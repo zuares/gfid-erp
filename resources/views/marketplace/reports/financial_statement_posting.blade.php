@@ -23,6 +23,25 @@
     <div class="alert alert-info d-flex gap-2 align-items-start"><i class="bi bi-info-circle-fill mt-1"></i><div><strong>Yang perlu dilakukan:</strong> pastikan periode dan angka sudah benar, cek balance <strong>Dr = Cr</strong>, lalu klik <strong>Post settlement ke jurnal</strong>. Proses ini membuat satu batch jurnal dan aman diulang.</div></div>
     <div class="alert alert-warning"><i class="bi bi-shield-lock me-1"></i> Posting hanya memasukkan settlement marketplace. HPP (Rp {{ $fmt($preview['excluded_from_gl']['hpp']) }}) dan iklan (Rp {{ $fmt($preview['excluded_from_gl']['ad_cost']) }}) tetap menjadi metrik subledger sampai sumber kredit/asetnya ditetapkan.</div>
 
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white fw-semibold">Mapping COA marketplace</div>
+        <div class="card-body py-2">
+            <div class="row g-2 small">
+                @foreach ($accountCodes as $key => $code)
+                    @php($account = $accountMappings->get($code))
+                    <div class="col-md-4 col-lg-3">
+                        <div class="border rounded p-2 h-100">
+                            <div class="text-muted">{{ str_replace('_', ' ', ucfirst($key)) }}</div>
+                            <code>{{ $code }}</code>
+                            <div>{{ $account?->name ?? 'Belum tersedia' }}</div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+            <div class="text-muted mt-2" style="font-size:.8rem;">Akun biaya rinci sudah disiapkan untuk Tahap 2. Preview dan posting saat ini masih memakai akun biaya gabungan sesuai aturan existing.</div>
+        </div>
+    </div>
+
     <div class="row g-3 mb-4">
         <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">Periode</div><strong>{{ $filters['date_from'] }} s/d {{ $filters['date_to'] }}</strong></div></div></div>
         <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">Order ready</div><strong>{{ $fmt($summary['order_count']) }}</strong></div></div></div>

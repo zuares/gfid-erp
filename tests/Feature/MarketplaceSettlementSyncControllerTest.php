@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\MarketplaceFinanceController;
 use App\Models\Channel;
-use App\Models\MarketplaceChannel;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderIncomeEstimate;
 use App\Models\MarketplaceOrderItem;
@@ -41,11 +40,11 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
     {
         $store = Store::create([
             'channel_id' => $this->shopee->id,
-            'code' => 'S-' . rand(1000, 9999),
+            'code' => 'S-'.rand(1000, 9999),
             'name' => 'Test Store',
             'status' => 'active',
             'is_active' => true,
-            'external_shop_id' => 'EXT-' . rand(100000, 999999),
+            'external_shop_id' => 'EXT-'.rand(100000, 999999),
             'credentials' => ['access_token' => 'dummy-token'],
             'token_expires_at' => now()->addDay(),
         ]);
@@ -61,9 +60,9 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
 
         if (! $channelId) {
             $channelId = DB::table('marketplace_channels')->insertGetId([
-                'code'       => $this->shopee->code,
-                'name'       => $this->shopee->name,
-                'is_active'  => true,
+                'code' => $this->shopee->code,
+                'name' => $this->shopee->name,
+                'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -72,13 +71,13 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         DB::table('marketplace_stores')->updateOrInsert(
             ['id' => $store->id],
             [
-                'channel_id'        => $channelId,
+                'channel_id' => $channelId,
                 'external_store_id' => $store->external_shop_id,
-                'name'              => $store->name,
-                'short_code'        => 'MKT-' . $store->id,
-                'is_active'         => true,
-                'created_at'        => now(),
-                'updated_at'        => now(),
+                'name' => $store->name,
+                'short_code' => 'MKT-'.$store->id,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]
         );
     }
@@ -89,7 +88,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $store = $this->createStore();
 
         $expectedFrom = now()->subMonthsNoOverflow(3)->startOfDay()->timestamp;
-        $expectedTo   = now()->endOfDay()->timestamp;
+        $expectedTo = now()->endOfDay()->timestamp;
 
         $this->mock(MarketplaceSyncService::class, function (MockInterface $mock) use ($store, $expectedFrom, $expectedTo) {
             $mock->shouldReceive('syncSettlementsBackfill')
@@ -115,7 +114,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
                 ]);
         });
 
-        $request = Request::create('/api/marketplace/stores/' . $store->id . '/sync-settlements', 'POST', [
+        $request = Request::create('/api/marketplace/stores/'.$store->id.'/sync-settlements', 'POST', [
             'backfill_months' => 3,
         ]);
 
@@ -140,7 +139,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             $mock->shouldNotReceive('syncSettlements');
         });
 
-        $request = Request::create('/api/marketplace/stores/' . $store->id . '/sync-settlements', 'POST', [
+        $request = Request::create('/api/marketplace/stores/'.$store->id.'/sync-settlements', 'POST', [
             'backfill_months' => 4,
         ]);
 
@@ -190,7 +189,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             'settlement_sync_error_code' => 'order_not_found',
             'settlement_sync_failed_at' => now(),
         ]);
-        Cache::put('marketplace:settlement_sync_progress:' . $store->id, [
+        Cache::put('marketplace:settlement_sync_progress:'.$store->id, [
             'status' => 'queued',
             'percent' => 2,
             'label' => 'Settlement sync untuk Greatfit.id sedang antre…',
@@ -206,7 +205,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ->assertJsonPath('deleted', 2);
 
         $this->assertSame(0, MarketplaceOrderSettlement::count());
-        $this->assertNull(Cache::get('marketplace:settlement_sync_progress:' . $store->id));
+        $this->assertNull(Cache::get('marketplace:settlement_sync_progress:'.$store->id));
         $this->assertSame(0, MarketplaceSyncLog::where('action', 'sync_settlements')->count());
         $this->assertSame(1, MarketplaceSyncLog::where('action', 'sync_orders')->count());
         $this->assertNull(\DB::table('marketplace_orders')->where('channel_order_id', 'ORD-001')->value('settlement_sync_error_code'));
@@ -521,15 +520,15 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        Cache::put('marketplace:settlement_sync_progress:' . $store->id, [
+        Cache::put('marketplace:settlement_sync_progress:'.$store->id, [
             'status' => 'queued',
             'percent' => 2,
-            'label' => 'Settlement sync untuk ' . $store->name . ' sedang antre…',
+            'label' => 'Settlement sync untuk '.$store->name.' sedang antre…',
             'store_id' => $store->id,
             'store_name' => $store->name,
         ], 1800);
 
-        Cache::put('marketplace:sync_progress:' . $store->id, [
+        Cache::put('marketplace:sync_progress:'.$store->id, [
             'status' => 'running',
             'percent' => 42,
             'label' => 'Sync orders berjalan…',
@@ -537,7 +536,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             'store_name' => $store->name,
         ], 1800);
 
-        $request = Request::create('/api/marketplace/stores/' . $store->id . '/purge-marketplace-data', 'POST', [
+        $request = Request::create('/api/marketplace/stores/'.$store->id.'/purge-marketplace-data', 'POST', [
             'confirm' => 'HAPUS SEMUA DATA MARKETPLACE',
         ]);
         $request->setUserResolver(fn () => $owner);
@@ -584,8 +583,8 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame(0, DB::table('marketplace_boost_pool')->where('store_id', $store->id)->count());
         $this->assertSame(0, DB::table('marketplace_boost_logs')->where('store_id', $store->id)->count());
         $this->assertSame(0, DB::table('mp_incomes')->where('store_id', $store->id)->count());
-        $this->assertNull(Cache::get('marketplace:settlement_sync_progress:' . $store->id));
-        $this->assertNull(Cache::get('marketplace:sync_progress:' . $store->id));
+        $this->assertNull(Cache::get('marketplace:settlement_sync_progress:'.$store->id));
+        $this->assertNull(Cache::get('marketplace:sync_progress:'.$store->id));
         $this->assertSame(1, MarketplaceOrderSettlement::where('store_id', $otherStore->id)->count());
     }
 
@@ -818,14 +817,15 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
 
         Artisan::shouldReceive('queue')
             ->once()
-            ->andReturn(new class {
+            ->andReturn(new class
+            {
                 public function onQueue($queue)
                 {
                     return $this;
                 }
             });
 
-        $request = Request::create('/api/marketplace/stores/' . $store->id . '/sync-settlements-background', 'POST');
+        $request = Request::create('/api/marketplace/stores/'.$store->id.'/sync-settlements-background', 'POST');
 
         $response = app(MarketplaceController::class)->syncSettlementsBackground($request, $store);
 
@@ -834,7 +834,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame('queued', $payload['status']);
         $this->assertSame('regular', $payload['mode']);
 
-        $progress = Cache::get('marketplace:settlement_sync_progress:' . $store->id);
+        $progress = Cache::get('marketplace:settlement_sync_progress:'.$store->id);
         $this->assertSame('queued', $progress['status'] ?? null);
         $this->assertSame('regular', $progress['mode'] ?? null);
     }
@@ -844,7 +844,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
         $store = Store::create([
             'channel_id' => $tiktok->id,
-            'code' => 'TT-' . rand(1000, 9999),
+            'code' => 'TT-'.rand(1000, 9999),
             'name' => 'TikTok Test Store',
             'status' => 'active',
             'is_active' => true,
@@ -852,12 +852,12 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             'token_expires_at' => now()->addDay(),
         ]);
 
-        $request = Request::create('/api/marketplace/stores/' . $store->id . '/sync-settlements-background', 'POST');
+        $request = Request::create('/api/marketplace/stores/'.$store->id.'/sync-settlements-background', 'POST');
         $response = app(MarketplaceController::class)->syncSettlementsBackground($request, $store);
 
         $this->assertSame(422, $response->getStatusCode());
         $this->assertSame('SETTLEMENT_CHANNEL_UNSUPPORTED', $response->getData(true)['code']);
-        $this->assertNull(Cache::get('marketplace:settlement_sync_progress:' . $store->id));
+        $this->assertNull(Cache::get('marketplace:settlement_sync_progress:'.$store->id));
     }
 
     public function test_settlement_sync_menolak_toko_nonaktif_sebelum_membuat_progress()
@@ -865,12 +865,12 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $store = $this->createStore();
         $store->update(['is_active' => false]);
 
-        $request = Request::create('/api/marketplace/stores/' . $store->id . '/sync-settlements-background', 'POST');
+        $request = Request::create('/api/marketplace/stores/'.$store->id.'/sync-settlements-background', 'POST');
         $response = app(MarketplaceController::class)->syncSettlementsBackground($request, $store->fresh());
 
         $this->assertSame(409, $response->getStatusCode());
         $this->assertSame('STORE_INACTIVE', $response->getData(true)['code']);
-        $this->assertNull(Cache::get('marketplace:settlement_sync_progress:' . $store->id));
+        $this->assertNull(Cache::get('marketplace:settlement_sync_progress:'.$store->id));
     }
 
     public function test_sync_settlement_reguler_menyimpan_status_terminal_di_progress()
@@ -894,11 +894,11 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
                 ]);
         });
 
-        $request = Request::create('/api/marketplace/stores/' . $store->id . '/sync-settlements', 'POST');
+        $request = Request::create('/api/marketplace/stores/'.$store->id.'/sync-settlements', 'POST');
         $response = app(MarketplaceController::class)->syncSettlements($request, $store);
 
         $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame('warn', Cache::get('marketplace:settlement_sync_progress:' . $store->id)['status']);
+        $this->assertSame('warn', Cache::get('marketplace:settlement_sync_progress:'.$store->id)['status']);
     }
 
     public function test_riwayat_settlement_hanya_mengembalikan_log_toko_yang_diminta()
@@ -943,14 +943,15 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
 
         Artisan::shouldReceive('queue')
             ->once()
-            ->andReturn(new class {
+            ->andReturn(new class
+            {
                 public function onQueue($queue)
                 {
                     return $this;
                 }
             });
 
-        $request = Request::create('/api/marketplace/stores/' . $store->id . '/sync-settlements-background', 'POST', [
+        $request = Request::create('/api/marketplace/stores/'.$store->id.'/sync-settlements-background', 'POST', [
             'backfill_months' => 2,
         ]);
 
@@ -960,9 +961,9 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $payload = $response->getData(true);
         $this->assertSame('queued', $payload['status']);
         $this->assertSame('backfill', $payload['mode']);
-        $this->assertSame('marketplace:settlement_sync_progress:' . $store->id, $payload['progress_key'] ?? null);
+        $this->assertSame('marketplace:settlement_sync_progress:'.$store->id, $payload['progress_key'] ?? null);
 
-        $progress = Cache::get('marketplace:settlement_sync_progress:' . $store->id);
+        $progress = Cache::get('marketplace:settlement_sync_progress:'.$store->id);
         $this->assertSame('queued', $progress['status'] ?? null);
         $this->assertSame('backfill', $progress['mode'] ?? null);
         $this->assertSame(2, $progress['backfill_months'] ?? null);
@@ -981,14 +982,15 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
 
         Artisan::shouldReceive('queue')
             ->once()
-            ->andReturn(new class {
+            ->andReturn(new class
+            {
                 public function onQueue($queue)
                 {
                     return $this;
                 }
             });
 
-        $request = Request::create('/api/marketplace/stores/' . $store->id . '/sync-settlements-background', 'POST');
+        $request = Request::create('/api/marketplace/stores/'.$store->id.'/sync-settlements-background', 'POST');
 
         $response = app(MarketplaceController::class)->syncSettlementsBackground($request, $store);
 
@@ -1001,7 +1003,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
     {
         $store = $this->createStore();
 
-        Cache::put('marketplace:settlement_sync_progress:' . $store->id, [
+        Cache::put('marketplace:settlement_sync_progress:'.$store->id, [
             'status' => 'running',
             'percent' => 42,
             'label' => 'Memproses settlement 42%',
@@ -1236,7 +1238,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ],
         ]);
 
-        $request = Request::create('/marketplace/orders/' . $order->id . '/test-settlement-fields', 'POST', [
+        $request = Request::create('/marketplace/orders/'.$order->id.'/test-settlement-fields', 'POST', [
             'order_ams_commission_fee' => 4754,
             'voucher_from_shopee' => 20078,
             'voucher_from_seller' => 0,
@@ -1608,6 +1610,41 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertEqualsWithDelta(206321.0, (float) $payload['meta']['total_income_belum_cair'], 0.01);
     }
 
+    public function test_subtab_sedang_dikemas_hanya_mengembalikan_order_belum_dikirim(): void
+    {
+        $store = $this->createStore();
+        foreach ([
+            ['id' => 'ORDER-PACKED', 'status' => 'READY_TO_SHIP', 'payment_method' => 'COD'],
+            ['id' => 'ORDER-PROCESSED', 'status' => 'PROCESSED'],
+            ['id' => 'ORDER-SHIPPED', 'status' => 'SHIPPED'],
+        ] as $row) {
+            MarketplaceOrder::create([
+                'store_id' => $store->id,
+                'external_order_id' => 'EXT-'.$row['id'],
+                'channel_order_id' => $row['id'],
+                'order_status' => $row['status'],
+                'payment_method' => $row['payment_method'] ?? null,
+                'ordered_at' => now()->subDay(),
+                'order_date' => now()->subDay(),
+                'subtotal_items' => 100000,
+                'total_paid_customer' => 100000,
+            ]);
+        }
+
+        $request = Request::create('/api/marketplace/settlements', 'GET', [
+            'store_id' => $store->id,
+            'tab' => 'belum_cair',
+            'sub_tab' => 'packed',
+            'page' => 1,
+            'per_page' => 50,
+        ]);
+        $payload = app(MarketplaceController::class)->settlements($request)->getData(true);
+        $ids = collect($payload['paginator']['data'])->pluck('channel_order_id')->all();
+
+        $this->assertSame(['ORDER-PACKED', 'ORDER-PROCESSED'], $ids);
+        $this->assertSame('COD', $payload['paginator']['data'][0]['payment_method']);
+    }
+
     public function test_filter_tanggal_belum_cair_memakai_estimated_payout_at(): void
     {
         Carbon::setTestNow('2026-08-26 10:00:00');
@@ -1740,7 +1777,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         });
 
         $response = app(MarketplaceController::class)->syncIncomeDetails(
-            Request::create('/api/marketplace/stores/' . $store->id . '/sync-income-details', 'POST', [
+            Request::create('/api/marketplace/stores/'.$store->id.'/sync-income-details', 'POST', [
                 'page_size' => 50,
             ]),
             $store,

@@ -4,39 +4,37 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\SyncOrdersRequest;
 use App\Models\Channel;
+use App\Models\Item;
 use App\Models\ItemCostSnapshot;
 use App\Models\MarketplaceAdCampaign;
 use App\Models\MarketplaceAdGroup;
 use App\Models\MarketplaceAdItemMap;
 use App\Models\MarketplaceOrder;
-use App\Models\Item;
-use App\Models\MarketplaceProduct;
-use App\Models\MarketplacePromotion;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
+use App\Models\MarketplaceProduct;
+use App\Models\MarketplacePromotion;
 use App\Models\MarketplaceSyncLog;
 use App\Models\OrderFulfillment;
 use App\Models\SkuMapping;
 use App\Models\Store;
 use App\Models\Warehouse;
-use App\Services\Marketplace\MarketplaceApiGateway;
-use App\Services\Marketplace\MarketplaceAnalyticsSummaryService;
 use App\Services\Marketplace\Ads\ItemHppResolver;
-use App\Services\Channels\ChannelManager;
-use App\Support\GmvMaxAnalytics;
+use App\Services\Marketplace\MarketplaceAnalyticsSummaryService;
+use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\MarketplaceIssueService;
 use App\Services\MarketplaceSyncService;
 use App\Services\OrderFulfillmentService;
+use App\Support\GmvMaxAnalytics;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
 
 class MarketplaceController extends Controller
 {
@@ -46,7 +44,7 @@ class MarketplaceController extends Controller
         protected MarketplaceSyncService $sync,
         protected MarketplaceApiGateway $gateway,
         protected OrderFulfillmentService $fulfillment,
-        protected MarketplaceIssueService $issueService = new MarketplaceIssueService(),
+        protected MarketplaceIssueService $issueService = new MarketplaceIssueService,
     ) {}
 
     // ─── Pages ────────────────────────────────────────────────────────────────
@@ -58,11 +56,11 @@ class MarketplaceController extends Controller
 
     public function orders(Request $request): \Illuminate\View\View
     {
-        $today   = now()->toDateString();
+        $today = now()->toDateString();
         $weekAgo = now()->subDays(6)->toDateString();
         $filters = [
             'date_from' => $request->query('date_from', $weekAgo),
-            'date_to'   => $request->query('date_to', $today),
+            'date_to' => $request->query('date_to', $today),
         ];
         $isDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
 
@@ -71,12 +69,12 @@ class MarketplaceController extends Controller
 
     public function webhookTests(Request $request): \Illuminate\View\View
     {
-        $today   = now()->toDateString();
+        $today = now()->toDateString();
         $weekAgo = now()->subDays(6)->toDateString();
         $filters = [
             'date_from' => $request->query('date_from', $weekAgo),
-            'date_to'   => $request->query('date_to', $today),
-            'store_id'  => $request->query('store_id'),
+            'date_to' => $request->query('date_to', $today),
+            'store_id' => $request->query('store_id'),
             'compare_mode' => $request->query('compare_mode', 'prev_period'),
         ];
         $isDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
@@ -109,28 +107,17 @@ class MarketplaceController extends Controller
         return view('marketplace.sync');
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
     public function analytics(Request $request): \Illuminate\View\View
     {
-        $today     = now()->toDateString();
+        $today = now()->toDateString();
         $monthFrom = now()->startOfMonth()->toDateString();
         $filters = [
             'date_from' => $request->query('date_from', $monthFrom),
-            'date_to'   => $request->query('date_to', $today),
-            'store_id'  => $request->query('store_id'),
+            'date_to' => $request->query('date_to', $today),
+            'store_id' => $request->query('store_id'),
             'compare_mode' => $request->query('compare_mode', 'prev_period'),
         ];
+
         return view('marketplace.analytics', compact('filters'));
     }
 
@@ -210,30 +197,6 @@ class MarketplaceController extends Controller
         return view('marketplace.ads');
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     // ─── API ──────────────────────────────────────────────────────────────────
 
     public function bootstrap(): JsonResponse
@@ -241,7 +204,7 @@ class MarketplaceController extends Controller
         $channels = $this->sync->bootstrapChannels();
 
         return response()->json([
-            'message'  => 'Channel default berhasil dibuat.',
+            'message' => 'Channel default berhasil dibuat.',
             'channels' => $channels,
         ]);
     }
@@ -256,28 +219,28 @@ class MarketplaceController extends Controller
     public function stores(): JsonResponse
     {
         $stores = Store::with(['channel', 'defaultWarehouse'])->latest()->get()->map(fn (Store $store) => [
-            'id'                   => $store->id,
-            'channel_id'           => $store->channel_id,
-            'code'                 => $store->code,
-            'name'                 => $store->name,
-            'external_shop_id'     => $store->external_shop_id,
-            'region'               => $store->region,
-            'status'               => $store->status,
-            'is_active'            => (bool) $store->is_active,
-            'connection_status'    => $store->connection_status,
-            'token_expires_at'     => $store->token_expires_at?->toISOString(),
-            'last_synced_at'       => $store->last_synced_at?->toISOString(),
-            'meta'                 => $store->meta,
+            'id' => $store->id,
+            'channel_id' => $store->channel_id,
+            'code' => $store->code,
+            'name' => $store->name,
+            'external_shop_id' => $store->external_shop_id,
+            'region' => $store->region,
+            'status' => $store->status,
+            'is_active' => (bool) $store->is_active,
+            'connection_status' => $store->connection_status,
+            'token_expires_at' => $store->token_expires_at?->toISOString(),
+            'last_synced_at' => $store->last_synced_at?->toISOString(),
+            'meta' => $store->meta,
             'default_warehouse_id' => $store->default_warehouse_id,
-            'default_warehouse'    => $store->defaultWarehouse ? [
-                'id'   => $store->defaultWarehouse->id,
+            'default_warehouse' => $store->defaultWarehouse ? [
+                'id' => $store->defaultWarehouse->id,
                 'code' => $store->defaultWarehouse->code,
                 'name' => $store->defaultWarehouse->name,
             ] : null,
             'channel' => $store->channel ? [
-                'id'     => $store->channel->id,
-                'code'   => $store->channel->code,
-                'name'   => $store->channel->name,
+                'id' => $store->channel->id,
+                'code' => $store->channel->code,
+                'name' => $store->channel->name,
                 'status' => $store->channel->status,
             ] : null,
         ]);
@@ -288,10 +251,10 @@ class MarketplaceController extends Controller
     public function storeStore(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'channel_id'           => ['required', 'integer', 'exists:channels,id'],
-            'name'                 => ['required', 'string', 'min:1', 'max:120'],
-            'code'                 => ['nullable', 'string', 'max:80'],
-            'region'               => ['nullable', 'string', 'max:32'],
+            'channel_id' => ['required', 'integer', 'exists:channels,id'],
+            'name' => ['required', 'string', 'min:1', 'max:120'],
+            'code' => ['nullable', 'string', 'max:80'],
+            'region' => ['nullable', 'string', 'max:32'],
             'default_warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
         ]);
 
@@ -303,18 +266,18 @@ class MarketplaceController extends Controller
         $code = $baseCode;
         $suffix = 2;
         while (Store::where('code', $code)->exists()) {
-            $suffixText = '-' . $suffix++;
-            $code = Str::limit($baseCode, 80 - strlen($suffixText), '') . $suffixText;
+            $suffixText = '-'.$suffix++;
+            $code = Str::limit($baseCode, 80 - strlen($suffixText), '').$suffixText;
         }
 
         $store = Store::create([
-            'code'                 => $code,
-            'name'                 => trim($data['name']),
-            'channel_id'           => $channel->id,
-            'region'               => $data['region'] ?? null,
+            'code' => $code,
+            'name' => trim($data['name']),
+            'channel_id' => $channel->id,
+            'region' => $data['region'] ?? null,
             'default_warehouse_id' => $data['default_warehouse_id'] ?? null,
-            'status'               => 'active',
-            'is_active'            => true,
+            'status' => 'active',
+            'is_active' => true,
         ]);
 
         return response()->json([
@@ -333,12 +296,12 @@ class MarketplaceController extends Controller
     public function promotionsIndex(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'store_id'         => ['nullable', 'integer', 'exists:stores,id'],
-            'status'           => ['nullable', 'string', 'in:all,ongoing,upcoming,ended'],
-            'page_no'          => ['nullable', 'integer', 'min:1'],
-            'page_size'        => ['nullable', 'integer', 'min:1', 'max:100'],
+            'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'status' => ['nullable', 'string', 'in:all,ongoing,upcoming,ended'],
+            'page_no' => ['nullable', 'integer', 'min:1'],
+            'page_size' => ['nullable', 'integer', 'min:1', 'max:100'],
             'update_time_from' => ['nullable', 'integer'],
-            'update_time_to'   => ['nullable', 'integer'],
+            'update_time_to' => ['nullable', 'integer'],
         ]);
 
         $store = $this->resolvePromotionStore($data['store_id'] ?? null);
@@ -357,7 +320,7 @@ class MarketplaceController extends Controller
         $updateTimeTo = $data['update_time_to'] ?? null;
 
         try {
-                        $responses = [];
+            $responses = [];
             $promotions = [];
             $statuses = $status === 'all' ? ['ongoing', 'upcoming', 'ended'] : [$status];
 
@@ -373,12 +336,13 @@ class MarketplaceController extends Controller
 
                 if (! empty($response['error'])) {
                     $message = $this->promotionAuthErrorMessage($response, 'Gagal memuat data promosi.');
+
                     return response()->json([
                         'success' => false,
                         'message' => $message,
-                        'code'    => $this->isShopeeAuthError($response) ? 'auth_required' : null,
-                        'store'   => $this->normalizeStorePayload($store),
-                        'raw'     => $response,
+                        'code' => $this->isShopeeAuthError($response) ? 'auth_required' : null,
+                        'store' => $this->normalizeStorePayload($store),
+                        'raw' => $response,
                     ], 422);
                 }
 
@@ -400,19 +364,19 @@ class MarketplaceController extends Controller
             $promotions = $this->enrichPromotionCampaignsWithLocalPreview($store, $promotions);
 
             return response()->json([
-                'success'    => true,
-                'message'    => 'Daftar promosi berhasil dimuat.',
-                'store'      => $this->normalizeStorePayload($store),
-                'status'     => $status,
+                'success' => true,
+                'message' => 'Daftar promosi berhasil dimuat.',
+                'store' => $this->normalizeStorePayload($store),
+                'status' => $status,
                 'promotions' => $promotions,
-                'count'      => count($promotions),
-                'raw'        => $status === 'all' ? $responses : ($responses[$status] ?? null),
+                'count' => count($promotions),
+                'raw' => $status === 'all' ? $responses : ($responses[$status] ?? null),
             ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
-                'store'   => $this->normalizeStorePayload($store),
+                'store' => $this->normalizeStorePayload($store),
             ], 500);
         }
     }
@@ -420,10 +384,10 @@ class MarketplaceController extends Controller
     public function promotionsSummaryData(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'store_id'  => ['nullable', 'string'],
-            'status'    => ['nullable', 'string', 'in:all,ongoing,upcoming,ended,suspended'],
+            'store_id' => ['nullable', 'string'],
+            'status' => ['nullable', 'string', 'in:all,ongoing,upcoming,ended,suspended'],
             'date_from' => ['nullable', 'date'],
-            'date_to'   => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date'],
         ]);
 
         $stores = $this->resolvePromotionStores(
@@ -460,19 +424,20 @@ class MarketplaceController extends Controller
 
         try {
             foreach ($stores as $store) {
-                                $storeRows = [];
+                $storeRows = [];
 
                 foreach ($statuses as $statusItem) {
                     $response = $this->gateway->getDiscountList($store, $statusItem, 1, 100, null, null);
 
                     if (! empty($response['error'])) {
                         $message = $this->promotionAuthErrorMessage($response, 'Gagal memuat ringkasan promosi.');
+
                         return response()->json([
                             'success' => false,
                             'message' => $message,
-                            'code'    => $this->isShopeeAuthError($response) ? 'auth_required' : null,
-                            'store'   => $this->normalizeStorePayload($store),
-                            'raw'     => $response,
+                            'code' => $this->isShopeeAuthError($response) ? 'auth_required' : null,
+                            'store' => $this->normalizeStorePayload($store),
+                            'raw' => $response,
                         ], 422);
                     }
 
@@ -525,10 +490,10 @@ class MarketplaceController extends Controller
                 'success' => true,
                 'message' => 'Ringkasan promosi berhasil dimuat.',
                 'filters' => [
-                    'store_id'  => $data['store_id'] ?? 'all',
-                    'status'    => $status,
+                    'store_id' => $data['store_id'] ?? 'all',
+                    'status' => $status,
                     'date_from' => $data['date_from'] ?? null,
-                    'date_to'   => $data['date_to'] ?? null,
+                    'date_to' => $data['date_to'] ?? null,
                 ],
                 'rows' => $rows,
                 'store_summaries' => $storeSummaries,
@@ -554,11 +519,11 @@ class MarketplaceController extends Controller
                 $cached = $this->getCachedPromotionDetail($store, $discountId);
                 if ($cached) {
                     return response()->json([
-                        'success'   => true,
-                        'message'   => 'Detail promosi dimuat dari cache lokal.',
-                        'store'     => $this->normalizeStorePayload($store),
+                        'success' => true,
+                        'message' => 'Detail promosi dimuat dari cache lokal.',
+                        'store' => $this->normalizeStorePayload($store),
                         'promotion' => $cached['promotion'],
-                        'cached'    => true,
+                        'cached' => true,
                         'cached_at' => $cached['cached_at'],
                     ]);
                 }
@@ -570,28 +535,28 @@ class MarketplaceController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => $response['message'] ?? $response['error'] ?? 'Gagal memuat detail promosi.',
-                    'store'   => $this->normalizeStorePayload($store),
-                    'raw'     => $response,
+                    'store' => $this->normalizeStorePayload($store),
+                    'raw' => $response,
                 ], 422);
             }
 
             return response()->json([
-                'success'   => true,
-                'message'   => 'Detail promosi berhasil dimuat.',
-                'store'     => $this->normalizeStorePayload($store),
+                'success' => true,
+                'message' => 'Detail promosi berhasil dimuat.',
+                'store' => $this->normalizeStorePayload($store),
                 'promotion' => $this->storePromotionDetailCache(
                     $store,
                     $discountId,
                     $this->normalizePromotionDetail($response, $store, $discountId)
                 ),
-                'cached'    => false,
-                'raw'       => $response,
+                'cached' => false,
+                'raw' => $response,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
-                'store'   => $this->normalizeStorePayload($store),
+                'store' => $this->normalizeStorePayload($store),
             ], 500);
         }
     }
@@ -599,11 +564,11 @@ class MarketplaceController extends Controller
     public function promotionCreate(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'store_id'      => ['required', 'integer', 'exists:stores,id'],
+            'store_id' => ['required', 'integer', 'exists:stores,id'],
             'discount_name' => ['required', 'string', 'max:255'],
-            'start_time'    => ['required', 'integer'],
-            'end_time'      => ['required', 'integer', 'gte:start_time'],
-            'item_list'     => ['nullable'],
+            'start_time' => ['required', 'integer'],
+            'end_time' => ['required', 'integer', 'gte:start_time'],
+            'item_list' => ['nullable'],
             'duplicate_from_discount_id' => ['nullable', 'integer'],
         ]);
 
@@ -611,7 +576,7 @@ class MarketplaceController extends Controller
         $itemList = $this->normalizePromotionItemList($data['item_list'] ?? []);
 
         try {
-                        $createResponse = $this->gateway->addDiscount(
+            $createResponse = $this->gateway->addDiscount(
                 $store,
                 $data['discount_name'],
                 (int) $data['start_time'],
@@ -622,8 +587,8 @@ class MarketplaceController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => $createResponse['message'] ?? $createResponse['error'] ?? 'Gagal membuat promosi.',
-                    'store'   => $this->normalizeStorePayload($store),
-                    'raw'     => $createResponse,
+                    'store' => $this->normalizeStorePayload($store),
+                    'raw' => $createResponse,
                 ], 422);
             }
 
@@ -663,30 +628,30 @@ class MarketplaceController extends Controller
 
             if (! empty($itemsResponse['error'])) {
                 return response()->json([
-                    'success'     => false,
-                    'message'     => $itemsResponse['message'] ?? $itemsResponse['error'] ?? 'Promosi dibuat, tetapi item gagal ditambahkan.',
-                    'store'       => $this->normalizeStorePayload($store),
+                    'success' => false,
+                    'message' => $itemsResponse['message'] ?? $itemsResponse['error'] ?? 'Promosi dibuat, tetapi item gagal ditambahkan.',
+                    'store' => $this->normalizeStorePayload($store),
                     'discount_id' => $discountId,
-                    'create'      => $createResponse,
-                    'items'       => $itemsResponse,
+                    'create' => $createResponse,
+                    'items' => $itemsResponse,
                 ], 422);
             }
 
             return response()->json([
-                'success'     => true,
-                'message'     => $discountId && ! empty($itemList)
+                'success' => true,
+                'message' => $discountId && ! empty($itemList)
                     ? 'Promosi berhasil dibuat dan item sudah ditambahkan.'
                     : 'Promosi berhasil dibuat.',
-                'store'       => $this->normalizeStorePayload($store),
+                'store' => $this->normalizeStorePayload($store),
                 'discount_id' => $discountId,
-                'create'      => $createResponse,
-                'items'       => $itemsResponse,
+                'create' => $createResponse,
+                'items' => $itemsResponse,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
-                'store'   => $this->normalizeStorePayload($store),
+                'store' => $this->normalizeStorePayload($store),
             ], 500);
         }
     }
@@ -696,9 +661,9 @@ class MarketplaceController extends Controller
         $store = $this->resolvePromotionStoreBinding($store);
         $data = $request->validate([
             'discount_name' => ['nullable', 'string', 'max:255'],
-            'start_time'    => ['nullable', 'integer'],
-            'end_time'      => ['nullable', 'integer'],
-            'item_list'     => ['nullable'],
+            'start_time' => ['nullable', 'integer'],
+            'end_time' => ['nullable', 'integer'],
+            'item_list' => ['nullable'],
         ]);
 
         $itemList = $this->normalizePromotionItemList($data['item_list'] ?? []);
@@ -723,12 +688,12 @@ class MarketplaceController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Tidak ada perubahan yang dikirim.',
-                'store'   => $this->normalizeStorePayload($store),
+                'store' => $this->normalizeStorePayload($store),
             ], 422);
         }
 
         try {
-                        $updateResponse = null;
+            $updateResponse = null;
             $itemsResponse = null;
 
             if ($shouldUpdateMeta) {
@@ -744,8 +709,8 @@ class MarketplaceController extends Controller
                     return response()->json([
                         'success' => false,
                         'message' => $updateResponse['message'] ?? $updateResponse['error'] ?? 'Gagal memperbarui promosi.',
-                        'store'   => $this->normalizeStorePayload($store),
-                        'raw'     => $updateResponse,
+                        'store' => $this->normalizeStorePayload($store),
+                        'raw' => $updateResponse,
                     ], 422);
                 }
             }
@@ -779,9 +744,9 @@ class MarketplaceController extends Controller
                     return response()->json([
                         'success' => false,
                         'message' => $itemsResponse['message'] ?? $itemsResponse['error'] ?? 'Promosi diperbarui, tetapi item gagal disimpan.',
-                        'store'   => $this->normalizeStorePayload($store),
-                        'update'  => $updateResponse,
-                        'items'   => $itemsResponse,
+                        'store' => $this->normalizeStorePayload($store),
+                        'update' => $updateResponse,
+                        'items' => $itemsResponse,
                     ], 422);
                 }
             }
@@ -820,15 +785,15 @@ class MarketplaceController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Promosi berhasil diperbarui.',
-                'store'   => $this->normalizeStorePayload($store),
-                'update'  => $updateResponse,
-                'items'   => $itemsResponse,
+                'store' => $this->normalizeStorePayload($store),
+                'update' => $updateResponse,
+                'items' => $itemsResponse,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
-                'store'   => $this->normalizeStorePayload($store),
+                'store' => $this->normalizeStorePayload($store),
             ], 500);
         }
     }
@@ -843,8 +808,8 @@ class MarketplaceController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => $response['message'] ?? $response['error'] ?? 'Gagal menutup promosi.',
-                    'store'   => $this->normalizeStorePayload($store),
-                    'raw'     => $response,
+                    'store' => $this->normalizeStorePayload($store),
+                    'raw' => $response,
                 ], 422);
             }
 
@@ -864,14 +829,14 @@ class MarketplaceController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Promosi berhasil ditutup.',
-                'store'   => $this->normalizeStorePayload($store),
-                'raw'     => $response,
+                'store' => $this->normalizeStorePayload($store),
+                'raw' => $response,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
-                'store'   => $this->normalizeStorePayload($store),
+                'store' => $this->normalizeStorePayload($store),
             ], 500);
         }
     }
@@ -896,8 +861,8 @@ class MarketplaceController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => $response['message'] ?? $response['error'] ?? 'Gagal mengaktifkan promosi.',
-                    'store'   => $this->normalizeStorePayload($store),
-                    'raw'     => $response,
+                    'store' => $this->normalizeStorePayload($store),
+                    'raw' => $response,
                 ], 422);
             }
 
@@ -929,14 +894,14 @@ class MarketplaceController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Promosi berhasil diaktifkan sekarang.',
-                'store'   => $this->normalizeStorePayload($store),
-                'raw'     => $response,
+                'store' => $this->normalizeStorePayload($store),
+                'raw' => $response,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
-                'store'   => $this->normalizeStorePayload($store),
+                'store' => $this->normalizeStorePayload($store),
             ], 500);
         }
     }
@@ -959,8 +924,8 @@ class MarketplaceController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => $response['message'] ?? $response['error'] ?? 'Gagal menonaktifkan promosi.',
-                    'store'   => $this->normalizeStorePayload($store),
-                    'raw'     => $response,
+                    'store' => $this->normalizeStorePayload($store),
+                    'raw' => $response,
                 ], 422);
             }
 
@@ -995,14 +960,14 @@ class MarketplaceController extends Controller
                 'message' => $data['current_status'] === 'ongoing'
                     ? 'Promosi berhasil dinonaktifkan.'
                     : 'Promosi yang belum aktif berhasil dihapus.',
-                'store'   => $this->normalizeStorePayload($store),
-                'raw'     => $response,
+                'store' => $this->normalizeStorePayload($store),
+                'raw' => $response,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
-                'store'   => $this->normalizeStorePayload($store),
+                'store' => $this->normalizeStorePayload($store),
             ], 500);
         }
     }
@@ -1017,8 +982,8 @@ class MarketplaceController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => $response['message'] ?? $response['error'] ?? 'Gagal menghapus promosi.',
-                    'store'   => $this->normalizeStorePayload($store),
-                    'raw'     => $response,
+                    'store' => $this->normalizeStorePayload($store),
+                    'raw' => $response,
                 ], 422);
             }
 
@@ -1037,14 +1002,14 @@ class MarketplaceController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Promosi berhasil dihapus.',
-                'store'   => $this->normalizeStorePayload($store),
-                'raw'     => $response,
+                'store' => $this->normalizeStorePayload($store),
+                'raw' => $response,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
-                'store'   => $this->normalizeStorePayload($store),
+                'store' => $this->normalizeStorePayload($store),
             ], 500);
         }
     }
@@ -1061,7 +1026,7 @@ class MarketplaceController extends Controller
     {
         $store = $this->resolvePromotionStoreBinding($store);
         $data = $request->validate([
-            'item_id'  => ['required', 'integer'],
+            'item_id' => ['required', 'integer'],
             'model_id' => ['nullable', 'integer'],
         ]);
 
@@ -1077,22 +1042,22 @@ class MarketplaceController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => $response['message'] ?? $response['error'] ?? 'Gagal menghapus item dari promosi.',
-                    'store'   => $this->normalizeStorePayload($store),
-                    'raw'     => $response,
+                    'store' => $this->normalizeStorePayload($store),
+                    'raw' => $response,
                 ], 422);
             }
 
             return response()->json([
                 'success' => true,
                 'message' => 'Item berhasil dihapus dari promosi.',
-                'store'   => $this->normalizeStorePayload($store),
-                'raw'     => $response,
+                'store' => $this->normalizeStorePayload($store),
+                'raw' => $response,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
-                'store'   => $this->normalizeStorePayload($store),
+                'store' => $this->normalizeStorePayload($store),
             ], 500);
         }
     }
@@ -1264,6 +1229,7 @@ class MarketplaceController extends Controller
     {
         if ($storeId) {
             $store = Store::with('channel')->find($storeId);
+
             return $this->isPromotionFilterableStore($store) ? $store : null;
         }
 
@@ -1286,6 +1252,7 @@ class MarketplaceController extends Controller
     {
         if ($storeId) {
             $store = Store::with('channel')->find($storeId);
+
             return $this->isPromotionFilterableStore($store) ? collect([$store]) : collect();
         }
 
@@ -1383,18 +1350,18 @@ class MarketplaceController extends Controller
         $status = (string) (data_get($discount, 'discount_status') ?? data_get($discount, 'status') ?? '');
 
         return [
-            'discount_id'   => (int) (data_get($discount, 'discount_id') ?? 0),
+            'discount_id' => (int) (data_get($discount, 'discount_id') ?? 0),
             'discount_name' => (string) (data_get($discount, 'discount_name') ?? data_get($discount, 'name') ?? ''),
             'discount_status' => $status ?: null,
-            'status_label'  => $this->formatPromotionStatus($status),
-            'start_time'    => $startTime ?: null,
-            'start_label'   => $this->formatPromotionTimestamp($startTime),
-            'end_time'      => $endTime ?: null,
-            'end_label'     => $this->formatPromotionTimestamp($endTime),
-            'update_time'   => $updateTime ?: null,
-            'update_label'  => $this->formatPromotionTimestamp($updateTime),
-            'item_count'    => (int) (data_get($discount, 'item_count') ?? count($itemList)),
-            'raw'           => $discount,
+            'status_label' => $this->formatPromotionStatus($status),
+            'start_time' => $startTime ?: null,
+            'start_label' => $this->formatPromotionTimestamp($startTime),
+            'end_time' => $endTime ?: null,
+            'end_label' => $this->formatPromotionTimestamp($endTime),
+            'update_time' => $updateTime ?: null,
+            'update_label' => $this->formatPromotionTimestamp($updateTime),
+            'item_count' => (int) (data_get($discount, 'item_count') ?? count($itemList)),
+            'raw' => $discount,
         ];
     }
 
@@ -1521,7 +1488,7 @@ class MarketplaceController extends Controller
             $itemId = (string) ($item['item_id'] ?? '');
             $head = $itemId !== '' ? $itemId : '—';
             if ($itemLabel !== '') {
-                $head .= ' • ' . Str::limit($itemLabel, 26);
+                $head .= ' • '.Str::limit($itemLabel, 26);
             }
 
             $variants = [];
@@ -1541,20 +1508,20 @@ class MarketplaceController extends Controller
                     $label = $variantId !== '' ? $variantId : 'variant';
                 }
                 if ($skuCode !== '') {
-                    $label .= ' [' . $skuCode . ']';
+                    $label .= ' ['.$skuCode.']';
                 }
                 $variants[] = $label;
             }
 
             if (count(($item['model_list'] ?? [])) > $maxVariants) {
-                $variants[] = '+' . (count($item['model_list']) - $maxVariants);
+                $variants[] = '+'.(count($item['model_list']) - $maxVariants);
             }
 
-            $chunks[] = $head . ' | ' . implode(', ', $variants);
+            $chunks[] = $head.' | '.implode(', ', $variants);
         }
 
         if (count($items) > $maxItems) {
-            $chunks[] = '+' . (count($items) - $maxItems) . ' item';
+            $chunks[] = '+'.(count($items) - $maxItems).' item';
         }
 
         return implode(' · ', $chunks);
@@ -1581,14 +1548,14 @@ class MarketplaceController extends Controller
         }
 
         return [
-            'discount_id'   => (int) (data_get($detail, 'discount_id') ?? $discountId),
+            'discount_id' => (int) (data_get($detail, 'discount_id') ?? $discountId),
             'discount_name' => (string) (data_get($detail, 'discount_name') ?? data_get($detail, 'name') ?? ''),
             'discount_status' => (string) (data_get($detail, 'discount_status') ?? data_get($detail, 'status') ?? ''),
-            'status_label'  => $this->formatPromotionStatus((string) (data_get($detail, 'discount_status') ?? data_get($detail, 'status') ?? '')),
-            'start_time'    => (int) (data_get($detail, 'start_time') ?? 0) ?: null,
-            'end_time'      => (int) (data_get($detail, 'end_time') ?? 0) ?: null,
-            'item_count'    => (int) (data_get($detail, 'item_count') ?? count($items)),
-            'items'         => $this->enrichPromotionItemsWithSku($store, collect($items)->map(function ($item) {
+            'status_label' => $this->formatPromotionStatus((string) (data_get($detail, 'discount_status') ?? data_get($detail, 'status') ?? '')),
+            'start_time' => (int) (data_get($detail, 'start_time') ?? 0) ?: null,
+            'end_time' => (int) (data_get($detail, 'end_time') ?? 0) ?: null,
+            'item_count' => (int) (data_get($detail, 'item_count') ?? count($items)),
+            'items' => $this->enrichPromotionItemsWithSku($store, collect($items)->map(function ($item) {
                 $modelList = data_get($item, 'model_list')
                     ?? data_get($item, 'models')
                     ?? data_get($item, 'model_info')
@@ -1620,8 +1587,8 @@ class MarketplaceController extends Controller
                     'raw' => $item,
                 ];
             })->values()->all()),
-            'store'         => $this->normalizeStorePayload($store),
-            'raw'           => $response,
+            'store' => $this->normalizeStorePayload($store),
+            'raw' => $response,
         ];
     }
 
@@ -1697,7 +1664,7 @@ class MarketplaceController extends Controller
                     'variant_sku_label' => $variantSku ?: '—',
                     'sku_mapping_code' => $mappingItem?->item?->code,
                     'sku_mapping_label' => $mappingItem?->item?->code
-                        ? ($mappingItem->item->code . ($mappingItem->item->name ? ' • ' . $mappingItem->item->name : ''))
+                        ? ($mappingItem->item->code.($mappingItem->item->name ? ' • '.$mappingItem->item->name : ''))
                         : '—',
                     'promo_stock' => $promoStock,
                     'promo_stock_label' => number_format($promoStock, 0, ',', '.'),
@@ -1785,11 +1752,11 @@ class MarketplaceController extends Controller
     private function formatPromotionStatus(string $status): string
     {
         return match (strtolower($status)) {
-            'ongoing'  => 'Ongoing',
+            'ongoing' => 'Ongoing',
             'upcoming' => 'Upcoming',
-            'ended'    => 'Ended',
-            'suspended'=> 'Suspended',
-            default    => $status !== '' ? ucfirst(strtolower($status)) : '-',
+            'ended' => 'Ended',
+            'suspended' => 'Suspended',
+            default => $status !== '' ? ucfirst(strtolower($status)) : '-',
         };
     }
 
@@ -1810,7 +1777,7 @@ class MarketplaceController extends Controller
         $end = $this->formatPromotionTimestamp($endTime);
 
         if ($start && $end) {
-            return $start . ' - ' . $end;
+            return $start.' - '.$end;
         }
 
         return $start ?: $end ?: '-';
@@ -1904,7 +1871,7 @@ class MarketplaceController extends Controller
             return response()->json([
                 'success' => false,
                 'code' => 'SETTLEMENT_CHANNEL_UNSUPPORTED',
-                'message' => "Sync settlement saat ini hanya tersedia untuk Shopee. Toko {$store->name} memakai channel " . ($store->channel?->name ?? 'tidak dikenal') . '.',
+                'message' => "Sync settlement saat ini hanya tersedia untuk Shopee. Toko {$store->name} memakai channel ".($store->channel?->name ?? 'tidak dikenal').'.',
             ], 422);
         }
 
@@ -1934,7 +1901,7 @@ class MarketplaceController extends Controller
         if (! $store->is_active || $store->status !== 'active') {
             return response()->json([
                 'success' => true,
-                'status'  => 'skipped',
+                'status' => 'skipped',
                 'skipped' => true,
                 'message' => "Sync dilewati: toko {$store->name} sedang nonaktif.",
             ]);
@@ -1960,9 +1927,9 @@ class MarketplaceController extends Controller
             } catch (\Throwable $e) {
                 $status = 'AUTH_REQUIRED';
                 \Illuminate\Support\Facades\Log::warning('Token refresh failed before queueing background sync', [
-                    'store_id'   => $store->id,
+                    'store_id' => $store->id,
                     'store_name' => $store->name,
-                    'error'      => $e->getMessage(),
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
@@ -1973,28 +1940,30 @@ class MarketplaceController extends Controller
 
         if ($status === 'NOT_CONNECTED') {
             $urlSegment = $store->channel->code === 'TKT' ? 'tiktok' : 'shopee';
+
             return response()->json([
                 'success' => false,
-                'code'    => 'STORE_NOT_CONNECTED',
+                'code' => 'STORE_NOT_CONNECTED',
                 'message' => "Toko {$store->name} belum terhubung ke {$store->channel->name}.",
-                'action'  => [
-                    'type'  => 'redirect',
-                    'label' => 'Hubungkan ' . $store->channel->name,
-                    'url'   => url('/marketplace/' . $urlSegment . '/connect'),
+                'action' => [
+                    'type' => 'redirect',
+                    'label' => 'Hubungkan '.$store->channel->name,
+                    'url' => url('/marketplace/'.$urlSegment.'/connect'),
                 ],
             ], 422);
         }
 
         if ($status !== 'CONNECTED') {
             $urlSegment = $store->channel->code === 'TKT' ? 'tiktok' : 'shopee';
+
             return response()->json([
                 'success' => false,
-                'code'    => 'SHOPEE_AUTH_REQUIRED',
+                'code' => 'SHOPEE_AUTH_REQUIRED',
                 'message' => "Koneksi {$store->channel->name} untuk toko {$store->name} sudah tidak aktif. Login ulang diperlukan sebelum sinkronisasi bisa berjalan.",
-                'action'  => [
-                    'type'  => 'redirect',
-                    'label' => 'Login Ulang ' . $store->channel->name,
-                    'url'   => url('/marketplace/' . $urlSegment . '/connect'),
+                'action' => [
+                    'type' => 'redirect',
+                    'label' => 'Login Ulang '.$store->channel->name,
+                    'url' => url('/marketplace/'.$urlSegment.'/connect'),
                 ],
             ], 401);
         }
@@ -2043,17 +2012,17 @@ class MarketplaceController extends Controller
         // (webhook order real-time, download resi) — lihat routes/console.php.
         \Illuminate\Support\Facades\Artisan::queue('shopee:sync-historical-orders', [
             'year' => $year,
-            '--store' => $store->id
+            '--store' => $store->id,
         ])->onQueue('heavy');
 
         \Illuminate\Support\Facades\Artisan::queue('shopee:sync-historical-returns', [
             'year' => $year,
-            '--store' => $store->id
+            '--store' => $store->id,
         ])->onQueue('heavy');
 
         return response()->json([
             'status' => 'success',
-            'message' => "Proses 'Mesin Waktu' menuju tahun {$year} untuk toko {$store->name} sedang berjalan di latar belakang!"
+            'message' => "Proses 'Mesin Waktu' menuju tahun {$year} untuk toko {$store->name} sedang berjalan di latar belakang!",
         ]);
     }
 
@@ -2070,7 +2039,7 @@ class MarketplaceController extends Controller
 
         return response()->json([
             'message' => 'Perintah tarik data pesanan (3 hari terakhir, default command) dan retur terbaru telah dikirim ke latar belakang.',
-            'status' => 'queued'
+            'status' => 'queued',
         ]);
     }
 
@@ -2085,15 +2054,15 @@ class MarketplaceController extends Controller
         // Set state awal supaya UI langsung menampilkan progres "antre" sebelum worker jalan.
         \Illuminate\Support\Facades\Cache::put("marketplace:sync_progress:{$store->id}", [
             'percent' => 0,
-            'label'   => 'Menunggu antrean worker…',
-            'status'  => 'queued',
-            'store'   => $store->name,
-            'ts'      => now()->timestamp,
+            'label' => 'Menunggu antrean worker…',
+            'status' => 'queued',
+            'store' => $store->name,
+            'ts' => now()->timestamp,
         ], 1800);
 
         $pending = \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-orders', [
             '--store' => $store->id,
-            '--days'  => $days,
+            '--days' => $days,
         ]);
         if ($days > 7) {
             // Rentang panjang = pekerjaan lama → queue 'heavy' agar webhook real-time
@@ -2120,8 +2089,8 @@ class MarketplaceController extends Controller
 
         return response()->json([
             'message' => "Sync pesanan {$days} hari untuk toko ini dikirim ke latar belakang. Data akan masuk bertahap.",
-            'status'  => 'queued',
-            'days'    => $days,
+            'status' => 'queued',
+            'days' => $days,
         ]);
     }
 
@@ -2148,7 +2117,7 @@ class MarketplaceController extends Controller
 
         $lock = \Illuminate\Support\Facades\Cache::lock("sync_store_{$store->id}", 240);
 
-        if (!$lock->get()) {
+        if (! $lock->get()) {
             return response()->json(['message' => 'Sync sedang berjalan untuk toko ini. Mohon tunggu.'], 429);
         }
 
@@ -2157,6 +2126,7 @@ class MarketplaceController extends Controller
         // yang sama persis (±60 baris) terduplikasi inline di sini.
         if ($resp = $this->ensureStoreReadyForBackgroundSync($store)) {
             $lock->release();
+
             return $resp;
         }
 
@@ -2193,13 +2163,13 @@ class MarketplaceController extends Controller
             if (str_contains(strtolower($msg), 'access_token') || str_contains(strtolower($msg), 'auth')) {
                 return response()->json([
                     'success' => false,
-                    'code'    => 'SHOPEE_AUTH_REQUIRED',
+                    'code' => 'SHOPEE_AUTH_REQUIRED',
                     'message' => "Koneksi {$store->channel->name} untuk toko {$store->name} sudah tidak aktif.",
-                    'action'  => [
-                        'type'  => 'redirect',
-                        'label' => 'Login Ulang ' . $store->channel->name,
-                        'url'   => url('/marketplace/' . $store->channel->code . '/connect')
-                    ]
+                    'action' => [
+                        'type' => 'redirect',
+                        'label' => 'Login Ulang '.$store->channel->name,
+                        'url' => url('/marketplace/'.$store->channel->code.'/connect'),
+                    ],
                 ], 401);
             }
 
@@ -2213,25 +2183,26 @@ class MarketplaceController extends Controller
 
             return response()->json([
                 'success' => false,
-                'code'    => 'VALIDATION_ERROR',
-                'message' => $msg
+                'code' => 'VALIDATION_ERROR',
+                'message' => $msg,
             ], 422);
         } catch (\Throwable $e) {
             $lock->release();
 
             \Illuminate\Support\Facades\Log::error('Marketplace sync internal error', [
                 'store_id' => $store->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'code'    => 'CONNECTION_ERROR',
-                'message' => 'Sinkronisasi pesanan belum berhasil. Koneksi ke ' . $store->channel->name . ' sedang bermasalah.'
+                'code' => 'CONNECTION_ERROR',
+                'message' => 'Sinkronisasi pesanan belum berhasil. Koneksi ke '.$store->channel->name.' sedang bermasalah.',
             ], 502);
         }
 
         $lock->release();
+
         return response()->json($result);
     }
 
@@ -2254,7 +2225,7 @@ class MarketplaceController extends Controller
             'store.channel',
             'items',
             'items.internalItem' => fn ($q) => $q->select('id', 'code', 'item_category_id')->with('category:id,code,name'),
-            'fulfillment:' . $fulfillmentSelect,
+            'fulfillment:'.$fulfillmentSelect,
             'fulfillment.lines',
             'fulfillment.lines.item:id,code,name',
             'fulfillment.lines.splitChildren',
@@ -2278,16 +2249,20 @@ class MarketplaceController extends Controller
         // Tanpa ini, halaman selalu terpaku pada 200 order terbaru sehingga hasil
         // sync data masa lalu (backfill) tidak pernah muncul / jumlah tidak bertambah.
         $dateFrom = request()->query('date_from');
-        $dateTo   = request()->query('date_to');
-        $limit    = max(1, min(2000, (int) request()->query('limit', 500)));
+        $dateTo = request()->query('date_to');
+        $limit = max(1, min(2000, (int) request()->query('limit', 500)));
 
         $ordersQuery = MarketplaceOrder::with($with);
         if ($dateFrom || $dateTo) {
             $ordersQuery->where(function ($q) use ($dateFrom, $dateTo) {
                 $q->whereNull('ordered_at'); // order tanpa tanggal tetap tampil (difilter longgar di frontend)
                 $q->orWhere(function ($range) use ($dateFrom, $dateTo) {
-                    if ($dateFrom) $range->where('ordered_at', '>=', $dateFrom . ' 00:00:00');
-                    if ($dateTo)   $range->where('ordered_at', '<=', $dateTo . ' 23:59:59');
+                    if ($dateFrom) {
+                        $range->where('ordered_at', '>=', $dateFrom.' 00:00:00');
+                    }
+                    if ($dateTo) {
+                        $range->where('ordered_at', '<=', $dateTo.' 23:59:59');
+                    }
                 });
             });
         }
@@ -2299,7 +2274,7 @@ class MarketplaceController extends Controller
             $extra = MarketplaceOrder::with($with)
                 ->where(function ($q) use ($kilatOrderSns) {
                     $q->whereIn('channel_order_id', $kilatOrderSns)
-                      ->orWhereIn('external_order_id', $kilatOrderSns);
+                        ->orWhereIn('external_order_id', $kilatOrderSns);
                 })
                 ->whereNotIn('id', $orders->pluck('id')->all())
                 ->latest('ordered_at')
@@ -2324,29 +2299,29 @@ class MarketplaceController extends Controller
             $arr = $o->toArray();
             // Kilat = punya booking DAN BUKAN Instan (same-day). Keduanya berbeda:
             // Instan dideteksi dari nama kurir, ditangani di tab "Instan" tersendiri.
-            $carrier   = strtolower((string) $o->shipping_carrier);
+            $carrier = strtolower((string) $o->shipping_carrier);
             $isInstant = str_contains($carrier, 'instant') || str_contains($carrier, 'same day') || str_contains($carrier, 'sameday');
             $bookingSn = $o->booking_sn ?? ($kilatMap[$o->channel_order_id] ?? ($kilatMap[$o->external_order_id] ?? null));
-            $arr['is_kilat']               = (!empty($bookingSn)) && ! $isInstant;
-            $arr['booking_sn']             = $bookingSn ?: null;
+            $arr['is_kilat'] = (! empty($bookingSn)) && ! $isInstant;
+            $arr['booking_sn'] = $bookingSn ?: null;
             $liveStatus = $liveOrderStatuses[$o->id]['status'] ?? null;
             $liveNeedsShipping = $liveOrderStatuses[$o->id]['needs_shipping'] ?? null;
             $liveLogisticsStatus = $liveOrderStatuses[$o->id]['logistics_status'] ?? null;
             $livePlatformPending = $liveOrderStatuses[$o->id]['platform_pending'] ?? null;
-            $arr['api_order_status']       = $liveStatus;
-            $arr['api_logistics_status']   = $liveLogisticsStatus;
-            $arr['api_platform_pending']   = $livePlatformPending;
-            $arr['status_source']          = $liveStatus ? 'api' : 'database';
+            $arr['api_order_status'] = $liveStatus;
+            $arr['api_logistics_status'] = $liveLogisticsStatus;
+            $arr['api_platform_pending'] = $livePlatformPending;
+            $arr['status_source'] = $liveStatus ? 'api' : 'database';
             if ($liveStatus) {
                 $arr['order_status'] = ($liveNeedsShipping === true)
                     ? 'READY_TO_SHIP'
                     : $liveStatus;
             }
-            $arr['fulfillment_id']         = $o->fulfillment?->id;
-            $arr['fulfillment_status']     = $o->fulfillment?->status; // null|draft|pending_review|confirmed|cancelled
-            $arr['print_count']            = $o->print_count ?? 0;
-            $arr['printed_at']             = $o->printed_at;
-            $arr['has_unresolved_lines']   = $o->fulfillment
+            $arr['fulfillment_id'] = $o->fulfillment?->id;
+            $arr['fulfillment_status'] = $o->fulfillment?->status; // null|draft|pending_review|confirmed|cancelled
+            $arr['print_count'] = $o->print_count ?? 0;
+            $arr['printed_at'] = $o->printed_at;
+            $arr['has_unresolved_lines'] = $o->fulfillment
                 ? $o->fulfillment->lines->whereNull('item_id')->isNotEmpty()
                 : false;
             $arr['needs_shipping_arrangement'] = $liveNeedsShipping ?? $o->needs_shipping_arrangement;
@@ -2375,14 +2350,21 @@ class MarketplaceController extends Controller
                     // Untuk status packed, juga ambil semua lines dengan qty_fulfilled > 0 (bisa 0 jika tidak dipacking)
                     $status = $o->fulfillment->status;
                     $usePickedAt = in_array($status, ['picking', 'pending_review']);
-                    $usePacked   = in_array($status, ['packed', 'confirmed']);
+                    $usePacked = in_array($status, ['packed', 'confirmed']);
 
                     $scannedLines = $o->fulfillment->lines
                         ->where('is_split_parent', false)
                         ->filter(function ($l) use ($usePickedAt, $usePacked) {
-                            if (! $l->item_id) return false;
-                            if ($usePacked)   return ($l->qty_fulfilled ?? 0) > 0;
-                            if ($usePickedAt) return $l->picked_at !== null && ($l->qty_fulfilled ?? 0) > 0;
+                            if (! $l->item_id) {
+                                return false;
+                            }
+                            if ($usePacked) {
+                                return ($l->qty_fulfilled ?? 0) > 0;
+                            }
+                            if ($usePickedAt) {
+                                return $l->picked_at !== null && ($l->qty_fulfilled ?? 0) > 0;
+                            }
+
                             return false;
                         });
 
@@ -2390,9 +2372,9 @@ class MarketplaceController extends Controller
                         // Group by item_id, sum qty
                         $grouped = $scannedLines->groupBy('item_id')->map(fn ($g, $itemId) => [
                             'item_id' => (int) $itemId,
-                            'qty'     => $g->sum('qty_fulfilled'),
-                            'code'    => $g->first()->item?->code ?? null,
-                            'name'    => $g->first()->item?->name ?? null,
+                            'qty' => $g->sum('qty_fulfilled'),
+                            'code' => $g->first()->item?->code ?? null,
+                            'name' => $g->first()->item?->name ?? null,
                         ]);
                         $arr['fulfillment_scan_log'] = $grouped->values()->all();
                     }
@@ -2406,54 +2388,54 @@ class MarketplaceController extends Controller
                 $arr['fulfillment_resolve_lines'] = $lines
                     ->filter(fn ($l) => $l->item_id !== null)
                     ->map(fn ($l) => [
-                        'qty_ordered'   => $l->qty_ordered   ?? 1,
+                        'qty_ordered' => $l->qty_ordered ?? 1,
                         'qty_fulfilled' => $l->qty_fulfilled ?? 0,
-                        'code'          => $l->item?->code ?? null,
-                        'name'          => $l->item?->name ?? null,
+                        'code' => $l->item?->code ?? null,
+                        'name' => $l->item?->name ?? null,
                         'marketplace_sku' => $l->marketplace_sku ?? null,
-                        'substituted'   => (bool) $l->substituted,
+                        'substituted' => (bool) $l->substituted,
                         'split_parent_id' => $l->split_parent_id,
                     ])
                     ->values()->all();
                 // Summary info untuk card display
-                $totalOrdered   = $lines->sum('qty_ordered');
+                $totalOrdered = $lines->sum('qty_ordered');
                 $totalFulfilled = $lines->sum('qty_fulfilled');
                 $arr['fulfillment_packing_summary'] = [
-                    'total_ordered'   => $totalOrdered,
+                    'total_ordered' => $totalOrdered,
                     'total_fulfilled' => $totalFulfilled,
-                    'has_shortage'    => $lines->filter(fn ($l) => $l->item_id)
-                                               ->some(fn ($l) => ($l->qty_fulfilled ?? 0) < ($l->qty_ordered ?? 1)),
+                    'has_shortage' => $lines->filter(fn ($l) => $l->item_id)
+                        ->some(fn ($l) => ($l->qty_fulfilled ?? 0) < ($l->qty_ordered ?? 1)),
                 ];
             } else {
-                $arr['fulfillment_resolve_lines']    = [];
-                $arr['fulfillment_packing_summary']  = null;
+                $arr['fulfillment_resolve_lines'] = [];
+                $arr['fulfillment_packing_summary'] = null;
             }
 
             // Untuk tab Sudah Proses: include fulfilled lines dengan info lengkap
             if ($o->fulfillment?->status === 'confirmed') {
                 $arr['fulfillment_lines'] = $o->fulfillment->lines->map(function ($l) {
                     return [
-                        'id'                    => $l->id,
-                        'marketplace_sku'       => $l->marketplace_sku,
+                        'id' => $l->id,
+                        'marketplace_sku' => $l->marketplace_sku,
                         'marketplace_item_name' => $l->marketplace_item_name,
-                        'qty_ordered'           => $l->qty_ordered,
-                        'qty_fulfilled'         => $l->qty_fulfilled,
-                        'substituted'           => (bool) $l->substituted,
-                        'is_split_parent'       => (bool) $l->is_split_parent,
-                        'split_parent_id'       => $l->split_parent_id,
-                        'notes'                 => $l->notes,
+                        'qty_ordered' => $l->qty_ordered,
+                        'qty_fulfilled' => $l->qty_fulfilled,
+                        'substituted' => (bool) $l->substituted,
+                        'is_split_parent' => (bool) $l->is_split_parent,
+                        'split_parent_id' => $l->split_parent_id,
+                        'notes' => $l->notes,
                         'item' => $l->item ? [
-                            'id'   => $l->item->id,
+                            'id' => $l->item->id,
                             'code' => $l->item->code,
                             'name' => $l->item->name,
                         ] : null,
                         'split_children' => $l->is_split_parent
                             ? $l->splitChildren->map(fn ($c) => [
-                                'id'          => $c->id,
-                                'qty_fulfilled'=> $c->qty_fulfilled,
+                                'id' => $c->id,
+                                'qty_fulfilled' => $c->qty_fulfilled,
                                 'substituted' => (bool) $c->substituted,
-                                'item'        => $c->item ? [
-                                    'id'   => $c->item->id,
+                                'item' => $c->item ? [
+                                    'id' => $c->item->id,
                                     'code' => $c->item->code,
                                     'name' => $c->item->name,
                                 ] : null,
@@ -2512,8 +2494,8 @@ class MarketplaceController extends Controller
             // Sebelumnya baris booking HANYA dicocokkan langsung ke Item.code, sehingga
             // SKU yang sudah di-map user tetap tampil "Belum Mapping" di tab ⚡ Kilat.
             $skuMapped = \App\Models\SkuMapping::with(['item' => fn ($q) => $q
-                    ->select('id', 'code', 'item_category_id', 'name')
-                    ->with('category:id,code,name')])
+                ->select('id', 'code', 'item_category_id', 'name')
+                ->with('category:id,code,name')])
                 ->whereIn('marketplace_sku', $allSkus)
                 ->get()
                 ->sortBy(fn ($m) => $m->channel_code === null ? 1 : 0) // spesifik channel menang atas global
@@ -2528,20 +2510,21 @@ class MarketplaceController extends Controller
                 $items = collect(is_array($b->items) ? $b->items : [])->map(function ($i) use ($mappedItems, $skuMapped) {
                     // Tampilkan SKU marketplace (bukan judul produk); judul hanya fallback.
                     $sku = $i['model_sku'] ?? $i['item_sku'] ?? null;
-                    $title = trim(($i['item_name'] ?? '') . (! empty($i['model_name']) ? ' - ' . $i['model_name'] : '')) ?: null;
+                    $title = trim(($i['item_name'] ?? '').(! empty($i['model_name']) ? ' - '.$i['model_name'] : '')) ?: null;
                     // Urutan: kecocokan langsung ke Item.code → tabel sku_mappings.
                     $mapped = $sku ? ($mappedItems->get($sku) ?? $skuMapped->get($sku)?->item) : null;
+
                     return [
-                        'qty'           => $i['quantity'] ?? $i['model_quantity_purchased'] ?? 1,
-                        'variant_name'  => $sku ?: $title,
-                        'model_sku'     => $sku,
-                        'item_sku'      => $i['item_sku'] ?? null,
+                        'qty' => $i['quantity'] ?? $i['model_quantity_purchased'] ?? 1,
+                        'variant_name' => $sku ?: $title,
+                        'model_sku' => $sku,
+                        'item_sku' => $i['item_sku'] ?? null,
                         'internal_item' => $mapped ? [
-                            'id'   => $mapped->id,
+                            'id' => $mapped->id,
                             'code' => $mapped->code,
                             'name' => $mapped->name,
                             'category' => $mapped->category ? [
-                                'id'   => $mapped->category->id,
+                                'id' => $mapped->category->id,
                                 'code' => $mapped->category->code,
                                 'name' => $mapped->category->name,
                             ] : null,
@@ -2555,50 +2538,50 @@ class MarketplaceController extends Controller
                     ?? $b->needsShipping();
 
                 return [
-                    'id'                          => -$b->id, // negatif = baris booking (bukan order)
-                    'store_id'                    => $b->store_id,
-                    'store'                       => $b->store ? [
-                        'id'      => $b->store->id,
-                        'name'    => $b->store->name,
+                    'id' => -$b->id, // negatif = baris booking (bukan order)
+                    'store_id' => $b->store_id,
+                    'store' => $b->store ? [
+                        'id' => $b->store->id,
+                        'name' => $b->store->name,
                         'channel' => $b->store->channel ? [
                             'code' => strtolower((string) $b->store->channel->code),
                             'name' => $b->store->channel->name,
                         ] : null,
                     ] : null,
-                    'channel_order_id'            => $b->order_sn ?: $b->booking_sn,
-                    'external_order_id'           => $b->order_sn,
-                    'booking_sn'                  => $b->booking_sn,
+                    'channel_order_id' => $b->order_sn ?: $b->booking_sn,
+                    'external_order_id' => $b->order_sn,
+                    'booking_sn' => $b->booking_sn,
                     // Booking tanpa bukti pengaturan kirim tetap di Perlu Dikirim,
                     // termasuk PROCESSED yang belum punya resi/package/document.
-                    'order_status'                => $needsShipping ? 'READY_TO_SHIP' : $bookingStatus,
-                    'api_order_status'            => $liveStatus,
-                    'api_logistics_status'        => $liveBookingStatuses[$b->id]['logistics_status'] ?? null,
-                    'api_platform_pending'        => $liveBookingStatuses[$b->id]['platform_pending'] ?? null,
+                    'order_status' => $needsShipping ? 'READY_TO_SHIP' : $bookingStatus,
+                    'api_order_status' => $liveStatus,
+                    'api_logistics_status' => $liveBookingStatuses[$b->id]['logistics_status'] ?? null,
+                    'api_platform_pending' => $liveBookingStatuses[$b->id]['platform_pending'] ?? null,
                     // Simpan status booking lokal juga agar UI tetap bisa
                     // membedakan PENDING/PROCESSED saat live API dibatasi
                     // dengan scope matched demi menjaga kecepatan halaman.
-                    'platform_status'             => $bookingStatus,
-                    'status_source'               => $liveStatus ? 'api' : 'database',
-                    'ordered_at'                  => $b->create_time
+                    'platform_status' => $bookingStatus,
+                    'status_source' => $liveStatus ? 'api' : 'database',
+                    'ordered_at' => $b->create_time
                         ? \Carbon\Carbon::createFromTimestamp($b->create_time)->toIso8601String()
                         : optional($b->created_at)->toIso8601String(),
-                    'items'                       => $items,
-                    'shipping_carrier'            => $b->shipping_carrier,
-                    'shipping_awb_no'             => $b->tracking_number,
-                    'is_kilat'                    => true,
-                    'is_booking'                  => true,
-                    'needs_shipping_arrangement'  => $needsShipping,
-                    'fulfillment_id'              => null,
-                    'fulfillment_status'          => null,
-                    'print_count'                 => $b->print_count ?? 0,
-                    'printed_at'                  => $b->printed_at ? \Carbon\Carbon::parse($b->printed_at)->toIso8601String() : null,
-                    'has_unresolved_lines'        => false,
-                    'has_data_issues'             => false,
-                    'logistics_status'            => null,
-                    'fulfillment_scan_log'        => null,
-                    'fulfillment_resolve_lines'   => [],
+                    'items' => $items,
+                    'shipping_carrier' => $b->shipping_carrier,
+                    'shipping_awb_no' => $b->tracking_number,
+                    'is_kilat' => true,
+                    'is_booking' => true,
+                    'needs_shipping_arrangement' => $needsShipping,
+                    'fulfillment_id' => null,
+                    'fulfillment_status' => null,
+                    'print_count' => $b->print_count ?? 0,
+                    'printed_at' => $b->printed_at ? \Carbon\Carbon::parse($b->printed_at)->toIso8601String() : null,
+                    'has_unresolved_lines' => false,
+                    'has_data_issues' => false,
+                    'logistics_status' => null,
+                    'fulfillment_scan_log' => null,
+                    'fulfillment_resolve_lines' => [],
                     'fulfillment_packing_summary' => null,
-                    'fulfillment_lines'           => [],
+                    'fulfillment_lines' => [],
                 ];
             });
 
@@ -2639,8 +2622,12 @@ class MarketplaceController extends Controller
             ->when($dateFrom || $dateTo, function ($query) use ($dateFrom, $dateTo) {
                 $query->where(function ($q) use ($dateFrom, $dateTo) {
                     $q->whereNull('ordered_at')->orWhere(function ($range) use ($dateFrom, $dateTo) {
-                        if ($dateFrom) $range->where('ordered_at', '>=', $dateFrom . ' 00:00:00');
-                        if ($dateTo) $range->where('ordered_at', '<=', $dateTo . ' 23:59:59');
+                        if ($dateFrom) {
+                            $range->where('ordered_at', '>=', $dateFrom.' 00:00:00');
+                        }
+                        if ($dateTo) {
+                            $range->where('ordered_at', '<=', $dateTo.' 23:59:59');
+                        }
                     });
                 });
             })
@@ -2666,6 +2653,7 @@ class MarketplaceController extends Controller
                     ?: $stored?->internalItem?->base_unit_cost
                     ?: $stored?->internalItem?->hpp
                     ?: 0);
+
                 return [
                     'item_name' => $item['item_name'] ?? $stored?->item_name,
                     'variant_name' => $item['model_name'] ?? $stored?->variant_name,
@@ -2690,22 +2678,23 @@ class MarketplaceController extends Controller
                         ?: $item->internalItem?->base_unit_cost
                         ?: $item->internalItem?->hpp
                         ?: 0);
+
                     return [
-                    'item_name' => $item->item_name,
-                    'variant_name' => $item->variant_name,
-                    'item_sku' => $item->item_sku,
-                    'model_sku' => $item->model_sku,
-                    'internal_sku' => $item->internalItem?->code,
-                    'internal_category' => $item->internalItem?->category?->name
-                        ?: $item->internalItem?->category?->code,
-                    'qty' => (int) $item->qty,
-                    'model_original_price' => (float) $item->price,
-                    'price_after_discount' => (float) $item->price_after_discount,
-                    'hpp_snapshot' => (float) $item->hpp_snapshot,
-                    'hpp_unit_snapshot' => (float) $item->hpp_unit_snapshot,
-                    'hpp_total_snapshot' => (float) $item->hpp_total_snapshot,
-                    'internal_hpp' => $internalHpp,
-                ];
+                        'item_name' => $item->item_name,
+                        'variant_name' => $item->variant_name,
+                        'item_sku' => $item->item_sku,
+                        'model_sku' => $item->model_sku,
+                        'internal_sku' => $item->internalItem?->code,
+                        'internal_category' => $item->internalItem?->category?->name
+                            ?: $item->internalItem?->category?->code,
+                        'qty' => (int) $item->qty,
+                        'model_original_price' => (float) $item->price,
+                        'price_after_discount' => (float) $item->price_after_discount,
+                        'hpp_snapshot' => (float) $item->hpp_snapshot,
+                        'hpp_unit_snapshot' => (float) $item->hpp_unit_snapshot,
+                        'hpp_total_snapshot' => (float) $item->hpp_total_snapshot,
+                        'internal_hpp' => $internalHpp,
+                    ];
                 });
             }
 
@@ -2847,8 +2836,7 @@ class MarketplaceController extends Controller
             'CANCELLED',
             'INVOICE_PENDING',
         ];
-        $candidates = $orders->filter(fn ($order) =>
-            in_array(strtoupper((string) $order->order_status), $candidateStatuses, true)
+        $candidates = $orders->filter(fn ($order) => in_array(strtoupper((string) $order->order_status), $candidateStatuses, true)
             || filled($order->booking_sn)
         );
         $result = [];
@@ -3196,34 +3184,36 @@ class MarketplaceController extends Controller
 
         if ($status === 'NOT_CONNECTED') {
             $lock->release();
+
             return response()->json([
                 'success' => false,
-                'code'    => 'STORE_NOT_CONNECTED',
+                'code' => 'STORE_NOT_CONNECTED',
                 'message' => "Toko {$store->name} belum terhubung ke {$channelName}.",
-                'action'  => [
-                    'type'  => 'redirect',
-                    'label' => 'Hubungkan ' . $channelName,
-                    'url'   => $connectUrl,
+                'action' => [
+                    'type' => 'redirect',
+                    'label' => 'Hubungkan '.$channelName,
+                    'url' => $connectUrl,
                 ],
             ], 422);
         }
 
         if ($status !== 'CONNECTED') {
             $lock->release();
+
             return response()->json([
                 'success' => false,
-                'code'    => 'SHOPEE_AUTH_REQUIRED',
+                'code' => 'SHOPEE_AUTH_REQUIRED',
                 'message' => "Koneksi {$channelName} untuk toko {$store->name} sudah tidak aktif. Login ulang diperlukan sebelum settlement bisa ditarik.",
-                'action'  => [
-                    'type'  => 'redirect',
-                    'label' => 'Login Ulang ' . $channelName,
-                    'url'   => $connectUrl,
+                'action' => [
+                    'type' => 'redirect',
+                    'label' => 'Login Ulang '.$channelName,
+                    'url' => $connectUrl,
                 ],
             ], 401);
         }
 
         $timeFrom = $request->input('time_from') ? (int) $request->input('time_from') : null;
-        $timeTo   = $request->input('time_to') ? (int) $request->input('time_to') : null;
+        $timeTo = $request->input('time_to') ? (int) $request->input('time_to') : null;
 
         if ($isBackfill) {
             $timeTo = $timeTo ?: now()->endOfDay()->timestamp;
@@ -3262,10 +3252,10 @@ class MarketplaceController extends Controller
             // TIDAK dikirim ke client. Response ke UI selalu pesan generik yang ramah,
             // konsisten dengan pola catch(\Throwable) di syncOrders() (baris ~665-677).
             \Illuminate\Support\Facades\Log::error('Settlement sync gagal total', [
-                'store_id'   => $store->id,
+                'store_id' => $store->id,
                 'store_name' => $store->name,
-                'error'      => $e->getMessage(),
-                'exception'  => get_class($e),
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
             ]);
             Cache::put($progressKey, [
                 'status' => 'error',
@@ -3278,7 +3268,7 @@ class MarketplaceController extends Controller
 
             return response()->json([
                 'success' => false,
-                'code'    => 'SETTLEMENT_SYNC_ERROR',
+                'code' => 'SETTLEMENT_SYNC_ERROR',
                 'message' => "Sinkronisasi settlement untuk toko {$store->name} belum berhasil. Detail teknis sudah dicatat di log server — hubungi admin bila berulang.",
             ], 502);
         } finally {
@@ -3329,23 +3319,23 @@ class MarketplaceController extends Controller
 
         $progressKey = "marketplace:settlement_sync_progress:{$store->id}";
         $fromDate = $isBackfill ? now()->subMonthsNoOverflow($backfillMonths)->startOfDay()->toDateString() : null;
-        $toDate   = $isBackfill ? now()->endOfDay()->toDateString() : null;
+        $toDate = $isBackfill ? now()->endOfDay()->toDateString() : null;
 
         \Illuminate\Support\Facades\Cache::put($progressKey, [
-            'status'     => 'queued',
-            'phase'      => 'queued',
-            'percent'    => 2,
-            'label'      => $isBackfill
+            'status' => 'queued',
+            'phase' => 'queued',
+            'percent' => 2,
+            'label' => $isBackfill
                 ? "Settlement backfill {$backfillMonths} bulan sedang antre…"
                 : ($isAll
                     ? "Settlement sync semua batch untuk {$store->name} sedang antre…"
                     : "Settlement sync untuk {$store->name} sedang antre…"),
-            'store_id'   => $store->id,
+            'store_id' => $store->id,
             'store_name' => $store->name,
-            'mode'       => $isBackfill ? 'backfill' : ($isAll ? 'all' : 'regular'),
+            'mode' => $isBackfill ? 'backfill' : ($isAll ? 'all' : 'regular'),
             'backfill_months' => $backfillMonths ?: null,
-            'from'       => $fromDate,
-            'to'         => $toDate,
+            'from' => $fromDate,
+            'to' => $toDate,
             'updated_at' => now()->toISOString(),
         ], 1800);
 
@@ -3370,13 +3360,13 @@ class MarketplaceController extends Controller
             }
         } catch (\Throwable $e) {
             Cache::put($progressKey, [
-                'status'     => 'error',
-                'phase'      => 'dispatch_failed',
-                'percent'    => 100,
-                'label'      => 'Gagal memasukkan settlement sync ke queue.',
-                'store_id'   => $store->id,
+                'status' => 'error',
+                'phase' => 'dispatch_failed',
+                'percent' => 100,
+                'label' => 'Gagal memasukkan settlement sync ke queue.',
+                'store_id' => $store->id,
                 'store_name' => $store->name,
-                'mode'       => $isBackfill ? 'backfill' : ($isAll ? 'all' : 'regular'),
+                'mode' => $isBackfill ? 'backfill' : ($isAll ? 'all' : 'regular'),
                 'updated_at' => now()->toISOString(),
             ], 1800);
             Log::error('Settlement background sync gagal di-queue', [
@@ -3399,8 +3389,8 @@ class MarketplaceController extends Controller
 
         return response()->json([
             'success' => true,
-            'status'  => 'queued',
-            'mode'    => $isBackfill ? 'backfill' : ($isAll ? 'all' : 'regular'),
+            'status' => 'queued',
+            'mode' => $isBackfill ? 'backfill' : ($isAll ? 'all' : 'regular'),
             'message' => $queuedMessage,
             'progress_key' => $progressKey,
         ]);
@@ -3491,7 +3481,7 @@ class MarketplaceController extends Controller
         $query = MarketplaceOrderSettlement::with([
             'store:id,name',
             'order:id,channel_order_id,order_status,ordered_at,subtotal_items,total_paid_customer',
-            'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,synced_at',
+            'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,payment_method,synced_at',
             'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id',
         ]);
 
@@ -3508,9 +3498,9 @@ class MarketplaceController extends Controller
                     ->limit(1),
                 $sortDir
             );
-        } else if (in_array($sortBy, ['settlement_time', 'buyer_payment_amount'])) {
+        } elseif (in_array($sortBy, ['settlement_time', 'buyer_payment_amount'])) {
             $query->orderBy($sortBy, $sortDir);
-        } else if ($sortBy !== 'final_income') {
+        } elseif ($sortBy !== 'final_income') {
             $query->latest('settlement_time');
         }
 
@@ -3528,9 +3518,9 @@ class MarketplaceController extends Controller
             $query->whereHas('order', function ($q) {
                 $q->where(function ($q2) {
                     $q2->doesntHave('items')
-                       ->orWhereHas('items', function ($q3) {
-                           $q3->whereNull('hpp_snapshot')->orWhere('hpp_snapshot', '<=', 0);
-                       });
+                        ->orWhereHas('items', function ($q3) {
+                            $q3->whereNull('hpp_snapshot')->orWhere('hpp_snapshot', '<=', 0);
+                        });
                 });
             });
         }
@@ -3554,12 +3544,12 @@ class MarketplaceController extends Controller
                 $from = $request->settlement_date_from;
                 $query->where(function ($q) use ($from) {
                     $q->whereDate('settlement_time', '>=', $from)
-                      ->orWhere(function ($q2) use ($from) {
-                          $q2->whereNull('settlement_time')
-                             ->whereHas('order', function ($oq) use ($from) {
-                                 $oq->whereDate('ordered_at', '>=', $from);
-                             });
-                      });
+                        ->orWhere(function ($q2) use ($from) {
+                            $q2->whereNull('settlement_time')
+                                ->whereHas('order', function ($oq) use ($from) {
+                                    $oq->whereDate('ordered_at', '>=', $from);
+                                });
+                        });
                 });
             }
 
@@ -3567,12 +3557,12 @@ class MarketplaceController extends Controller
                 $to = $request->settlement_date_to;
                 $query->where(function ($q) use ($to) {
                     $q->whereDate('settlement_time', '<=', $to)
-                      ->orWhere(function ($q2) use ($to) {
-                          $q2->whereNull('settlement_time')
-                             ->whereHas('order', function ($oq) use ($to) {
-                                 $oq->whereDate('ordered_at', '<=', $to);
-                             });
-                      });
+                        ->orWhere(function ($q2) use ($to) {
+                            $q2->whereNull('settlement_time')
+                                ->whereHas('order', function ($oq) use ($to) {
+                                    $oq->whereDate('ordered_at', '<=', $to);
+                                });
+                        });
                 });
             }
         } elseif (! $isUnsettledFilter) {
@@ -3604,20 +3594,24 @@ class MarketplaceController extends Controller
         if ($request->filled('tab')) {
             if ($request->tab === 'cair') {
                 $query->whereNotNull('settlement_time')
-                      ->where(function ($q) {
-                          $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
-                      })
-                      ->whereDoesntHave('order', function ($q) {
-                          $q->whereIn('order_status', ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
-                      });
+                    ->where(function ($q) {
+                        $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
+                    })
+                    ->whereDoesntHave('order', function ($q) {
+                        $q->whereIn('order_status', ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
+                    });
             } elseif ($request->tab === 'belum_cair') {
                 $query->whereNull('settlement_time')
-                      ->where(function ($q) {
-                          $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
-                      });
+                    ->where(function ($q) {
+                        $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
+                    });
 
                 if ($request->filled('sub_tab')) {
-                    if ($request->sub_tab === 'shipped') {
+                    if ($request->sub_tab === 'packed') {
+                        $query->whereHas('order', function ($q) {
+                            $q->whereIn('order_status', ['READY_TO_SHIP', 'PROCESSED', 'MATCHED']);
+                        });
+                    } elseif ($request->sub_tab === 'shipped') {
                         $query->whereHas('order', function ($q) {
                             $q->whereIn('order_status', ['SHIPPED', 'DIKIRIM']);
                         });
@@ -3644,9 +3638,9 @@ class MarketplaceController extends Controller
                     $q->whereHas('order', function ($q2) {
                         $q2->whereIn('order_status', ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
                     })
-                    ->orWhere(function ($q3) {
-                        $q3->whereNotNull('drc_adjustable_refund')->where('drc_adjustable_refund', '!=', 0);
-                    });
+                        ->orWhere(function ($q3) {
+                            $q3->whereNotNull('drc_adjustable_refund')->where('drc_adjustable_refund', '!=', 0);
+                        });
                 });
             }
         }
@@ -3676,19 +3670,19 @@ class MarketplaceController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('channel_order_id', 'like', "%{$search}%")
-                  ->orWhereHas('order', function ($orderQuery) use ($search) {
-                      $orderQuery->where('channel_order_id', 'like', "%{$search}%")
-                          ->orWhereHas('items', function ($itemQuery) use ($search) {
-                              $itemQuery->where(function ($itemFilter) use ($search) {
-                                  $itemFilter->where('item_name', 'like', "%{$search}%")
-                                      ->orWhere('variant_name', 'like', "%{$search}%")
-                                      ->orWhere('model_sku', 'like', "%{$search}%")
-                                      ->orWhere('item_sku', 'like', "%{$search}%")
-                                      ->orWhere('marketplace_sku', 'like', "%{$search}%")
-                                      ->orWhere('external_sku', 'like', "%{$search}%");
-                              });
-                          });
-                  });
+                    ->orWhereHas('order', function ($orderQuery) use ($search) {
+                        $orderQuery->where('channel_order_id', 'like', "%{$search}%")
+                            ->orWhereHas('items', function ($itemQuery) use ($search) {
+                                $itemQuery->where(function ($itemFilter) use ($search) {
+                                    $itemFilter->where('item_name', 'like', "%{$search}%")
+                                        ->orWhere('variant_name', 'like', "%{$search}%")
+                                        ->orWhere('model_sku', 'like', "%{$search}%")
+                                        ->orWhere('item_sku', 'like', "%{$search}%")
+                                        ->orWhere('marketplace_sku', 'like', "%{$search}%")
+                                        ->orWhere('external_sku', 'like', "%{$search}%");
+                                });
+                            });
+                    });
             });
         }
 
@@ -3696,7 +3690,7 @@ class MarketplaceController extends Controller
         if ($includeMissingPending) {
             $pendingOrdersQuery = MarketplaceOrder::with([
                 'store:id,name,channel_id',
-                'incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,synced_at',
+                'incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,payment_method,synced_at',
                 'items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id',
             ])
                 ->whereDoesntHave('settlement')
@@ -3739,7 +3733,9 @@ class MarketplaceController extends Controller
                     $pendingOrdersQuery->whereDate('ordered_at', '<=', $request->settlement_date_to);
                 }
             } elseif ($request->input('tab') === 'belum_cair' && $request->filled('sub_tab')) {
-                if ($request->sub_tab === 'shipped') {
+                if ($request->sub_tab === 'packed') {
+                    $pendingOrdersQuery->whereIn('order_status', ['READY_TO_SHIP', 'PROCESSED', 'MATCHED']);
+                } elseif ($request->sub_tab === 'shipped') {
                     $pendingOrdersQuery->whereIn('order_status', ['SHIPPED', 'DIKIRIM']);
                 } elseif ($request->sub_tab === 'to_confirm') {
                     $pendingOrdersQuery->whereIn('order_status', ['TO_CONFIRM_RECEIVE', 'COMPLETED', 'SELESAI']);
@@ -3818,7 +3814,9 @@ class MarketplaceController extends Controller
             $marketplaceFeeAfterAffiliate = max($sellerBurdenTotal - $affiliateDisplay, 0);
             $marketplaceFeePercent = $grossAfterVoucherToko > 0 ? round(($marketplaceFeeAfterAffiliate / $grossAfterVoucherToko) * 100, 1) : 0.0;
             $feePercentToko = $grossAfterVoucherToko > 0 ? round(($sellerBurdenTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
-            $cogs = $s->order ? $s->order->items->sum(function ($item) { return (float) $item->hpp_snapshot * (float) $item->qty; }) : 0;
+            $cogs = $s->order ? $s->order->items->sum(function ($item) {
+                return (float) $item->hpp_snapshot * (float) $item->qty;
+            }) : 0;
 
             $netIncome = (float) $s->final_income;
             $estimatedEscrowAmount = $this->settlementEstimatedEscrowAmount($s);
@@ -3849,78 +3847,82 @@ class MarketplaceController extends Controller
             $grossProfit = $netIncome - $cogs;
 
             return [
-                'id'                    => $s->id,
-                'channel_order_id'      => $s->channel_order_id,
-                'order_status'          => $s->order?->order_status,
-                'ordered_at'            => $s->order?->ordered_at?->toISOString(),
-                'store'                 => $s->store,
-                'order'                 => $s->order,
-                'buyer_payment_amount'  => (float) $s->buyer_payment_amount,
-                'subtotal_items'        => (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount),
-                'total_paid_customer'   => (float) ($s->order?->total_paid_customer ?? $s->buyer_payment_amount),
-                'seller_discount'       => $sellerDiscount,
-                'gross_amount'          => $grossAmount,
-                'buyer_paid_amount'     => $buyerPaidAmount,
-                'commission_fee'        => (float) $s->commission_fee,
-                'service_fee'           => (float) $s->service_fee,
-                'transaction_fee'       => (float) $s->transaction_fee,
-                'affiliate_fee'         => (float) $s->affiliate_fee,
-                'seller_voucher'        => (float) $s->seller_voucher,
+                'id' => $s->id,
+                'channel_order_id' => $s->channel_order_id,
+                'order_status' => $s->order?->order_status,
+                'payment_method' => $s->order?->payment_method
+                    ?? $s->order?->incomeEstimate?->payment_method
+                    ?? data_get($s->raw_json, 'payment_method')
+                    ?? data_get($s->raw_json, 'payment_info.payment_method'),
+                'ordered_at' => $s->order?->ordered_at?->toISOString(),
+                'store' => $s->store,
+                'order' => $s->order,
+                'buyer_payment_amount' => (float) $s->buyer_payment_amount,
+                'subtotal_items' => (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount),
+                'total_paid_customer' => (float) ($s->order?->total_paid_customer ?? $s->buyer_payment_amount),
+                'seller_discount' => $sellerDiscount,
+                'gross_amount' => $grossAmount,
+                'buyer_paid_amount' => $buyerPaidAmount,
+                'commission_fee' => (float) $s->commission_fee,
+                'service_fee' => (float) $s->service_fee,
+                'transaction_fee' => (float) $s->transaction_fee,
+                'affiliate_fee' => (float) $s->affiliate_fee,
+                'seller_voucher' => (float) $s->seller_voucher,
                 'voucher_platform_total' => $voucherPlatformAmount,
-                'voucher_toko_total'    => $voucherTokoAmount,
-                'voucher_total'         => $voucherAmount,
+                'voucher_toko_total' => $voucherTokoAmount,
+                'voucher_total' => $voucherAmount,
                 'seller_coin_cash_back' => (float) $s->seller_coin_cash_back,
-                'actual_shipping_fee'   => (float) $s->actual_shipping_fee,
-                'shipping_fee_subsidy'  => (float) $s->shipping_fee_subsidy,
-                'reverse_shipping_fee'  => (float) $s->reverse_shipping_fee,
-                'premi'                 => (float) (data_get($s->raw_json, 'premi') ?? data_get($s->raw_json, 'shipping_insurance') ?? data_get($s->raw_json, 'insurance_fee') ?? 0),
+                'actual_shipping_fee' => (float) $s->actual_shipping_fee,
+                'shipping_fee_subsidy' => (float) $s->shipping_fee_subsidy,
+                'reverse_shipping_fee' => (float) $s->reverse_shipping_fee,
+                'premi' => (float) (data_get($s->raw_json, 'premi') ?? data_get($s->raw_json, 'shipping_insurance') ?? data_get($s->raw_json, 'insurance_fee') ?? 0),
                 'seller_transaction_fee' => (float) (data_get($s->raw_json, 'seller_transaction_fee') ?? data_get($s->raw_json, 'transaction_fee') ?? 0),
                 'seller_order_processing_fee' => (float) (data_get($s->raw_json, 'seller_order_processing_fee') ?? 0),
                 'order_ams_commission_fee' => (float) (data_get($s->raw_json, 'order_ams_commission_fee') ?? data_get($s->raw_json, 'ams_commission_fee') ?? $s->activity_fee ?? 0),
-                'biaya_affiliate'       => (float) (data_get($s->raw_json, 'affiliate_fee') ?? data_get($s->raw_json, 'affiliate_commission_fee') ?? data_get($s->raw_json, 'seller_affiliate_fee') ?? 0),
+                'biaya_affiliate' => (float) (data_get($s->raw_json, 'affiliate_fee') ?? data_get($s->raw_json, 'affiliate_commission_fee') ?? data_get($s->raw_json, 'seller_affiliate_fee') ?? 0),
                 'affiliate_commission_fee' => (float) (data_get($s->raw_json, 'affiliate_commission_fee') ?? data_get($s->raw_json, 'seller_affiliate_fee') ?? 0),
-                'seller_affiliate_fee'  => (float) (data_get($s->raw_json, 'seller_affiliate_fee') ?? 0),
-                'affiliate'             => (float) (data_get($s->raw_json, 'affiliate_commission') ?? data_get($s->raw_json, 'affiliate_commission_amount') ?? 0),
-                'affiliate_display'     => $affiliateDisplay,
-                'affiliate_percent'     => $affiliatePercent,
+                'seller_affiliate_fee' => (float) (data_get($s->raw_json, 'seller_affiliate_fee') ?? 0),
+                'affiliate' => (float) (data_get($s->raw_json, 'affiliate_commission') ?? data_get($s->raw_json, 'affiliate_commission_amount') ?? 0),
+                'affiliate_display' => $affiliateDisplay,
+                'affiliate_percent' => $affiliatePercent,
                 'marketplace_fee_after_affiliate' => $marketplaceFeeAfterAffiliate,
                 'marketplace_fee_percent' => $marketplaceFeePercent,
                 'shipping_insurance_fee' => (float) $s->shipping_insurance_fee,
-                'activity_fee'          => (float) $s->activity_fee,
+                'activity_fee' => (float) $s->activity_fee,
                 'drc_adjustable_refund' => (float) $s->drc_adjustable_refund,
-                'escrow_tax'            => (float) $s->escrow_tax,
-                'ad_cost'               => (float) $s->ad_cost,
-                'final_income'          => (float) $netIncome,
+                'escrow_tax' => (float) $s->escrow_tax,
+                'ad_cost' => (float) $s->ad_cost,
+                'final_income' => (float) $netIncome,
                 'estimated_escrow_amount' => $estimatedEscrowAmount !== null ? $estimatedEscrowAmount : null,
-                'estimated_payout_at'   => ! $s->settlement_time
+                'estimated_payout_at' => ! $s->settlement_time
                     ? $s->order?->incomeEstimate?->estimated_payout_at?->toISOString()
                     : null,
                 'income_estimate_synced_at' => ! $s->settlement_time
                     ? $s->order?->incomeEstimate?->synced_at?->toISOString()
                     : null,
-                'has_income_estimate'   => ! $s->settlement_time && $estimatedEscrowAmount !== null,
-                'is_estimated_income'   => $isEstimatedIncome,
+                'has_income_estimate' => ! $s->settlement_time && $estimatedEscrowAmount !== null,
+                'is_estimated_income' => $isEstimatedIncome,
                 'income_estimation_source' => $incomeEstimationSource,
-                'fee_is_final'          => (bool) $s->settlement_time,
-                'cogs'                  => (float) $cogs,
-                'gross_profit'          => (float) $grossProfit,
-                'gross_after_voucher'   => $grossAfterVoucherTotal,
+                'fee_is_final' => (bool) $s->settlement_time,
+                'cogs' => (float) $cogs,
+                'gross_profit' => (float) $grossProfit,
+                'gross_after_voucher' => $grossAfterVoucherTotal,
                 'gross_after_voucher_toko' => $grossAfterVoucherToko,
-                'fee_total'             => $sellerBurdenTotal,
-                'fee_breakdown_total'   => $sellerBurdenTotal,
-                'seller_burden_total'   => $sellerBurdenTotal,
-                'buyer_burden_total'    => $buyerBurdenTotal,
+                'fee_total' => $sellerBurdenTotal,
+                'fee_breakdown_total' => $sellerBurdenTotal,
+                'seller_burden_total' => $sellerBurdenTotal,
+                'buyer_burden_total' => $buyerBurdenTotal,
                 'platform_burden_total' => $platformBurdenTotal,
-                'adjustment_total'      => $adjustmentTotal,
-                'total_burden_total'    => $allBurdenTotal,
-                'fee_breakdown'         => $breakdown,
-                'fee_percent'           => $feePercent,
-                'fee_percent_toko'      => $feePercentToko,
-                'settlement_status'    => $s->settlement_time ? 'cair' : 'belum_cair',
-                'settlement_recorded'  => ! (bool) $s->getAttribute('is_missing_settlement'),
-                'settlement_time'       => $s->settlement_time?->toISOString(),
-                'synced_at'             => $s->synced_at?->toISOString(),
-                'raw_json'              => is_string($s->raw_json) ? json_decode($s->raw_json, true) : $s->raw_json,
+                'adjustment_total' => $adjustmentTotal,
+                'total_burden_total' => $allBurdenTotal,
+                'fee_breakdown' => $breakdown,
+                'fee_percent' => $feePercent,
+                'fee_percent_toko' => $feePercentToko,
+                'settlement_status' => $s->settlement_time ? 'cair' : 'belum_cair',
+                'settlement_recorded' => ! (bool) $s->getAttribute('is_missing_settlement'),
+                'settlement_time' => $s->settlement_time?->toISOString(),
+                'synced_at' => $s->synced_at?->toISOString(),
+                'raw_json' => is_string($s->raw_json) ? json_decode($s->raw_json, true) : $s->raw_json,
             ];
         };
 
@@ -3966,28 +3968,28 @@ class MarketplaceController extends Controller
             } else {
                 $metaQuery->with('order.items:id,marketplace_order_id,hpp_snapshot,qty');
                 $metaRows = $metaQuery->get([
-                'id',
-                'buyer_payment_amount',
-                'order_id',
-                'store_id',
-                'commission_fee',
-                'service_fee',
-                'transaction_fee',
-                'affiliate_fee',
-                'seller_voucher',
-                'seller_coin_cash_back',
-                'actual_shipping_fee',
-                'shipping_fee_subsidy',
-                'reverse_shipping_fee',
-                'shipping_insurance_fee',
-                'activity_fee',
-                'drc_adjustable_refund',
-                'escrow_tax',
-                'ad_cost',
-                'final_income',
-                'settlement_time',
-                'synced_at',
-                'raw_json',
+                    'id',
+                    'buyer_payment_amount',
+                    'order_id',
+                    'store_id',
+                    'commission_fee',
+                    'service_fee',
+                    'transaction_fee',
+                    'affiliate_fee',
+                    'seller_voucher',
+                    'seller_coin_cash_back',
+                    'actual_shipping_fee',
+                    'shipping_fee_subsidy',
+                    'reverse_shipping_fee',
+                    'shipping_insurance_fee',
+                    'activity_fee',
+                    'drc_adjustable_refund',
+                    'escrow_tax',
+                    'ad_cost',
+                    'final_income',
+                    'settlement_time',
+                    'synced_at',
+                    'raw_json',
                 ]);
             }
             $feeTotals = $metaRows->reduce(function (array $carry, MarketplaceOrderSettlement $settlement) {
@@ -3998,6 +4000,7 @@ class MarketplaceController extends Controller
                 $carry['voucher'] += (float) ($totals['voucher'] ?? 0);
                 $carry['adjustment'] += (float) ($totals['adjustment'] ?? 0);
                 $carry['total'] += (float) ($totals['total'] ?? 0);
+
                 return $carry;
             }, ['seller' => 0.0, 'buyer' => 0.0, 'platform' => 0.0, 'voucher' => 0.0, 'adjustment' => 0.0, 'total' => 0.0]);
             $sellerFeeTotal = (float) ($feeTotals['seller'] ?? 0);
@@ -4008,6 +4011,7 @@ class MarketplaceController extends Controller
             $allFeeTotal = (float) ($feeTotals['total'] ?? 0);
             $grossTotal = (float) $metaRows->sum(function (MarketplaceOrderSettlement $settlement) {
                 $sellerDiscount = (float) data_get($settlement->raw_json, 'seller_discount', 0);
+
                 return (float) ($settlement->order?->subtotal_items ?? $settlement->buyer_payment_amount) - $sellerDiscount;
             });
             $buyerPaidTotal = (float) $metaRows->sum(function (MarketplaceOrderSettlement $settlement) {
@@ -4063,7 +4067,9 @@ class MarketplaceController extends Controller
                     $countPenyesuaian++;
                 }
 
-                $cogs = $s->order ? $s->order->items->sum(function ($item) { return (float) $item->hpp_snapshot * (float) $item->qty; }) : 0;
+                $cogs = $s->order ? $s->order->items->sum(function ($item) {
+                    return (float) $item->hpp_snapshot * (float) $item->qty;
+                }) : 0;
                 $isCancelledOrReturned = in_array($st, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
                 $isReturning = in_array($st, ['TO_RETURN', 'RETURNING']);
 
@@ -4147,35 +4153,35 @@ class MarketplaceController extends Controller
             $feePercentToko = $grossAfterVoucherToko > 0 ? round(($sellerFeeTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
 
             $meta = [
-                'kpi_count'             => (int) $metaRows->count(),
-                'kpi_count_selesai'     => $countSelesai,
-                'kpi_count_batal'       => $countBatal,
+                'kpi_count' => (int) $metaRows->count(),
+                'kpi_count_selesai' => $countSelesai,
+                'kpi_count_batal' => $countBatal,
                 'kpi_count_penyesuaian' => $countPenyesuaian,
-                'kpi_count_shipped'     => $countShipped,
-                'kpi_count_to_confirm'  => $countToConfirm,
-                'kpi_count_returning'   => $countReturning,
-                'kpi_count_unsettled'   => $countUnsettled,
-                'kpi_gross'             => $grossTotal,
-                'kpi_buyer_paid'        => $buyerPaidTotal,
-                'kpi_voucher'           => $voucherTokoTotal + $voucherPlatformTotal,
-                'kpi_voucher_toko'      => $voucherTokoTotal,
-                'kpi_voucher_platform'  => $voucherPlatformTotal,
+                'kpi_count_shipped' => $countShipped,
+                'kpi_count_to_confirm' => $countToConfirm,
+                'kpi_count_returning' => $countReturning,
+                'kpi_count_unsettled' => $countUnsettled,
+                'kpi_gross' => $grossTotal,
+                'kpi_buyer_paid' => $buyerPaidTotal,
+                'kpi_voucher' => $voucherTokoTotal + $voucherPlatformTotal,
+                'kpi_voucher_toko' => $voucherTokoTotal,
+                'kpi_voucher_platform' => $voucherPlatformTotal,
                 'kpi_gross_after_voucher' => $grossAfterVoucher,
                 'kpi_gross_after_voucher_toko' => $grossAfterVoucherToko,
-                'kpi_net'               => $kpiNet,
-                'kpi_cogs'              => $kpiCogs,
-                'kpi_gross_profit'      => $kpiNet - $kpiCogs,
-                'kpi_aov'               => $metaRows->count() > 0 ? round($buyerPaidTotal / $metaRows->count()) : 0,
-                'kpi_fees'              => $sellerFeeTotal,
-                'kpi_affiliate'         => $kpiAffiliate,
-                'kpi_marketplace'       => $kpiMarketplace,
-                'kpi_seller_burden'     => $sellerFeeTotal,
-                'kpi_buyer_burden'      => $buyerFeeTotal,
-                'kpi_platform_burden'   => $platformFeeTotal,
-                'kpi_adjustment_total'  => $adjustmentFeeTotal,
-                'kpi_total_burden'      => $allFeeTotal,
-                'kpi_fee_pct'           => $feePercent,
-                'kpi_fee_pct_toko'      => $feePercentToko,
+                'kpi_net' => $kpiNet,
+                'kpi_cogs' => $kpiCogs,
+                'kpi_gross_profit' => $kpiNet - $kpiCogs,
+                'kpi_aov' => $metaRows->count() > 0 ? round($buyerPaidTotal / $metaRows->count()) : 0,
+                'kpi_fees' => $sellerFeeTotal,
+                'kpi_affiliate' => $kpiAffiliate,
+                'kpi_marketplace' => $kpiMarketplace,
+                'kpi_seller_burden' => $sellerFeeTotal,
+                'kpi_buyer_burden' => $buyerFeeTotal,
+                'kpi_platform_burden' => $platformFeeTotal,
+                'kpi_adjustment_total' => $adjustmentFeeTotal,
+                'kpi_total_burden' => $allFeeTotal,
+                'kpi_fee_pct' => $feePercent,
+                'kpi_fee_pct_toko' => $feePercentToko,
                 'estimate_shopee_count' => $estimatedShopeeCount,
                 'estimate_manual_count' => $estimatedManualCount,
                 'estimate_last_synced_at' => $estimateLastSyncedAt?->toISOString(),
@@ -4186,7 +4192,7 @@ class MarketplaceController extends Controller
 
         return response()->json([
             'paginator' => $paginator,
-            'meta'      => $meta
+            'meta' => $meta,
         ]);
     }
 
@@ -4415,7 +4421,7 @@ class MarketplaceController extends Controller
             $ordersReset = \Illuminate\Support\Facades\DB::table('marketplace_orders')
                 ->where(function ($q) {
                     $q->whereNotNull('settlement_sync_error_code')
-                      ->orWhereNotNull('settlement_sync_failed_at');
+                        ->orWhereNotNull('settlement_sync_failed_at');
                 })
                 ->update([
                     'settlement_sync_error_code' => null,
@@ -4432,9 +4438,9 @@ class MarketplaceController extends Controller
             'message' => $deleted > 0 || $logsDeleted > 0 || $ordersReset > 0
                 ? "Semua data settlement dan data terkait berhasil dihapus. Settlement: {$deleted}, log sync: {$logsDeleted}, flag order di-reset: {$ordersReset}."
                 : 'Tidak ada data settlement atau data terkait untuk dihapus.',
-            'deleted'       => $deleted,
-            'logs_deleted'  => $logsDeleted,
-            'orders_reset'   => $ordersReset,
+            'deleted' => $deleted,
+            'logs_deleted' => $logsDeleted,
+            'orders_reset' => $ordersReset,
         ]);
     }
 
@@ -4477,32 +4483,32 @@ class MarketplaceController extends Controller
             ->all();
 
         $deleted = [
-            'settlements'         => 0,
-            'order_items'         => 0,
-            'fulfillments'        => 0,
-            'sync_logs'           => 0,
-            'conversations'       => 0,
-            'chat_messages'       => 0,
-            'returns'             => 0,
-            'return_items'        => 0,
-            'bookings'            => 0,
-            'product_models'      => 0,
-            'product_dailies'     => 0,
-            'products'            => 0,
-            'ads_dailies'         => 0,
-            'ads_balance_logs'    => 0,
-            'ads_item_dailies'    => 0,
-            'ads_hourly'          => 0,
-            'ads_sync_runs'       => 0,
-            'ads_settings'        => 0,
-            'ad_item_maps'        => 0,
+            'settlements' => 0,
+            'order_items' => 0,
+            'fulfillments' => 0,
+            'sync_logs' => 0,
+            'conversations' => 0,
+            'chat_messages' => 0,
+            'returns' => 0,
+            'return_items' => 0,
+            'bookings' => 0,
+            'product_models' => 0,
+            'product_dailies' => 0,
+            'products' => 0,
+            'ads_dailies' => 0,
+            'ads_balance_logs' => 0,
+            'ads_item_dailies' => 0,
+            'ads_hourly' => 0,
+            'ads_sync_runs' => 0,
+            'ads_settings' => 0,
+            'ad_item_maps' => 0,
             'ad_campaign_dailies' => 0,
-            'campaign_items'      => 0,
-            'ad_campaigns'        => 0,
-            'boost_logs'          => 0,
-            'boost_schedules'     => 0,
-            'boost_pool'          => 0,
-            'mp_incomes'          => 0,
+            'campaign_items' => 0,
+            'ad_campaigns' => 0,
+            'boost_logs' => 0,
+            'boost_schedules' => 0,
+            'boost_pool' => 0,
+            'mp_incomes' => 0,
         ];
 
         DB::transaction(function () use ($store, $legacyOrderIds, $productIds, $campaignIds, $returnIds, &$deleted) {
@@ -4667,10 +4673,10 @@ class MarketplaceController extends Controller
             'settlement',
             'items:id,marketplace_order_id,model_sku,item_sku,qty,price,mapping_status,internal_item_id,hpp_snapshot',
         ])
-        ->where(function($q) {
-            $q->whereNotIn('order_status', ['UNPAID', 'CANCELLED'])
-              ->orWhereHas('settlement');
-        });
+            ->where(function ($q) {
+                $q->whereNotIn('order_status', ['UNPAID', 'CANCELLED'])
+                    ->orWhereHas('settlement');
+            });
 
         if ($request->filled('store_id')) {
             $query->where('store_id', $request->store_id);
@@ -4702,15 +4708,15 @@ class MarketplaceController extends Controller
 
         if ($request->filled('settlement_status')) {
             if ($request->settlement_status === 'cair') {
-                $query->whereHas('settlement', function($q) {
+                $query->whereHas('settlement', function ($q) {
                     $q->whereNotNull('settlement_time');
                 });
             } elseif ($request->settlement_status === 'belum_cair') {
-                $query->where(function($q) {
+                $query->where(function ($q) {
                     $q->doesntHave('settlement')
-                      ->orWhereHas('settlement', function($q2) {
-                          $q2->whereNull('settlement_time');
-                      });
+                        ->orWhereHas('settlement', function ($q2) {
+                            $q2->whereNull('settlement_time');
+                        });
                 });
             }
         }
@@ -4719,11 +4725,11 @@ class MarketplaceController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('channel_order_id', 'like', "%{$search}%")
-                  ->orWhereHas('items', function ($qi) use ($search) {
-                      $qi->where('item_name', 'like', "%{$search}%")
-                         ->orWhere('model_sku', 'like', "%{$search}%")
-                         ->orWhere('item_sku', 'like', "%{$search}%");
-                  });
+                    ->orWhereHas('items', function ($qi) use ($search) {
+                        $qi->where('item_name', 'like', "%{$search}%")
+                            ->orWhere('model_sku', 'like', "%{$search}%")
+                            ->orWhere('item_sku', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -4741,8 +4747,7 @@ class MarketplaceController extends Controller
 
         // Build sku → item_id map via SkuMapping
         $skuMappings = SkuMapping::whereIn('marketplace_sku', $allSkus)
-            ->when($channelCode, fn ($q) => $q->where(fn ($q2) =>
-                $q2->where('channel_code', $channelCode)->orWhereNull('channel_code')
+            ->when($channelCode, fn ($q) => $q->where(fn ($q2) => $q2->where('channel_code', $channelCode)->orWhereNull('channel_code')
             ))
             ->get()
             ->groupBy('marketplace_sku');
@@ -4767,14 +4772,14 @@ class MarketplaceController extends Controller
 
         $rows = $orders->map(function ($order) use ($skuToHpp) {
             $s = $order->settlement;
-            $items    = $order->items ?? collect();
+            $items = $order->items ?? collect();
             $hppTotal = 0.0;
             $hppMapped = true;
 
             $itemDetails = [];
             foreach ($items as $item) {
                 $sku = $item->model_sku ?: $item->item_sku;
-                $isMapped = $item->mapping_status === \App\Services\MarketplaceIssueService::MAPPING_MAPPED || !empty($item->internal_item_id);
+                $isMapped = $item->mapping_status === \App\Services\MarketplaceIssueService::MAPPING_MAPPED || ! empty($item->internal_item_id);
 
                 $hpp = (float) $item->hpp_snapshot;
                 // Fallback to active snapshot if hpp_snapshot is 0
@@ -4791,7 +4796,7 @@ class MarketplaceController extends Controller
                 $itemDetails[] = [
                     'sku' => $sku ?: 'No SKU',
                     'qty' => (int) $item->qty,
-                    'mapped' => $isMapped && $hpp > 0
+                    'mapped' => $isMapped && $hpp > 0,
                 ];
             }
 
@@ -4802,63 +4807,63 @@ class MarketplaceController extends Controller
 
             $baseAmount = (float) ($order->total_paid_customer > 0 ? $order->total_paid_customer : $order->total_amount);
             $inc = $rawJson['income_details'] ?? [];
-            $escrowAmount = (float)($inc['escrow_amount'] ?? $rawJson['payment_info']['net_revenue'] ?? 0);
+            $escrowAmount = (float) ($inc['escrow_amount'] ?? $rawJson['payment_info']['net_revenue'] ?? 0);
             $isCompleted = in_array(strtoupper($order->order_status ?: $order->status), ['COMPLETED', 'SELESAI']);
 
-            if ($s && $s->final_income !== null && (float)$s->final_income > 0) {
+            if ($s && $s->final_income !== null && (float) $s->final_income > 0) {
                 $finalIncome = (float) $s->final_income;
-            } else if ($isCompleted && $escrowAmount > 0) {
+            } elseif ($isCompleted && $escrowAmount > 0) {
                 $finalIncome = $escrowAmount;
-            } else if ($isCompleted && $order->net_payout_estimated > 0) {
+            } elseif ($isCompleted && $order->net_payout_estimated > 0) {
                 $finalIncome = (float) $order->net_payout_estimated;
             } else {
                 // Estimasi potong admin fee 24% (Hanya untuk belum selesai / belum ada data)
                 $finalIncome = $baseAmount * 0.76;
             }
 
-            $adCost      = $s ? (float) $s->ad_cost : 0.0;
-            $profitNet   = $finalIncome - $hppTotal - $adCost;
-            $buyerPayment = $s ? (float) $s->buyer_payment_amount : ($isCompleted && !empty($inc['buyer_total_amount']) ? (float)$inc['buyer_total_amount'] : $baseAmount);
+            $adCost = $s ? (float) $s->ad_cost : 0.0;
+            $profitNet = $finalIncome - $hppTotal - $adCost;
+            $buyerPayment = $s ? (float) $s->buyer_payment_amount : ($isCompleted && ! empty($inc['buyer_total_amount']) ? (float) $inc['buyer_total_amount'] : $baseAmount);
 
             $omzetGross = (float) ($inc['cost_of_goods_sold'] ?? $inc['order_selling_price'] ?? $rawJson['cost_of_goods_sold'] ?? $rawJson['order_selling_price'] ?? $buyerPayment);
 
             $data = [
-                'id'                    => $s ? $s->id : null,
-                'channel_order_id'      => $order->channel_order_id,
-                'store'                 => $order->store ? ['id' => $order->store->id, 'name' => $order->store->name] : null,
-                'order'                 => [
-                    'id'           => $order->id,
+                'id' => $s ? $s->id : null,
+                'channel_order_id' => $order->channel_order_id,
+                'store' => $order->store ? ['id' => $order->store->id, 'name' => $order->store->name] : null,
+                'order' => [
+                    'id' => $order->id,
                     'order_status' => $order->order_status,
-                    'ordered_at'   => $order->ordered_at?->toISOString(),
+                    'ordered_at' => $order->ordered_at?->toISOString(),
                 ],
-                'items'                 => $itemDetails,
-                'buyer_payment_amount'  => $buyerPayment,
-                'final_income'          => $finalIncome,
-                'hpp_total'             => $hppTotal,
-                'hpp_mapped'            => $hppMapped,
-                'ad_cost'               => $adCost,
-                'profit_gross'          => $finalIncome - $hppTotal,  // before ad cost
-                'profit_net'            => $profitNet,
-                'margin_pct'            => $omzetGross > 0
+                'items' => $itemDetails,
+                'buyer_payment_amount' => $buyerPayment,
+                'final_income' => $finalIncome,
+                'hpp_total' => $hppTotal,
+                'hpp_mapped' => $hppMapped,
+                'ad_cost' => $adCost,
+                'profit_gross' => $finalIncome - $hppTotal,  // before ad cost
+                'profit_net' => $profitNet,
+                'margin_pct' => $omzetGross > 0
                     ? round($profitNet / $omzetGross * 100, 1)
                     : null,
-                'settlement_time'       => $s ? $s->settlement_time?->toISOString() : null,
-                'raw_json'              => $rawJson,
+                'settlement_time' => $s ? $s->settlement_time?->toISOString() : null,
+                'raw_json' => $rawJson,
                 // Detail potongan (untuk tooltip)
-                'commission_fee'        => $s ? (float) $s->commission_fee : 0.0,
-                'service_fee'           => $s ? (float) $s->service_fee : 0.0,
-                'transaction_fee'       => $s ? (float) $s->transaction_fee : 0.0,
-                'activity_fee'          => $s ? (float) $s->activity_fee : 0.0,
-                'seller_voucher'        => $s ? (float) $s->seller_voucher : 0.0,
+                'commission_fee' => $s ? (float) $s->commission_fee : 0.0,
+                'service_fee' => $s ? (float) $s->service_fee : 0.0,
+                'transaction_fee' => $s ? (float) $s->transaction_fee : 0.0,
+                'activity_fee' => $s ? (float) $s->activity_fee : 0.0,
+                'seller_voucher' => $s ? (float) $s->seller_voucher : 0.0,
                 'seller_coin_cash_back' => $s ? (float) $s->seller_coin_cash_back : 0.0,
-                'shipping_fee_subsidy'  => $s ? (float) $s->shipping_fee_subsidy : 0.0,
+                'shipping_fee_subsidy' => $s ? (float) $s->shipping_fee_subsidy : 0.0,
             ];
 
             $itemsDiscount = 0;
             if (isset($rawJson['items']) && is_array($rawJson['items'])) {
                 foreach ($rawJson['items'] as $it) {
-                    $sellPrice = (float)($it['selling_price'] ?? 0);
-                    $discPrice = (float)($it['discounted_price'] ?? 0);
+                    $sellPrice = (float) ($it['selling_price'] ?? 0);
+                    $discPrice = (float) ($it['discounted_price'] ?? 0);
                     if ($sellPrice > $discPrice) {
                         $itemsDiscount += ($sellPrice - $discPrice);
                     }
@@ -4888,7 +4893,7 @@ class MarketplaceController extends Controller
 
         foreach ($rows as $row) {
             $inc = $row['raw_json']['income_details'] ?? [];
-            $omzetGross = (float)($inc['cost_of_goods_sold'] ?? $inc['order_selling_price'] ?? $row['raw_json']['cost_of_goods_sold'] ?? $row['raw_json']['order_selling_price'] ?? $row['buyer_payment_amount']);
+            $omzetGross = (float) ($inc['cost_of_goods_sold'] ?? $inc['order_selling_price'] ?? $row['raw_json']['cost_of_goods_sold'] ?? $row['raw_json']['order_selling_price'] ?? $row['buyer_payment_amount']);
 
             $kpiOmzet += $omzetGross;
             $kpiHpp += (float) $row['hpp_total'];
@@ -4905,11 +4910,11 @@ class MarketplaceController extends Controller
         | ad_cost manual per-order (di-nol-kan dulu agar tidak dobel) - iklan+PPN.
         */
         $adsFrom = $request->input('order_date_from');
-        $adsTo   = $request->input('order_date_to');
+        $adsTo = $request->input('order_date_to');
 
         // Tanpa filter tanggal order eksplisit, ikuti min-max tanggal pesanan
         // dari baris HASIL filter, dikonversi ke timezone aplikasi.
-        if (!$adsFrom || !$adsTo) {
+        if (! $adsFrom || ! $adsTo) {
             $orderDates = $rows->pluck('order.ordered_at')
                 ->filter()
                 ->map(fn ($iso) => \Carbon\Carbon::parse($iso)
@@ -4917,7 +4922,7 @@ class MarketplaceController extends Controller
                     ->toDateString());
             if ($orderDates->isNotEmpty()) {
                 $adsFrom = $adsFrom ?: $orderDates->min();
-                $adsTo   = $adsTo   ?: $orderDates->max();
+                $adsTo = $adsTo ?: $orderDates->max();
             }
         }
 
@@ -4932,22 +4937,35 @@ class MarketplaceController extends Controller
         $kpiAdsTotal = round($kpiAdsSpend * 1.11, 2); // + PPN 11%
 
         $kpiAdCostManual = (float) $rows->sum(fn ($r) => (float) $r['ad_cost']);
-        $kpiProfitFinal  = $kpiProfit + $kpiAdCostManual - $kpiAdsTotal;
-        $kpiMarginFinal  = $kpiOmzet > 0 ? round(($kpiProfitFinal / $kpiOmzet) * 100, 1) : null;
-        $avgProfitFinal  = $kpiCount > 0 ? round($kpiProfitFinal / $kpiCount) : 0;
+        $kpiProfitFinal = $kpiProfit + $kpiAdCostManual - $kpiAdsTotal;
+        $kpiMarginFinal = $kpiOmzet > 0 ? round(($kpiProfitFinal / $kpiOmzet) * 100, 1) : null;
+        $avgProfitFinal = $kpiCount > 0 ? round($kpiProfitFinal / $kpiCount) : 0;
 
         // 2. Sort the Collection
         if ($request->filled('sort')) {
             $sort = $request->sort;
-            if ($sort === 'margin_asc') $rows = $rows->sortBy('margin_pct')->values();
-            elseif ($sort === 'margin_desc') $rows = $rows->sortByDesc('margin_pct')->values();
-            elseif ($sort === 'profit_asc') $rows = $rows->sortBy('profit_net')->values();
-            elseif ($sort === 'profit_desc') $rows = $rows->sortByDesc('profit_net')->values();
-            elseif ($sort === 'date_asc') $rows = $rows->sortBy(function ($r) { return $r['settlement_time'] ?? $r['order']['ordered_at'] ?? ''; })->values();
-            elseif ($sort === 'date_desc') $rows = $rows->sortByDesc(function ($r) { return $r['settlement_time'] ?? $r['order']['ordered_at'] ?? ''; })->values();
+            if ($sort === 'margin_asc') {
+                $rows = $rows->sortBy('margin_pct')->values();
+            } elseif ($sort === 'margin_desc') {
+                $rows = $rows->sortByDesc('margin_pct')->values();
+            } elseif ($sort === 'profit_asc') {
+                $rows = $rows->sortBy('profit_net')->values();
+            } elseif ($sort === 'profit_desc') {
+                $rows = $rows->sortByDesc('profit_net')->values();
+            } elseif ($sort === 'date_asc') {
+                $rows = $rows->sortBy(function ($r) {
+                    return $r['settlement_time'] ?? $r['order']['ordered_at'] ?? '';
+                })->values();
+            } elseif ($sort === 'date_desc') {
+                $rows = $rows->sortByDesc(function ($r) {
+                    return $r['settlement_time'] ?? $r['order']['ordered_at'] ?? '';
+                })->values();
+            }
         } else {
             // Default sort: latest settlement time or ordered at
-            $rows = $rows->sortByDesc(function ($r) { return $r['settlement_time'] ?? $r['order']['ordered_at'] ?? ''; })->values();
+            $rows = $rows->sortByDesc(function ($r) {
+                return $r['settlement_time'] ?? $r['order']['ordered_at'] ?? '';
+            })->values();
         }
 
         // 3. Export to CSV if requested
@@ -4957,14 +4975,14 @@ class MarketplaceController extends Controller
                 'Content-Disposition' => 'attachment; filename="profit_export.csv"',
             ];
 
-            $callback = function() use ($rows) {
+            $callback = function () use ($rows) {
                 $file = fopen('php://output', 'w');
                 // CSV Header
                 fputcsv($file, ['Order SN', 'Toko', 'Status', 'Tgl Order', 'Tgl Cair', 'Harga Jual', 'Promosi Seller (Voucher)', 'Promosi Seller (Koin)', 'Dana Cair', 'HPP', 'Profit', 'Margin %']);
 
                 foreach ($rows as $row) {
                     $inc = $row['raw_json']['income_details'] ?? [];
-                    $omzetGross = (float)($inc['cost_of_goods_sold'] ?? $inc['order_selling_price'] ?? $row['raw_json']['cost_of_goods_sold'] ?? $row['raw_json']['order_selling_price'] ?? $row['buyer_payment_amount']);
+                    $omzetGross = (float) ($inc['cost_of_goods_sold'] ?? $inc['order_selling_price'] ?? $row['raw_json']['cost_of_goods_sold'] ?? $row['raw_json']['order_selling_price'] ?? $row['buyer_payment_amount']);
 
                     fputcsv($file, [
                         $row['channel_order_id'],
@@ -4978,7 +4996,7 @@ class MarketplaceController extends Controller
                         $row['final_income'],
                         $row['hpp_total'],
                         $row['profit_net'],
-                        $row['margin_pct']
+                        $row['margin_pct'],
                     ]);
                 }
                 fclose($file);
@@ -4999,21 +5017,21 @@ class MarketplaceController extends Controller
 
         return response()->json([
             'paginator' => $paginator,
-            'meta'      => [
-                'kpi_omzet'        => $kpiOmzet,
-                'kpi_hpp'          => $kpiHpp,
-                'kpi_net'          => $kpiNet,
-                'kpi_profit'       => $kpiProfit,
-                'kpi_margin'       => $kpiMargin,
-                'avg_profit'       => $avgProfit,
-                'kpi_ads_spend'    => $kpiAdsSpend,
-                'kpi_ads_total'    => $kpiAdsTotal,
+            'meta' => [
+                'kpi_omzet' => $kpiOmzet,
+                'kpi_hpp' => $kpiHpp,
+                'kpi_net' => $kpiNet,
+                'kpi_profit' => $kpiProfit,
+                'kpi_margin' => $kpiMargin,
+                'avg_profit' => $avgProfit,
+                'kpi_ads_spend' => $kpiAdsSpend,
+                'kpi_ads_total' => $kpiAdsTotal,
                 'kpi_profit_final' => $kpiProfitFinal,
                 'kpi_margin_final' => $kpiMarginFinal,
                 'avg_profit_final' => $avgProfitFinal,
-                'kpi_count'        => $kpiCount,
-                'last_sync'        => $lastSync ? $lastSync->toISOString() : null
-            ]
+                'kpi_count' => $kpiCount,
+                'last_sync' => $lastSync ? $lastSync->toISOString() : null,
+            ],
         ]);
     }
 
@@ -5033,11 +5051,12 @@ class MarketplaceController extends Controller
         set_time_limit(180); // 3 menit — banyak campaign
 
         $dateFrom = $request->input('date_from', now()->subDays(29)->toDateString());
-        $dateTo   = $request->input('date_to',   now()->toDateString());
+        $dateTo = $request->input('date_to', now()->toDateString());
 
-        if (app()->environment('local') && function_exists('exec') && false === stripos(ini_get('disable_functions'), 'exec')) {
+        if (app()->environment('local') && function_exists('exec') && stripos(ini_get('disable_functions'), 'exec') === false) {
             try {
                 $result = $this->sync->syncAdCampaigns($store, $dateFrom, $dateTo);
+
                 return response()->json($result);
             } catch (\Throwable $e) {
                 return response()->json(['message' => $e->getMessage()], 422);
@@ -5049,7 +5068,7 @@ class MarketplaceController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Proses sinkronisasi campaign berjalan di background.'
+            'message' => 'Proses sinkronisasi campaign berjalan di background.',
         ]);
     }
 
@@ -5067,9 +5086,9 @@ class MarketplaceController extends Controller
         $data = $res['response'] ?? [];
 
         return response()->json([
-            'balance'  => $data['total_balance'] ?? $data['balance'] ?? null,
+            'balance' => $data['total_balance'] ?? $data['balance'] ?? null,
             'currency' => $data['currency'] ?? 'IDR',
-            'raw'      => $data,
+            'raw' => $data,
         ]);
     }
 
@@ -5079,7 +5098,7 @@ class MarketplaceController extends Controller
     public function adsShopPerformance(Request $request, Store $store): JsonResponse
     {
         $dateFrom = $request->input('date_from', now()->subDays(29)->toDateString());
-        $dateTo   = $request->input('date_to',   now()->toDateString());
+        $dateTo = $request->input('date_to', now()->toDateString());
 
         $res = $this->gateway->getAdsShopDailyPerformance(
             $store,
@@ -5097,14 +5116,14 @@ class MarketplaceController extends Controller
             ?? (is_array($res['response'] ?? null) && array_is_list($res['response']) ? $res['response'] : []);
 
         $rows = collect($days)->map(fn ($d) => [
-            'date'        => $d['date'] ?? null,
+            'date' => $d['date'] ?? null,
             'impressions' => $d['impression'] ?? $d['impressions'] ?? 0,
-            'clicks'      => $d['clicks'] ?? $d['click'] ?? 0,
-            'ctr'         => $d['ctr'] ?? null,
-            'spend'       => $d['expense'] ?? $d['spend'] ?? 0,
-            'orders'      => $d['broad_order'] ?? $d['orders'] ?? 0,
-            'gmv'         => $d['broad_gmv'] ?? $d['broad_order_amount'] ?? $d['gmv'] ?? 0,
-            'roas'        => $d['broad_roi'] ?? $d['roas'] ?? null,
+            'clicks' => $d['clicks'] ?? $d['click'] ?? 0,
+            'ctr' => $d['ctr'] ?? null,
+            'spend' => $d['expense'] ?? $d['spend'] ?? 0,
+            'orders' => $d['broad_order'] ?? $d['orders'] ?? 0,
+            'gmv' => $d['broad_gmv'] ?? $d['broad_order_amount'] ?? $d['gmv'] ?? 0,
+            'roas' => $d['broad_roi'] ?? $d['roas'] ?? null,
         ])->values();
 
         return response()->json(['days' => $rows]);
@@ -5176,7 +5195,7 @@ class MarketplaceController extends Controller
             $queued = Artisan::queue('marketplace:sync-ads', $params);
             $queued->onQueue('ads');
         } catch (\Throwable $e) {
-            Log::error('[Ads] Gagal memasukkan sync ke queue: ' . $e->getMessage());
+            Log::error('[Ads] Gagal memasukkan sync ke queue: '.$e->getMessage());
 
             return response()->json([
                 'status' => 'error',
@@ -5206,17 +5225,17 @@ class MarketplaceController extends Controller
 
         if ($syncType === 'yesterday') {
             $dateFrom = now()->subDay()->toDateString();
-            $dateTo   = now()->subDay()->toDateString();
+            $dateTo = now()->subDay()->toDateString();
         } elseif ($syncType === 'today') {
             $dateFrom = now()->toDateString();
-            $dateTo   = now()->toDateString();
+            $dateTo = now()->toDateString();
         } elseif ($request->filled('date_from') || $request->filled('date_to')) {
             // custom
             $dateFrom = $request->input('date_from', now()->subDays(7)->toDateString());
-            $dateTo   = $request->input('date_to', now()->toDateString());
+            $dateTo = $request->input('date_to', now()->toDateString());
         } else {
             $dateFrom = now()->toDateString();
-            $dateTo   = now()->toDateString();
+            $dateTo = now()->toDateString();
         }
 
         $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
@@ -5230,8 +5249,10 @@ class MarketplaceController extends Controller
 
         return response()->stream(function () use ($stores, $dateFrom, $dateTo, $rangeDays) {
             $sendEvent = function ($type, $message, $progress = null, $extra = []) {
-                echo json_encode(array_merge(['type' => $type, 'message' => $message, 'progress' => $progress], $extra)) . "\n";
-                if (ob_get_level() > 0) ob_flush();
+                echo json_encode(array_merge(['type' => $type, 'message' => $message, 'progress' => $progress], $extra))."\n";
+                if (ob_get_level() > 0) {
+                    ob_flush();
+                }
                 flush();
             };
 
@@ -5242,6 +5263,7 @@ class MarketplaceController extends Controller
 
             if ($totalStores === 0) {
                 $sendEvent('done', 'Tidak ada toko aktif untuk disinkronisasi.', 100, ['saved' => 0, 'errors' => []]);
+
                 return;
             }
 
@@ -5252,24 +5274,26 @@ class MarketplaceController extends Controller
             // backfill yang otomatis retry + backoff mengikuti Retry-After.
             if ($rangeDays > 65) {
                 foreach ($stores as $store) {
-                    if (\Illuminate\Support\Facades\Cache::has('shopee-ads-backfill-queued:' . $store->id)) {
+                    if (\Illuminate\Support\Facades\Cache::has('shopee-ads-backfill-queued:'.$store->id)) {
                         $sendEvent('log', "[{$store->name}] Backfill sudah ada di antrean — tidak ditambah lagi.", 60);
+
                         continue;
                     }
                     $sendEvent('log', "[{$store->name}] Rentang {$rangeDays} hari — dialihkan ke backfill background...", 20);
                     \Illuminate\Support\Facades\Artisan::call('marketplace:sync-ads', [
-                        '--store'    => $store->id,
+                        '--store' => $store->id,
                         '--backfill' => true,
-                        '--from'     => $dateFrom,
-                        '--to'       => $dateTo,
+                        '--from' => $dateFrom,
+                        '--to' => $dateTo,
                     ]);
                     $sendEvent('log', "[{$store->name}] Backfill dimasukkan ke antrean.", 60);
                 }
                 $sendEvent('done', 'Rentang panjang diproses di background dengan auto-retry saat rate limit. Pantau progres di Riwayat Sync — jendela ini boleh ditutup.', 100, [
-                    'saved'  => 0,
+                    'saved' => 0,
                     'errors' => [],
                     'status' => 'queued',
                 ]);
+
                 return;
             }
 
@@ -5278,9 +5302,10 @@ class MarketplaceController extends Controller
                 $sendEvent('log', "Mempersiapkan koneksi toko {$store->name}...", $baseProgress + 2);
 
                 try {
-                                    } catch (\Throwable $e) {
-                    $errors[] = "[{$store->name}] " . $e->getMessage();
-                    $sendEvent('log', "Gagal menghubungi {$store->name}: " . $e->getMessage(), $baseProgress + 5);
+                } catch (\Throwable $e) {
+                    $errors[] = "[{$store->name}] ".$e->getMessage();
+                    $sendEvent('log', "Gagal menghubungi {$store->name}: ".$e->getMessage(), $baseProgress + 5);
+
                     continue;
                 }
 
@@ -5288,24 +5313,26 @@ class MarketplaceController extends Controller
                 // dengan WithoutOverlapping di ShopeeAdsSyncJob
                 // (prefix 'laravel-queue-overlap:' + key 'shopee-ads-store:{id}').
                 $lock = \Illuminate\Support\Facades\Cache::lock(
-                    'laravel-queue-overlap:shopee-ads-store:' . $store->id,
+                    'laravel-queue-overlap:shopee-ads-store:'.$store->id,
                     1800
                 );
 
                 if (! $lock->get()) {
                     $errors[] = "[{$store->name}] Sync otomatis sedang berjalan untuk toko ini. Coba lagi beberapa menit.";
                     $sendEvent('log', "[{$store->name}] Dilewati: sync otomatis sedang berjalan.", $baseProgress + 5);
+
                     continue;
                 }
 
                 // Shopee masih dalam jendela rate limit? Beri tahu user dengan
                 // estimasi tunggu, jangan buang 1 call untuk gagal.
-                $cooldownUntil = (int) \Illuminate\Support\Facades\Cache::get('shopee-ads-cooldown:' . $store->id, 0);
+                $cooldownUntil = (int) \Illuminate\Support\Facades\Cache::get('shopee-ads-cooldown:'.$store->id, 0);
                 if ($cooldownUntil > time()) {
                     $waitMin = (int) ceil(($cooldownUntil - time()) / 60);
                     $errors[] = "[{$store->name}] Shopee masih membatasi permintaan (rate limit). Coba lagi dalam ±{$waitMin} menit.";
                     $sendEvent('log', "[{$store->name}] Dilewati: menunggu cooldown rate limit (±{$waitMin} menit).", $baseProgress + 5);
                     $lock->release();
+
                     continue;
                 }
 
@@ -5315,139 +5342,140 @@ class MarketplaceController extends Controller
                     ->where('status', 'processing')
                     ->where('started_at', '<', now()->subHours(2))
                     ->update([
-                        'status'        => 'error',
+                        'status' => 'error',
                         'error_message' => 'Terputus (stale) — ditandai otomatis oleh sync berikutnya',
-                        'finished_at'   => now(),
+                        'finished_at' => now(),
                     ]);
 
                 $run = null;
 
                 try {
 
-                // 1. Snapshot saldo
-                $sendEvent('log', "[{$store->name}] Sinkronisasi saldo iklan...", $baseProgress + 5);
-                try {
-                    $bal = data_get($this->gateway->getAdsTotalBalance($store), 'response.total_balance');
-                    if ($bal !== null) {
-                        \App\Models\MarketplaceAdsBalanceLog::create(['store_id' => $store->id, 'balance' => $bal]);
-                        $sendEvent('log', "[{$store->name}] Saldo berhasil disimpan.", $baseProgress + 10);
-                    }
-                } catch (\Throwable $e) {
-                    $sendEvent('log', "[{$store->name}] Gagal menarik saldo: " . $e->getMessage(), $baseProgress + 10);
-                }
-
-                $syncService = app(\App\Services\Marketplace\Ads\ShopeeAdsSyncService::class);
-                $run = \App\Models\MarketplaceAdsSyncRun::create([
-                    'store_id' => $store->id,
-                    'sync_type' => 'manual_dashboard',
-                    'date_from' => $dateFrom,
-                    'date_to' => $dateTo,
-                    'status' => 'processing',
-                    'started_at' => now(),
-                ]);
-
-                $isRateLimited = false;
-                $rateWaited = false; // tunggu-otomatis rate limit hanya sekali per toko
-                $sendEvent('log', "[{$store->name}] Sinkronisasi Daftar Kampanye...", $baseProgress + 12);
-                try {
-                    $syncService->syncCampaignsAndSettings($store, $run);
-                } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
-                    $isRateLimited = true;
-                    $errors[] = "[{$store->name}] Rate limit Shopee dicapai (Tunggu " . ceil($e->retryAfter / 60) . " menit). Sinkronisasi dihentikan sementara.";
-                    $sendEvent('log', "[{$store->name}] Batal: Rate limit tercapai.", $baseProgress + 15);
-                } catch (\Throwable $e) {
-                    $sendEvent('log', "[{$store->name}] Gagal menarik daftar kampanye: " . $e->getMessage(), $baseProgress + 15);
-                }
-
-                // 2. Performa harian, kampanye, dan produk
-                if (!$isRateLimited) {
-                    $sendEvent('log', "[{$store->name}] Memulai sinkronisasi performa...", $baseProgress + 15);
-
-                    $currentStart = \Carbon\Carbon::parse($dateFrom);
-                    $finalEnd     = \Carbon\Carbon::parse($dateTo);
-
-                    while ($currentStart->lessThanOrEqualTo($finalEnd)) {
-                    $currentEnd = clone $currentStart;
-                    $currentEnd->addDays(29);
-                    if ($currentEnd->greaterThan($finalEnd)) {
-                        $currentEnd = clone $finalEnd;
-                    }
-
-                    $sendEvent('log', "[{$store->name}] Menarik periode " . $currentStart->format('d-m-Y') . " s/d " . $currentEnd->format('d-m-Y'), $baseProgress + 20);
-
+                    // 1. Snapshot saldo
+                    $sendEvent('log', "[{$store->name}] Sinkronisasi saldo iklan...", $baseProgress + 5);
                     try {
-                        $syncService->syncShopDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
-                        $sendEvent('log', "[{$store->name}] Performa harian toko tersimpan.", $baseProgress + 20);
-
-                        $sendEvent('log', "[{$store->name}] Mengambil data performa per-jam (heatmap)...", $baseProgress + 21);
-                        $hStart = clone $currentStart;
-                        while ($hStart->lessThanOrEqualTo($currentEnd)) {
-                            // OPTIMIZATION: Only sync hourly data for the last 3 days to save rate limit
-                            if ($hStart->diffInDays(now()) <= 3) {
-                                $syncService->syncShopHourlyPerformance($store, $hStart->format('Y-m-d'), $run);
-                                usleep(250000); // 0.25s delay
-                            }
-                            $hStart->addDay();
+                        $bal = data_get($this->gateway->getAdsTotalBalance($store), 'response.total_balance');
+                        if ($bal !== null) {
+                            \App\Models\MarketplaceAdsBalanceLog::create(['store_id' => $store->id, 'balance' => $bal]);
+                            $sendEvent('log', "[{$store->name}] Saldo berhasil disimpan.", $baseProgress + 10);
                         }
-                        $sendEvent('log', "[{$store->name}] Performa per-jam tersimpan.", $baseProgress + 22);
-
-                        $syncService->syncCampaignDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
-                        $sendEvent('log', "[{$store->name}] Performa kampanye tersimpan.", $baseProgress + 25);
-
-                        $syncService->syncGmsDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
-                        $sendEvent('log', "[{$store->name}] Performa produk tersimpan.", $baseProgress + 30);
-                    } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
-                        // Jeda pendek (≤150 dtk): tunggu otomatis di sini SEKALI,
-                        // lalu ulangi chunk yang sama — user tidak perlu klik ulang.
-                        if (! $rateWaited && $e->retryAfter <= 150) {
-                            $rateWaited = true;
-                            $waitS = (int) $e->retryAfter + 5;
-                            set_time_limit(300 + $waitS);
-                            $sendEvent('log', "[{$store->name}] Rate limit Shopee — menunggu {$waitS} detik lalu lanjut otomatis…");
-                            $slept = 0;
-                            while ($slept < $waitS) {
-                                sleep(10);
-                                $slept += 10;
-                                $sendEvent('log', "[{$store->name}] …menunggu " . max(0, $waitS - $slept) . " detik lagi");
-                            }
-                            $sendEvent('log', "[{$store->name}] Lanjut — mengulang periode yang terpotong…");
-                            continue; // ulangi chunk yang sama (advance tanggal dilewati)
-                        }
-
-                        $isRateLimited = true;
-                        $errors[] = "[{$store->name}] Rate limit Shopee dicapai (Tunggu " . ceil($e->retryAfter / 60) . " menit). Sinkronisasi dihentikan sementara — klik ulang nanti, proses lanjut dari yang belum tertarik.";
-                        $sendEvent('log', "[{$store->name}] Batal: Rate limit tercapai. Silakan coba lagi nanti.");
-                        break; // Stop syncing this store for now
                     } catch (\Throwable $e) {
-                        $errors[] = "[{$store->name}] " . $e->getMessage();
-                        $sendEvent('log', "[{$store->name}] Kesalahan pada periode ini: " . $e->getMessage());
+                        $sendEvent('log', "[{$store->name}] Gagal menarik saldo: ".$e->getMessage(), $baseProgress + 10);
                     }
 
-                    $currentStart = $currentEnd->addDay();
-                    usleep(500000); // 0.5 sec delay between chunks
-                }
-                } // End if (!$isRateLimited)
+                    $syncService = app(\App\Services\Marketplace\Ads\ShopeeAdsSyncService::class);
+                    $run = \App\Models\MarketplaceAdsSyncRun::create([
+                        'store_id' => $store->id,
+                        'sync_type' => 'manual_dashboard',
+                        'date_from' => $dateFrom,
+                        'date_to' => $dateTo,
+                        'status' => 'processing',
+                        'started_at' => now(),
+                    ]);
 
-                // Rate-limit BUKAN sukses — jangan tandai success supaya
-                // riwayat sync jujur dan bisa di-retry.
-                $run->update([
-                    'status'      => $isRateLimited ? 'rate_limited' : 'success',
-                    'finished_at' => now(),
-                ]);
-                $saved += $run->total_updated;
-                $sendEvent('log', "[{$store->name}] Berhasil memperbarui {$run->total_updated} baris data.", $baseProgress + (90 / $totalStores));
+                    $isRateLimited = false;
+                    $rateWaited = false; // tunggu-otomatis rate limit hanya sekali per toko
+                    $sendEvent('log', "[{$store->name}] Sinkronisasi Daftar Kampanye...", $baseProgress + 12);
+                    try {
+                        $syncService->syncCampaignsAndSettings($store, $run);
+                    } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
+                        $isRateLimited = true;
+                        $errors[] = "[{$store->name}] Rate limit Shopee dicapai (Tunggu ".ceil($e->retryAfter / 60).' menit). Sinkronisasi dihentikan sementara.';
+                        $sendEvent('log', "[{$store->name}] Batal: Rate limit tercapai.", $baseProgress + 15);
+                    } catch (\Throwable $e) {
+                        $sendEvent('log', "[{$store->name}] Gagal menarik daftar kampanye: ".$e->getMessage(), $baseProgress + 15);
+                    }
+
+                    // 2. Performa harian, kampanye, dan produk
+                    if (! $isRateLimited) {
+                        $sendEvent('log', "[{$store->name}] Memulai sinkronisasi performa...", $baseProgress + 15);
+
+                        $currentStart = \Carbon\Carbon::parse($dateFrom);
+                        $finalEnd = \Carbon\Carbon::parse($dateTo);
+
+                        while ($currentStart->lessThanOrEqualTo($finalEnd)) {
+                            $currentEnd = clone $currentStart;
+                            $currentEnd->addDays(29);
+                            if ($currentEnd->greaterThan($finalEnd)) {
+                                $currentEnd = clone $finalEnd;
+                            }
+
+                            $sendEvent('log', "[{$store->name}] Menarik periode ".$currentStart->format('d-m-Y').' s/d '.$currentEnd->format('d-m-Y'), $baseProgress + 20);
+
+                            try {
+                                $syncService->syncShopDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
+                                $sendEvent('log', "[{$store->name}] Performa harian toko tersimpan.", $baseProgress + 20);
+
+                                $sendEvent('log', "[{$store->name}] Mengambil data performa per-jam (heatmap)...", $baseProgress + 21);
+                                $hStart = clone $currentStart;
+                                while ($hStart->lessThanOrEqualTo($currentEnd)) {
+                                    // OPTIMIZATION: Only sync hourly data for the last 3 days to save rate limit
+                                    if ($hStart->diffInDays(now()) <= 3) {
+                                        $syncService->syncShopHourlyPerformance($store, $hStart->format('Y-m-d'), $run);
+                                        usleep(250000); // 0.25s delay
+                                    }
+                                    $hStart->addDay();
+                                }
+                                $sendEvent('log', "[{$store->name}] Performa per-jam tersimpan.", $baseProgress + 22);
+
+                                $syncService->syncCampaignDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
+                                $sendEvent('log', "[{$store->name}] Performa kampanye tersimpan.", $baseProgress + 25);
+
+                                $syncService->syncGmsDailyPerformance($store, $currentStart->format('Y-m-d'), $currentEnd->format('Y-m-d'), $run);
+                                $sendEvent('log', "[{$store->name}] Performa produk tersimpan.", $baseProgress + 30);
+                            } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
+                                // Jeda pendek (≤150 dtk): tunggu otomatis di sini SEKALI,
+                                // lalu ulangi chunk yang sama — user tidak perlu klik ulang.
+                                if (! $rateWaited && $e->retryAfter <= 150) {
+                                    $rateWaited = true;
+                                    $waitS = (int) $e->retryAfter + 5;
+                                    set_time_limit(300 + $waitS);
+                                    $sendEvent('log', "[{$store->name}] Rate limit Shopee — menunggu {$waitS} detik lalu lanjut otomatis…");
+                                    $slept = 0;
+                                    while ($slept < $waitS) {
+                                        sleep(10);
+                                        $slept += 10;
+                                        $sendEvent('log', "[{$store->name}] …menunggu ".max(0, $waitS - $slept).' detik lagi');
+                                    }
+                                    $sendEvent('log', "[{$store->name}] Lanjut — mengulang periode yang terpotong…");
+
+                                    continue; // ulangi chunk yang sama (advance tanggal dilewati)
+                                }
+
+                                $isRateLimited = true;
+                                $errors[] = "[{$store->name}] Rate limit Shopee dicapai (Tunggu ".ceil($e->retryAfter / 60).' menit). Sinkronisasi dihentikan sementara — klik ulang nanti, proses lanjut dari yang belum tertarik.';
+                                $sendEvent('log', "[{$store->name}] Batal: Rate limit tercapai. Silakan coba lagi nanti.");
+                                break; // Stop syncing this store for now
+                            } catch (\Throwable $e) {
+                                $errors[] = "[{$store->name}] ".$e->getMessage();
+                                $sendEvent('log', "[{$store->name}] Kesalahan pada periode ini: ".$e->getMessage());
+                            }
+
+                            $currentStart = $currentEnd->addDay();
+                            usleep(500000); // 0.5 sec delay between chunks
+                        }
+                    } // End if (!$isRateLimited)
+
+                    // Rate-limit BUKAN sukses — jangan tandai success supaya
+                    // riwayat sync jujur dan bisa di-retry.
+                    $run->update([
+                        'status' => $isRateLimited ? 'rate_limited' : 'success',
+                        'finished_at' => now(),
+                    ]);
+                    $saved += $run->total_updated;
+                    $sendEvent('log', "[{$store->name}] Berhasil memperbarui {$run->total_updated} baris data.", $baseProgress + (90 / $totalStores));
 
                 } catch (\Throwable $e) {
                     // Jangan biarkan run tertinggal 'processing' kalau ada error tak terduga.
                     if ($run && $run->status === 'processing') {
                         $run->update([
-                            'status'        => 'error',
+                            'status' => 'error',
                             'error_message' => substr($e->getMessage(), 0, 1000),
-                            'finished_at'   => now(),
+                            'finished_at' => now(),
                         ]);
                     }
-                    $errors[] = "[{$store->name}] " . $e->getMessage();
-                    $sendEvent('log', "[{$store->name}] Error: " . $e->getMessage());
+                    $errors[] = "[{$store->name}] ".$e->getMessage();
+                    $sendEvent('log', "[{$store->name}] Error: ".$e->getMessage());
                 } finally {
                     $lock->release();
                 }
@@ -5457,7 +5485,7 @@ class MarketplaceController extends Controller
                 'saved' => $saved,
                 'stores' => $totalStores,
                 'errors' => $errors,
-                'status' => 'success'
+                'status' => 'success',
             ]);
         }, 200, [
             'Content-Type' => 'application/x-ndjson',
@@ -5487,9 +5515,9 @@ class MarketplaceController extends Controller
         }
 
         $rows = collect($byDayStore)->map(fn ($stores, $date) => [
-            'date'    => $date,
+            'date' => $date,
             'balance' => array_sum($stores),
-            'stores'  => count($stores),
+            'stores' => count($stores),
         ])->values();
 
         return response()->json(['days' => $rows]);
@@ -5501,7 +5529,7 @@ class MarketplaceController extends Controller
     public function adsDaily(Request $request): JsonResponse
     {
         $dateFrom = $request->input('date_from', now()->subDays(29)->toDateString());
-        $dateTo   = $request->input('date_to',   now()->toDateString());
+        $dateTo = $request->input('date_to', now()->toDateString());
 
         $q = \App\Models\MarketplaceAdsDaily::query()
             ->whereBetween('date', [$dateFrom, $dateTo])
@@ -5515,8 +5543,9 @@ class MarketplaceController extends Controller
             ->groupBy('date')->orderBy('date')
             ->get()
             ->map(function ($r) {
-                $r->ctr  = $r->impressions > 0 ? round($r->clicks / $r->impressions * 100, 2) : null;
+                $r->ctr = $r->impressions > 0 ? round($r->clicks / $r->impressions * 100, 2) : null;
                 $r->roas = $r->spend > 0 ? round($r->gmv / $r->spend, 2) : null;
+
                 return $r;
             });
 
@@ -5529,9 +5558,9 @@ class MarketplaceController extends Controller
             ->map(fn ($r) => [
                 'store' => $r->store?->name,
                 'spend' => (float) $r->spend,
-                'orders'=> (int) $r->orders,
-                'gmv'   => (float) $r->gmv,
-                'roas'  => $r->spend > 0 ? round($r->gmv / $r->spend, 2) : null,
+                'orders' => (int) $r->orders,
+                'gmv' => (float) $r->gmv,
+                'roas' => $r->spend > 0 ? round($r->gmv / $r->spend, 2) : null,
             ]);
 
         return response()->json(['days' => $days, 'per_store' => $perStore]);
@@ -5540,24 +5569,24 @@ class MarketplaceController extends Controller
     /** Debug: lihat raw response Shopee Ads API (hapus setelah selesai debug) */
     public function debugAdApi(Request $request, Store $store): JsonResponse
     {
-        $sampleIds  = [34741562, 34741571, 65538832]; // 3 campaign pertama
-        $today      = now()->format('d-m-Y');
-        $monthAgo   = now()->subDays(29)->format('d-m-Y');
+        $sampleIds = [34741562, 34741571, 65538832]; // 3 campaign pertama
+        $today = now()->format('d-m-Y');
+        $monthAgo = now()->subDays(29)->format('d-m-Y');
 
         return response()->json([
-            'toggle_info'    => $this->gateway->getShopToggleInfo($store),
-            'campaign_ids'   => $this->gateway->getCampaignIdList($store, 1, 5),
-            'setting_info'   => $this->gateway->getCampaignSettingInfo($store, $sampleIds),
-            'daily_perf'     => $this->gateway->getCampaignDailyPerformance($store, $sampleIds, $monthAgo, $today),
+            'toggle_info' => $this->gateway->getShopToggleInfo($store),
+            'campaign_ids' => $this->gateway->getCampaignIdList($store, 1, 5),
+            'setting_info' => $this->gateway->getCampaignSettingInfo($store, $sampleIds),
+            'daily_perf' => $this->gateway->getCampaignDailyPerformance($store, $sampleIds, $monthAgo, $today),
         ]);
     }
 
     public function adsAnalytics(Request $request): JsonResponse
     {
         $dateFrom = $request->input('date_from', now()->subDays(29)->toDateString());
-        $dateTo   = $request->input('date_to',   now()->toDateString());
-        $storeId  = $request->input('store_id');
-        $groupBy  = $request->input('group_by', 'campaign'); // campaign | item | group
+        $dateTo = $request->input('date_to', now()->toDateString());
+        $storeId = $request->input('store_id');
+        $groupBy = $request->input('group_by', 'campaign'); // campaign | item | group
 
         // ── 1. Agregasi metrik harian per campaign dalam rentang tanggal ──────
         //    Grain data ada di marketplace_ad_campaign_dailies → dijumlahkan
@@ -5578,15 +5607,15 @@ class MarketplaceController extends Controller
             ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
             ->groupBy('store_id', 'channel_campaign_id')
             ->get()
-            ->keyBy(fn ($r) => $r->store_id . '|' . $r->channel_campaign_id);
+            ->keyBy(fn ($r) => $r->store_id.'|'.$r->channel_campaign_id);
 
         if ($agg->isEmpty()) {
             return response()->json([
-                'rows'   => [],
+                'rows' => [],
                 'groups' => $this->adGroupsPayload(),
-                'view'   => $groupBy,
-                'kpi'    => ['spend' => 0, 'gmv' => 0, 'roas' => null, 'acos' => null,
-                             'orders' => 0, 'clicks' => 0, 'profit_after_ads' => null],
+                'view' => $groupBy,
+                'kpi' => ['spend' => 0, 'gmv' => 0, 'roas' => null, 'acos' => null,
+                    'orders' => 0, 'clicks' => 0, 'profit_after_ads' => null],
             ]);
         }
 
@@ -5595,102 +5624,111 @@ class MarketplaceController extends Controller
             ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
             ->whereIn('channel_campaign_id', $agg->pluck('channel_campaign_id')->unique()->all())
             ->get()
-            ->keyBy(fn ($c) => $c->store_id . '|' . $c->channel_campaign_id);
+            ->keyBy(fn ($c) => $c->store_id.'|'.$c->channel_campaign_id);
 
         // ── 3. Build baris campaign-level ─────────────────────────────────────
         $campaignRows = collect();
         foreach ($agg as $key => $a) {
             $c = $masters->get($key);
-            if (! $c) continue;
+            if (! $c) {
+                continue;
+            }
 
-            $spend  = (float) $a->spend;
-            $gmv    = (float) $a->gmv;
+            $spend = (float) $a->spend;
+            $gmv = (float) $a->gmv;
             $orders = (int) $a->orders;
             $clicks = (int) $a->clicks;
-            $units  = (int) $a->items_sold;
+            $units = (int) $a->items_sold;
 
             $acos = $gmv > 0 && $spend > 0 ? round($spend / $gmv, 4) : null;
             $roas = GmvMaxAnalytics::roas($gmv, $spend);            // broad actual ROAS
             $directRoas = GmvMaxAnalytics::roas((float) $a->direct_gmv, $spend);
-            $cpc  = $clicks > 0 ? round($spend / $clicks, 2) : null;
+            $cpc = $clicks > 0 ? round($spend / $clicks, 2) : null;
 
             // ── Setting GMV Max (Fase 2 kolom; sudah ter-load di $c, tanpa N+1) ──
-            $targetRoas   = $c->target_roas !== null ? (float) $c->target_roas : null;
+            $targetRoas = $c->target_roas !== null ? (float) $c->target_roas : null;
             $targetStatus = GmvMaxAnalytics::targetStatus($targetRoas, $roas, $c->bidding_method);
 
             // Break-even ACOS efektif (override manual atau derivasi HPP item)
             $beAcos = $c->break_even_acos !== null
                 ? (float) $c->break_even_acos
                 : $this->deriveBreakEvenAcos($c->internalItem, $gmv, $units);
-            $bePct  = $beAcos !== null ? round($beAcos * 100, 1) : null;
+            $bePct = $beAcos !== null ? round($beAcos * 100, 1) : null;
 
             $profitAfterAds = ($beAcos !== null) ? round($gmv * $beAcos - $spend, 2) : null;
             $reco = $this->adsRecommendation($spend, $acos, $beAcos, $orders);
 
             $campaignRows->push([
-                'id'              => $c->id,
-                'store_id'        => $c->store_id,
-                'store_name'      => $c->store?->name,
-                'campaign_id'     => $c->channel_campaign_id,
-                'campaign_name'   => $c->campaign_name,
-                'campaign_type'   => $c->campaign_type,
-                'status'          => $c->status,
+                'id' => $c->id,
+                'store_id' => $c->store_id,
+                'store_name' => $c->store?->name,
+                'campaign_id' => $c->channel_campaign_id,
+                'campaign_name' => $c->campaign_name,
+                'campaign_type' => $c->campaign_type,
+                'status' => $c->status,
                 'channel_item_id' => $c->channel_item_id,
-                'internal_item_id'=> $c->internal_item_id,
-                'item_code'       => $c->internalItem?->code,
-                'item_name'       => $c->internalItem?->name,
-                'mapping_status'  => $c->mapping_status,
-                'ad_group_id'     => $c->ad_group_id,
-                'group_name'      => $c->group?->name,
-                'group_color'     => $c->group?->color,
+                'internal_item_id' => $c->internal_item_id,
+                'item_code' => $c->internalItem?->code,
+                'item_name' => $c->internalItem?->name,
+                'mapping_status' => $c->mapping_status,
+                'ad_group_id' => $c->ad_group_id,
+                'group_name' => $c->group?->name,
+                'group_color' => $c->group?->color,
                 // ── Setting GMV Max ──
-                'ad_type'            => $c->ad_type,
-                'bidding_method'     => $c->bidding_method,
-                'target_roas'        => $targetRoas,
-                'target_status'      => $targetStatus,
-                'campaign_budget'    => $c->campaign_budget !== null ? (float) $c->campaign_budget : null,
-                'campaign_status'    => $c->campaign_status,
+                'ad_type' => $c->ad_type,
+                'bidding_method' => $c->bidding_method,
+                'target_roas' => $targetRoas,
+                'target_status' => $targetStatus,
+                'campaign_budget' => $c->campaign_budget !== null ? (float) $c->campaign_budget : null,
+                'campaign_status' => $c->campaign_status,
                 'campaign_placement' => $c->campaign_placement,
-                'started_at'         => optional($c->started_at)->toDateTimeString(),
-                'ended_at'           => optional($c->ended_at)->toDateTimeString(),
-                'setting_synced_at'  => optional($c->setting_synced_at)->toDateTimeString(),
+                'started_at' => optional($c->started_at)->toDateTimeString(),
+                'ended_at' => optional($c->ended_at)->toDateTimeString(),
+                'setting_synced_at' => optional($c->setting_synced_at)->toDateTimeString(),
 
-                'spend'           => $spend,
-                'gmv'             => $gmv,
-                'direct_gmv'      => (float) $a->direct_gmv,
-                'direct_roas'     => $directRoas,
-                'impressions'     => (int) $a->impressions,
-                'clicks'          => $clicks,
-                'orders'          => $orders,
-                'items_sold'      => $units,
-                'roas'            => $roas,
-                'cpc'             => $cpc,
-                'acos'            => $acos,
-                'acos_pct'        => $acos !== null ? round($acos * 100, 1) : null,
-                'break_even_acos'     => $beAcos,
+                'spend' => $spend,
+                'gmv' => $gmv,
+                'direct_gmv' => (float) $a->direct_gmv,
+                'direct_roas' => $directRoas,
+                'impressions' => (int) $a->impressions,
+                'clicks' => $clicks,
+                'orders' => $orders,
+                'items_sold' => $units,
+                'roas' => $roas,
+                'cpc' => $cpc,
+                'acos' => $acos,
+                'acos_pct' => $acos !== null ? round($acos * 100, 1) : null,
+                'break_even_acos' => $beAcos,
                 'break_even_acos_pct' => $bePct,
-                'profit_after_ads'    => $profitAfterAds,
-                'reco'            => $reco,
+                'profit_after_ads' => $profitAfterAds,
+                'reco' => $reco,
             ]);
         }
 
         // ── 3b. Filter server-side khusus GMV Max (opsional) ──────────────────
-        $fBidding      = $request->input('bidding_method');
-        $fCampStatus   = $request->input('campaign_status');
+        $fBidding = $request->input('bidding_method');
+        $fCampStatus = $request->input('campaign_status');
         $fTargetStatus = $request->input('target_status');
         if ($fBidding || $fCampStatus || $fTargetStatus) {
             $campaignRows = $campaignRows->filter(function ($r) use ($fBidding, $fCampStatus, $fTargetStatus) {
-                if ($fBidding && ($r['bidding_method'] ?? null) !== $fBidding) return false;
-                if ($fCampStatus && ($r['campaign_status'] ?? null) !== $fCampStatus) return false;
-                if ($fTargetStatus && ($r['target_status'] ?? null) !== $fTargetStatus) return false;
+                if ($fBidding && ($r['bidding_method'] ?? null) !== $fBidding) {
+                    return false;
+                }
+                if ($fCampStatus && ($r['campaign_status'] ?? null) !== $fCampStatus) {
+                    return false;
+                }
+                if ($fTargetStatus && ($r['target_status'] ?? null) !== $fTargetStatus) {
+                    return false;
+                }
+
                 return true;
             })->values();
         }
 
         // ── 4. Regroup jika perlu (per item internal / per grup) ──────────────
         $rows = match ($groupBy) {
-            'item'  => $this->aggregateAdRows($campaignRows, 'internal_item_id',
-                fn ($r) => $r['item_name'] ?? ($r['internal_item_id'] ? 'Item #' . $r['internal_item_id'] : '⚠ Belum di-mapping'),
+            'item' => $this->aggregateAdRows($campaignRows, 'internal_item_id',
+                fn ($r) => $r['item_name'] ?? ($r['internal_item_id'] ? 'Item #'.$r['internal_item_id'] : '⚠ Belum di-mapping'),
                 fn ($r) => ['item_code' => $r['item_code'], 'internal_item_id' => $r['internal_item_id']]),
             'group' => $this->aggregateAdRows($campaignRows, 'ad_group_id',
                 fn ($r) => $r['group_name'] ?? '— Tanpa Grup —',
@@ -5699,34 +5737,34 @@ class MarketplaceController extends Controller
         };
 
         // ── 5. Overall KPI (selalu level campaign; broad = attributed utama) ──
-        $totSpend    = $campaignRows->sum('spend');
-        $totGmv      = $campaignRows->sum('gmv');       // broad — JANGAN jumlahkan dgn direct
-        $totDirect   = $campaignRows->sum('direct_gmv');
+        $totSpend = $campaignRows->sum('spend');
+        $totGmv = $campaignRows->sum('gmv');       // broad — JANGAN jumlahkan dgn direct
+        $totDirect = $campaignRows->sum('direct_gmv');
         // Last sync = setting/perf tersinkron terbaru dari campaign yang tampil
         $lastSync = $masters->flatMap(fn ($c) => [$c->setting_synced_at, $c->synced_at])
             ->filter()->max();
         $kpi = [
-            'spend'            => $totSpend,
-            'gmv'              => $totGmv,
-            'direct_gmv'       => $totDirect,
-            'roas'             => GmvMaxAnalytics::roas($totGmv, $totSpend),
-            'direct_roas'      => GmvMaxAnalytics::roas($totDirect, $totSpend),
+            'spend' => $totSpend,
+            'gmv' => $totGmv,
+            'direct_gmv' => $totDirect,
+            'roas' => GmvMaxAnalytics::roas($totGmv, $totSpend),
+            'direct_roas' => GmvMaxAnalytics::roas($totDirect, $totSpend),
             'weighted_target_roas' => GmvMaxAnalytics::weightedTargetRoas($campaignRows),
-            'acos'             => $totGmv  > 0 ? round($totSpend / $totGmv * 100, 1) : null,
-            'orders'           => $campaignRows->sum('orders'),
-            'clicks'           => $campaignRows->sum('clicks'),
+            'acos' => $totGmv > 0 ? round($totSpend / $totGmv * 100, 1) : null,
+            'orders' => $campaignRows->sum('orders'),
+            'clicks' => $campaignRows->sum('clicks'),
             'active_campaigns' => $campaignRows->where('campaign_status', 'ongoing')->count(),
-            'below_target'     => $campaignRows->where('target_status', 'below')->count(),
+            'below_target' => $campaignRows->where('target_status', 'below')->count(),
             'profit_after_ads' => $campaignRows->filter(fn ($r) => $r['profit_after_ads'] !== null)->sum('profit_after_ads') ?: null,
-            'unmapped'         => $campaignRows->where('internal_item_id', null)->count(),
-            'last_sync'        => $lastSync ? $lastSync->toDateTimeString() : null,
+            'unmapped' => $campaignRows->where('internal_item_id', null)->count(),
+            'last_sync' => $lastSync ? $lastSync->toDateTimeString() : null,
         ];
 
         return response()->json([
-            'rows'   => $rows->values(),
+            'rows' => $rows->values(),
             'groups' => $this->adGroupsPayload(),
-            'view'   => $groupBy,
-            'kpi'    => $kpi,
+            'view' => $groupBy,
+            'kpi' => $kpi,
         ]);
     }
 
@@ -5736,11 +5774,18 @@ class MarketplaceController extends Controller
      */
     private function deriveBreakEvenAcos(?Item $item, float $gmv, int $units): ?float
     {
-        if (! $item || $units <= 0 || $gmv <= 0) return null;
+        if (! $item || $units <= 0 || $gmv <= 0) {
+            return null;
+        }
         $hpp = (float) ($item->hpp ?? $item->base_unit_cost ?? 0);
-        if ($hpp <= 0) return null;
+        if ($hpp <= 0) {
+            return null;
+        }
         $avgPrice = $gmv / $units;
-        if ($hpp >= $avgPrice) return null;
+        if ($hpp >= $avgPrice) {
+            return null;
+        }
+
         return round(($avgPrice - $hpp) / $avgPrice, 6);
     }
 
@@ -5753,9 +5798,9 @@ class MarketplaceController extends Controller
         return $campaignRows
             ->groupBy(fn ($r) => $r[$keyField] ?? '∅')
             ->map(function ($group) use ($keyField, $labelFn, $metaFn) {
-                $first  = $group->first();
-                $spend  = $group->sum('spend');
-                $gmv    = $group->sum('gmv');
+                $first = $group->first();
+                $spend = $group->sum('spend');
+                $gmv = $group->sum('gmv');
                 $orders = $group->sum('orders');
                 $clicks = $group->sum('clicks');
 
@@ -5766,34 +5811,34 @@ class MarketplaceController extends Controller
                 $beAcos = $beWeighted->isNotEmpty() && $beWeighted->sum('gmv') > 0
                     ? round($beWeighted->sum(fn ($r) => $r['break_even_acos'] * $r['gmv']) / $beWeighted->sum('gmv'), 4)
                     : null;
-                $bePct  = $beAcos !== null ? round($beAcos * 100, 1) : null;
+                $bePct = $beAcos !== null ? round($beAcos * 100, 1) : null;
 
                 $profit = $group->filter(fn ($r) => $r['profit_after_ads'] !== null)->sum('profit_after_ads') ?: null;
-                $reco   = $this->adsRecommendation($spend, $acos, $beAcos, $orders);
+                $reco = $this->adsRecommendation($spend, $acos, $beAcos, $orders);
 
                 return array_merge([
-                    'id'              => $keyField . ':' . ($first[$keyField] ?? 'none'),
-                    'is_group'        => true,
-                    'campaign_id'     => null,
-                    'campaign_name'   => $labelFn($first),
-                    'campaign_type'   => $group->count() . ' campaign',
-                    'status'          => null,
-                    'members'         => $group->count(),
-                    'spend'           => $spend,
-                    'gmv'             => $gmv,
-                    'direct_gmv'      => $group->sum('direct_gmv'),
-                    'impressions'     => $group->sum('impressions'),
-                    'clicks'          => $clicks,
-                    'orders'          => $orders,
-                    'items_sold'      => $group->sum('items_sold'),
-                    'roas'            => $roas,
-                    'cpc'             => $clicks > 0 ? round($spend / $clicks, 2) : null,
-                    'acos'            => $acos,
-                    'acos_pct'        => $acos !== null ? round($acos * 100, 1) : null,
-                    'break_even_acos'     => $beAcos,
+                    'id' => $keyField.':'.($first[$keyField] ?? 'none'),
+                    'is_group' => true,
+                    'campaign_id' => null,
+                    'campaign_name' => $labelFn($first),
+                    'campaign_type' => $group->count().' campaign',
+                    'status' => null,
+                    'members' => $group->count(),
+                    'spend' => $spend,
+                    'gmv' => $gmv,
+                    'direct_gmv' => $group->sum('direct_gmv'),
+                    'impressions' => $group->sum('impressions'),
+                    'clicks' => $clicks,
+                    'orders' => $orders,
+                    'items_sold' => $group->sum('items_sold'),
+                    'roas' => $roas,
+                    'cpc' => $clicks > 0 ? round($spend / $clicks, 2) : null,
+                    'acos' => $acos,
+                    'acos_pct' => $acos !== null ? round($acos * 100, 1) : null,
+                    'break_even_acos' => $beAcos,
                     'break_even_acos_pct' => $bePct,
-                    'profit_after_ads'    => $profit,
-                    'reco'            => $reco,
+                    'profit_after_ads' => $profit,
+                    'reco' => $reco,
                 ], $metaFn($first));
             })
             ->sortByDesc('spend')
@@ -5821,7 +5866,7 @@ class MarketplaceController extends Controller
         $campaign->update(['break_even_acos' => $data['break_even_acos']]);
 
         return response()->json([
-            'message'         => 'Break-even ACOS diperbarui.',
+            'message' => 'Break-even ACOS diperbarui.',
             'break_even_acos' => (float) $campaign->break_even_acos,
         ]);
     }
@@ -5842,7 +5887,9 @@ class MarketplaceController extends Controller
             MarketplaceAdItemMap::query()
                 ->where('channel_code', 'shopee')
                 ->where(function ($q) use ($campaign) {
-                    if ($campaign->channel_item_id) $q->orWhere('channel_item_id', $campaign->channel_item_id);
+                    if ($campaign->channel_item_id) {
+                        $q->orWhere('channel_item_id', $campaign->channel_item_id);
+                    }
                     $q->orWhere('channel_campaign_id', $campaign->channel_campaign_id);
                 })->delete();
 
@@ -5850,9 +5897,9 @@ class MarketplaceController extends Controller
             $campaign->save();
 
             return response()->json([
-                'message'          => 'Override mapping dihapus, kembali ke otomatis.',
+                'message' => 'Override mapping dihapus, kembali ke otomatis.',
                 'internal_item_id' => $campaign->internal_item_id,
-                'mapping_status'   => $campaign->mapping_status,
+                'mapping_status' => $campaign->mapping_status,
             ]);
         }
 
@@ -5861,24 +5908,24 @@ class MarketplaceController extends Controller
                 ? ['channel_code' => 'shopee', 'channel_item_id' => $campaign->channel_item_id]
                 : ['channel_code' => 'shopee', 'channel_campaign_id' => $campaign->channel_campaign_id],
             [
-                'store_id'            => $campaign->store_id,
+                'store_id' => $campaign->store_id,
                 'channel_campaign_id' => $campaign->channel_campaign_id,
-                'internal_item_id'    => $data['internal_item_id'],
-                'created_by'          => $request->user()?->id,
+                'internal_item_id' => $data['internal_item_id'],
+                'created_by' => $request->user()?->id,
             ]
         );
 
         $campaign->update([
             'internal_item_id' => $data['internal_item_id'],
-            'mapping_status'   => 'manual',
-            'mapping_source'   => 'manual',
+            'mapping_status' => 'manual',
+            'mapping_source' => 'manual',
         ]);
 
         return response()->json([
-            'message'          => 'Item internal berhasil di-mapping.',
+            'message' => 'Item internal berhasil di-mapping.',
             'internal_item_id' => $campaign->internal_item_id,
-            'item'             => optional(Item::find($data['internal_item_id']))->only(['id', 'code', 'name']),
-            'mapping_status'   => 'manual',
+            'item' => optional(Item::find($data['internal_item_id']))->only(['id', 'code', 'name']),
+            'mapping_status' => 'manual',
         ]);
     }
 
@@ -5886,7 +5933,7 @@ class MarketplaceController extends Controller
     public function storeAdGroup(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name'  => ['required', 'string', 'max:120'],
+            'name' => ['required', 'string', 'max:120'],
             'color' => ['nullable', 'string', 'max:20'],
             'notes' => ['nullable', 'string'],
         ]);
@@ -5901,7 +5948,7 @@ class MarketplaceController extends Controller
     public function updateAdGroup(Request $request, MarketplaceAdGroup $group): JsonResponse
     {
         $data = $request->validate([
-            'name'  => ['sometimes', 'string', 'max:120'],
+            'name' => ['sometimes', 'string', 'max:120'],
             'color' => ['nullable', 'string', 'max:20'],
             'notes' => ['nullable', 'string'],
         ]);
@@ -5921,7 +5968,7 @@ class MarketplaceController extends Controller
         $campaign->update(['ad_group_id' => $data['ad_group_id'] ?? null]);
 
         return response()->json([
-            'message'     => $data['ad_group_id'] ? 'Campaign dimasukkan ke grup.' : 'Campaign dikeluarkan dari grup.',
+            'message' => $data['ad_group_id'] ? 'Campaign dimasukkan ke grup.' : 'Campaign dikeluarkan dari grup.',
             'ad_group_id' => $campaign->ad_group_id,
         ]);
     }
@@ -5934,7 +5981,7 @@ class MarketplaceController extends Controller
     public function campaignDetail(Request $request, MarketplaceAdCampaign $campaign): JsonResponse
     {
         $dateFrom = $request->input('date_from', now()->subDays(29)->toDateString());
-        $dateTo   = $request->input('date_to',   now()->toDateString());
+        $dateTo = $request->input('date_to', now()->toDateString());
 
         $campaign->loadMissing('internalItem:id,code,name', 'store:id,name');
 
@@ -5945,46 +5992,46 @@ class MarketplaceController extends Controller
             ->orderBy('date')
             ->get(['date', 'expense', 'impressions', 'clicks', 'broad_order', 'direct_order', 'broad_gmv', 'direct_gmv']);
 
-        $spend  = (float) $daily->sum('expense');
-        $gmv    = (float) $daily->sum('broad_gmv');
-        $dGmv   = (float) $daily->sum('direct_gmv');
-        $impr   = (int) $daily->sum('impressions');
+        $spend = (float) $daily->sum('expense');
+        $gmv = (float) $daily->sum('broad_gmv');
+        $dGmv = (float) $daily->sum('direct_gmv');
+        $impr = (int) $daily->sum('impressions');
         $clicks = (int) $daily->sum('clicks');
-        $bOrd   = (int) $daily->sum('broad_order');
-        $dOrd   = (int) $daily->sum('direct_order');
+        $bOrd = (int) $daily->sum('broad_order');
+        $dOrd = (int) $daily->sum('direct_order');
 
         $performance = [
-            'spend'       => $spend,
-            'broad_gmv'   => $gmv,
-            'direct_gmv'  => $dGmv,
+            'spend' => $spend,
+            'broad_gmv' => $gmv,
+            'direct_gmv' => $dGmv,
             'impressions' => $impr,
-            'clicks'      => $clicks,
+            'clicks' => $clicks,
             'broad_order' => $bOrd,
-            'direct_order'=> $dOrd,
-            'ctr'         => GmvMaxAnalytics::safeDiv($clicks * 100, $impr, 2),
-            'cpc'         => GmvMaxAnalytics::safeDiv($spend, $clicks, 2),
-            'broad_cvr'   => GmvMaxAnalytics::safeDiv($bOrd * 100, $clicks, 2),
-            'direct_cvr'  => GmvMaxAnalytics::safeDiv($dOrd * 100, $clicks, 2),
-            'broad_roas'  => GmvMaxAnalytics::roas($gmv, $spend),
+            'direct_order' => $dOrd,
+            'ctr' => GmvMaxAnalytics::safeDiv($clicks * 100, $impr, 2),
+            'cpc' => GmvMaxAnalytics::safeDiv($spend, $clicks, 2),
+            'broad_cvr' => GmvMaxAnalytics::safeDiv($bOrd * 100, $clicks, 2),
+            'direct_cvr' => GmvMaxAnalytics::safeDiv($dOrd * 100, $clicks, 2),
+            'broad_roas' => GmvMaxAnalytics::roas($gmv, $spend),
             'direct_roas' => GmvMaxAnalytics::roas($dGmv, $spend),
-            'broad_cpa'   => GmvMaxAnalytics::safeDiv($spend, $bOrd, 2),
-            'direct_cpa'  => GmvMaxAnalytics::safeDiv($spend, $dOrd, 2),
+            'broad_cpa' => GmvMaxAnalytics::safeDiv($spend, $bOrd, 2),
+            'direct_cpa' => GmvMaxAnalytics::safeDiv($spend, $dOrd, 2),
         ];
 
         $setting = [
-            'campaign_id'        => $campaign->channel_campaign_id,
-            'item_id'            => $campaign->channel_item_id,
-            'item_code'          => $campaign->internalItem?->code,
-            'item_name'          => $campaign->internalItem?->name,
-            'ad_type'            => $campaign->ad_type,
-            'bidding_method'     => $campaign->bidding_method,
-            'target_roas'        => $campaign->target_roas !== null ? (float) $campaign->target_roas : null,
-            'campaign_budget'    => $campaign->campaign_budget !== null ? (float) $campaign->campaign_budget : null,
+            'campaign_id' => $campaign->channel_campaign_id,
+            'item_id' => $campaign->channel_item_id,
+            'item_code' => $campaign->internalItem?->code,
+            'item_name' => $campaign->internalItem?->name,
+            'ad_type' => $campaign->ad_type,
+            'bidding_method' => $campaign->bidding_method,
+            'target_roas' => $campaign->target_roas !== null ? (float) $campaign->target_roas : null,
+            'campaign_budget' => $campaign->campaign_budget !== null ? (float) $campaign->campaign_budget : null,
             'campaign_placement' => $campaign->campaign_placement,
-            'campaign_status'    => $campaign->campaign_status,
-            'started_at'         => optional($campaign->started_at)->toDateTimeString(),
-            'ended_at'           => optional($campaign->ended_at)->toDateTimeString(),
-            'setting_synced_at'  => optional($campaign->setting_synced_at)->toDateTimeString(),
+            'campaign_status' => $campaign->campaign_status,
+            'started_at' => optional($campaign->started_at)->toDateTimeString(),
+            'ended_at' => optional($campaign->ended_at)->toDateTimeString(),
+            'setting_synced_at' => optional($campaign->setting_synced_at)->toDateTimeString(),
         ];
 
         // Raw payload: owner-only, sanitasi ganda (defensif) walau sudah bersih saat simpan.
@@ -5994,9 +6041,9 @@ class MarketplaceController extends Controller
         }
 
         return response()->json([
-            'setting'             => $setting,
-            'performance'         => $performance,
-            'daily'               => $daily,
+            'setting' => $setting,
+            'performance' => $performance,
+            'daily' => $daily,
             'raw_setting_payload' => $raw,
         ]);
     }
@@ -6058,12 +6105,12 @@ class MarketplaceController extends Controller
             ->limit(100)
             ->get()
             ->map(fn ($log) => [
-                'id'         => $log->id,
+                'id' => $log->id,
                 'store_name' => $log->store?->name,
-                'action'     => $log->action,
-                'status'     => $log->status,
-                'message'    => $log->message,
-                'payload'    => $log->payload ?? [],
+                'action' => $log->action,
+                'status' => $log->status,
+                'message' => $log->message,
+                'payload' => $log->payload ?? [],
                 'created_at' => $log->created_at?->toISOString(),
             ]);
 
@@ -6080,9 +6127,9 @@ class MarketplaceController extends Controller
     public function updateStore(Request $request, Store $store): JsonResponse
     {
         $data = $request->validate([
-            'name'                        => ['sometimes', 'string', 'max:120'],
-            'region'                      => ['sometimes', 'nullable', 'string', 'max:32'],
-            'default_warehouse_id'        => ['nullable', 'integer', 'exists:warehouses,id'],
+            'name' => ['sometimes', 'string', 'max:120'],
+            'region' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'default_warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'meta_shipping_document_type' => ['sometimes', 'string', 'in:THERMAL_AIR_WAYBILL,NORMAL_AIR_WAYBILL'],
         ]);
 
@@ -6103,12 +6150,12 @@ class MarketplaceController extends Controller
             $updateData['meta'] = $meta;
         }
 
-        if (!empty($updateData)) {
+        if (! empty($updateData)) {
             $store->update($updateData);
         }
 
-        if (!empty($data['default_warehouse_id'])) {
-            $warehouseId  = $data['default_warehouse_id'];
+        if (! empty($data['default_warehouse_id'])) {
+            $warehouseId = $data['default_warehouse_id'];
             $fulfillments = OrderFulfillment::whereHas('order', fn ($q) => $q->where('store_id', $store->id))
                 ->whereIn('status', [OrderFulfillment::STATUS_DRAFT, OrderFulfillment::STATUS_PENDING_REVIEW])
                 ->whereNull('warehouse_id')
@@ -6121,8 +6168,9 @@ class MarketplaceController extends Controller
         }
 
         $store->load('channel');
+
         return response()->json([
-            'message'              => 'Toko diperbarui.',
+            'message' => 'Toko diperbarui.',
             'default_warehouse_id' => $store->default_warehouse_id,
             'fulfillments_updated' => isset($fulfillments) ? $fulfillments->count() : 0,
         ]);
@@ -6137,11 +6185,11 @@ class MarketplaceController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Toko berhasil diputuskan koneksinya.'
+                'message' => 'Toko berhasil diputuskan koneksinya.',
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Terjadi kesalahan saat memutuskan koneksi: ' . $e->getMessage()
+                'message' => 'Terjadi kesalahan saat memutuskan koneksi: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -6155,9 +6203,9 @@ class MarketplaceController extends Controller
         $store->update(['is_active' => ! $store->is_active]);
 
         return response()->json([
-            'success'   => true,
+            'success' => true,
             'is_active' => (bool) $store->is_active,
-            'message'   => $store->is_active ? 'Toko diaktifkan.' : 'Toko dinonaktifkan (disembunyikan dari peringatan).',
+            'message' => $store->is_active ? 'Toko diaktifkan.' : 'Toko dinonaktifkan (disembunyikan dari peringatan).',
         ]);
     }
 
@@ -6191,7 +6239,7 @@ class MarketplaceController extends Controller
 
         if ($historyLabel) {
             return response()->json([
-                'message' => "Toko ini tidak dapat dihapus karena sudah memiliki {$historyLabel}. Nonaktifkan toko jika tidak ingin dipakai lagi."
+                'message' => "Toko ini tidak dapat dihapus karena sudah memiliki {$historyLabel}. Nonaktifkan toko jika tidak ingin dipakai lagi.",
             ], 422);
         }
 
@@ -6203,11 +6251,11 @@ class MarketplaceController extends Controller
             });
 
             return response()->json([
-                'message' => 'Toko berhasil dihapus karena belum memiliki riwayat pesanan.'
+                'message' => 'Toko berhasil dihapus karena belum memiliki riwayat pesanan.',
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Gagal menghapus toko: ' . $e->getMessage()
+                'message' => 'Gagal menghapus toko: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -6241,8 +6289,8 @@ class MarketplaceController extends Controller
 
         // Item bermasalah (data_status = incomplete) per toko
         $issueItems = MarketplaceOrderItem::whereHas(
-                'order', fn ($q) => $q->whereIn('store_id', $storeIds)
-            )
+            'order', fn ($q) => $q->whereIn('store_id', $storeIds)
+        )
             ->where('data_status', 'incomplete')
             ->join('marketplace_orders', 'marketplace_order_items.marketplace_order_id', '=', 'marketplace_orders.id')
             ->selectRaw('marketplace_orders.store_id, count(marketplace_order_items.id) as cnt')
@@ -6251,10 +6299,10 @@ class MarketplaceController extends Controller
 
         $result = [];
         foreach ($storeIds as $id) {
-            $result[(string)$id] = [
+            $result[(string) $id] = [
                 'orders_today' => (int) ($ordersToday[$id] ?? 0),
-                'unfulfilled'  => (int) ($unfulfilled[$id] ?? 0),
-                'issues'       => (int) ($issueItems[$id] ?? 0),
+                'unfulfilled' => (int) ($unfulfilled[$id] ?? 0),
+                'issues' => (int) ($issueItems[$id] ?? 0),
             ];
         }
 
@@ -6267,13 +6315,13 @@ class MarketplaceController extends Controller
 
     public function issueItems(Request $request): JsonResponse
     {
-        $tab      = $request->input('tab', 'all');   // all|sku_empty|mapping_not_found|missing_hpp|profit_incomplete|selesai
-        $storeId  = $request->input('store_id');
-        $q        = $request->input('q');
+        $tab = $request->input('tab', 'all');   // all|sku_empty|mapping_not_found|missing_hpp|profit_incomplete|selesai
+        $storeId = $request->input('store_id');
+        $q = $request->input('q');
         $dateFrom = $request->input('date_from');
-        $dateTo   = $request->input('date_to');
-        $page     = max(1, (int) $request->input('page', 1));
-        $perPage  = 20;
+        $dateTo = $request->input('date_to');
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = 20;
 
         $query = MarketplaceOrderItem::with([
             'order:id,store_id,channel_order_id,external_order_id,ordered_at,order_date',
@@ -6285,34 +6333,40 @@ class MarketplaceController extends Controller
         // Filter toko & tanggal via whereHas
         if ($storeId || $dateFrom || $dateTo) {
             $query->whereHas('order', function ($oq) use ($storeId, $dateFrom, $dateTo) {
-                if ($storeId)  $oq->where('store_id', $storeId);
-                if ($dateFrom) $oq->where('ordered_at', '>=', $dateFrom . ' 00:00:00');
-                if ($dateTo)   $oq->where('ordered_at', '<=', $dateTo   . ' 23:59:59');
+                if ($storeId) {
+                    $oq->where('store_id', $storeId);
+                }
+                if ($dateFrom) {
+                    $oq->where('ordered_at', '>=', $dateFrom.' 00:00:00');
+                }
+                if ($dateTo) {
+                    $oq->where('ordered_at', '<=', $dateTo.' 23:59:59');
+                }
             });
         }
 
         // Search
         if ($q) {
             $query->where(function ($qr) use ($q) {
-                $qr->where('item_name',      'like', "%{$q}%")
-                   ->orWhere('variant_name',  'like', "%{$q}%")
-                   ->orWhere('model_sku',     'like', "%{$q}%")
-                   ->orWhere('item_sku',      'like', "%{$q}%")
-                   ->orWhere('marketplace_sku','like', "%{$q}%")
-                   ->orWhereHas('order', fn ($oq) => $oq
-                       ->where('channel_order_id', 'like', "%{$q}%")
-                       ->orWhere('external_order_id', 'like', "%{$q}%"));
+                $qr->where('item_name', 'like', "%{$q}%")
+                    ->orWhere('variant_name', 'like', "%{$q}%")
+                    ->orWhere('model_sku', 'like', "%{$q}%")
+                    ->orWhere('item_sku', 'like', "%{$q}%")
+                    ->orWhere('marketplace_sku', 'like', "%{$q}%")
+                    ->orWhereHas('order', fn ($oq) => $oq
+                        ->where('channel_order_id', 'like', "%{$q}%")
+                        ->orWhere('external_order_id', 'like', "%{$q}%"));
             });
         }
 
         // Tab filter
         match ($tab) {
-            'sku_empty'         => $query->skuEmpty(),
+            'sku_empty' => $query->skuEmpty(),
             'mapping_not_found' => $query->mappingNotFound(),
-            'missing_hpp'       => $query->missingHpp(),
+            'missing_hpp' => $query->missingHpp(),
             'profit_incomplete' => $query->profitIncomplete(),
-            'selesai'           => $query->where('data_status', 'valid'),
-            default             => $query->hasIssues(),
+            'selesai' => $query->where('data_status', 'valid'),
+            default => $query->hasIssues(),
         };
 
         $paginator = $query->orderByDesc('id')->paginate($perPage, ['*'], 'page', $page);
@@ -6321,15 +6375,15 @@ class MarketplaceController extends Controller
             // Recommendation: fuzzy-match by item_name for mapping_not_found items
             $rec = null;
             if ($i->issue_reason === 'mapping_not_found' && $i->item_name) {
-                $found = Item::where('name', 'like', '%' . addcslashes($i->item_name, '%_\\') . '%')
-                             ->select('id', 'name', 'code', 'base_unit_cost', 'hpp')
-                             ->first();
+                $found = Item::where('name', 'like', '%'.addcslashes($i->item_name, '%_\\').'%')
+                    ->select('id', 'name', 'code', 'base_unit_cost', 'hpp')
+                    ->first();
                 if ($found) {
                     $rec = [
-                        'id'   => $found->id,
+                        'id' => $found->id,
                         'name' => $found->name,
                         'code' => $found->code ?? '',
-                        'hpp'  => (float) ($found->base_unit_cost ?: $found->hpp ?: 0),
+                        'hpp' => (float) ($found->base_unit_cost ?: $found->hpp ?: 0),
                     ];
                 }
             }
@@ -6338,33 +6392,33 @@ class MarketplaceController extends Controller
             $mappingStatus = $i->mapping_status;
             $issueReason = $i->issue_reason;
 
-            if ($mappingStatus === 'marketplace_sku_empty' && !empty($sku)) {
+            if ($mappingStatus === 'marketplace_sku_empty' && ! empty($sku)) {
                 $mappingStatus = 'mapping_not_found';
                 $issueReason = 'mapping_not_found';
             }
 
             return [
-                'id'                  => $i->id,
-                'order_id'            => $i->order?->id,
-                'order_number'        => $i->order?->channel_order_id ?? $i->order?->external_order_id,
-                'ordered_at'          => $i->order?->ordered_at?->toISOString() ?? $i->order?->order_date,
-                'store_name'          => $i->order?->store?->name,
-                'channel_code'        => $i->order?->store?->channel?->code,
-                'item_name'           => $i->item_name ?? $i->item_name_snapshot,
-                'variant_name'        => $i->variant_name ?? $i->variant_snapshot,
-                'marketplace_sku'     => $sku,
-                'qty'                 => $i->qty,
-                'mapping_status'      => $mappingStatus,
-                'cost_status'         => $i->cost_status,
-                'profit_status'       => $i->profit_status,
-                'data_status'         => $i->data_status,
-                'issue_reason'        => $issueReason,
-                'internal_item_id'    => $i->internal_item_id,
-                'internal_item_name'  => $i->internalItem?->name,
-                'internal_item_code'  => $i->internalItem?->code,
-                'hpp_current'         => $i->internalItem ? (float) ($i->internalItem->base_unit_cost ?: $i->internalItem->hpp ?: 0) : 0,
-                'hpp_snapshot'        => $i->hpp_snapshot,
-                'recommended_item'    => $rec,
+                'id' => $i->id,
+                'order_id' => $i->order?->id,
+                'order_number' => $i->order?->channel_order_id ?? $i->order?->external_order_id,
+                'ordered_at' => $i->order?->ordered_at?->toISOString() ?? $i->order?->order_date,
+                'store_name' => $i->order?->store?->name,
+                'channel_code' => $i->order?->store?->channel?->code,
+                'item_name' => $i->item_name ?? $i->item_name_snapshot,
+                'variant_name' => $i->variant_name ?? $i->variant_snapshot,
+                'marketplace_sku' => $sku,
+                'qty' => $i->qty,
+                'mapping_status' => $mappingStatus,
+                'cost_status' => $i->cost_status,
+                'profit_status' => $i->profit_status,
+                'data_status' => $i->data_status,
+                'issue_reason' => $issueReason,
+                'internal_item_id' => $i->internal_item_id,
+                'internal_item_name' => $i->internalItem?->name,
+                'internal_item_code' => $i->internalItem?->code,
+                'hpp_current' => $i->internalItem ? (float) ($i->internalItem->base_unit_cost ?: $i->internalItem->hpp ?: 0) : 0,
+                'hpp_snapshot' => $i->hpp_snapshot,
+                'recommended_item' => $rec,
             ];
         });
 
@@ -6378,21 +6432,28 @@ class MarketplaceController extends Controller
             // Filter tanggal (booking pakai create_time → ordered_at ISO string)
             if ($dateFrom || $dateTo) {
                 $bookingRows = array_values(array_filter($bookingRows, function ($r) use ($dateFrom, $dateTo) {
-                    if (! $r['ordered_at']) return false;
+                    if (! $r['ordered_at']) {
+                        return false;
+                    }
                     $t = \Carbon\Carbon::parse($r['ordered_at']);
-                    if ($dateFrom && $t->lt(\Carbon\Carbon::parse($dateFrom)->startOfDay())) return false;
-                    if ($dateTo   && $t->gt(\Carbon\Carbon::parse($dateTo)->endOfDay()))   return false;
+                    if ($dateFrom && $t->lt(\Carbon\Carbon::parse($dateFrom)->startOfDay())) {
+                        return false;
+                    }
+                    if ($dateTo && $t->gt(\Carbon\Carbon::parse($dateTo)->endOfDay())) {
+                        return false;
+                    }
+
                     return true;
                 }));
             }
         }
 
         return response()->json([
-            'data'         => array_merge($bookingRows, $items->items()),
+            'data' => array_merge($bookingRows, $items->items()),
             'current_page' => $paginator->currentPage(),
-            'last_page'    => $paginator->lastPage(),
-            'total'        => $paginator->total() + count($bookingRows),
-            'per_page'     => $perPage,
+            'last_page' => $paginator->lastPage(),
+            'total' => $paginator->total() + count($bookingRows),
+            'per_page' => $perPage,
         ]);
     }
 
@@ -6403,7 +6464,7 @@ class MarketplaceController extends Controller
     public function fillItemSku(Request $request, MarketplaceOrderItem $item): JsonResponse
     {
         $data = $request->validate([
-            'sku'              => 'required|string|max:100',
+            'sku' => 'required|string|max:100',
             'apply_to_similar' => 'boolean',
         ]);
 
@@ -6411,8 +6472,9 @@ class MarketplaceController extends Controller
             $result = $this->issueService->fillSku(
                 $item, $data['sku'], (bool) ($data['apply_to_similar'] ?? false)
             );
+
             return response()->json([
-                'message'  => "SKU berhasil diisi. {$result['affected']} item diperbarui.",
+                'message' => "SKU berhasil diisi. {$result['affected']} item diperbarui.",
                 'affected' => $result['affected'],
             ]);
         } catch (\InvalidArgumentException $e) {
@@ -6424,15 +6486,16 @@ class MarketplaceController extends Controller
     {
         $data = $request->validate([
             'internal_item_id' => 'required|integer|exists:items,id',
-            'apply_to_all'     => 'boolean',
+            'apply_to_all' => 'boolean',
         ]);
 
         try {
             $result = $this->issueService->mapSku(
                 $item, (int) $data['internal_item_id'], (bool) ($data['apply_to_all'] ?? false)
             );
+
             return response()->json([
-                'message'  => "SKU berhasil dihubungkan. {$result['affected']} item diperbarui.",
+                'message' => "SKU berhasil dihubungkan. {$result['affected']} item diperbarui.",
                 'affected' => $result['affected'],
             ]);
         } catch (\InvalidArgumentException $e) {
@@ -6443,7 +6506,7 @@ class MarketplaceController extends Controller
     public function fillItemHpp(Request $request, MarketplaceOrderItem $item): JsonResponse
     {
         $data = $request->validate([
-            'hpp'             => 'required|numeric|min:1',
+            'hpp' => 'required|numeric|min:1',
             'update_affected' => 'boolean',
         ]);
 
@@ -6451,8 +6514,9 @@ class MarketplaceController extends Controller
             $result = $this->issueService->fillHpp(
                 $item, (float) $data['hpp'], (bool) ($data['update_affected'] ?? true)
             );
+
             return response()->json([
-                'message'  => "HPP berhasil disimpan. {$result['affected']} item diperbarui.",
+                'message' => "HPP berhasil disimpan. {$result['affected']} item diperbarui.",
                 'affected' => $result['affected'],
             ]);
         } catch (\InvalidArgumentException $e) {
@@ -6464,8 +6528,9 @@ class MarketplaceController extends Controller
     {
         try {
             $result = $this->issueService->recalcProfit($item);
+
             return response()->json([
-                'message'  => "Profit berhasil dihitung ulang.",
+                'message' => 'Profit berhasil dihitung ulang.',
                 'affected' => $result['affected'],
             ]);
         } catch (\InvalidArgumentException $e) {
@@ -6476,35 +6541,35 @@ class MarketplaceController extends Controller
     public function bulkMapSku(Request $request): JsonResponse
     {
         $request->validate([
-            'item_ids'         => 'required|array|min:1',
-            'item_ids.*'       => 'integer',
+            'item_ids' => 'required|array|min:1',
+            'item_ids.*' => 'integer',
             'internal_item_id' => 'required|integer|exists:items,id',
-            'apply_to_all'     => 'boolean',
+            'apply_to_all' => 'boolean',
         ]);
 
-        $items    = MarketplaceOrderItem::whereIn('id', $request->item_ids)->get();
-        $updated  = 0;
-        $errors   = [];
+        $items = MarketplaceOrderItem::whereIn('id', $request->item_ids)->get();
+        $updated = 0;
+        $errors = [];
 
         foreach ($items as $item) {
             try {
                 $this->issueService->mapSku($item, (int) $request->internal_item_id, $request->boolean('apply_to_all', false));
                 $updated++;
             } catch (\Throwable $e) {
-                $errors[] = 'Item #' . $item->id . ': ' . $e->getMessage();
+                $errors[] = 'Item #'.$item->id.': '.$e->getMessage();
             }
         }
 
         return response()->json([
-            'message' => "{$updated} item berhasil di-mapping." . (count($errors) ? ' ' . count($errors) . ' gagal.' : ''),
+            'message' => "{$updated} item berhasil di-mapping.".(count($errors) ? ' '.count($errors).' gagal.' : ''),
             'updated' => $updated,
-            'errors'  => $errors,
+            'errors' => $errors,
         ]);
     }
 
     public function searchInternalItems(Request $request): JsonResponse
     {
-        $q     = trim($request->input('q', ''));
+        $q = trim($request->input('q', ''));
         $limit = min(20, (int) $request->input('limit', 15));
 
         // Ads mapping memilih level produk utama. HPP yang dikirim ke UI
@@ -6527,16 +6592,16 @@ class MarketplaceController extends Controller
         $items = Item::query()
             ->when($q, fn ($query) => $query->where(function ($qr) use ($q) {
                 $qr->where('name', 'like', "%{$q}%")
-                   ->orWhere('code', 'like', "%{$q}%");
+                    ->orWhere('code', 'like', "%{$q}%");
             }))
             ->select('id', 'name', 'code', 'base_unit_cost', 'hpp')
             ->limit($limit)
             ->get()
             ->map(fn ($i) => [
-                'id'   => $i->id,
+                'id' => $i->id,
                 'name' => $i->name,
                 'code' => $i->code,
-                'hpp'  => (float) ($i->base_unit_cost ?: $i->hpp ?: 0),
+                'hpp' => (float) ($i->base_unit_cost ?: $i->hpp ?: 0),
             ]);
 
         return response()->json($items);
@@ -6556,26 +6621,26 @@ class MarketplaceController extends Controller
         }
 
         return response()->json([
-            'id'   => $item->id,
+            'id' => $item->id,
             'name' => $item->name,
             'code' => $item->code,
-            'hpp'  => (float) ($item->base_unit_cost ?: $item->hpp ?: 0),
+            'hpp' => (float) ($item->base_unit_cost ?: $item->hpp ?: 0),
         ]);
     }
 
-        public function issueSummary(Request $request): JsonResponse
+    public function issueSummary(Request $request): JsonResponse
     {
         $storeId = $request->input('store_id');
         $summary = $this->issueService->summary($storeId ? (int) $storeId : null);
 
         // Gabungkan issue dari Pesanan Kilat (booking tanpa order lokal)
         $booking = $this->issueService->bookingIssueSummary($storeId ? (int) $storeId : null);
-        $summary['sku_empty']         += $booking['sku_empty'];
+        $summary['sku_empty'] += $booking['sku_empty'];
         $summary['mapping_not_found'] += $booking['mapping_not_found'];
-        $summary['missing_hpp']       += $booking['missing_hpp'];
-        $summary['total_issues']      += $booking['total_issues'];
-        $summary['data_incomplete']   += $booking['total_issues'];
-        $summary['booking_issues']     = $booking['total_issues'];
+        $summary['missing_hpp'] += $booking['missing_hpp'];
+        $summary['total_issues'] += $booking['total_issues'];
+        $summary['data_incomplete'] += $booking['total_issues'];
+        $summary['booking_issues'] = $booking['total_issues'];
 
         return response()->json($summary);
     }
@@ -6586,13 +6651,14 @@ class MarketplaceController extends Controller
     {
         $data = $request->validate([
             'index' => 'required|integer|min:0',
-            'sku'   => 'required|string|max:100',
+            'sku' => 'required|string|max:100',
         ]);
 
         try {
             $result = $this->issueService->fillBookingItemSku($booking, (int) $data['index'], $data['sku']);
+
             return response()->json([
-                'message'  => 'SKU berhasil diisi. Mapping nama produk tersimpan — order berikutnya otomatis terisi.',
+                'message' => 'SKU berhasil diisi. Mapping nama produk tersimpan — order berikutnya otomatis terisi.',
                 'affected' => $result['affected'],
             ]);
         } catch (\InvalidArgumentException $e) {
@@ -6603,14 +6669,15 @@ class MarketplaceController extends Controller
     public function mapBookingItemSku(Request $request, \App\Models\MarketplaceBooking $booking): JsonResponse
     {
         $data = $request->validate([
-            'index'            => 'required|integer|min:0',
+            'index' => 'required|integer|min:0',
             'internal_item_id' => 'required|integer|exists:items,id',
         ]);
 
         try {
             $result = $this->issueService->mapBookingItemSku($booking, (int) $data['index'], (int) $data['internal_item_id']);
+
             return response()->json([
-                'message'  => 'SKU berhasil dihubungkan ke item internal.',
+                'message' => 'SKU berhasil dihubungkan ke item internal.',
                 'affected' => $result['affected'],
             ]);
         } catch (\InvalidArgumentException $e) {
@@ -6622,11 +6689,12 @@ class MarketplaceController extends Controller
     {
         set_time_limit(300);
         $storeId = $request->input('store_id');
-        $result  = $this->issueService->remapItems($storeId ? (int) $storeId : null);
+        $result = $this->issueService->remapItems($storeId ? (int) $storeId : null);
+
         return response()->json([
             'message' => 'Remap selesai.',
             'updated' => $result['updated'],
-            'errors'  => $result['errors'],
+            'errors' => $result['errors'],
         ]);
     }
 
@@ -6634,11 +6702,12 @@ class MarketplaceController extends Controller
     {
         set_time_limit(300);
         $storeId = $request->input('store_id');
-        $result  = $this->issueService->syncHpp($storeId ? (int) $storeId : null);
+        $result = $this->issueService->syncHpp($storeId ? (int) $storeId : null);
+
         return response()->json([
             'message' => 'HPP berhasil disinkronisasi.',
             'updated' => $result['updated'],
-            'errors'  => $result['errors'],
+            'errors' => $result['errors'],
         ]);
     }
 
@@ -6646,20 +6715,19 @@ class MarketplaceController extends Controller
     {
         set_time_limit(300);
         $storeId = $request->input('store_id');
-        $result  = $this->issueService->autoMapByCode($storeId ? (int) $storeId : null);
+        $result = $this->issueService->autoMapByCode($storeId ? (int) $storeId : null);
+
         return response()->json([
             'message' => 'Auto-map selesai.',
-            'mapped'  => $result['mapped'],
+            'mapped' => $result['mapped'],
             'skipped' => $result['skipped'],
-            'errors'  => $result['errors'],
+            'errors' => $result['errors'],
         ]);
     }
 
     /** [DEV ONLY] Hapus semua marketplace orders + fulfillments + mutations untuk reset testing. */
 
-
     /** [DEV ONLY] Hapus fulfillments saja, orders tetap (reset ke state "Perlu Proses"). */
-
 
     /** [DEV ONLY] Return order READY_TO_SHIP berikutnya yang belum punya fulfillment. */
     public function devNextOrder(): JsonResponse
@@ -6678,10 +6746,10 @@ class MarketplaceController extends Controller
         }
 
         return response()->json(['order' => [
-            'id'               => $order->id,
+            'id' => $order->id,
             'channel_order_id' => $order->channel_order_id,
-            'buyer_username'   => $order->buyer_username,
-            'order_status'     => $order->order_status,
+            'buyer_username' => $order->buyer_username,
+            'order_status' => $order->order_status,
         ]]);
     }
 
@@ -6692,21 +6760,20 @@ class MarketplaceController extends Controller
             return response()->json(['message' => 'Tidak diizinkan di production.'], 403);
         }
 
-        $orders       = \DB::table('marketplace_orders')->count();
-        $perluProses  = \DB::table('marketplace_orders')
+        $orders = \DB::table('marketplace_orders')->count();
+        $perluProses = \DB::table('marketplace_orders')
             ->whereIn('order_status', ['READY_TO_SHIP', 'PROCESSED'])
-            ->whereNotExists(fn($q) => $q->from('order_fulfillments')->whereColumn('marketplace_order_id','marketplace_orders.id'))
+            ->whereNotExists(fn ($q) => $q->from('order_fulfillments')->whereColumn('marketplace_order_id', 'marketplace_orders.id'))
             ->count();
         $sedangPacking = \DB::table('order_fulfillments')
             ->whereNotIn('status', ['confirmed', 'cancelled'])
             ->count();
-        $fulfilled    = \DB::table('order_fulfillments')->where('status', 'confirmed')->count();
+        $fulfilled = \DB::table('order_fulfillments')->where('status', 'confirmed')->count();
 
         return response()->json(compact('orders', 'perluProses', 'sedangPacking', 'fulfilled'));
     }
 
     /** [DEV ONLY] Buat dummy marketplace orders untuk testing. */
-
     public function saveAdsSetting(Request $request)
     {
         $request->validate([
@@ -6726,7 +6793,7 @@ class MarketplaceController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Pengaturan kampanye berhasil disimpan.',
-            'data' => $setting
+            'data' => $setting,
         ]);
     }
 }

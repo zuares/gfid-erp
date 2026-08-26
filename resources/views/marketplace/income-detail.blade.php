@@ -1264,6 +1264,7 @@
     </div>
     <div id="belumCairSubTabs" class="income-subtabs" style="display:none; margin-bottom:1rem;">
         <button type="button" class="income-subtab active" onclick="switchSubTab('', this)">Semua</button>
+        <button type="button" class="income-subtab" onclick="switchSubTab('packed', this)">Sedang Dikemas</button>
         <button type="button" class="income-subtab" onclick="switchSubTab('shipped', this)">Sedang Dikirim</button>
         <button type="button" class="income-subtab" onclick="switchSubTab('to_confirm', this)">Menunggu Konfirmasi</button>
         <button type="button" class="income-subtab" onclick="switchSubTab('returning', this)">Sedang Dikembalikan</button>
@@ -2226,6 +2227,9 @@
     function getOrderStatusMeta(status) {
         const st = String(status || '').toUpperCase();
         if (st === 'COMPLETED') return { label: 'Selesai', cls: 'success', icon: 'bi-check-circle-fill' };
+        if (['READY_TO_SHIP', 'PROCESSED', 'MATCHED', 'PACKED', 'DIKEMAS'].includes(st)) {
+            return { label: 'Dikemas', cls: 'warning', icon: 'bi-box-seam' };
+        }
         if (st === 'SHIPPED' || st === 'DIKIRIM') return { label: 'Dikirim', cls: 'primary', icon: 'bi-truck' };
         if (st === 'CANCELLED' || st === 'BATAL' || st === 'RETURNED' || st === 'REFUND') return { label: 'Batal / Return', cls: 'danger', icon: 'bi-x-circle-fill' };
         if (st === 'TO_RETURN' || st === 'RETURNING') return { label: 'Return', cls: 'warning', icon: 'bi-arrow-return-left' };
@@ -2266,6 +2270,7 @@
         };
         const subLabels = {
             '': 'Semua',
+            packed: 'Sedang Dikemas',
             shipped: 'Sedang Dikirim',
             to_confirm: 'Menunggu Konfirmasi',
             returning: 'Sedang Dikembalikan',
@@ -2598,6 +2603,7 @@
                             </div>
                             <div class="income-row-badges">
                                 <span class="income-chip neutral"><i class="bi bi-box"></i>${itemCount.toLocaleString('id-ID')} item</span>
+                                <span class="income-chip neutral" title="Metode pembayaran"><i class="bi bi-credit-card"></i>${esc(s.payment_method || 'Tidak tercatat')}</span>
                             </div>
                             <div class="income-timeline-stack">
                                 <div class="income-timeline-row">

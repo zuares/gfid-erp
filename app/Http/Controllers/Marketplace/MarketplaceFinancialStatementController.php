@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Marketplace;
 
 use App\Http\Controllers\Controller;
 use App\Models\Store;
+use App\Models\Account;
 use App\Models\MarketplaceAccountingPosting;
 use App\Services\Marketplace\MarketplaceAccountingPostingService;
 use App\Services\Marketplace\MarketplaceFinancialStatementService;
@@ -30,8 +31,13 @@ class MarketplaceFinancialStatementController extends Controller
         $filters = $this->filters($request);
         $preview = $postingService->preview($filters);
         $stores = Store::with('channel')->where('is_active', true)->orderBy('name')->get();
+        $accountCodes = config('marketplace.accounting_accounts', []);
+        $accountMappings = Account::query()
+            ->whereIn('code', array_values($accountCodes))
+            ->get(['code', 'name', 'type', 'is_active'])
+            ->keyBy('code');
 
-        return view('marketplace.reports.financial_statement_posting', compact('preview', 'stores'));
+        return view('marketplace.reports.financial_statement_posting', compact('preview', 'stores', 'accountCodes', 'accountMappings'));
     }
 
     public function post(Request $request, MarketplaceAccountingPostingService $postingService)

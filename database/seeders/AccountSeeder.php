@@ -203,6 +203,22 @@ class AccountSeeder extends Seeder
                 'is_cash' => 0,
                 'is_active' => 1,
             ]);
+            foreach ([
+                ['code' => '6202', 'name' => 'Biaya Komisi Marketplace'],
+                ['code' => '6203', 'name' => 'Biaya Layanan Marketplace'],
+                ['code' => '6204', 'name' => 'Biaya Transaksi Marketplace'],
+                ['code' => '6205', 'name' => 'Biaya Affiliate Marketplace'],
+                ['code' => '6206', 'name' => 'Biaya Iklan Marketplace'],
+                ['code' => '6207', 'name' => 'Biaya Asuransi Pengiriman Marketplace'],
+            ] as $account) {
+                DB::table('accounts')->updateOrInsert(['code' => $account['code']], [
+                    'code' => $account['code'],
+                    'name' => $account['name'],
+                    'type' => 'expense',
+                    'is_cash' => 0,
+                    'is_active' => 1,
+                ]);
+            }
             DB::table('accounts')->updateOrInsert(['code' => '1305'], [
                 'code' => '1305',
                 'name' => 'Piutang Supplier (Retur / Klaim Pembelian)',

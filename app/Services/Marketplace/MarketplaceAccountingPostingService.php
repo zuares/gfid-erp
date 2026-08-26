@@ -15,11 +15,6 @@ class MarketplaceAccountingPostingService
 {
     public const SOURCE_TYPE = 'marketplace_financial_statement';
 
-    private const ACCOUNT_SALES = '4101';
-    private const ACCOUNT_SALES_RETURN = '4201';
-    private const ACCOUNT_MARKETPLACE_RECEIVABLE = '1302';
-    private const ACCOUNT_MARKETPLACE_EXPENSE = '6201';
-
     public function __construct(
         private MarketplaceFinancialStatementService $statementService,
         private JournalService $journalService,
@@ -55,11 +50,11 @@ class MarketplaceAccountingPostingService
         $summary = $statement['summary'];
         $otherAdjustment = (float) $summary['other_settlement_adjustment'];
         $lines = [
-            $this->line($accounts[self::ACCOUNT_MARKETPLACE_RECEIVABLE], (float) $summary['payout'], 0),
-            $this->line($accounts[self::ACCOUNT_SALES_RETURN], (float) $summary['seller_discount'] + (float) $summary['refund'], 0),
-            $this->line($accounts[self::ACCOUNT_MARKETPLACE_EXPENSE], (float) $summary['marketplace_fees'] + max(-$otherAdjustment, 0), 0),
-            $this->line($accounts[self::ACCOUNT_MARKETPLACE_EXPENSE], 0, max($otherAdjustment, 0)),
-            $this->line($accounts[self::ACCOUNT_SALES], 0, (float) $summary['gross_sales']),
+            $this->line($accounts[$this->accountCode('marketplace_receivable')], (float) $summary['payout'], 0),
+            $this->line($accounts[$this->accountCode('sales_return')], (float) $summary['seller_discount'] + (float) $summary['refund'], 0),
+            $this->line($accounts[$this->accountCode('other_fee')], (float) $summary['marketplace_fees'] + max(-$otherAdjustment, 0), 0),
+            $this->line($accounts[$this->accountCode('other_fee')], 0, max($otherAdjustment, 0)),
+            $this->line($accounts[$this->accountCode('sales')], 0, (float) $summary['gross_sales']),
         ];
 
         $lines = array_values(array_filter($lines, fn (array $line) => $line['debit'] > 0 || $line['credit'] > 0));
@@ -274,7 +269,17 @@ class MarketplaceAccountingPostingService
 
     private function accountCodes(): array
     {
-        return [self::ACCOUNT_SALES, self::ACCOUNT_SALES_RETURN, self::ACCOUNT_MARKETPLACE_RECEIVABLE, self::ACCOUNT_MARKETPLACE_EXPENSE];
+        return [
+            $this->accountCode('sales'),
+            $this->accountCode('sales_return'),
+            $this->accountCode('marketplace_receivable'),
+            $this->accountCode('other_fee'),
+        ];
+    }
+
+    private function accountCode(string $key): string
+    {
+        return (string) config('marketplace.accounting_accounts.' . $key, '6201');
     }
 
     private function scopeKey(array $filters): string
