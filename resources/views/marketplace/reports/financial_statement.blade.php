@@ -30,6 +30,12 @@
     .mp-finance-page .summary-card .card-body { min-height: 92px; display:flex; flex-direction:column; justify-content:center; }
     .mp-finance-page .table th { white-space: nowrap; }
     .mp-finance-page .filter-help { font-size:.76rem; color:#64748b; }
+    .mp-finance-page .mp-status-strip { background:#f8fafc; border:1px solid rgba(148,163,184,.2); border-radius:12px; padding:.65rem .85rem; }
+    .mp-finance-page .mp-status-strip .badge { font-weight:700; letter-spacing:.01em; }
+    .mp-finance-page .mp-tab-nav { position:sticky; top:.5rem; z-index:10; background:rgba(255,255,255,.94); backdrop-filter:blur(8px); border:1px solid rgba(148,163,184,.18); border-radius:14px; padding:.35rem; }
+    .mp-finance-page .mp-tab-nav .nav-link { border-radius:10px; color:#475569; font-weight:700; font-size:.84rem; }
+    .mp-finance-page .mp-tab-nav .nav-link.active { background:#0f172a; color:#fff; }
+    .mp-finance-page .mp-table-caption { color:#64748b; font-size:.78rem; }
     @media (max-width: 767.98px) {
         .mp-finance-page { padding-left:.65rem; padding-right:.65rem; }
         .mp-finance-page .page-actions { width:100%; }
@@ -73,10 +79,12 @@
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small fw-semibold">Mode laporan</label>
-                    <select name="report_scope" class="form-select">
-                        <option value="final" @selected(!$includeShipped)>Final (COMPLETED)</option>
-                        <option value="include_shipped" @selected($includeShipped)>Berjalan + Shipped</option>
-                    </select>
+                    <div class="btn-group w-100" role="group" aria-label="Mode laporan">
+                        <input type="radio" class="btn-check" name="report_scope" id="scope-final" value="final" @checked(!$includeShipped)>
+                        <label class="btn btn-outline-secondary" for="scope-final">Final</label>
+                        <input type="radio" class="btn-check" name="report_scope" id="scope-shipped" value="include_shipped" @checked($includeShipped)>
+                        <label class="btn btn-outline-info" for="scope-shipped">+ Shipped</label>
+                    </div>
                     <div class="filter-help mt-1">Shipped tampil sebagai piutang provisional.</div>
                 </div>
                 <div class="col-md-2">
@@ -113,6 +121,15 @@
             </div>
         </div>
     @endif
+
+    <div class="mp-status-strip d-flex flex-wrap align-items-center gap-2 mb-3">
+        <span class="small fw-semibold text-dark"><i class="bi bi-database-check me-1 text-success"></i>Data terakhir: {{ $dataLastDate }}</span>
+        <span class="badge rounded-pill bg-success-subtle text-success-emphasis">{{ $fmt($summary['final_order_count'] ?? $summary['order_count']) }} final</span>
+        @if ($includeShipped)
+            <span class="badge rounded-pill bg-info-subtle text-info-emphasis">{{ $fmt($summary['provisional_order_count'] ?? 0) }} shipped provisional</span>
+        @endif
+        <a class="small ms-auto" href="{{ route('marketplace.reports.financial-quality', ['store_id' => $filters['store_id'], 'date_from' => $filters['date_from'], 'date_to' => $filters['date_to']]) }}">Buka audit kualitas <i class="bi bi-arrow-up-right"></i></a>
+    </div>
 
     @if (session('status'))
         <div class="alert alert-success"><i class="bi bi-check-circle me-1"></i>{{ session('status') }}</div>
@@ -153,6 +170,16 @@
         </div>
     </div>
 
+    <ul class="nav nav-pills mp-tab-nav mb-3" id="financialStatementTabs" role="tablist">
+        <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-summary" type="button" role="tab">Ringkasan</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-stores" type="button" role="tab">Per toko</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-products" type="button" role="tab">Per produk</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-orders" type="button" role="tab">Detail order</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-trend" type="button" role="tab">Trend</button></li>
+    </ul>
+
+    <div class="tab-content" id="financialStatementTabContent">
+    <div class="tab-pane fade show active" id="tab-summary" role="tabpanel">
     <div class="row g-3 mb-4">
         @foreach ([
             ['label' => $includeShipped ? 'Penjualan bersih berjalan' : 'Penjualan bersih', 'value' => $summary['net_sales_before_settlement'], 'class' => 'primary'],
@@ -247,7 +274,9 @@
             </div>
         </div>
     </div>
+    </div>
 
+    <div class="tab-pane fade" id="tab-stores" role="tabpanel">
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-white"><div class="mp-section-title"><i class="bi bi-shop"></i> Performa per toko</div></div>
         <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Toko</th><th class="text-end">Order</th><th class="text-end">Penjualan bersih</th><th class="text-end">Payout</th><th class="text-end">HPP</th><th class="text-end">Laba operasional</th><th class="text-end">Margin</th></tr></thead><tbody>
@@ -258,7 +287,35 @@
             @endforelse
         </tbody></table></div>
     </div>
+    </div>
 
+    <div class="tab-pane fade" id="tab-products" role="tabpanel">
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center"><div class="mp-section-title"><i class="bi bi-box-seam"></i> Performa per produk</div><span class="mp-table-caption">{{ $fmt(count($statement['items'])) }} SKU</span></div>
+        <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>SKU</th><th>Produk</th><th class="text-end">Qty</th><th class="text-end">Payout</th><th class="text-end">HPP</th><th class="text-end">Laba</th><th class="text-end">Margin</th></tr></thead><tbody>
+            @forelse ($statement['items'] as $row)
+                <tr><td class="fw-semibold">{{ $row['sku'] }}</td><td style="min-width:280px">{{ $row['item_name'] }}</td><td class="text-end">{{ $fmt($row['qty']) }}</td><td class="text-end">Rp {{ $fmt($row['payout']) }}</td><td class="text-end">Rp {{ $fmt($row['hpp']) }}</td><td class="text-end fw-semibold">Rp {{ $fmt($row['operating_profit']) }}</td><td class="text-end">{{ $pct($row['margin_pct']) }}</td></tr>
+            @empty
+                <tr><td colspan="7" class="text-center text-muted py-4">Belum ada data produk.</td></tr>
+            @endforelse
+        </tbody></table></div>
+    </div>
+    </div>
+
+    <div class="tab-pane fade" id="tab-orders" role="tabpanel">
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center"><div class="mp-section-title"><i class="bi bi-receipt"></i> Detail order</div><span class="mp-table-caption">{{ $fmt(count($statement['orders'])) }} order terverifikasi</span></div>
+        <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Order</th><th>Tanggal</th><th>Status</th><th>Toko</th><th class="text-end">Omzet</th><th class="text-end">Payout</th><th class="text-end">HPP</th><th class="text-end">Laba</th></tr></thead><tbody>
+            @forelse ($statement['orders'] as $row)
+                <tr><td class="fw-semibold">{{ $row['channel_order_id'] }}</td><td>{{ $row['ordered_at'] ?: '-' }}</td><td><span class="badge rounded-pill {{ ($row['recognition_status'] ?? 'final') === 'provisional' ? 'bg-info-subtle text-info-emphasis' : 'bg-success-subtle text-success-emphasis' }}">{{ ($row['recognition_status'] ?? 'final') === 'provisional' ? 'Shipped · provisional' : 'Final' }}</span></td><td>{{ $row['store_name'] }}</td><td class="text-end">Rp {{ $fmt($row['gross_sales']) }}</td><td class="text-end">Rp {{ $fmt($row['payout']) }}</td><td class="text-end">Rp {{ $fmt($row['hpp']) }}</td><td class="text-end fw-semibold">Rp {{ $fmt($row['operating_profit']) }}</td></tr>
+            @empty
+                <tr><td colspan="8" class="text-center text-muted py-4">Belum ada order pada periode ini.</td></tr>
+            @endforelse
+        </tbody></table></div>
+    </div>
+    </div>
+
+    <div class="tab-pane fade" id="tab-trend" role="tabpanel">
     <div class="card shadow-sm">
         <div class="card-header bg-white"><div class="mp-section-title"><i class="bi bi-graph-up"></i> Trend laba operasional</div></div>
         <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Tanggal</th><th class="text-end">Order</th><th class="text-end">Penjualan bersih</th><th class="text-end">Payout</th><th class="text-end">HPP</th><th class="text-end">Biaya iklan</th><th class="text-end">Laba operasional</th></tr></thead><tbody>
@@ -269,5 +326,7 @@
             @endforelse
         </tbody></table></div>
     </div>
+</div>
+</div>
 </div>
 @endsection
