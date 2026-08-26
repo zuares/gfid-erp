@@ -2,6 +2,7 @@
 
 namespace App\Services\Marketplace;
 
+use Carbon\Carbon;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
@@ -206,17 +207,23 @@ class MarketplaceProfitReportService
 
         if ($filters['date_basis'] === 'settlement_time') {
             $query->whereHas('settlement', function (Builder $settlement) use ($filters) {
-                $settlement
-                    ->when($filters['date_from'], fn (Builder $builder, $date) => $builder->whereDate('settlement_time', '>=', $date))
-                    ->when($filters['date_to'], fn (Builder $builder, $date) => $builder->whereDate('settlement_time', '<=', $date));
+                $this->applyDateRange($settlement, 'settlement_time', $filters['date_from'], $filters['date_to']);
             });
         } else {
-            $query
-                ->when($filters['date_from'], fn (Builder $builder, $date) => $builder->whereDate('ordered_at', '>=', $date))
-                ->when($filters['date_to'], fn (Builder $builder, $date) => $builder->whereDate('ordered_at', '<=', $date));
+            $this->applyDateRange($query, 'ordered_at', $filters['date_from'], $filters['date_to']);
         }
 
         return $query;
+    }
+
+    private function applyDateRange(Builder $query, string $column, ?string $from, ?string $to): void
+    {
+        if ($from) {
+            $query->where($column, '>=', Carbon::parse($from)->startOfDay());
+        }
+        if ($to) {
+            $query->where($column, '<', Carbon::parse($to)->addDay()->startOfDay());
+        }
     }
 
     private function buildOrderRow(MarketplaceOrder $order, MarketplaceOrderSettlement $settlement, $items): array

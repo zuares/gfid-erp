@@ -224,7 +224,7 @@ class MarketplaceAccountingPostingService
 
     public function forFilters(array $filters): ?MarketplaceAccountingPosting
     {
-        $normalized = $this->statementService->statement($filters)['filters'];
+        $normalized = $this->statementService->normalizeFilters($filters);
 
         return MarketplaceAccountingPosting::query()
             ->where('scope_key', $this->scopeKey($normalized))

@@ -14,7 +14,7 @@ class MarketplaceFinancialStatementService
      */
     public function statement(array $filters): array
     {
-        $report = $this->profitReport->report($filters);
+        $report = $this->profitReport->report($this->normalizeFilters($filters));
         $summary = $this->statementRow($report['summary']);
         $orderRows = $report['orders'];
         $summary['data_last_order_at'] = collect($orderRows)
@@ -59,6 +59,24 @@ class MarketplaceFinancialStatementService
                     2,
                 ),
             ],
+        ];
+    }
+
+    /**
+     * Normalize filters without executing the potentially expensive report query.
+     */
+    public function normalizeFilters(array $filters): array
+    {
+        return [
+            'store_id' => ! empty($filters['store_id']) ? (int) $filters['store_id'] : null,
+            'report_scope' => ($filters['report_scope'] ?? 'final') === 'include_shipped'
+                ? 'include_shipped'
+                : 'final',
+            'date_basis' => in_array($filters['date_basis'] ?? 'ordered_at', ['ordered_at', 'settlement_time'], true)
+                ? $filters['date_basis']
+                : 'ordered_at',
+            'date_from' => $filters['date_from'] ?? null,
+            'date_to' => $filters['date_to'] ?? null,
         ];
     }
 
