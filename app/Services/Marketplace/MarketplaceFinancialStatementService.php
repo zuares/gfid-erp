@@ -2,6 +2,10 @@
 
 namespace App\Services\Marketplace;
 
+use App\Models\MarketplaceAdWalletTransaction;
+use App\Models\MarketplaceAdsDaily;
+use Carbon\Carbon;
+
 class MarketplaceFinancialStatementService
 {
     public function __construct(private MarketplaceProfitReportService $profitReport)
@@ -32,6 +36,11 @@ class MarketplaceFinancialStatementService
         $summary['final'] = $this->statementRow($summary['final'] ?? []);
         $summary['provisional'] = $this->statementRow($summary['provisional'] ?? []);
 
+        // Wallet ads are period-level cash mutations. They are intentionally
+        // reported separately from settlement.ad_cost until an allocation
+        // policy to individual orders has been approved.
+        $summary = array_merge($summary, $this->adCostReconciliation($report['filters']));
+
         $stores = array_map(fn (array $row) => $this->statementRow($row), $report['stores']);
         $daily = array_map(function (array $row) {
             return array_merge(['date' => $row['date'] ?? null], $this->statementRow($row));
@@ -58,6 +67,11 @@ class MarketplaceFinancialStatementService
                     $summary['payout'] - ($summary['expected_payout_before_other_adjustments'] + $summary['other_settlement_adjustment']),
                     2,
                 ),
+                'wallet_ad_cost' => $summary['wallet_ad_cost'],
+                'wallet_ad_charge' => $summary['wallet_ad_charge'],
+                'wallet_ad_refund' => $summary['wallet_ad_refund'],
+                'ads_daily_spend' => $summary['ads_daily_spend'],
+                'ad_cost_variance' => $summary['ad_cost_variance'],
             ],
         ];
     }
@@ -110,5 +124,44 @@ class MarketplaceFinancialStatementService
                 ? round($grossSales / (float) $row['order_count'], 2)
                 : 0.0,
         ]);
+    }
+
+    /**
+     * Compare actual wallet deductions with Ads Daily performance spend.
+     * Both are store-level aggregates and use the transaction/performance date,
+     * not the order date or settlement release date.
+     */
+    private function adCostReconciliation(array $filters): array
+    {
+        $from = Carbon::parse($filters['date_from'])->startOfDay();
+        $to = Carbon::parse($filters['date_to'])->endOfDay();
+
+        $wallet = MarketplaceAdWalletTransaction::query()
+            ->whereBetween('transaction_created_at', [$from, $to])
+            ->when($filters['store_id'], fn ($query, $storeId) => $query->where('store_id', $storeId))
+            ->selectRaw('COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0) AS charge')
+            ->selectRaw('COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS refund')
+            ->selectRaw('COUNT(*) AS transaction_count')
+            ->first();
+
+        $adsDailySpend = MarketplaceAdsDaily::query()
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->when($filters['store_id'], fn ($query, $storeId) => $query->where('store_id', $storeId))
+            ->sum('spend');
+
+        $charge = round((float) ($wallet->charge ?? 0), 2);
+        $refund = round((float) ($wallet->refund ?? 0), 2);
+        $walletNet = round($charge - $refund, 2);
+        $adsDailySpend = round((float) $adsDailySpend, 2);
+
+        return [
+            'wallet_ad_charge' => $charge,
+            'wallet_ad_refund' => $refund,
+            'wallet_ad_cost' => $walletNet,
+            'wallet_ad_transaction_count' => (int) ($wallet->transaction_count ?? 0),
+            'ads_daily_spend' => $adsDailySpend,
+            'ad_cost_variance' => round($walletNet - $adsDailySpend, 2),
+            'ad_cost_date_basis' => 'wallet_transaction_created_at',
+        ];
     }
 }

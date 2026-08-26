@@ -12,35 +12,43 @@
     $dataLastDate = !empty($summary['data_last_order_at'])
         ? \Carbon\Carbon::parse($summary['data_last_order_at'])->translatedFormat('d M Y')
         : 'Belum ada';
+    $visibleItems = array_slice($statement['items'], 0, 100);
+    $visibleOrders = array_slice($statement['orders'], 0, 100);
 @endphp
 
 @push('head')
 <style>
-    .mp-finance-page { max-width: 1500px; }
-    .mp-finance-page .card { border-radius: 16px; border-color: rgba(148,163,184,.18); }
-    .mp-finance-page .mp-finance-hero { background: rgba(255,255,255,.86); border:1px solid rgba(148,163,184,.16); padding:1rem 1.1rem; border-radius:16px; }
-    .mp-finance-page .mp-eyebrow { text-transform:uppercase; letter-spacing:.12em; font-size:.68rem; font-weight:800; color:#64748b; }
-    .mp-finance-page .mp-finance-hero h4 { font-weight:850; letter-spacing:-.03em; }
-    .mp-finance-page .page-actions .btn { border-radius:999px; font-weight:700; }
-    .mp-finance-page .page-actions .btn-primary { background:#fbbf24; border-color:#fbbf24; color:#422006; }
-    .mp-finance-page .mp-filter-card .card-body { padding:1rem 1.1rem; }
-    .mp-finance-page .mp-section-title { display:flex; align-items:center; gap:.45rem; text-transform:uppercase; letter-spacing:.1em; font-size:.68rem; font-weight:850; color:#334155; }
+    .mp-finance-page { max-width:1040px; margin-inline:auto; padding:.75rem .75rem 4rem; }
+    .mp-finance-page .card { border-radius:8px; border-color:rgba(148,163,184,.18); box-shadow:none!important; }
+    .mp-finance-page .mp-finance-hero { background:var(--card,#fff); border:1px solid rgba(148,163,184,.18); padding:.45rem .75rem; border-radius:8px; }
+    .mp-finance-page .mp-eyebrow { text-transform:none; letter-spacing:0; font-size:.72rem; font-weight:650; color:#64748b; }
+    .mp-finance-page .mp-finance-hero h4 { font-weight:750; letter-spacing:0; font-size:1rem; }
+    .mp-finance-page .mp-finance-hero p { font-size:.78rem; }
+    .mp-finance-page .page-actions .btn { border-radius:7px; font-weight:600; font-size:.73rem; padding:.3rem .65rem; }
+    .mp-finance-page .page-actions .btn-primary { background:#334155; border-color:#334155; color:#fff; }
+    .mp-finance-page .mp-filter-card .card-body { padding:.75rem .85rem; }
+    .mp-finance-page .mp-section-title { display:flex; align-items:center; gap:.45rem; text-transform:none; letter-spacing:0; font-size:.78rem; font-weight:750; color:#334155; }
     .mp-finance-page .mp-section-title i { color:#64748b; }
     .mp-finance-page .summary-card { border-width: 0 0 0 4px !important; }
-    .mp-finance-page .summary-card .card-body { min-height: 92px; display:flex; flex-direction:column; justify-content:center; }
+    .mp-finance-page .summary-card .card-body { min-height:0; padding:.7rem .85rem; display:flex; flex-direction:column; justify-content:center; }
+    .mp-finance-page .summary-card .text-muted { font-size:.66rem!important; color:#94a3b8!important; }
+    .mp-finance-page .summary-card .fs-5 { font-size:1.2rem!important; font-weight:650!important; }
+    .mp-finance-page .form-select, .mp-finance-page .form-control { min-height:34px; border-radius:8px; font-size:.8rem; }
     .mp-finance-page .table th { white-space: nowrap; }
-    .mp-finance-page .filter-help { font-size:.76rem; color:#64748b; }
-    .mp-finance-page .mp-status-strip { background:#f8fafc; border:1px solid rgba(148,163,184,.2); border-radius:12px; padding:.65rem .85rem; }
+    .mp-finance-page .mp-status-strip { background:#f8fafc; border:1px solid rgba(148,163,184,.2); border-radius:8px; padding:.5rem .7rem; }
     .mp-finance-page .mp-status-strip .badge { font-weight:700; letter-spacing:.01em; }
-    .mp-finance-page .mp-tab-nav { position:sticky; top:.5rem; z-index:10; background:rgba(255,255,255,.94); backdrop-filter:blur(8px); border:1px solid rgba(148,163,184,.18); border-radius:14px; padding:.35rem; }
-    .mp-finance-page .mp-tab-nav .nav-link { border-radius:10px; color:#475569; font-weight:700; font-size:.84rem; }
-    .mp-finance-page .mp-tab-nav .nav-link.active { background:#0f172a; color:#fff; }
+    .mp-finance-page .mp-tab-nav { position:sticky; top:.5rem; z-index:10; background:var(--card,#fff); border:1px solid rgba(148,163,184,.18); border-radius:8px; padding:.25rem; gap:.25rem; }
+    .mp-finance-page .mp-tab-nav .nav-link { border-radius:999px; color:#475569; font-weight:700; font-size:.75rem; padding:.3rem .75rem; }
+    .mp-finance-page .mp-tab-nav .nav-link.active { background:#334155; color:#fff; }
     .mp-finance-page .mp-table-caption { color:#64748b; font-size:.78rem; }
+    .mp-finance-page .table-responsive { max-height:60vh; overflow:auto; }
+    .mp-finance-page .table thead th { position:sticky; top:0; z-index:2; background:var(--card,#fff); font-size:.64rem; text-transform:uppercase; letter-spacing:.04em; color:#64748b; }
+    .mp-finance-page .table td { font-size:.78rem; }
     @media (max-width: 767.98px) {
         .mp-finance-page { padding-left:.65rem; padding-right:.65rem; }
         .mp-finance-page .page-actions { width:100%; }
         .mp-finance-page .page-actions .btn { flex:1 1 auto; }
-        .mp-finance-page .summary-card .card-body { min-height:78px; padding:.8rem; }
+        .mp-finance-page .summary-card .card-body { padding:.65rem; }
         .mp-finance-page .summary-card .fs-5 { font-size:1rem !important; }
     }
 </style>
@@ -85,7 +93,6 @@
                         <input type="radio" class="btn-check" name="report_scope" id="scope-shipped" value="include_shipped" @checked($includeShipped)>
                         <label class="btn btn-outline-info" for="scope-shipped">+ Shipped</label>
                     </div>
-                    <div class="filter-help mt-1">Shipped tampil sebagai piutang provisional.</div>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small fw-semibold">Basis tanggal</label>
@@ -93,7 +100,6 @@
                         <option value="ordered_at" @selected($filters['date_basis'] === 'ordered_at')>Tanggal order</option>
                         <option value="settlement_time" @selected($filters['date_basis'] === 'settlement_time')>Tanggal cair</option>
                     </select>
-                    <div class="filter-help mt-1">Menentukan transaksi yang masuk periode laporan.</div>
                 </div>
                 <div class="col-md-2"><label class="form-label small fw-semibold">Dari</label><input type="date" name="date_from" class="form-control" value="{{ $filters['date_from'] }}"></div>
                 <div class="col-md-2"><label class="form-label small fw-semibold">Sampai</label><input type="date" name="date_to" class="form-control" value="{{ $filters['date_to'] }}"></div>
@@ -212,19 +218,20 @@
             <div class="mp-section-title mb-3"><i class="bi bi-speedometer2"></i> KPI audit marketplace</div>
             <div class="row g-3">
                 @foreach ([
-                    ['label' => 'Payout rate', 'value' => $pct($summary['payout_rate_pct']), 'hint' => 'Payout ÷ omzet'],
-                    ['label' => 'Fee rate', 'value' => $pct($summary['fee_rate_pct']), 'hint' => 'Fee ÷ omzet'],
-                    ['label' => 'HPP rate', 'value' => $pct($summary['hpp_rate_pct']), 'hint' => 'HPP ÷ omzet'],
-                    ['label' => 'Nilai order rata-rata', 'value' => 'Rp ' . $fmt($summary['average_order_value']), 'hint' => 'Omzet ÷ order'],
-                    ['label' => 'Refund rate', 'value' => $pct($summary['refund_rate_pct']), 'hint' => 'Refund ÷ omzet'],
-                    ['label' => 'Data terakhir', 'value' => $dataLastDate, 'hint' => 'Order valid terbaru'],
-                    ['label' => 'Anomali payout', 'value' => $fmt($summary['payout_anomaly_count'] ?? 0) . ' order', 'hint' => 'Payout > omzet material'],
+                    ['label' => 'Payout rate', 'value' => $pct($summary['payout_rate_pct'])],
+                    ['label' => 'Fee rate', 'value' => $pct($summary['fee_rate_pct'])],
+                    ['label' => 'HPP rate', 'value' => $pct($summary['hpp_rate_pct'])],
+                    ['label' => 'Nilai order rata-rata', 'value' => 'Rp ' . $fmt($summary['average_order_value'])],
+                    ['label' => 'Refund rate', 'value' => $pct($summary['refund_rate_pct'])],
+                    ['label' => 'Iklan wallet aktual', 'value' => 'Rp ' . $fmt($summary['wallet_ad_cost'] ?? 0)],
+                    ['label' => 'Selisih iklan', 'value' => 'Rp ' . $fmt($summary['ad_cost_variance'] ?? 0)],
+                    ['label' => 'Data terakhir', 'value' => $dataLastDate],
+                    ['label' => 'Anomali payout', 'value' => $fmt($summary['payout_anomaly_count'] ?? 0) . ' order'],
                 ] as $kpi)
                     <div class="col-6 col-md-3 col-xl-{{ $loop->index < 4 ? '2' : '2' }}">
                         <div class="border rounded-3 h-100 p-3">
                             <div class="text-muted small">{{ $kpi['label'] }}</div>
                             <div class="fw-bold mt-1">{{ $kpi['value'] }}</div>
-                            <div class="text-muted" style="font-size:.72rem;">{{ $kpi['hint'] }}</div>
                         </div>
                     </div>
                 @endforeach
@@ -250,7 +257,7 @@
                         <tr class="table-info fw-semibold"><td>Payout aktual</td><td class="text-end">Rp {{ $fmt($summary['payout']) }}</td></tr>
                         <tr><td>HPP</td><td class="text-end text-danger">(Rp {{ $fmt($summary['hpp']) }})</td></tr>
                         <tr class="table-light fw-semibold"><td>Laba kotor</td><td class="text-end">Rp {{ $fmt($summary['gross_profit']) }}</td></tr>
-                        <tr><td>Biaya iklan</td><td class="text-end text-danger">(Rp {{ $fmt($summary['ad_cost']) }})</td></tr>
+                        <tr><td>Biaya iklan order/settlement</td><td class="text-end text-danger">(Rp {{ $fmt($summary['ad_cost']) }})</td></tr>
                         <tr class="table-success fw-bold"><td>Laba operasional</td><td class="text-end">Rp {{ $fmt($summary['operating_profit']) }}</td></tr>
                     </tbody>
                 </table></div>
@@ -260,7 +267,6 @@
             <div class="card shadow-sm h-100">
                 <div class="card-header bg-white"><div class="mp-section-title"><i class="bi bi-arrow-left-right"></i> Rekonsiliasi payout</div></div>
                 <div class="card-body">
-                    <div class="small text-muted mb-3">Selisih payout aktual dengan perhitungan dasar ditampilkan sebagai penyesuaian lain agar tidak dipaksakan hilang.</div>
                     @foreach ([
                         ['label' => 'Payout dasar sebelum penyesuaian', 'value' => $statement['reconciliation']['expected_payout_before_other_adjustments']],
                         ['label' => 'Penyesuaian settlement lain', 'value' => $statement['reconciliation']['other_settlement_adjustment']],
@@ -269,9 +275,24 @@
                     ] as $line)
                         <div class="d-flex justify-content-between border-bottom py-2"><span class="small">{{ $line['label'] }}</span><strong>Rp {{ $fmt($line['value']) }}</strong></div>
                     @endforeach
-                    <div class="alert alert-info small mt-3 mb-0">Selisih idealnya Rp0. Jika besar, cek voucher, ongkir, pajak, refund, atau adjustment di settlement raw.</div>
+                    @if (abs((float) $statement['reconciliation']['difference']) > 0.01)
+                        <div class="alert alert-warning small mt-3 mb-0"><i class="bi bi-exclamation-triangle me-1"></i> Selisih payout perlu diaudit pada voucher, ongkir, pajak, refund, atau adjustment settlement.</div>
+                    @endif
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-warning mb-4">
+        <div class="card-body">
+            <div class="mp-section-title mb-3"><i class="bi bi-megaphone"></i> Rekonsiliasi biaya iklan</div>
+            <div class="row g-3">
+                <div class="col-6 col-md-3"><div class="text-muted small">Charge wallet</div><div class="fw-bold">Rp {{ $fmt($summary['wallet_ad_charge'] ?? 0) }}</div></div>
+                <div class="col-6 col-md-3"><div class="text-muted small">Refund wallet</div><div class="fw-bold">Rp {{ $fmt($summary['wallet_ad_refund'] ?? 0) }}</div></div>
+                <div class="col-6 col-md-3"><div class="text-muted small">Ads Daily spend</div><div class="fw-bold">Rp {{ $fmt($summary['ads_daily_spend'] ?? 0) }}</div></div>
+                <div class="col-6 col-md-3"><div class="text-muted small">Selisih</div><div class="fw-bold {{ abs((float) ($summary['ad_cost_variance'] ?? 0)) > 0.01 ? 'text-warning-emphasis' : 'text-success' }}">Rp {{ $fmt($summary['ad_cost_variance'] ?? 0) }}</div></div>
+            </div>
+            <div class="small text-muted mt-3">Biaya wallet memakai tanggal transaksi Shopee. Angka ini belum mengubah laba operasional per order; gunakan selisih untuk audit sinkronisasi dan perbedaan waktu pencatatan.</div>
         </div>
     </div>
     </div>
@@ -291,9 +312,9 @@
 
     <div class="tab-pane fade" id="tab-products" role="tabpanel">
     <div class="card shadow-sm mb-4">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center"><div class="mp-section-title"><i class="bi bi-box-seam"></i> Performa per produk</div><span class="mp-table-caption">{{ $fmt(count($statement['items'])) }} SKU</span></div>
+        <div class="card-header bg-white d-flex justify-content-between align-items-center"><div class="mp-section-title"><i class="bi bi-box-seam"></i> Performa per produk</div><span class="mp-table-caption">{{ $fmt(count($visibleItems)) }} dari {{ $fmt(count($statement['items'])) }} SKU</span></div>
         <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>SKU</th><th>Produk</th><th class="text-end">Qty</th><th class="text-end">Payout</th><th class="text-end">HPP</th><th class="text-end">Laba</th><th class="text-end">Margin</th></tr></thead><tbody>
-            @forelse ($statement['items'] as $row)
+            @forelse ($visibleItems as $row)
                 <tr><td class="fw-semibold">{{ $row['sku'] }}</td><td style="min-width:280px">{{ $row['item_name'] }}</td><td class="text-end">{{ $fmt($row['qty']) }}</td><td class="text-end">Rp {{ $fmt($row['payout']) }}</td><td class="text-end">Rp {{ $fmt($row['hpp']) }}</td><td class="text-end fw-semibold">Rp {{ $fmt($row['operating_profit']) }}</td><td class="text-end">{{ $pct($row['margin_pct']) }}</td></tr>
             @empty
                 <tr><td colspan="7" class="text-center text-muted py-4">Belum ada data produk.</td></tr>
@@ -304,9 +325,9 @@
 
     <div class="tab-pane fade" id="tab-orders" role="tabpanel">
     <div class="card shadow-sm mb-4">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center"><div class="mp-section-title"><i class="bi bi-receipt"></i> Detail order</div><span class="mp-table-caption">{{ $fmt(count($statement['orders'])) }} order terverifikasi</span></div>
+        <div class="card-header bg-white d-flex justify-content-between align-items-center"><div class="mp-section-title"><i class="bi bi-receipt"></i> Detail order</div><span class="mp-table-caption">{{ $fmt(count($visibleOrders)) }} dari {{ $fmt(count($statement['orders'])) }} order</span></div>
         <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Order</th><th>Tanggal</th><th>Status</th><th>Toko</th><th class="text-end">Omzet</th><th class="text-end">Payout</th><th class="text-end">HPP</th><th class="text-end">Laba</th></tr></thead><tbody>
-            @forelse ($statement['orders'] as $row)
+            @forelse ($visibleOrders as $row)
                 <tr><td class="fw-semibold">{{ $row['channel_order_id'] }}</td><td>{{ $row['ordered_at'] ?: '-' }}</td><td><span class="badge rounded-pill {{ ($row['recognition_status'] ?? 'final') === 'provisional' ? 'bg-info-subtle text-info-emphasis' : 'bg-success-subtle text-success-emphasis' }}">{{ ($row['recognition_status'] ?? 'final') === 'provisional' ? 'Shipped · provisional' : 'Final' }}</span></td><td>{{ $row['store_name'] }}</td><td class="text-end">Rp {{ $fmt($row['gross_sales']) }}</td><td class="text-end">Rp {{ $fmt($row['payout']) }}</td><td class="text-end">Rp {{ $fmt($row['hpp']) }}</td><td class="text-end fw-semibold">Rp {{ $fmt($row['operating_profit']) }}</td></tr>
             @empty
                 <tr><td colspan="8" class="text-center text-muted py-4">Belum ada order pada periode ini.</td></tr>

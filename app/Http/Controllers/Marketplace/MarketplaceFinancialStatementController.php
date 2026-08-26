@@ -85,6 +85,9 @@ class MarketplaceFinancialStatementController extends Controller
                 ['Laba Rugi', 'COGS', 'HPP', -$statement['summary']['hpp']],
                 ['Laba Rugi', 'GP', 'Laba kotor', $statement['summary']['gross_profit']],
                 ['Laba Rugi', 'ADS', 'Biaya iklan', -$statement['summary']['ad_cost']],
+                ['Rekonsiliasi Iklan', 'ADS-WALLET', 'Biaya iklan aktual wallet Shopee', -$statement['summary']['wallet_ad_cost']],
+                ['Rekonsiliasi Iklan', 'ADS-DAILY', 'Ads Daily spend', -$statement['summary']['ads_daily_spend']],
+                ['Rekonsiliasi Iklan', 'ADS-VAR', 'Selisih wallet vs Ads Daily', $statement['summary']['ad_cost_variance']],
                 ['Laba Rugi', 'OP', 'Laba operasional', $statement['summary']['operating_profit']],
             ];
 

@@ -3,6 +3,8 @@
 namespace Tests\Unit\Services;
 
 use App\Models\Channel;
+use App\Models\MarketplaceAdWalletTransaction;
+use App\Models\MarketplaceAdsDaily;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
@@ -60,6 +62,31 @@ class MarketplaceFinancialStatementServiceTest extends TestCase
             'data_status' => 'complete',
             'raw_json' => [],
         ]);
+        MarketplaceAdWalletTransaction::create([
+            'store_id' => $store->id,
+            'external_transaction_id' => 'AD-CHARGE-1',
+            'transaction_type' => 'paid_ads_charge',
+            'amount' => -150,
+            'money_flow' => 'MONEY_OUT',
+            'status' => 'COMPLETED',
+            'transaction_created_at' => '2026-08-10 10:00:00',
+            'source_payload' => [],
+        ]);
+        MarketplaceAdWalletTransaction::create([
+            'store_id' => $store->id,
+            'external_transaction_id' => 'AD-REFUND-1',
+            'transaction_type' => 'paid_ads_refund',
+            'amount' => 20,
+            'money_flow' => 'MONEY_IN',
+            'status' => 'COMPLETED',
+            'transaction_created_at' => '2026-08-11 10:00:00',
+            'source_payload' => [],
+        ]);
+        MarketplaceAdsDaily::create([
+            'store_id' => $store->id,
+            'date' => '2026-08-10',
+            'spend' => 100,
+        ]);
 
         $statement = app(MarketplaceFinancialStatementService::class)->statement([
             'store_id' => $store->id,
@@ -74,5 +101,10 @@ class MarketplaceFinancialStatementServiceTest extends TestCase
         $this->assertSame(135.0, $statement['summary']['gross_profit']);
         $this->assertSame(125.0, $statement['summary']['operating_profit']);
         $this->assertSame(0.0, $statement['reconciliation']['difference']);
+        $this->assertSame(150.0, $statement['summary']['wallet_ad_charge']);
+        $this->assertSame(20.0, $statement['summary']['wallet_ad_refund']);
+        $this->assertSame(130.0, $statement['summary']['wallet_ad_cost']);
+        $this->assertSame(100.0, $statement['summary']['ads_daily_spend']);
+        $this->assertSame(30.0, $statement['summary']['ad_cost_variance']);
     }
 }
