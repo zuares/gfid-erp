@@ -121,7 +121,7 @@ class MarketplaceFinanceController extends Controller
         $settlementQuery = MarketplaceOrderSettlement::with([
             'store:id,name,channel_id',
             'store.channel:id,code,name',
-            'order:id,channel_order_id,order_status,ordered_at,subtotal_items,total_paid_customer',
+            'order:id,channel_order_id,booking_sn,order_status,ordered_at,subtotal_items,total_paid_customer',
             'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,synced_at',
             'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id,price',
         ]);
@@ -216,6 +216,7 @@ class MarketplaceFinanceController extends Controller
         foreach ($settlements as $settlement) {
             $order = $settlement->order;
             if (! $order) continue;
+            if ($this->isBookingOnlyOrder($order)) continue;
             $totalOrderCount++;
             $isSettled = ! empty($settlement->settlement_time);
             if ($isSettled) {
@@ -462,6 +463,14 @@ class MarketplaceFinanceController extends Controller
         }
 
         return max(0.0, (float) $value);
+    }
+
+    private function isBookingOnlyOrder(?MarketplaceOrder $order): bool
+    {
+        return $order
+            && filled($order->booking_sn)
+            && filled($order->channel_order_id)
+            && (string) $order->channel_order_id === (string) $order->booking_sn;
     }
 
     private function settlementVoucherTokoAmount(MarketplaceOrderSettlement $settlement): float

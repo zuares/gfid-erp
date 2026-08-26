@@ -3480,7 +3480,7 @@ class MarketplaceController extends Controller
     {
         $query = MarketplaceOrderSettlement::with([
             'store:id,name',
-            'order:id,channel_order_id,order_status,ordered_at,subtotal_items,total_paid_customer',
+            'order:id,channel_order_id,booking_sn,order_status,ordered_at,subtotal_items,total_paid_customer',
             'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,payment_method,synced_at',
             'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id',
         ]);
@@ -3672,6 +3672,7 @@ class MarketplaceController extends Controller
                 $q->where('channel_order_id', 'like', "%{$search}%")
                     ->orWhereHas('order', function ($orderQuery) use ($search) {
                         $orderQuery->where('channel_order_id', 'like', "%{$search}%")
+                            ->orWhere('booking_sn', 'like', "%{$search}%")
                             ->orWhereHas('items', function ($itemQuery) use ($search) {
                                 $itemQuery->where(function ($itemFilter) use ($search) {
                                     $itemFilter->where('item_name', 'like', "%{$search}%")
@@ -3751,6 +3752,7 @@ class MarketplaceController extends Controller
                 $search = $request->search;
                 $pendingOrdersQuery->where(function ($q) use ($search) {
                     $q->where('channel_order_id', 'like', "%{$search}%")
+                        ->orWhere('booking_sn', 'like', "%{$search}%")
                         ->orWhereHas('items', function ($itemQuery) use ($search) {
                             $itemQuery->where(function ($itemFilter) use ($search) {
                                 $itemFilter->where('item_name', 'like', "%{$search}%")
@@ -3785,6 +3787,11 @@ class MarketplaceController extends Controller
 
         $metaQuery = clone $query;
         $formatSettlement = function ($s) {
+            $orderChannelId = $s->order?->channel_order_id ?: $s->channel_order_id;
+            $bookingSn = $s->order?->booking_sn ?: data_get($s->raw_json, 'booking_sn');
+            $isBookingOnly = filled($bookingSn)
+                && filled($orderChannelId)
+                && (string) $orderChannelId === (string) $bookingSn;
             $breakdown = $s->marketplaceFeeBreakdown();
             $feeTotals = $s->marketplaceFeeCategoryTotals($breakdown);
             $sellerBurdenTotal = (float) ($feeTotals['seller'] ?? 0);
@@ -3819,14 +3826,19 @@ class MarketplaceController extends Controller
             }) : 0;
 
             $netIncome = (float) $s->final_income;
-            $estimatedEscrowAmount = $this->settlementEstimatedEscrowAmount($s);
+            $estimatedEscrowAmount = $isBookingOnly ? null : $this->settlementEstimatedEscrowAmount($s);
             $isEstimatedIncome = false;
             $incomeEstimationSource = null;
             $status = strtoupper($s->order?->order_status ?? '');
             $isCancelledOrReturned = in_array($status, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
             $isReturning = in_array($status, ['TO_RETURN', 'RETURNING']);
 
-            if ($isCancelledOrReturned) {
+            if ($isBookingOnly) {
+                // Booking-only belum memiliki order_sn/settlement yang valid.
+                // Jangan tampilkan fallback 24% atau ikutkan sebagai income.
+                $netIncome = 0;
+                $cogs = 0;
+            } elseif ($isCancelledOrReturned) {
                 $netIncome = 0;
                 $cogs = 0;
             } elseif ($isReturning) {
@@ -3848,7 +3860,13 @@ class MarketplaceController extends Controller
 
             return [
                 'id' => $s->id,
-                'channel_order_id' => $s->channel_order_id,
+                // Setelah booking MATCHED, gunakan order_sn asli sebagai ID
+                // utama keuangan. channel_order_id settlement lama bisa masih
+                // menyimpan booking_sn.
+                'channel_order_id' => $orderChannelId,
+                'booking_sn' => $bookingSn,
+                'is_booking_only' => $isBookingOnly,
+                'financial_data_available' => ! $isBookingOnly,
                 'order_status' => $s->order?->order_status,
                 'payment_method' => $s->order?->payment_method
                     ?? $s->order?->incomeEstimate?->payment_method
@@ -3955,7 +3973,9 @@ class MarketplaceController extends Controller
                 $page,
                 ['path' => $request->url(), 'query' => $request->query()]
             );
-            $metaRowsForSettlement = $allRows;
+            $metaRowsForSettlement = $allRows
+                ->reject(fn ($settlement) => $this->isBookingOnlySettlement($settlement))
+                ->values();
         } else {
             $paginator = $query->paginate($request->input('per_page', 50));
             $paginator->setCollection($paginator->getCollection()->map($formatSettlement));
@@ -3992,6 +4012,9 @@ class MarketplaceController extends Controller
                     'raw_json',
                 ]);
             }
+            $metaRows = $metaRows
+                ->reject(fn ($settlement) => $this->isBookingOnlySettlement($settlement))
+                ->values();
             $feeTotals = $metaRows->reduce(function (array $carry, MarketplaceOrderSettlement $settlement) {
                 $totals = $settlement->marketplaceFeeCategoryTotals($settlement->marketplaceFeeBreakdown());
                 $carry['seller'] += (float) ($totals['seller'] ?? 0);
@@ -4196,6 +4219,17 @@ class MarketplaceController extends Controller
         ]);
     }
 
+    /** Booking yang belum memiliki order_sn bukan data finansial. */
+    private function isBookingOnlySettlement(MarketplaceOrderSettlement $settlement): bool
+    {
+        $orderChannelId = $settlement->order?->channel_order_id ?: $settlement->channel_order_id;
+        $bookingSn = $settlement->order?->booking_sn ?: data_get($settlement->raw_json, 'booking_sn');
+
+        return filled($bookingSn)
+            && filled($orderChannelId)
+            && (string) $orderChannelId === (string) $bookingSn;
+    }
+
     /**
      * Build a dynamic fee breakdown from synced settlement payload.
      * Known fee fields are mapped to friendly labels; any new fee-like field
@@ -4302,6 +4336,10 @@ class MarketplaceController extends Controller
      */
     private function settlementSortIncome(MarketplaceOrderSettlement $s): float
     {
+        if ($this->isBookingOnlySettlement($s)) {
+            return 0.0;
+        }
+
         $status = strtoupper($s->order?->order_status ?? '');
         if (in_array($status, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND', 'TO_RETURN', 'RETURNING'])) {
             return 0.0;

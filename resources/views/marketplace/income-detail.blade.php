@@ -2353,9 +2353,11 @@
         const sub = $('incomeBreakdownModalSub');
         const body = $('incomeBreakdownModalBody');
 
-        title.textContent = `Rincian Potongan • ${s.channel_order_id || '-'}`;
+        title.textContent = `${s.is_booking_only ? 'Booking' : 'Rincian Potongan'} • ${s.booking_sn || s.channel_order_id || '-'}`;
         sub.textContent = `${s.store?.name || '-'} • ${s.order?.order_status || s.order_status || '-'}`;
-        body.innerHTML = renderBreakdownModalContent(s);
+        body.innerHTML = s.is_booking_only
+            ? '<div style="padding:1.5rem;text-align:center;color:#a16207;"><i class="bi bi-lightning-charge-fill" style="font-size:1.4rem;"></i><div style="font-weight:800;margin-top:.5rem;">Belum ada data penghasilan</div><div style="font-size:.75rem;color:#64748b;margin-top:.25rem;">Booking belum terhubung ke No. Pesanan dan belum memiliki settlement Shopee.</div></div>'
+            : renderBreakdownModalContent(s);
 
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('incomeBreakdownModal'));
         modal.show();
@@ -2512,7 +2514,18 @@
                     && s.estimated_escrow_amount !== undefined
                     && s.estimated_escrow_amount !== '';
                 const estimatedEscrowAmount = hasEstimatedEscrowAmount ? Number(s.estimated_escrow_amount) : 0;
-                const statusMeta = getOrderStatusMeta(s.order?.order_status || s.order_status);
+                const isBookingOnly = s.is_booking_only === true;
+                const bookingSn = s.booking_sn || s.order?.booking_sn || '';
+                const displayOrderId = isBookingOnly ? (bookingSn || s.channel_order_id || '-') : (s.channel_order_id || '-');
+                const orderLink = !isBookingOnly && s.order?.id
+                    ? `<a href="/marketplace/orders/${s.order.id}" class="income-row-title" title="${esc(displayOrderId)}">${esc(displayOrderId)}</a>`
+                    : `<span class="income-row-title" title="${isBookingOnly ? 'No. Booking — menunggu No. Pesanan' : displayOrderId}">${esc(displayOrderId)}</span>`;
+                const bookingMeta = bookingSn && !isBookingOnly
+                    ? `<div class="income-row-sub" title="No. Booking"><i class="bi bi-lightning-charge-fill" style="font-size:0.55rem;color:#a16207;"></i><span class="text-truncate" style="color:#a16207;font-weight:800;">No. Booking: ${esc(bookingSn)}</span></div>`
+                    : '';
+                const statusMeta = isBookingOnly
+                    ? { label: 'Booking • Belum Match', cls: 'warning', icon: 'bi-lightning-charge-fill' }
+                    : getOrderStatusMeta(s.order?.order_status || s.order_status);
                 const orderDateText = s.order?.ordered_at ? fmtShortDate(s.order.ordered_at) : '—';
                 const settlementDateText = s.settlement_time
                     ? fmtShortDate(s.settlement_time)
@@ -2524,32 +2537,37 @@
                 let finalPercent = gross > 0 ? ((netCairValue / gross) * 100).toFixed(1) : '0.0';
                 const cogsValue = Number(s.cogs || 0);
                 const cogsPercent = gross > 0 ? ((cogsValue / gross) * 100).toFixed(1) : '0.0';
-                const profitValue = Number(s.gross_profit || 0);
+                const profitValue = isBookingOnly ? 0 : Number(s.gross_profit || 0);
                 const profitPercent = gross > 0 ? ((Math.abs(profitValue) / gross) * 100).toFixed(1) : '0.0';
 
                 const isCompleted = s.order?.order_status === 'COMPLETED';
                 const isCancelledOrReturned = s.order?.order_status === 'CANCELLED' || s.order?.order_status === 'BATAL' || s.order?.order_status === 'RETURNED' || s.order?.order_status === 'REFUND';
                 const isReturning = s.order?.order_status === 'TO_RETURN' || s.order?.order_status === 'RETURNING';
 
-                const shouldEstimatePendingIncome = !s.settlement_time;
-                const incomeEstimationSource = s.income_estimation_source
-                    || (s.is_estimated_income ? (hasEstimatedEscrowAmount ? 'estimated_escrow' : 'manual_24') : null);
+                const shouldEstimatePendingIncome = !isBookingOnly && !s.settlement_time;
+                const incomeEstimationSource = isBookingOnly ? null : (s.income_estimation_source
+                    || (s.is_estimated_income ? (hasEstimatedEscrowAmount ? 'estimated_escrow' : 'manual_24') : null));
                 const incomeSourceLabel = incomeEstimationSource === 'estimated_escrow'
                     ? 'EST. SHOPEE'
                     : (incomeEstimationSource === 'manual_24'
                         ? 'EST. MANUAL 24%'
-                        : (s.settlement_time ? 'CAIR • FINAL' : 'ESTIMASI BELUM TERSEDIA'));
+                        : (isBookingOnly ? 'BELUM TERSEDIA' : (s.settlement_time ? 'CAIR • FINAL' : 'ESTIMASI BELUM TERSEDIA')));
                 const incomeSourceTitle = incomeEstimationSource === 'estimated_escrow'
                     ? 'Estimasi dari estimated_escrow_amount Shopee'
                     : (incomeEstimationSource === 'manual_24'
                         ? 'Estimasi fallback manual 24%'
-                        : (s.settlement_time ? 'Nilai pencairan final' : 'Income detail Shopee belum tersedia'));
+                        : (isBookingOnly ? 'Booking belum terhubung ke No. Pesanan dan belum memiliki data settlement' : (s.settlement_time ? 'Nilai pencairan final' : 'Income detail Shopee belum tersedia')));
                 const incomeIsPending = !s.settlement_time;
                 const estimateFreshness = s.income_estimate_synced_at
                     ? `Diperbarui ${relativeTime(s.income_estimate_synced_at)}`
-                    : (incomeEstimationSource === 'manual_24' ? 'Fallback lokal' : (incomeIsPending ? 'Menunggu data Shopee' : ''));
+                    : (isBookingOnly ? 'Menunggu No. Pesanan / data settlement Shopee' : (incomeEstimationSource === 'manual_24' ? 'Fallback lokal' : (incomeIsPending ? 'Menunggu data Shopee' : '')));
 
-                if (isCancelledOrReturned) {
+                if (isBookingOnly) {
+                    net = 0;
+                    s.final_income = 0;
+                    s.cogs = 0;
+                    s.gross_profit = 0;
+                } else if (isCancelledOrReturned) {
                     net = 0;
                     s.final_income = 0;
                     s.cogs = 0;
@@ -2591,7 +2609,7 @@
                             <div class="income-row-top">
                                 <div class="income-row-main">
                                     <i class="bi bi-box-seam text-muted" style="font-size:0.62rem;"></i>
-                                    <a href="/marketplace/orders/${s.order?.id || ''}" class="income-row-title" title="${esc(s.channel_order_id || '-')}">${esc(s.channel_order_id || '-')}</a>
+                                    ${orderLink}
                                 </div>
                                 <span class="income-chip ${statusMeta.cls}">
                                     <i class="bi ${statusMeta.icon}"></i>${esc(statusMeta.label)}
@@ -2601,6 +2619,8 @@
                                 <i class="bi bi-shop" style="font-size:0.55rem;"></i>
                                 <span class="fw-bold text-truncate" style="letter-spacing:-0.01em;">${esc(s.store?.name || '-').toUpperCase()}</span>
                             </div>
+                            ${bookingMeta}
+                            ${isBookingOnly ? '<div style="font-size:.62rem;color:#a16207;font-weight:800;margin-top:.2rem;"><i class="bi bi-info-circle me-1"></i>Menunggu No. Pesanan dan data settlement Shopee</div>' : ''}
                             <div class="income-row-badges">
                                 <span class="income-chip neutral"><i class="bi bi-box"></i>${itemCount.toLocaleString('id-ID')} item</span>
                                 <span class="income-chip neutral" title="Metode pembayaran"><i class="bi bi-credit-card"></i>${esc(s.payment_method || 'Tidak tercatat')}</span>
@@ -2635,7 +2655,10 @@
                         </div>
                     </td>
                     <td>
-                        <div class="income-money-stack">
+                        ${isBookingOnly ? `
+                            <div style="padding:.5rem 0;color:#a16207;font-size:.68rem;font-weight:800;">Belum tersedia</div>
+                            <div style="font-size:.58rem;color:#94a3b8;">Menunggu No. Pesanan</div>
+                        ` : `<div class="income-money-stack">
                             <div class="income-money-line">
                                 <span class="income-money-label">Gross</span>
                                 <span class="income-money-value text-muted">${fmtRp(gross)}</span>
@@ -2648,10 +2671,13 @@
                                 <span class="income-money-label">Pembayaran Pembeli</span>
                                 <span class="income-money-value text-muted">${fmtRp(buyerPaid)} <span style="font-size:.52rem; color:#94a3b8; font-weight:800;">(${gross > 0 ? ((buyerPaid/gross)*100).toFixed(1) : '0.0'}%)</span></span>
                             </div>
-                        </div>
+                        </div>`}
                     </td>
                     <td>
-                        <div class="income-money-stack">
+                        ${isBookingOnly ? `
+                            <div style="padding:.5rem 0;color:#a16207;font-size:.68rem;font-weight:800;">Belum tersedia</div>
+                            <div style="font-size:.58rem;color:#94a3b8;">Belum ada data potongan</div>
+                        ` : `<div class="income-money-stack">
                             <div class="income-money-line">
                                 <span class="income-money-label">Voucher Platform</span>
                                 <span class="income-money-value txt-danger">-${fmtRp(voucherPlatform)}</span>
@@ -2676,10 +2702,13 @@
                                 <span class="income-money-label">Penyesuaian</span>
                                 <span class="income-money-value txt-danger">-${fmtRp(adjustmentTotal)}</span>
                             </div>
-                        </div>
+                        </div>`}
                     </td>
                     <td>
-                        <div class="income-money-stack">
+                        ${isBookingOnly ? `
+                            <div style="padding:.5rem 0;color:#a16207;font-size:.68rem;font-weight:800;">Belum tersedia</div>
+                            <div style="font-size:.58rem;color:#94a3b8;">Booking belum menjadi order</div>
+                        ` : `<div class="income-money-stack">
                             <div class="income-money-line">
                                 <span title="${incomeSourceTitle}" class="${incomeIsPending ? 'text-warning' : 'text-muted'} income-money-label">${incomeSourceLabel}</span>
                                 <span class="${incomeIsPending ? 'text-warning' : 'text-success'} income-money-value">${fmtRp(netCairValue)} <span style="font-size:.52rem; color:${incomeIsPending ? '#d97706' : '#10b981'}; font-weight:800;">(${finalPercent}%)</span></span>
@@ -2693,14 +2722,14 @@
                                 <span class="income-money-label" style="font-size:.58rem;">${incomeIsPending ? 'EST. PROFIT' : 'PROFIT'}</span>
                                 <span class="${profitValue < 0 ? 'text-danger' : 'text-success'} income-money-value">${fmtRp(profitValue)} <span style="font-size:.52rem; color:${profitValue < 0 ? '#ef4444' : '#10b981'}; font-weight:800;">(${profitPercent}%)</span></span>
                             </div>
-                        </div>
+                        </div>`}
                     </td>
                     <td class="text-center align-middle" style="padding-right:1rem;">
                         <div class="income-action-stack w-100">
                             <button type="button" class="btn btn-sm btn-light border" style="font-size:0.6rem; font-weight:800; display:flex; justify-content:center; align-items:center; border-radius:10px;" onclick="openBreakdownModal(${idx})">
                                 Rincian
                             </button>
-                            <button type="button" class="btn btn-sm" style="font-size:0.6rem; font-weight:800; background:#eef2ff; color:#4f46e5; border:1px solid #c7d2fe; display:flex; justify-content:center; align-items:center; border-radius:10px;" onclick="trackOrder(${s.store?.id || s.order?.store_id || 0}, '${s.channel_order_id}', event)">
+                            <button type="button" class="btn btn-sm" style="font-size:0.6rem; font-weight:800; background:#eef2ff; color:#4f46e5; border:1px solid #c7d2fe; display:flex; justify-content:center; align-items:center; border-radius:10px;" onclick="trackOrder(${s.store?.id || s.order?.store_id || 0}, ${JSON.stringify(isBookingOnly ? (bookingSn || s.channel_order_id || '') : (s.channel_order_id || ''))}, event)">
                                 <i class="bi bi-geo-alt-fill me-1"></i> Lacak
                             </button>
                         </div>

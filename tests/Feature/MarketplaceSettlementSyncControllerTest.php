@@ -1472,6 +1472,93 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame(0, $cairPayload['paginator']['total']);
     }
 
+    public function test_booking_only_tidak_mendapat_estimasi_dan_tidak_masuk_kpi_penghasilan(): void
+    {
+        $store = $this->createStore();
+        $bookingSn = '260823AASA3PIA4H25M';
+
+        MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => $bookingSn,
+            'channel_order_id' => $bookingSn,
+            'booking_sn' => $bookingSn,
+            'order_status' => 'READY_TO_SHIP',
+            'ordered_at' => now()->subHour(),
+            'order_date' => now()->subHour(),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+
+        $request = Request::create('/api/marketplace/settlements', 'GET', [
+            'store_id' => $store->id,
+            'tab' => 'belum_cair',
+            'page' => 1,
+            'per_page' => 50,
+        ]);
+
+        $payload = app(MarketplaceController::class)->settlements($request)->getData(true);
+        $row = $payload['paginator']['data'][0] ?? [];
+
+        $this->assertSame(1, $payload['paginator']['total']);
+        $this->assertSame($bookingSn, $row['booking_sn']);
+        $this->assertTrue($row['is_booking_only']);
+        $this->assertFalse($row['financial_data_available']);
+        $this->assertNull($row['estimated_escrow_amount']);
+        $this->assertFalse($row['is_estimated_income']);
+        $this->assertSame(0.0, (float) $row['final_income']);
+        $this->assertSame(0, $payload['meta']['kpi_count']);
+        $this->assertSame(0.0, (float) $payload['meta']['kpi_net']);
+        $this->assertSame(0, $payload['meta']['estimate_manual_count']);
+        $this->assertSame(0, $payload['meta']['estimate_shopee_count']);
+    }
+
+    public function test_order_kilat_yang_sudah_match_tetap_memakai_estimasi_dan_menampilkan_booking(): void
+    {
+        $store = $this->createStore();
+        $orderSn = '260823AASA3PIA4H25M-ORDER';
+        $bookingSn = '260823AASA3PIA4H25M';
+
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => $orderSn,
+            'channel_order_id' => $orderSn,
+            'booking_sn' => $bookingSn,
+            'order_status' => 'SHIPPED',
+            'ordered_at' => now()->subHour(),
+            'order_date' => now()->subHour(),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+
+        MarketplaceOrderIncomeEstimate::create([
+            'store_id' => $store->id,
+            'marketplace_order_id' => $order->id,
+            'channel_order_id' => $orderSn,
+            'income_status' => 2,
+            'estimated_escrow_amount' => 76000,
+            'estimated_payout_at' => now()->addDay(),
+            'synced_at' => now(),
+        ]);
+
+        $request = Request::create('/api/marketplace/settlements', 'GET', [
+            'store_id' => $store->id,
+            'tab' => 'belum_cair',
+            'page' => 1,
+            'per_page' => 50,
+        ]);
+
+        $payload = app(MarketplaceController::class)->settlements($request)->getData(true);
+        $row = $payload['paginator']['data'][0] ?? [];
+
+        $this->assertSame($orderSn, $row['channel_order_id']);
+        $this->assertSame($bookingSn, $row['booking_sn']);
+        $this->assertFalse($row['is_booking_only']);
+        $this->assertTrue($row['financial_data_available']);
+        $this->assertSame(76000.0, (float) $row['estimated_escrow_amount']);
+        $this->assertSame('estimated_escrow', $row['income_estimation_source']);
+        $this->assertSame(1, $payload['meta']['kpi_count']);
+    }
+
     public function test_tab_belum_cair_mencakup_order_tanpa_settlement_dan_estimasi_nol_tetap_valid(): void
     {
         $store = $this->createStore();
