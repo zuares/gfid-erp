@@ -8,11 +8,24 @@
     $summary = $statement['summary'];
     $quality = $statement['quality'];
     $filters = $statement['filters'];
+    $includeShipped = ($filters['report_scope'] ?? 'final') === 'include_shipped';
+    $dataLastDate = !empty($summary['data_last_order_at'])
+        ? \Carbon\Carbon::parse($summary['data_last_order_at'])->translatedFormat('d M Y')
+        : 'Belum ada';
 @endphp
 
 @push('head')
 <style>
-    .mp-finance-page .card { border-radius: 14px; }
+    .mp-finance-page { max-width: 1500px; }
+    .mp-finance-page .card { border-radius: 16px; border-color: rgba(148,163,184,.18); }
+    .mp-finance-page .mp-finance-hero { background: rgba(255,255,255,.86); border:1px solid rgba(148,163,184,.16); padding:1rem 1.1rem; border-radius:16px; }
+    .mp-finance-page .mp-eyebrow { text-transform:uppercase; letter-spacing:.12em; font-size:.68rem; font-weight:800; color:#64748b; }
+    .mp-finance-page .mp-finance-hero h4 { font-weight:850; letter-spacing:-.03em; }
+    .mp-finance-page .page-actions .btn { border-radius:999px; font-weight:700; }
+    .mp-finance-page .page-actions .btn-primary { background:#fbbf24; border-color:#fbbf24; color:#422006; }
+    .mp-finance-page .mp-filter-card .card-body { padding:1rem 1.1rem; }
+    .mp-finance-page .mp-section-title { display:flex; align-items:center; gap:.45rem; text-transform:uppercase; letter-spacing:.1em; font-size:.68rem; font-weight:850; color:#334155; }
+    .mp-finance-page .mp-section-title i { color:#64748b; }
     .mp-finance-page .summary-card { border-width: 0 0 0 4px !important; }
     .mp-finance-page .summary-card .card-body { min-height: 92px; display:flex; flex-direction:column; justify-content:center; }
     .mp-finance-page .table th { white-space: nowrap; }
@@ -29,13 +42,13 @@
 
 @section('content')
 <div class="container-fluid py-3 mp-finance-page">
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3 mp-finance-hero">
         <div>
-            <div class="text-uppercase text-muted small fw-semibold">Marketplace · Owner finance</div>
+            <div class="mp-eyebrow">Marketplace · Owner finance</div>
             <h4 class="mb-1">Laporan Keuangan Marketplace</h4>
             <p class="text-muted mb-0" style="max-width: 820px">
-                Laporan subledger marketplace berbasis order yang sudah terverifikasi. Owner dapat meninjau dan mem-posting settlement
-                ke jurnal umum berdasarkan filter periode yang sedang aktif.
+                Laporan subledger marketplace berdasarkan settlement terverifikasi. Mode berjalan dapat menampilkan order shipped
+                sebagai piutang provisional; hanya mode final yang dapat diposting ke jurnal umum.
             </p>
         </div>
         <div class="d-flex flex-wrap gap-2 page-actions">
@@ -45,8 +58,9 @@
         </div>
     </div>
 
-    <div class="card shadow-sm mb-3">
+    <div class="card shadow-sm mb-3 mp-filter-card">
         <div class="card-body">
+            <div class="mp-section-title mb-3"><i class="bi bi-funnel"></i> Filter laporan</div>
             <form method="GET" class="row g-2 align-items-end">
                 <div class="col-md-3">
                     <label class="form-label small fw-semibold">Toko</label>
@@ -56,6 +70,14 @@
                             <option value="{{ $store->id }}" @selected((int) ($filters['store_id'] ?? 0) === (int) $store->id)>{{ $store->name }} · {{ strtoupper($store->channel?->code ?? '-') }}</option>
                         @endforeach
                     </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold">Mode laporan</label>
+                    <select name="report_scope" class="form-select">
+                        <option value="final" @selected(!$includeShipped)>Final (COMPLETED)</option>
+                        <option value="include_shipped" @selected($includeShipped)>Berjalan + Shipped</option>
+                    </select>
+                    <div class="filter-help mt-1">Shipped tampil sebagai piutang provisional.</div>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small fw-semibold">Basis tanggal</label>
@@ -82,6 +104,16 @@
         </div>
     @endif
 
+    @if ($includeShipped)
+        <div class="alert alert-info d-flex gap-2 align-items-start">
+            <i class="bi bi-info-circle fs-5"></i>
+            <div>
+                <div class="fw-semibold">Mode berjalan: shipped ikut dihitung sebagai provisional.</div>
+                <div class="small">{{ $fmt($summary['provisional_order_count'] ?? 0) }} order shipped dengan settlement lengkap ditampilkan sebagai piutang marketplace. Angka ini belum boleh diposting ke pendapatan final sampai order menjadi COMPLETED.</div>
+            </div>
+        </div>
+    @endif
+
     @if (session('status'))
         <div class="alert alert-success"><i class="bi bi-check-circle me-1"></i>{{ session('status') }}</div>
     @endif
@@ -96,16 +128,19 @@
                 @elseif ($posting?->status === 'void')
                     <div class="fw-semibold text-danger">Posting periode ini sudah di-void.</div>
                     <div class="small text-muted">Journal asal #{{ $posting->journal_id }} · {{ $posting->void_reason }}</div>
-                @elseif ($quality['incomplete'] === 0 && $quality['unknown'] === 0 && $summary['order_count'] > 0)
+                @elseif (!$includeShipped && $quality['incomplete'] === 0 && $quality['unknown'] === 0 && $summary['order_count'] > 0)
                     <div class="fw-semibold">Settlement siap direview sebelum masuk jurnal.</div>
                     <div class="small text-muted">Posting dibuat satu batch per toko/periode dan aman diulang karena idempotent.</div>
+                @elseif ($includeShipped)
+                    <div class="fw-semibold text-info">Mode provisional — belum dapat diposting ke jurnal final.</div>
+                    <div class="small text-muted">Kembalikan Mode laporan ke Final setelah order shipped berubah menjadi COMPLETED.</div>
                 @else
                     <div class="fw-semibold text-muted">Posting belum tersedia.</div>
                     <div class="small text-muted">Selesaikan quality gate dan pastikan periode memiliki order ready.</div>
                 @endif
             </div>
             <div class="d-flex flex-wrap gap-2">
-                @if (!$posting && $quality['incomplete'] === 0 && $quality['unknown'] === 0 && $summary['order_count'] > 0)
+                @if (!$includeShipped && !$posting && $quality['incomplete'] === 0 && $quality['unknown'] === 0 && $summary['order_count'] > 0)
                     <a class="btn btn-primary" href="{{ route('marketplace.reports.financial-statement.posting-preview', $filters) }}"><i class="bi bi-journal-check me-1"></i> Review posting</a>
                 @elseif ($posting?->status === 'posted')
                     <form method="POST" action="{{ route('marketplace.reports.financial-statement.postings.void', $posting) }}" onsubmit="return confirm('Void posting ini? Jurnal asal akan di-void dan reversal audit dibuat.');">
@@ -120,20 +155,63 @@
 
     <div class="row g-3 mb-4">
         @foreach ([
-            ['label' => 'Penjualan bersih', 'value' => $summary['net_sales_before_settlement'], 'class' => 'primary'],
-            ['label' => 'Payout aktual', 'value' => $summary['payout'], 'class' => 'info'],
-            ['label' => 'Laba kotor', 'value' => $summary['gross_profit'], 'class' => 'success'],
-            ['label' => 'Laba operasional', 'value' => $summary['operating_profit'], 'class' => 'success'],
+            ['label' => $includeShipped ? 'Penjualan bersih berjalan' : 'Penjualan bersih', 'value' => $summary['net_sales_before_settlement'], 'class' => 'primary'],
+            ['label' => $includeShipped ? 'Payout berjalan' : 'Payout aktual', 'value' => $summary['payout'], 'class' => 'info'],
+            ['label' => $includeShipped ? 'Laba kotor berjalan' : 'Laba kotor', 'value' => $summary['gross_profit'], 'class' => 'success'],
+            ['label' => $includeShipped ? 'Laba operasional berjalan' : 'Laba operasional', 'value' => $summary['operating_profit'], 'class' => 'success'],
             ['label' => 'Margin operasional', 'value' => $pct($summary['margin_pct']), 'class' => 'dark', 'text' => true],
         ] as $card)
             <div class="col-6 col-xl-{{ $loop->last ? '2' : '2' }}"><div class="card summary-card shadow-sm h-100 border-{{ $card['class'] }}"><div class="card-body"><div class="text-muted small">{{ $card['label'] }}</div><div class="fs-5 fw-bold text-{{ $card['class'] }} mt-1">{!! !empty($card['text']) ? $card['value'] : 'Rp ' . $fmt($card['value']) !!}</div></div></div></div>
         @endforeach
     </div>
 
+    @if ($includeShipped)
+        <div class="card shadow-sm border-info mb-4">
+            <div class="card-body">
+                <div class="mp-section-title mb-3"><i class="bi bi-wallet2"></i> Piutang marketplace provisional</div>
+                <div class="row g-3">
+                    <div class="col-6 col-md-3"><div class="text-muted small">Order final</div><div class="fs-5 fw-bold">{{ $fmt($summary['final_order_count'] ?? 0) }}</div></div>
+                    <div class="col-6 col-md-3"><div class="text-muted small">Order shipped</div><div class="fs-5 fw-bold text-info">{{ $fmt($summary['provisional_order_count'] ?? 0) }}</div></div>
+                    <div class="col-6 col-md-3"><div class="text-muted small">Payout final</div><div class="fs-5 fw-bold">Rp {{ $fmt($summary['final']['payout'] ?? 0) }}</div></div>
+                    <div class="col-6 col-md-3"><div class="text-muted small">Piutang provisional</div><div class="fs-5 fw-bold text-info">Rp {{ $fmt($summary['provisional_receivable'] ?? 0) }}</div></div>
+                </div>
+                <div class="small text-muted mt-3">Piutang provisional hanya memakai order SHIPPED dengan settlement lengkap. Reklasifikasi ke penjualan final dilakukan setelah status COMPLETED.</div>
+            </div>
+        </div>
+    @endif
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="mp-section-title mb-3"><i class="bi bi-speedometer2"></i> KPI audit marketplace</div>
+            <div class="row g-3">
+                @foreach ([
+                    ['label' => 'Payout rate', 'value' => $pct($summary['payout_rate_pct']), 'hint' => 'Payout ÷ omzet'],
+                    ['label' => 'Fee rate', 'value' => $pct($summary['fee_rate_pct']), 'hint' => 'Fee ÷ omzet'],
+                    ['label' => 'HPP rate', 'value' => $pct($summary['hpp_rate_pct']), 'hint' => 'HPP ÷ omzet'],
+                    ['label' => 'Nilai order rata-rata', 'value' => 'Rp ' . $fmt($summary['average_order_value']), 'hint' => 'Omzet ÷ order'],
+                    ['label' => 'Refund rate', 'value' => $pct($summary['refund_rate_pct']), 'hint' => 'Refund ÷ omzet'],
+                    ['label' => 'Data terakhir', 'value' => $dataLastDate, 'hint' => 'Order valid terbaru'],
+                    ['label' => 'Anomali payout', 'value' => $fmt($summary['payout_anomaly_count'] ?? 0) . ' order', 'hint' => 'Payout > omzet material'],
+                ] as $kpi)
+                    <div class="col-6 col-md-3 col-xl-{{ $loop->index < 4 ? '2' : '2' }}">
+                        <div class="border rounded-3 h-100 p-3">
+                            <div class="text-muted small">{{ $kpi['label'] }}</div>
+                            <div class="fw-bold mt-1">{{ $kpi['value'] }}</div>
+                            <div class="text-muted" style="font-size:.72rem;">{{ $kpi['hint'] }}</div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+            @if (($summary['payout_anomaly_count'] ?? 0) > 0)
+                <div class="alert alert-warning small mt-3 mb-0"><i class="bi bi-exclamation-triangle me-1"></i> Ada order dengan payout jauh lebih besar dari omzet. Audit raw settlement sebelum posting jurnal.</div>
+            @endif
+        </div>
+    </div>
+
     <div class="row g-3 mb-4">
         <div class="col-lg-7">
             <div class="card shadow-sm h-100">
-                <div class="card-header bg-white fw-semibold">Laporan Laba Rugi Subledger</div>
+                <div class="card-header bg-white"><div class="mp-section-title"><i class="bi bi-bar-chart-line"></i> Laporan Laba Rugi Subledger</div></div>
                 <div class="table-responsive"><table class="table table-sm align-middle mb-0">
                     <tbody>
                         <tr><td>Omzet customer</td><td class="text-end">Rp {{ $fmt($summary['gross_sales']) }}</td></tr>
@@ -153,7 +231,7 @@
         </div>
         <div class="col-lg-5">
             <div class="card shadow-sm h-100">
-                <div class="card-header bg-white fw-semibold">Rekonsiliasi payout</div>
+                <div class="card-header bg-white"><div class="mp-section-title"><i class="bi bi-arrow-left-right"></i> Rekonsiliasi payout</div></div>
                 <div class="card-body">
                     <div class="small text-muted mb-3">Selisih payout aktual dengan perhitungan dasar ditampilkan sebagai penyesuaian lain agar tidak dipaksakan hilang.</div>
                     @foreach ([
@@ -171,7 +249,7 @@
     </div>
 
     <div class="card shadow-sm mb-4">
-        <div class="card-header bg-white fw-semibold">Performa per toko</div>
+        <div class="card-header bg-white"><div class="mp-section-title"><i class="bi bi-shop"></i> Performa per toko</div></div>
         <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Toko</th><th class="text-end">Order</th><th class="text-end">Penjualan bersih</th><th class="text-end">Payout</th><th class="text-end">HPP</th><th class="text-end">Laba operasional</th><th class="text-end">Margin</th></tr></thead><tbody>
             @forelse ($statement['stores'] as $row)
                 <tr><td><div class="fw-semibold">{{ $row['store_name'] }}</div><div class="text-muted small">{{ strtoupper($row['channel']) }}</div></td><td class="text-end">{{ $fmt($row['order_count']) }}</td><td class="text-end">Rp {{ $fmt($row['net_sales_before_settlement']) }}</td><td class="text-end">Rp {{ $fmt($row['payout']) }}</td><td class="text-end">Rp {{ $fmt($row['hpp']) }}</td><td class="text-end fw-semibold">Rp {{ $fmt($row['operating_profit']) }}</td><td class="text-end">{{ $pct($row['margin_pct']) }}</td></tr>
@@ -182,7 +260,7 @@
     </div>
 
     <div class="card shadow-sm">
-        <div class="card-header bg-white fw-semibold">Trend laba operasional</div>
+        <div class="card-header bg-white"><div class="mp-section-title"><i class="bi bi-graph-up"></i> Trend laba operasional</div></div>
         <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Tanggal</th><th class="text-end">Order</th><th class="text-end">Penjualan bersih</th><th class="text-end">Payout</th><th class="text-end">HPP</th><th class="text-end">Biaya iklan</th><th class="text-end">Laba operasional</th></tr></thead><tbody>
             @forelse ($statement['daily'] as $row)
                 <tr><td>{{ $row['date'] ?: 'Tanpa tanggal' }}</td><td class="text-end">{{ $fmt($row['order_count']) }}</td><td class="text-end">Rp {{ $fmt($row['net_sales_before_settlement']) }}</td><td class="text-end">Rp {{ $fmt($row['payout']) }}</td><td class="text-end">Rp {{ $fmt($row['hpp']) }}</td><td class="text-end">Rp {{ $fmt($row['ad_cost']) }}</td><td class="text-end fw-semibold">Rp {{ $fmt($row['operating_profit']) }}</td></tr>

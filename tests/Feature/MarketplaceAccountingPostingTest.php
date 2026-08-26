@@ -119,6 +119,27 @@ class MarketplaceAccountingPostingTest extends TestCase
         $this->assertDatabaseCount('journals', 0);
     }
 
+    public function test_preview_is_blocked_for_provisional_shipped_scope(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-POSTING-SHIPPED-' . uniqid(),
+        ]);
+        $store = $this->seedFinancialData();
+
+        $response = $this->actingAs($owner)->get(route('marketplace.reports.financial-statement.posting-preview', [
+            'store_id' => $store->id,
+            'report_scope' => 'include_shipped',
+            'date_basis' => 'ordered_at',
+            'date_from' => '2026-08-01',
+            'date_to' => '2026-08-31',
+        ]));
+
+        $response->assertSessionHasErrors('posting');
+        $this->assertDatabaseCount('marketplace_accounting_postings', 0);
+        $this->assertDatabaseCount('journals', 0);
+    }
+
     public function test_non_owner_cannot_post_marketplace_accounting(): void
     {
         $admin = User::factory()->create([

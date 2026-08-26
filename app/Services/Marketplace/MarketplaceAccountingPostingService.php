@@ -243,6 +243,12 @@ class MarketplaceAccountingPostingService
 
     private function assertPostable(array $statement): void
     {
+        if (($statement['filters']['report_scope'] ?? 'final') !== 'final') {
+            throw ValidationException::withMessages([
+                'posting' => 'Posting jurnal hanya tersedia untuk scope Final. Order SHIPPED tetap berupa piutang provisional sampai statusnya COMPLETED.',
+            ]);
+        }
+
         $quality = $statement['quality'];
         if (($quality['incomplete'] ?? 0) > 0 || ($quality['unknown'] ?? 0) > 0) {
             throw ValidationException::withMessages([
@@ -284,13 +290,17 @@ class MarketplaceAccountingPostingService
 
     private function scopeKey(array $filters): string
     {
-        return sprintf(
+        $key = sprintf(
             'store:%s|basis:%s|from:%s|to:%s',
             $filters['store_id'] ?: 'all',
             $filters['date_basis'],
             $filters['date_from'],
             $filters['date_to'],
         );
+
+        return ($filters['report_scope'] ?? 'final') === 'final'
+            ? $key
+            : $key . '|scope:' . $filters['report_scope'];
     }
 
     private function description(array $filters): string

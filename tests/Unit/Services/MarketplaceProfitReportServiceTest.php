@@ -124,6 +124,55 @@ class MarketplaceProfitReportServiceTest extends TestCase
         $this->assertSame(0, $report['summary']['order_count']);
     }
 
+    public function test_include_shipped_scope_adds_settlement_complete_orders_as_provisional(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'PROFIT-SHIPPED-001',
+            'channel_order_id' => 'PROFIT-SHIPPED-001',
+            'order_date' => '2026-08-04 10:00:00',
+            'ordered_at' => '2026-08-04 10:00:00',
+            'order_status' => 'SHIPPED',
+            'financial_data_status' => 'not_applicable',
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'line_no' => 1,
+            'item_name' => 'Produk Shipped',
+            'model_sku' => 'SKU-SHIPPED',
+            'qty' => 1,
+            'price' => 300,
+            'hpp_snapshot' => 100,
+            'data_status' => 'valid',
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => 'PROFIT-SHIPPED-001',
+            'buyer_payment_amount' => 300,
+            'commission_fee' => 30,
+            'final_income' => 270,
+            'data_status' => 'complete',
+            'raw_json' => [],
+        ]);
+
+        $report = app(MarketplaceProfitReportService::class)->report([
+            'store_id' => $store->id,
+            'report_scope' => 'include_shipped',
+            'date_basis' => 'ordered_at',
+            'date_from' => '2026-08-01',
+            'date_to' => '2026-08-31',
+        ]);
+
+        $this->assertSame(1, $report['summary']['order_count']);
+        $this->assertSame(1, $report['summary']['provisional_order_count']);
+        $this->assertSame(270.0, $report['summary']['provisional_receivable']);
+        $this->assertSame('provisional', $report['orders'][0]['recognition_status']);
+        $this->assertSame(1, $report['quality']['provisional_ready']);
+    }
+
     private function store(): Store
     {
         $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);

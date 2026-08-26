@@ -21,7 +21,8 @@ class MarketplaceProfitReportService
 
     /**
      * Profit report menggunakan payout aktual, bukan estimasi omzet x rasio.
-     * Order baru masuk ke angka profit jika quality gate Tahap 1 sudah ready.
+     * Scope final hanya menerima COMPLETED; scope include_shipped juga menerima
+     * SHIPPED dengan settlement lengkap dan menandainya sebagai provisional.
      *
      * @return array<string, mixed>
      */
@@ -54,8 +55,23 @@ class MarketplaceProfitReportService
             ->all();
 
         $ordersQuery = $this->filteredOrders($filters)
-            ->whereIn('order_status', MarketplaceFinancialDataQualityService::FINANCIAL_ELIGIBLE_ORDER_STATUSES)
-            ->where('financial_data_status', MarketplaceFinancialDataQualityService::ORDER_READY)
+            ->where(function (Builder $query) use ($filters) {
+                $query->where(function (Builder $completed) {
+                    $completed
+                        ->where('order_status', 'COMPLETED')
+                        ->where('financial_data_status', MarketplaceFinancialDataQualityService::ORDER_READY);
+                });
+
+                if ($filters['report_scope'] === 'include_shipped') {
+                    $query->orWhere(function (Builder $shipped) {
+                        $shipped
+                            ->where('order_status', 'SHIPPED')
+                            ->whereHas('settlement', function (Builder $settlement) {
+                                $settlement->where('data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE);
+                            });
+                    });
+                }
+            })
             ->whereHas('settlement', function (Builder $query) {
                 $query->where('data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE);
             })
@@ -112,14 +128,26 @@ class MarketplaceProfitReportService
         });
 
         $summary = $this->emptyAggregate();
+        $finalSummary = $this->emptyAggregate();
+        $provisionalSummary = $this->emptyAggregate();
         foreach ($orderRows as $row) {
             $summary = $this->mergeAggregate($summary, $row);
+            if (($row['recognition_status'] ?? 'final') === 'provisional') {
+                $provisionalSummary = $this->mergeAggregate($provisionalSummary, $row);
+            } else {
+                $finalSummary = $this->mergeAggregate($finalSummary, $row);
+            }
         }
 
         $summary['order_count'] = count($orderRows);
         $summary['margin_pct'] = $summary['gross_sales'] > 0
             ? round(($summary['operating_profit'] / $summary['gross_sales']) * 100, 2)
             : 0.0;
+        $summary['final_order_count'] = $finalSummary['order_count'];
+        $summary['provisional_order_count'] = $provisionalSummary['order_count'];
+        $summary['provisional_receivable'] = round($provisionalSummary['payout'], 2);
+        $summary['final'] = $finalSummary;
+        $summary['provisional'] = $provisionalSummary;
 
         usort($orderRows, fn (array $left, array $right) => strcmp((string) ($right['ordered_at'] ?? ''), (string) ($left['ordered_at'] ?? '')));
         $this->finalizeAggregates($storeRows);
@@ -138,6 +166,16 @@ class MarketplaceProfitReportService
                 'not_applicable' => (int) ($qualityCounts['not_applicable'] ?? 0),
                 'unknown' => (int) ($qualityCounts['unknown'] ?? 0),
                 'issues' => $issueBreakdown,
+                'provisional_total' => $filters['report_scope'] === 'include_shipped'
+                    ? $this->filteredOrders($filters)->where('order_status', 'SHIPPED')->count()
+                    : 0,
+                'provisional_ready' => $filters['report_scope'] === 'include_shipped'
+                    ? $this->filteredOrders($filters)
+                        ->where('order_status', 'SHIPPED')
+                        ->whereHas('settlement', fn (Builder $query) => $query->where('data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE))
+                        ->whereHas('items', fn (Builder $query) => $query->where('data_status', 'valid')->where('hpp_snapshot', '>', 0))
+                        ->count()
+                    : 0,
             ],
             'orders' => $orderRows,
             'stores' => array_values($storeRows),
@@ -150,6 +188,9 @@ class MarketplaceProfitReportService
     {
         return [
             'store_id' => ! empty($filters['store_id']) ? (int) $filters['store_id'] : null,
+            'report_scope' => ($filters['report_scope'] ?? 'final') === 'include_shipped'
+                ? 'include_shipped'
+                : 'final',
             'date_basis' => in_array($filters['date_basis'] ?? 'ordered_at', ['ordered_at', 'settlement_time'], true)
                 ? $filters['date_basis']
                 : 'ordered_at',
@@ -198,6 +239,9 @@ class MarketplaceProfitReportService
             'store_name' => $order->store?->name ?? '-',
             'channel' => $order->store?->channel?->code ?? '-',
             'order_status' => $order->order_status ?: $order->status,
+            'recognition_status' => strtoupper((string) ($order->order_status ?: $order->status)) === 'COMPLETED'
+                ? 'final'
+                : 'provisional',
             'ordered_at' => optional($order->ordered_at)->toDateString(),
             'settlement_time' => optional($settlement->settlement_time)->toDateString(),
             'gross_sales' => $grossSales,

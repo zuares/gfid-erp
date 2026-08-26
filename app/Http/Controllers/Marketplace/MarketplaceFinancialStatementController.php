@@ -103,10 +103,12 @@ class MarketplaceFinancialStatementController extends Controller
 
         return $request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'report_scope' => ['nullable', 'in:final,include_shipped'],
             'date_basis' => ['nullable', 'in:ordered_at,settlement_time'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ]) + [
+            'report_scope' => $request->input('report_scope', 'final'),
             'date_basis' => $request->input('date_basis', 'ordered_at'),
             'date_from' => $request->input('date_from', $defaultFrom),
             'date_to' => $request->input('date_to', $defaultTo),

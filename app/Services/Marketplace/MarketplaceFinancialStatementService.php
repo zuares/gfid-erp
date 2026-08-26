@@ -16,6 +16,21 @@ class MarketplaceFinancialStatementService
     {
         $report = $this->profitReport->report($filters);
         $summary = $this->statementRow($report['summary']);
+        $orderRows = $report['orders'];
+        $summary['data_last_order_at'] = collect($orderRows)
+            ->pluck('ordered_at')
+            ->filter()
+            ->max();
+        $summary['payout_anomaly_count'] = collect($orderRows)
+            ->filter(function (array $row) {
+                $gross = (float) ($row['gross_sales'] ?? 0);
+                $payout = (float) ($row['payout'] ?? 0);
+
+                return $gross > 0 && $payout > $gross && ($payout - $gross) > max($gross * 0.10, 50000);
+            })
+            ->count();
+        $summary['final'] = $this->statementRow($summary['final'] ?? []);
+        $summary['provisional'] = $this->statementRow($summary['provisional'] ?? []);
 
         $stores = array_map(fn (array $row) => $this->statementRow($row), $report['stores']);
         $daily = array_map(function (array $row) {
@@ -69,6 +84,13 @@ class MarketplaceFinancialStatementService
             'gross_profit' => round($grossProfit, 2),
             'operating_profit' => round($operatingProfit, 2),
             'margin_pct' => $grossSales > 0 ? round(($operatingProfit / $grossSales) * 100, 2) : 0.0,
+            'payout_rate_pct' => $grossSales > 0 ? round(($payout / $grossSales) * 100, 2) : 0.0,
+            'fee_rate_pct' => $grossSales > 0 ? round(($fees / $grossSales) * 100, 2) : 0.0,
+            'hpp_rate_pct' => $grossSales > 0 ? round(($hpp / $grossSales) * 100, 2) : 0.0,
+            'refund_rate_pct' => $grossSales > 0 ? round(($refund / $grossSales) * 100, 2) : 0.0,
+            'average_order_value' => ((float) ($row['order_count'] ?? 0)) > 0
+                ? round($grossSales / (float) $row['order_count'], 2)
+                : 0.0,
         ]);
     }
 }
