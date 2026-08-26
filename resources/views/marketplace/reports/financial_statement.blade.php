@@ -10,8 +10,25 @@
     $filters = $statement['filters'];
 @endphp
 
+@push('head')
+<style>
+    .mp-finance-page .card { border-radius: 14px; }
+    .mp-finance-page .summary-card { border-width: 0 0 0 4px !important; }
+    .mp-finance-page .summary-card .card-body { min-height: 92px; display:flex; flex-direction:column; justify-content:center; }
+    .mp-finance-page .table th { white-space: nowrap; }
+    .mp-finance-page .filter-help { font-size:.76rem; color:#64748b; }
+    @media (max-width: 767.98px) {
+        .mp-finance-page { padding-left:.65rem; padding-right:.65rem; }
+        .mp-finance-page .page-actions { width:100%; }
+        .mp-finance-page .page-actions .btn { flex:1 1 auto; }
+        .mp-finance-page .summary-card .card-body { min-height:78px; padding:.8rem; }
+        .mp-finance-page .summary-card .fs-5 { font-size:1rem !important; }
+    }
+</style>
+@endpush
+
 @section('content')
-<div class="container-fluid py-3">
+<div class="container-fluid py-3 mp-finance-page">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
         <div>
             <div class="text-uppercase text-muted small fw-semibold">Marketplace · Owner finance</div>
@@ -21,7 +38,7 @@
                 ke jurnal umum berdasarkan filter periode yang sedang aktif.
             </p>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex flex-wrap gap-2 page-actions">
             <a class="btn btn-outline-secondary" href="{{ route('marketplace.reports.profit', $filters) }}"><i class="bi bi-graph-up-arrow me-1"></i> Detail Profit</a>
             <a class="btn btn-outline-warning" href="{{ route('marketplace.reports.financial-closing', $filters) }}"><i class="bi bi-lock-fill me-1"></i> Closing & Audit</a>
             <a class="btn btn-primary" href="{{ route('marketplace.reports.financial-statement.export', $filters) }}"><i class="bi bi-download me-1"></i> Export Statement</a>
@@ -46,10 +63,14 @@
                         <option value="ordered_at" @selected($filters['date_basis'] === 'ordered_at')>Tanggal order</option>
                         <option value="settlement_time" @selected($filters['date_basis'] === 'settlement_time')>Tanggal cair</option>
                     </select>
+                    <div class="filter-help mt-1">Menentukan transaksi yang masuk periode laporan.</div>
                 </div>
                 <div class="col-md-2"><label class="form-label small fw-semibold">Dari</label><input type="date" name="date_from" class="form-control" value="{{ $filters['date_from'] }}"></div>
                 <div class="col-md-2"><label class="form-label small fw-semibold">Sampai</label><input type="date" name="date_to" class="form-control" value="{{ $filters['date_to'] }}"></div>
-                <div class="col-md-auto"><button class="btn btn-outline-primary"><i class="bi bi-funnel me-1"></i> Terapkan</button></div>
+                <div class="col-md-auto d-flex gap-2">
+                    <button class="btn btn-outline-primary"><i class="bi bi-funnel me-1"></i> Terapkan</button>
+                    <a class="btn btn-outline-secondary" href="{{ route('marketplace.reports.financial-statement') }}" title="Kembalikan filter default"><i class="bi bi-arrow-counterclockwise"></i></a>
+                </div>
             </form>
         </div>
     </div>
@@ -68,7 +89,7 @@
     <div class="card shadow-sm border-primary mb-4">
         <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div>
-                <div class="text-uppercase text-primary small fw-semibold">Tahap 4 · Posting accounting</div>
+            <div class="text-uppercase text-primary small fw-semibold">Kontrol posting accounting</div>
                 @if ($posting?->status === 'posted')
                     <div class="fw-semibold">Periode ini sudah posted ke jurnal umum.</div>
                     <div class="small text-muted">Journal #{{ $posting->journal_id }} · Posted {{ optional($posting->posted_at)->format('d M Y H:i') }} · Scope tersimpan sebagai snapshot audit.</div>
@@ -105,7 +126,7 @@
             ['label' => 'Laba operasional', 'value' => $summary['operating_profit'], 'class' => 'success'],
             ['label' => 'Margin operasional', 'value' => $pct($summary['margin_pct']), 'class' => 'dark', 'text' => true],
         ] as $card)
-            <div class="col-6 col-xl-{{ $loop->last ? '2' : '2' }}"><div class="card shadow-sm h-100 border-{{ $card['class'] }}"><div class="card-body"><div class="text-muted small">{{ $card['label'] }}</div><div class="fs-5 fw-bold text-{{ $card['class'] }} mt-1">{!! !empty($card['text']) ? $card['value'] : 'Rp ' . $fmt($card['value']) !!}</div></div></div></div>
+            <div class="col-6 col-xl-{{ $loop->last ? '2' : '2' }}"><div class="card summary-card shadow-sm h-100 border-{{ $card['class'] }}"><div class="card-body"><div class="text-muted small">{{ $card['label'] }}</div><div class="fs-5 fw-bold text-{{ $card['class'] }} mt-1">{!! !empty($card['text']) ? $card['value'] : 'Rp ' . $fmt($card['value']) !!}</div></div></div></div>
         @endforeach
     </div>
 
