@@ -115,6 +115,49 @@ class ShopeeWalletAdCostSyncTest extends TestCase
         $this->assertSame('451', $ranges[1][2]);
     }
 
+    public function test_sync_mengabaikan_respons_campuran_agar_charge_tidak_menjadi_refund(): void
+    {
+        $store = $this->createShopeeStore();
+        $mixed = [
+            'response' => [
+                'transaction_list' => [
+                    [
+                        'transaction_id' => 2001,
+                        'transaction_type' => 'paid_ads_charge',
+                        'amount' => -10000,
+                        'create_time' => 1787223600,
+                    ],
+                    [
+                        'transaction_id' => 2002,
+                        'transaction_type' => 'paid_ads_refund',
+                        'amount' => 1500,
+                        'create_time' => 1787227200,
+                    ],
+                ],
+                'more' => false,
+            ],
+        ];
+
+        Http::fake(['*/api/v2/payment/get_wallet_transaction_list*' => Http::response($mixed, 200)]);
+
+        $result = app(ShopeeWalletAdCostSyncService::class)->sync(
+            $store,
+            now()->subDays(2)->startOfDay(),
+            now()->endOfDay(),
+        );
+
+        $this->assertSame(2, $result['created']);
+        $this->assertSame(2, $result['skipped']);
+        $this->assertDatabaseHas('marketplace_ad_wallet_transactions', [
+            'external_transaction_id' => '2001',
+            'amount' => -10000,
+        ]);
+        $this->assertDatabaseHas('marketplace_ad_wallet_transactions', [
+            'external_transaction_id' => '2002',
+            'amount' => 1500,
+        ]);
+    }
+
     private function createShopeeStore(): Store
     {
         $channel = Channel::firstOrCreate(['code' => 'shopee'], ['name' => 'Shopee']);

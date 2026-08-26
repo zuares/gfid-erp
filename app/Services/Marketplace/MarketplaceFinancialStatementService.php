@@ -8,6 +8,9 @@ use Carbon\Carbon;
 
 class MarketplaceFinancialStatementService
 {
+    private const WALLET_AD_CHARGE_TYPES = ['450', 'paid_ads_charge', 'paid-ads-charge'];
+    private const WALLET_AD_REFUND_TYPES = ['451', 'paid_ads_refund', 'paid-ads-refund'];
+
     public function __construct(private MarketplaceProfitReportService $profitReport)
     {
     }
@@ -136,21 +139,31 @@ class MarketplaceFinancialStatementService
         $from = Carbon::parse($filters['date_from'])->startOfDay();
         $to = Carbon::parse($filters['date_to'])->endOfDay();
 
-        $wallet = MarketplaceAdWalletTransaction::query()
+        $walletBase = MarketplaceAdWalletTransaction::query()
             ->whereBetween('transaction_created_at', [$from, $to])
-            ->when($filters['store_id'], fn ($query, $storeId) => $query->where('store_id', $storeId))
-            ->selectRaw('COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0) AS charge')
-            ->selectRaw('COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS refund')
-            ->selectRaw('COUNT(*) AS transaction_count')
+            ->when($filters['store_id'], fn ($query, $storeId) => $query->where('store_id', $storeId));
+
+        // Use the transaction type as the source of truth. Amount signs from
+        // Shopee/proxies are not stable enough to distinguish charge/refund.
+        $chargeRows = (clone $walletBase)
+            ->whereIn('transaction_type', self::WALLET_AD_CHARGE_TYPES)
+            ->selectRaw('COALESCE(SUM(ABS(amount)), 0) AS total')
             ->first();
+        $refundRows = (clone $walletBase)
+            ->whereIn('transaction_type', self::WALLET_AD_REFUND_TYPES)
+            ->selectRaw('COALESCE(SUM(ABS(amount)), 0) AS total')
+            ->first();
+        $walletCount = (clone $walletBase)
+            ->whereIn('transaction_type', array_merge(self::WALLET_AD_CHARGE_TYPES, self::WALLET_AD_REFUND_TYPES))
+            ->count();
 
         $adsDailySpend = MarketplaceAdsDaily::query()
             ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
             ->when($filters['store_id'], fn ($query, $storeId) => $query->where('store_id', $storeId))
             ->sum('spend');
 
-        $charge = round((float) ($wallet->charge ?? 0), 2);
-        $refund = round((float) ($wallet->refund ?? 0), 2);
+        $charge = round((float) ($chargeRows->total ?? 0), 2);
+        $refund = round((float) ($refundRows->total ?? 0), 2);
         $walletNet = round($charge - $refund, 2);
         $adsDailySpend = round((float) $adsDailySpend, 2);
 
@@ -158,7 +171,7 @@ class MarketplaceFinancialStatementService
             'wallet_ad_charge' => $charge,
             'wallet_ad_refund' => $refund,
             'wallet_ad_cost' => $walletNet,
-            'wallet_ad_transaction_count' => (int) ($wallet->transaction_count ?? 0),
+            'wallet_ad_transaction_count' => (int) $walletCount,
             'ads_daily_spend' => $adsDailySpend,
             'ad_cost_variance' => round($walletNet - $adsDailySpend, 2),
             'ad_cost_date_basis' => 'wallet_transaction_created_at',

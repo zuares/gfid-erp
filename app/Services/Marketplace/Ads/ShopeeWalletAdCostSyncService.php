@@ -15,6 +15,11 @@ class ShopeeWalletAdCostSyncService
         '451' => 1,  // PAID_ADS_REFUND
     ];
 
+    private const TYPE_ALIASES = [
+        '450' => ['450', 'paid_ads_charge', 'paid-ads-charge'],
+        '451' => ['451', 'paid_ads_refund', 'paid-ads-refund'],
+    ];
+
     public function __construct(private readonly ShopeeChannel $shopee)
     {
     }
@@ -115,6 +120,14 @@ class ShopeeWalletAdCostSyncService
                     continue;
                 }
 
+                // Some Shopee responses/proxies can return more than the
+                // requested type. Never let a mixed response overwrite an
+                // existing charge with a refund (or vice versa).
+                if (! $this->matchesTransactionType($row, $transactionType)) {
+                    $totals['skipped']++;
+                    continue;
+                }
+
                 $transactionId = trim((string) (
                     data_get($row, 'transaction_id')
                     ?? data_get($row, 'id', '')
@@ -189,5 +202,20 @@ class ShopeeWalletAdCostSyncService
         }
 
         return abs((float) str_replace(',', '', trim((string) $value)));
+    }
+
+    private function matchesTransactionType(array $row, string $requestedType): bool
+    {
+        $rawType = data_get($row, 'transaction_type') ?? data_get($row, 'type');
+        if ($rawType === null || trim((string) $rawType) === '') {
+            // If Shopee omits the type, trust the server-side filter.
+            return true;
+        }
+
+        return in_array(
+            strtolower(trim((string) $rawType)),
+            self::TYPE_ALIASES[$requestedType] ?? [$requestedType],
+            true,
+        );
     }
 }

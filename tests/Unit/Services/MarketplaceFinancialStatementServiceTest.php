@@ -66,7 +66,9 @@ class MarketplaceFinancialStatementServiceTest extends TestCase
             'store_id' => $store->id,
             'external_transaction_id' => 'AD-CHARGE-1',
             'transaction_type' => 'paid_ads_charge',
-            'amount' => -150,
+            // Simulate a legacy/proxy row with an inverted sign; the report
+            // must classify by transaction_type, not amount sign.
+            'amount' => 150,
             'money_flow' => 'MONEY_OUT',
             'status' => 'COMPLETED',
             'transaction_created_at' => '2026-08-10 10:00:00',
@@ -76,7 +78,7 @@ class MarketplaceFinancialStatementServiceTest extends TestCase
             'store_id' => $store->id,
             'external_transaction_id' => 'AD-REFUND-1',
             'transaction_type' => 'paid_ads_refund',
-            'amount' => 20,
+            'amount' => -20,
             'money_flow' => 'MONEY_IN',
             'status' => 'COMPLETED',
             'transaction_created_at' => '2026-08-11 10:00:00',
