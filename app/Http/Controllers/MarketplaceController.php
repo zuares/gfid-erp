@@ -3423,9 +3423,77 @@ class MarketplaceController extends Controller
         return response()->json($progress);
     }
 
+    /**
+     * Refresh estimasi dana cair Shopee untuk kebutuhan operasional UI.
+     * Nilai ini tetap terpisah dari settlement final.
+     */
+    public function syncIncomeDetails(Request $request, Store $store): JsonResponse
+    {
+        @set_time_limit(180);
+
+        $data = $request->validate([
+            'page_size' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        if ($response = $this->ensureSettlementStoreSyncable($store)) {
+            return $response;
+        }
+
+        if ($response = $this->ensureStoreReadyForBackgroundSync($store)) {
+            return $response;
+        }
+
+        $lock = Cache::lock(
+            "sync_settlements_store_{$store->id}",
+            (int) config('marketplace.settlement_lock_ttl', 3600)
+        );
+
+        if (! $lock->get()) {
+            return response()->json([
+                'success' => false,
+                'code' => 'INCOME_DETAIL_SYNC_BUSY',
+                'message' => "Toko {$store->name} sedang menjalankan sinkronisasi marketplace lain. Coba lagi setelah proses tersebut selesai.",
+            ], 429);
+        }
+
+        try {
+            $result = $this->sync->syncIncomeDetails(
+                $store,
+                2,
+                (int) ($data['page_size'] ?? 100),
+            );
+
+            $hasErrors = (int) ($result['errors'] ?? 0) > 0;
+
+            return response()->json(array_merge($result, [
+                'success' => ! $hasErrors,
+                'synced_at' => now()->toISOString(),
+            ]), $hasErrors ? 502 : 200);
+        } catch (\Throwable $e) {
+            Log::error('Income detail sync gagal dari UI', [
+                'store_id' => $store->id,
+                'store_name' => $store->name,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'code' => 'INCOME_DETAIL_SYNC_ERROR',
+                'message' => 'Estimasi dana cair belum berhasil diperbarui. Detail teknis sudah dicatat di log server.',
+            ], 502);
+        } finally {
+            $lock->release();
+        }
+    }
+
     public function settlements(Request $request): JsonResponse
     {
-        $query = MarketplaceOrderSettlement::with(['store:id,name', 'order:id,channel_order_id,order_status,ordered_at,subtotal_items,total_paid_customer', 'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id']);
+        $query = MarketplaceOrderSettlement::with([
+            'store:id,name',
+            'order:id,channel_order_id,order_status,ordered_at,subtotal_items,total_paid_customer',
+            'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,synced_at',
+            'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id',
+        ]);
 
         $sortBy = $request->input('sort_by', 'settlement_time');
         $sortDir = strtolower($request->input('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
@@ -3514,6 +3582,22 @@ class MarketplaceController extends Controller
 
             if ($request->filled('settlement_date_to')) {
                 $query->whereDate('settlement_time', '<=', $request->settlement_date_to);
+            }
+        }
+
+        // Pada mode belum cair, filter tanggal berarti tanggal payout estimasi
+        // dari get_income_detail, bukan settlement_time yang memang masih null.
+        if ($isUnsettledFilter) {
+            if ($request->filled('settlement_date_from')) {
+                $query->whereHas('order.incomeEstimate', function ($estimateQuery) use ($request) {
+                    $estimateQuery->whereDate('estimated_payout_at', '>=', $request->settlement_date_from);
+                });
+            }
+
+            if ($request->filled('settlement_date_to')) {
+                $query->whereHas('order.incomeEstimate', function ($estimateQuery) use ($request) {
+                    $estimateQuery->whereDate('estimated_payout_at', '<=', $request->settlement_date_to);
+                });
             }
         }
 
@@ -3612,6 +3696,7 @@ class MarketplaceController extends Controller
         if ($includeMissingPending) {
             $pendingOrdersQuery = MarketplaceOrder::with([
                 'store:id,name,channel_id',
+                'incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,synced_at',
                 'items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id',
             ])
                 ->whereDoesntHave('settlement')
@@ -3635,6 +3720,16 @@ class MarketplaceController extends Controller
             }
             if ($request->filled('order_date_to')) {
                 $pendingOrdersQuery->whereDate('ordered_at', '<=', $request->order_date_to);
+            }
+            if ($isUnsettledFilter && $request->filled('settlement_date_from')) {
+                $pendingOrdersQuery->whereHas('incomeEstimate', function ($estimateQuery) use ($request) {
+                    $estimateQuery->whereDate('estimated_payout_at', '>=', $request->settlement_date_from);
+                });
+            }
+            if ($isUnsettledFilter && $request->filled('settlement_date_to')) {
+                $pendingOrdersQuery->whereHas('incomeEstimate', function ($estimateQuery) use ($request) {
+                    $estimateQuery->whereDate('estimated_payout_at', '<=', $request->settlement_date_to);
+                });
             }
             if ($request->input('tab') === 'semua') {
                 if ($request->filled('settlement_date_from')) {
@@ -3797,8 +3892,16 @@ class MarketplaceController extends Controller
                 'ad_cost'               => (float) $s->ad_cost,
                 'final_income'          => (float) $netIncome,
                 'estimated_escrow_amount' => $estimatedEscrowAmount !== null ? $estimatedEscrowAmount : null,
+                'estimated_payout_at'   => ! $s->settlement_time
+                    ? $s->order?->incomeEstimate?->estimated_payout_at?->toISOString()
+                    : null,
+                'income_estimate_synced_at' => ! $s->settlement_time
+                    ? $s->order?->incomeEstimate?->synced_at?->toISOString()
+                    : null,
+                'has_income_estimate'   => ! $s->settlement_time && $estimatedEscrowAmount !== null,
                 'is_estimated_income'   => $isEstimatedIncome,
                 'income_estimation_source' => $incomeEstimationSource,
+                'fee_is_final'          => (bool) $s->settlement_time,
                 'cogs'                  => (float) $cogs,
                 'gross_profit'          => (float) $grossProfit,
                 'gross_after_voucher'   => $grossAfterVoucherTotal,
@@ -3834,7 +3937,10 @@ class MarketplaceController extends Controller
                     return (float) $s->buyer_payment_amount;
                 }
 
-                return $s->settlement_time?->timestamp ?? $s->order?->ordered_at?->timestamp ?? 0;
+                return $s->settlement_time?->timestamp
+                    ?? $s->order?->incomeEstimate?->estimated_payout_at?->timestamp
+                    ?? $s->order?->ordered_at?->timestamp
+                    ?? 0;
             };
             $allRows = ($sortDir === 'asc' ? $allRows->sortBy($sortValue) : $allRows->sortByDesc($sortValue))->values();
 
@@ -3879,6 +3985,8 @@ class MarketplaceController extends Controller
                 'escrow_tax',
                 'ad_cost',
                 'final_income',
+                'settlement_time',
+                'synced_at',
                 'raw_json',
                 ]);
             }
@@ -3922,6 +4030,9 @@ class MarketplaceController extends Controller
             $kpiCogs = 0.0;
             $kpiAffiliate = 0.0;
             $kpiMarketplace = 0.0;
+            $estimatedShopeeCount = 0;
+            $estimatedManualCount = 0;
+            $estimateLastSyncedAt = null;
             foreach ($metaRows as $s) {
                 $st = strtoupper($s->order?->order_status ?? '');
                 $isCompleted = $st === 'COMPLETED';
@@ -3966,6 +4077,11 @@ class MarketplaceController extends Controller
                 if ($isCancelledOrReturned || $isReturning) {
                     // Jika batal/return atau sedang dikembalikan, maka tidak ada pendapatan dan potongan.
                 } elseif (! $s->settlement_time && $estimatedEscrowAmount !== null) {
+                    $estimatedShopeeCount++;
+                    $estimateSyncedAt = $s->order?->incomeEstimate?->synced_at;
+                    if ($estimateSyncedAt && (! $estimateLastSyncedAt || $estimateSyncedAt->gt($estimateLastSyncedAt))) {
+                        $estimateLastSyncedAt = $estimateSyncedAt;
+                    }
                     $sellerDiscount = (float) data_get($s->raw_json, 'seller_discount', 0);
                     $grossAmt = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
                     $tokoVoucher = $this->settlementVoucherTokoAmount($s);
@@ -3986,6 +4102,7 @@ class MarketplaceController extends Controller
                     $sellerFeeTotal += $impliedMarketplaceFee + $affiliateCommission;
                     $kpiNet += $estimatedEscrowAmount;
                 } elseif ((float) $s->final_income <= 0) {
+                    $estimatedManualCount++;
                     $sellerDiscount = (float) data_get($s->raw_json, 'seller_discount', 0);
                     $grossAmt = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
                     $tokoVoucher = $this->settlementVoucherTokoAmount($s);
@@ -4059,6 +4176,9 @@ class MarketplaceController extends Controller
                 'kpi_total_burden'      => $allFeeTotal,
                 'kpi_fee_pct'           => $feePercent,
                 'kpi_fee_pct_toko'      => $feePercentToko,
+                'estimate_shopee_count' => $estimatedShopeeCount,
+                'estimate_manual_count' => $estimatedManualCount,
+                'estimate_last_synced_at' => $estimateLastSyncedAt?->toISOString(),
             ];
         } else {
             $meta = null; // Frontend can preserve previous KPI state on page change
@@ -4141,6 +4261,15 @@ class MarketplaceController extends Controller
 
     private function settlementEstimatedEscrowAmount(MarketplaceOrderSettlement $s): ?float
     {
+        if ($s->settlement_time) {
+            return null;
+        }
+
+        $estimate = $s->order?->incomeEstimate;
+        if ($estimate && $estimate->estimated_escrow_amount !== null) {
+            return max(0.0, (float) $estimate->estimated_escrow_amount);
+        }
+
         $raw = is_array($s->raw_json) ? $s->raw_json : [];
         $hasNestedValue = array_key_exists('estimated_escrow_amount', (array) data_get($raw, '_income_detail', []));
         $hasTopLevelValue = array_key_exists('estimated_escrow_amount', $raw);

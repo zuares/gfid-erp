@@ -407,7 +407,7 @@ class ShopeeChannel implements MarketplaceChannel
             'cursor'        => $cursor,
         ];
 
-        return $this->post($store, '/api/v2/payment/get_income_detail', $params);
+        return $this->get($store, '/api/v2/payment/get_income_detail', $params);
     }
 
     /**

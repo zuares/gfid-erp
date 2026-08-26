@@ -244,6 +244,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/sync-logs',                         [MarketplaceController::class, 'syncLogs']);
     Route::get('/settlements',                       [MarketplaceController::class, 'settlements']);
     Route::get('/stores/{store}/sync-settlements-progress', [MarketplaceController::class, 'syncSettlementsProgress']);
+    Route::post('/stores/{store}/sync-income-details', [MarketplaceController::class, 'syncIncomeDetails']);
     Route::post('/settlements/purge',                [MarketplaceController::class, 'purgeSettlements'])
         ->middleware('role:owner');
     Route::post('/stores/{store}/purge-marketplace-data', [MarketplaceController::class, 'purgeMarketplaceData'])

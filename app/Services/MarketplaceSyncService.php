@@ -8,6 +8,7 @@ use App\Models\MarketplaceAdCampaign;
 use App\Models\MarketplaceAdCampaignDaily;
 use App\Models\MarketplaceAdsBalanceLog;
 use App\Models\MarketplaceOrder;
+use App\Models\MarketplaceOrderIncomeEstimate;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\MarketplaceSyncLog;
@@ -1110,10 +1111,9 @@ class MarketplaceSyncService
     /**
      * Sinkronkan nilai estimasi payout dari Payment GetIncomeDetail.
      *
-     * Fase ini sengaja terpisah dari sync escrow final: estimated_escrow_amount
-     * hanya disimpan di metadata raw_json dan tidak pernah menimpa final_income
-     * maupun settlement_time. Dengan begitu data pending bisa dipakai UI tanpa
-     * mengubah histori dana yang sudah cair.
+     * Fase ini sengaja terpisah dari sync escrow final. Estimasi disimpan di
+     * marketplace_order_income_estimates dan tidak pernah membuat settlement
+     * placeholder atau menimpa final_income/settlement_time.
      *
      * @return array{found:int, updated:int, created:int, unmatched:int, pages:int, errors:int, message:string}
      */
@@ -1203,38 +1203,36 @@ class MarketplaceSyncService
                         continue;
                     }
 
-                    $wasCreated = false;
-                    if (! $settlement) {
-                        $settlement = new MarketplaceOrderSettlement([
-                            'store_id' => $store->id,
-                            'order_id' => $order->id,
-                            'channel_order_id' => $orderSn,
-                            'buyer_payment_amount' => $order->total_paid_customer
-                                ?? $order->subtotal_items
-                                ?? $order->total_amount
-                                ?? 0,
-                            'final_income' => 0,
-                            'settlement_time' => null,
-                            'synced_at' => null,
-                        ]);
-                        $wasCreated = true;
-                    }
-
-                    $rawJson = is_array($settlement->raw_json) ? $settlement->raw_json : [];
-                    $rawJson['_income_detail'] = [
-                        'income_status' => $incomeStatus,
-                        'estimated_escrow_amount' => (float) $estimated,
-                        'synced_at' => now()->toISOString(),
-                        'raw' => $row,
+                    $lookup = [
+                        'store_id' => $store->id,
+                        'channel_order_id' => $orderSn,
                     ];
-                    $settlement->raw_json = $rawJson;
-                    $settlement->save();
+                    $wasCreated = ! MarketplaceOrderIncomeEstimate::where($lookup)->exists();
+
+                    MarketplaceOrderIncomeEstimate::updateOrCreate($lookup, [
+                        'marketplace_order_id' => $order->id,
+                        'income_status' => $incomeStatus,
+                        'estimated_escrow_amount' => $estimated,
+                        'estimated_payout_at' => $this->normalizeShopeeTimestamp(
+                            $row['estimated_payout_time'] ?? null
+                        ),
+                        'payment_method' => $row['payment_method'] ?? null,
+                        'status_description' => $row['status'] ?? null,
+                        'currency' => $row['currency'] ?? null,
+                        'source_created_at' => $this->normalizeShopeeTimestamp(
+                            $row['creation_date'] ?? null
+                        ),
+                        'synced_at' => now(),
+                        'raw_json' => $row,
+                    ]);
 
                     $wasCreated ? $created++ : $updated++;
                 }
 
                 $nextCursor = (string) (
-                    data_get($response, 'response.next_cursor')
+                    data_get($response, 'response.income_detail_list.next_page.cursor')
+                    ?? data_get($response, 'income_detail_list.next_page.cursor')
+                    ?? data_get($response, 'response.next_cursor')
                     ?? data_get($response, 'response.cursor')
                     ?? data_get($response, 'next_cursor')
                     ?? ''
@@ -1290,6 +1288,8 @@ class MarketplaceSyncService
     private function extractIncomeDetailRows(array $response): array
     {
         $candidates = [
+            data_get($response, 'response.income_detail_list.list'),
+            data_get($response, 'income_detail_list.list'),
             data_get($response, 'response.income_detail'),
             data_get($response, 'response.income_details'),
             data_get($response, 'response.income_detail_list'),

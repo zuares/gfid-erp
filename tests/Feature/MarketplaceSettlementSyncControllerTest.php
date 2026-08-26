@@ -7,6 +7,7 @@ use App\Http\Controllers\MarketplaceFinanceController;
 use App\Models\Channel;
 use App\Models\MarketplaceChannel;
 use App\Models\MarketplaceOrder;
+use App\Models\MarketplaceOrderIncomeEstimate;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\MarketplaceSyncLog;
@@ -614,8 +615,23 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ->assertSee('Rincian Penghasilan')
             ->assertSee('Tgl Order')
             ->assertSee('Tgl Cair')
+            ->assertSee('Perbarui Estimasi')
+            ->assertSee('ESTIMASI BELUM TERSEDIA')
             ->assertSee('Komisi Affiliate')
             ->assertSee('Rincian');
+    }
+
+    public function test_halaman_settlement_menampilkan_pemisahan_dana_final_dan_estimasi(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'employee_code' => 'ADM-SETTLEMENT-UI']);
+
+        $this->actingAs($admin)
+            ->get(route('marketplace.settlement'))
+            ->assertOk()
+            ->assertSee('Dana Cair (Final)')
+            ->assertSee('Perbarui Estimasi')
+            ->assertSee('EST. SHOPEE')
+            ->assertSee('Rincian tersedia setelah settlement.');
     }
 
     public function test_detail_order_menampilkan_estimasi_bila_income_belum_ada()
@@ -1480,16 +1496,14 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame($order->channel_order_id, $payload['paginator']['data'][0]['channel_order_id']);
         $this->assertSame('manual_24', $payload['paginator']['data'][0]['income_estimation_source']);
 
-        MarketplaceOrderSettlement::create([
+        MarketplaceOrderIncomeEstimate::create([
             'store_id' => $store->id,
-            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
             'channel_order_id' => $order->channel_order_id,
-            'buyer_payment_amount' => 100000,
-            'final_income' => 0,
-            'settlement_time' => null,
-            'raw_json' => [
-                '_income_detail' => ['estimated_escrow_amount' => 0],
-            ],
+            'income_status' => 2,
+            'estimated_escrow_amount' => 0,
+            'estimated_payout_at' => now()->addDay()->startOfHour(),
+            'synced_at' => now(),
         ]);
 
         $payload = app(MarketplaceController::class)->settlements($request)->getData(true);
@@ -1498,6 +1512,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame(0.0, (float) $row['final_income']);
         $this->assertTrue($row['is_estimated_income']);
         $this->assertSame('estimated_escrow', $row['income_estimation_source']);
+        $this->assertNotNull($row['estimated_payout_at']);
 
         $highOrder = MarketplaceOrder::create([
             'store_id' => $store->id,
@@ -1555,16 +1570,13 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             'qty' => 1,
             'price' => 100000,
         ]);
-        MarketplaceOrderSettlement::create([
+        MarketplaceOrderIncomeEstimate::create([
             'store_id' => $store->id,
-            'order_id' => $estimatedOrder->id,
+            'marketplace_order_id' => $estimatedOrder->id,
             'channel_order_id' => $estimatedOrder->channel_order_id,
-            'buyer_payment_amount' => 100000,
-            'final_income' => 0,
-            'settlement_time' => null,
-            'raw_json' => [
-                '_income_detail' => ['estimated_escrow_amount' => 54321],
-            ],
+            'income_status' => 2,
+            'estimated_escrow_amount' => 54321,
+            'synced_at' => now(),
         ]);
 
         $missingOrder = MarketplaceOrder::create([
@@ -1594,5 +1606,150 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
 
         $this->assertSame(2, $payload['meta']['total_unsettled_order_count']);
         $this->assertEqualsWithDelta(206321.0, (float) $payload['meta']['total_income_belum_cair'], 0.01);
+    }
+
+    public function test_filter_tanggal_belum_cair_memakai_estimated_payout_at(): void
+    {
+        Carbon::setTestNow('2026-08-26 10:00:00');
+        $store = $this->createStore();
+
+        $inside = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-EST-IN',
+            'channel_order_id' => 'ORDER-EST-IN',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDays(5),
+            'order_date' => now()->subDays(5),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+        $outside = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-EST-OUT',
+            'channel_order_id' => 'ORDER-EST-OUT',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDays(4),
+            'order_date' => now()->subDays(4),
+            'subtotal_items' => 200000,
+            'total_paid_customer' => 200000,
+        ]);
+
+        MarketplaceOrderIncomeEstimate::create([
+            'store_id' => $store->id,
+            'marketplace_order_id' => $inside->id,
+            'channel_order_id' => $inside->channel_order_id,
+            'income_status' => 2,
+            'estimated_escrow_amount' => 76000,
+            'estimated_payout_at' => Carbon::parse('2026-08-28 12:00:00'),
+            'synced_at' => Carbon::parse('2026-08-26 09:00:00'),
+        ]);
+        MarketplaceOrderIncomeEstimate::create([
+            'store_id' => $store->id,
+            'marketplace_order_id' => $outside->id,
+            'channel_order_id' => $outside->channel_order_id,
+            'income_status' => 2,
+            'estimated_escrow_amount' => 152000,
+            'estimated_payout_at' => Carbon::parse('2026-09-03 12:00:00'),
+            'synced_at' => Carbon::parse('2026-08-26 08:00:00'),
+        ]);
+
+        $request = Request::create('/api/marketplace/settlements', 'GET', [
+            'store_id' => $store->id,
+            'tab' => 'belum_cair',
+            'settlement_date_from' => '2026-08-27',
+            'settlement_date_to' => '2026-08-31',
+            'page' => 1,
+            'per_page' => 50,
+        ]);
+
+        $payload = app(MarketplaceController::class)->settlements($request)->getData(true);
+
+        $this->assertSame(1, $payload['paginator']['total']);
+        $this->assertSame('ORDER-EST-IN', $payload['paginator']['data'][0]['channel_order_id']);
+        $this->assertFalse($payload['paginator']['data'][0]['fee_is_final']);
+        $this->assertNotNull($payload['paginator']['data'][0]['income_estimate_synced_at']);
+        $this->assertSame(1, $payload['meta']['estimate_shopee_count']);
+        $this->assertSame(0, $payload['meta']['estimate_manual_count']);
+        $this->assertNotNull($payload['meta']['estimate_last_synced_at']);
+    }
+
+    public function test_kpi_cair_tidak_memakai_estimasi_lama_sebagai_settlement_final(): void
+    {
+        $store = $this->createStore();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-FINAL-WITH-OLD-ESTIMATE',
+            'channel_order_id' => 'ORDER-FINAL-WITH-OLD-ESTIMATE',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDays(3),
+            'order_date' => now()->subDays(3),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+        MarketplaceOrderIncomeEstimate::create([
+            'store_id' => $store->id,
+            'marketplace_order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'income_status' => 2,
+            'estimated_escrow_amount' => 76000,
+            'estimated_payout_at' => now()->subDay(),
+            'synced_at' => now()->subDays(2),
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'buyer_payment_amount' => 100000,
+            'final_income' => 81234,
+            'settlement_time' => now(),
+        ]);
+
+        $request = Request::create('/api/marketplace/settlements', 'GET', [
+            'store_id' => $store->id,
+            'settlement_status' => 'cair',
+            'page' => 1,
+            'per_page' => 50,
+        ]);
+        $payload = app(MarketplaceController::class)->settlements($request)->getData(true);
+
+        $this->assertSame(81234.0, (float) $payload['meta']['kpi_net']);
+        $this->assertSame(0, $payload['meta']['estimate_shopee_count']);
+        $this->assertTrue($payload['paginator']['data'][0]['fee_is_final']);
+        $this->assertNull($payload['paginator']['data'][0]['estimated_payout_at']);
+    }
+
+    public function test_manual_sync_income_detail_memanggil_service_dengan_status_pending(): void
+    {
+        $store = $this->createStore();
+
+        $this->mock(MarketplaceSyncService::class, function (MockInterface $mock) use ($store) {
+            $mock->shouldReceive('syncIncomeDetails')
+                ->once()
+                ->withArgs(fn (Store $argStore, int $status, int $pageSize) => $argStore->is($store)
+                    && $status === 2
+                    && $pageSize === 50)
+                ->andReturn([
+                    'found' => 3,
+                    'updated' => 2,
+                    'created' => 1,
+                    'unmatched' => 0,
+                    'pages' => 1,
+                    'errors' => 0,
+                    'message' => 'ok',
+                ]);
+        });
+
+        $response = app(MarketplaceController::class)->syncIncomeDetails(
+            Request::create('/api/marketplace/stores/' . $store->id . '/sync-income-details', 'POST', [
+                'page_size' => 50,
+            ]),
+            $store,
+        );
+        $payload = $response->getData(true);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertTrue($payload['success']);
+        $this->assertSame(3, $payload['found']);
+        $this->assertNotNull($payload['synced_at']);
     }
 }

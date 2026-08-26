@@ -203,4 +203,39 @@ class ShopeeChannelMetaTest extends TestCase
                 && str_contains($url, 'page_size=100');
         });
     }
+
+    public function test_getIncomeDetail_memakai_get_dan_parameter_resmi()
+    {
+        $store = $this->createStore();
+
+        Http::fake([
+            '*/api/v2/payment/get_income_detail*' => Http::response([
+                'income_detail_list' => [
+                    'list' => [],
+                    'next_page' => ['cursor' => '', 'page_size' => 30],
+                ],
+            ], 200),
+        ]);
+
+        app(ShopeeChannel::class)->getIncomeDetail(
+            $store,
+            '2026-08-25',
+            '2026-08-26',
+            2,
+            30,
+            'CURSOR-X',
+        );
+
+        Http::assertSent(function ($request) {
+            $url = $request->url();
+
+            return $request->method() === 'GET'
+                && str_contains($url, '/api/v2/payment/get_income_detail')
+                && str_contains($url, 'date_from=2026-08-25')
+                && str_contains($url, 'date_to=2026-08-26')
+                && str_contains($url, 'income_status=2')
+                && str_contains($url, 'page_size=30')
+                && str_contains($url, 'cursor=CURSOR-X');
+        });
+    }
 }

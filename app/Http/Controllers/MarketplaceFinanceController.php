@@ -122,6 +122,7 @@ class MarketplaceFinanceController extends Controller
             'store:id,name,channel_id',
             'store.channel:id,code,name',
             'order:id,channel_order_id,order_status,ordered_at,subtotal_items,total_paid_customer',
+            'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,synced_at',
             'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id,price',
         ]);
 
@@ -163,6 +164,7 @@ class MarketplaceFinanceController extends Controller
         $pendingOrdersQuery = MarketplaceOrder::with([
             'store:id,name,channel_id',
             'store.channel:id,code,name',
+            'incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,synced_at',
             'items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id,price',
         ])
             ->whereDoesntHave('settlement')
@@ -434,6 +436,15 @@ class MarketplaceFinanceController extends Controller
      */
     private function settlementEstimatedEscrowAmount(MarketplaceOrderSettlement $settlement): ?float
     {
+        if ($settlement->settlement_time) {
+            return null;
+        }
+
+        $estimate = $settlement->order?->incomeEstimate;
+        if ($estimate && $estimate->estimated_escrow_amount !== null) {
+            return max(0.0, (float) $estimate->estimated_escrow_amount);
+        }
+
         $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
         $hasNestedValue = array_key_exists('estimated_escrow_amount', (array) data_get($raw, '_income_detail', []));
         $hasTopLevelValue = array_key_exists('estimated_escrow_amount', $raw);

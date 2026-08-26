@@ -5,6 +5,7 @@ namespace Tests\Feature\Services;
 use App\Models\Channel;
 use App\Models\Journal;
 use App\Models\MarketplaceOrder;
+use App\Models\MarketplaceOrderIncomeEstimate;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\Store;
 use App\Services\Channels\Shopee\ShopeeChannel;
@@ -1605,7 +1606,7 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->assertStringContainsString('tidak tersedia', $result['message']);
     }
 
-    public function test_income_detail_pending_menyimpan_estimated_escrow_tanpa_menimpa_final_income(): void
+    public function test_income_detail_pending_menyimpan_estimasi_terpisah_dari_settlement_final(): void
     {
         $order = $this->createOrder(['order_status' => 'SHIPPED']);
 
@@ -1618,12 +1619,16 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
                     && $pageSize === 100
                     && $cursor === '')
                 ->andReturn([
-                    'response' => [
-                        'income_detail' => [[
+                    'income_detail_list' => [
+                        'list' => [[
                             'order_sn' => $order->channel_order_id,
                             'estimated_escrow_amount' => 54321,
+                            'estimated_payout_time' => 1787677200,
+                            'payment_method' => 'ShopeePay Balance',
+                            'currency' => 'IDR',
+                            'status' => 'Pending',
                         ]],
-                        'more' => false,
+                        'next_page' => ['cursor' => '', 'page_size' => 100],
                     ],
                 ]);
         });
@@ -1633,10 +1638,15 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->assertSame(1, $result['created']);
         $this->assertSame(0, $result['errors']);
 
-        $settlement = MarketplaceOrderSettlement::where('channel_order_id', $order->channel_order_id)->firstOrFail();
-        $this->assertSame(0.0, (float) $settlement->final_income);
-        $this->assertNull($settlement->settlement_time);
-        $this->assertSame(54321.0, (float) data_get($settlement->raw_json, '_income_detail.estimated_escrow_amount'));
+        $this->assertDatabaseMissing('marketplace_order_settlements', [
+            'channel_order_id' => $order->channel_order_id,
+        ]);
+
+        $estimate = MarketplaceOrderIncomeEstimate::where('channel_order_id', $order->channel_order_id)->firstOrFail();
+        $this->assertSame(54321.0, (float) $estimate->estimated_escrow_amount);
+        $this->assertSame('2026-08-25 17:00:00', $estimate->estimated_payout_at->utc()->format('Y-m-d H:i:s'));
+        $this->assertSame('ShopeePay Balance', $estimate->payment_method);
+        $this->assertSame('IDR', $estimate->currency);
     }
 
     public function test_income_detail_pending_tidak_mengubah_settlement_yang_sudah_cair(): void
@@ -1657,12 +1667,12 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
             $mock->shouldReceive('getIncomeDetail')
                 ->once()
                 ->andReturn([
-                    'response' => [
-                        'income_detail' => [[
+                    'income_detail_list' => [
+                        'list' => [[
                             'order_sn' => $order->channel_order_id,
                             'estimated_escrow_amount' => 12345,
                         ]],
-                        'more' => false,
+                        'next_page' => ['cursor' => '', 'page_size' => 100],
                     ],
                 ]);
         });
@@ -1673,6 +1683,52 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->assertSame(77777.0, (float) $settlement->final_income);
         $this->assertEqualsWithDelta($releaseTime->timestamp, $settlement->settlement_time->timestamp, 1);
         $this->assertTrue((bool) data_get($settlement->raw_json, 'existing'));
-        $this->assertNull(data_get($settlement->raw_json, '_income_detail.estimated_escrow_amount'));
+        $this->assertDatabaseMissing('marketplace_order_income_estimates', [
+            'channel_order_id' => $order->channel_order_id,
+        ]);
+    }
+
+    public function test_income_detail_membaca_cursor_resmi_dan_semua_halaman(): void
+    {
+        $firstOrder = $this->createOrder(['order_status' => 'SHIPPED']);
+        $secondOrder = $this->createOrder(['order_status' => 'SHIPPED']);
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($firstOrder, $secondOrder): void {
+            $mock->shouldReceive('getIncomeDetail')
+                ->once()
+                ->withArgs(fn ($store, $dateFrom, $dateTo, $status, $pageSize, $cursor) => $cursor === '')
+                ->andReturn([
+                    'response' => [
+                        'income_detail_list' => [
+                            'list' => [[
+                                'order_sn' => $firstOrder->channel_order_id,
+                                'estimated_escrow_amount' => 10000,
+                            ]],
+                            'next_page' => ['cursor' => 'NEXT-1', 'page_size' => 1],
+                        ],
+                    ],
+                ]);
+            $mock->shouldReceive('getIncomeDetail')
+                ->once()
+                ->withArgs(fn ($store, $dateFrom, $dateTo, $status, $pageSize, $cursor) => $cursor === 'NEXT-1')
+                ->andReturn([
+                    'response' => [
+                        'income_detail_list' => [
+                            'list' => [[
+                                'order_sn' => $secondOrder->channel_order_id,
+                                'estimated_escrow_amount' => 20000,
+                            ]],
+                            'next_page' => ['cursor' => '', 'page_size' => 1],
+                        ],
+                    ],
+                ]);
+        });
+
+        $result = app(MarketplaceSyncService::class)->syncIncomeDetails($this->store);
+
+        $this->assertSame(2, $result['found']);
+        $this->assertSame(2, $result['created']);
+        $this->assertSame(2, $result['pages']);
+        $this->assertDatabaseCount('marketplace_order_income_estimates', 2);
     }
 }

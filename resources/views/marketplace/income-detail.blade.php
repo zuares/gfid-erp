@@ -1246,6 +1246,10 @@
             </a>
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="resetFilters()">Reset Filter</button>
             <button class="btn btn-sm btn-ship-outline btn-pill" onclick="loadIncomeDetail()">Refresh</button>
+            <button class="btn btn-sm btn-warning btn-pill" id="refreshIncomeEstimateBtn" onclick="refreshIncomeEstimate()" title="Ambil estimasi payout terbaru dari Shopee untuk toko yang dipilih">
+                <i class="bi bi-clock-history"></i> Perbarui Estimasi
+            </button>
+            <span id="incomeEstimateSyncStatus" style="font-size:.68rem;color:var(--shp-muted);"></span>
         </div>
     </div>
 
@@ -1297,7 +1301,7 @@
                 </div>
             </div>
             <div class="income-field">
-                <label>Tgl Cair</label>
+                <label id="filterSettlementLabel">Tgl Cair</label>
                 <div class="income-date-wrap">
                     <i class="bi bi-calendar-check income-date-icon" style="color:#10b981;"></i>
                     <input id="filterSettlement" class="income-date-input" type="text" placeholder="Bulan ini">
@@ -1471,6 +1475,44 @@
     let orderRangePicker = null;
     let settlementRangePicker = null;
 
+    function relativeTime(value) {
+        if (!value) return 'belum pernah diperbarui';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return fmt(value);
+        const seconds = Math.round((date.getTime() - Date.now()) / 1000);
+        const formatter = new Intl.RelativeTimeFormat('id-ID', { numeric: 'auto' });
+        if (Math.abs(seconds) < 60) return formatter.format(seconds, 'second');
+        const minutes = Math.round(seconds / 60);
+        if (Math.abs(minutes) < 60) return formatter.format(minutes, 'minute');
+        const hours = Math.round(minutes / 60);
+        if (Math.abs(hours) < 24) return formatter.format(hours, 'hour');
+        return formatter.format(Math.round(hours / 24), 'day');
+    }
+
+    function updateIncomeModeLabels(meta = null) {
+        const isPending = currentTab === 'belum_cair';
+        const label = $('filterSettlementLabel');
+        const input = $('filterSettlement');
+        if (label) label.textContent = isPending ? 'Estimasi Tgl Cair' : (currentTab === 'semua' ? 'Tgl Cair / Order Pending' : 'Tgl Cair');
+        if (input) {
+            input.placeholder = isPending ? 'Estimasi bulan ini' : 'Bulan ini';
+            input.title = isPending
+                ? 'Memfilter estimated_payout_at dari Shopee'
+                : (currentTab === 'semua' ? 'Tanggal settlement untuk order cair dan tanggal order untuk pending' : 'Memfilter tanggal settlement final');
+        }
+
+        const status = $('incomeEstimateSyncStatus');
+        if (status && isPending && meta) {
+            const shopeeCount = Number(meta.estimate_shopee_count || 0);
+            const manualCount = Number(meta.estimate_manual_count || 0);
+            status.textContent = `${shopeeCount} estimasi Shopee • ${manualCount} fallback 24%${meta.estimate_last_synced_at ? ` • update ${relativeTime(meta.estimate_last_synced_at)}` : ''}`;
+            status.title = meta.estimate_last_synced_at ? `Sinkronisasi terakhir ${fmt(meta.estimate_last_synced_at)}` : 'Belum ada sinkronisasi estimasi Shopee';
+        } else if (status && !status.dataset.syncing) {
+            status.textContent = '';
+            status.removeAttribute('title');
+        }
+    }
+
     function parseStoredRange(value) {
         if (!value || typeof value !== 'string') return null;
         const parts = value.split(' to ').map(part => part.trim()).filter(Boolean);
@@ -1556,6 +1598,7 @@
                 $('belumCairSubTabs').style.display = 'none';
             }
         }
+        updateIncomeModeLabels();
         if (state.sub_tab !== undefined) {
             currentSubTab = state.sub_tab;
             document.querySelectorAll('#belumCairSubTabs button').forEach(b => b.classList.remove('active'));
@@ -1629,6 +1672,7 @@
     window.switchIncomeTab = function (tabId, el) {
         document.querySelectorAll('.income-tab').forEach(t => t.classList.remove('active'));
         if (el) el.classList.add('active');
+        const previousTab = currentTab;
         currentTab = tabId;
         if ($('incomeSummaryPanel')) {
             $('incomeSummaryPanel').hidden = false;
@@ -1639,12 +1683,18 @@
         }
         if (currentTab === 'belum_cair') {
             $('belumCairSubTabs').style.display = 'flex';
+            // Jangan sembunyikan order fallback yang belum memiliki tanggal
+            // estimasi. User tetap dapat memilih rentang payout setelah masuk tab.
+            if (previousTab !== 'belum_cair' && settlementRangePicker) {
+                settlementRangePicker.clear(false);
+            }
         } else {
             $('belumCairSubTabs').style.display = 'none';
             currentSubTab = '';
             document.querySelectorAll('#belumCairSubTabs button').forEach(b => b.classList.remove('active'));
             document.querySelector('#belumCairSubTabs button').classList.add('active');
         }
+        updateIncomeModeLabels();
         goFirstPage();
     };
 
@@ -1671,7 +1721,50 @@
         if ($('filterSearch')) $('filterSearch').value = '';
         if (orderRangePicker) orderRangePicker.setDate(monthRange(), false);
         if (settlementRangePicker) settlementRangePicker.setDate(monthRange(), false);
+        updateIncomeModeLabels();
         loadIncomeDetail();
+    };
+
+    window.refreshIncomeEstimate = async function () {
+        const storeId = $('filterStore')?.value;
+        if (!storeId) {
+            alert('Pilih satu toko Shopee terlebih dahulu agar estimasi dapat diperbarui.');
+            return;
+        }
+
+        const btn = $('refreshIncomeEstimateBtn');
+        const status = $('incomeEstimateSyncStatus');
+        if (!btn || btn.disabled) return;
+        const oldHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Memperbarui…';
+        if (status) {
+            status.dataset.syncing = '1';
+            status.style.color = '#b45309';
+            status.textContent = 'Mengambil estimasi terbaru dari Shopee…';
+        }
+
+        try {
+            const result = await api('/api/marketplace/stores/' + storeId + '/sync-income-details', {
+                method: 'POST',
+                body: JSON.stringify({ page_size: 100 }),
+            });
+            if (status) {
+                status.style.color = '#15803d';
+                status.textContent = `${Number(result.updated || 0)} diperbarui • ${Number(result.created || 0)} baru`;
+            }
+            currentPage = 1;
+            await loadIncomeDetail();
+        } catch (error) {
+            if (status) {
+                status.style.color = '#b91c1c';
+                status.textContent = error?.data?.message || error?.message || 'Estimasi gagal diperbarui.';
+            }
+        } finally {
+            if (status) delete status.dataset.syncing;
+            btn.disabled = false;
+            btn.innerHTML = oldHtml;
+        }
     };
 
     function renderKpi(meta) {
@@ -1923,11 +2016,11 @@
                 setHtml('kpiFeeTotal', amount(grossValue));
                 setLabelWithPct('kpiAffiliateLabel', '<i class="bi bi-wallet2"></i>', 'Net', netValue, grossValue || 1);
                 setHtml('kpiAffiliate', amount(netValue));
-                setLabelWithPct('kpiMarketplaceLabel', '<i class="bi bi-cash-coin"></i>', 'Cair', netValue, grossValue || 1);
+                setLabelWithPct('kpiMarketplaceLabel', '<i class="bi bi-cash-coin"></i>', 'Net Est.', netValue, grossValue || 1);
                 setHtml('kpiMarketplace', amount(netValue));
                 setLabelWithPct('kpiAdjustmentLabel', '<i class="bi bi-percent"></i>', 'Margin', meta.kpi_gross_profit || 0, grossValue || 1);
                 setHtml('kpiAdjustment', `<span style="font-size:.72rem; font-weight:900; color:${toNum(meta.kpi_gross_profit) < 0 ? '#dc2626' : '#16a34a'}">${grossValue > 0 ? ((toNum(meta.kpi_gross_profit) / grossValue) * 100).toFixed(1) : '0.0'}%</span>`);
-                setHtml('kpiGrossProfitLabel', 'Profit');
+                setHtml('kpiGrossProfitLabel', 'Est. Profit');
                 setHtml('kpiGrossProfitPercent', labelPct(meta.kpi_gross_profit, grossValue || 1));
                 setHtml('kpiNetLabel', `${view.netPct}<i class="bi bi-wallet2 text-primary"></i><span>${view.netLabel}</span>`);
                 setHtml('kpiNetPayout', amount(netValue));
@@ -2416,7 +2509,9 @@
                 const estimatedEscrowAmount = hasEstimatedEscrowAmount ? Number(s.estimated_escrow_amount) : 0;
                 const statusMeta = getOrderStatusMeta(s.order?.order_status || s.order_status);
                 const orderDateText = s.order?.ordered_at ? fmtShortDate(s.order.ordered_at) : '—';
-                const settlementDateText = s.settlement_time ? fmtShortDate(s.settlement_time) : 'Belum cair';
+                const settlementDateText = s.settlement_time
+                    ? fmtShortDate(s.settlement_time)
+                    : (s.estimated_payout_at ? `Est. ${fmtShortDate(s.estimated_payout_at)}` : 'Belum cair');
                 const itemCount = Array.isArray(s.order?.items) ? s.order.items.length : 0;
                 const grossPercent = gross > 0 ? ((grossAfterVoucherToko / gross) * 100).toFixed(1) : '0.0';
                 const buyerPercent = gross > 0 ? ((buyerPaid / gross) * 100).toFixed(1) : '0.0';
@@ -2431,15 +2526,23 @@
                 const isCancelledOrReturned = s.order?.order_status === 'CANCELLED' || s.order?.order_status === 'BATAL' || s.order?.order_status === 'RETURNED' || s.order?.order_status === 'REFUND';
                 const isReturning = s.order?.order_status === 'TO_RETURN' || s.order?.order_status === 'RETURNING';
 
-                const shouldEstimatePendingIncome = currentTab !== 'semua';
+                const shouldEstimatePendingIncome = !s.settlement_time;
                 const incomeEstimationSource = s.income_estimation_source
                     || (s.is_estimated_income ? (hasEstimatedEscrowAmount ? 'estimated_escrow' : 'manual_24') : null);
                 const incomeSourceLabel = incomeEstimationSource === 'estimated_escrow'
                     ? 'EST. SHOPEE'
-                    : (incomeEstimationSource === 'manual_24' ? 'EST. 24%' : 'CAIR');
+                    : (incomeEstimationSource === 'manual_24'
+                        ? 'EST. MANUAL 24%'
+                        : (s.settlement_time ? 'CAIR • FINAL' : 'ESTIMASI BELUM TERSEDIA'));
                 const incomeSourceTitle = incomeEstimationSource === 'estimated_escrow'
                     ? 'Estimasi dari estimated_escrow_amount Shopee'
-                    : (incomeEstimationSource === 'manual_24' ? 'Estimasi fallback manual 24%' : 'Nilai pencairan final');
+                    : (incomeEstimationSource === 'manual_24'
+                        ? 'Estimasi fallback manual 24%'
+                        : (s.settlement_time ? 'Nilai pencairan final' : 'Income detail Shopee belum tersedia'));
+                const incomeIsPending = !s.settlement_time;
+                const estimateFreshness = s.income_estimate_synced_at
+                    ? `Diperbarui ${relativeTime(s.income_estimate_synced_at)}`
+                    : (incomeEstimationSource === 'manual_24' ? 'Fallback lokal' : (incomeIsPending ? 'Menunggu data Shopee' : ''));
 
                 if (isCancelledOrReturned) {
                     net = 0;
@@ -2454,6 +2557,11 @@
                     if (hasEstimatedEscrowAmount && Number.isFinite(estimatedEscrowAmount)) {
                         // Nilai pending dari Shopee menjadi sumber utama.
                         net = estimatedEscrowAmount;
+                        const estimatedSellerBurden = Math.max(grossAfterVoucherToko - net, 0);
+                        marketplaceFeeAfterAffiliate = Math.max(estimatedSellerBurden - affiliateCommission, 0);
+                        sellerBurdenTotal = estimatedSellerBurden;
+                        marketplaceFeePercent = grossAfterVoucherToko > 0 ? (marketplaceFeeAfterAffiliate / grossAfterVoucherToko) * 100 : 0;
+                        feePercent = grossAfterVoucherToko > 0 ? (sellerBurdenTotal / grossAfterVoucherToko) * 100 : 0;
                     } else {
                         // Fallback sementara bila income detail belum tersedia.
                         marketplaceFeePercent = 24.0;
@@ -2497,7 +2605,7 @@
                                     <span class="income-timeline-value">${orderDateText}</span>
                                 </div>
                                 <div class="income-timeline-row">
-                                    <span class="income-timeline-label"><i class="bi bi-cash-coin"></i><span>Cair</span></span>
+                                    <span class="income-timeline-label"><i class="bi bi-cash-coin"></i><span>${s.settlement_time ? 'Cair' : 'Est. Cair'}</span></span>
                                     <span class="income-timeline-value ${s.settlement_time ? 'text-success' : 'text-warning'}">${settlementDateText}</span>
                                 </div>
                             </div>
@@ -2551,11 +2659,11 @@
                                 <span class="income-money-value txt-danger">${affiliateCommissionText}</span>
                             </div>
                             <div class="income-money-line">
-                                <span class="income-money-label">Mktplace <span style="font-size:.48rem;">(${fmtPct(marketplaceFeePercent)})</span></span>
+                                <span class="income-money-label">${incomeIsPending ? 'Mktplace Est.' : 'Mktplace'} <span style="font-size:.48rem;">(${fmtPct(marketplaceFeePercent)})</span></span>
                                 <span class="income-money-value txt-danger">-${fmtRp(marketplaceFeeAfterAffiliate)}</span>
                             </div>
                             <div class="income-money-line">
-                                <span class="income-money-label">Biaya Penjual <span style="font-size:.48rem;">(${Number.isFinite(feePercent) ? feePercent.toFixed(1) + '%' : '-'})</span></span>
+                                <span class="income-money-label">${incomeIsPending ? 'Biaya Penjual Est.' : 'Biaya Penjual'} <span style="font-size:.48rem;">(${Number.isFinite(feePercent) ? feePercent.toFixed(1) + '%' : '-'})</span></span>
                                 <span class="income-money-value txt-danger">-${fmtRp(sellerBurdenTotal)}</span>
                             </div>
                             <div class="income-money-line">
@@ -2567,15 +2675,16 @@
                     <td>
                         <div class="income-money-stack">
                             <div class="income-money-line">
-                                <span title="${incomeSourceTitle}" class="${s.is_estimated_income ? 'text-warning' : 'text-muted'} income-money-label">${incomeSourceLabel}</span>
-                                <span class="${s.is_estimated_income ? 'text-warning' : 'text-success'} income-money-value">${fmtRp(netCairValue)} <span style="font-size:.52rem; color:#10b981; font-weight:800;">(${finalPercent}%)</span></span>
+                                <span title="${incomeSourceTitle}" class="${incomeIsPending ? 'text-warning' : 'text-muted'} income-money-label">${incomeSourceLabel}</span>
+                                <span class="${incomeIsPending ? 'text-warning' : 'text-success'} income-money-value">${fmtRp(netCairValue)} <span style="font-size:.52rem; color:${incomeIsPending ? '#d97706' : '#10b981'}; font-weight:800;">(${finalPercent}%)</span></span>
                             </div>
+                            ${estimateFreshness ? `<div style="font-size:.52rem;color:#94a3b8;text-align:right;margin-top:-.1rem;">${estimateFreshness}</div>` : ''}
                             <div class="income-money-line">
                                 <span class="income-money-label">COGS</span>
                                 <span class="income-money-value text-danger">${fmtRp(cogsValue)} <span style="font-size:.52rem; color:#ef4444; font-weight:800;">(${cogsPercent}%)</span></span>
                             </div>
                             <div class="income-money-line" style="padding-top:.25rem; margin-top:.1rem; border-top:1px dashed rgba(148,163,184,.24);">
-                                <span class="income-money-label" style="font-size:.58rem;">PROFIT</span>
+                                <span class="income-money-label" style="font-size:.58rem;">${incomeIsPending ? 'EST. PROFIT' : 'PROFIT'}</span>
                                 <span class="${profitValue < 0 ? 'text-danger' : 'text-success'} income-money-value">${fmtRp(profitValue)} <span style="font-size:.52rem; color:${profitValue < 0 ? '#ef4444' : '#10b981'}; font-weight:800;">(${profitPercent}%)</span></span>
                             </div>
                         </div>
@@ -2779,6 +2888,7 @@
 
     window.loadIncomeDetail = async function () {
         saveState();
+        updateIncomeModeLabels();
         if ($('incomeTableMeta')) $('incomeTableMeta').textContent = 'Memuat data…';
         $('incomeBody').innerHTML = `
             <div style="padding:1.5rem;">
@@ -2819,6 +2929,7 @@
                 if (res.meta) {
                     lastMeta = res.meta;
                     renderKpi(res.meta);
+                    updateIncomeModeLabels(res.meta);
                 }
             }
             renderTable();

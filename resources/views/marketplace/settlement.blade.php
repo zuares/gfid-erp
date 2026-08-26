@@ -390,7 +390,7 @@
                     </div>
 
                     <div style="position:relative; min-width:125px; width:125px;">
-                        <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterSettlementStatus" onchange="loadSettlements()">
+                        <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterSettlementStatus" onchange="onSettlementStatusChange()">
                             <option value="">Semua Dana</option>
                             <option value="cair" selected>Sudah Cair</option>
                             <option value="belum_cair">Belum Cair</option>
@@ -404,7 +404,7 @@
                     </div>
 
                     <div style="position:relative; min-width:135px; width:135px;">
-                        <input type="text" class="form-control form-control-sm filter-select w-100" style="background:#fff;cursor:pointer;padding-left:26px" id="filterSettlementDate" placeholder="Tgl Cair...">
+                        <input type="text" class="form-control form-control-sm filter-select w-100" style="background:#fff;cursor:pointer;padding-left:26px" id="filterSettlementDate" placeholder="Tgl Cair..." title="Tanggal pencairan final">
                         <i class="bi bi-calendar3" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
                     </div>
 
@@ -418,7 +418,7 @@
 
         <div style="display:flex; flex-wrap: nowrap; gap: .65rem; margin-bottom: 1rem;">
             <div class="oc-kpi-card" style="flex: 1 1 0; min-width: 0; margin: 0; padding: .65rem .75rem; overflow:hidden;">
-                <div class="oc-kpi-label" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Tersettlement">Tersettlement</div>
+                <div class="oc-kpi-label" id="kpiCountLabel" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Order Cair">Order Cair</div>
                 <div class="oc-kpi-value" id="kpiCount" style="font-size: 1.05rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
             </div>
             <div class="oc-kpi-card" style="flex: 1 1 0; min-width: 0; margin: 0; padding: .65rem .75rem; overflow:hidden;">
@@ -426,13 +426,14 @@
                 <div class="oc-kpi-value" id="kpiBuyerTotal" style="font-size: 1.05rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
             </div>
             <div class="oc-kpi-card" style="flex: 1 1 0; min-width: 0; margin: 0; padding: .65rem .75rem; overflow:hidden;">
-                <div class="oc-kpi-label" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Total Fee Marketplace">Fee Marketplace</div>
+                <div class="oc-kpi-label" id="kpiFeeLabel" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Total Fee Marketplace">Fee Marketplace</div>
                 <div class="oc-kpi-value" id="kpiFeeTotal" style="font-size: 1.05rem; color:#b91c1c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
                 <div id="kpiFeePercent" style="font-size:.72rem; color:var(--shp-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
             </div>
             <div class="oc-kpi-card" style="flex: 1 1 0; min-width: 0; margin: 0; padding: .65rem .75rem; overflow:hidden;">
-                <div class="oc-kpi-label" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Total Dana Cair (Net)">Dana Cair (Net)</div>
+                <div class="oc-kpi-label" id="kpiNetPayoutLabel" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Dana Cair Final">Dana Cair (Final)</div>
                 <div class="oc-kpi-value" id="kpiNetPayout" style="font-size: 1.05rem; color:#16a34a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
+                <div id="kpiEstimateFreshness" style="font-size:.68rem; color:var(--shp-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
             </div>
         </div>
 
@@ -516,6 +517,9 @@
                     <div class="settlement-sync-actions-row" style="margin-left:auto;">
                         <button class="btn btn-sm btn-ship-primary btn-pill" id="runSettlementBtn" onclick="runSettlementSync()">
                             <i class="bi bi-arrow-down-circle"></i> Tarik Settlement
+                        </button>
+                        <button class="btn btn-sm btn-warning btn-pill" id="runIncomeEstimateBtn" onclick="runIncomeEstimateSync()">
+                            <i class="bi bi-clock-history"></i> Perbarui Estimasi
                         </button>
                         <button class="btn btn-sm btn-ship-outline btn-pill" id="runSettlementBackfillBtn" onclick="runSettlementBackfill()">
                             <i class="bi bi-clock-history"></i> Jalankan Backfill
@@ -685,6 +689,68 @@
         });
     }
 
+    function fmtRelativeTime(value) {
+        if (!value) return 'belum pernah diperbarui';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return fmtDateTime(value);
+        const seconds = Math.round((date.getTime() - Date.now()) / 1000);
+        const formatter = new Intl.RelativeTimeFormat('id-ID', { numeric: 'auto' });
+        if (Math.abs(seconds) < 60) return formatter.format(seconds, 'second');
+        const minutes = Math.round(seconds / 60);
+        if (Math.abs(minutes) < 60) return formatter.format(minutes, 'minute');
+        const hours = Math.round(minutes / 60);
+        if (Math.abs(hours) < 24) return formatter.format(hours, 'hour');
+        return formatter.format(Math.round(hours / 24), 'day');
+    }
+
+    function updateSettlementModeLabels(meta = null) {
+        const mode = $('filterSettlementStatus')?.value || '';
+        const isPending = mode === 'belum_cair';
+        const isFinal = mode === 'cair';
+        const dateInput = $('filterSettlementDate');
+
+        if ($('kpiCountLabel')) {
+            $('kpiCountLabel').textContent = isPending ? 'Order Menunggu Cair' : (isFinal ? 'Order Cair' : 'Total Order');
+        }
+        if ($('kpiFeeLabel')) {
+            $('kpiFeeLabel').textContent = isPending ? 'Estimasi Fee' : (isFinal ? 'Fee Marketplace' : 'Fee Final + Est.');
+        }
+        if ($('kpiNetPayoutLabel')) {
+            $('kpiNetPayoutLabel').textContent = isPending ? 'Estimasi Dana Cair' : (isFinal ? 'Dana Cair (Final)' : 'Dana Final + Estimasi');
+        }
+        if ($('kpiNetPayout')) {
+            $('kpiNetPayout').style.color = isPending ? '#d97706' : (isFinal ? '#16a34a' : '#2563eb');
+        }
+        if (dateInput) {
+            dateInput.placeholder = isPending ? 'Est. Tgl Cair...' : 'Tgl Cair Final...';
+            dateInput.title = isPending
+                ? 'Memfilter estimated_payout_at dari Shopee'
+                : 'Memfilter tanggal pencairan final';
+        }
+
+        const freshness = $('kpiEstimateFreshness');
+        if (freshness) {
+            if (isPending && meta) {
+                const shopeeCount = Number(meta.estimate_shopee_count || 0);
+                const manualCount = Number(meta.estimate_manual_count || 0);
+                const lastSync = meta.estimate_last_synced_at
+                    ? ` • diperbarui ${fmtRelativeTime(meta.estimate_last_synced_at)}`
+                    : '';
+                freshness.textContent = `${shopeeCount} Shopee • ${manualCount} fallback 24%${lastSync}`;
+                freshness.title = meta.estimate_last_synced_at ? `Sync terakhir ${fmtDateTime(meta.estimate_last_synced_at)}` : 'Belum ada estimasi Shopee';
+            } else {
+                freshness.textContent = '';
+                freshness.removeAttribute('title');
+            }
+        }
+    }
+
+    window.onSettlementStatusChange = function () {
+        currentPage = 1;
+        updateSettlementModeLabels();
+        loadSettlements();
+    };
+
     function getSyncStoreId() {
         return $('syncStore') ? $('syncStore').value : '';
     }
@@ -778,6 +844,8 @@
             SETTLEMENT_CHANNEL_UNSUPPORTED: { level: 'warn', title: 'Channel belum didukung', message: fallback },
             SETTLEMENT_QUEUE_ERROR: { level: 'error', title: 'Queue tidak tersedia', message: 'Sync belum masuk antrian. Pastikan queue worker berjalan, lalu coba lagi.' },
             SETTLEMENT_SYNC_ERROR: { level: 'error', title: 'Sync settlement gagal', message: fallback },
+            INCOME_DETAIL_SYNC_BUSY: { level: 'warn', title: 'Sync lain sedang berjalan', message: fallback },
+            INCOME_DETAIL_SYNC_ERROR: { level: 'error', title: 'Estimasi gagal diperbarui', message: fallback },
         };
         const item = map[code] || { level: 'error', title: fallbackTitle, message: fallback };
         const action = error?.data?.action?.type === 'redirect'
@@ -1180,6 +1248,7 @@
         }
 
         restoreSettlementFilterState();
+        updateSettlementModeLabels();
 
         const filterSearch = $('filterSearch');
         if (filterSearch) {
@@ -1203,6 +1272,7 @@
             syncStore.value = '';
         }
         currentPage = 1;
+        updateSettlementModeLabels();
         loadSettlements();
     };
 
@@ -1263,6 +1333,7 @@
 
     window.loadSettlements = async function () {
         saveSettlementFilterState();
+        updateSettlementModeLabels();
         $('settlementBody').innerHTML = '<div style="padding:2rem;text-align:center;color:var(--shp-muted);font-size:.85rem;"><span class="spinner-border spinner-border-sm"></span> Memuat data...</div>';
 
         const params = new URLSearchParams();
@@ -1300,6 +1371,7 @@
                     ? `${Number(res.meta.kpi_fee_pct).toFixed(1)}% dari gross setelah voucher`
                     : '—';
                 $('kpiNetPayout').textContent = fmtRp(res.meta.kpi_net);
+                updateSettlementModeLabels(res.meta);
             }
 
             renderTable();
@@ -1315,6 +1387,12 @@
             return;
         }
 
+        const selectedFundMode = $('filterSettlementStatus')?.value || '';
+        const pendingView = selectedFundMode === 'belum_cair';
+        const dateHeading = pendingView ? 'Est. Tgl Cair' : (selectedFundMode === 'cair' ? 'Tgl Cair Final' : 'Cair / Estimasi');
+        const payoutHeading = pendingView ? 'Gross & Estimasi Payout' : 'Gross & Net Payout';
+        const feeHeading = pendingView ? 'Status Rincian Fee' : 'Biaya Marketplace';
+
         let html = `
         <div class="table-responsive" style="margin:0; border:none; max-height:65vh; overflow-y:auto;">
         <table class="table table-list w-100" style="margin-bottom:0">
@@ -1322,9 +1400,9 @@
                 <tr>
                     <th style="min-width:130px">Order & Toko</th>
                     <th style="min-width:90px">Tgl Dibuat</th>
-                    <th style="min-width:90px">Tgl Cair</th>
-                    <th class="text-end" style="min-width:110px">Gross & Net Payout</th>
-                    <th style="min-width:145px">Biaya Marketplace</th>
+                    <th style="min-width:90px">${dateHeading}</th>
+                    <th class="text-end" style="min-width:110px">${payoutHeading}</th>
+                    <th style="min-width:145px">${feeHeading}</th>
                     <th style="min-width:110px">Promosi Seller</th>
                     <th style="min-width:140px">Logistik & Ongkir</th>
                     <th class="text-end" style="min-width:90px">Penyesuaian (DRC)</th>
@@ -1332,6 +1410,19 @@
             </thead>
             <tbody>
             ${settlements.map(s => {
+                const isPending = !s.settlement_time;
+                const estimateSource = String(s.income_estimation_source || '');
+                const estimateSourceLabel = estimateSource === 'estimated_escrow'
+                    ? 'EST. SHOPEE'
+                    : (estimateSource === 'manual_24' ? 'EST. MANUAL 24%' : 'ESTIMASI BELUM TERSEDIA');
+                const estimateSourceColor = estimateSource === 'estimated_escrow' ? '#b45309' : '#64748b';
+                const estimateSyncText = s.income_estimate_synced_at
+                    ? `Diperbarui ${fmtRelativeTime(s.income_estimate_synced_at)}`
+                    : (estimateSource === 'manual_24' ? 'Fallback lokal, bukan data Shopee' : 'Menunggu data income Shopee');
+                const pendingDetailPlaceholder = `
+                    <div style="padding:.45rem .55rem; border:1px dashed rgba(217,119,6,.38); border-radius:9px; background:rgba(245,158,11,.07); color:#92400e; font-size:.68rem; line-height:1.35;">
+                        <strong>Belum final</strong><br>Rincian tersedia setelah settlement.
+                    </div>`;
                 return `<tr>
                     <td>
                         <a href="/marketplace/orders/${s.order?.id || ''}" class="code-link">${esc(s.channel_order_id)}</a>
@@ -1343,17 +1434,21 @@
                     </td>
 
                     <td style="font-size:.75rem;color:var(--shp-muted);">
-                        ${s.settlement_time ? fmtDateTime(s.settlement_time) : '<span class="oc-badge oc-badge-amber" style="font-size:.65rem">Belum Cair</span>'}
-                        ${s.settlement_recorded === false ? '<div style="font-size:.63rem;color:#b45309;margin-top:3px;">Belum ada data payout</div>' : ''}
+                        ${isPending
+                            ? `<span class="oc-badge oc-badge-amber" style="font-size:.65rem">${s.estimated_payout_at ? 'Est. ' + fmtDateTime(s.estimated_payout_at) : 'Tanggal belum tersedia'}</span>
+                               <div style="font-size:.62rem;color:${estimateSourceColor};font-weight:800;margin-top:5px;">${estimateSourceLabel}</div>
+                               <div style="font-size:.6rem;color:#94a3b8;margin-top:2px;" title="${s.income_estimate_synced_at ? esc(fmtDateTime(s.income_estimate_synced_at)) : ''}">${estimateSyncText}</div>`
+                            : `${fmtDateTime(s.settlement_time)}<div style="font-size:.62rem;color:#15803d;font-weight:800;margin-top:4px;">CAIR • FINAL</div>`}
                     </td>
 
                     <td class="text-end">
                         <div class="fw-bold" style="font-size:.82rem; color:var(--shp-text);">${fmtRp(s.raw_json ? (s.raw_json.cost_of_goods_sold || s.raw_json.order_selling_price || s.buyer_payment_amount) : s.buyer_payment_amount)}</div>
-                        <div class="fw-black" style="font-size:.9rem; color:#16a34a; margin-top:2px;">${fmtRp(s.final_income)}</div>
-                        ${!s.settlement_time ? `<div style="font-size:.65rem; color:#d97706; margin-top:2px; font-weight:600;">(Estimasi)</div>` : ''}
+                        <div class="fw-black" style="font-size:.9rem; color:${isPending ? '#d97706' : '#16a34a'}; margin-top:2px;">${fmtRp(s.final_income)}</div>
+                        <div style="font-size:.62rem; color:${isPending ? estimateSourceColor : '#15803d'}; margin-top:2px; font-weight:800;">${isPending ? estimateSourceLabel : 'CAIR • FINAL'}</div>
                     </td>
 
                     <td>
+                        ${isPending ? pendingDetailPlaceholder : `
                         <ul class="fee-list">
                             ${(() => {
                                 let html = '';
@@ -1415,25 +1510,30 @@
                                 return html || '<li><span style="color:var(--shp-muted)">Tidak ada potongan</span></li>';
                             })()}
                         </ul>
+                        `}
                     </td>
 
                     <td>
+                        ${isPending ? pendingDetailPlaceholder : `
                         <ul class="fee-list">
                             <li><span>Voucher:</span> <span class="fee-val">${s.seller_voucher ? '−'+fmtRp(s.seller_voucher) : '-'}</span></li>
                             <li><span>Koin CB:</span> <span class="fee-val">${s.seller_coin_cash_back ? '−'+fmtRp(s.seller_coin_cash_back) : '-'}</span></li>
                         </ul>
+                        `}
                     </td>
 
                     <td>
+                        ${isPending ? pendingDetailPlaceholder : `
                         <ul class="fee-list">
                             <li><span>Ongkir Aktual:</span> <span class="fee-val">${s.actual_shipping_fee ? '−'+fmtRp(s.actual_shipping_fee) : '-'}</span></li>
                             <li><span>Ongkir Balik:</span> <span class="fee-val">${s.reverse_shipping_fee ? '−'+fmtRp(s.reverse_shipping_fee) : '-'}</span></li>
                             <li><span>Subsidi (Plaftorm):</span> <span class="subsidy-val">${s.shipping_fee_subsidy ? '+'+fmtRp(s.shipping_fee_subsidy) : '-'}</span></li>
                         </ul>
+                        `}
                     </td>
 
                     <td class="text-end">
-                        <span class="drc-val" style="font-size:.82rem">${s.drc_adjustable_refund ? (s.drc_adjustable_refund > 0 ? '+' : '') + fmtRp(s.drc_adjustable_refund) : '-'}</span>
+                        ${isPending ? '<span style="font-size:.68rem;color:#92400e;">Belum final</span>' : `<span class="drc-val" style="font-size:.82rem">${s.drc_adjustable_refund ? (s.drc_adjustable_refund > 0 ? '+' : '') + fmtRp(s.drc_adjustable_refund) : '-'}</span>`}
                     </td>
                 </tr>`;
             }).join('')}
@@ -1607,6 +1707,49 @@
             setSyncState(presentation.level === 'warn' ? 'warn' : 'error', presentation.level === 'warn' ? 'Perlu tindakan' : 'Gagal');
             updateSyncDot(false);
             refreshSettlementSyncLogs();
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = oldHtml;
+        }
+    };
+
+    window.runIncomeEstimateSync = async function () {
+        const storeId = getSyncStoreId() || $('filterStore').value;
+        if (!storeId) {
+            alert('Pilih satu toko Shopee di tab Sync sebelum memperbarui estimasi.');
+            return;
+        }
+
+        const btn = $('runIncomeEstimateBtn');
+        if (!btn || btn.disabled) return;
+        const oldHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Memperbarui…';
+        hideSyncFeedback();
+        setSyncState('running', 'Estimasi');
+        updateSyncDot(true);
+
+        try {
+            const result = await api('/api/marketplace/stores/' + storeId + '/sync-income-details', {
+                method: 'POST',
+                body: JSON.stringify({ page_size: 100 }),
+            });
+            showSyncFeedback('success', 'Estimasi dana cair diperbarui', result.message || 'Income detail Shopee berhasil diperbarui.', [
+                result.found !== undefined ? `Ditemukan: ${result.found}` : null,
+                result.updated !== undefined ? `Diperbarui: ${result.updated}` : null,
+                result.created !== undefined ? `Baru: ${result.created}` : null,
+                result.unmatched !== undefined ? `Order tidak cocok: ${result.unmatched}` : null,
+                result.pages !== undefined ? `Halaman: ${result.pages}` : null,
+            ].filter(Boolean));
+            setSyncState('success', 'Siap');
+            updateSyncDot(false);
+            currentPage = 1;
+            await loadSettlements();
+        } catch (error) {
+            const presentation = presentSyncError(error, 'Gagal memperbarui estimasi');
+            showSyncFeedback(presentation.level, presentation.title, presentation.message, [presentation.code ? `Kode: ${presentation.code}` : null].filter(Boolean), presentation.action);
+            setSyncState(presentation.level === 'warn' ? 'warn' : 'error', presentation.level === 'warn' ? 'Tertunda' : 'Gagal');
+            updateSyncDot(false);
         } finally {
             btn.disabled = false;
             btn.innerHTML = oldHtml;

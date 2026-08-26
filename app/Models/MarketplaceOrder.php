@@ -101,6 +101,11 @@ class MarketplaceOrder extends Model
         return $this->hasOne(MarketplaceOrderSettlement::class, 'order_id');
     }
 
+    public function incomeEstimate(): HasOne
+    {
+        return $this->hasOne(MarketplaceOrderIncomeEstimate::class, 'marketplace_order_id');
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(MarketplaceOrderItem::class);
