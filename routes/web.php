@@ -66,6 +66,7 @@ Route::middleware(['auth'])
 
 use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\MarketplaceFinanceController;
+use App\Http\Controllers\Marketplace\MarketplaceProfitOverviewController;
 use App\Http\Controllers\MarketplacePromotionsController;
 use App\Http\Controllers\MarketplaceSettingsController;
 use App\Http\Controllers\MarketplaceSystemController;
@@ -251,7 +252,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->middleware('role:owner');
     Route::post('/stores/{store}/sync-settlements', [MarketplaceController::class, 'syncSettlements']);
     Route::post('/stores/{store}/sync-settlements-background', [MarketplaceController::class, 'syncSettlementsBackground']);
-    Route::get('/order-profits',                     [MarketplaceController::class, 'orderProfits']);
+    Route::get('/order-profits',                     MarketplaceProfitOverviewController::class);
     
     // Returns Module
     Route::get('/returns/live', [\App\Http\Controllers\MarketplaceReturnController::class, 'live']);

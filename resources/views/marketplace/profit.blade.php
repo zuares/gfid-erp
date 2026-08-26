@@ -9,7 +9,7 @@
     <div class="ship-topbar">
         <div>
             <h1 class="title">Profit per Order</h1>
-            <div class="sub">Harga jual dikurangi COGS, fee marketplace, voucher, dan promosi — profit bersih per order.</div>
+            <div class="sub">Pisahkan payout aktual dan estimasi Shopee. Profit order adalah kontribusi sebelum biaya iklan periode.</div>
             <div class="sub" id="lastSyncLabel" style="margin-top:4px; font-size:0.75rem; color:#64748b; font-weight: 500;">
                 Terakhir Sync: <span id="lastSyncTime">—</span>
                 <span id="financeSyncChip" style="display:none; margin-left:8px; padding:2px 10px; border-radius:999px; font-weight:700; font-size:.68rem; cursor:pointer;" title="Klik untuk lihat log" onclick="toggleFinanceLog()"></span>
@@ -36,7 +36,9 @@
 <div id="profitTabData">
 
     <div id="profitHppWarning" class="alert alert-warning d-none mb-3" style="border-radius:8px;font-size:.85rem">
-        ⚠️ Beberapa order tidak memiliki mapping SKU → Item, sehingga COGS-nya <strong>0</strong>. Lengkapi <a href="{{ route('marketplace.sku-mapping') }}">SKU Mapping</a> dan pastikan sudah ada <em>COGS Snapshot</em> aktif.
+        <strong>Data belum lengkap.</strong> <span id="profitQualityMessage"></span>
+        Order tersebut tetap ditampilkan, tetapi tidak masuk KPI profit.
+        <a href="{{ route('marketplace.sku-mapping') }}">Perbaiki SKU Mapping/COGS</a> atau sinkronkan Income Detail Shopee.
     </div>
 
     <style>
@@ -116,24 +118,26 @@
 
             <div class="filter-item">
                 <label>Toko</label>
-                <select class="form-select filter-select w-100" style="cursor:pointer;" id="profitStoreId" onchange="loadProfits()">
+                <select class="form-select filter-select w-100" style="cursor:pointer;" id="profitStoreId">
                     <option value="">Semua</option>
                 </select>
             </div>
 
             <div class="filter-item">
                 <label>Status</label>
-                <select class="form-select filter-select w-100" style="cursor:pointer;" id="filterStatus" onchange="loadProfits()">
+                <select class="form-select filter-select w-100" style="cursor:pointer;" id="filterStatus">
                     <option value="">Semua</option>
                     <option value="COMPLETED">Selesai</option>
+                    <option value="TO_CONFIRM_RECEIVE">Menunggu Konfirmasi</option>
                     <option value="SHIPPED">Dikirim</option>
-                    <option value="CANCELLED">Batal</option>
+                    <option value="READY_TO_SHIP">Siap Dikirim</option>
+                    <option value="PROCESSED">Diproses</option>
                 </select>
             </div>
 
             <div class="filter-item">
                 <label>Dana</label>
-                <select class="form-select filter-select w-100" style="cursor:pointer;" id="filterSettlementStatus" onchange="loadProfits()">
+                <select class="form-select filter-select w-100" style="cursor:pointer;" id="filterSettlementStatus">
                     <option value="">Semua</option>
                     <option value="cair">Cair</option>
                     <option value="belum_cair">Belum Cair</option>
@@ -142,7 +146,7 @@
 
             <div class="filter-item">
                 <label>COGS</label>
-                <select class="form-select filter-select w-100" style="cursor:pointer;" id="filterHppStatus" onchange="loadProfits()">
+                <select class="form-select filter-select w-100" style="cursor:pointer;" id="filterHppStatus">
                     <option value="">Semua</option>
                     <option value="empty">Kosong</option>
                     <option value="mapped">Terisi</option>
@@ -151,8 +155,9 @@
 
             <div class="filter-item">
                 <label>Urutkan</label>
-                <select class="form-select filter-select w-100" style="cursor:pointer;" id="filterSort" onchange="loadProfits()">
-                    <option value="">Waktu Cair</option>
+                <select class="form-select filter-select w-100" style="cursor:pointer;" id="filterSort">
+                    <option value="date_desc">Waktu Dana ↓</option>
+                    <option value="date_asc">Waktu Dana ↑</option>
                     <option value="margin_asc">Margin ↑</option>
                     <option value="margin_desc" selected>Margin ↓</option>
                     <option value="profit_asc">Profit ↑</option>
@@ -166,8 +171,8 @@
             </div>
 
             <div class="filter-item">
-                <label>Tgl Cair</label>
-                <input type="text" class="form-control filter-select w-100" style="cursor:pointer;" id="filterSettlementDate" placeholder="Rentang tanggal">
+                <label>Tgl Dana</label>
+                <input type="text" class="form-control filter-select w-100" style="cursor:pointer;" id="filterSettlementDate" placeholder="Aktual / estimasi">
             </div>
 
             <div class="filter-item search-item">
@@ -198,14 +203,14 @@
         </div>
     </div>
     
-    <!-- KPI — urutan alur hitung: Harga Jual → Dana Cair − COGS − Iklan = Profit -->
+    <!-- KPI — profit kontribusi order direkonsiliasi dengan iklan pada level periode -->
     <div style="display:flex; flex-wrap: wrap; gap: .6rem; margin-bottom: 1rem;">
         <div class="pkpi" style="border-color:rgba(3,105,161,.2); background:rgba(3,105,161,.05);">
             <div class="pkpi-label" style="color:#0369a1;"><i class="bi bi-graph-up-arrow"></i> Harga Jual</div>
             <div class="pkpi-value" id="kpiOmzet" style="color:#0369a1;">—</div>
         </div>
         <div class="pkpi" style="border-color:rgba(3,105,161,.2); background:rgba(3,105,161,.05);">
-            <div class="pkpi-label" style="color:#0369a1;"><i class="bi bi-wallet2"></i> Dana Cair</div>
+            <div class="pkpi-label" id="kpiIncomeLabel" style="color:#0369a1;"><i class="bi bi-wallet2"></i> Dana Aktual / Estimasi</div>
             <div class="pkpi-value" id="kpiIncome" style="color:#0369a1;">—</div>
         </div>
         <div class="pkpi" style="border-color:rgba(100,116,139,.25); background:rgba(100,116,139,.05);">
@@ -213,19 +218,19 @@
             <div class="pkpi-value" id="kpiHpp" style="color:#334155;">—</div>
         </div>
         <div class="pkpi" style="border-color:rgba(245,158,11,.25); background:rgba(245,158,11,.05);">
-            <div class="pkpi-label" style="color:#b45309;"><i class="bi bi-badge-ad"></i> &minus; Iklan +PPN</div>
+            <div class="pkpi-label" id="kpiAdsLabel" style="color:#b45309;"><i class="bi bi-badge-ad"></i> &minus; Iklan + PPN</div>
             <div class="pkpi-value" id="kpiAds" style="color:#92400e;">—</div>
         </div>
         <div class="pkpi" style="border-color:rgba(22,163,74,.3); background:rgba(22,163,74,.07);">
-            <div class="pkpi-label" style="color:#15803d;"><i class="bi bi-cash-stack"></i> = Profit Bersih</div>
+            <div class="pkpi-label" id="kpiProfitLabel" style="color:#15803d;"><i class="bi bi-cash-stack"></i> = Profit Setelah Iklan</div>
             <div class="pkpi-value" id="kpiProfit" style="color:#16a34a;">—</div>
         </div>
         <div class="pkpi" style="border-color:rgba(124,58,237,.2); background:rgba(124,58,237,.04);">
-            <div class="pkpi-label" style="color:#7c3aed;"><i class="bi bi-percent"></i> Margin</div>
+            <div class="pkpi-label" id="kpiMarginLabel" style="color:#7c3aed;"><i class="bi bi-percent"></i> Margin</div>
             <div class="pkpi-value" id="kpiMargin" style="color:#6d28d9;">—</div>
         </div>
         <div class="pkpi">
-            <div class="pkpi-label"><i class="bi bi-receipt"></i> Avg Profit/Order</div>
+            <div class="pkpi-label" id="kpiAvgProfitLabel"><i class="bi bi-receipt"></i> Avg Profit/Order</div>
             <div class="pkpi-value" id="kpiAvgProfit">—</div>
         </div>
     </div>
@@ -429,6 +434,7 @@
     let fpOrderDate = null, fpSettlementDate = null;
     let currentPage = 1;
     let paginationData = null;
+    let latestLoadRequest = 0;
     const $ = id => document.getElementById(id);
 
     // ── Init ──────────────────────────────────────────────────────────────────
@@ -453,7 +459,9 @@
         const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
         const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         let defaultOrderDate = [firstDay, lastDay];
-        let defaultSettlementDate = [firstDay, lastDay];
+        // Tanggal dana bersifat opsional. Jika diisi, backend memakai tanggal
+        // cair aktual untuk realisasi dan estimated_payout_at untuk pending.
+        let defaultSettlementDate = null;
 
         // 2. Read saved state
         const savedRaw = sessionStorage.getItem('mpProfitFilters');
@@ -517,8 +525,8 @@
             $('filterSort').value = 'margin_desc';
         }
 
-        // Hanya SELECT — pencarian sudah ditangani debounce + Enter,
-        // ikut listener 'change' bikin reload dobel saat input kehilangan fokus.
+        // Satu listener saja per select agar perubahan filter tidak mengirim
+        // request ganda dan saling menimpa hasil.
         document.querySelectorAll('select.filter-select').forEach(el => {
             el.addEventListener('change', () => { currentPage = 1; loadProfits(); });
         });
@@ -837,7 +845,7 @@
         const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
         if (fpOrderDate) fpOrderDate.setDate([firstDay, lastDay]);
-        if (fpSettlementDate) fpSettlementDate.setDate([firstDay, lastDay]);
+        if (fpSettlementDate) fpSettlementDate.clear();
         markPreset('month'); // default reset = bulan ini
 
         currentPage = 1;
@@ -883,6 +891,7 @@
 
     // ── Load ──────────────────────────────────────────────────────────────────
     window.loadProfits = async function () {
+        const requestId = ++latestLoadRequest;
         // Muat ulang lembut: tabel yang sudah tampil cukup diredupkan,
         // bukan diganti spinner — tidak ada kedipan tiap ganti filter.
         const pb = $('profitBody');
@@ -933,6 +942,7 @@
 
         try {
             const res = await api('/api/marketplace/order-profits?' + params.toString());
+            if (requestId !== latestLoadRequest) return;
             if (!res || !res.paginator) {
                 throw new Error("Invalid response format from server.");
             }
@@ -943,10 +953,13 @@
             renderKpi(res.meta);
             renderTable();
         } catch (e) {
+            if (requestId !== latestLoadRequest) return;
             $('profitBody').innerHTML = '<div style="padding:2rem;text-align:center;color:#b91c1c;">Gagal memuat data: ' + e.message + '</div>';
         } finally {
-            pb.style.opacity = '';
-            pb.style.pointerEvents = '';
+            if (requestId === latestLoadRequest) {
+                pb.style.opacity = '';
+                pb.style.pointerEvents = '';
+            }
         }
     };
     
@@ -989,25 +1002,44 @@
 
     function renderKpi(meta) {
         if (!meta) return;
-        hasUnmapped = rows.some(r => !r.hpp_mapped);
+        hasUnmapped = (meta.kpi_missing_hpp_count || 0) > 0;
+        const adsApplicable = meta.kpi_ads_applicable === true;
+        const profitValue = adsApplicable && meta.kpi_profit_final !== null
+            ? meta.kpi_profit_final
+            : meta.kpi_profit_contribution;
+        const marginValue = adsApplicable && meta.kpi_margin_final !== null
+            ? meta.kpi_margin_final
+            : meta.kpi_margin;
+        const avgValue = adsApplicable && meta.avg_profit_final !== null
+            ? meta.avg_profit_final
+            : meta.avg_profit;
 
-        // Profit & margin final = sudah dikurangi biaya iklan (+PPN) dari Ads Dashboard.
-        // Fallback ke angka lama kalau backend belum mengirim field *_final.
-        const profitFinal = meta.kpi_profit_final !== undefined ? meta.kpi_profit_final : meta.kpi_profit;
-        const marginFinal = meta.kpi_margin_final !== undefined ? meta.kpi_margin_final : meta.kpi_margin;
-        const avgFinal    = meta.avg_profit_final !== undefined ? meta.avg_profit_final : meta.avg_profit;
+        const actualCount = meta.kpi_actual_count || 0;
+        const estimatedCount = meta.kpi_estimated_count || 0;
+        $('kpiIncomeLabel').innerHTML = '<i class="bi bi-wallet2"></i> ' +
+            (actualCount && estimatedCount ? 'Dana Aktual + Estimasi' : (estimatedCount ? 'Dana Estimasi' : 'Payout Aktual'));
+        $('kpiAdsLabel').innerHTML = '<i class="bi bi-badge-ad"></i> ' +
+            (adsApplicable ? '− Iklan + PPN ' + (meta.kpi_ads_vat_percent || 0) + '%' : 'Iklan periode');
+        $('kpiProfitLabel').innerHTML = '<i class="bi bi-cash-stack"></i> ' +
+            (adsApplicable ? '= Profit Setelah Iklan' : '= Profit Kontribusi');
+        $('kpiMarginLabel').innerHTML = '<i class="bi bi-percent"></i> ' +
+            (adsApplicable ? 'Margin Setelah Iklan' : 'Margin Kontribusi');
+        $('kpiAvgProfitLabel').innerHTML = '<i class="bi bi-receipt"></i> ' +
+            (adsApplicable ? 'Avg Setelah Iklan' : 'Avg Profit Kontribusi');
 
         $('kpiOmzet').textContent  = fmtRp(meta.kpi_omzet);
         $('kpiIncome').textContent = fmtRp(meta.kpi_net);
         $('kpiHpp').textContent    = fmtRp(meta.kpi_hpp);
-        $('kpiAds').textContent    = meta.kpi_ads_total !== undefined
+        $('kpiAds').textContent    = adsApplicable && meta.kpi_ads_total !== null
             ? (meta.kpi_ads_total > 0 ? '−' + fmtRp(meta.kpi_ads_total) : fmtRp(0))
             : '—';
-        $('kpiProfit').textContent = fmtRp(profitFinal);
-        $('kpiProfit').style.color = profitFinal >= 0 ? '#16a34a' : '#dc2626';
-        $('kpiAvgProfit').textContent = fmtRp(avgFinal);
-        $('kpiMargin').textContent = marginFinal !== null ? marginFinal + '%' : '—';
-        $('kpiMargin').style.color = (marginFinal !== null && marginFinal < 0) ? '#dc2626' : '#6d28d9';
+        $('kpiProfit').textContent = profitValue === null || profitValue === undefined ? '—' : fmtRp(profitValue);
+        $('kpiProfit').style.color = profitValue === null || profitValue === undefined
+            ? '#64748b'
+            : (profitValue >= 0 ? '#16a34a' : '#dc2626');
+        $('kpiAvgProfit').textContent = avgValue === null || avgValue === undefined ? '—' : fmtRp(avgValue);
+        $('kpiMargin').textContent = marginValue !== null && marginValue !== undefined ? marginValue + '%' : '—';
+        $('kpiMargin').style.color = (marginValue !== null && marginValue < 0) ? '#dc2626' : '#6d28d9';
 
         if (meta.last_sync) {
             $('lastSyncTime').textContent = fmtDateTime(meta.last_sync);
@@ -1016,9 +1048,14 @@
         }
 
         const rc = $('resultCount');
-        if (rc) rc.textContent = meta.kpi_count != null ? meta.kpi_count.toLocaleString('id-ID') + ' order cocok' : '';
+        if (rc) rc.textContent = meta.kpi_count != null
+            ? `${meta.kpi_count.toLocaleString('id-ID')} ditemukan · ${meta.kpi_ready_count || 0} masuk KPI`
+            : '';
 
-        $('profitHppWarning').className = 'alert alert-warning mt-3' + (hasUnmapped ? '' : ' d-none');
+        const missingHpp = meta.kpi_missing_hpp_count || 0;
+        const missingIncome = meta.kpi_missing_income_count || 0;
+        $('profitQualityMessage').textContent = `${missingHpp} order belum memiliki HPP lengkap dan ${missingIncome} order belum memiliki dana aktual/estimasi.`;
+        $('profitHppWarning').className = 'alert alert-warning mt-3' + ((missingHpp || missingIncome) ? '' : ' d-none');
     }
 
     function renderTable() {
@@ -1040,9 +1077,9 @@
                     <th style="min-width:100px">Waktu</th>
                     <th class="text-end" style="min-width:90px">Harga Jual</th>
                     <th class="text-end" style="min-width:110px">Promosi Seller</th>
-                    <th class="text-end" style="min-width:100px">Dana Cair</th>
+                    <th class="text-end" style="min-width:125px">Dana Aktual / Estimasi</th>
                     <th class="text-end" title="COGS dari snapshot aktif">COGS</th>
-                    <th class="text-end" style="color:#16a34a;font-weight:900">Profit</th>
+                    <th class="text-end" style="color:#16a34a;font-weight:900">Profit Kontribusi</th>
                     <th class="text-end">Margin</th>
                 </tr>
             </thead>
@@ -1052,16 +1089,20 @@
                 if (r.margin_pct >= 15) marginColor = '#16a34a'; // Green
                 else if (r.margin_pct >= 0) marginColor = '#d97706'; // Amber/Orange
                 
-                const profitColor = r.profit_net >= 0 ? '#16a34a' : '#b91c1c';
+                const profitColor = r.profit_eligible ? (r.profit_net >= 0 ? '#16a34a' : '#b91c1c') : '#64748b';
                 const hppLabel = r.hpp_mapped
                     ? fmtRp(r.hpp_total)
                     : `<span style="color:#b91c1c" title="SKU belum ter-mapping">${fmtRp(r.hpp_total)} ⚠</span>`;
                 
-                let omzetGross = r.buyer_payment_amount;
-                if (r.raw_json) {
-                    const inc = r.raw_json.income_details || {};
-                    omzetGross = inc.cost_of_goods_sold || inc.order_selling_price || r.raw_json.cost_of_goods_sold || r.raw_json.order_selling_price || r.buyer_payment_amount;
-                }
+                const omzetGross = r.gross_sales ?? r.buyer_payment_amount ?? 0;
+                const incomeLabel = r.income_source_label || (r.income_available ? 'Aktual' : 'Belum tersedia');
+                const incomeValue = r.income_available && r.final_income !== null ? fmtRp(r.final_income) : '—';
+                const incomeBadgeColor = r.income_type === 'actual' ? '#15803d' : (r.income_available ? '#b45309' : '#64748b');
+                const payoutDate = r.settlement_time
+                    ? `<span class="oc-badge oc-badge-green" style="font-size:.65rem;padding:.1rem .3rem">Cair ${fmtDateTime(r.settlement_time)}</span>`
+                    : (r.estimated_payout_at
+                        ? `<span class="oc-badge oc-badge-amber" style="font-size:.65rem;padding:.1rem .3rem">Est. cair ${fmtDateTime(r.estimated_payout_at)}</span>`
+                        : '<span class="oc-badge oc-badge-muted" style="font-size:.65rem;padding:.1rem .3rem">Tanggal belum tersedia</span>');
 
                 return `<tr>
                     <td>
@@ -1083,9 +1124,7 @@
                     
                     <td style="font-size:.78rem;">
                         <div style="color:var(--shp-text)">${r.order?.ordered_at ? fmtDateTime(r.order.ordered_at) : '<span style="color:#94a3b8">—</span>'}</div>
-                        <div style="font-size:.72rem;color:var(--shp-muted);margin-top:2px;">
-                            ${r.settlement_time ? fmtDateTime(r.settlement_time) : '<span class="oc-badge oc-badge-amber" style="font-size:.65rem;padding:.1rem .3rem">Belum Cair</span>'}
-                        </div>
+                        <div style="font-size:.72rem;color:var(--shp-muted);margin-top:3px;">${payoutDate}</div>
                     </td>
                     
                     <td class="text-end">
@@ -1105,18 +1144,19 @@
                     </td>
 
                     <td class="text-end">
-                        <div class="fw-black" style="font-size:.9rem; color:#0369a1;">${fmtRp(r.final_income)}</div>
-                        ${!r.settlement_time ? `<div style="font-size:.65rem; color:#d97706; margin-top:2px; font-weight:600;">(Estimasi)</div>` : ''}
+                        <div class="fw-black" style="font-size:.9rem; color:#0369a1;">${incomeValue}</div>
+                        <div style="font-size:.65rem;color:${incomeBadgeColor};margin-top:2px;font-weight:700;">${esc(incomeLabel)}</div>
+                        ${r.income_synced_at ? `<div style="font-size:.62rem;color:#94a3b8;margin-top:2px;">Sync ${fmtDateTime(r.income_synced_at)}</div>` : ''}
                     </td>
 
                     <td class="text-end" style="font-size:.78rem;color:#b45309">${hppLabel}
                         ${r.hpp_total > 0 ? `<div style="font-size:.66rem;color:#94a3b8">COGS unit tersimpan</div>` : ''}
                     </td>
 
-                    <td class="text-end fw-black" style="font-size:.88rem;color:${profitColor}">${fmtRp(r.profit_net)}</td>
+                    <td class="text-end fw-black" style="font-size:.88rem;color:${profitColor}">${r.profit_eligible ? fmtRp(r.profit_net) : '<span style="font-size:.72rem;font-weight:600">Tidak dihitung</span>'}</td>
                     
                     <td class="text-end" style="font-size:.82rem;font-weight:700;color:${marginColor}">
-                        ${r.margin_pct !== null ? r.margin_pct + '%' : '—'}
+                        ${r.profit_eligible && r.margin_pct !== null ? r.margin_pct + '%' : '—'}
                     </td>
                 </tr>`;
             }).join('')}
@@ -1162,33 +1202,6 @@
 
         body.innerHTML = html;
     }
-
-    // ── Edit Ad Cost (inline) ─────────────────────────────────────────────────
-    window.editAdCost = function (idx) {
-        const r   = rows[idx];
-        if (!r.id) {
-            alert('Order belum cair, belum ada catatan settlement untuk menyimpan biaya iklan.');
-            return;
-        }
-        const cur = r.ad_cost || 0;
-        const val = prompt(`Biaya iklan untuk order ${r.channel_order_id}:`, cur);
-        if (val === null) return;
-        const num = parseFloat(val);
-        if (isNaN(num) || num < 0) { alert('Masukkan angka ≥ 0'); return; }
-
-        api('/api/marketplace/settlements/' + r.id + '/ad-cost', {
-            method: 'PATCH',
-            body: JSON.stringify({ ad_cost: num }),
-        }).then(res => {
-            rows[idx].ad_cost    = res.ad_cost;
-            rows[idx].profit_net = rows[idx].final_income - rows[idx].hpp_total - res.ad_cost;
-            rows[idx].margin_pct = rows[idx].buyer_payment_amount > 0
-                ? Math.round(rows[idx].profit_net / rows[idx].buyer_payment_amount * 1000) / 10
-                : null;
-            renderKpi();
-            renderTable();
-        }).catch(e => alert('Gagal simpan: ' + e.message));
-    };
 
     init();
 })();
