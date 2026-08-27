@@ -170,6 +170,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/analytics-orders',            [MarketplaceController::class, 'analyticsOrders']);
     Route::get('/analytics-summary',           [MarketplaceController::class, 'analyticsSummary']);
     Route::get('/analytics-products',          [MarketplaceController::class, 'analyticsProducts']);
+    Route::get('/analytics-cohort',            [MarketplaceController::class, 'analyticsCohort']);
     Route::get('/analytics-cash-orders',       [MarketplaceController::class, 'analyticsCashOrders']);
     Route::get('/analytics-return-orders',      [MarketplaceController::class, 'analyticsReturnOrders']);
     Route::get('/analytics-ad-cost',           [MarketplaceController::class, 'analyticsAdCost']);

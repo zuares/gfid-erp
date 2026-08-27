@@ -21,6 +21,7 @@ use App\Models\Store;
 use App\Models\Warehouse;
 use App\Services\Marketplace\Ads\ItemHppResolver;
 use App\Services\Marketplace\MarketplaceAnalyticsSummaryService;
+use App\Services\Marketplace\MarketplaceCohortService;
 use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\MarketplaceIssueService;
 use App\Services\MarketplaceSyncService;
@@ -147,6 +148,25 @@ class MarketplaceController extends Controller
             ->json([
                 'data' => $summaryService->products($filters),
             ])
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+
+    public function analyticsCohort(Request $request, MarketplaceCohortService $cohortService): JsonResponse
+    {
+        $filters = $request->validate([
+            'mode' => ['nullable', 'in:customer,product'],
+            'metric' => ['nullable', 'in:retention_pct,active_customers,orders,qty_sold,revenue,gross_profit,gross_margin_pct,net_profit'],
+            'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'marketplace' => ['nullable', 'string', 'max:100'],
+            'category' => ['nullable', 'string', 'max:150'],
+            'product' => ['nullable', 'string', 'max:190'],
+            'sku' => ['nullable', 'string', 'max:100'],
+            'date_from' => ['required', 'date'],
+            'date_to' => ['required', 'date', 'after_or_equal:date_from'],
+        ]);
+
+        return response()
+            ->json($cohortService->cohort($filters))
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
