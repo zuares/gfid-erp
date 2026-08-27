@@ -2,11 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\EnsureModuleAccess;
 use App\Models\Channel;
 use App\Models\Store;
 use App\Services\Marketplace\MarketplaceApiGateway;
 use Carbon\Carbon;
-use App\Http\Middleware\EnsureModuleAccess;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;

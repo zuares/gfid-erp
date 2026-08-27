@@ -131,7 +131,7 @@ class EscrowService
     }
 
     /**
-     * @param array<string,mixed> $row
+     * @param  array<string,mixed>  $row
      * @return array<string,mixed>
      */
     private function normalizeListItem(array $row): array
@@ -172,7 +172,7 @@ class EscrowService
      * Metadata internal dari gateway tidak perlu ikut menjadi response API modul.
      * Field response Shopee lainnya dibiarkan utuh.
      *
-     * @param array<string,mixed> $response
+     * @param  array<string,mixed>  $response
      * @return array<string,mixed>
      */
     private function withoutMeta(array $response): array

@@ -246,10 +246,13 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     function orderContextHtml(o) {
         const storeName = o.store?.name || '';
         const channel = o.store?.channel || null;
+        const repeatOrder = Number(o.buyer_previous_order_count || 0);
+        const repeatBuyer = o.is_repeat_buyer === true || repeatOrder > 0;
         return `<div class="ord-order-context">
             ${orderStatusBadge(o.order_status)}
             ${storeName ? `<span class="ord-order-store">🏪 ${esc(storeName)}</span>` : ''}
             ${channel ? channelPill(channel) : ''}
+            ${repeatBuyer ? `<span class="ord-repeat-badge" title="Pembeli ini sudah pernah melakukan ${repeatOrder} pembelian sebelumnya">🔁 Repeat order · ke-${repeatOrder + 1}</span>` : ''}
         </div>`;
     }
 

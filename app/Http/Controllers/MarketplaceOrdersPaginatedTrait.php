@@ -196,10 +196,18 @@ trait MarketplaceOrdersPaginatedTrait
         }
 
         $paginator = $query->latest('ordered_at')->paginate($limit);
+        $buyerPurchaseCounts = $this->buyerPurchaseCounts($paginator->getCollection());
 
         // Map items exactly like in localOrders
-        $paginator->getCollection()->transform(function ($o) use ($hasScanLog) {
+        $paginator->getCollection()->transform(function ($o) use ($hasScanLog, $buyerPurchaseCounts) {
             $arr = $o->toArray();
+
+            $buyerKey = $this->buyerIdentityKey($o);
+            $purchaseCount = $buyerKey ? (int) ($buyerPurchaseCounts[$buyerKey] ?? 0) : 0;
+            $currentOrderCounts = $this->isCountableBuyerOrder($o) ? 1 : 0;
+            $previousPurchaseCount = max(0, $purchaseCount - $currentOrderCounts);
+            $arr['buyer_previous_order_count'] = $previousPurchaseCount;
+            $arr['is_repeat_buyer'] = $previousPurchaseCount > 0;
 
             if (isset($arr['items']) && is_array($arr['items'])) {
                 foreach ($arr['items'] as &$orderItem) {
@@ -263,6 +271,99 @@ trait MarketplaceOrdersPaginatedTrait
         });
 
         return response()->json($paginator);
+    }
+
+    /**
+     * Hitung pembelian sukses per pembeli di toko yang sama. Query dilakukan
+     * per halaman secara agregat agar UI bisa menandai repeat order tanpa N+1.
+     *
+     * @param \Illuminate\Support\Collection<int,MarketplaceOrder> $orders
+     * @return array<string,int>
+     */
+    private function buyerPurchaseCounts($orders): array
+    {
+        $identities = $orders
+            ->map(function (MarketplaceOrder $order): ?array {
+                $username = trim((string) ($order->buyer_username ?? ''));
+                if ($username !== '') {
+                    return [
+                        'type' => 'username',
+                        'store_id' => (int) $order->store_id,
+                        'value' => $username,
+                    ];
+                }
+
+                $name = trim((string) ($order->buyer_name ?? ''));
+                if ($name === '') {
+                    return null;
+                }
+
+                return [
+                    'type' => 'name',
+                    'store_id' => (int) $order->store_id,
+                    'value' => $name,
+                ];
+            })
+            ->filter()
+            ->values();
+
+        $counts = [];
+        $excludedStatuses = ['UNPAID', 'CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING'];
+
+        foreach (['username', 'name'] as $type) {
+            $groups = $identities
+                ->where('type', $type)
+                ->groupBy('store_id');
+
+            foreach ($groups as $storeId => $rows) {
+                $values = $rows->pluck('value')->unique()->values()->all();
+                if ($values === []) {
+                    continue;
+                }
+
+                $column = $type === 'username' ? 'buyer_username' : 'buyer_name';
+                $result = MarketplaceOrder::query()
+                    ->where('store_id', (int) $storeId)
+                    ->whereNotIn('order_status', $excludedStatuses)
+                    ->whereNotNull($column)
+                    ->where($column, '!=', '')
+                    ->whereIn($column, $values)
+                    ->select($column)
+                    ->selectRaw('COUNT(*) AS purchase_count')
+                    ->groupBy($column)
+                    ->get();
+
+                foreach ($result as $row) {
+                    $normalized = mb_strtolower(trim((string) $row->{$column}));
+                    $key = ((int) $storeId).'|'.$type.'|'.$normalized;
+                    $counts[$key] = (int) $row->purchase_count;
+                }
+            }
+        }
+
+        return $counts;
+    }
+
+    private function buyerIdentityKey(MarketplaceOrder $order): ?string
+    {
+        $username = trim((string) ($order->buyer_username ?? ''));
+        if ($username !== '') {
+            return ((int) $order->store_id).'|username|'.mb_strtolower($username);
+        }
+
+        $name = trim((string) ($order->buyer_name ?? ''));
+        if ($name !== '') {
+            return ((int) $order->store_id).'|name|'.mb_strtolower($name);
+        }
+
+        return null;
+    }
+
+    private function isCountableBuyerOrder(MarketplaceOrder $order): bool
+    {
+        return ! in_array(strtoupper((string) $order->order_status), [
+            'UNPAID', 'CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING',
+        ], true);
     }
 
     private function excludeKilatOrders($query): void

@@ -242,6 +242,13 @@ body[data-theme="dark"] .ord-card { border-color: var(--glass-border); box-shado
 }
 .ord-order-context .badge-status,
 .ord-order-context .oc-channel-pill { flex-shrink: 0; }
+.ord-repeat-badge {
+    display: inline-flex; align-items: center; gap: .18rem; flex-shrink: 0;
+    padding: .12rem .38rem; border: 1px solid #c4b5fd; border-radius: 999px;
+    color: #6d28d9; background: #f5f3ff; font-size: .58rem; font-weight: 800;
+    white-space: nowrap;
+}
+body[data-theme="dark"] .ord-repeat-badge { color: #ddd6fe; background: rgba(109, 40, 217, .22); border-color: rgba(167, 139, 250, .35); }
 .ord-items-invoice-head {
     display: flex; align-items: center; justify-content: space-between;
     gap: .5rem; margin-bottom: .15rem; padding: .12rem .05rem .35rem;
