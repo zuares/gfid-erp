@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceBooking;
+use App\Models\Item;
+use App\Models\SkuMapping;
 use Illuminate\Http\JsonResponse;
 
 trait MarketplaceOrdersPaginatedTrait
@@ -268,6 +270,26 @@ trait MarketplaceOrdersPaginatedTrait
             return true;
         });
 
+        $allSkus = $bookings->flatMap(function ($booking) {
+            return collect(is_array($booking->items) ? $booking->items : [])
+                ->map(fn ($item) => $item['model_sku'] ?? $item['item_sku'] ?? null);
+        })->filter()->unique()->values()->all();
+
+        $mappedItems = Item::whereIn('code', $allSkus)
+            ->select('id', 'code', 'item_category_id', 'name')
+            ->with('category:id,code,name')
+            ->get()
+            ->keyBy('code');
+
+        $skuMapped = SkuMapping::with(['item' => fn ($query) => $query
+            ->select('id', 'code', 'item_category_id', 'name')
+            ->with('category:id,code,name')])
+            ->whereIn('marketplace_sku', $allSkus)
+            ->get()
+            ->sortBy(fn ($mapping) => $mapping->channel_code === null ? 1 : 0)
+            ->unique('marketplace_sku')
+            ->keyBy('marketplace_sku');
+
         // Jangan tampilkan pseudo-order bila booking ternyata sudah terhubung
         // ke order lokal melalui salah satu nomor identitasnya.
         $sns = $bookings->flatMap(fn ($booking) => [
@@ -294,18 +316,32 @@ trait MarketplaceOrdersPaginatedTrait
         return $bookings
             ->reject(fn ($booking) => $knownSns->has($booking->booking_sn)
                 || ($booking->order_sn && $knownSns->has($booking->order_sn)))
-            ->map(function ($booking) {
+            ->map(function ($booking) use ($mappedItems, $skuMapped) {
                 $items = collect(is_array($booking->items) ? $booking->items : [])
-                    ->map(function ($item) {
+                    ->map(function ($item) use ($mappedItems, $skuMapped) {
                         $sku = $item['model_sku'] ?? $item['item_sku'] ?? null;
+                        $title = trim(($item['item_name'] ?? '')
+                            . (! empty($item['model_name']) ? ' - ' . $item['model_name'] : '')) ?: null;
+                        $mapped = $sku
+                            ? ($mappedItems->get($sku) ?? $skuMapped->get($sku)?->item)
+                            : null;
 
                         return [
                             'qty' => $item['quantity'] ?? $item['model_quantity_purchased'] ?? 1,
-                            'variant_name' => $sku ?: ($item['item_name'] ?? null),
+                            'variant_name' => $sku ?: $title,
                             'item_name' => $item['item_name'] ?? null,
                             'model_sku' => $sku,
                             'item_sku' => $item['item_sku'] ?? null,
-                            'internal_item' => null,
+                            'internal_item' => $mapped ? [
+                                'id' => $mapped->id,
+                                'code' => $mapped->code,
+                                'name' => $mapped->name,
+                                'category' => $mapped->category ? [
+                                    'id' => $mapped->category->id,
+                                    'code' => $mapped->category->code,
+                                    'name' => $mapped->category->name,
+                                ] : null,
+                            ] : null,
                         ];
                     })->values()->all();
 
