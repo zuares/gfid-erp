@@ -340,20 +340,6 @@ class MarketplaceLogisticsController extends Controller
                 ]);
             }
 
-            if (request()->boolean('emergency') && $order) {
-                $rawOrder = is_array($order->raw_json) ? $order->raw_json : [];
-                $emergencyAwb = $order->shipping_awb_no
-                    ?: data_get($rawOrder, 'package_list.0.tracking_number')
-                    ?: data_get($rawOrder, 'package_list.0.tracking_no')
-                    ?: 'N/A';
-
-                return response()->view('marketplace.documents.fallback_awb', [
-                    'order' => $order,
-                    'store' => $store,
-                    'awb'   => $emergencyAwb,
-                ], 200);
-            }
-
             if ($storedOnly) {
                 $emergencyUrl = htmlspecialchars(
                     request()->fullUrlWithQuery(['stored_only' => '0', 'emergency' => '1']),
@@ -530,6 +516,10 @@ class MarketplaceLogisticsController extends Controller
                 }
                 
                 if ($errorMsg !== null) {
+                    if (request()->boolean('emergency') && $order) {
+                        return $this->emergencyAwbResponse($order, $store, $payload);
+                    }
+
                     return response(
                         "<div style='font-family:sans-serif; text-align:center; padding:50px;'>
                             <h2 style='color:#e11d48;'>Gagal Mencetak Resi</h2>
@@ -547,10 +537,12 @@ class MarketplaceLogisticsController extends Controller
             if (isset($downloadRes['error']) && $downloadRes['error'] === 'invalid_response') {
                 $content = $downloadRes['message']; // Raw body
                 if (str_starts_with($content, '%PDF')) {
-                    $config = [];
-                    if ($cardParam !== null) {
-                        $config['marketplace_print_greeting_card'] = $cardParam === '1' ? '1' : '0';
-                    }
+                    // Samakan overlay dengan PDF yang disimpan oleh job label:
+                    // default memakai kartu, sedangkan card=0 secara eksplisit
+                    // meminta versi tanpa kartu.
+                    $config = [
+                        'marketplace_print_greeting_card' => $cardParam === '0' ? '0' : '1',
+                    ];
                     $overlayService = new \App\Services\ShippingLabelOverlayService();
                     $content = $overlayService->overlayPdfContent($content, $config);
 
@@ -570,6 +562,10 @@ class MarketplaceLogisticsController extends Controller
             }
             if (isset($downloadRes['error'])) {
                 $errorMsg = $downloadRes['message'] ?? 'Gagal mengunduh dokumen resi.';
+                if (request()->boolean('emergency') && $order) {
+                    return $this->emergencyAwbResponse($order, $store, $payload);
+                }
+
                 return response(
                     "<div style='font-family:sans-serif; text-align:center; padding:50px;'>
                         <h2 style='color:#f59e0b;'>Resi Belum Siap</h2>
@@ -579,13 +575,37 @@ class MarketplaceLogisticsController extends Controller
                 );
             }
             
+            if (request()->boolean('emergency') && $order) {
+                return $this->emergencyAwbResponse($order, $store, $payload);
+            }
+
             return response()->json([
                 'create_result' => $createRes,
                 'download_result' => $downloadRes
             ]);
         } catch (\Exception $e) {
+            if (request()->boolean('emergency') && isset($order) && $order) {
+                return $this->emergencyAwbResponse($order, $store, $payload ?? []);
+            }
+
             return $this->errorResponse($e);
         }
+    }
+
+    private function emergencyAwbResponse(MarketplaceOrder $order, Store $store, array $payload = [])
+    {
+        $rawOrder = is_array($order->raw_json) ? $order->raw_json : [];
+        $emergencyAwb = $order->shipping_awb_no
+            ?: ($payload['tracking_number'] ?? null)
+            ?: data_get($rawOrder, 'package_list.0.tracking_number')
+            ?: data_get($rawOrder, 'package_list.0.tracking_no')
+            ?: 'N/A';
+
+        return response()->view('marketplace.documents.fallback_awb', [
+            'order' => $order,
+            'store' => $store,
+            'awb'   => $emergencyAwb,
+        ], 200);
     }
 
     public function createBulkPrintJob(Request $request)
