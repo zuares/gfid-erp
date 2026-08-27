@@ -178,6 +178,10 @@
     .fq-issue-missing { display: block; margin-top: .24rem; color: var(--fq-muted); }
     .fq-action { color: var(--fq-brand); font-weight: 750; text-decoration: none; white-space: nowrap; }
     .fq-action:hover { color: var(--fq-brand-dark); }
+    .fq-row-actions { display: flex; flex-direction: column; align-items: flex-end; gap: .28rem; }
+    .fq-action-fix { padding: .25rem .48rem; border: 1px solid #c9d9f4; border-radius: 6px; color: var(--fq-brand); background: #f5f8ff; font: inherit; font-size: .68rem; cursor: pointer; }
+    .fq-action-fix:hover { border-color: #91afe0; background: #eef4ff; }
+    .fq-action-muted { color: var(--fq-muted); font-size: .65rem; }
     .fq-empty { padding: 3rem 1rem !important; text-align: center; }
     .fq-empty-icon { display: grid; width: 40px; height: 40px; margin: 0 auto .7rem; place-items: center; border-radius: 12px; color: #16704c; background: #ecfdf3; font-size: 1rem; }
     .fq-empty-title { margin: 0 0 .25rem; color: var(--fq-ink); font-size: .8rem; font-weight: 780; }
@@ -473,7 +477,16 @@ document.addEventListener('DOMContentLoaded', function () {
                             <td><span class="fq-status {{ $settlementStatusRow === 'complete' ? 'fq-status-ready' : ($settlementStatusRow === 'missing' ? 'fq-status-missing' : 'fq-status-incomplete') }}">{{ $settlementLabels[$settlementStatusRow] ?? 'Payout belum diperiksa' }}</span></td>
                             <td><span class="{{ $validItems === $itemCount && $itemCount > 0 ? 'fq-valid' : 'fq-invalid' }}">{{ $itemCount > 0 ? $validItems . '/' . $itemCount . ' siap' : 'Belum ada item' }}</span></td>
                             <td class="fq-muted"><span class="fq-issue-main">{{ $issueText ?: 'Tidak ada masalah utama' }}</span>@if ($missingText)<span class="fq-issue-missing"><i class="bi bi-info-circle me-1"></i>Data kurang: {{ $missingText }}{{ $missingCount > 2 ? '…' : '' }}</span>@endif</td>
-                            <td class="text-end"><a href="{{ route('marketplace.orders.show', $order) }}" class="fq-action">Buka perbaikan <i class="bi bi-arrow-up-right ms-1"></i></a></td>
+                            <td class="text-end">
+                                <div class="fq-row-actions">
+                                    <form method="POST" action="{{ route('marketplace.reports.financial-quality.orders.repair', $order) }}" onsubmit="return confirm('Perbaiki ulang mapping/HPP dan tarik payout order ini bila tersedia?')">
+                                        @csrf
+                                        <button type="submit" class="fq-action-fix"><i class="bi bi-magic me-1"></i>Perbaiki otomatis</button>
+                                    </form>
+                                    <a href="{{ route('marketplace.issues', ['q' => $order->channel_order_id ?: $order->external_order_id, 'store_id' => $order->store_id, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}" class="fq-action">Mapping manual <i class="bi bi-arrow-up-right ms-1"></i></a>
+                                    <a href="{{ route('marketplace.orders.show', $order) }}" class="fq-action-muted">Lihat detail</a>
+                                </div>
+                            </td>
                         </tr>
                     @empty
                         <tr><td colspan="7" class="fq-empty"><div class="fq-empty-icon"><i class="bi bi-check2"></i></div><p class="fq-empty-title">Tidak ada data yang perlu diperbaiki</p><p class="fq-empty-copy">Semua data yang sesuai filter sudah siap, atau belum ada order pada periode ini.</p></td></tr>

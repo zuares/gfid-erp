@@ -5,6 +5,7 @@
 @php
     $typeLabels = $typeLabels ?? ['material' => 'Material / Bahan', 'wip' => 'Setengah Jadi (WIP)', 'finished_good' => 'Barang Jadi (FG)'];
     $hpp = (float) ($activeSnapshot?->unit_cost ?? $item->effective_unit_cost ?? 0);
+    $bomEstimate = $bomEstimate ?? null;
     $modeClass = $item->isHybrid() ? 'item-detail-hybrid' : ($item->canMake() ? 'item-detail-make' : ($item->canBuy() ? 'item-detail-buy' : 'item-detail-undefined'));
     $typeLabel = $item->itemTypeOption?->name ?? ($typeLabels[$item->type] ?? $item->type);
 @endphp
@@ -46,6 +47,15 @@
     .item-detail-table td { padding:.55rem .85rem; border-top:1px solid rgba(148,163,184,.12); border-bottom:0; vertical-align:middle; font-size:.78rem; }
     .item-detail-table tbody tr:hover { background:#f8fafc; }
     .item-detail-empty { padding:18px; color:#94a3b8; text-align:center; font-size:.78rem; }
+    .item-bom-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:12px 0; }
+    .item-bom-summary-card { padding:10px 12px; border:1px solid #dbeafe; border-radius:12px; background:#eff6ff; }
+    .item-bom-summary-label { color:#64748b; font-size:.64rem; font-weight:850; text-transform:uppercase; letter-spacing:.04em; }
+    .item-bom-summary-value { margin-top:3px; color:#0f172a; font-size:.92rem; font-weight:900; }
+    .item-bom-summary-note { margin-top:2px; color:#64748b; font-size:.68rem; }
+    .item-bom-component-table { margin:0; font-size:.76rem; }
+    .item-bom-component-table th { padding:.5rem .65rem; color:#64748b; background:#f8fafc; border:0; font-size:.62rem; text-transform:uppercase; letter-spacing:.04em; }
+    .item-bom-component-table td { padding:.5rem .65rem; border-top:1px solid #eef2f7; vertical-align:middle; }
+    .item-bom-optional { color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:999px; padding:2px 6px; font-size:.62rem; font-weight:800; }
     body[data-theme="dark"] .item-detail-page { color:#e5e7eb; }
     body[data-theme="dark"] .item-detail-hero, body[data-theme="dark"] .item-detail-card, body[data-theme="dark"] .item-detail-stat { background:#0f172a; border-color:#334155; }
     body[data-theme="dark"] .item-detail-title, body[data-theme="dark"] .item-detail-value, body[data-theme="dark"] .item-detail-stat-value, body[data-theme="dark"] .item-detail-heading { color:#f8fafc; }
@@ -54,7 +64,11 @@
     body[data-theme="dark"] .item-detail-table td { border-top-color:#334155; }
     body[data-theme="dark"] .item-detail-table tbody tr:hover { background:#111827; }
     body[data-theme="dark"] .item-detail-soft { background:#0f172a!important; color:#cbd5e1!important; border-color:#475569!important; }
-    @media(max-width:700px) { .item-detail-page { padding:.5rem .5rem 4rem; } .item-detail-hero { align-items:flex-start; flex-direction:column; margin-inline:-.5rem; padding:.5rem .65rem; } .item-detail-actions, .item-detail-actions .btn { width:100%; } .item-detail-actions .btn { justify-content:center; } .item-detail-grid, .item-detail-info { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    body[data-theme="dark"] .item-bom-summary-card { background:#172554; border-color:#3730a3; }
+    body[data-theme="dark"] .item-bom-summary-value { color:#f8fafc; }
+    body[data-theme="dark"] .item-bom-component-table th { background:#111827; }
+    body[data-theme="dark"] .item-bom-component-table td { border-top-color:#334155; }
+    @media(max-width:700px) { .item-detail-page { padding:.5rem .5rem 4rem; } .item-detail-hero { align-items:flex-start; flex-direction:column; margin-inline:-.5rem; padding:.5rem .65rem; } .item-detail-actions, .item-detail-actions .btn { width:100%; } .item-detail-actions .btn { justify-content:center; } .item-detail-grid, .item-detail-info, .item-bom-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     @media(max-width:440px) { .item-detail-grid, .item-detail-info { grid-template-columns:1fr; } }
 </style>
 @endpush
@@ -117,7 +131,44 @@
                     @endif
                 </div>
                 @if($itemBom)
-                    <div class="item-detail-note">BOM aktif untuk produksi sendiri dan siap dipakai pada kebutuhan material.</div>
+                    <div class="item-detail-note">BOM {{ $itemBom->active ? 'aktif' : 'nonaktif' }} untuk item ini.</div>
+                    @if($bomEstimate)
+                        <div class="item-bom-summary">
+                            <div class="item-bom-summary-card">
+                                <div class="item-bom-summary-label">Estimasi HPP BOM</div>
+                                <div class="item-bom-summary-value">{{ $bomEstimate['total'] > 0 ? 'Rp '.number_format($bomEstimate['total'], 0, ',', '.') : 'Belum tersedia' }}</div>
+                                <div class="item-bom-summary-note">Per 1 {{ $bomEstimate['item_unit'] }}</div>
+                            </div>
+                            <div class="item-bom-summary-card">
+                                <div class="item-bom-summary-label">Komponen</div>
+                                <div class="item-bom-summary-value">{{ $bomEstimate['line_count'] }}</div>
+                                <div class="item-bom-summary-note">{{ $bomEstimate['required_line_count'] }} wajib · {{ $bomEstimate['optional_line_count'] }} opsional</div>
+                            </div>
+                            <div class="item-bom-summary-card">
+                                <div class="item-bom-summary-label">Basis perhitungan</div>
+                                <div class="item-bom-summary-value">Qty + scrap</div>
+                                <div class="item-bom-summary-note">Optional tidak masuk total</div>
+                            </div>
+                        </div>
+                        @if(!empty($bomEstimate['components']))
+                            <div class="table-responsive">
+                                <table class="table item-bom-component-table align-middle">
+                                    <thead><tr><th>Komponen</th><th class="text-end">Qty efektif</th><th class="text-end">HPP/unit</th><th class="text-end">Estimasi</th><th>Status</th></tr></thead>
+                                    <tbody>
+                                        @foreach($bomEstimate['components'] as $component)
+                                            <tr>
+                                                <td><strong class="font-monospace">{{ $component['code'] ?: '-' }}</strong><div class="item-detail-note">{{ $component['name'] ?: 'Komponen' }}</div></td>
+                                                <td class="text-end font-monospace">{{ decimal_id($component['qty_with_scrap'], 8) }} {{ $component['uom'] }}</td>
+                                                <td class="text-end">{{ $component['unit_cost'] > 0 ? 'Rp '.number_format($component['unit_cost'], 0, ',', '.') : '-' }}</td>
+                                                <td class="text-end fw-bold">{{ $component['estimated_cost'] > 0 ? 'Rp '.number_format($component['estimated_cost'], 0, ',', '.') : '-' }}</td>
+                                                <td>@if($component['is_optional'])<span class="item-bom-optional">Opsional</span>@else<span class="item-detail-note">Wajib</span>@endif</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                    @endif
                     @if($canManageBom)
                         <a href="{{ route('master.item_boms.edit', $itemBom) }}" class="btn item-detail-primary btn-sm mt-3"><i class="bi bi-pencil"></i>Review BOM</a>
                     @endif

@@ -37,6 +37,22 @@ class MarketplaceSyncService
         'REFUNDED',
     ];
 
+    private const API_STATUS_RANKS = [
+        'UNPAID' => 0,
+        'READY_TO_SHIP' => 10,
+        'PROCESSED' => 20,
+        'READY_TO_HANDOVER' => 30,
+        'SHIPPED' => 40,
+        'TO_CONFIRM_RECEIVE' => 50,
+        'COMPLETED' => 60,
+        'TO_RETURN' => 70,
+        'RETURNING' => 80,
+        'RETURNED' => 90,
+        'REFUNDED' => 100,
+        'CANCELLED' => 100,
+        'IN_CANCEL' => 100,
+    ];
+
     public function __construct(
         protected MarketplaceApiGateway $gateway,
         protected OrderFulfillmentService $fulfillment,
@@ -2265,7 +2281,10 @@ class MarketplaceSyncService
 
         $orders = MarketplaceOrder::query()
             ->where('store_id', $store->id)
-            ->where('order_status', 'PROCESSED')
+            // PROCESSED perlu diverifikasi agar tidak tertahan, sementara
+            // SHIPPED/TO_CONFIRM_RECEIVE juga perlu sweep karena webhook bisa
+            // terlambat atau datang tidak berurutan sebelum COMPLETED.
+            ->whereIn('order_status', ['PROCESSED', 'SHIPPED', 'TO_CONFIRM_RECEIVE'])
             ->where(function ($query) {
                 $query->whereNull('processed_api_checked_at')
                     ->orWhere('processed_api_checked_at', '<=', now()->subMinutes(10));
@@ -2338,7 +2357,8 @@ class MarketplaceSyncService
                 continue;
             }
 
-            if (! in_array($status, self::PROCESSED_API_ADVANCED_STATUSES, true)) {
+            if (! in_array($status, self::PROCESSED_API_ADVANCED_STATUSES, true)
+                || ! $this->shouldApplyApiStatus($order->order_status, $status)) {
                 $stats['unchanged']++;
                 $order->update([
                     'processed_api_checked_at' => now(),
@@ -2391,6 +2411,30 @@ class MarketplaceSyncService
             'RETURNED' => 'shipped',
             'REFUNDED' => 'cancelled',
         ][$status] ?? ($current ?: 'packed');
+    }
+
+    private function shouldApplyApiStatus(?string $current, string $incoming): bool
+    {
+        $current = strtoupper(trim((string) $current));
+        $incoming = strtoupper(trim($incoming));
+
+        if ($current === $incoming) {
+            return true;
+        }
+
+        $returnStatuses = ['TO_RETURN', 'RETURNING', 'RETURNED', 'REFUNDED'];
+        if (in_array($current, ['RETURNED', 'REFUNDED'], true)) {
+            return $incoming === 'REFUNDED' && $current !== 'REFUNDED';
+        }
+        if (in_array($incoming, $returnStatuses, true)) {
+            return ! in_array($current, ['CANCELLED', 'RETURNED', 'REFUNDED'], true);
+        }
+        if (in_array($current, ['CANCELLED', 'IN_CANCEL'], true)) {
+            return false;
+        }
+
+        return (self::API_STATUS_RANKS[$incoming] ?? -1)
+            >= (self::API_STATUS_RANKS[$current] ?? -1);
     }
 
     private function upsertOrders(Store $store, array $details, bool $dryRun = false): array
@@ -2463,7 +2507,11 @@ class MarketplaceSyncService
                 // Jika pesanan sudah diserahkan ke kurir (berdasarkan logistics status API Shopee), 
                 // tapi order_status-nya telat update dari Shopee dan masih tertahan di PROCESSED atau READY_TO_SHIP,
                 // paksa majukan ke SHIPPED agar tidak "nyangkut" di tab Dikemas.
-                if (in_array($logisticsStatus, ['LOGISTICS_PICKUP_DONE', 'LOGISTICS_DROP_OFF_DONE', 'LOGISTICS_DELIVERY_DONE', 'LOGISTICS_SHIPPED'])) {
+                // The marketplace order status is authoritative for the
+                // financial lifecycle. A delivery-complete logistics event
+                // must never downgrade a COMPLETED order back to SHIPPED.
+                if ($orderStatus !== 'COMPLETED'
+                    && in_array($logisticsStatus, ['LOGISTICS_PICKUP_DONE', 'LOGISTICS_DROP_OFF_DONE', 'LOGISTICS_DELIVERY_DONE', 'LOGISTICS_SHIPPED'], true)) {
                     $orderStatus = 'SHIPPED';
                 }
 
@@ -2495,6 +2543,15 @@ class MarketplaceSyncService
                 $existingOrder = MarketplaceOrder::where('store_id', $store->id)
                     ->where('channel_order_id', $detail['order_sn'])
                     ->first(['id', 'order_status', 'status', 'booking_sn']);
+
+                // Response detail/list Shopee bisa stale dan datang tidak
+                // berurutan. Jangan biarkan status API yang lebih rendah
+                // menurunkan status lokal yang sudah lebih maju.
+                if ($existingOrder
+                    && $orderStatus !== null
+                    && ! $this->shouldApplyApiStatus($existingOrder->order_status, $orderStatus)) {
+                    $orderStatus = $existingOrder->order_status;
+                }
 
                 if ($existingOrder?->order_status === 'READY_TO_HANDOVER'
                     && in_array($orderStatus, ['READY_TO_SHIP', 'PROCESSED', 'MATCHED'], true)) {

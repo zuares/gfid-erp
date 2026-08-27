@@ -16,7 +16,7 @@ class VerifyProcessedOrdersCommand extends Command
         {--limit=50 : Maksimum order yang diverifikasi}
         {--apply : Terapkan status API ke database (default hanya preview)}';
 
-    protected $description = 'Verifikasi order PROCESSED ke API marketplace dan pindahkan jika statusnya sudah maju.';
+    protected $description = 'Verifikasi status order aktif ke API marketplace agar tidak tertahan atau mundur.';
 
     /**
      * Status lokal PROCESSED tidak boleh dipindahkan hanya karena fulfillment
@@ -36,6 +36,22 @@ class VerifyProcessedOrdersCommand extends Command
         'REFUNDED',
     ];
 
+    private const STATUS_RANKS = [
+        'UNPAID' => 0,
+        'READY_TO_SHIP' => 10,
+        'PROCESSED' => 20,
+        'READY_TO_HANDOVER' => 30,
+        'SHIPPED' => 40,
+        'TO_CONFIRM_RECEIVE' => 50,
+        'COMPLETED' => 60,
+        'TO_RETURN' => 70,
+        'RETURNING' => 80,
+        'RETURNED' => 90,
+        'REFUNDED' => 100,
+        'CANCELLED' => 100,
+        'IN_CANCEL' => 100,
+    ];
+
     public function handle(MarketplaceApiGateway $gateway): int
     {
         $storeId = $this->option('store');
@@ -45,7 +61,7 @@ class VerifyProcessedOrdersCommand extends Command
 
         $query = MarketplaceOrder::query()
             ->with('store.channel')
-            ->where('order_status', 'PROCESSED')
+            ->whereIn('order_status', ['PROCESSED', 'SHIPPED', 'TO_CONFIRM_RECEIVE'])
             ->orderBy('id');
 
         // Scheduler berjalan tiap 5 menit. Jeda ini membuat antrean adil bila
@@ -73,12 +89,12 @@ class VerifyProcessedOrdersCommand extends Command
         $orders = $query->limit($limit)->get();
 
         if ($orders->isEmpty()) {
-            $this->info('Tidak ada order PROCESSED yang perlu diverifikasi.');
+            $this->info('Tidak ada order aktif yang perlu diverifikasi.');
             return self::SUCCESS;
         }
 
         $this->info(sprintf(
-            'Memverifikasi %d order PROCESSED ke API (%s).',
+            'Memverifikasi %d order aktif ke API (%s).',
             $orders->count(),
             $apply ? 'APPLY' : 'DRY-RUN'
         ));
@@ -157,7 +173,8 @@ class VerifyProcessedOrdersCommand extends Command
                     continue;
                 }
 
-                if (! in_array($apiStatus, self::ADVANCED_STATUSES, true)) {
+                if (! in_array($apiStatus, self::ADVANCED_STATUSES, true)
+                    || ! $this->shouldApplyStatus($order->order_status, $apiStatus)) {
                     $stats['unchanged']++;
                     $this->line($this->formatLine($order, 'UNCHANGED', "API status={$apiStatus}"));
                     $this->markChecked($order, $apply);
@@ -183,7 +200,7 @@ class VerifyProcessedOrdersCommand extends Command
         $this->info('Ringkasan verifikasi:');
         $this->line('Order dicek       : ' . $stats['checked']);
         $this->line('Dipindahkan        : ' . $stats['moved']);
-        $this->line('Tetap PROCESSED    : ' . $stats['unchanged']);
+        $this->line('Status tetap       : ' . $stats['unchanged']);
         $this->line('Tidak ditemukan API: ' . $stats['not_found']);
         $this->line('Status tidak dikenal: ' . $stats['unknown_status']);
         $this->line('Store dilewati     : ' . $stats['skipped_store']);
@@ -203,6 +220,30 @@ class VerifyProcessedOrdersCommand extends Command
         if ($apply) {
             $order->update(['processed_api_checked_at' => now()]);
         }
+    }
+
+    private function shouldApplyStatus(?string $current, string $incoming): bool
+    {
+        $current = strtoupper(trim((string) $current));
+        $incoming = strtoupper(trim($incoming));
+
+        if ($current === $incoming) {
+            return true;
+        }
+
+        $returnStatuses = ['TO_RETURN', 'RETURNING', 'RETURNED', 'REFUNDED'];
+        if (in_array($current, ['RETURNED', 'REFUNDED'], true)) {
+            return $incoming === 'REFUNDED' && $current !== 'REFUNDED';
+        }
+        if (in_array($incoming, $returnStatuses, true)) {
+            return ! in_array($current, ['CANCELLED', 'RETURNED', 'REFUNDED'], true);
+        }
+        if (in_array($current, ['CANCELLED', 'IN_CANCEL'], true)) {
+            return false;
+        }
+
+        return (self::STATUS_RANKS[$incoming] ?? -1)
+            >= (self::STATUS_RANKS[$current] ?? -1);
     }
 
     private function extractOrderDetails(array $response): array

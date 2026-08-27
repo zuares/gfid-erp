@@ -20,6 +20,26 @@ class ProcessShopeeWebhookJob implements ShouldQueue
     protected $eventType;
 
     /**
+     * Webhook Shopee dapat datang tidak berurutan. Status lokal hanya boleh
+     * bergerak maju agar event lama tidak menurunkan status yang sudah final.
+     */
+    private const STATUS_RANKS = [
+        'UNPAID' => 0,
+        'READY_TO_SHIP' => 10,
+        'PROCESSED' => 20,
+        'READY_TO_HANDOVER' => 30,
+        'SHIPPED' => 40,
+        'TO_CONFIRM_RECEIVE' => 50,
+        'COMPLETED' => 60,
+        'TO_RETURN' => 70,
+        'RETURNING' => 80,
+        'RETURNED' => 90,
+        'REFUNDED' => 100,
+        'CANCELLED' => 100,
+        'IN_CANCEL' => 100,
+    ];
+
+    /**
      * Create a new job instance.
      */
     public function __construct(array $payload, string $eventType)
@@ -166,23 +186,23 @@ class ProcessShopeeWebhookJob implements ShouldQueue
                     $meta['completed_scenario'] = $completedScenario;
                 }
 
-                // Prevent reverting a locally 'PROCESSED' (sedang dikemas) order back to 'READY_TO_SHIP'
-                // tapi JANGAN blok status yang maju ke depan (SHIPPED, TO_CONFIRM_RECEIVE, COMPLETED).
-                $isRollback = $localOrder->order_status === 'PROCESSED' && $status === 'READY_TO_SHIP';
-                if ($isRollback) {
-                    Log::info("Order {$orderSn} is already PROCESSED locally. Ignoring READY_TO_SHIP webhook.");
+                $incomingStatus = $this->canonicalStatus($status);
+                $acceptStatus = $incomingStatus !== null
+                    && $this->shouldAcceptStatus($localOrder->order_status, $incomingStatus);
+                if (! $acceptStatus) {
+                    Log::info("Order {$orderSn} status webhook diabaikan karena mundur: lokal={$localOrder->order_status}, masuk={$status}.");
                     // Still update meta just in case
                     $localOrder->update(['meta' => $meta]);
                 } else {
-                    $localOrder->update(['order_status' => $status, 'meta' => $meta]);
-                    Log::info("Updated local order {$orderSn} to status: {$status}");
+                    $localOrder->update(['order_status' => $incomingStatus, 'meta' => $meta]);
+                    Log::info("Updated local order {$orderSn} to status: {$incomingStatus}");
                     
-                    if (in_array($status, ['READY_TO_SHIP', 'PROCESSED'])) {
+                    if (in_array($incomingStatus, ['READY_TO_SHIP', 'PROCESSED'])) {
                         \App\Jobs\DownloadMarketplaceShippingDocumentJob::dispatch($store->id, $orderSn);
                     }
-                    
-                    event(new \App\Events\OrderUpdated($store->id, $orderSn, $status));
                 }
+
+                event(new \App\Events\OrderUpdated($store->id, $orderSn, $localOrder->fresh()->order_status));
             }
 
         } else {
@@ -362,15 +382,22 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             
             // Mapping optimis status booking ke order_status agar UI langsung memindahkannya
             $bookingStatusUpper = strtoupper((string) $bookingStatus);
+            $candidateStatus = null;
             if ($bookingStatusUpper === 'PROCESSED') {
-                $updates['order_status'] = 'PROCESSED';
+                $candidateStatus = 'PROCESSED';
             } elseif (in_array($bookingStatusUpper, ['SHIPPED', 'READY_TO_HANDOVER'])) {
                 // Kurir sudah mengambil / sedang dalam perjalanan → pindah ke tab Sedang Dikirim
-                $updates['order_status'] = 'SHIPPED';
+                $candidateStatus = 'SHIPPED';
             } elseif ($bookingStatusUpper === 'COMPLETED') {
-                $updates['order_status'] = 'COMPLETED';
+                $candidateStatus = 'COMPLETED';
             } elseif (in_array($bookingStatusUpper, ['CANCELLED_BEFORE_SHIPPING', 'CANCELLED'])) {
-                $updates['order_status'] = 'CANCELLED';
+                $candidateStatus = 'CANCELLED';
+            }
+
+            if ($candidateStatus !== null && $this->shouldAcceptStatus($localOrder->order_status, $candidateStatus)) {
+                $updates['order_status'] = $candidateStatus;
+            } elseif ($candidateStatus !== null) {
+                Log::info("Booking {$bookingSn} status {$bookingStatus} tidak menurunkan status lokal {$localOrder->order_status}.");
             }
             
             // Ambil detail booking untuk menukar booking_sn menjadi order_sn asli
@@ -565,17 +592,24 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             // Map fulfillment status → order_status agar tab UI otomatis berubah
             // Ref: Shopee V2 PackageFulfillmentStatus data definition
             $fulfillmentUpper = strtoupper((string) $fulfillmentStatus);
+            $candidateStatus = null;
             if (in_array($fulfillmentUpper, ['LOGISTICS_PICKUP_DONE', 'LOGISTICS_PICKUP_RETRY'])) {
                 // Kurir sudah mengambil paket → Sedang Dikirim
-                $updates['order_status'] = 'SHIPPED';
+                $candidateStatus = 'SHIPPED';
             } elseif ($fulfillmentUpper === 'LOGISTICS_DELIVERY_DONE') {
                 // Paket sudah diterima pembeli → Menunggu Konfirmasi
-                $updates['order_status'] = 'TO_CONFIRM_RECEIVE';
+                $candidateStatus = 'TO_CONFIRM_RECEIVE';
             } elseif ($fulfillmentUpper === 'LOGISTICS_INVALID_OR_LOST') {
                 // Paket hilang / tidak valid — simpan di meta saja, jangan ubah status
                 Log::warning("Package {$orderSn} marked as LOGISTICS_INVALID_OR_LOST.");
             } elseif (in_array($fulfillmentUpper, ['LOGISTICS_REQUEST_CREATED', 'LOGISTICS_READY_TO_SHIP'])) {
                 // Pengiriman diatur, belum diambil kurir → tetap PROCESSED
+            }
+
+            if ($candidateStatus !== null && $this->shouldAcceptStatus($localOrder->order_status, $candidateStatus)) {
+                $updates['order_status'] = $candidateStatus;
+            } elseif ($candidateStatus !== null) {
+                Log::info("Package {$orderSn} fulfillment status {$fulfillmentStatus} tidak menurunkan status lokal {$localOrder->order_status}.");
             }
             
             $localOrder->update($updates);
@@ -876,5 +910,47 @@ class ProcessShopeeWebhookJob implements ShouldQueue
                 Log::info("Shopee shop_authorization_push received for unknown shop_id: {$id}. Store cannot be created via webhook alone because access_token is missing.");
             }
         }
+    }
+
+    private function canonicalStatus(mixed $status): ?string
+    {
+        if (! is_string($status) || trim($status) === '') {
+            return null;
+        }
+
+        $status = strtoupper(trim($status));
+
+        return [
+            'AWAITING_SHIPMENT' => 'READY_TO_SHIP',
+            'AWAITING_COLLECTION' => 'READY_TO_HANDOVER',
+            'IN_TRANSIT' => 'SHIPPED',
+            'DELIVERED' => 'COMPLETED',
+        ][$status] ?? $status;
+    }
+
+    private function shouldAcceptStatus(?string $current, string $incoming): bool
+    {
+        $current = $this->canonicalStatus($current);
+        $incoming = $this->canonicalStatus($incoming);
+
+        if ($incoming === null || $current === $incoming) {
+            return $incoming !== null;
+        }
+
+        $returnStatuses = ['TO_RETURN', 'RETURNING', 'RETURNED', 'REFUNDED'];
+        if (in_array($current, ['RETURNED', 'REFUNDED'], true)) {
+            return $incoming === 'REFUNDED' && $current !== 'REFUNDED';
+        }
+        if (in_array($incoming, $returnStatuses, true)) {
+            return ! in_array($current, ['CANCELLED', 'RETURNED', 'REFUNDED'], true);
+        }
+        if (in_array($current, ['CANCELLED', 'IN_CANCEL'], true)) {
+            return false;
+        }
+
+        $currentRank = self::STATUS_RANKS[$current] ?? -1;
+        $incomingRank = self::STATUS_RANKS[$incoming] ?? -1;
+
+        return $incomingRank >= $currentRank;
     }
 }

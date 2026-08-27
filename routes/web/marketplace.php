@@ -72,6 +72,8 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
                 ->name('reports.financial-quality');
             Route::post('reports/financial-quality/refresh', [MarketplaceFinancialQualityController::class, 'refresh'])
                 ->name('reports.financial-quality.refresh');
+            Route::post('reports/financial-quality/orders/{order}/repair', [MarketplaceFinancialQualityController::class, 'repairOrder'])
+                ->name('reports.financial-quality.orders.repair');
         });
 
         // =========================

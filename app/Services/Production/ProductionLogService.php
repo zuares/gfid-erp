@@ -49,6 +49,8 @@ class ProductionLogService
         'stock_request' => 'Setor dadakan',
         'stock_request_void' => 'Batal setor dadakan',
         'production_movement' => 'Pindah proses',
+        'bundle_assembly' => 'Assembly bundle',
+        'bundle_assembly_void' => 'Batal assembly bundle',
         'wip_fin_adjustment' => 'Sesuaikan WIP-FIN',
         'wip_normalization' => 'Rapikan WIP',
         'wip_cleanup' => 'Bersihkan WIP',
@@ -72,7 +74,7 @@ class ProductionLogService
     /**
      * Timeline gabungan, terbaru dulu.
      *
-     * @param array{date_from?:string,date_to?:string,source?:string,q?:string} $f
+     * @param  array{date_from?:string,date_to?:string,source?:string,q?:string}  $f
      */
     public function timeline(array $f = [], int $limit = 200): Collection
     {
@@ -91,16 +93,16 @@ class ProductionLogService
             $mut->leftJoin('users as mu', 'mu.id', '=', 'm.created_by');
         }
 
-        if (!empty($f['source'])) {
+        if (! empty($f['source'])) {
             $mut->where('m.source_type', $f['source']);
         }
-        if (!empty($f['date_from'])) {
+        if (! empty($f['date_from'])) {
             $mut->whereDate('m.date', '>=', $f['date_from']);
         }
-        if (!empty($f['date_to'])) {
+        if (! empty($f['date_to'])) {
             $mut->whereDate('m.date', '<=', $f['date_to']);
         }
-        if (!empty($f['q'])) {
+        if (! empty($f['q'])) {
             $q = trim($f['q']);
             $mut->where(function ($x) use ($q) {
                 $x->where('i.code', 'like', "%{$q}%")
@@ -123,8 +125,8 @@ class ProductionLogService
                 m.direction as direction,
                 m.total_cost as value,
                 m.notes as notes,
-                " . ($hasActor ? 'mu.name' : 'NULL') . " as actor
-            ")
+                ".($hasActor ? 'mu.name' : 'NULL').' as actor
+            ')
             ->orderByDesc('m.id')
             ->limit($limit)
             ->get()
@@ -134,14 +136,14 @@ class ProductionLogService
         if (Schema::hasTable('production_logs') && empty($f['source'])) {
             $logs = DB::table('production_logs as p')
                 ->leftJoin('users as u', 'u.id', '=', 'p.actor_id');
-            if (!empty($f['date_from'])) {
+            if (! empty($f['date_from'])) {
                 $logs->whereDate('p.created_at', '>=', $f['date_from']);
             }
-            if (!empty($f['date_to'])) {
+            if (! empty($f['date_to'])) {
                 $logs->whereDate('p.created_at', '<=', $f['date_to']);
             }
-            if (!empty($f['q'])) {
-                $logs->where('p.summary', 'like', '%' . trim($f['q']) . '%');
+            if (! empty($f['q'])) {
+                $logs->where('p.summary', 'like', '%'.trim($f['q']).'%');
             }
             $logs->selectRaw("
                     'event' as kind,

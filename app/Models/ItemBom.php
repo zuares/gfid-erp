@@ -29,6 +29,38 @@ class ItemBom extends Model
         return $this->hasMany(ItemBomLine::class)->orderBy('sort_order');
     }
 
+    public function requiredLines(): HasMany
+    {
+        return $this->hasMany(ItemBomLine::class)
+            ->where('is_optional', false)
+            ->orderBy('sort_order');
+    }
+
+    public function optionalLines(): HasMany
+    {
+        return $this->hasMany(ItemBomLine::class)
+            ->where('is_optional', true)
+            ->orderBy('sort_order');
+    }
+
+    public function hasComponents(): bool
+    {
+        if ($this->relationLoaded('lines')) {
+            return $this->lines->isNotEmpty();
+        }
+
+        return $this->lines()->exists();
+    }
+
+    public function componentCount(): int
+    {
+        if ($this->relationLoaded('lines')) {
+            return $this->lines->count();
+        }
+
+        return $this->lines()->count();
+    }
+
     public function mainMaterialLines(): HasMany
     {
         return $this->hasMany(ItemBomLine::class)

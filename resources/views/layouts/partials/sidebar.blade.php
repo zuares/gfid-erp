@@ -184,6 +184,7 @@
     $hasProdWipNormalization = $router->has('production.wip_normalization.index');
     $hasProdWipCleanup       = $router->has('production.wip_cleanup.index');
     $hasProdLog              = $router->has('production.log.index');
+    $hasProdBundleAssemblies = $router->has('production.bundle_assemblies.index');
 
     // Akuntansi
     $hasAccountsIndex = $router->has('accounting.accounts.index');
@@ -1394,6 +1395,13 @@
                         <x-sidebar.simple-link href="{{ route('production.wip_normalization.index') }}" icon="bi bi-clipboard-check"
                             :active="request()->routeIs('production.wip_normalization.*')">
                             Normalisasi WIP
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasProdBundleAssemblies)
+                        <x-sidebar.simple-link href="{{ route('production.bundle_assemblies.index') }}" icon="bi bi-boxes"
+                            :active="request()->routeIs('production.bundle_assemblies.*')">
+                            Assembly Bundle
                         </x-sidebar.simple-link>
                     @endif
 

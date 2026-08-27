@@ -63,6 +63,27 @@ class AccountSeeder extends Seeder
                 'is_cash' => 0,
                 'is_active' => 1,
             ]);
+            DB::table('accounts')->updateOrInsert(['code' => '1210'], [
+                'code' => '1210',
+                'name' => 'Persediaan Perlengkapan',
+                'type' => 'asset',
+                'is_cash' => 0,
+                'is_active' => 1,
+            ]);
+            foreach ([
+                ['code' => '1501', 'name' => 'Peralatan Produksi'],
+                ['code' => '1502', 'name' => 'Peralatan Kantor'],
+                ['code' => '1503', 'name' => 'Peralatan Packing'],
+                ['code' => '1591', 'name' => 'Akumulasi Penyusutan Peralatan'],
+            ] as $account) {
+                DB::table('accounts')->updateOrInsert(['code' => $account['code']], [
+                    'code' => $account['code'],
+                    'name' => $account['name'],
+                    'type' => 'asset',
+                    'is_cash' => 0,
+                    'is_active' => 1,
+                ]);
+            }
             DB::table('accounts')->updateOrInsert(['code' => '1301'], [
                 'code' => '1301',
                 'name' => 'Piutang Dagang',
@@ -185,6 +206,20 @@ class AccountSeeder extends Seeder
             DB::table('accounts')->updateOrInsert(['code' => '6110'], [
                 'code' => '6110',
                 'name' => 'Biaya Packing',
+                'type' => 'expense',
+                'is_cash' => 0,
+                'is_active' => 1,
+            ]);
+            DB::table('accounts')->updateOrInsert(['code' => '6112'], [
+                'code' => '6112',
+                'name' => 'Beban Perlengkapan',
+                'type' => 'expense',
+                'is_cash' => 0,
+                'is_active' => 1,
+            ]);
+            DB::table('accounts')->updateOrInsert(['code' => '6301'], [
+                'code' => '6301',
+                'name' => 'Beban Penyusutan Peralatan',
                 'type' => 'expense',
                 'is_cash' => 0,
                 'is_active' => 1,

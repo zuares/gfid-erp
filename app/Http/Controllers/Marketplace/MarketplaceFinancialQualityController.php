@@ -7,7 +7,9 @@ use App\Jobs\MarketplaceRefreshDataQualityJob;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\Store;
+use App\Services\MarketplaceIssueService;
 use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
+use App\Services\MarketplaceSyncService;
 use Illuminate\Http\Request;
 
 class MarketplaceFinancialQualityController extends Controller
@@ -131,7 +133,7 @@ class MarketplaceFinancialQualityController extends Controller
             ->get();
 
         $orders = $orderQuery()
-            ->with(['store.channel', 'settlement', 'items'])
+            ->with(['store.channel', 'settlement', 'items.internalItem'])
             ->when($defaultIssueQueue, fn ($query) => $query->where(function ($issueQuery) {
                 $issueQuery->whereIn(
                     'order_status',
@@ -224,5 +226,71 @@ class MarketplaceFinancialQualityController extends Controller
                 'dry_run' => $dryRun,
                 'queued' => true,
             ]);
+    }
+
+    /**
+     * Perbaiki satu order langsung dari antrean kualitas data.
+     *
+     * Aksi ini tidak mengarang nilai finansial: item hanya di-resolve ulang
+     * dari mapping/HPP yang sudah ada, lalu payout ditarik ulang hanya untuk
+     * order COMPLETED dan toko yang sedang CONNECTED.
+     */
+    public function repairOrder(
+        Request $request,
+        MarketplaceOrder $order,
+        MarketplaceIssueService $issues,
+        MarketplaceSyncService $sync,
+        MarketplaceFinancialDataQualityService $quality,
+    ) {
+        set_time_limit(180);
+
+        $order->load(['store.channel', 'items']);
+        abort_unless($order->store, 404, 'Toko order tidak ditemukan.');
+
+        $resolvedItems = 0;
+        foreach ($order->items as $item) {
+            $issues->resolveItem($item, $order->store->channel?->code);
+            $resolvedItems++;
+        }
+
+        $settlementResult = null;
+        $channelCode = strtolower((string) $order->store->channel?->code);
+        if (
+            strtoupper((string) $order->order_status) === 'COMPLETED'
+            && in_array($channelCode, ['shopee', 'shp'], true)
+            && $order->store->is_active
+            && $order->store->status === 'active'
+            && $order->store->connection_status === 'CONNECTED'
+        ) {
+            $settlementResult = $sync->syncSettlements(
+                store: $order->store,
+                orderSn: $order->channel_order_id,
+                resync: true,
+                limit: 1,
+            );
+        }
+
+        $assessment = $quality->refreshOrder($order->fresh());
+        $syncMessage = $settlementResult === null
+            ? 'Payout tidak ditarik ulang karena order belum COMPLETED atau toko belum CONNECTED.'
+            : sprintf(
+                'Payout: %d berhasil, %d error.',
+                (int) ($settlementResult['synced'] ?? 0),
+                (int) ($settlementResult['errors'] ?? 0),
+            );
+
+        $message = sprintf(
+            'Perbaikan order %s selesai. %d item di-resolve ulang. Status kualitas: %s. %s',
+            $order->channel_order_id ?: ('#' . $order->id),
+            $resolvedItems,
+            $assessment['status'],
+            $syncMessage,
+        );
+
+        return redirect()->back()->with('quality_result', [
+            'message' => $message,
+            'dry_run' => false,
+            'queued' => false,
+        ]);
     }
 }

@@ -7,6 +7,7 @@
     ];
     $isEdit = filled($item?->id);
     $itemBom = $itemBom ?? null;
+    $bomEstimate = $bomEstimate ?? null;
     $itemTypeOptions = $itemTypeOptions ?? collect();
     $purchaseTreatmentOptions = $purchaseTreatmentOptions ?? collect();
     $supplierOptions = $suppliers ?? collect();
@@ -168,7 +169,9 @@
     .item-bom-menu-icon { width:36px; height:36px; flex:0 0 36px; display:flex; align-items:center; justify-content:center; border-radius:11px; color:#4338ca; background:#e0e7ff; }
     .item-bom-menu-title { color:#1e1b4b; font-size:.82rem; font-weight:900; }
     .item-bom-menu-text { margin-top:2px; color:#64748b; font-size:.72rem; }
-    .item-bom-menu .btn { border-radius:999px; font-weight:800; white-space:nowrap; }
+        .item-bom-menu .btn { border-radius:999px; font-weight:800; white-space:nowrap; }
+        .item-bom-menu-summary { display:flex; flex-wrap:wrap; gap:6px; margin-top:5px; color:#475569; font-size:.7rem; font-weight:750; }
+        .item-bom-menu-summary span { display:inline-flex; align-items:center; gap:4px; padding:3px 7px; border-radius:999px; background:rgba(255,255,255,.72); border:1px solid #c7d2fe; }
     body[data-theme="dark"] .item-form { color:#e5e7eb; }
     body[data-theme="dark"] .item-crud-header { background:#0f172a; border-color:#334155; }
     body[data-theme="dark"] .item-crud-title { color:#f8fafc; }
@@ -647,6 +650,12 @@
             <div>
                 <div class="item-bom-menu-title">Bill of Materials (BOM)</div>
                 <div class="item-bom-menu-text">Atur bahan dan komponen yang dipakai untuk memproduksi item ini.</div>
+                @if($bomEstimate)
+                    <div class="item-bom-menu-summary">
+                        <span><i class="bi bi-diagram-3"></i>{{ $bomEstimate['line_count'] }} komponen</span>
+                        <span><i class="bi bi-cash-coin"></i>{{ $bomEstimate['total'] > 0 ? 'Rp '.number_format($bomEstimate['total'], 0, ',', '.') : 'HPP belum tersedia' }}</span>
+                    </div>
+                @endif
             </div>
         </div>
         @if($bomHref)

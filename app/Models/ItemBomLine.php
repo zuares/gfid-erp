@@ -47,10 +47,27 @@ class ItemBomLine extends Model
         return $this->belongsTo(Item::class, 'material_item_id');
     }
 
+    public function qtyWithScrap(): float
+    {
+        $qty = (float) $this->qty;
+        $scrap = (float) ($this->scrap_pct ?? 0);
+
+        return round($qty * (1 + ($scrap / 100)), 8);
+    }
+
+    public function componentUnitCost(): float
+    {
+        return (float) ($this->material?->effective_unit_cost ?? 0);
+    }
+
+    public function estimatedCost(): float
+    {
+        return round($this->qtyWithScrap() * $this->componentUnitCost(), 2);
+    }
+
     // dipakai saat generate kebutuhan material berdasarkan qty produksi
     public function requiredQty(float $orderQty): float
     {
-        $base = (float) $this->qty * $orderQty;
-        return $base + ($base * ((float) $this->scrap_pct / 100));
+        return round($this->qtyWithScrap() * $orderQty, 8);
     }
 }

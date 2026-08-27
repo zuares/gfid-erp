@@ -67,6 +67,23 @@
         line-height: 1.45 !important;
     }
 
+    .bom-cost-summary {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1.3fr) repeat(2, minmax(0, .8fr)) !important;
+        gap: 8px !important;
+        margin-top: 14px !important;
+        padding: 12px !important;
+        border: 1px solid #bfdbfe !important;
+        border-radius: 16px !important;
+        background: linear-gradient(135deg, #eff6ff, #f8fafc) !important;
+    }
+    .bom-cost-summary-label { color:#64748b !important; font-size:.64rem !important; font-weight:850 !important; text-transform:uppercase !important; letter-spacing:.04em !important; }
+    .bom-cost-summary-value { margin-top:2px !important; color:#0f172a !important; font-size:1rem !important; font-weight:950 !important; }
+    .bom-cost-summary-note { margin-top:2px !important; color:#64748b !important; font-size:.7rem !important; }
+    body[data-theme="dark"] .bom-cost-summary { background:#172554 !important; border-color:#3730a3 !important; }
+    body[data-theme="dark"] .bom-cost-summary-value { color:#f8fafc !important; }
+    @media(max-width:700px) { .bom-cost-summary { grid-template-columns:1fr 1fr !important; } .bom-cost-summary > :first-child { grid-column:1 / -1 !important; } }
+
     .chip {
         display: inline-flex !important;
         align-items: center !important;
@@ -428,6 +445,7 @@
 @php
   $isEdit = (bool) $bom;
   $prefilledItem = $prefilledItem ?? null;
+  $bomEstimate = $bomEstimate ?? null;
   $action = $isEdit ? route('master.item_boms.update', $bom) : route('master.item_boms.store');
 
   // controller sebaiknya kirim $rows (sudah kamu punya)
@@ -478,6 +496,26 @@
         <ul class="mb-0">
           @foreach($errors->all() as $e) <li>{{ $e }}</li> @endforeach
         </ul>
+      </div>
+    @endif
+
+    @if($isEdit && $bomEstimate)
+      <div class="bom-cost-summary" aria-label="Ringkasan estimasi HPP BOM">
+        <div>
+          <div class="bom-cost-summary-label">Estimasi HPP BOM</div>
+          <div class="bom-cost-summary-value">{{ $bomEstimate['total'] > 0 ? 'Rp '.number_format($bomEstimate['total'], 0, ',', '.') : 'Belum tersedia' }}</div>
+          <div class="bom-cost-summary-note">Per 1 {{ $bomEstimate['item_unit'] }} · komponen optional tidak dihitung</div>
+        </div>
+        <div>
+          <div class="bom-cost-summary-label">Komponen</div>
+          <div class="bom-cost-summary-value">{{ $bomEstimate['line_count'] }}</div>
+          <div class="bom-cost-summary-note">{{ $bomEstimate['required_line_count'] }} wajib · {{ $bomEstimate['optional_line_count'] }} opsional</div>
+        </div>
+        <div>
+          <div class="bom-cost-summary-label">Status</div>
+          <div class="bom-cost-summary-value">{{ $bom->active ? 'Aktif' : 'Nonaktif' }}</div>
+          <div class="bom-cost-summary-note">Estimasi tidak mengubah histori</div>
+        </div>
       </div>
     @endif
 

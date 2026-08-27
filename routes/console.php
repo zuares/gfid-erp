@@ -77,8 +77,10 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-orders'))
     ->name('sync-orders')
     ->withoutOverlapping();
 
-// Verifikasi status PROCESSED ke API setelah sync order. Hanya status API yang
-// sudah maju yang boleh memindahkan order keluar dari tab Sedang Dikemas.
+// Verifikasi status order yang masih aktif ke API setelah sync order. Sweep ini
+// juga mencakup SHIPPED/TO_CONFIRM_RECEIVE supaya COMPLETED tidak menunggu
+// histori sync besar, serta memakai guard agar response API yang stale tidak
+// menurunkan status lokal.
 Schedule::command('marketplace:verify-processed-orders', [
         '--apply' => true,
         '--limit' => 50,

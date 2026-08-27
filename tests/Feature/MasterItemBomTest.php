@@ -96,4 +96,43 @@ class MasterItemBomTest extends TestCase
             'usage_stage' => ItemBomLine::STAGE_SEWING_SUPPLY,
         ]);
     }
+
+    public function test_bom_rejects_the_parent_item_as_a_component(): void
+    {
+        $finishedGood = Item::create([
+            'code' => 'FG-BOM-SELF-001',
+            'name' => 'Produk BOM Self Reference',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_role' => 'finished_good',
+            'is_stocked' => true,
+            'hpp_behavior' => 'hpp',
+            'default_allocation' => 'hpp',
+            'can_buy' => true,
+            'can_make' => true,
+            'default_supply_source' => 'make',
+            'active' => true,
+        ]);
+
+        $response = $this->actingAs($this->owner)
+            ->from(route('master.item_boms.create'))
+            ->post(route('master.item_boms.store'), [
+                'item_id' => $finishedGood->id,
+                'name' => 'BOM Self Reference',
+                'active' => 1,
+                'lines' => [[
+                    'material_item_id' => $finishedGood->id,
+                    'usage_stage' => ItemBomLine::STAGE_MAIN_MATERIAL,
+                    'qty' => '1',
+                    'uom' => 'pcs',
+                    'scrap_pct' => '0',
+                    'is_optional' => 0,
+                    'sort_order' => 10,
+                ]],
+            ]);
+
+        $response->assertRedirect(route('master.item_boms.create'));
+        $response->assertSessionHasErrors('lines');
+        $this->assertDatabaseCount('item_boms', 0);
+    }
 }

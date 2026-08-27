@@ -27,7 +27,7 @@ class JournalService
     public const CODE_HPP = '5101'; // Harga Pokok Penjualan
     public const CODE_ADV_PURCHASE = '1151'; // Uang Muka Pembelian
     public const CODE_SUPPLIER_CLAIM = '1305'; // Piutang Supplier
-    public const CODE_EXP_OPEX = '6101'; // Biaya Operasional Umum (untuk selisih adjustment)
+    public const CODE_EXP_OPEX = '6101'; // Biaya Operasional Umum
     public const CODE_STOCK_VARIANCE = '6115'; // Selisih Stock Opname
     public const CODE_LEGACY_CORRECTION = '6116'; // Koreksi Persediaan Legacy (close as legacy)
     public const CODE_PRODUCTION_LOSS = '6120'; // Kerugian Produksi / Reject (scrap & write-off)
@@ -1332,9 +1332,9 @@ class JournalService
             }
         }
 
-        $opexId = $this->accountIdByCode(self::CODE_EXP_OPEX);
-        if ($totalOut > 0) $lines[] = ['account_id' => $opexId, 'debit' => round($totalOut, 2), 'credit' => 0];
-        if ($totalIn > 0) $lines[] = ['account_id' => $opexId, 'debit' => 0, 'credit' => round($totalIn, 2)];
+        $varianceId = $this->accountIdByCode(self::CODE_STOCK_VARIANCE);
+        if ($totalOut > 0) $lines[] = ['account_id' => $varianceId, 'debit' => round($totalOut, 2), 'credit' => 0];
+        if ($totalIn > 0) $lines[] = ['account_id' => $varianceId, 'debit' => 0, 'credit' => round($totalIn, 2)];
         if (count($lines) < 2) return null;
 
         return $this->post(
