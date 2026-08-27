@@ -368,6 +368,29 @@ body[data-theme="dark"] .ord-buyer-paid {
     color: #a7f3d0;
 }
 
+.ord-payment-method {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    margin-top: .25rem;
+    padding: .14rem .42rem;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: .63rem;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+body[data-theme="dark"] .ord-payment-method {
+    background: rgba(30, 64, 175, .22);
+    border-color: rgba(96, 165, 250, .35);
+    color: #bfdbfe;
+}
+
 /* ── Item cards (focal point) ── */
 .ord-items-cell { display: flex; flex-direction: column; gap: .3rem; }
 .ord-item-card {
@@ -393,6 +416,14 @@ body[data-theme="dark"] .ord-buyer-paid {
     font-size: .72rem; color: #475569; margin-top: .12rem;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.ord-item-price {
+    display: flex; align-items: baseline; flex-wrap: wrap; gap: .28rem;
+    margin-top: .25rem; font-size: .68rem; color: #047857;
+}
+.ord-item-price del { color: #94a3b8; font-size: .62rem; }
+.ord-item-price strong { font-weight: 800; }
+body[data-theme="dark"] .ord-item-price { color: #6ee7b7; }
+body[data-theme="dark"] .ord-item-price del { color: #64748b; }
 .ord-item-sku {
     font-size: .63rem; color: #94a3b8; font-family: 'SF Mono', 'Menlo', monospace;
     margin-top: .06rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

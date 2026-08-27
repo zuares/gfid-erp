@@ -38,6 +38,47 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         </div>`;
     }
 
+    function paymentMethodLabel(o) {
+        const raw = o.payment_method
+            || o.raw_json?.payment_method
+            || o.raw_json?.payment_info?.payment_method
+            || '';
+        const value = String(raw).trim();
+        if (!value) return 'Belum tercatat';
+
+        const labels = {
+            cod: 'COD',
+            cash_on_delivery: 'COD',
+            shopeepay: 'ShopeePay',
+            shopee_pay: 'ShopeePay',
+            spaylater: 'SPayLater',
+            credit_card: 'Kartu Kredit',
+            debit_card: 'Kartu Debit',
+            bank_transfer: 'Transfer Bank',
+        };
+        const key = value.toLowerCase().replace(/[\s-]+/g, '_');
+        return labels[key] || value.replace(/_/g, ' ');
+    }
+
+    function buyerPaymentMethodHtml(o) {
+        return `<div class="ord-payment-method" title="Metode pembayaran">
+            <span>💳 ${esc(paymentMethodLabel(o))}</span>
+        </div>`;
+    }
+
+    function itemSalePriceHtml(i) {
+        const sale = Number(i.price_after_discount);
+        if (!Number.isFinite(sale) || sale <= 0) return '';
+
+        const original = Number(i.price_original ?? i.price);
+        const originalHtml = Number.isFinite(original) && original > sale
+            ? `<del>${esc(fmtRp(original))}</del>`
+            : '';
+        return `<div class="ord-item-price" title="Harga jual setelah diskon">
+            ${originalHtml}<strong>Jual ${esc(fmtRp(sale))}</strong>
+        </div>`;
+    }
+
     let orders           = [];
     let currentPage      = 1;
     let lastPage         = 1;
@@ -1558,6 +1599,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             bodyHtml = `<div class="ord-item-name" style="color:#64748b">${esc(dispName)}</div>`
                 + `<span class="ord-item-nomap">Belum mapping</span>`;
         }
+        bodyHtml += itemSalePriceHtml(i);
 
         const qtyClass = urgent ? 'ord-item-qty urgent' : 'ord-item-qty';
         return `<div class="ord-item-card">
@@ -1800,6 +1842,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                     <div class="ord-card-meta">
                         <div class="ord-id">${orderIdHtml}</div>
                         ${buyerPaidHtml(o)}
+                        ${buyerPaymentMethodHtml(o)}
                         <div class="ord-card-sub">
                             ${instantBadge}
                             ${storeText ? `<span class="ord-card-sub-text">${esc(storeText)}</span>` : ''}
@@ -2462,6 +2505,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <div class="ord-id">${orderIdHtml}</div>
                 <div class="ord-date" style="margin-top:4px">${dateHtml}</div>
                 ${buyerPaidHtml(o)}
+                ${buyerPaymentMethodHtml(o)}
                 <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;">
                     ${perluKirimBadge}
                     ${instantBadge}
