@@ -65,21 +65,23 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     // Semua reload order wajib memakai scope yang sama. Sebelumnya silent
     // refresh memanggil endpoint polos sehingga setelah beberapa detik data
     // seluruh database menimpa hasil halaman yang sudah difilter.
-    function localOrdersUrl() {
+    function localOrdersUrl(overrides = {}) {
         const lp = new URLSearchParams();
         if (typeof IS_DUMMY_MODE !== 'undefined' && IS_DUMMY_MODE) lp.set('dummy', '1');
         if (getFrom()) lp.set('date_from', getFrom());
         if (getTo())   lp.set('date_to', getTo());
         
-        lp.set('tab', activeTab);
-        if (activeTab === 'ready') lp.set('sub_tab', subTabReady);
-        else if (activeTab === 'processed') lp.set('sub_tab', subTabProcessed);
-        else if (activeTab === 'shipped') lp.set('sub_tab', subTabShipped);
+        const tab = overrides.tab ?? activeTab;
+        const subTab = overrides.subTab
+            ?? (tab === 'ready' ? subTabReady : tab === 'processed' ? subTabProcessed : tab === 'shipped' ? subTabShipped : 'all');
+
+        lp.set('tab', tab);
+        if (tab === 'ready' || tab === 'processed' || tab === 'shipped') lp.set('sub_tab', subTab);
         
         if (getSearch()) lp.set('search', getSearch());
         if (activeStore && activeStore !== '') lp.set('store', activeStore);
-        lp.set('page', currentPage);
-        lp.set('limit', 50);
+        lp.set('page', overrides.page ?? currentPage);
+        lp.set('limit', overrides.limit ?? 50);
 
         return '/api/marketplace/local-orders-paginated' + (lp.toString() ? ('?' + lp.toString()) : '');
     }
@@ -377,7 +379,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         sessionStorage.setItem('ord_sub_tab_processed', tab);
         document.querySelectorAll('#subTabProcessedContainer .ord-subtab').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        renderTable();
+        currentPage = 1;
+        loadOrders();
         // Hide badges for active subtabs
         document.querySelectorAll('#subTabProcessedContainer .ord-badge').forEach(b => b.classList.remove('urgent'));
         btn.querySelector('.ord-badge')?.classList.add('urgent');
@@ -388,7 +391,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         sessionStorage.setItem('ord_sub_tab_ready', tab);
         document.querySelectorAll('#subTabReadyContainer .ord-subtab').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        renderTable();
+        currentPage = 1;
+        loadOrders();
         // Hide badges for active subtabs
         document.querySelectorAll('#subTabReadyContainer .ord-badge').forEach(b => b.classList.remove('urgent'));
         btn.querySelector('.ord-badge')?.classList.add('urgent');
@@ -913,6 +917,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         restoreSavedTab();
         render();
         updateLastSyncTime();
+        refreshReadyKilatBadge(loadSeq);
 
         if (activeTab === 'processed') {
             autoFetchMissingAwbs();
@@ -932,6 +937,26 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 }
             }, 500);
         }
+    }
+
+    async function refreshReadyKilatBadge(loadSeq) {
+        const badge = $('badge-sub-ready-kilat');
+        if (!badge) return;
+
+        const res = await api(localOrdersUrl({
+            tab: 'ready',
+            subTab: 'kilat',
+            page: 1,
+            limit: 50,
+        })).catch(() => null);
+
+        if (!res || loadSeq !== ordersLoadSeq) return;
+
+        const payload = Array.isArray(res) ? { data: res } : res;
+        const total = Number(payload.total);
+        badge.textContent = Number.isFinite(total)
+            ? total
+            : (Array.isArray(payload.data) ? payload.data.length : 0);
     }
 
     function inRange(o) { return true; }
@@ -1559,7 +1584,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
 
     function isKilatReadyToShip(o) {
         return !!o.is_kilat
-            && platformOrderStatus(o) === 'READY_TO_SHIP'
+            && (platformOrderStatus(o) === 'READY_TO_SHIP'
+                || (o.is_booking && o.needs_shipping_arrangement))
             && !isPendingOrder(o);
     }
 
@@ -1567,6 +1593,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     // platform. Pisahkan dari Kilat supaya tidak terlihat siap diproses.
     function isKilatPlatformBlocked(o) {
         return !!o.is_kilat
+            && !o.is_booking
             && kilatNeedsArrange(o)
             && ['MATCHED', 'PROCESSED'].includes(platformOrderStatus(o));
     }

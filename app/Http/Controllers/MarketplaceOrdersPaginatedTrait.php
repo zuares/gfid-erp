@@ -196,6 +196,164 @@ trait MarketplaceOrdersPaginatedTrait
             return $arr;
         });
 
+        // Pesanan Kilat baru sering masih tersimpan sebagai booking tanpa
+        // marketplace_order (order_sn belum diberikan Shopee). Endpoint lama
+        // menyertakan pseudo-order ini, jadi endpoint paginated juga harus
+        // mengembalikannya saat sub-tab Kilat dibuka.
+        if ($tab === 'ready' && $subTab === 'kilat' && (int) request()->query('page', 1) === 1) {
+            $pureBookingRows = $this->pureKilatBookingRows($dateFrom, $dateTo, $store, $search);
+
+            if ($pureBookingRows->isNotEmpty()) {
+                $payload = $paginator->toArray();
+                $merged = $paginator->getCollection()
+                    ->concat($pureBookingRows)
+                    ->sortByDesc('ordered_at')
+                    ->values();
+
+                $payload['data'] = $merged->all();
+                $payload['total'] = $paginator->total() + $pureBookingRows->count();
+                $payload['last_page'] = max(1, (int) ceil($payload['total'] / max(1, $limit)));
+
+                return response()->json($payload);
+            }
+        }
+
         return response()->json($paginator);
+    }
+
+    private function pureKilatBookingRows(?string $dateFrom, ?string $dateTo, ?string $store, ?string $search): \Illuminate\Support\Collection
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('marketplace_bookings')) {
+            return collect();
+        }
+
+        $bookings = MarketplaceBooking::with('store.channel')
+            ->whereIn('booking_status', ['PENDING', 'READY_TO_SHIP', 'PROCESSED'])
+            ->get();
+
+        $from = $dateFrom ? \Carbon\Carbon::parse($dateFrom)->startOfDay() : null;
+        $to = $dateTo ? \Carbon\Carbon::parse($dateTo)->endOfDay() : null;
+
+        $bookings = $bookings->filter(function ($booking) use ($from, $to, $store, $search) {
+            if ($store && $booking->store?->name !== $store) {
+                return false;
+            }
+
+            $bookingDate = $booking->create_time
+                ? \Carbon\Carbon::createFromTimestamp((int) $booking->create_time)
+                : ($booking->created_at ? \Carbon\Carbon::parse($booking->created_at) : null);
+
+            if ($bookingDate && $from && $bookingDate->lt($from)) {
+                return false;
+            }
+            if ($bookingDate && $to && $bookingDate->gt($to)) {
+                return false;
+            }
+
+            if ($search) {
+                $parts = [$booking->booking_sn, $booking->order_sn, $booking->shipping_carrier];
+                foreach ((array) $booking->items as $item) {
+                    if (is_array($item)) {
+                        $parts[] = $item['model_sku'] ?? null;
+                        $parts[] = $item['item_sku'] ?? null;
+                        $parts[] = $item['item_name'] ?? null;
+                    }
+                }
+
+                if (mb_stripos(implode(' ', array_filter($parts)), $search) === false) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        // Jangan tampilkan pseudo-order bila booking ternyata sudah terhubung
+        // ke order lokal melalui salah satu nomor identitasnya.
+        $sns = $bookings->flatMap(fn ($booking) => [
+            $booking->booking_sn,
+            $booking->order_sn,
+        ])->filter()->unique()->values();
+
+        $knownSns = collect();
+        if ($sns->isNotEmpty()) {
+            $knownSns = MarketplaceOrder::query()
+                ->where(function ($query) use ($sns) {
+                    $query->whereIn('channel_order_id', $sns->all())
+                        ->orWhereIn('external_order_id', $sns->all())
+                        ->orWhereIn('booking_sn', $sns->all());
+                })
+                ->get(['channel_order_id', 'external_order_id', 'booking_sn'])
+                ->flatMap(fn ($order) => [
+                    $order->channel_order_id,
+                    $order->external_order_id,
+                    $order->booking_sn,
+                ])->filter()->flip();
+        }
+
+        return $bookings
+            ->reject(fn ($booking) => $knownSns->has($booking->booking_sn)
+                || ($booking->order_sn && $knownSns->has($booking->order_sn)))
+            ->map(function ($booking) {
+                $items = collect(is_array($booking->items) ? $booking->items : [])
+                    ->map(function ($item) {
+                        $sku = $item['model_sku'] ?? $item['item_sku'] ?? null;
+
+                        return [
+                            'qty' => $item['quantity'] ?? $item['model_quantity_purchased'] ?? 1,
+                            'variant_name' => $sku ?: ($item['item_name'] ?? null),
+                            'item_name' => $item['item_name'] ?? null,
+                            'model_sku' => $sku,
+                            'item_sku' => $item['item_sku'] ?? null,
+                            'internal_item' => null,
+                        ];
+                    })->values()->all();
+
+                $bookingStatus = (string) $booking->booking_status;
+                $needsShipping = $booking->needsShipping();
+                $orderedAt = $booking->create_time
+                    ? \Carbon\Carbon::createFromTimestamp((int) $booking->create_time)->toIso8601String()
+                    : optional($booking->created_at)->toIso8601String();
+
+                return [
+                    'id' => -$booking->id,
+                    'store_id' => $booking->store_id,
+                    'store' => $booking->store ? [
+                        'id' => $booking->store->id,
+                        'name' => $booking->store->name,
+                        'channel' => $booking->store->channel ? [
+                            'code' => strtolower((string) $booking->store->channel->code),
+                            'name' => $booking->store->channel->name,
+                        ] : null,
+                    ] : null,
+                    'channel_order_id' => $booking->order_sn ?: $booking->booking_sn,
+                    'external_order_id' => $booking->order_sn,
+                    'booking_sn' => $booking->booking_sn,
+                    'order_status' => $needsShipping ? 'READY_TO_SHIP' : $bookingStatus,
+                    'platform_status' => $bookingStatus,
+                    'status_source' => 'database',
+                    'ordered_at' => $orderedAt,
+                    'items' => $items,
+                    'shipping_carrier' => $booking->shipping_carrier,
+                    'shipping_awb_no' => $booking->tracking_number,
+                    'raw_json' => $booking->raw_json,
+                    'is_kilat' => true,
+                    'is_booking' => true,
+                    'needs_shipping_arrangement' => $needsShipping,
+                    'fulfillment_id' => null,
+                    'fulfillment_status' => null,
+                    'print_count' => $booking->print_count ?? 0,
+                    'printed_at' => $booking->printed_at
+                        ? \Carbon\Carbon::parse($booking->printed_at)->toIso8601String()
+                        : null,
+                    'has_unresolved_lines' => false,
+                    'has_data_issues' => false,
+                    'logistics_status' => null,
+                    'fulfillment_scan_log' => null,
+                    'fulfillment_resolve_lines' => [],
+                    'fulfillment_packing_summary' => null,
+                    'fulfillment_lines' => [],
+                ];
+            })->values();
     }
 }
