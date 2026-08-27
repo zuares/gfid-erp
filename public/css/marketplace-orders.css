@@ -680,3 +680,202 @@ body[data-theme="dark"] .ord-table tbody tr td {
     border-top-color: rgba(51, 65, 85, 0.85);
 }
 
+/* ── Visual parity with /marketplace/kilat ── */
+.page-wrap {
+    max-width: 1040px;
+    margin-inline: auto;
+    padding: .75rem .75rem 4rem;
+    background: transparent !important;
+}
+
+.card-main {
+    background: var(--card, #fff);
+    border-radius: 8px;
+    border: 1px solid var(--shp-border);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+body[data-theme="dark"] .card-main {
+    background: var(--card, #0f172a);
+    border-color: rgba(51, 65, 85, .85);
+}
+
+.ship-topbar {
+    background: var(--card, #fff);
+    border-bottom: 1px solid var(--shp-border);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+body[data-theme="dark"] .ship-topbar {
+    background: var(--card, #0f172a);
+}
+
+.title {
+    color: var(--shp-accent);
+    font-size: 1.15rem;
+    font-weight: 750;
+}
+
+body[data-theme="dark"] .title {
+    color: #f8fafc;
+}
+
+.orders-title-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: .63rem;
+    font-weight: 800;
+    color: #475569;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    padding: .12rem .48rem;
+}
+
+body[data-theme="dark"] .orders-title-badge {
+    color: #cbd5e1;
+    background: rgba(255, 255, 255, .08);
+    border-color: rgba(148, 163, 184, .24);
+}
+
+.orders-help {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+    border-radius: 8px;
+    padding: .5rem .8rem;
+    font-size: .75rem;
+    margin-bottom: .75rem;
+    line-height: 1.4;
+}
+
+.orders-help a {
+    color: #92400e;
+    font-weight: 800;
+    text-decoration: underline;
+}
+
+body[data-theme="dark"] .orders-help {
+    background: rgba(120, 53, 15, .22);
+    border-color: rgba(217, 119, 6, .45);
+    color: #fde68a;
+}
+
+body[data-theme="dark"] .orders-help a {
+    color: #fde68a;
+}
+
+.ord-tabs {
+    gap: .5rem;
+    background: #fff;
+    padding: .7rem;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, .05), 0 4px 6px -2px rgba(0, 0, 0, .025);
+}
+
+body[data-theme="dark"] .ord-tabs {
+    background: rgba(15, 23, 42, .4);
+    border-color: rgba(255, 255, 255, .1);
+}
+
+.ord-tab {
+    background: #f8fafc;
+    border: 1px solid #f1f5f9;
+    padding: .45rem .85rem;
+    font-size: .8rem;
+    font-weight: 600;
+    color: #475569;
+    border-radius: 8px;
+}
+
+.ord-tab:hover:not(.active) {
+    background: #f1f5f9;
+    color: #1e293b;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, .02);
+}
+
+.ord-tab.active {
+    color: #fff;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    border-color: #1e40af;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, .25);
+}
+
+.ord-subtab {
+    background: transparent;
+    border: none;
+    padding: .3rem .7rem;
+    font-size: .75rem;
+    font-weight: 600;
+    color: #64748b;
+    border-radius: 6px;
+}
+
+.ord-subtab.active {
+    background: #fff;
+    color: #0f172a;
+    border-color: transparent;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .08);
+}
+
+.ord-subtab.active .ord-badge {
+    background: #e2e8f0 !important;
+    color: #475569 !important;
+    box-shadow: none !important;
+}
+
+body[data-theme="dark"] .ord-subtab.active {
+    background: rgba(255, 255, 255, .12);
+    color: #fff;
+}
+
+body[data-theme="dark"] .ord-subtab.active .ord-badge {
+    background: rgba(255, 255, 255, .12) !important;
+    color: #cbd5e1 !important;
+}
+
+.btn-ship-primary {
+    box-shadow: none;
+    transform: none;
+}
+
+.btn-ship-primary:hover {
+    transform: none;
+}
+
+.btn-ship-outline {
+    background: transparent !important;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.btn-ship-outline:hover {
+    transform: none;
+    background: rgba(148, 163, 184, .08) !important;
+}
+
+.ord-table thead tr th {
+    padding: .52rem .62rem;
+}
+
+.ord-table tbody tr td {
+    padding: .7rem .62rem;
+    vertical-align: top;
+}
+
+@media (max-width: 640px) {
+    .ord-tabs {
+        padding: .7rem;
+    }
+}

@@ -21,6 +21,11 @@
     {{-- ── TOPBAR ── --}}
     @include('marketplace.partials.orders-topbar')
 
+    <div class="orders-help">
+        <span>💡</span>
+        <span>Order Kilat dikelola terpisah di <a href="{{ url('/marketplace/kilat') }}">Pesanan Kilat</a>. Halaman ini menampilkan order marketplace reguler.</span>
+    </div>
+
     @if(auth()->user()?->role === 'owner')
     {{-- ══ DEV TOOLS PANEL ══════════════════════════════════════════════════ --}}
     <div id="devPanel" style="display:none;background:#faf5ff;border:1px solid #ddd6fe;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem">

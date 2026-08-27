@@ -2,6 +2,7 @@
         <div>
             <h1 class="title">
                 📦 Order Lokal
+                <span class="orders-title-badge">Marketplace</span>
                 <span id="syncIndicator" style="display:none;font-size:.7rem;color:var(--shp-muted);font-weight:normal;background:#f1f5f9;padding:2px 8px;border-radius:12px;margin-left:8px;">
                     <span class="prod-tab-spinner" style="width:10px;height:10px;border-width:1.5px;margin-right:.2rem;"></span>
                     Menyinkronkan...
@@ -34,13 +35,13 @@
             {{-- Date filter --}}
             <div style="position:relative" class="mobile-hide">
                 <button class="btn-ship-outline" id="btnDate" onclick="toggleDropdown('ddDate', event)">
-                    <span style="opacity:0.7;">📅</span> <span id="btnDateLabel" class="hdr-btn-label" style="color:inherit; font-size:0.75rem;">30 hari terakhir</span>
+                    <span style="opacity:0.7;">📅</span> <span id="btnDateLabel" class="hdr-btn-label" style="color:inherit; font-size:0.75rem;">7 hari terakhir</span>
                 </button>
                 <div class="hdr-dropdown" id="ddDate" style="right:0;left:auto;min-width:210px">
                     <div style="padding:.25rem .4rem .1rem;font-size:.65rem;font-weight:700;color:#94a3b8;letter-spacing:.04em">PERIODE CEPAT</div>
                     <div class="hdr-dropdown-item" onclick="setDatePreset(1)">📆 Hari ini</div>
-                    <div class="hdr-dropdown-item" onclick="setDatePreset(7)">📆 7 hari terakhir</div>
-                    <div class="hdr-dropdown-item selected" onclick="setDatePreset(30)">📆 30 hari terakhir</div>
+                    <div class="hdr-dropdown-item selected" onclick="setDatePreset(7)">📆 7 hari terakhir</div>
+                    <div class="hdr-dropdown-item" onclick="setDatePreset(30)">📆 30 hari terakhir</div>
                     <div class="hdr-dropdown-item" onclick="setDatePreset(90)">📆 90 hari terakhir</div>
                     <div class="hdr-dropdown-divider"></div>
                     <div style="padding:.2rem .4rem .1rem;font-size:.65rem;font-weight:700;color:#94a3b8">PILIH MANUAL</div>
