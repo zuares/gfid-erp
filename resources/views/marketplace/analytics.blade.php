@@ -363,6 +363,11 @@
     .an-cohort-summary-card.is-primary .an-cohort-summary-value { color:#fff; }
     .an-cohort-summary-note { color:var(--dsh-muted); font-size:.59rem; font-weight:650; }
     .an-cohort-summary-card.is-primary .an-cohort-summary-note { color:#64748b; }
+    .an-cohort-chart-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.8rem; }
+    .an-cohort-chart-card { min-width:0; }
+    .an-cohort-chart-body { padding-top:.15rem; }
+    .an-cohort-chart-canvas { position:relative; height:220px; border-radius:10px; background:linear-gradient(180deg,#fbfdff 0%,#fff 100%); }
+    .an-cohort-chart-canvas canvas { display:block; width:100% !important; height:220px !important; }
     .an-cohort-layout { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(240px,.55fr); gap:.8rem; align-items:start; }
     .an-cohort-matrix-card, .an-cohort-guide-card { min-width:0; }
     .an-cohort-panel-head { align-items:center; }
@@ -415,7 +420,7 @@
     .an-cohort-guide-footer i { color:#2563eb; }
     body[data-theme="dark"] .an-cohort-field input, body[data-theme="dark"] .an-cohort-field select { background:#0f172a; color:#e2e8f0; }
     body[data-theme="dark"] .an-cohort-table th:first-child, body[data-theme="dark"] .an-cohort-table td:first-child, body[data-theme="dark"] .an-cohort-table .an-cohort-sticky { background:var(--card,#1e293b); }
-    @media (max-width:1100px) { .an-cohort-filter-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } .an-cohort-apply { width:100%; } .an-cohort-layout { grid-template-columns:1fr; } }
+    @media (max-width:1100px) { .an-cohort-filter-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } .an-cohort-apply { width:100%; } .an-cohort-chart-grid, .an-cohort-layout { grid-template-columns:1fr; } }
     @media (max-width:760px) { .an-cohort-header { flex-direction:column; } .an-cohort-header-meta { align-items:flex-start; } .an-cohort-filter-head { align-items:flex-start; } .an-cohort-filter-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-cohort-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-cohort-field, .an-cohort-field input, .an-cohort-field select { width:100%; min-width:0; } .an-cohort-apply { grid-column:1/-1; } .an-cohort-reading-hint { width:100%; margin-left:0; padding-top:.35rem; border-top:1px solid var(--dsh-border); } }
     @media (max-width:420px) { .an-cohort-filter-grid, .an-cohort-summary-grid { grid-template-columns:1fr; } .an-cohort-apply { grid-column:auto; } .an-cohort-filter-head { flex-direction:column; } }
 </style>
@@ -594,8 +599,11 @@
     let cohortLoading = false;
     let cohortOptionsKey = null;
     let revenueChartInstance = null;
+    let cohortChartInstance = null;
+    let cohortDistributionChartInstance = null;
     let chartLibraryPromise = null;
     let chartRenderToken = 0;
+    let cohortChartRenderToken = 0;
     let selectedPulseMetric = null;
     const APP_TIMEZONE = @json(config('app.timezone', 'Asia/Jakarta'));
     const from = () => $('anDateFrom').value;
@@ -1098,6 +1106,67 @@
                     y:{ beginAtZero:true, grid:{ color:'rgba(148,163,184,.16)', drawBorder:false }, ticks:{ color:'#94a3b8', padding:8, font:{ size:10, family:'Inter, sans-serif' }, callback:chartMoneyTick } },
                 },
             },
+        });
+    }
+    function renderCohortCharts(payload) {
+        const renderToken = ++cohortChartRenderToken;
+        const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+        const mode = payload?.mode === 'product' ? 'product' : 'customer';
+        const metric = payload?.metric || (mode === 'product' ? 'revenue' : 'retention_pct');
+        const periods = Array.from({ length: Math.max(0, Number(payload?.max_period || 0)) + 1 }, (_, index) => index);
+        const empty = '<div class="an-empty">Belum ada data cohort untuk divisualisasikan.</div>';
+        if (!rows.length) {
+            if (cohortChartInstance) cohortChartInstance.destroy();
+            if (cohortDistributionChartInstance) cohortDistributionChartInstance.destroy();
+            cohortChartInstance = null;
+            cohortDistributionChartInstance = null;
+            $('anCohortCurveChart').innerHTML = empty;
+            $('anCohortDistributionChart').innerHTML = empty;
+            return;
+        }
+        if (!window.Chart) {
+            $('anCohortCurveChart').innerHTML = '<div class="an-empty">Menyiapkan grafik…</div>';
+            $('anCohortDistributionChart').innerHTML = '<div class="an-empty">Menyiapkan grafik…</div>';
+            loadChartLibrary().then(() => {
+                if (renderToken === cohortChartRenderToken) renderCohortCharts(payload);
+            }).catch(() => {
+                $('anCohortCurveChart').innerHTML = '<div class="an-empty">Grafik belum tersedia.</div>';
+                $('anCohortDistributionChart').innerHTML = '<div class="an-empty">Grafik belum tersedia.</div>';
+            });
+            return;
+        }
+        const isPercent = ['retention_pct', 'gross_margin_pct'].includes(metric);
+        const formatValue = value => isPercent ? `${Number(value || 0).toFixed(1)}%` : cohortFormat(value, metric);
+        const tickValue = value => {
+            if (isPercent) return `${Number(value || 0).toFixed(0)}%`;
+            const absolute = Math.abs(Number(value || 0));
+            if (absolute >= 1000000) return `${value < 0 ? '-' : ''}Rp ${(absolute / 1000000).toFixed(1)} Jt`;
+            if (absolute >= 1000) return `${value < 0 ? '-' : ''}Rp ${(absolute / 1000).toFixed(0)} Rb`;
+            return metric === 'qty_sold' || metric === 'orders' || metric === 'active_customers' ? Number(value || 0).toLocaleString('id-ID') : `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
+        };
+        const averageByPeriod = periods.map(periodIndex => {
+            const values = rows.map(row => Number(row.periods?.[periodIndex]?.[metric])).filter(value => Number.isFinite(value));
+            return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+        });
+        const distribution = mode === 'customer'
+            ? rows.map(row => ({ label: cohortMonthLabel(row.cohort_month), value: Number(row.cohort_size || 0) }))
+            : Object.entries(rows.reduce((carry, row) => { carry[row.cohort_month] = (carry[row.cohort_month] || 0) + 1; return carry; }, {})).sort(([a], [b]) => a.localeCompare(b)).map(([label, value]) => ({ label: cohortMonthLabel(label), value }));
+        $('anCohortCurveSubtitle').textContent = `${payload.metric_label || 'Metric'} · rata-rata ${mode === 'product' ? 'product cohort' : 'customer cohort'} per umur`;
+        $('anCohortDistributionSubtitle').textContent = mode === 'customer' ? 'Ukuran customer cohort berdasarkan bulan transaksi pertama.' : 'Jumlah product cohort berdasarkan bulan transaksi pertama.';
+        $('anCohortCurveChart').innerHTML = '<canvas id="anCohortCurveCanvas" aria-label="Grafik progression cohort"></canvas>';
+        $('anCohortDistributionChart').innerHTML = '<canvas id="anCohortDistributionCanvas" aria-label="Grafik distribusi cohort"></canvas>';
+        if (cohortChartInstance) cohortChartInstance.destroy();
+        if (cohortDistributionChartInstance) cohortDistributionChartInstance.destroy();
+        const curveColor = mode === 'product' ? '#d97706' : '#2563eb';
+        cohortChartInstance = new Chart($('anCohortCurveCanvas').getContext('2d'), {
+            type:'line',
+            data:{ labels:periods.map(index => `M${index}`), datasets:[{ label:payload.metric_label || 'Metric', data:averageByPeriod, borderColor:curveColor, backgroundColor:mode === 'product' ? 'rgba(217,119,6,.14)' : 'rgba(37,99,235,.14)', fill:true, tension:.35, borderWidth:2.4, pointRadius:periods.length <= 8 ? 3 : 1, pointHoverRadius:5, spanGaps:false }] },
+            options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, animation:{duration:420, easing:'easeOutQuart'}, plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'rgba(15,23,42,.95)', titleColor:'#f8fafc', bodyColor:'#f8fafc', borderColor:'rgba(255,255,255,.15)', borderWidth:1, padding:9, callbacks:{ label:context => `${context.dataset.label}: ${formatValue(context.parsed.y)}` } } }, scales:{ x:{grid:{display:false}, ticks:{color:'#94a3b8',font:{size:10,family:'Inter, sans-serif'}}}, y:{grid:{color:'rgba(148,163,184,.16)'}, ticks:{color:'#94a3b8',font:{size:10,family:'Inter, sans-serif'}, callback:tickValue}} } },
+        });
+        cohortDistributionChartInstance = new Chart($('anCohortDistributionCanvas').getContext('2d'), {
+            type:'bar',
+            data:{ labels:distribution.map(item => item.label), datasets:[{ label:mode === 'customer' ? 'Customers' : 'Product cohorts', data:distribution.map(item => item.value), backgroundColor:mode === 'product' ? 'rgba(217,119,6,.72)' : 'rgba(22,163,74,.72)', borderRadius:5, maxBarThickness:32 }] },
+            options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'rgba(15,23,42,.95)', titleColor:'#f8fafc', bodyColor:'#f8fafc', borderColor:'rgba(255,255,255,.15)', borderWidth:1, padding:9, callbacks:{ label:context => `${context.dataset.label}: ${Number(context.parsed.y || 0).toLocaleString('id-ID')}` } } }, scales:{ x:{grid:{display:false}, ticks:{color:'#94a3b8',font:{size:10,family:'Inter, sans-serif'},maxRotation:0,autoSkip:true,maxTicksLimit:8}}, y:{beginAtZero:true, grid:{color:'rgba(148,163,184,.16)'}, ticks:{color:'#94a3b8',font:{size:10,family:'Inter, sans-serif'},precision:0}} } },
         });
     }
     function renderFunnel() {
@@ -1604,11 +1673,14 @@
             cohortPayload = await api('/api/marketplace/analytics-cohort?' + cohortParams().toString(), { cache:'no-store' });
             renderCohortKpis(cohortPayload);
             renderCohortTable(cohortPayload);
+            renderCohortCharts(cohortPayload);
         } catch (error) {
             console.error('Cohort load failed', error);
             cohortPayload = null;
             $('anCohortNote').textContent = 'Cohort gagal dimuat. Periksa filter atau log aplikasi.';
             $('anCohortBody').innerHTML = '<tr><td colspan="8"><div class="an-error">Data cohort gagal dimuat.</div></td></tr>';
+            $('anCohortCurveChart').innerHTML = '<div class="an-error">Grafik cohort gagal dimuat.</div>';
+            $('anCohortDistributionChart').innerHTML = '<div class="an-error">Grafik cohort gagal dimuat.</div>';
         } finally {
             cohortLoading = false;
             $('anCohortApply').disabled = false;

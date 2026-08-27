@@ -35,6 +35,21 @@
         <div class="an-cohort-summary-card"><span class="an-cohort-summary-label">Data confidence</span><strong class="an-cohort-summary-value">—</strong><span class="an-cohort-summary-note">Coverage / retention</span></div>
     </div>
 
+    <div class="an-cohort-chart-grid">
+        <section class="an-enterprise-card an-cohort-chart-card">
+            <div class="an-enterprise-head">
+                <div><div class="an-enterprise-title"><i class="bi bi-graph-up-arrow me-1" style="color:#2563eb"></i>Progression by cohort age</div><div class="an-enterprise-sub" id="anCohortCurveSubtitle">Rata-rata metric per umur cohort.</div></div>
+            </div>
+            <div class="an-enterprise-body an-cohort-chart-body"><div class="an-cohort-chart-canvas" id="anCohortCurveChart"><div class="an-empty">Buka analisis untuk memuat grafik.</div></div></div>
+        </section>
+        <section class="an-enterprise-card an-cohort-chart-card">
+            <div class="an-enterprise-head">
+                <div><div class="an-enterprise-title"><i class="bi bi-bar-chart-line me-1" style="color:#16a34a"></i>Cohort distribution</div><div class="an-enterprise-sub" id="anCohortDistributionSubtitle">Ukuran cohort berdasarkan bulan transaksi pertama.</div></div>
+            </div>
+            <div class="an-enterprise-body an-cohort-chart-body"><div class="an-cohort-chart-canvas" id="anCohortDistributionChart"><div class="an-empty">Buka analisis untuk memuat grafik.</div></div></div>
+        </section>
+    </div>
+
     <div class="an-cohort-layout">
         <section class="an-enterprise-card an-cohort-matrix-card">
             <div class="an-enterprise-head an-cohort-panel-head">
