@@ -49,7 +49,7 @@
                     <span class="an-cohort-reading-item"><i class="bi bi-arrow-right" aria-hidden="true"></i><strong>M1+</strong><small>bulan setelahnya</small></span>
                     <span class="an-cohort-reading-hint" id="anCohortMetricHint">Pilih metric untuk melihat definisinya.</span>
                 </div>
-                <div class="an-table-wrap an-cohort-table-wrap"><table class="an-table an-cohort-table"><caption class="visually-hidden">Cohort matrix berdasarkan periode transaksi pertama</caption><thead id="anCohortHead"><tr><th>Cohort</th><th>Base</th><th>M0</th><th>M1</th><th>M2</th><th>M3</th><th>M4</th><th>M5</th></tr></thead><tbody id="anCohortBody" aria-live="polite"><tr><td colspan="8"><div class="an-empty">Buka tab Cohort untuk memuat data.</div></td></tr></tbody></table></div>
+                <div class="an-table-wrap an-cohort-table-wrap"><table id="anCohortTable" class="an-table an-cohort-table"><caption class="visually-hidden">Cohort matrix berdasarkan periode transaksi pertama</caption><thead id="anCohortHead"><tr><th>Cohort</th><th>Base</th><th>M0</th><th>M1</th><th>M2</th><th>M3</th><th>M4</th><th>M5</th></tr></thead><tbody id="anCohortBody" aria-live="polite"><tr><td colspan="8"><div class="an-empty">Buka tab Cohort untuk memuat data.</div></td></tr></tbody></table></div>
             </div>
         </section>
         <aside class="an-enterprise-card an-cohort-guide-card">

@@ -377,9 +377,13 @@
     .an-cohort-reading-item i { color:#2563eb; font-size:.72rem; }
     .an-cohort-reading-item small { color:var(--dsh-muted); font-size:.58rem; font-weight:650; }
     .an-cohort-reading-hint { margin-left:auto; color:var(--dsh-muted); font-size:.6rem; font-weight:700; }
-    .an-cohort-table-wrap { border:1px solid var(--dsh-border); border-radius:10px; }
-    .an-cohort-table { min-width:720px; }
-    .an-cohort-table th, .an-cohort-table td { text-align:right; white-space:nowrap; }
+    .an-cohort-table-wrap { overflow:hidden; border:1px solid var(--dsh-border); border-radius:10px; }
+    .an-cohort-table { width:100%; min-width:0; table-layout:fixed; }
+    .an-cohort-table th, .an-cohort-table td { overflow:hidden; text-align:right; white-space:normal; }
+    .an-cohort-table:not(.is-product) th:first-child { width:18%; }
+    .an-cohort-table:not(.is-product) th:nth-child(2) { width:10%; }
+    .an-cohort-table.is-product th:first-child { width:26%; }
+    .an-cohort-table.is-product th:nth-child(2) { width:14%; }
     .an-cohort-table th:first-child, .an-cohort-table td:first-child { text-align:left; position:sticky; left:0; z-index:3; background:var(--card,#fff); }
     .an-cohort-table thead th { background:var(--hero-bg,#f8fafc); vertical-align:bottom; }
     .an-cohort-table thead th small { display:block; margin-top:.12rem; color:var(--dsh-muted); font-size:.53rem; font-weight:650; text-transform:none; letter-spacing:0; }
@@ -387,9 +391,14 @@
     .an-cohort-row-title { font-weight:850; color:var(--text,#0f172a); }
     .an-cohort-row-sub { display:block; margin-top:.12rem; color:var(--dsh-muted); font-size:.6rem; font-weight:650; }
     .an-cohort-base-value { display:block; color:var(--text,#0f172a); font-weight:900; }
+    .an-cohort-product-cell .an-cohort-row-title { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .an-cohort-cell { min-width:78px; border:0; border-radius:7px; padding:.35rem .42rem; color:var(--text,#0f172a); background:rgba(37,99,235,var(--heat,.08)); font-size:.68rem; font-weight:850; cursor:pointer; }
     .an-cohort-cell-value, .an-cohort-cell-sub { display:block; }
+    .an-cohort-cell-value { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .an-cohort-cell-sub { margin-top:.12rem; color:var(--dsh-muted); font-size:.53rem; font-weight:700; }
+    .an-cohort-table.is-dense .an-cohort-cell { min-width:0; padding-inline:.18rem; font-size:.61rem; }
+    .an-cohort-table.is-dense .an-cohort-cell-sub { display:none; }
+    .an-cohort-table.is-dense thead th small { display:none; }
     .an-cohort-cell:hover, .an-cohort-cell:focus-visible { outline:2px solid #2563eb; outline-offset:1px; }
     .an-cohort-cell.product { background:rgba(217,119,6,var(--heat,.1)); }
     .an-cohort-cell.is-empty { background:transparent; color:#cbd5e1; cursor:default; }
@@ -1541,7 +1550,8 @@
         const intensity = Math.min(.46, .08 + (Math.abs(Number(value || 0)) / Math.max(maxValue, 1)) * .38);
         const encoded = esc(JSON.stringify({ ...context, ...detail, metric, metric_label: payloadMetricLabel(metric), is_product: isProduct }));
         const supportingValue = isProduct ? `Rev ${money(detail.revenue)}` : `${Number(detail.active_customers || 0).toLocaleString('id-ID')} active`;
-        return `<button type="button" class="an-cohort-cell ${isProduct ? 'product' : ''}" style="--heat:${intensity}" aria-label="${esc(`${payloadMetricLabel(metric)} ${cohortFormat(value, metric)}, ${supportingValue}`)}" data-cohort-detail="${encoded}"><span class="an-cohort-cell-value">${cohortFormat(value, metric)}</span><span class="an-cohort-cell-sub">${esc(supportingValue)}</span></button>`;
+        const cellLabel = `${payloadMetricLabel(metric)} ${cohortFormat(value, metric)}, ${supportingValue}`;
+        return `<button type="button" class="an-cohort-cell ${isProduct ? 'product' : ''}" style="--heat:${intensity}" title="${esc(cellLabel)}" aria-label="${esc(cellLabel)}" data-cohort-detail="${encoded}"><span class="an-cohort-cell-value">${cohortFormat(value, metric)}</span><span class="an-cohort-cell-sub">${esc(supportingValue)}</span></button>`;
     }
     const payloadMetricLabel = metric => ({retention_pct:'Retention %',active_customers:'Active Customers',orders:'Orders',qty_sold:'Qty Sold',revenue:'Revenue',gross_profit:'Gross Profit',gross_margin_pct:'Gross Margin %',net_profit:'Net Profit'})[metric] || metric;
     const cohortHeader = (label, sub = '') => `<th>${label}${sub ? `<small>${sub}</small>` : ''}</th>`;
@@ -1550,15 +1560,17 @@
         const metric = payload?.metric || (mode === 'product' ? 'revenue' : 'retention_pct');
         const maxPeriod = Math.max(0, Number(payload?.max_period || 0));
         const periods = Array.from({ length: maxPeriod + 1 }, (_, index) => index);
+        $('anCohortTable').classList.toggle('is-product', mode === 'product');
+        $('anCohortTable').classList.toggle('is-dense', periods.length > 8);
         if (mode === 'customer') {
             $('anCohortHead').innerHTML = `<tr>${cohortHeader('Cohort', 'first transaction')}${cohortHeader('Base', 'customers')}${periods.map(index => cohortHeader(`M${index}`, index === 0 ? 'same month' : `+${index} month`)).join('')}</tr>`;
             const maxValue = Math.max(...(payload?.rows || []).flatMap(row => Object.values(row.periods || {}).map(period => Number(period[metric] || 0))), 1);
             $('anCohortBody').innerHTML = payload?.rows?.length ? payload.rows.map(row => `<tr><td class="an-cohort-sticky"><span class="an-cohort-row-title">${esc(cohortMonthLabel(row.cohort_month))}</span><span class="an-cohort-row-sub">First transaction month</span></td><td><span class="an-cohort-base-value">${Number(row.cohort_size || 0).toLocaleString('id-ID')}</span><span class="an-cohort-row-sub">customers</span></td>${periods.map(index => cohortCell(row.periods?.[index], metric, false, maxValue, { cohort_month:row.cohort_month })).join('')}</tr>`).join('') : `<tr><td colspan="${periods.length + 2}"><div class="an-empty">Tidak ada cohort customer untuk filter ini.</div></td></tr>`;
             return;
         }
-        $('anCohortHead').innerHTML = `<tr>${cohortHeader('Product', 'catalog item')}${cohortHeader('SKU')}${cohortHeader('Category')}${cohortHeader('Cohort', 'first transaction')}${periods.map(index => cohortHeader(`M${index}`, index === 0 ? 'same month' : `+${index} month`)).join('')}</tr>`;
+        $('anCohortHead').innerHTML = `<tr>${cohortHeader('Product', 'catalog item')}${cohortHeader('Cohort', 'first transaction')}${periods.map(index => cohortHeader(`M${index}`, index === 0 ? 'same month' : `+${index} month`)).join('')}</tr>`;
         const maxValue = Math.max(...(payload?.rows || []).flatMap(row => Object.values(row.periods || {}).map(period => Number(period[metric] || 0))), 1);
-        $('anCohortBody').innerHTML = payload?.rows?.length ? payload.rows.map(row => `<tr><td class="an-cohort-sticky"><span class="an-cohort-row-title">${esc(row.product_name)}</span><span class="an-cohort-row-sub">Product cohort</span></td><td class="an-cohort-sticky">${esc(row.sku)}</td><td>${esc(row.category)}</td><td>${esc(cohortMonthLabel(row.cohort_month))}</td>${periods.map(index => cohortCell(row.periods?.[index], metric, true, maxValue, { cohort_month:row.cohort_month, product_name:row.product_name, sku:row.sku, category:row.category })).join('')}</tr>`).join('') : `<tr><td colspan="${periods.length + 4}"><div class="an-empty">Tidak ada cohort product untuk filter ini.</div></td></tr>`;
+        $('anCohortBody').innerHTML = payload?.rows?.length ? payload.rows.map(row => `<tr><td class="an-cohort-sticky an-cohort-product-cell"><span class="an-cohort-row-title">${esc(row.product_name)}</span><span class="an-cohort-row-sub">${esc(row.sku)} · ${esc(row.category)}</span></td><td>${esc(cohortMonthLabel(row.cohort_month))}</td>${periods.map(index => cohortCell(row.periods?.[index], metric, true, maxValue, { cohort_month:row.cohort_month, product_name:row.product_name, sku:row.sku, category:row.category })).join('')}</tr>`).join('') : `<tr><td colspan="${periods.length + 2}"><div class="an-empty">Tidak ada cohort product untuk filter ini.</div></td></tr>`;
     }
     function openCohortDetail(detail) {
         const label = detail.is_product ? detail.product_name : cohortMonthLabel(detail.cohort_month);
