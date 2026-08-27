@@ -2620,15 +2620,10 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                     logisticsBtn = `
                     <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
                         <button class="btn-ship-primary" style="font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>
-                        <button class="btn-ship-outline" style="font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak Resi</button>
                     </div>`;
                 }
             } else if (activeTab === 'processed') {
-                logisticsBtn = `
-                <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
-                    <button class="btn-ship-outline" style="font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak Resi</button>
-                    <button class="btn-ship-outline" style="font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); printSingleGreeting(${o.store_id}, '${o.channel_order_id}')">💌 Kartu</button>
-                </div>`;
+                logisticsBtn = '';
             } else if (activeTab === 'ready') {
                 if (o.order_status === 'UNPAID') {
                     // Belum bayar → tidak bisa diproses; tawarkan chat ke pembeli
@@ -2643,8 +2638,22 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 } else if (o.needs_shipping_arrangement || (o.order_status === 'READY_TO_SHIP' && !o.shipping_awb_no)) {
                     logisticsBtn = `<button class="btn-ship-primary" style="font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>`;
                 } else if (o.order_status === 'READY_TO_SHIP' || o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') {
-                    logisticsBtn = `<button class="btn-ship-outline" style="font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak Resi</button>`;
+                    logisticsBtn = '';
                 }
+            }
+
+            let printHtml = '';
+            const printResiBtn = `<button class="ord-action-btn print" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak</button>`;
+            const printGreetingBtn = `<button class="ord-action-btn greeting" onclick="event.stopPropagation(); printSingleGreeting(${o.store_id}, '${o.channel_order_id}')">💌 Kartu</button>`;
+            if (activeTab === 'processed_instant' && o.order_status !== 'UNPAID') {
+                printHtml = printResiBtn;
+            } else if (activeTab === 'processed') {
+                printHtml = `<div class="ord-action-stack">${printResiBtn}${printGreetingBtn}</div>`;
+            } else if (['READY_TO_SHIP', 'PROCESSED', 'SHIPPED'].includes(o.order_status)) {
+                printHtml = printResiBtn;
+            }
+            if (isPrinted && ['processed', 'shipped'].includes(activeTab)) {
+                printHtml += `<div class="ord-printed-note">✓ ${esc(cetakTeks)}</div>`;
             }
 
             const printedBadge = (isPrinted && !isFulfilled && !['ready', 'processed', 'shipped'].includes(activeTab))
@@ -2701,13 +2710,11 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             }
             if (logisticsBtn) {
                 pengirimanHtml += `<div>${logisticsBtn}</div>`;
-                if (['processed', 'shipped'].includes(activeTab) && isPrinted) {
-                    pengirimanHtml += `<div style="margin-top:4px; font-size:0.68rem; color:#94a3b8; font-style:italic; text-align:center;">✓ Sudah dicetak</div>`;
-                }
-                if (['shipped', 'completed'].includes(activeTab) && o.shipping_awb_no) {
-                    pengirimanHtml += `<div style="margin-top:4px;"><button class="btn btn-sm btn-link" style="font-size:0.65rem; padding:0; text-decoration:none;" onclick="trackOrder(${o.store_id}, '${o.channel_order_id}', event)">🔍 Lacak</button></div>`;
-                }
             }
+
+            const trackHtml = ['shipped', 'completed'].includes(activeTab) && o.shipping_awb_no
+                ? `<button class="ord-action-btn track" onclick="event.stopPropagation(); trackOrder(${o.store_id}, '${o.channel_order_id}', event)">🔍 Lacak</button>`
+                : '<span class="ord-payment-empty">—</span>';
 
             const orderIdContent = `
                 <div class="ord-id">${orderIdHtml}</div>
@@ -2749,19 +2756,23 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 ${incomeCell}
                 <td class="ord-ams-cell">${amsHtml(o)}</td>
                 <td>${pengirimanHtml}</td>
+                <td class="ord-track-cell">${trackHtml}</td>
+                <td class="ord-print-cell">${printHtml || '<span class="ord-payment-empty">—</span>'}</td>
             </tr>`;
         }).join('');
 
         const hasResolveCol = activeTab === 'processed' && subTabProcessed !== 'packing';
         const hasScanCol    = activeTab === 'processed' && subTabProcessed !== 'packing';
-        // col widths: order | items | resolve? | scan? | buyer paid | voucher | income | AMS | pengiriman
-        const colItems  = hasResolveCol ? '17%' : '27%';
-        const colOrder = hasResolveCol ? '14%' : '18%';
-        const colPaid = hasResolveCol ? '11%' : '13%';
-        const colVoucher = hasResolveCol ? '12%' : '15%';
-        const colIncome = hasResolveCol ? '10%' : '12%';
-        const colAms = '7%';
-        const colShipping = hasResolveCol ? '7%' : '8%';
+        // col widths: order | items | resolve? | scan? | buyer paid | voucher | income | AMS | pengiriman | lacak | cetak
+        const colItems  = hasResolveCol ? '16%' : '25%';
+        const colOrder = hasResolveCol ? '13%' : '17%';
+        const colPaid = hasResolveCol ? '10%' : '12%';
+        const colVoucher = hasResolveCol ? '10%' : '14%';
+        const colIncome = hasResolveCol ? '9%' : '10%';
+        const colAms = '6%';
+        const colShipping = hasResolveCol ? '6%' : '6%';
+        const colTrack = hasResolveCol ? '6%' : '5%';
+        const colPrint = hasResolveCol ? '6%' : '5%';
         
         const firstHeaderHtml = activeTab === 'processed'
             ? `<div style="display:flex; align-items:center;">
@@ -2776,13 +2787,15 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             <colgroup>
                 <col style="width:${colOrder}">
                 <col style="width:${colItems}">
-                ${hasResolveCol ? '<col style="width:12%">' : ''}
-                ${hasScanCol    ? '<col style="width:12%">' : ''}
+                ${hasResolveCol ? '<col style="width:9%">' : ''}
+                ${hasScanCol    ? '<col style="width:9%">' : ''}
                 <col style="width:${colPaid}">
                 <col style="width:${colVoucher}">
                 <col style="width:${colIncome}">
                 <col style="width:${colAms}">
                 <col style="width:${colShipping}">
+                <col style="width:${colTrack}">
+                <col style="width:${colPrint}">
             </colgroup>
             <thead><tr>
                 <th>${firstHeaderHtml}</th>
@@ -2794,6 +2807,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <th>Penghasilan</th>
                 <th>AMS</th>
                 <th>Pengiriman</th>
+                <th>Lacak</th>
+                <th>Cetak</th>
             </tr></thead>
             <tbody>${tableRows}</tbody>
         </table></div>

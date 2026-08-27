@@ -287,6 +287,23 @@ body[data-theme="dark"] .ord-payment-line.seller { color: #bfdbfe; background: r
 body[data-theme="dark"] .ord-income-value.estimated { color: #fde68a; background: rgba(161, 98, 7, .22); border-color: rgba(250, 204, 21, .35); }
 body[data-theme="dark"] .ord-income-value.actual { color: #a7f3d0; background: rgba(5, 150, 105, .2); border-color: rgba(52, 211, 153, .35); }
 .ord-ams-cell { text-align: right; }
+.ord-track-cell, .ord-print-cell { text-align: center; vertical-align: middle; }
+.ord-action-stack { display: flex; flex-direction: column; align-items: stretch; gap: .25rem; }
+.ord-action-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: .2rem;
+    width: 100%; min-width: 0; padding: .24rem .3rem; border: 1px solid;
+    border-radius: 5px; background: transparent; font-size: .61rem; font-weight: 750;
+    line-height: 1.25; white-space: nowrap; cursor: pointer;
+}
+.ord-action-btn.track { color: #0369a1; background: #f0f9ff; border-color: #bae6fd; }
+.ord-action-btn.print { color: #475569; background: #f8fafc; border-color: #cbd5e1; }
+.ord-action-btn.greeting { color: #7c3aed; background: #f5f3ff; border-color: #ddd6fe; }
+.ord-action-btn:hover { filter: brightness(.97); transform: translateY(-1px); }
+.ord-printed-note { margin-top: .25rem; color: #0369a1; font-size: .57rem; font-style: italic; white-space: nowrap; }
+body[data-theme="dark"] .ord-action-btn.track { color: #bae6fd; background: rgba(3, 105, 161, .22); border-color: rgba(56, 189, 248, .35); }
+body[data-theme="dark"] .ord-action-btn.print { color: #cbd5e1; background: rgba(51, 65, 85, .4); border-color: rgba(148, 163, 184, .35); }
+body[data-theme="dark"] .ord-action-btn.greeting { color: #ddd6fe; background: rgba(109, 40, 217, .22); border-color: rgba(167, 139, 250, .35); }
+body[data-theme="dark"] .ord-printed-note { color: #7dd3fc; }
 .ord-ams-value {
     display: inline-flex; padding: .18rem .35rem; border-radius: 5px;
     color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe;
