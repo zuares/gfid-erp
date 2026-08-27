@@ -195,6 +195,14 @@ trait MarketplaceOrdersPaginatedTrait
         // Map items exactly like in localOrders
         $paginator->getCollection()->transform(function ($o) use ($hasScanLog) {
             $arr = $o->toArray();
+
+            // Samakan angka voucher dengan endpoint Income Detail. Field ini
+            // sudah menormalisasi sumber voucher seller/platform dari escrow,
+            // termasuk response yang hanya menyimpan nilainya di raw_json.
+            if ($o->settlement) {
+                $arr['settlement']['voucher_toko_total'] = $this->settlementVoucherTokoAmount($o->settlement);
+                $arr['settlement']['voucher_platform_total'] = $this->settlementVoucherPlatformAmount($o->settlement);
+            }
             
             $carrier   = strtolower((string) $o->shipping_carrier);
             $isInstant = str_contains($carrier, 'instant') || str_contains($carrier, 'same day') || str_contains($carrier, 'sameday');

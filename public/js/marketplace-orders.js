@@ -131,8 +131,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     }
 
     function voucherSummaryHtml(o) {
-        const sellerVoucher = voucherAmount(o, ['voucher_from_seller', 'seller_voucher_rebate', 'seller_voucher', 'discount_from_voucher_seller']);
-        const shopeeVoucher = voucherAmount(o, ['voucher_from_shopee', 'voucher_from_platform', 'platform_voucher', 'discount_from_voucher_shopee']);
+        const sellerVoucher = voucherAmount(o, ['voucher_toko_total', 'voucher_from_seller', 'seller_voucher_rebate', 'seller_voucher', 'discount_from_voucher_seller']);
+        const shopeeVoucher = voucherAmount(o, ['voucher_platform_total', 'voucher_from_shopee', 'voucher_from_platform', 'platform_voucher', 'discount_from_voucher_shopee']);
         const hasVoucherPayload = !!(o.settlement || o.raw_json?.income_details);
         if (!hasVoucherPayload && sellerVoucher <= 0 && shopeeVoucher <= 0) return '';
         const valueHtml = value => hasVoucherPayload ? esc(fmtRp(value)) : 'Belum tersedia';
