@@ -392,12 +392,13 @@
     .an-cohort-table th:first-child, .an-cohort-table td:first-child { text-align:left; position:sticky; left:0; z-index:3; background:var(--card,#fff); }
     .an-cohort-table thead th { background:var(--hero-bg,#f8fafc); vertical-align:bottom; }
     .an-cohort-table thead th small { display:block; margin-top:.12rem; color:var(--dsh-muted); font-size:.53rem; font-weight:650; text-transform:none; letter-spacing:0; }
+    .an-cohort-table tbody td { padding:.45rem .3rem; vertical-align:middle; }
     .an-cohort-table tbody tr:hover td { background:rgba(37,99,235,.035); }
     .an-cohort-row-title { font-weight:850; color:var(--text,#0f172a); }
     .an-cohort-row-sub { display:block; margin-top:.12rem; color:var(--dsh-muted); font-size:.6rem; font-weight:650; }
     .an-cohort-base-value { display:block; color:var(--text,#0f172a); font-weight:900; }
     .an-cohort-product-cell .an-cohort-row-title { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .an-cohort-cell { min-width:78px; border:0; border-radius:7px; padding:.35rem .42rem; color:var(--text,#0f172a); background:rgba(37,99,235,var(--heat,.08)); font-size:.68rem; font-weight:850; cursor:pointer; }
+    .an-cohort-cell { display:block; width:100%; min-width:0; border:0; border-radius:7px; padding:.35rem .3rem; color:var(--text,#0f172a); background:rgba(37,99,235,var(--heat,.08)); font-size:.68rem; font-weight:850; cursor:pointer; }
     .an-cohort-cell-value, .an-cohort-cell-sub { display:block; }
     .an-cohort-cell-value { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .an-cohort-cell-sub { margin-top:.12rem; color:var(--dsh-muted); font-size:.53rem; font-weight:700; }
@@ -406,7 +407,7 @@
     .an-cohort-table.is-dense thead th small { display:none; }
     .an-cohort-cell:hover, .an-cohort-cell:focus-visible { outline:2px solid #2563eb; outline-offset:1px; }
     .an-cohort-cell.product { background:rgba(217,119,6,var(--heat,.1)); }
-    .an-cohort-cell.is-empty { background:transparent; color:#cbd5e1; cursor:default; }
+    .an-cohort-cell.is-empty { display:block; min-height:2.1rem; padding:.35rem .2rem; background:transparent; color:#94a3b8; cursor:default; text-align:center; }
     .an-cohort-table .an-cohort-sticky { position:sticky; left:0; z-index:3; background:var(--card,#fff); }
     .an-cohort-guide-list { display:grid; gap:.72rem; }
     .an-cohort-guide-item { display:grid; grid-template-columns:28px minmax(0,1fr); gap:.55rem; align-items:start; }
@@ -1613,9 +1614,9 @@
         $('anCohortNote').textContent = notes.join(' · ') || 'Agregasi cohort mengikuti filter periode dan toko di halaman ini.';
     }
     function cohortCell(detail, metric, isProduct, maxValue, context = {}) {
-        if (!detail) return '<span class="an-cohort-cell is-empty">—</span>';
+        if (!detail) return '<span class="an-cohort-cell is-empty" title="Tidak ada aktivitas pada periode ini">—</span>';
         const value = detail[metric];
-        if (value === null || value === undefined) return '<span class="an-cohort-cell is-empty">—</span>';
+        if (value === null || value === undefined) return '<span class="an-cohort-cell is-empty" title="Metric tidak tersedia pada periode ini">—</span>';
         const intensity = Math.min(.46, .08 + (Math.abs(Number(value || 0)) / Math.max(maxValue, 1)) * .38);
         const encoded = esc(JSON.stringify({ ...context, ...detail, metric, metric_label: payloadMetricLabel(metric), is_product: isProduct }));
         const supportingValue = isProduct ? `Rev ${money(detail.revenue)}` : `${Number(detail.active_customers || 0).toLocaleString('id-ID')} active`;

@@ -122,7 +122,7 @@ class MarketplaceCohortService
             ->all();
 
         $periodRows = [];
-        $maxPeriod = 0;
+        $maxPeriod = $this->periodSpan($filters);
         foreach ($rows as $row) {
             $cohortMonthValue = (string) $row->cohort_month;
             $periodMonthValue = (string) $row->period_month;
@@ -228,7 +228,7 @@ class MarketplaceCohortService
             ->get();
 
         $grouped = [];
-        $maxPeriod = 0;
+        $maxPeriod = $this->periodSpan($filters);
         foreach ($rows as $row) {
             $cohortMonthValue = (string) $row->cohort_month;
             $periodMonthValue = (string) $row->period_month;
@@ -554,5 +554,16 @@ class MarketplaceCohortService
     private function monthDiff(string $from, string $to): int
     {
         return Carbon::createFromFormat('Y-m', $from)->diffInMonths(Carbon::createFromFormat('Y-m', $to), false);
+    }
+
+    private function periodSpan(array $filters): int
+    {
+        if (empty($filters['date_from']) || empty($filters['date_to'])) {
+            return 0;
+        }
+
+        return max(0, Carbon::parse($filters['date_from'])->startOfMonth()->diffInMonths(
+            Carbon::parse($filters['date_to'])->startOfMonth(),
+        ));
     }
 }
