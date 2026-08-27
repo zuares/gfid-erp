@@ -118,9 +118,25 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     }
 
     function itemSalePriceHtml(i) {
-        const original = Number(i.price_original ?? i.price);
-        const discounted = Number(i.price_after_discount);
-        const sale = Number.isFinite(discounted) && discounted > 0 ? discounted : original;
+        // Payload orders lama/regular memakai model_* sementara payload item
+        // tersimpan memakai price_*. Ambil nilai positif pertama agar harga
+        // tanpa diskon tetap tampil walaupun salah satu field bernilai 0.
+        const positivePrice = (...values) => values
+            .map(value => Number(value))
+            .find(value => Number.isFinite(value) && value > 0) || 0;
+        const original = positivePrice(
+            i.price_original,
+            i.model_original_price,
+            i.original_price,
+            i.price,
+            i.item_original_price,
+        );
+        const discounted = positivePrice(
+            i.price_after_discount,
+            i.model_discounted_price,
+            i.discounted_price,
+        );
+        const sale = discounted > 0 ? discounted : original;
         if (!Number.isFinite(sale) || sale <= 0) return '';
 
         const qty = Math.max(1, Number(i.qty) || 1);
