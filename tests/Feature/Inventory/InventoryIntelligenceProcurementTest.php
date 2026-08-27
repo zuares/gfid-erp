@@ -145,7 +145,7 @@ it('extends procurement forecast to the manually configured supplier lead time',
 
     expect($row->lead_time_days)->toBe(90)
         ->and($row->lead_time_source)->toBe('item')
-        ->and($row->procurement_effective_days)->toBe(90)
-        ->and($row->procurement_forecast)->toBe(180.0)
-        ->and($row->procurement_suggested_qty)->toBe(170.0);
+        ->and($row->procurement_effective_days)->toBe(120)
+        ->and($row->procurement_forecast)->toBe(240.0)
+        ->and($row->procurement_suggested_qty)->toBe(230.0);
 });

@@ -35,7 +35,7 @@
     </div>
     <div class="col-6 col-xl">
         <div class="card-main h-100 p-3">
-            <div class="text-muted-ii small">Forecast minimum {{ $procurementDays }} hari</div>
+            <div class="text-muted-ii small">Forecast {{ $procurementDays }} hari + lead time</div>
             <div class="fw-bold fs-5">{{ $fmt($totalForecast) }} pcs</div>
         </div>
     </div>
@@ -62,7 +62,7 @@
 <div class="filter-bar mb-3">
     <div class="d-flex flex-wrap gap-2 align-items-center">
         <div class="filter-placeholder d-flex flex-wrap align-items-center gap-2"></div>
-        <span class="text-muted-ii" style="font-size:.72rem;">Forecast minimum {{ $procurementDays }} hari · menyesuaikan lead time supplier</span>
+        <span class="text-muted-ii" style="font-size:.72rem;">Forecast {{ $procurementDays }} hari + lead time supplier</span>
         <div class="vr mx-1 d-none d-md-block" style="opacity: .15;"></div>
         <input type="search" class="form-control form-control-sm ii-search" data-ii-search
             placeholder="Cari SKU / produk / kategori…" autocomplete="off" style="max-width:200px;">
@@ -115,7 +115,7 @@
                         <th class="text-end">Lead Time</th>
                         <th data-ii-sort-key="stock" data-ii-sort-type="number" class="text-end">Stok Tersedia</th>
                         <th data-ii-sort-key="ads" data-ii-sort-type="number" class="text-end">Jual / Hari</th>
-                        <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Forecast minimal {{ $procurementDays }} hari, diperpanjang mengikuti lead time">Forecast</th>
+                        <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Forecast {{ $procurementDays }} hari ditambah lead time supplier">Forecast</th>
                         <th data-ii-sort-key="suggested" data-ii-sort-type="number" class="text-end" style="padding-right: 1.25rem; width: 140px;">Saran Pengadaan</th>
                     </tr>
                 </thead>

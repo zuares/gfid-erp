@@ -118,7 +118,7 @@
             </div>
             <div class="slip-title">
                 <b>Draft {{ $suggestionLabel }}</b>
-                <span>Forecast minimum {{ $forecastDays }} hari, menyesuaikan lead time supplier</span>
+                <span>Forecast {{ $forecastDays }} hari + lead time supplier</span>
             </div>
         </div>
 
@@ -172,7 +172,7 @@
             </div>
 
             <div class="foot-note">
-                Saran = maks(0, forecast minimum {{ $forecastDays }} hari / lead time − (ready + PRD + WIP proses)).
+                Saran = maks(0, forecast ({{ $forecastDays }} hari + lead time) − (ready + PRD + WIP proses)).
                 Angka mengikuti data realtime saat dicetak.
             </div>
         @endif

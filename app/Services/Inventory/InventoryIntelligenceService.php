@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
  * Menggabungkan snapshot stok + laju jual dengan metadata item (finished_good)
  * lalu menurunkan metrik forecast realtime:
  *   - forecast_30   = ADS × 30
- *   - procurement_forecast = ADS × max(horizon pengadaan, lead time supplier)
+ *   - procurement_forecast = ADS × (horizon pengadaan + lead time supplier)
  *   - suggested_qty = saran sesuai default_supply_source
  *   - production_suggested_qty / procurement_suggested_qty tetap tersedia
  *     untuk item Hybrid agar user bisa memilih jalurnya
@@ -86,10 +86,11 @@ class InventoryIntelligenceService
             $leadTimeSource = $directLeadTime?->lead_time_days !== null
                 ? 'item'
                 : ($categoryLeadTime?->lead_time_days !== null ? 'category' : null);
-            $effectiveProcurementDays = max($procurementHorizon, (int) ($leadTimeDays ?? 0));
+            // Periode pengadaan adalah kebutuhan setelah barang tiba; lead time
+            // ditambahkan agar stok tetap mencukupi selama menunggu supplier.
+            $effectiveProcurementDays = $procurementHorizon + (int) ($leadTimeDays ?? 0);
 
             $productionForecast = round($ads * $productionHorizon, 1);
-            // Horizon pengadaan tidak boleh lebih pendek dari waktu tunggu supplier.
             $procurementForecast = round($ads * $effectiveProcurementDays, 1);
             $productionSuggested = $item->canMake() && $ads > 0
                 ? max(0.0, round($productionForecast - $availableStock, 0))
