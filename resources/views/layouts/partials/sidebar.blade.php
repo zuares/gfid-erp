@@ -105,6 +105,7 @@
     $hasMarketplacePromotionsSummary  = $router->has('marketplace.promotions.summary');
     $hasMarketplacePencairanDana  = $router->has('marketplace.settlement');
     $hasMarketplaceIncomeDetail = $router->has('marketplace.income-detail');
+    $hasMarketplaceEscrow = $router->has('marketplace.escrow');
     $hasMarketplaceProfit      = $router->has('marketplace.profit');
     $hasMarketplaceAds         = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics   = $router->has('marketplace.analytics');
@@ -325,6 +326,7 @@
         $open('marketplace.promotions.summary') ||
         $open('marketplace.settlement') ||
         $open('marketplace.income-detail') ||
+        $open('marketplace.escrow') ||
         $open('marketplace.profit') ||
         $open('marketplace.ads') ||
         $open('marketplace.analytics') ||
@@ -1668,6 +1670,12 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.income-detail') }}" icon="bi bi-journal-text"
                                 :active="request()->routeIs('marketplace.income-detail')">
                                 Rincian Penghasilan
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceEscrow)
+                            <x-sidebar.sub-link href="{{ route('marketplace.escrow') }}" icon="bi bi-safe2"
+                                :active="request()->routeIs('marketplace.escrow')">
+                                Escrow Shopee
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceProfit)

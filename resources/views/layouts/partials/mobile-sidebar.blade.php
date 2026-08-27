@@ -314,6 +314,7 @@
     $hasMarketplacePromotionsSummary = $router->has('marketplace.promotions.summary');
     $hasMarketplacePencairanDana = $router->has('marketplace.settlement');
     $hasMarketplaceIncomeDetail = $router->has('marketplace.income-detail');
+    $hasMarketplaceEscrow = $router->has('marketplace.escrow');
     $hasMarketplaceProfit = $router->has('marketplace.profit');
     $hasMarketplaceAds = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics = $router->has('marketplace.analytics');
@@ -535,6 +536,7 @@
         request()->routeIs('marketplace.promotions.summary') ||
         request()->routeIs('marketplace.settlement') ||
         request()->routeIs('marketplace.income-detail') ||
+        request()->routeIs('marketplace.escrow') ||
         request()->routeIs('marketplace.profit') ||
         request()->routeIs('marketplace.reports.*') ||
         request()->routeIs('marketplace.ads') ||
@@ -1680,6 +1682,13 @@
                                 <a href="{{ route('marketplace.income-detail') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.income-detail') ? 'active' : '' }}">
                                     <span class="icon">🧾</span><span>Rincian Penghasilan</span>
+                                </a>
+                            @endif
+
+                            @if ($hasMarketplaceEscrow)
+                                <a href="{{ route('marketplace.escrow') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.escrow') ? 'active' : '' }}">
+                                    <span class="icon">🔐</span><span>Escrow Shopee</span>
                                 </a>
                             @endif
 

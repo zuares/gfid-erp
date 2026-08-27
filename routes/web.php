@@ -74,6 +74,7 @@ use App\Http\Controllers\Owner\FulfillmentController;
 use App\Http\Controllers\Owner\SkuMappingController;
 use App\Http\Controllers\ShopeeStoreAuthController;
 use App\Http\Controllers\TikTokShopAuthController;
+use App\Http\Controllers\Marketplace\EscrowController;
 
 // Marketplace — halaman
 Route::middleware(['auth', 'access:marketplace'])->group(function () {
@@ -96,6 +97,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/sync',        [MarketplaceController::class, 'sync'])->name('marketplace.sync');
     Route::get('/marketplace/settlement',  [MarketplaceFinanceController::class, 'settlement'])->name('marketplace.settlement');
     Route::get('/marketplace/penghasilan',  [MarketplaceFinanceController::class, 'incomeDetail'])->name('marketplace.income-detail');
+    Route::get('/marketplace/escrow', [EscrowController::class, 'index'])->name('marketplace.escrow');
     Route::get('/marketplace/penghasilan/produk', [MarketplaceFinanceController::class, 'incomeProducts'])->name('marketplace.income-detail.products');
     Route::get('/marketplace/profit',      [MarketplaceFinanceController::class, 'profit'])->name('marketplace.profit');
     Route::get('/marketplace/ads',         [MarketplaceController::class, 'ads'])->name('marketplace.ads');
@@ -134,6 +136,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/channels',                    [MarketplaceController::class, 'channels']);
     Route::get('/stores',                      [MarketplaceController::class, 'stores']);
     Route::get('/stores/{store}/shop-info',    [MarketplaceController::class, 'shopInfo']);
+    Route::get('/stores/{store}/escrow-list', [EscrowController::class, 'list'])->name('marketplace.api.escrow-list');
+    Route::get('/stores/{store}/escrow-detail', [EscrowController::class, 'detail'])->name('marketplace.api.escrow-detail');
     Route::post('/stores/{store}/sync-orders', [MarketplaceController::class, 'syncOrders'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/stores/{store}/sync-orders-background', [MarketplaceController::class, 'syncOrdersBackground'])
