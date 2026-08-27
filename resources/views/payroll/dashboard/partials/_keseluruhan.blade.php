@@ -2,8 +2,8 @@
     $fmt = fn($n, $d = 0) => number_format((float) $n, $d, ',', '.');
     $rp = fn($n) => 'Rp ' . number_format((float) $n, 0, ',', '.');
     $roleBadge = fn($role) => $role === 'Cutting' ? 'gf-badge-amber' : 'gf-badge-green';
-    // Upah ter-proyeksi: Setor/Potong = upah riil; Ambil = perkiraan (rate × qty).
-    $projOf = fn($r) => $r->kind === 'Ambil' ? $r->rate * $r->qty : $r->amount;
+    // Upah jahit berasal dari Ambil Jahit; upah cutting berasal dari hasil QC OK.
+    $projOf = fn($r) => $r->amount;
 
     // ---- Ringkasan KPI (gabungan jahit + cutting, per transaksi) ----
     $txCount = $rows->count();
@@ -12,7 +12,7 @@
     $upahCutting = (float) $rows->where('module', 'cutting')->sum('amount');
     $upahGabungan = $upahJahit + $upahCutting;
     $totalQty = (float) $rows->sum('qty');
-    // Total termasuk perkiraan Ambil (rate × qty) — utk footer & area filter, bukan KPI.
+    // Total upah berdasarkan basis pembayaran masing-masing modul.
     $totalUpahProj = (float) $rows->sum($projOf);
 
     // Opsi filter operator (kode → nama, peran)
@@ -27,12 +27,12 @@
     <div class="gf-overview-kpi-card gf-overview-kpi-card-strong">
         <div class="gf-overview-kpi-label">Total Upah Gabungan</div>
         <div class="gf-overview-kpi-value" data-ks-kpi-total>{{ $rp($upahGabungan) }}</div>
-        <div class="gf-overview-kpi-note">jahit + cutting (setoran OK)</div>
+        <div class="gf-overview-kpi-note">jahit Ambil + cutting QC OK</div>
     </div>
     <div class="gf-overview-kpi-card">
         <div class="gf-overview-kpi-label">Upah Jahit</div>
         <div class="gf-overview-kpi-value" data-ks-kpi-jahit>{{ $rp($upahJahit) }}</div>
-        <div class="gf-overview-kpi-note">borongan jahit (setor OK)</div>
+        <div class="gf-overview-kpi-note">borongan jahit (Ambil Jahit)</div>
     </div>
     <div class="gf-overview-kpi-card">
         <div class="gf-overview-kpi-label">Upah Cutting</div>
@@ -128,8 +128,8 @@
                             <td class="gf-num gf-hide-mobile">{{ $r->rate > 0 ? $rp($r->rate) : '–' }}</td>
                             <td class="gf-num">
                                 @if ($r->kind === 'Ambil')
-                                    @if ($r->rate > 0)
-                                        <span class="text-muted" title="Perkiraan upah bila semua lolos QC (belum final)">~{{ $rp($r->rate * $r->qty) }}</span>
+                                    @if ($r->amount > 0)
+                                        {{ $rp($r->amount) }}
                                     @else
                                         –
                                     @endif
@@ -142,7 +142,7 @@
                 </tbody>
                 <tfoot>
                     <tr class="gf-total-row" data-ks-foot>
-                        <td colspan="6" class="text-muted">Total Qty &amp; upah borongan (riil + perkiraan Ambil)</td>
+                        <td colspan="6" class="text-muted">Total Qty &amp; upah borongan (Ambil Jahit + Cutting QC OK)</td>
                         <td class="gf-num"><b data-ks-foot-qty>{{ $fmt($totalQty) }}</b></td>
                         <td class="gf-num gf-hide-mobile"></td>
                         <td class="gf-num gf-hide-mobile"></td>
@@ -155,7 +155,6 @@
         <div class="gf-table-foot">
             <span class="gf-table-foot-hint" data-ks-slip-hint hidden>Pilih peran (Jahit/Cutting) + satu operator untuk mencetak slip upah.</span>
             <a class="gf-slip-btn" data-ks-slip hidden target="_blank" rel="noopener">Slip Setor</a>
-            <a class="gf-slip-btn" data-ks-slip-ambil hidden target="_blank" rel="noopener">Slip Ambil</a>
         </div>
     @endif
 </x-gf.panel>

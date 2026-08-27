@@ -20,7 +20,8 @@ use Illuminate\View\View;
  *
  * Tab:
  *  - Keseluruhan : gabungan transaksi jahit + cutting (filter peran/operator/SKU).
- *  - Penjahit    : aktivitas jahit per transaksi (ambil & setor) + upah borongan.
+ *  - Penjahit    : aktivitas jahit per transaksi (ambil & setor) + upah borongan
+ *                  berbasis Ambil Jahit.
  *  - Cutting     : aktivitas cutting per transaksi (hasil potong) + upah borongan.
  */
 class PayrollDashboardController extends Controller
@@ -30,8 +31,7 @@ class PayrollDashboardController extends Controller
 
     public function __construct(
         private PieceRateService $pieceRate,
-    ) {
-    }
+    ) {}
 
     /**
      * Shell dashboard: render kerangka + HANYA tab awal (lazy).
@@ -42,7 +42,7 @@ class PayrollDashboardController extends Controller
         $filters = $this->resolveFilters($request);
 
         $initialTab = $request->input('tab');
-        if (!in_array($initialTab, self::TABS, true)) {
+        if (! in_array($initialTab, self::TABS, true)) {
             $initialTab = 'keseluruhan';
         }
 
@@ -70,7 +70,7 @@ class PayrollDashboardController extends Controller
     public function data(Request $request): \Illuminate\Http\JsonResponse
     {
         $tab = $request->input('tab');
-        if (!in_array($tab, self::TABS, true)) {
+        if (! in_array($tab, self::TABS, true)) {
             return response()->json(['message' => 'Tab tidak dikenal.'], 422);
         }
 
@@ -94,18 +94,17 @@ class PayrollDashboardController extends Controller
     /**
      * Slip upah borongan per operator (siap cetak). Reuse view slip produksi.
      * Sumber upah = nilai REAL yang dibayar:
-     *   - sewing  → setoran jahit lolos QC (qty_ok × rate)
+     *   - sewing  → ambil jahit (qty_ambil × rate)
      *   - cutting → hasil potong lolos QC (qty_qc_ok × rate)
-     * + bagian perkiraan (belum disetor) khusus jahit.
      */
     public function slip(Request $request): View
     {
         $module = $request->query('module') === 'cutting' ? 'cutting' : 'sewing';
-        $basis = $module === 'sewing' && $request->query('basis') === 'ambil' ? 'ambil' : 'setor';
+        $basis = $module === 'sewing' && $request->query('basis') !== 'setor' ? 'ambil' : 'setor';
         $code = trim((string) $request->query('operator', ''));
 
         $employee = $code !== '' ? Employee::where('code', $code)->first() : null;
-        abort_if(!$employee, 404, 'Operator tidak ditemukan.');
+        abort_if(! $employee, 404, 'Operator tidak ditemukan.');
 
         $f = $this->resolveFilters($request);
         $f['operator_id'] = $employee->id;
@@ -131,6 +130,7 @@ class PayrollDashboardController extends Controller
                             $pickupDates = $s->pluck('pickup_date')->filter()->unique()->sort()->values();
                             $pickupFrom = $pickupDates->first();
                             $pickupTo = $pickupDates->last();
+
                             return (object) [
                                 'sku' => $first->sku,
                                 'product_name' => $first->product_name,
@@ -156,15 +156,15 @@ class PayrollDashboardController extends Controller
         };
 
         $groups = $basis === 'ambil'
-            ? $groupBy($rows, fn($r) => $r->qty, fn($r) => $r->rate * $r->qty)
-            : $groupBy($rows, fn($r) => $r->qty_ok, fn($r) => $r->amount);
+            ? $groupBy($rows, fn ($r) => $r->qty, fn ($r) => $r->rate * $r->qty)
+            : $groupBy($rows, fn ($r) => $r->qty_ok, fn ($r) => $r->amount);
         $estGroups = collect();
         $estQty = 0.0;
         $estAmount = 0.0;
 
         $recap = $groups
             ->groupBy('category')
-            ->map(fn($g, $cat) => (object) [
+            ->map(fn ($g, $cat) => (object) [
                 'category' => $cat,
                 'qty' => (float) $g->sum('qty'),
                 'amount' => (float) $g->sum('amount'),
@@ -178,14 +178,14 @@ class PayrollDashboardController extends Controller
         $pickupFrom = $pickupDates->first();
         $pickupTo = $pickupDates->last();
 
-        $clean = fn(string $s) => preg_replace('/[^A-Za-z0-9]+/', '', $s);
-        $range = Carbon::parse($f['date_from'])->format('Ymd') . '-' . Carbon::parse($f['date_to'])->format('Ymd');
+        $clean = fn (string $s) => preg_replace('/[^A-Za-z0-9]+/', '', $s);
+        $range = Carbon::parse($f['date_from'])->format('Ymd').'-'.Carbon::parse($f['date_to'])->format('Ymd');
         $basisLabel = $basis === 'ambil' ? 'Ambil' : 'Setor';
-        $fileName = trim($clean($employee->name) . '_' . $role . '_' . $basisLabel . '_' . $range, '_');
+        $fileName = trim($clean($employee->name).'_'.$role.'_'.$basisLabel.'_'.$range, '_');
 
         return view('production.dashboard.slip', [
             'module' => $module,
-            'moduleLabel' => $module === 'cutting' ? 'Cutting (Potong)' : 'Jahit (' . $basisLabel . ')',
+            'moduleLabel' => $module === 'cutting' ? 'Cutting (Potong)' : 'Jahit ('.$basisLabel.')',
             'slipBasis' => $basis,
             'role' => $role,
             'employee' => $employee,
@@ -196,7 +196,7 @@ class PayrollDashboardController extends Controller
             'pickupTo' => $pickupTo,
             'groups' => $groups,
             'grandQty' => (float) ($basis === 'ambil' ? $rows->sum('qty') : $rows->sum('qty_ok')),
-            'grandAmount' => (float) ($basis === 'ambil' ? $rows->sum(fn($r) => $r->rate * $r->qty) : $rows->sum('amount')),
+            'grandAmount' => (float) ($basis === 'ambil' ? $rows->sum(fn ($r) => $r->rate * $r->qty) : $rows->sum('amount')),
             'estGroups' => $estGroups,
             'estQty' => $estQty,
             'estAmount' => $estAmount,
@@ -213,12 +213,12 @@ class PayrollDashboardController extends Controller
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
-        if (!$dateFrom && !$dateTo) {
+        if (! $dateFrom && ! $dateTo) {
             $dateTo = $today->toDateString();
             $dateFrom = $today->copy()->subDays(6)->toDateString();
-        } elseif ($dateFrom && !$dateTo) {
+        } elseif ($dateFrom && ! $dateTo) {
             $dateTo = $dateFrom;
-        } elseif (!$dateFrom && $dateTo) {
+        } elseif (! $dateFrom && $dateTo) {
             $dateFrom = $dateTo;
         }
         if ($dateFrom > $dateTo) {
@@ -238,13 +238,13 @@ class PayrollDashboardController extends Controller
     private function periodLabel(array $f): string
     {
         return Carbon::parse($f['date_from'])->format('d M Y')
-            . ' – ' . Carbon::parse($f['date_to'])->format('d M Y');
+            .' – '.Carbon::parse($f['date_to'])->format('d M Y');
     }
 
     /** Nama blade partial untuk sebuah tab. */
     private function partialFor(string $tab): string
     {
-        return 'payroll.dashboard.partials._' . $tab;
+        return 'payroll.dashboard.partials._'.$tab;
     }
 
     /** Hitung HANYA data yang diperlukan tab terkait. */
@@ -267,6 +267,7 @@ class PayrollDashboardController extends Controller
             $r->module = 'sewing';
             $r->role = 'Jahit';
             $r->kind = $r->type; // Ambil / Setor
+
             return $r;
         });
 
@@ -276,6 +277,7 @@ class PayrollDashboardController extends Controller
             $r->kind = 'Potong';
             $r->type = 'Potong';
             $r->qty_outstanding = 0.0;
+
             return $r;
         });
 
@@ -300,7 +302,9 @@ class PayrollDashboardController extends Controller
             ->join('items as it', 'it.id', '=', 'pl.finished_item_id')
             ->leftJoin('item_categories as cat', 'cat.id', '=', 'it.item_category_id')
             ->whereNull('p.voided_at')
+            ->where('p.status', '!=', 'void')
             ->whereNull('pl.voided_at')
+            ->where('pl.status', '!=', 'void')
             ->whereRaw('DATE(p.date) BETWEEN ? AND ?', [$from, $to]);
         if ($f['operator_id']) {
             $pick->where('p.operator_id', $f['operator_id']);
@@ -317,7 +321,8 @@ class PayrollDashboardController extends Controller
                 e.id as operator_emp_id, e.code as operator_code, e.name as operator_name,
                 it.id as item_id, it.code as sku, it.name as product_name, COALESCE(cat.name,'-') as category,
                 COALESCE(pl.qty_bundle,0) as qty, 0 as qty_ok, 0 as qty_reject,
-                COALESCE(pl.qty_bundle,0) - COALESCE(pl.qty_returned_ok,0) - COALESCE(pl.qty_returned_reject,0) as qty_outstanding
+                COALESCE(pl.qty_bundle,0) - COALESCE(pl.qty_returned_ok,0) - COALESCE(pl.qty_returned_reject,0) as qty_outstanding,
+                COALESCE(pl.wage_per_pcs,0) as snapshot_rate
             ")
             ->get();
 
@@ -330,6 +335,11 @@ class PayrollDashboardController extends Controller
             ->join('employees as e', 'e.id', '=', 'r.operator_id')
             ->leftJoin('item_categories as cat', 'cat.id', '=', 'it.item_category_id')
             ->whereNull('r.voided_at')
+            ->where('r.status', '!=', 'void')
+            ->whereNull('pp.voided_at')
+            ->where('pp.status', '!=', 'void')
+            ->whereNull('pl.voided_at')
+            ->where('pl.status', '!=', 'void')
             ->whereRaw('DATE(r.date) BETWEEN ? AND ?', [$from, $to]);
         if ($f['operator_id']) {
             $ret->where('r.operator_id', $f['operator_id']);
@@ -346,7 +356,7 @@ class PayrollDashboardController extends Controller
                 e.id as operator_emp_id, e.code as operator_code, e.name as operator_name,
                 it.id as item_id, it.code as sku, it.name as product_name, COALESCE(cat.name,'-') as category,
                 COALESCE(rl.qty_ok,0) as qty, COALESCE(rl.qty_ok,0) as qty_ok, COALESCE(rl.qty_reject,0) as qty_reject,
-                0 as qty_outstanding
+                0 as qty_outstanding, COALESCE(pl.wage_per_pcs,0) as snapshot_rate
             ")
             ->get();
 
@@ -356,16 +366,20 @@ class PayrollDashboardController extends Controller
             ->map(function ($r) use (&$rateMemo) {
                 $qtyOk = (float) $r->qty_ok;
                 $amount = 0.0;
-                $key = $r->operator_emp_id . '|' . $r->item_id . '|' . $r->date;
-                $rate = $rateMemo[$key] ??= (float) $this->pieceRate->getRatePerPcs(
-                    'sewing',
-                    (int) $r->operator_emp_id,
-                    (int) $r->item_id,
-                    $r->date,
-                );
-                if ($r->type === 'Setor' && $qtyOk > 0) {
-                    $amount = $rate * $qtyOk;
+                $key = $r->operator_emp_id.'|'.$r->item_id.'|'.$r->date;
+                $snapshotRate = (float) ($r->snapshot_rate ?? 0);
+                $rate = $snapshotRate > 0
+                    ? $snapshotRate
+                    : ($rateMemo[$key] ??= (float) $this->pieceRate->getRatePerPcs(
+                        'sewing',
+                        (int) $r->operator_emp_id,
+                        (int) $r->item_id,
+                        $r->date,
+                    ));
+                if ($r->type === 'Ambil' && (float) $r->qty > 0) {
+                    $amount = $rate * (float) $r->qty;
                 }
+
                 return (object) [
                     'type' => $r->type,
                     'code' => $r->code,
@@ -433,7 +447,7 @@ class PayrollDashboardController extends Controller
                 $rate = 0.0;
                 $amount = 0.0;
                 if ($r->operator_emp_id) {
-                    $key = $r->operator_emp_id . '|' . $r->item_id . '|' . $r->date;
+                    $key = $r->operator_emp_id.'|'.$r->item_id.'|'.$r->date;
                     $rate = $rateMemo[$key] ??= (float) $this->pieceRate->getRatePerPcs(
                         'cutting',
                         (int) $r->operator_emp_id,
@@ -444,6 +458,7 @@ class PayrollDashboardController extends Controller
                         $amount = $rate * $qtyOk;
                     }
                 }
+
                 return (object) [
                     'code' => $r->code,
                     'date' => $r->date,

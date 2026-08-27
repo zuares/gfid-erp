@@ -99,7 +99,7 @@
         <div class="pw-card">
             <div class="pw-h">
                 <div class="pw-title">Generate Payroll • {{ $moduleLabel ?? ucfirst($module) }}</div>
-                <div class="pw-sub">Pilih rentang tanggal → sistem generate periode (draft). Jika sudah FINAL tidak bisa
+                <div class="pw-sub">Pilih rentang tanggal → sistem generate periode (draft) dari {{ $module === 'sewing' ? 'qty Ambil Jahit' : 'qty QC OK' }}. Jika sudah FINAL tidak bisa
                     diulang.</div>
             </div>
 

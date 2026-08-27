@@ -1151,8 +1151,7 @@
                 setKpi('[data-ks-kpi-tx]', idFmt(shown));
 
                 const module = role === 'Jahit' ? 'sewing' : (role === 'Cutting' ? 'cutting' : '');
-                gfUpdateSlip(root.querySelector('[data-ks-slip]'), operator, module, module === 'sewing' ? 'setor' : '');
-                gfUpdateSlip(root.querySelector('[data-ks-slip-ambil]'), operator, module === 'sewing' ? 'sewing' : '', 'ambil');
+                gfUpdateSlip(root.querySelector('[data-ks-slip]'), operator, module, module === 'sewing' ? 'ambil' : '');
 
                 const empty = root.querySelector('[data-ks-empty]');
                 if (empty) empty.hidden = (shown !== 0) || rows.length === 0;

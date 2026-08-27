@@ -169,6 +169,7 @@
 @endpush
 
 @section('content')
+    @php($qtyLabel = $module === 'sewing' ? 'Qty Ambil' : 'Qty OK')
     <div class="pw-wrap">
         <div class="pw-top">
             <div>
@@ -273,7 +274,7 @@
                         <thead>
                             <tr>
                                 <th>Operator</th>
-                                <th class="pw-right">Qty</th>
+                                <th class="pw-right">{{ $qtyLabel }}</th>
                                 <th class="pw-right">Amount</th>
                             </tr>
                         </thead>
@@ -327,7 +328,7 @@
                                 <th>Employee</th>
                                 <th class="pw-hide-sm">Category</th>
                                 <th>Item</th>
-                                <th class="pw-right">Qty OK</th>
+                                <th class="pw-right">{{ $qtyLabel }}</th>
                                 <th class="pw-right pw-hide-sm">Rate</th>
                                 <th class="pw-right">Amount</th>
                             </tr>

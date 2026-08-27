@@ -2433,7 +2433,7 @@
 
                             <x-sidebar.sub-link href="{{ route('payroll.piecework.index', ['module' => 'sewing']) }}" icon="bi bi-send"
                                 :active="$pieceworkSewingActive">
-                                Gaji Jahit
+                                Gaji Jahit (Ambil)
                             </x-sidebar.sub-link>
                         @endif
 

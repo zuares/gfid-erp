@@ -10,8 +10,8 @@
     $totalReject = (float) $rows->where('type', 'Setor')->sum('qty_reject');
     $totalUpah = (float) $rows->sum('amount');
     $totalQty = (float) $rows->sum('qty');
-    // Total upah termasuk estimasi Ambil (rate × qty) — HANYA utk footer & area filter, bukan KPI.
-    $totalUpahProj = (float) $rows->sum(fn($r) => $r->type === 'Setor' ? $r->amount : $r->rate * $r->qty);
+    // Upah jahit dibayar berdasarkan qty Ambil Jahit.
+    $totalUpahProj = (float) $rows->sum('amount');
 
     $penjahitOptions = $rows
         ->map(fn($r) => ['code' => $r->operator_code, 'name' => $r->operator_name])
@@ -34,7 +34,7 @@
     <div class="gf-overview-kpi-card gf-overview-kpi-card-strong">
         <div class="gf-overview-kpi-label">Total Upah Jahit</div>
         <div class="gf-overview-kpi-value" data-pj-kpi-upah>{{ $rp($totalUpah) }}</div>
-        <div class="gf-overview-kpi-note">borongan dari setoran OK</div>
+        <div class="gf-overview-kpi-note">borongan dari Ambil Jahit</div>
     </div>
     <div class="gf-overview-kpi-card">
         <div class="gf-overview-kpi-label">Total Reject</div>
@@ -43,7 +43,7 @@
     </div>
 </div>
 
-<x-gf.panel title="Aktivitas Penjahit" subtitle="Rincian per transaksi — ambil &amp; setor jahit + upah borongan">
+<x-gf.panel title="Aktivitas Penjahit" subtitle="Rincian per transaksi — upah jahit dihitung dari Ambil Jahit">
     @if (!$rows->isEmpty())
         <x-slot:actions>
             <div class="pj-head-filters">
@@ -83,7 +83,7 @@
                         <th data-pj-sort-key="type"><button type="button" class="gf-sort-th">Jenis</button></th>
                         <th data-pj-sort-key="sku"><button type="button" class="gf-sort-th">SKU</button></th>
                         <th class="gf-hide-mobile">Produk</th>
-                        <th class="gf-num" data-pj-sort-key="qty"><button type="button" class="gf-sort-th">Qty / OK</button></th>
+                        <th class="gf-num" data-pj-sort-key="qty"><button type="button" class="gf-sort-th">Qty</button></th>
                         <th class="gf-num gf-hide-mobile" data-pj-sort-key="reject"><button type="button" class="gf-sort-th">Reject</button></th>
                         <th class="gf-num gf-hide-mobile">Piece Rate</th>
                         <th class="gf-num" data-pj-sort-key="amount"><button type="button" class="gf-sort-th">Total Upah</button></th>
@@ -104,7 +104,7 @@
                             data-reject="{{ (float) $r->qty_reject }}"
                             data-rate="{{ (float) $r->rate }}"
                             data-amount="{{ (float) $r->amount }}"
-                            data-proj="{{ (float) ($r->type === 'Setor' ? $r->amount : $r->rate * $r->qty) }}">
+                            data-proj="{{ (float) $r->amount }}">
                             <td>
                                 <x-gf.datecell :date="$r->date" :time="$r->created_at" />
                                 <span class="gf-doc-code">{{ $r->code }}</span>
@@ -120,10 +120,10 @@
                             <td class="gf-num gf-hide-mobile">{{ $r->qty_reject > 0 ? $fmt($r->qty_reject) : '-' }}</td>
                             <td class="gf-num gf-hide-mobile">{{ $r->rate > 0 ? $rp($r->rate) : '–' }}</td>
                             <td class="gf-num">
-                                @if ($r->type === 'Setor')
-                                    {{ $r->amount > 0 ? $rp($r->amount) : '–' }}
-                                @elseif ($r->rate > 0)
-                                    <span class="text-muted" title="Perkiraan upah bila semua lolos QC (belum final)">~{{ $rp($r->rate * $r->qty) }}</span>
+                                @if ($r->type === 'Ambil' && $r->amount > 0)
+                                    {{ $rp($r->amount) }}
+                                @elseif ($r->type === 'Setor')
+                                    <span class="text-muted" title="Upah sudah dihitung pada transaksi Ambil Jahit">–</span>
                                 @else
                                     –
                                 @endif
@@ -133,7 +133,7 @@
                 </tbody>
                 <tfoot>
                     <tr class="gf-total-row" data-pj-foot>
-                        <td colspan="5" class="text-muted">Total Qty &amp; upah borongan (Setor real + perkiraan Ambil)</td>
+                        <td colspan="5" class="text-muted">Total Qty &amp; upah borongan (basis Ambil Jahit)</td>
                         <td class="gf-num"><b data-pj-foot-qty>{{ $fmt($totalQty) }}</b></td>
                         <td class="gf-num gf-hide-mobile"></td>
                         <td class="gf-num gf-hide-mobile"></td>

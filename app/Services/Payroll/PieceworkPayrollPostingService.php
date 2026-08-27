@@ -22,10 +22,43 @@ class PieceworkPayrollPostingService
     public function finalize(PieceworkPayrollPeriod $period): PieceworkPayrollPeriod
     {
         return DB::transaction(function () use ($period) {
-            $period->refresh();
+            // Lock header payroll agar finalize/pay yang bersamaan tidak membaca
+            // status lama lalu membuat jurnal atau marker ganda.
+            $period = PieceworkPayrollPeriod::query()
+                ->lockForUpdate()
+                ->findOrFail($period->getKey());
+
+            $payable = Account::where('code', '2102')->first();
+            if (! $payable) {
+                throw new \RuntimeException('Akun 2102 (Hutang Upah Borongan) tidak ditemukan.');
+            }
+
+            $activeAccrual = Journal::query()
+                ->where('source_type', 'piecework_payroll_period_accrual')
+                ->where('source_id', $period->id)
+                ->whereNull('voided_at')
+                ->latest('id')
+                ->first();
 
             if ($period->status === 'final') {
-                return $period;
+                // Repair marker untuk periode lama yang sudah final sebelum field
+                // accounting masuk ke $fillable.
+                $updates = [];
+                if (! $period->payable_account_id) {
+                    $updates['payable_account_id'] = $payable->id;
+                }
+                if (! $period->finalized_at) {
+                    $updates['finalized_at'] = now();
+                }
+                if (! $period->accrual_journal_id && $activeAccrual) {
+                    $updates['accrual_journal_id'] = $activeAccrual->id;
+                }
+
+                if ($updates) {
+                    $period->forceFill($updates)->save();
+                }
+
+                return $period->fresh();
             }
 
             // hitung total
@@ -34,16 +67,10 @@ class PieceworkPayrollPostingService
                 throw new \RuntimeException('Total payroll 0. Tidak bisa finalize.');
             }
 
-            // akun hutang upah borongan (2102)
-            $payable = Account::where('code', '2102')->first();
-            if (!$payable) {
-                throw new \RuntimeException('Akun 2102 (Hutang Upah Borongan) tidak ditemukan.');
-            }
-
             // anti dobel journal
             if ($period->accrual_journal_id) {
                 $existing = Journal::find($period->accrual_journal_id);
-                if ($existing && !$existing->voided_at) {
+                if ($existing && ! $existing->voided_at) {
                     throw new \RuntimeException('Sudah ada jurnal accrual aktif untuk periode ini.');
                 }
             }
@@ -68,8 +95,8 @@ class PieceworkPayrollPostingService
             if (abs($difference) > 0.01) {
                 $inventoryCode = $period->module === 'finishing' ? '1203' : '1202';
                 $inventory = Account::where('code', $inventoryCode)->firstOrFail();
-                $desc = strtoupper($period->module) . ' Payroll Borongan (REKONSILIASI) '
-                    . $period->period_start . ' s/d ' . $period->period_end;
+                $desc = strtoupper($period->module).' Payroll Borongan (REKONSILIASI) '
+                    .$period->period_start.' s/d '.$period->period_end;
 
                 $lines = $difference > 0
                     ? [
@@ -90,14 +117,14 @@ class PieceworkPayrollPostingService
                 );
             }
 
-            $period->update([
+            $period->forceFill([
                 'total_amount' => $total,
                 'status' => 'final',
                 'finalized_at' => now(),
                 'finalized_by' => Auth::id(),
                 'payable_account_id' => $payable->id,
-                'accrual_journal_id' => $journal?->id,
-            ]);
+                'accrual_journal_id' => $journal?->id ?: $activeAccrual?->id,
+            ])->save();
 
             return $period;
         });
@@ -111,14 +138,49 @@ class PieceworkPayrollPostingService
     public function pay(PieceworkPayrollPeriod $period, int $paidFromAccountId): PieceworkPayrollPeriod
     {
         return DB::transaction(function () use ($period, $paidFromAccountId) {
-            $period->refresh();
+            // Satu lock per payroll period menjadi guard utama terhadap double
+            // submit dari dua request yang datang hampir bersamaan.
+            $period = PieceworkPayrollPeriod::query()
+                ->lockForUpdate()
+                ->findOrFail($period->getKey());
 
             if ($period->status !== 'final') {
                 throw new \RuntimeException('Periode harus FINAL sebelum dibayar.');
             }
 
-            if ($period->paid_at || $period->payment_journal_id) {
-                throw new \RuntimeException('Periode ini sudah dicatat pembayaran sebelumnya.');
+            // Recovery untuk data lama: jurnal payment mungkin sudah terbentuk,
+            // tetapi marker di payroll period gagal tersimpan.
+            $existingPayment = Journal::query()
+                ->with('lines')
+                ->where('source_type', 'piecework_payroll_period_payment')
+                ->where('source_id', $period->id)
+                ->whereNull('voided_at')
+                ->latest('id')
+                ->first();
+
+            if ($existingPayment) {
+                $paidAmount = round((float) $existingPayment->lines->sum('debit'), 2);
+                if ($paidAmount <= 0) {
+                    throw new \RuntimeException('Jurnal pembayaran payroll ditemukan tetapi nilainya tidak valid.');
+                }
+
+                $paidFromLine = $existingPayment->lines
+                    ->first(fn ($line) => (float) $line->credit > 0);
+
+                $period->forceFill([
+                    'payment_journal_id' => $existingPayment->id,
+                    'paid_from_account_id' => $paidFromLine?->account_id ?: $period->paid_from_account_id,
+                    'paid_at' => $period->paid_at ?: ($existingPayment->posted_at ?: now()),
+                    'total_amount' => $period->total_amount ?: $paidAmount,
+                ])->save();
+
+                return $period->fresh();
+            }
+
+            if ($period->payment_journal_id || $period->paid_at) {
+                throw new \RuntimeException(
+                    'Marker pembayaran payroll ada, tetapi jurnal pembayaran aktif tidak ditemukan. Periksa jurnal sebelum membayar ulang.'
+                );
             }
 
             $total = (float) ($period->total_amount ?? 0);
@@ -132,9 +194,9 @@ class PieceworkPayrollPostingService
 
             // hutang upah borongan (ambil dari period kalau ada)
             $payableId = (int) ($period->payable_account_id ?: 0);
-            if (!$payableId) {
+            if (! $payableId) {
                 $payable = Account::where('code', '2102')->first();
-                if (!$payable) {
+                if (! $payable) {
                     throw new \RuntimeException('Akun 2102 tidak ditemukan.');
                 }
 
@@ -143,13 +205,13 @@ class PieceworkPayrollPostingService
 
             // akun kas/bank pembayaran
             $paidFrom = Account::findOrFail($paidFromAccountId);
-            if (!$paidFrom->is_cash) {
+            if (! $paidFrom->is_cash) {
                 throw new \RuntimeException('Akun pembayaran harus akun Kas/Bank.');
             }
 
-            $desc = strtoupper($period->module) . ' Payroll Borongan (PAY) '
-            . $period->period_start . ' s/d ' . $period->period_end
-            . ' via ' . $paidFrom->name;
+            $desc = strtoupper($period->module).' Payroll Borongan (PAY) '
+            .$period->period_start.' s/d '.$period->period_end
+            .' via '.$paidFrom->name;
 
             $journal = $this->journalService->post(
                 date: now()->toDateString(),
@@ -162,15 +224,15 @@ class PieceworkPayrollPostingService
                 ]
             );
 
-            $period->update([
+            $period->forceFill([
                 'paid_from_account_id' => $paidFrom->id,
                 'paid_at' => now(),
                 'paid_by' => Auth::id(),
                 'payment_journal_id' => $journal->id,
                 'total_amount' => $total,
-            ]);
+            ])->save();
 
-            return $period;
+            return $period->fresh();
         });
     }
 }

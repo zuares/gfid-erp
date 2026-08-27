@@ -110,6 +110,7 @@
 @endpush
 
 @section('content')
+    @php($qtyLabel = $module === 'sewing' ? 'Qty Ambil' : 'Qty OK')
     <div class="pw-wrap">
         <div class="pw-card">
             <div class="pw-h">
@@ -124,7 +125,7 @@
 
             <div class="pw-b">
                 <div class="pw-sub" style="margin-bottom:.8rem">
-                    Grand Qty: <b>{{ rtrim(rtrim(number_format((float) $grandTotalQty, 2, '.', ''), '0'), '.') }}</b>
+                    Grand {{ $qtyLabel }}: <b>{{ rtrim(rtrim(number_format((float) $grandTotalQty, 2, '.', ''), '0'), '.') }}</b>
                     • Grand Amount: <b>{{ number_format((float) $grandTotalAmount, 0, ',', '.') }}</b>
                 </div>
 
@@ -134,7 +135,7 @@
                             <div>
                                 <div class="pw-emp-name">{{ $row['employee']?->name ?? '-' }}</div>
                                 <div class="pw-sub" style="margin:0">
-                                    Qty:
+                                    {{ $qtyLabel }}:
                                     <b>{{ rtrim(rtrim(number_format((float) $row['total_qty'], 2, '.', ''), '0'), '.') }}</b>
                                     • Amount: <b>{{ number_format((float) $row['total_amount'], 0, ',', '.') }}</b>
                                 </div>
@@ -148,7 +149,7 @@
                                 <tr>
                                     <th class="pw-hide-sm">Category</th>
                                     <th>Item</th>
-                                    <th class="pw-right">Qty</th>
+                                    <th class="pw-right">{{ $qtyLabel }}</th>
                                     <th class="pw-right pw-hide-sm">Rate</th>
                                     <th class="pw-right">Amount</th>
                                 </tr>

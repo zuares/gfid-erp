@@ -2216,7 +2216,7 @@
 
                                 <a href="{{ route('payroll.piecework.index', ['module' => 'sewing']) }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ $pieceworkSewingActive ? 'active' : '' }}">
-                                    <span class="icon">🧵</span><span>Gaji Jahit</span>
+                                    <span class="icon">🧵</span><span>Gaji Jahit (Ambil)</span>
                                 </a>
                             @endif
 

@@ -91,6 +91,7 @@
 @endpush
 
 @section('content')
+    @php($qtyLabel = $module === 'sewing' ? 'Qty Ambil' : 'Qty OK')
     <div class="pw-wrap">
         <div class="pw-card">
             <div class="pw-h">
@@ -109,7 +110,7 @@
 
             <div class="pw-b">
                 <div class="pw-sub" style="margin-bottom:.7rem">
-                    Total Qty: <b>{{ rtrim(rtrim(number_format((float) $totalQty, 2, '.', ''), '0'), '.') }}</b>
+                    {{ $qtyLabel }}: <b>{{ rtrim(rtrim(number_format((float) $totalQty, 2, '.', ''), '0'), '.') }}</b>
                     • Total Amount: <b>{{ number_format((float) $totalAmount, 0, ',', '.') }}</b>
                 </div>
 
@@ -118,7 +119,7 @@
                         <tr>
                             <th class="pw-hide-sm">Category</th>
                             <th>Item</th>
-                            <th class="pw-right">Qty OK</th>
+                            <th class="pw-right">{{ $qtyLabel }}</th>
                             <th class="pw-right">Rate</th>
                             <th class="pw-right">Amount</th>
                         </tr>
