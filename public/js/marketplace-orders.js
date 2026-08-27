@@ -3448,7 +3448,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             loadOrders();
 
             if ($('asPrintDocument') && $('asPrintDocument').checked) {
-                printDocument(storeId, orderSn, window._asBookingSn);
+                printDocument(storeId, orderSn, window._asBookingSn, false);
             }
         } catch (e) {
             btn.disabled = false;
@@ -3461,7 +3461,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         }
     };
 
-    window.printDocument = async function (storeId, orderSn, bookingSn = null) {
+    window.printDocument = async function (storeId, orderSn, bookingSn = null, storedOnly = true) {
         // Jika order ini punya booking_sn, gunakan booking document API
         let url;
         if (bookingSn) {
@@ -3469,8 +3469,10 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         } else {
             url = `/api/marketplace/stores/${storeId}/orders/${orderSn}/document`;
         }
+        if (!storedOnly) url += `${url.includes('?') ? '&' : '?'}stored_only=0`;
         
-        const alertHtml = `<div id="printAlert" style="position:fixed;top:20px;right:20px;background:#3b82f6;color:white;padding:10px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 6px rgba(0,0,0,0.1)">⏳ Meminta dokumen resi dari Marketplace...</div>`;
+        const alertText = storedOnly ? 'Membuka dokumen resi tersimpan di aplikasi...' : 'Meminta dokumen resi resmi dari Marketplace...';
+        const alertHtml = `<div id="printAlert" style="position:fixed;top:20px;right:20px;background:#3b82f6;color:white;padding:10px 20px;border-radius:8px;z-index:9999;box-shadow:0 4px 6px rgba(0,0,0,0.1)">⏳ ${alertText}</div>`;
         document.body.insertAdjacentHTML('beforeend', alertHtml);
         
         // Buka langsung agar tidak diblokir popup blocker

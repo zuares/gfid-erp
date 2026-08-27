@@ -308,10 +308,71 @@ class MarketplaceLogisticsController extends Controller
     public function printDocument(Store $store, string $orderSn)
     {
         try {
-            $driver = $this->manager->driver($store);
             $order = MarketplaceOrder::where('store_id', $store->id)
                 ->where('channel_order_id', $orderSn)
                 ->first();
+
+            // Cetak dari marketplace/orders memakai PDF yang sudah tersimpan di
+            // aplikasi. Jangan membuat atau menampilkan resi darurat dari AWB.
+            $storedOnly = request()->boolean('stored_only', true);
+            $cardParam = request()->query('card');
+            $cacheSuffix = $cardParam === '0' ? '_nocard' : '';
+            $disk = \Illuminate\Support\Facades\Storage::disk('local');
+            $storedCachePaths = array_values(array_unique([
+                "shipping_labels/{$store->id}/{$orderSn}{$cacheSuffix}.pdf.gz",
+                "shipping_labels/{$store->id}/{$orderSn}.pdf.gz",
+                "shipping_labels/{$store->id}/{$orderSn}_nocard.pdf.gz",
+            ]));
+
+            foreach ($storedCachePaths as $storedCachePath) {
+                if (! $disk->exists($storedCachePath)) {
+                    continue;
+                }
+
+                if ($order) {
+                    $order->increment('print_count');
+                    if (! $order->printed_at) $order->update(['printed_at' => now()]);
+                }
+                $content = gzdecode($disk->get($storedCachePath));
+                return response($content, 200, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="Resi_' . $orderSn . '.pdf"'
+                ]);
+            }
+
+            if (request()->boolean('emergency') && $order) {
+                $rawOrder = is_array($order->raw_json) ? $order->raw_json : [];
+                $emergencyAwb = $order->shipping_awb_no
+                    ?: data_get($rawOrder, 'package_list.0.tracking_number')
+                    ?: data_get($rawOrder, 'package_list.0.tracking_no')
+                    ?: 'N/A';
+
+                return response()->view('marketplace.documents.fallback_awb', [
+                    'order' => $order,
+                    'store' => $store,
+                    'awb'   => $emergencyAwb,
+                ], 200);
+            }
+
+            if ($storedOnly) {
+                $emergencyUrl = htmlspecialchars(
+                    request()->fullUrlWithQuery(['stored_only' => '0', 'emergency' => '1']),
+                    ENT_QUOTES,
+                    'UTF-8'
+                );
+
+                return response(
+                    "<div style='font-family:sans-serif;text-align:center;padding:50px;'>
+                        <h2 style='color:#b45309;'>Dokumen Resi Belum Tersimpan</h2>
+                        <p>Resi resmi belum tersimpan di aplikasi. Silakan tunggu sinkronisasi resi selesai, lalu coba cetak kembali.</p>
+                        <a href='{$emergencyUrl}' style='display:inline-block;margin-top:12px;padding:10px 16px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:6px;font-weight:700;'>Cetak Resi Darurat</a>
+                        <button onclick='window.close()' style='padding:10px 20px;background:#e2e8f0;border:none;border-radius:5px;cursor:pointer;'>Tutup Halaman</button>
+                    </div>",
+                    409
+                );
+            }
+
+            $driver = $this->manager->driver($store);
 
             // Jika order masih menggunakan booking_sn sebagai ID utamanya, usahakan tukar ke order_sn asli
             if ($order && method_exists($driver, 'getBookingDetail') && $order->booking_sn && $order->channel_order_id === $order->booking_sn) {
@@ -403,15 +464,6 @@ class MarketplaceLogisticsController extends Controller
                 ]);
             }
 
-            // Jika belum ada di cache, dan statusnya sudah SHIPPED, berikan keterangan langsung
-            if ($order && $order->order_status === 'SHIPPED') {
-                return response()->view('marketplace.documents.fallback_awb', [
-                    'order' => $order,
-                    'store' => $store,
-                    'awb'   => $payload['tracking_number'] ?? $order->shipping_awb_no ?? 'N/A',
-                ], 200);
-            }
-            
             // Step 1: Create Document
             $createRes = $driver->createShippingDocument($store, [$payload]);
             
@@ -472,13 +524,6 @@ class MarketplaceLogisticsController extends Controller
                                 } catch (\Throwable $e) {}
                             }
 
-                            if (str_contains($errorMsg, 'parcel has been shipped')) {
-                                return response()->view('marketplace.documents.fallback_awb', [
-                                    'order' => $order,
-                                    'store' => $store,
-                                    'awb'   => $payload['tracking_number'] ?? $order->shipping_awb_no ?? 'N/A',
-                                ], 200);
-                            }
                             break;
                         }
                     }
