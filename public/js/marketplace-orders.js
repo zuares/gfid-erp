@@ -220,13 +220,23 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         if (amount === null) return '<span class="ord-payment-empty">—</span>';
 
         const isActual = Boolean(o.settlement?.settlement_time);
-        const status = isActual ? 'ACT' : 'EST';
-        const statusTitle = isActual ? 'Sudah cair berdasarkan settlement time' : 'Masih estimasi, belum ada settlement time';
-
-        return `<span class="ord-income-value ${isActual ? 'actual' : 'estimated'}" title="Penghasilan dari Escrow Detail Shopee — ${statusTitle}">
+        const estimatedAmount = o.settlement?.estimated_escrow_amount !== null && o.settlement?.estimated_escrow_amount !== undefined
+            ? Number(o.settlement.estimated_escrow_amount)
+            : null;
+        const hasEstimatedAmount = Number.isFinite(estimatedAmount);
+        const valueHtml = (status, value, statusTitle) => `<span class="ord-income-value ${status === 'ACT' ? 'actual' : 'estimated'}" title="Penghasilan dari Escrow Detail Shopee — ${statusTitle}">
             <span class="ord-income-status">${status}</span>
-            <strong>${esc(fmtRp(amount))}</strong>
+            <strong>${value === null ? '—' : esc(fmtRp(value))}</strong>
         </span>`;
+
+        if (!isActual) {
+            return valueHtml('EST', amount, 'Masih estimasi, belum ada settlement time');
+        }
+
+        return `<div class="ord-income-stack">
+            ${valueHtml('EST', hasEstimatedAmount ? Math.abs(estimatedAmount) : null, hasEstimatedAmount ? 'Estimasi penghasilan sebelum pencairan' : 'Estimasi belum tersedia')}
+            ${valueHtml('ACT', amount, 'Sudah cair berdasarkan settlement time')}
+        </div>`;
     }
 
     function itemPaymentSummaryHtml(o) {

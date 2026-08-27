@@ -274,6 +274,7 @@ body[data-theme="dark"] .ord-payment-line .ord-payment-note { color: #94a3b8; }
 body[data-theme="dark"] .ord-payment-line.buyer { color: #a7f3d0; background: rgba(6, 78, 59, .25); border-color: rgba(52, 211, 153, .35); }
 body[data-theme="dark"] .ord-payment-line.seller { color: #bfdbfe; background: rgba(30, 64, 175, .22); border-color: rgba(96, 165, 250, .35); }
 .ord-income-cell { text-align: right; }
+.ord-income-stack { display: flex; flex-direction: column; align-items: flex-end; gap: .28rem; min-width: 0; }
 .ord-income-value {
     display: inline-flex; align-items: center; gap: .28rem; padding: .18rem .35rem; border-radius: 5px;
     color: #047857; background: #ecfdf5; border: 1px solid #a7f3d0;

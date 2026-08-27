@@ -102,6 +102,7 @@ trait MarketplaceOrdersPaginatedTrait
             'store.channel',
             'items',
             'settlement:id,order_id,buyer_payment_amount,seller_voucher,raw_json,final_income,settlement_time,data_status',
+            'incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,payment_method,synced_at',
             'items.internalItem' => fn ($q) => $q
                 ->select('id', 'code', 'name', 'unit', 'stock_unit', 'item_category_id')
                 ->with('category:id,code,name')
@@ -224,6 +225,9 @@ trait MarketplaceOrdersPaginatedTrait
                 $arr['settlement']['bundle_discount_total'] = $this->settlementBundleDiscountAmount($o->settlement);
                 $arr['settlement']['escrow_amount'] = $this->settlementEscrowAmount($o->settlement);
                 $arr['settlement']['order_selling_price'] = $this->settlementOrderSellingPrice($o->settlement);
+                $arr['settlement']['estimated_escrow_amount'] = $o->incomeEstimate?->estimated_escrow_amount !== null
+                    ? (float) $o->incomeEstimate->estimated_escrow_amount
+                    : null;
                 $arr['settlement']['ams_total'] = $this->settlementAmsAmount($o->settlement);
             }
             
