@@ -69,6 +69,7 @@ Route::middleware(['auth', 'access:cash-expenses'])->prefix('accounting')->name(
     Route::resource('cash-expenses', CashExpenseController::class);
     Route::post('cash-expenses/{cashExpense}/post', [CashExpenseController::class, 'post'])->name('cash-expenses.post');
     Route::post('cash-expenses/{cashExpense}/void', [CashExpenseController::class, 'void'])->name('cash-expenses.void');
+    Route::post('cash-expenses/{cashExpense}/reclassify', [CashExpenseController::class, 'reclassify'])->name('cash-expenses.reclassify');
 });
 
 // routes/web.php

@@ -155,9 +155,22 @@ class CashExpenseController extends Controller
 
     public function show(CashExpense $cashExpense)
     {
-        $cashExpense->load(['expenseAccount', 'cashAccount', 'journal.lines.account']);
+        $cashExpense->load([
+            'expenseAccount',
+            'cashAccount',
+            'journal.lines.account',
+            'reclassifications.fromExpenseAccount',
+            'reclassifications.toExpenseAccount',
+            'reclassifications.journal',
+            'reclassifications.creator',
+        ]);
+        $expenseAccounts = Account::query()
+            ->where('type', 'expense')
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get();
 
-        return view('accounting.cash_expenses.show', compact('cashExpense'));
+        return view('accounting.cash_expenses.show', compact('cashExpense', 'expenseAccounts'));
     }
 
     public function proof(CashExpense $cashExpense)
@@ -291,6 +304,33 @@ class CashExpenseController extends Controller
             ->route('accounting.cash-expenses.show', $cashExpense)
             ->with('status', 'ok')
             ->with('message', 'Pengeluaran berhasil di-VOID (Reversal journal dibuat).');
+    }
+
+    public function reclassify(Request $request, CashExpense $cashExpense, CashExpenseService $service)
+    {
+        $data = $request->validate([
+            'to_expense_account_id' => ['required', 'integer', 'exists:accounts,id'],
+            'reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        try {
+            $service->reclassify(
+                $cashExpense,
+                (int) $data['to_expense_account_id'],
+                trim($data['reason']),
+                Auth::id(),
+            );
+        } catch (ValidationException $e) {
+            return redirect()
+                ->route('accounting.cash-expenses.show', $cashExpense)
+                ->with('status', 'error')
+                ->with('message', collect($e->errors())->flatten()->first() ?: 'Kategori tidak bisa direklasifikasi.');
+        }
+
+        return redirect()
+            ->route('accounting.cash-expenses.show', $cashExpense)
+            ->with('status', 'ok')
+            ->with('message', 'Kategori pengeluaran berhasil direklasifikasi. Jurnal koreksi dibuat.');
     }
 
     private function cashBasisAccountOptions(): array

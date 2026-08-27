@@ -3,8 +3,10 @@
 namespace App\Services\Accounting;
 
 use App\Models\CashExpense;
+use App\Models\CashExpenseReclassification;
 use App\Models\Journal;
 use App\Models\JournalLine;
+use App\Models\Account;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -58,6 +60,80 @@ class CashExpenseService
                 'status' => 'posted',
                 'journal_id' => $journal->id,
             ]);
+
+            return $locked->fresh();
+        });
+    }
+
+    public function reclassify(CashExpense $expense, int $toExpenseAccountId, string $reason, ?int $userId = null): CashExpense
+    {
+        return DB::transaction(function () use ($expense, $toExpenseAccountId, $reason, $userId) {
+            $locked = CashExpense::whereKey($expense->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status !== 'posted' || !$locked->journal_id) {
+                throw ValidationException::withMessages([
+                    'status' => 'Hanya transaksi POSTED yang bisa direklasifikasi.',
+                ]);
+            }
+
+            $toAccount = Account::query()
+                ->whereKey($toExpenseAccountId)
+                ->where('type', 'expense')
+                ->where('is_active', true)
+                ->first();
+
+            if (!$toAccount) {
+                throw ValidationException::withMessages([
+                    'to_expense_account_id' => 'Kategori tujuan harus akun biaya yang aktif.',
+                ]);
+            }
+
+            $fromAccountId = (int) $locked->expense_account_id;
+            if ($fromAccountId === (int) $toAccount->id) {
+                throw ValidationException::withMessages([
+                    'to_expense_account_id' => 'Kategori tujuan harus berbeda dari kategori saat ini.',
+                ]);
+            }
+
+            $journal = Journal::create([
+                'date' => $locked->date,
+                'description' => 'REKLASIFIKASI: ' . ($locked->description ?: 'Cash Expense'),
+                'source_type' => 'cash_expense_reclass',
+                'source_id' => $locked->id,
+                'posted_at' => now(),
+                'created_by' => $userId ?? auth()->id(),
+                'notes' => $reason,
+            ]);
+
+            // Pindahkan beban dari kategori lama ke kategori baru.
+            JournalLine::create([
+                'journal_id' => $journal->id,
+                'account_id' => $toAccount->id,
+                'debit' => $locked->amount,
+                'credit' => 0,
+            ]);
+
+            JournalLine::create([
+                'journal_id' => $journal->id,
+                'account_id' => $fromAccountId,
+                'debit' => 0,
+                'credit' => $locked->amount,
+            ]);
+
+            $this->assertBalanced($journal->id);
+
+            CashExpenseReclassification::create([
+                'cash_expense_id' => $locked->id,
+                'from_expense_account_id' => $fromAccountId,
+                'to_expense_account_id' => $toAccount->id,
+                'journal_id' => $journal->id,
+                'amount' => $locked->amount,
+                'reason' => $reason,
+                'created_by' => $userId ?? auth()->id(),
+            ]);
+
+            // Field ini menyimpan kategori efektif terakhir. Jurnal awal tidak diubah.
+            $locked->update(['expense_account_id' => $toAccount->id]);
 
             return $locked->fresh();
         });

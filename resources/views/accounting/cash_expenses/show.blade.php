@@ -69,6 +69,14 @@
             min-height: 40px; border-radius: 999px; border: 1px solid rgba(15, 23, 42, .12);
             padding: .45rem .75rem; min-width: 230px; box-shadow: none;
         }
+        .ce-reclass-form { display: grid; gap: .85rem; }
+        .ce-reclass-help { color: #64748b; font-size: .82rem; line-height: 1.45; }
+        .ce-history-row {
+            display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start;
+            padding: .75rem 0; border-bottom: 1px dashed #e2e8f0;
+        }
+        .ce-history-row:last-child { border-bottom: 0; padding-bottom: 0; }
+        .ce-history-meta { color: #64748b; font-size: .76rem; margin-top: .18rem; }
         @media (max-width: 768px) {
             .gf-master-header { padding: 12px 14px; border-radius: 14px; }
             .gf-master-title { font-size: 18px; }
@@ -249,6 +257,9 @@
                     @endif
 
                     @if ($cashExpense->status === 'posted')
+                        <button class="ce-btn" type="button" data-bs-toggle="modal" data-bs-target="#cashExpenseReclassifyModal">
+                            Ubah Kategori
+                        </button>
                         <form method="POST"
                             action="{{ route('accounting.cash-expenses.void', $cashExpense) }}"
                             class="ce-inline-form"
@@ -264,6 +275,56 @@
                     @endif
                 </div>
             </x-gf.panel>
+
+            @if ($cashExpense->status === 'posted')
+                <div class="modal fade" id="cashExpenseReclassifyModal" tabindex="-1"
+                    aria-labelledby="cashExpenseReclassifyModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow-lg">
+                            <div class="modal-header border-0 pb-0">
+                                <div>
+                                    <div class="ce-modal-sub">Reklasifikasi</div>
+                                    <h5 class="modal-title fw-black" id="cashExpenseReclassifyModalLabel">Ubah Kategori Pengeluaran</h5>
+                                </div>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                            </div>
+                            <form method="POST" action="{{ route('accounting.cash-expenses.reclassify', $cashExpense) }}"
+                                class="ce-reclass-form" data-gf-confirm
+                                data-gf-confirm-title="Reklasifikasi kategori?"
+                                data-gf-confirm-text="Sistem akan membuat jurnal koreksi tanpa mengubah saldo kas."
+                                data-gf-confirm-ok="Ya, reklasifikasi">
+                                @csrf
+                                <div class="modal-body">
+                                    <div class="ce-reclass-help mb-3">
+                                        Kategori saat ini: <strong>{{ $cashExpense->expenseAccount?->name ?? '-' }}</strong>.
+                                        Jurnal awal tidak diubah; sistem akan membuat jurnal koreksi dan menyimpan riwayatnya.
+                                    </div>
+                                    <label class="form-label small fw-semibold mb-1" for="reclassify-category">Kategori baru</label>
+                                    <select class="form-select form-control-lg ce-form-control" id="reclassify-category"
+                                        name="to_expense_account_id" required>
+                                        <option value="">Pilih kategori baru</option>
+                                        @foreach ($expenseAccounts as $account)
+                                            @if ((int) $account->id !== (int) $cashExpense->expense_account_id)
+                                                <option value="{{ $account->id }}">
+                                                    {{ $account->name }}{{ $account->code ? " · {$account->code}" : '' }}
+                                                </option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                    <label class="form-label small fw-semibold mb-1 mt-3" for="reclassify-reason">Alasan</label>
+                                    <textarea class="form-control ce-form-control" id="reclassify-reason" name="reason"
+                                        rows="3" maxlength="255" required
+                                        placeholder="Contoh: Seharusnya masuk kategori transportasi"></textarea>
+                                </div>
+                                <div class="modal-footer border-0 pt-0">
+                                    <button type="button" class="ce-btn" data-bs-dismiss="modal">Batal</button>
+                                    <button type="submit" class="ce-btn ce-btn-primary">Simpan Perubahan</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            @endif
 
 <div class="ce-kpi-grid">
                 <div class="ce-kpi">
@@ -380,6 +441,27 @@
                         </div>
                         <a class="ce-btn" href="{{ route('accounting.journals.show', $cashExpense->journal) }}">Lihat Jurnal</a>
                     </div>
+                </x-gf.panel>
+            @endif
+
+            @if ($cashExpense->reclassifications->isNotEmpty())
+                <x-gf.panel title="Riwayat Reklasifikasi" subtitle="Perubahan kategori dicatat melalui jurnal koreksi.">
+                    @foreach ($cashExpense->reclassifications as $reclassification)
+                        <div class="ce-history-row">
+                            <div>
+                                <div class="fw-bold text-dark">
+                                    {{ $reclassification->fromExpenseAccount?->name ?? '-' }}
+                                    → {{ $reclassification->toExpenseAccount?->name ?? '-' }}
+                                </div>
+                                <div class="ce-history-meta">
+                                    {{ $reclassification->reason }}
+                                    · {{ $reclassification->creator?->name ?? 'Sistem' }}
+                                    · {{ $reclassification->created_at?->format('d/m/Y H:i') }}
+                                </div>
+                            </div>
+                            <a class="ce-btn" href="{{ route('accounting.journals.show', $reclassification->journal) }}">Jurnal Koreksi</a>
+                        </div>
+                    @endforeach
                 </x-gf.panel>
             @endif
 

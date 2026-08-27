@@ -39,4 +39,9 @@ class CashExpense extends Model
     {
         return $this->belongsTo(Account::class, 'cash_account_id');
     }
+
+    public function reclassifications()
+    {
+        return $this->hasMany(CashExpenseReclassification::class)->latest();
+    }
 }
