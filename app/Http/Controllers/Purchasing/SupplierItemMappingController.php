@@ -101,6 +101,83 @@ class SupplierItemMappingController extends Controller
         return back()->with('success', 'Mapping pemasok barang berhasil disimpan.');
     }
 
+    public function bulkStore(Request $request): RedirectResponse
+    {
+        $data = $this->validateBulkStore($request);
+        $isOwner = $request->user()->isOwner();
+        $hasLastPrice = $isOwner && $request->filled('last_price');
+
+        DB::transaction(function () use ($data, $isOwner, $hasLastPrice, $request) {
+            foreach ($data['items'] as $item) {
+                if ($item['is_primary']) {
+                    SupplierItem::query()
+                        ->where('item_id', $item['item_id'])
+                        ->update(['is_primary' => false]);
+                }
+
+                $mapping = SupplierItem::query()->firstOrNew([
+                    'supplier_id' => $data['supplier_id'],
+                    'item_id' => $item['item_id'],
+                ]);
+                $wasNew = !$mapping->exists;
+                $mapping->fill([
+                    'supplier_id' => $data['supplier_id'],
+                    'item_id' => $item['item_id'],
+                    'is_primary' => $item['is_primary'],
+                    'minimum_order_qty' => $data['minimum_order_qty'],
+                    'lead_time_days' => $data['lead_time_days'],
+                    'active' => $data['active'],
+                ]);
+
+                if ($isOwner && $hasLastPrice) {
+                    $mapping->last_price = (float) $data['last_price'];
+                } elseif ($wasNew) {
+                    $mapping->last_price = 0;
+                }
+
+                $mapping->save();
+            }
+        });
+
+        return back()->with('success', count($data['items']) . ' item berhasil dimapping.');
+    }
+
+    public function bulkUpdate(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'mapping_ids' => ['required', 'array', 'max:200'],
+            'mapping_ids.*' => ['required', 'integer', 'distinct', 'exists:supplier_items,id'],
+            'bulk_minimum_order_qty' => ['nullable', 'numeric', 'min:0'],
+            'bulk_lead_time_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
+            'bulk_active' => ['nullable', 'in:0,1'],
+            'bulk_last_price' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $changes = [];
+        if ($request->input('bulk_minimum_order_qty', '') !== '') {
+            $changes['minimum_order_qty'] = (float) $data['bulk_minimum_order_qty'];
+        }
+        if ($request->input('bulk_lead_time_days', '') !== '') {
+            $changes['lead_time_days'] = (int) $data['bulk_lead_time_days'];
+        }
+        if ($request->input('bulk_active', '') !== '') {
+            $changes['active'] = $request->input('bulk_active') === '1';
+        }
+        if ($request->user()->isOwner() && $request->input('bulk_last_price', '') !== '') {
+            $changes['last_price'] = (float) $data['bulk_last_price'];
+        }
+
+        if ($changes === []) {
+            return back()->withErrors(['mapping_ids' => 'Pilih minimal satu perubahan.']);
+        }
+
+        SupplierItem::query()
+            ->whereKey($data['mapping_ids'])
+            ->update($changes);
+
+        return back()->with('success', count($data['mapping_ids']) . ' mapping berhasil diperbarui.');
+    }
+
     public function update(Request $request, SupplierItem $supplierItem): RedirectResponse
     {
         $data = $this->validateMapping($request, $supplierItem);
@@ -286,6 +363,32 @@ class SupplierItemMappingController extends Controller
             'minimum_order_qty' => isset($data['minimum_order_qty']) ? (float) $data['minimum_order_qty'] : null,
             'lead_time_days' => isset($data['lead_time_days']) ? (int) $data['lead_time_days'] : null,
             'active' => $request->boolean('active', true),
+        ];
+    }
+
+    private function validateBulkStore(Request $request): array
+    {
+        $data = $request->validate([
+            'items' => ['required', 'array', 'max:200'],
+            'items.*.item_id' => ['required', 'integer', 'distinct', 'exists:items,id'],
+            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
+            'is_primary' => ['nullable', 'boolean'],
+            'minimum_order_qty' => ['nullable', 'numeric', 'min:0'],
+            'lead_time_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
+            'active' => ['nullable', 'boolean'],
+            'last_price' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        return [
+            'items' => collect($data['items'])->map(fn (array $item) => [
+                'item_id' => (int) $item['item_id'],
+                'is_primary' => $request->boolean('is_primary'),
+            ])->values()->all(),
+            'supplier_id' => (int) $data['supplier_id'],
+            'minimum_order_qty' => isset($data['minimum_order_qty']) ? (float) $data['minimum_order_qty'] : null,
+            'lead_time_days' => isset($data['lead_time_days']) ? (int) $data['lead_time_days'] : null,
+            'active' => $request->boolean('active', true),
+            'last_price' => isset($data['last_price']) ? (float) $data['last_price'] : null,
         ];
     }
 

@@ -29,6 +29,10 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
             ->name('supplier_items.index');
         Route::post('supplier-items', [SupplierItemMappingController::class, 'store'])
             ->name('supplier_items.store');
+        Route::post('supplier-items/bulk', [SupplierItemMappingController::class, 'bulkStore'])
+            ->name('supplier_items.bulk_store');
+        Route::patch('supplier-items/bulk', [SupplierItemMappingController::class, 'bulkUpdate'])
+            ->name('supplier_items.bulk_update');
         Route::put('supplier-items/{supplierItem}', [SupplierItemMappingController::class, 'update'])
             ->name('supplier_items.update');
         Route::delete('supplier-items/{supplierItem}', [SupplierItemMappingController::class, 'destroy'])

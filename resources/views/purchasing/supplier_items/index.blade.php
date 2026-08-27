@@ -5,9 +5,9 @@
 @push('head')
 <style>
     .mapping-wrap { max-width: 1120px; margin-inline: auto; padding: 1rem .75rem 3rem; }
-    .mapping-hero { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:.85rem; }
+    .mapping-hero { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:.7rem; }
     .mapping-title { font-size:1.35rem; font-weight:800; margin:0; letter-spacing:-.01em; }
-    .mapping-subtitle { color:var(--muted); font-size:.82rem; margin-top:.15rem; }
+    .mapping-subtitle { color:var(--muted); font-size:.78rem; margin-top:.1rem; }
     .mapping-stats { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.55rem; }
     .mapping-stat { display:inline-flex; align-items:center; gap:.35rem; border:1px solid var(--line); border-radius:999px; padding:.22rem .58rem; background:var(--card); font-size:.75rem; color:var(--muted); }
     .mapping-stat strong { color:var(--text); font-size:.8rem; }
@@ -15,11 +15,13 @@
     .mapping-tab { border:1px solid var(--line); background:var(--card); color:var(--text); border-radius:999px; padding:.35rem .75rem; font-size:.78rem; font-weight:800; text-decoration:none; }
     .mapping-tab.is-active { color:#fff; background:#2563eb; border-color:#2563eb; }
     .mapping-panel { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow:hidden; }
+    /* Item suggest harus bisa melewati batas panel dan berada di atas tabel di bawahnya. */
+    #mapping-create-panel { position:relative; z-index:10; overflow:visible; }
     .mapping-panel + .mapping-panel { margin-top:.8rem; }
-    .mapping-panel-head { padding: .75rem .85rem; border-bottom: 1px solid var(--line); }
+    .mapping-panel-head { padding: .68rem .85rem; border-bottom: 1px solid var(--line); }
     .mapping-panel-body { padding: .85rem; }
     .mapping-filter { padding:.75rem .85rem; background:rgba(248,250,252,.55); border-bottom:1px solid var(--line); }
-    .mapping-table th { color: var(--muted); font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; padding:.65rem .75rem; }
+    .mapping-table th { color: var(--muted); font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; padding:.58rem .65rem; }
     .mapping-table td { vertical-align: middle; padding:.7rem .75rem; }
     .mapping-item-name { font-weight: 800; line-height: 1.2; }
     .mapping-item-code { color: var(--muted); font-size: .74rem; margin-top:.08rem; }
@@ -47,6 +49,24 @@
     .autosave-state.is-saving { color: #a16207; }
     .autosave-state.is-saved { color: #15803d; }
     .autosave-state.is-error { color: #b91c1c; }
+    .mapping-create-head, .bulk-update-head { display:flex; align-items:center; justify-content:space-between; gap:.75rem; }
+    .mapping-create-count, .bulk-update-count { color:var(--muted); font-size:.74rem; font-weight:700; white-space:nowrap; }
+    .bulk-create-picker { max-width:460px; }
+    .bulk-create-list { display:flex; flex-wrap:wrap; gap:.4rem; min-height:2.15rem; margin-top:.65rem; }
+    .bulk-create-list.is-empty { align-items:center; color:var(--muted); font-size:.75rem; }
+    .bulk-create-chip { display:inline-flex; align-items:center; gap:.35rem; max-width:100%; padding:.32rem .45rem .32rem .62rem; border:1px solid rgba(37,99,235,.25); border-radius:999px; background:rgba(37,99,235,.07); font-size:.76rem; }
+    .bulk-create-chip-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bulk-create-chip-remove { display:inline-flex; align-items:center; justify-content:center; width:1.1rem; height:1.1rem; padding:0; border:0; border-radius:50%; background:transparent; color:var(--muted); font-size:1rem; line-height:1; }
+    .bulk-create-chip-remove:hover { background:rgba(15,23,42,.1); color:var(--text); }
+    .bulk-create-fields { margin-top:.85rem; }
+    .bulk-update-bar { padding:.65rem .85rem; border-bottom:1px solid var(--line); background:rgba(248,250,252,.35); }
+    .bulk-update-fields { display:flex; align-items:center; justify-content:flex-end; gap:.4rem; flex-wrap:wrap; }
+    .bulk-update-fields .form-control, .bulk-update-fields .form-select { width:auto; min-width:108px; }
+    .bulk-update-fields .bulk-price { min-width:132px; }
+    .mapping-select-cell { width:38px; padding-inline:.5rem !important; }
+    .mapping-select-cell .form-check-input { margin:0; }
+    .mapping-select-all { cursor:pointer; }
+    .bulk-submit:disabled { cursor:not-allowed; }
     @media (max-width: 767.98px) {
         .mapping-wrap { padding-inline:.65rem; }
         .mapping-hero { display:block; }
@@ -55,7 +75,10 @@
         .mapping-stat { flex:0 0 auto; }
         .mapping-tabs { overflow-x:auto; padding-bottom:.1rem; }
         .mapping-tab { flex:0 0 auto; }
-        .mapping-panel-head, .mapping-panel-body, .mapping-filter { padding:.7rem .75rem; }
+        .mapping-panel-head, .mapping-panel-body, .mapping-filter, .bulk-update-bar { padding:.7rem .75rem; }
+        .bulk-update-fields { justify-content:stretch; }
+        .bulk-update-fields .form-control, .bulk-update-fields .form-select, .bulk-update-fields .btn { flex:1 1 0; min-width:0; }
+        .bulk-update-fields .bulk-price { min-width:0; }
         .supplier-check-row { grid-template-columns: 1fr 92px; gap: .45rem .6rem; padding: .6rem .75rem; }
         .supplier-check-main { grid-column: 1 / -1; }
         .mapping-actions { justify-content:stretch; }
@@ -69,7 +92,7 @@
     <div class="mapping-hero">
         <div>
             <h1 class="mapping-title">Mapping Pemasok</h1>
-            <div class="mapping-subtitle">Atur pemasok utama dan alternatif agar PR/PO lebih cepat diarahkan.</div>
+            <div class="mapping-subtitle">Kelola pemasok per barang.</div>
             <div class="mapping-stats">
                 <span class="mapping-stat">Mapping <strong>{{ number_format($mappingStats['total'] ?? 0, 0, ',', '.') }}</strong></span>
                 <span class="mapping-stat">Aktif <strong>{{ number_format($mappingStats['active'] ?? 0, 0, ',', '.') }}</strong></span>
@@ -79,7 +102,7 @@
         </div>
         @if ($mode === 'item')
             <button class="btn btn-sm btn-primary flex-shrink-0" type="button" data-bs-toggle="collapse" data-bs-target="#mapping-create-panel">
-                + Mapping
+                + Tambah
             </button>
         @endif
     </div>
@@ -100,22 +123,26 @@
 
     @if ($mode === 'item')
     <div class="mapping-panel collapse {{ $errors->any() ? 'show' : '' }}" id="mapping-create-panel">
-        <div class="mapping-panel-head fw-semibold">Mapping Baru</div>
+        <div class="mapping-panel-head mapping-create-head">
+            <span class="fw-semibold">Tambah mapping</span>
+            <span class="mapping-create-count" id="bulk-create-count">0 barang</span>
+        </div>
         <div class="mapping-panel-body">
-            <form method="POST" action="{{ route('purchasing.supplier_items.store') }}">
+            <form method="POST" action="{{ route('purchasing.supplier_items.bulk_store') }}" id="bulk-create-form">
                 @csrf
-                <div class="row g-2 align-items-end">
-                    <div class="col-12 col-lg-4">
-                        <label class="form-label small fw-semibold mb-1">Barang</label>
-                        <x-item-suggest
-                            id-name="item_id"
-                            placeholder="Cari nama atau kode barang..."
-                            :show-name="true"
-                            :show-category="true"
-                            :min-chars="1"
-                            :max-results="8"
-                        />
-                    </div>
+                <div class="bulk-create-picker">
+                    <label class="form-label small fw-semibold mb-1">Barang</label>
+                    <x-item-suggest
+                        id-name="bulk_item_picker_id"
+                        placeholder="Cari dan pilih barang"
+                        :show-name="true"
+                        :show-category="true"
+                        :min-chars="1"
+                        :max-results="8"
+                    />
+                </div>
+                <div class="bulk-create-list is-empty" id="bulk-create-list">Pilih barang untuk ditambahkan</div>
+                <div class="row g-2 align-items-end bulk-create-fields">
                     <div class="col-12 col-md-5 col-lg-3">
                         <label class="form-label small fw-semibold mb-1">Pemasok</label>
                         <select name="supplier_id" class="form-select form-select-sm" required>
@@ -141,14 +168,20 @@
                             <input type="number" name="last_price" value="{{ old('last_price') }}" min="0" step="0.01" class="form-control form-control-sm" placeholder="Rp 0">
                         </div>
                     @endif
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <label class="form-label small fw-semibold mb-1">Status</label>
+                        <select name="active" class="form-select form-select-sm">
+                            <option value="1" @selected(old('active', '1') === '1')>Aktif</option>
+                            <option value="0" @selected(old('active') === '0')>Nonaktif</option>
+                        </select>
+                    </div>
                     <div class="col-6 col-md-3 col-lg-1">
-                        <input type="hidden" name="active" value="1">
-                        <input type="hidden" name="is_primary" value="0">
                         <div class="form-check mb-2 small">
+                            <input type="hidden" name="is_primary" value="0">
                             <input type="checkbox" name="is_primary" value="1" class="form-check-input" id="new-primary" @checked(old('is_primary'))>
                             <label class="form-check-label" for="new-primary">Utama</label>
                         </div>
-                        <button class="btn btn-sm btn-primary w-100" type="submit">Simpan</button>
+                        <button class="btn btn-sm btn-primary w-100 bulk-submit" type="submit" id="bulk-create-submit" disabled>Simpan</button>
                     </div>
                 </div>
             </form>
@@ -190,10 +223,43 @@
             </form>
         </div>
 
+        <form method="POST" action="{{ route('purchasing.supplier_items.bulk_update') }}" class="bulk-update-bar" id="bulk-update-form">
+            @csrf
+            @method('PATCH')
+            <div class="bulk-update-head mb-2">
+                <label class="small fw-semibold mb-0 d-flex align-items-center gap-2 mapping-select-all">
+                    <input type="checkbox" class="form-check-input m-0 js-mapping-select-all" aria-label="Pilih semua mapping">
+                    <span id="bulk-update-count">0 dipilih</span>
+                </label>
+                <span class="bulk-update-count">Ubah massal</span>
+            </div>
+            <div class="bulk-update-fields">
+                <label class="visually-hidden" for="bulk-minimum-order-qty">MOQ</label>
+                <input type="number" id="bulk-minimum-order-qty" name="bulk_minimum_order_qty" class="form-control form-control-sm" min="0" step="0.01" placeholder="MOQ" title="MOQ">
+                <label class="visually-hidden" for="bulk-lead-time-days">Lead time</label>
+                <input type="number" id="bulk-lead-time-days" name="bulk_lead_time_days" class="form-control form-control-sm" min="0" max="3650" placeholder="Lead time" title="Lead time (hari)">
+                <label class="visually-hidden" for="bulk-active">Status</label>
+                <select id="bulk-active" name="bulk_active" class="form-select form-select-sm" title="Status">
+                    <option value="">Status</option>
+                    <option value="1">Aktif</option>
+                    <option value="0">Nonaktif</option>
+                </select>
+                @if ($canSeeMoney)
+                    <label class="visually-hidden" for="bulk-last-price">Harga terakhir</label>
+                    <input type="number" id="bulk-last-price" name="bulk_last_price" class="form-control form-control-sm bulk-price" min="0" step="0.01" placeholder="Harga" title="Harga terakhir">
+                @endif
+                <button type="submit" class="btn btn-sm btn-primary bulk-submit" id="bulk-update-submit" disabled>Simpan</button>
+            </div>
+            <div id="bulk-update-inputs"></div>
+        </form>
+
         <div class="table-responsive d-none d-md-block">
             <table class="table table-sm mb-0 mapping-table">
                 <thead class="table-light">
                     <tr>
+                        <th class="mapping-select-cell">
+                            <input type="checkbox" class="form-check-input m-0 js-mapping-select-all" aria-label="Pilih semua mapping">
+                        </th>
                         <th>Barang</th>
                         <th>Pemasok</th>
                         <th class="text-center">Utama</th>
@@ -210,6 +276,9 @@
                             $formId = 'mapping-' . $mapping->id;
                         @endphp
                         <tr>
+                            <td class="mapping-select-cell">
+                                <input type="checkbox" class="form-check-input m-0 js-mapping-select" value="{{ $mapping->id }}" aria-label="Pilih mapping {{ $mapping->item?->name ?? $mapping->item?->code }}">
+                            </td>
                             <td>
                                 <div class="mapping-item-name">{{ $mapping->item?->name ?? 'Barang tidak ditemukan' }}</div>
                                 <div class="mapping-item-code">{{ $mapping->item?->code }} · {{ $mapping->item?->unit }}</div>
@@ -253,7 +322,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="{{ $canSeeMoney ? 8 : 7 }}" class="text-center text-muted py-4">Belum ada mapping pemasok barang.</td></tr>
+                        <tr><td colspan="{{ $canSeeMoney ? 9 : 8 }}" class="text-center text-muted py-4">Belum ada mapping pemasok barang.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -265,9 +334,12 @@
                 @endphp
                 <div class="mapping-mobile-card">
                     <div class="d-flex justify-content-between align-items-start gap-2">
-                        <div class="min-w-0">
+                        <div class="min-w-0 d-flex align-items-start gap-2">
+                            <input type="checkbox" class="form-check-input mt-1 m-0 js-mapping-select" value="{{ $mapping->id }}" aria-label="Pilih mapping {{ $mapping->item?->name ?? $mapping->item?->code }}">
+                            <div>
                             <div class="mapping-item-name">{{ $mapping->item?->code ?? '-' }}</div>
                             <div class="mapping-item-code">{{ $mapping->item?->name ?? 'Barang tidak ditemukan' }}</div>
+                            </div>
                         </div>
                         <div class="text-end flex-shrink-0">
                             @if ($mapping->is_primary)<span class="primary-label">Utama</span>@endif
@@ -533,6 +605,132 @@ document.addEventListener('DOMContentLoaded', function () {
     searchInput.addEventListener('input', renderSuppliers);
     selectedOnlyInput.addEventListener('change', renderSuppliers);
     render();
+});
+</script>
+@endpush
+@endif
+
+@if ($mode === 'item')
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const createForm = document.getElementById('bulk-create-form');
+    const createList = document.getElementById('bulk-create-list');
+    const createCount = document.getElementById('bulk-create-count');
+    const createSubmit = document.getElementById('bulk-create-submit');
+    const pickerWrap = createForm?.querySelector('.item-suggest-wrap');
+    const pickerInput = pickerWrap?.querySelector('.js-item-suggest-input');
+    const pickerHidden = pickerWrap?.querySelector('.js-item-suggest-id');
+    const selectedItems = new Map();
+
+    function escapeHtml(value) {
+        return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+    }
+
+    function renderCreateItems() {
+        const items = Array.from(selectedItems.entries());
+        createCount.textContent = `${items.length} barang`;
+        createSubmit.disabled = items.length === 0;
+
+        if (!items.length) {
+            createList.className = 'bulk-create-list is-empty';
+            createList.textContent = 'Pilih barang untuk ditambahkan';
+            return;
+        }
+
+        createList.className = 'bulk-create-list';
+        createList.innerHTML = items.map(([id, item], index) => `
+            <span class="bulk-create-chip">
+                <input type="hidden" name="items[${index}][item_id]" value="${escapeHtml(id)}">
+                <span class="bulk-create-chip-label" title="${escapeHtml(item.label)}">${escapeHtml(item.label)}</span>
+                <button type="button" class="bulk-create-chip-remove" data-item-id="${escapeHtml(id)}" aria-label="Hapus ${escapeHtml(item.label)}">&times;</button>
+            </span>`).join('');
+
+        createList.querySelectorAll('.bulk-create-chip-remove').forEach(button => {
+            button.addEventListener('click', function () {
+                selectedItems.delete(button.dataset.itemId);
+                renderCreateItems();
+            });
+        });
+    }
+
+    function resetPicker() {
+        if (!pickerInput || !pickerHidden) return;
+        pickerInput.value = '';
+        pickerHidden.value = '';
+        pickerWrap.querySelector('.item-suggest-dropdown')?.style.setProperty('display', 'none');
+    }
+
+    pickerHidden?.addEventListener('change', function () {
+        const id = String(pickerHidden.value || '').trim();
+        if (!id) return;
+
+        if (!selectedItems.has(id)) {
+            selectedItems.set(id, { label: pickerInput.value.trim() || `Item #${id}` });
+            renderCreateItems();
+        }
+        resetPicker();
+    });
+
+    createForm?.addEventListener('submit', function (event) {
+        if (selectedItems.size === 0) {
+            event.preventDefault();
+            pickerInput?.focus();
+        }
+    });
+
+    renderCreateItems();
+
+    const updateForm = document.getElementById('bulk-update-form');
+    const updateCount = document.getElementById('bulk-update-count');
+    const updateSubmit = document.getElementById('bulk-update-submit');
+    const updateInputs = document.getElementById('bulk-update-inputs');
+    const rowChecks = Array.from(document.querySelectorAll('.js-mapping-select'));
+    const selectAllChecks = Array.from(document.querySelectorAll('.js-mapping-select-all'));
+    const selectedMappings = new Set();
+    const mappingIds = [...new Set(rowChecks.map(input => input.value))];
+
+    function hasBulkChanges() {
+        return Array.from(updateForm?.querySelectorAll('[name^="bulk_"]') || [])
+            .some(input => input.value !== '');
+    }
+
+    function renderBulkSelection() {
+        rowChecks.forEach(input => {
+            input.checked = selectedMappings.has(input.value);
+        });
+        selectAllChecks.forEach(input => {
+            input.checked = mappingIds.length > 0 && mappingIds.every(id => selectedMappings.has(id));
+            input.indeterminate = selectedMappings.size > 0 && !input.checked;
+        });
+        updateCount.textContent = `${selectedMappings.size} dipilih`;
+        updateSubmit.disabled = selectedMappings.size === 0 || !hasBulkChanges();
+        updateInputs.innerHTML = Array.from(selectedMappings)
+            .map(id => `<input type="hidden" name="mapping_ids[]" value="${escapeHtml(id)}">`).join('');
+    }
+
+    rowChecks.forEach(input => input.addEventListener('change', function () {
+        if (input.checked) selectedMappings.add(input.value);
+        else selectedMappings.delete(input.value);
+        renderBulkSelection();
+    }));
+
+    selectAllChecks.forEach(input => input.addEventListener('change', function () {
+        mappingIds.forEach(id => input.checked ? selectedMappings.add(id) : selectedMappings.delete(id));
+        renderBulkSelection();
+    }));
+
+    updateForm?.querySelectorAll('[name^="bulk_"]').forEach(input => {
+        input.addEventListener('input', renderBulkSelection);
+        input.addEventListener('change', renderBulkSelection);
+    });
+
+    updateForm?.addEventListener('submit', function (event) {
+        if (!selectedMappings.size || !hasBulkChanges()) event.preventDefault();
+    });
+
+    renderBulkSelection();
 });
 </script>
 @endpush
