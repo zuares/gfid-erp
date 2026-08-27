@@ -348,6 +348,7 @@
     $hasInvStocksItems = $router->has('inventory.stocks.items');
     $hasInvStocksLots = $router->has('inventory.stocks.lots');
     $hasInvStockCard = $router->has('inventory.stock_card.index');
+    $hasInvBarcodes = $router->has('inventory.barcodes.create') && ($isOwner || $isAdmin);
     $hasInvTransfersIndex = $router->has('inventory.transfers.index');
     $hasInvTransfersCreate = $router->has('inventory.transfers.create');
     $hasInvAdjustmentsIndex = $router->has('inventory.adjustments.index');
@@ -454,6 +455,7 @@
     if (!$canModule('inventory')) {
         $hasInvIntelligence = $hasWhIntelligence = false;
         $hasInvStocksItems = $hasInvStocksLots = $hasInvStockCard = false;
+        $hasInvBarcodes = false;
         $hasInvTransfersIndex = $hasInvTransfersCreate = $hasInvAdjustmentsIndex = false;
         $hasInvWipAdjIndex = $hasInvWipCutReconcile = false;
         $hasInvOpnamesIndex = $hasInvOpnamesCreate = false;
