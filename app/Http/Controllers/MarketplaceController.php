@@ -2553,6 +2553,14 @@ class MarketplaceController extends Controller
                         'variant_name' => $sku ?: $title,
                         'model_sku' => $sku,
                         'item_sku' => $i['item_sku'] ?? null,
+                        'price' => $i['model_original_price'] ?? $i['original_price'] ?? $i['price'] ?? null,
+                        'price_original' => $i['model_original_price'] ?? $i['original_price'] ?? $i['price'] ?? null,
+                        'price_after_discount' => $i['model_discounted_price']
+                            ?? $i['discounted_price']
+                            ?? $i['model_original_price']
+                            ?? $i['original_price']
+                            ?? $i['price']
+                            ?? null,
                         'internal_item' => $mapped ? [
                             'id' => $mapped->id,
                             'code' => $mapped->code,
