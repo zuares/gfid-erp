@@ -65,23 +65,21 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     // Semua reload order wajib memakai scope yang sama. Sebelumnya silent
     // refresh memanggil endpoint polos sehingga setelah beberapa detik data
     // seluruh database menimpa hasil halaman yang sudah difilter.
-    function localOrdersUrl(overrides = {}) {
+    function localOrdersUrl() {
         const lp = new URLSearchParams();
         if (typeof IS_DUMMY_MODE !== 'undefined' && IS_DUMMY_MODE) lp.set('dummy', '1');
         if (getFrom()) lp.set('date_from', getFrom());
         if (getTo())   lp.set('date_to', getTo());
         
-        const tab = overrides.tab ?? activeTab;
-        const subTab = overrides.subTab
-            ?? (tab === 'ready' ? subTabReady : tab === 'processed' ? subTabProcessed : tab === 'shipped' ? subTabShipped : 'all');
-
-        lp.set('tab', tab);
-        if (tab === 'ready' || tab === 'processed' || tab === 'shipped') lp.set('sub_tab', subTab);
+        lp.set('tab', activeTab);
+        if (activeTab === 'ready') lp.set('sub_tab', subTabReady);
+        else if (activeTab === 'processed') lp.set('sub_tab', subTabProcessed);
+        else if (activeTab === 'shipped') lp.set('sub_tab', subTabShipped);
         
         if (getSearch()) lp.set('search', getSearch());
         if (activeStore && activeStore !== '') lp.set('store', activeStore);
-        lp.set('page', overrides.page ?? currentPage);
-        lp.set('limit', overrides.limit ?? 50);
+        lp.set('page', currentPage);
+        lp.set('limit', 50);
 
         return '/api/marketplace/local-orders-paginated' + (lp.toString() ? ('?' + lp.toString()) : '');
     }
@@ -917,7 +915,6 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         restoreSavedTab();
         render();
         updateLastSyncTime();
-        refreshReadyKilatBadge(loadSeq);
 
         if (activeTab === 'processed') {
             autoFetchMissingAwbs();
@@ -937,26 +934,6 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 }
             }, 500);
         }
-    }
-
-    async function refreshReadyKilatBadge(loadSeq) {
-        const badge = $('badge-sub-ready-kilat');
-        if (!badge) return;
-
-        const res = await api(localOrdersUrl({
-            tab: 'ready',
-            subTab: 'kilat',
-            page: 1,
-            limit: 50,
-        })).catch(() => null);
-
-        if (!res || loadSeq !== ordersLoadSeq) return;
-
-        const payload = Array.isArray(res) ? { data: res } : res;
-        const total = Number(payload.total);
-        badge.textContent = Number.isFinite(total)
-            ? total
-            : (Array.isArray(payload.data) ? payload.data.length : 0);
     }
 
     function inRange(o) { return true; }

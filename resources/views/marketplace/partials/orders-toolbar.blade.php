@@ -12,7 +12,6 @@
             <div id="subTabReadyContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
                 <button class="ord-subtab" data-sub="all" onclick="switchSubTabReady('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-ready-all">—</span></button>
                 <button class="ord-subtab active" data-sub="process" onclick="switchSubTabReady('process', this)">Bisa Proses <span class="ord-badge bg-secondary" id="badge-sub-ready-process">—</span></button>
-                <button class="ord-subtab" data-sub="kilat" onclick="switchSubTabReady('kilat', this)">⚡ Kilat <span class="ord-badge bg-secondary" id="badge-sub-ready-kilat">—</span></button>
                 <button class="ord-subtab" data-sub="pending" onclick="switchSubTabReady('pending', this)" title="Status platform masih tertunda">⏳ Tertunda <span class="ord-badge bg-secondary" id="badge-sub-ready-pending">—</span></button>
                 <button class="ord-subtab" data-sub="blocked" onclick="switchSubTabReady('blocked', this)" title="Platform belum mengizinkan pengaturan pengiriman">🚫 Belum Bisa Atur <span class="ord-badge bg-secondary" id="badge-sub-ready-blocked">—</span></button>
                 <button class="ord-subtab" data-sub="unpaid" onclick="switchSubTabReady('unpaid', this)">Belum Bayar <span class="ord-badge bg-secondary" id="badge-sub-ready-unpaid">—</span></button>
