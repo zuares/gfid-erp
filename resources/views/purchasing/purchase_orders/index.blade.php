@@ -86,6 +86,19 @@
         min-width: 190px;
     }
 
+    .po-qty-cell {
+        min-width: 92px;
+    }
+
+    .po-qty-line {
+        color: #475569;
+        font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+        font-size: .76rem;
+        font-weight: 700;
+        line-height: 1.35;
+        white-space: nowrap;
+    }
+
     .po-item-line {
         display: flex;
         align-items: baseline;
@@ -116,6 +129,15 @@
         font-weight: 700;
     }
 
+    .po-item-qty {
+        flex: 0 0 auto;
+        color: #64748b;
+        font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+        font-size: .7rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
     .po-mobile-items {
         display: none;
         margin-top: .45rem;
@@ -134,7 +156,9 @@
     }
 
     body[data-theme="dark"] .po-item-code,
-    body[data-theme="dark"] .po-unit-value {
+    body[data-theme="dark"] .po-unit-value,
+    body[data-theme="dark"] .po-qty-line,
+    body[data-theme="dark"] .po-item-qty {
         color: #e2e8f0;
     }
 
@@ -412,6 +436,9 @@
             <th class="mobile-hide" style="width: 210px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">
                 Item
             </th>
+            <th class="text-end mobile-hide" style="width: 100px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">
+                Qty
+            </th>
             @if ($canSeeMoney)
                 <th class="text-end" style="width: 130px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">
                     <a href="{{ $sortUrl('grand_total') }}" class="th-sort {{ $sortCol === 'grand_total' ? 'active' : '' }}">
@@ -486,6 +513,7 @@
                             @forelse ($visibleOrderLines as $line)
                                 <div class="po-item-line">
                                     <span class="po-item-code">{{ $line->item?->code ?? 'Item #' . ($line->item_id ?? '-') }}</span>
+                                    <span class="po-item-qty">× {{ number_format((float) $line->qty, 2, ',', '.') }}</span>
                                 </div>
                             @empty
                                 <span class="text-muted" style="font-size:.72rem;">Belum ada item</span>
@@ -522,6 +550,17 @@
                 @endforelse
                 @if ($remainingOrderLines > 0)
                     <div class="po-item-more">+{{ $remainingOrderLines }} item lainnya</div>
+                @endif
+            </td>
+
+            <td class="po-qty-cell text-end mobile-hide">
+                @forelse ($visibleOrderLines as $line)
+                    <div class="po-qty-line">{{ number_format((float) $line->qty, 2, ',', '.') }}</div>
+                @empty
+                    <span class="text-muted" style="font-size:.74rem;">—</span>
+                @endforelse
+                @if ($remainingOrderLines > 0)
+                    <div class="po-item-more">+{{ $remainingOrderLines }} qty lainnya</div>
                 @endif
             </td>
 
