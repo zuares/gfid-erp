@@ -786,15 +786,32 @@
             });
 
             // ---- Production Action: slip cetak + export CSV (ikut filter aktif) ----
-            function actionUrl(base) {
+            function visibleItemIds() {
+                const pane = paneByName(activeName());
+                const table = pane?.querySelector('[data-ii-table]');
+                if (!table) return [];
+
+                return Array.from(table.querySelectorAll('tbody [data-ii-row]'))
+                    .filter(row => !row.hidden)
+                    .map(row => row.dataset.itemId)
+                    .filter(Boolean);
+            }
+
+            function actionUrl(base, { includeVisibleRows = false } = {}) {
                 const params = new URLSearchParams(currentFilters());
                 if (activeName() === 'procurement') params.set('source', 'external');
                 if (activeName() === 'forecast') params.set('source', 'own');
+                if (includeVisibleRows && ['procurement', 'forecast'].includes(activeName())) {
+                    const ids = visibleItemIds();
+                    // Tetap kirim penanda saat hasil filter kosong agar server tidak
+                    // menganggap parameter kosong sebagai "semua SKU".
+                    params.set('item_ids', ids.length ? ids.join(',') : 'none');
+                }
                 return base + (params.toString() ? '?' + params.toString() : '');
             }
             document.addEventListener('click', (e) => {
                 if (e.target.closest('[data-ii-slip]')) {
-                    window.open(actionUrl(SLIP_URL), '_blank', 'noopener');
+                    window.open(actionUrl(SLIP_URL, { includeVisibleRows: true }), '_blank', 'noopener');
                 } else if (e.target.closest('[data-ii-export]')) {
                     window.location.assign(actionUrl(EXPORT_URL));
                 }

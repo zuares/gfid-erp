@@ -191,12 +191,16 @@ class InventoryIntelligenceController extends Controller
         ];
     }
 
-    /** Parse daftar item_id terpilih (CSV "1,2,3") untuk slip/export. Kosong = semua suggested>0. */
+    /** Parse daftar item_id terpilih (CSV "1,2,3") untuk slip/export. Kosong = semua suggested>0; "none" = kosong. */
     private function resolveItemIds(Request $request): array
     {
         $raw = (string) $request->input('item_ids', '');
         if ($raw === '') {
             return [];
+        }
+
+        if ($raw === 'none') {
+            return [-1];
         }
 
         return collect(explode(',', $raw))

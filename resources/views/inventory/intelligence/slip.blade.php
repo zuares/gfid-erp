@@ -1,26 +1,9 @@
 @php
     $fmt = fn($n, $d = 0) => number_format((float) $n, $d, ',', '.');
-    $fmtRp = fn($n) => 'Rp ' . number_format((float) $n, 0, ',', '.');
-    $groups = $rows->groupBy('category')
-        ->map(fn($g, $cat) => (object) [
-            'category' => $cat ?: '-',
-            'lines' => $g->sortByDesc('suggested_qty')->values(),
-            'qty' => (float) $g->sum('suggested_qty'),
-        ])
-        ->sortByDesc('qty')
-        ->values();
-    $statusLabel = [
-        'stockout' => 'Stockout',
-        'kritis' => 'Kritis',
-        'menipis' => 'Menipis',
-        'sehat' => 'Sehat',
-        'no_demand' => 'Tanpa demand',
-    ];
+    $lines = $rows->sortByDesc('suggested_qty')->values();
     $isProcurement = ($draftType ?? 'production') === 'procurement';
     $forecastDays = $forecastDays ?? ($isProcurement ? 60 : 30);
-    $forecastField = $forecastField ?? ($isProcurement ? 'forecast_60' : 'forecast_30');
     $suggestionLabel = $suggestionLabel ?? ($isProcurement ? 'Saran Pengadaan FOB' : 'Saran Produksi');
-    $totalSuggestedValue = (float) ($totalSuggestedValue ?? $rows->sum('suggested_value'));
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -70,27 +53,15 @@
         .hero-total { text-align: left; }
         .hero-amount { font-size: 32px; font-weight: 800; letter-spacing: -.02em; margin-top: 2px; color: var(--ink); }
         .hero-sub { font-size: 12px; color: var(--muted); margin-top: 5px; }
-        .hero-recap { flex: 1 1 auto; min-width: 0; }
-        .recap-list { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
-        .recap-row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-            padding: 9px 12px; border-bottom: 1px solid var(--line); }
-        .recap-row:last-child { border-bottom: 0; }
-        .recap-cat { font-weight: 700; color: var(--ink); font-size: 13px; }
-        .recap-amt { white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 800; font-size: 14px; }
-
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 7px 5px; text-align: left; vertical-align: top; }
         thead th { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
             border-bottom: 1px solid var(--line); }
         .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .cat-row td { background: #f8fafc; font-weight: 700; border-top: 1px solid var(--line); padding-top: 9px; }
         .line-row td { border-bottom: 1px solid #f1f5f9; }
-        .line-row .prod-name { font-weight: 600; }
-        .line-row .sku-mini { display: block; color: var(--muted); font-size: 11px; margin-top: 1px; }
+        .line-row .sku { font-weight: 700; }
+        .line-row .prod-name { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; }
         .saran { font-weight: 800; }
-        .st { font-size: 11px; font-weight: 700; }
-        .st-stockout, .st-kritis { color: #b91c1c; }
-        .st-menipis { color: #b45309; }
 
         .grand { margin-top: 18px; display: flex; justify-content: stretch; }
         .grand-box { width: 100%; }
@@ -115,7 +86,6 @@
             .slip-meta { grid-template-columns: 1fr 1fr; gap: 6px 24px; }
             th, td { padding: 7px 8px; }
             .hero { flex-direction: row; align-items: center; justify-content: space-between; gap: 28px; }
-            .hero-recap { max-width: 56%; }
             .hero-total { text-align: right; flex: 0 0 auto; }
             .grand { justify-content: flex-end; }
             .grand-box { width: auto; min-width: 280px; }
@@ -163,65 +133,29 @@
             <div class="empty">Tidak ada {{ strtolower($suggestionLabel) }} untuk filter ini.<br>Semua SKU tercukupi (saran 0).</div>
         @else
             <div class="hero">
-                @if ($groups->count() > 1)
-                    <div class="hero-recap">
-                        <div class="hero-label">Per Kategori</div>
-                        <div class="recap-list">
-                            @foreach ($groups as $g)
-                                <div class="recap-row">
-                                    <span class="recap-cat">{{ $g->category }}</span>
-                                    <span class="recap-amt">{{ $fmt($g->qty) }} pcs</span>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
                 <div class="hero-total">
                     <div class="hero-label">Total {{ $suggestionLabel }}</div>
                     <div class="hero-amount">{{ $fmt($totalSuggested) }} pcs</div>
                     <div class="hero-sub">{{ $fmt($skuCount) }} SKU perlu ditindaklanjuti</div>
-                    <div class="hero-sub">Estimasi nilai: {{ $fmtRp($totalSuggestedValue) }}</div>
                 </div>
             </div>
 
             <table>
                 <thead>
                     <tr>
-                        <th>Produk</th>
-                        <th class="num">Ready + PRD</th>
-                        <th class="num">WIP proses</th>
-                        <th class="num">Cover</th>
-                        <th class="num">F{{ $forecastDays }}</th>
-                        <th class="num">Saran (pcs)</th>
-                        <th class="num">Nilai</th>
+                        <th>SKU Produk</th>
+                        <th class="num">{{ $suggestionLabel }} (pcs)</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($groups as $g)
-                        <tr class="cat-row">
-                            <td>{{ $g->category }}</td>
-                            <td class="num" colspan="4"></td>
-                            <td class="num">{{ $fmt($g->qty) }}</td>
-                            <td class="num">{{ $fmtRp($g->lines->sum('suggested_value')) }}</td>
+                    @foreach ($lines as $l)
+                        <tr class="line-row">
+                            <td>
+                                <span class="sku">{{ $l->sku }}</span>
+                                <span class="prod-name">{{ $l->product }}</span>
+                            </td>
+                            <td class="num saran">{{ $fmt($l->suggested_qty) }}</td>
                         </tr>
-                        @foreach ($g->lines as $l)
-                            <tr class="line-row">
-                                <td>
-                                    <span class="prod-name">{{ $l->product }}</span>
-                                    <span class="sku-mini">{{ $l->sku }}
-                                        @if (in_array($l->status, ['stockout', 'kritis', 'menipis'], true))
-                                            · <span class="st st-{{ $l->status }}">{{ $statusLabel[$l->status] ?? $l->status }}</span>
-                                        @endif
-                                    </span>
-                                </td>
-                                <td class="num">{{ $fmt($l->ready_total) }}</td>
-                                <td class="num">{{ $fmt($l->wip_process) }}</td>
-                                <td class="num">{{ $l->cover_days === null ? '–' : $fmt($l->cover_days, 1) }}</td>
-                                <td class="num">{{ $fmt($l->{$forecastField}) }}</td>
-                                <td class="num saran">{{ $fmt($l->suggested_qty) }}</td>
-                                <td class="num saran">{{ $fmtRp($l->suggested_value) }}</td>
-                            </tr>
-                        @endforeach
                     @endforeach
                 </tbody>
             </table>
@@ -229,7 +163,6 @@
             <div class="grand">
                 <div class="grand-box">
                     <div class="total"><span>Total Saran</span><span>{{ $fmt($totalSuggested) }} pcs</span></div>
-                    <div class="total"><span>Estimasi Nilai</span><span>{{ $fmtRp($totalSuggestedValue) }}</span></div>
                 </div>
             </div>
 

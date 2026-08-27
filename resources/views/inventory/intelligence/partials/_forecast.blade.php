@@ -122,6 +122,7 @@
                 <tbody>
                     @foreach ($rows->sortByDesc('suggested_qty') as $r)
                         <tr data-ii-row
+                            data-item-id="{{ $r->item_id }}"
                             data-search="{{ strtolower(trim($r->sku . ' ' . $r->product . ' ' . $r->category)) }}"
                             data-status="{{ $r->status }}"
                             data-sku="{{ $r->sku }}"
