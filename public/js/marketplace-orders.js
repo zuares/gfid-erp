@@ -26,6 +26,44 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         return `<span class="badge-status st-draft">${esc(s)}</span>`;
     }
 
+    function orderCopyHtml(orderNumber) {
+        const value = String(orderNumber || '—');
+        return `<button type="button" class="ord-order-copy" data-order-number="${esc(value)}"
+            onclick="event.stopPropagation(); window.copyOrderNumber(this)"
+            title="Klik untuk menyalin nomor order">${esc(value)}</button>`;
+    }
+
+    window.copyOrderNumber = async function (button) {
+        const value = button?.getAttribute('data-order-number') || '';
+        if (!value || value === '—') return;
+
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(value);
+            } else {
+                const input = document.createElement('textarea');
+                input.value = value;
+                input.style.position = 'fixed';
+                input.style.opacity = '0';
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                input.remove();
+            }
+            const original = button.innerHTML;
+            button.classList.add('is-copied');
+            button.innerHTML = '✓ Disalin';
+            window.setTimeout(() => {
+                if (button.isConnected) {
+                    button.classList.remove('is-copied');
+                    button.innerHTML = original;
+                }
+            }, 1200);
+        } catch (error) {
+            console.warn('Gagal menyalin nomor order:', error);
+        }
+    };
+
     function buyerPaidAmount(o) {
         const escrowPaid = Number(o.settlement?.buyer_payment_amount);
         if (Number.isFinite(escrowPaid) && escrowPaid > 0) return escrowPaid;
@@ -69,17 +107,30 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         </div>`;
     }
 
+    function orderContextHtml(o) {
+        const storeName = o.store?.name || '';
+        const channel = o.store?.channel || null;
+        return `<div class="ord-order-context">
+            ${orderStatusBadge(o.order_status)}
+            ${storeName ? `<span class="ord-order-store">🏪 ${esc(storeName)}</span>` : ''}
+            ${channel ? channelPill(channel) : ''}
+        </div>`;
+    }
+
     function itemSalePriceHtml(i) {
         const original = Number(i.price_original ?? i.price);
         const discounted = Number(i.price_after_discount);
         const sale = Number.isFinite(discounted) && discounted > 0 ? discounted : original;
         if (!Number.isFinite(sale) || sale <= 0) return '';
 
+        const qty = Math.max(1, Number(i.qty) || 1);
+        const lineTotal = sale * qty;
         const originalHtml = Number.isFinite(original) && original > sale
             ? `<del>${esc(fmtRp(original))}</del>`
             : '';
         return `<div class="ord-item-price" title="Harga jual setelah diskon">
-            ${originalHtml}<strong>Jual ${esc(fmtRp(sale))}</strong>
+            ${originalHtml}<span>${esc(fmtRp(sale))} / item</span>
+            ${qty > 1 ? `<strong>${esc(fmtRp(lineTotal))}</strong>` : ''}
         </div>`;
     }
 
@@ -1763,10 +1814,6 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             }
 
             // Sub-info
-            const storeName   = o.store?.name || '';
-            const channelName = o.store?.channel?.name || '';
-            const storeText   = [storeName, channelName].filter(Boolean).join(' · ');
-            
             let dateTimeText = '';
             if (o.ordered_at) {
                 const d = new Date(o.ordered_at);
@@ -1789,7 +1836,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             // ── Section: Item Produk (Tampil default tanpa accordion di mobile)
             const itemCards = items.map(i => renderItemCard(i, urgent)).join('');
             const itemsSection = `<div class="ord-card-section" style="padding:0.6rem 0.9rem; border-top:1px dashed #e2e8f0; background:#f8fafc">
-                <div style="font-size:0.65rem; font-weight:800; color:#64748b; text-transform:uppercase; margin-bottom:0.5rem; letter-spacing:0.05em">Item Produk (${items.length})</div>
+                <div class="ord-items-invoice-head"><span>Item Produk (${items.length})</span>${buyerPaidHtml(o)}</div>
                 <div class="ord-items-cell" style="padding:0">${itemCards}</div>
             </div>`;
 
@@ -1835,7 +1882,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 }
             }
 
-            let orderIdHtml = esc(o.channel_order_id || '—');
+            let orderIdHtml = orderCopyHtml(o.channel_order_id || '—');
             if (o.is_kilat) orderIdHtml = '<span title="Pesanan Kilat (Booking Shopee)" style="font-size:.6rem;font-weight:800;color:#a16207;background:#fefce8;border:1px solid #fde68a;border-radius:4px;padding:1px 5px;margin-right:5px;white-space:nowrap;">⚡ KILAT</span>' + orderIdHtml;
             if (isAdvanceFulfillment) {
                 orderIdHtml = `No. Reservasi ${orderIdHtml}`;
@@ -1846,11 +1893,10 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <div class="ord-card-header">
                     <div class="ord-card-meta">
                         <div class="ord-id">${orderIdHtml}</div>
-                        ${buyerPaidHtml(o)}
+                        ${orderContextHtml(o)}
                         ${buyerPaymentMethodHtml(o)}
                         <div class="ord-card-sub">
                             ${instantBadge}
-                            ${storeText ? `<span class="ord-card-sub-text">${esc(storeText)}</span>` : ''}
                         </div>
                     </div>
                     <div class="ord-card-actions" style="text-align:right">
@@ -1897,7 +1943,6 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             const cetakTeks  = printCount > 1 ? `Sudah Cetak (ke-${printCount})` : 'Sudah Cetak';
             const isInPacking = fulfillmentStatusMap.has(o.id) && !isFulfilled;
             const fStatus     = fulfillmentStatusMap.get(o.id)?.status || '';
-            const store       = [o.store?.name, o.store?.channel?.name].filter(Boolean).join(' · ');
             const carrier     = (o.shipping_carrier || '').toLowerCase();
             const isInstant   = carrier.includes('instant') || carrier.includes('same day') || carrier.includes('sameday');
             let instantBadge  = isInstant ? `<span style="font-size:.65rem;background:#fef08a;color:#854d0e;border-radius:4px;padding:1px 5px;font-weight:800;border:1px solid #fde047;margin-right:4px;">⚡ INSTAN</span>` : '';
@@ -2082,7 +2127,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 }
             }
 
-            let orderIdHtml = esc(o.channel_order_id || '—');
+            let orderIdHtml = orderCopyHtml(o.channel_order_id || '—');
             if (o.is_kilat) orderIdHtml = '<span title="Pesanan Kilat (Booking Shopee)" style="font-size:.6rem;font-weight:800;color:#a16207;background:#fefce8;border:1px solid #fde68a;border-radius:4px;padding:1px 5px;margin-right:5px;white-space:nowrap;">⚡ KILAT</span>' + orderIdHtml;
             if (isAdvanceFulfillment) {
                 orderIdHtml = `No. Reservasi ${orderIdHtml}`;
@@ -2095,6 +2140,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                         <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
                             ${isProcessed ? `<input type="checkbox" class="form-check-input chk-print-order" data-order-sn="${esc(o.channel_order_id)}" style="width:1.2rem;height:1.2rem;cursor:pointer;accent-color:#0284c7;margin-right:2px;">` : ''}
                             <span class="pk-order-id">${orderIdHtml}</span>
+                            ${orderContextHtml(o)}
                             ${instantBadge}
                             ${logBadge}
                             ${isPrinted && !isFulfilled ? `<span style="font-size:0.7rem; background:#e0f2fe; color:#0369a1; border-radius:4px; padding:1px 6px; font-weight:700; border:1px solid #7dd3fc;">🖨 ${cetakTeks}</span>` : ''}
@@ -2102,7 +2148,6 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                             ${dataIssue}
                         </div>
                         <div class="pk-row-meta" style="margin-top:.28rem; display:flex; align-items:center; flex-wrap:wrap; gap:.35rem">
-                            ${store ? `<span class="pk-meta-text">${esc(store)}</span><span class="pk-meta-text" style="color:#e2e8f0">·</span>` : ''}
                             ${orderDateHtml}
                             <div style="display:flex;flex-wrap:wrap;gap:.25rem;align-items:center">
                                 ${itemChips}${moreChip}
@@ -2145,8 +2190,6 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         const pkRows = rows.map(o => {
             const summary = o.fulfillment_packing_summary;
             const fStatus = fulfillmentStatusMap.get(o.id)?.status || '';
-            const store   = [o.store?.name, o.store?.channel?.name].filter(Boolean).join(' · ');
-
             // Packing info text
             const totalOrd = summary?.total_ordered   ?? 0;
             const totalFul = summary?.total_fulfilled ?? 0;
@@ -2176,11 +2219,11 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <div class="pk-row-left">
                     <div class="pk-order-id">
                         ${o.is_kilat ? '<span title="Pesanan Kilat (Booking Shopee)" style="font-size:.6rem;font-weight:800;color:#a16207;background:#fefce8;border:1px solid #fde68a;border-radius:4px;padding:1px 5px;margin-right:5px;white-space:nowrap;">⚡ KILAT</span>' : ''}
-                        ${esc(o.channel_order_id || '—')}
+                        ${orderCopyHtml(o.channel_order_id || '—')}
                         ${o.shipping_awb_no ? `<span style="font-size:0.55rem; color:#059669; margin-left:8px; font-weight:600; padding:2px 6px; background:#d1fae5; border-radius:4px;">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span>` : ''}
                     </div>
                     <div class="pk-row-meta">
-                        ${store ? `<span class="pk-meta-text">${esc(store)}</span>` : ''}
+                        ${orderContextHtml(o)}
                         ${fStatusLabel ? `<span class="pk-meta-text" style="font-weight:700">${fStatusLabel}</span>` : ''}
                         ${statusBadgeEl}
                         ${packInfo}
@@ -2322,7 +2365,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 }
             }
 
-            let itemsHtml = `<div class="ord-items-cell">`
+            let itemsHtml = `<div class="ord-items-cell">
+                <div class="ord-items-invoice-head"><span>Item Produk (${items.length})</span>${buyerPaidHtml(o)}</div>`
                 + items.map(i => renderItemCard(i, urgent)).join('')
                 + `</div>`;
                 
@@ -2458,7 +2502,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 }
             }
 
-            let orderIdHtml = esc(o.channel_order_id || '—');
+            let orderIdHtml = orderCopyHtml(o.channel_order_id || '—');
             if (o.is_kilat) orderIdHtml = '<span title="Pesanan Kilat (Booking Shopee)" style="font-size:.6rem;font-weight:800;color:#a16207;background:#fefce8;border:1px solid #fde68a;border-radius:4px;padding:1px 5px;margin-right:5px;white-space:nowrap;">⚡ KILAT</span>' + orderIdHtml;
             if (isAdvanceFulfillment) {
                 orderIdHtml = `No. Reservasi ${orderIdHtml}`;
@@ -2509,7 +2553,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             const orderIdContent = `
                 <div class="ord-id">${orderIdHtml}</div>
                 <div class="ord-date" style="margin-top:4px">${dateHtml}</div>
-                ${buyerPaidHtml(o)}
+                ${orderContextHtml(o)}
                 ${buyerPaymentMethodHtml(o)}
                 <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;">
                     ${perluKirimBadge}
@@ -2537,21 +2581,15 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <td>${itemsHtml}</td>
                 ${resolveTd}
                 ${scanTd}
-                <td>${orderStatusBadge(o.order_status)}</td>
                 <td>${pengirimanHtml}</td>
-                <td>
-                    <div style="font-weight:700;font-size:.78rem">${esc(o.store?.name || '—')}</div>
-                    <div style="margin-top:.2rem">${channelPill(o.store?.channel)}</div>
-                </td>
             </tr>`;
         }).join('');
 
         const hasResolveCol = activeTab === 'processed' && subTabProcessed !== 'packing';
         const hasScanCol    = activeTab === 'processed' && subTabProcessed !== 'packing';
-        // col widths: order(16%) | items | resolve? | scan? | status | pengiriman | store
-        const colItems  = hasResolveCol ? '16%' : (hasScanCol ? '24%' : '34%');
-        const colStatus = '12%';
-        const colStore  = '12%';
+        // col widths: order | items | resolve? | scan? | pengiriman
+        const colItems  = hasResolveCol ? '28%' : '60%';
+        const colShipping = hasResolveCol ? '20%' : '16%';
         
         const firstHeaderHtml = activeTab === 'processed'
             ? `<div style="display:flex; align-items:center;">
@@ -2564,22 +2602,18 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         <div class="gf-table-scroll">
         <table class="ord-table">
             <colgroup>
-                <col style="width:16%">
+                <col style="width:22%">
                 <col style="width:${colItems}">
                 ${hasResolveCol ? '<col style="width:15%">' : ''}
                 ${hasScanCol    ? '<col style="width:15%">' : ''}
-                <col style="width:${colStatus}">
-                <col style="width:14%">
-                <col style="width:${colStore}">
+                <col style="width:${colShipping}">
             </colgroup>
             <thead><tr>
                 <th>${firstHeaderHtml}</th>
                 <th>Item Produk</th>
                 ${hasResolveCol ? '<th>✅ Item Pengganti</th>' : ''}
                 ${hasScanCol    ? '<th>📦 Item Scan</th>'    : ''}
-                <th>Status</th>
                 <th>Pengiriman</th>
-                <th>Toko</th>
             </tr></thead>
             <tbody>${tableRows}</tbody>
         </table></div>

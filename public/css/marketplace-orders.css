@@ -215,12 +215,41 @@ body[data-theme="dark"] .ord-card { border-color: var(--glass-border); box-shado
     gap: .5rem; padding: .7rem .9rem .55rem;
 }
 .ord-card-meta { min-width: 0; }
-.ord-card-meta .ord-id { font-size: .72rem; font-weight:700; }
+.ord-card-meta .ord-id { font-size: .86rem; font-weight:700; }
 .ord-card-sub {
     display: flex; align-items: center; gap: .4rem; margin-top: .18rem; flex-wrap: wrap;
 }
 .ord-card-sub-text { font-size: .62rem; color: var(--shp-muted); font-weight: 500; }
 .ord-card-actions { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: .3rem; }
+.ord-order-copy {
+    display: inline-flex; align-items: center; gap: .3rem;
+    max-width: 100%; padding: 0; border: 0; background: transparent;
+    color: inherit; font: inherit; font-weight: 850; letter-spacing: inherit;
+    text-align: left; cursor: copy; word-break: break-all;
+}
+.ord-order-copy::after { content: '⧉'; font-family: sans-serif; font-size: .72em; color: #94a3b8; }
+.ord-order-copy:hover { color: #2563eb; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.ord-order-copy:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; border-radius: 4px; }
+.ord-order-copy.is-copied { color: #047857; text-decoration: none; }
+.ord-order-copy.is-copied::after { content: ''; }
+.ord-order-context {
+    display: flex; align-items: center; flex-wrap: wrap; gap: .3rem;
+    margin-top: .35rem; min-width: 0;
+}
+.ord-order-store {
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--shp-muted); font-size: .66rem; font-weight: 650;
+}
+.ord-order-context .badge-status,
+.ord-order-context .oc-channel-pill { flex-shrink: 0; }
+.ord-items-invoice-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: .5rem; margin-bottom: .15rem; padding: .12rem .05rem .35rem;
+    color: #64748b; font-size: .63rem; font-weight: 800;
+    letter-spacing: .04em; text-transform: uppercase;
+}
+.ord-items-invoice-head .ord-buyer-paid { margin-top: 0; font-size: .62rem; }
+.ord-items-invoice-head .ord-buyer-paid strong { font-size: .68rem; }
 .ord-card-section { border-top: 1px solid var(--shp-border); }
 /* Accordion trigger */
 .ord-acc-toggle {
@@ -437,6 +466,13 @@ body[data-theme="dark"] .ord-item-price del { color: #64748b; }
 .ord-item-nomap {
     font-size: .72rem; color: #d97706; background: #fef3c7;
     border-radius: 5px; padding: .1rem .4rem; display: inline-block; font-weight: 700;
+}
+
+@media (max-width: 640px) {
+    .ord-card-meta .ord-id { font-size: .8rem; }
+    .ord-order-context { gap: .25rem; }
+    .ord-items-invoice-head { align-items: flex-start; }
+    .ord-items-invoice-head .ord-buyer-paid { max-width: 70%; }
 }
 .ord-more {
     font-size: .68rem; color: #64748b; padding: .15rem .5rem;
