@@ -4488,6 +4488,48 @@ class MarketplaceController extends Controller
         return $total;
     }
 
+    /**
+     * Ambil komisi AMS dari payload Escrow Detail Shopee.
+     * Response dapat mengirim nilai di level order atau hanya di setiap item.
+     */
+    private function settlementAmsAmount(MarketplaceOrderSettlement $s): ?float
+    {
+        $raw = is_array($s->raw_json) ? $s->raw_json : [];
+        $hasTopLevelField = false;
+
+        foreach (['order_ams_commission_fee', 'ams_commission_fee'] as $key) {
+            if (! array_key_exists($key, $raw)) {
+                continue;
+            }
+
+            $hasTopLevelField = true;
+            $value = $this->settlementFeeAmount($raw[$key]);
+            if ($value > 0) {
+                return $value;
+            }
+        }
+
+        $items = data_get($raw, 'items', []);
+        if (is_array($items)) {
+            $hasItemField = false;
+            $total = 0.0;
+            foreach ($items as $item) {
+                if (! is_array($item) || ! array_key_exists('ams_commission_fee', $item)) {
+                    continue;
+                }
+
+                $hasItemField = true;
+                $total += $this->settlementFeeAmount($item['ams_commission_fee']);
+            }
+
+            if ($hasItemField) {
+                return $total;
+            }
+        }
+
+        return $hasTopLevelField ? 0.0 : null;
+    }
+
     private function settlementAdjustmentAmount(MarketplaceOrderSettlement $s): float
     {
         $raw = is_array($s->raw_json) ? $s->raw_json : [];

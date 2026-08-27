@@ -258,6 +258,13 @@ body[data-theme="dark"] .ord-card { border-color: var(--glass-border); box-shado
 .ord-voucher-cell .ord-voucher-summary { flex-direction: column; align-items: stretch; }
 .ord-voucher-cell .ord-voucher-chip { justify-content: space-between; }
 .ord-payment-cell .ord-buyer-paid { margin-top: 0; }
+.ord-ams-cell { text-align: right; }
+.ord-ams-value {
+    display: inline-flex; padding: .18rem .35rem; border-radius: 5px;
+    color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe;
+    font-size: .67rem; font-weight: 800; white-space: nowrap;
+}
+body[data-theme="dark"] .ord-ams-value { color: #bfdbfe; background: rgba(30, 64, 175, .22); border-color: rgba(96, 165, 250, .35); }
 .ord-payment-empty { color: #cbd5e1; font-size: .75rem; font-style: italic; }
 .ord-voucher-chip {
     display: inline-flex; align-items: baseline; gap: .22rem;

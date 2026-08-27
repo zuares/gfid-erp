@@ -221,6 +221,7 @@ trait MarketplaceOrdersPaginatedTrait
                 $arr['settlement']['voucher_toko_total'] = $this->settlementVoucherTokoAmount($o->settlement);
                 $arr['settlement']['voucher_platform_total'] = $this->settlementVoucherPlatformAmount($o->settlement);
                 $arr['settlement']['bundle_discount_total'] = $this->settlementBundleDiscountAmount($o->settlement);
+                $arr['settlement']['ams_total'] = $this->settlementAmsAmount($o->settlement);
             }
             
             $carrier   = strtolower((string) $o->shipping_carrier);

@@ -142,6 +142,40 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         </div>`;
     }
 
+    function amsAmount(o) {
+        const normalized = o.settlement?.ams_total;
+        if (normalized !== null && normalized !== undefined && normalized !== '') {
+            const value = Number(normalized);
+            if (Number.isFinite(value) && value >= 0) return value;
+        }
+
+        const raw = o.settlement?.raw_json;
+        if (!raw || typeof raw !== 'object') return null;
+
+        for (const key of ['order_ams_commission_fee', 'ams_commission_fee']) {
+            if (Object.prototype.hasOwnProperty.call(raw, key)) {
+                const value = Number(raw[key]);
+                if (Number.isFinite(value) && value > 0) return Math.abs(value);
+            }
+        }
+
+        if (Array.isArray(raw.items)) {
+            const itemValues = raw.items
+                .map(item => Number(item?.ams_commission_fee))
+                .filter(value => Number.isFinite(value) && value >= 0);
+            if (itemValues.length) return itemValues.reduce((total, value) => total + Math.abs(value), 0);
+        }
+
+        return null;
+    }
+
+    function amsHtml(o) {
+        const amount = amsAmount(o);
+        if (amount === null) return '<span class="ord-payment-empty">—</span>';
+
+        return `<span class="ord-ams-value" title="AMS dari Escrow Detail Shopee">${esc(fmtRp(amount))}</span>`;
+    }
+
     function itemPaymentSummaryHtml(o) {
         return `<div class="ord-item-payment-summary">${buyerPaidHtml(o)}${voucherSummaryHtml(o)}</div>`;
     }
@@ -2648,18 +2682,20 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 ${scanTd}
                 ${buyerPaidCell}
                 ${voucherCell}
+                <td class="ord-ams-cell">${amsHtml(o)}</td>
                 <td>${pengirimanHtml}</td>
             </tr>`;
         }).join('');
 
         const hasResolveCol = activeTab === 'processed' && subTabProcessed !== 'packing';
         const hasScanCol    = activeTab === 'processed' && subTabProcessed !== 'packing';
-        // col widths: order | items | resolve? | scan? | buyer paid | voucher | pengiriman
-        const colItems  = hasResolveCol ? '22%' : '36%';
-        const colOrder = hasResolveCol ? '17%' : '20%';
-        const colPaid = hasResolveCol ? '13%' : '14%';
-        const colVoucher = hasResolveCol ? '14%' : '16%';
-        const colShipping = hasResolveCol ? '10%' : '14%';
+        // col widths: order | items | resolve? | scan? | buyer paid | voucher | AMS | pengiriman
+        const colItems  = hasResolveCol ? '20%' : '31%';
+        const colOrder = hasResolveCol ? '15%' : '20%';
+        const colPaid = hasResolveCol ? '12%' : '14%';
+        const colVoucher = hasResolveCol ? '13%' : '16%';
+        const colAms = '8%';
+        const colShipping = hasResolveCol ? '8%' : '11%';
         
         const firstHeaderHtml = activeTab === 'processed'
             ? `<div style="display:flex; align-items:center;">
@@ -2678,6 +2714,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 ${hasScanCol    ? '<col style="width:12%">' : ''}
                 <col style="width:${colPaid}">
                 <col style="width:${colVoucher}">
+                <col style="width:${colAms}">
                 <col style="width:${colShipping}">
             </colgroup>
             <thead><tr>
@@ -2687,6 +2724,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 ${hasScanCol    ? '<th>📦 Item Scan</th>'    : ''}
                 <th>Bayar Pembeli</th>
                 <th>Voucher &amp; Diskon</th>
+                <th>AMS</th>
                 <th>Pengiriman</th>
             </tr></thead>
             <tbody>${tableRows}</tbody>

@@ -151,14 +151,24 @@ class SyncSettlementsCommand extends Command
             $storesQuery->where('id', $resolvedStoreId);
         }
 
+        // Credentials terenkripsi tidak bisa difilter langsung lewat SQL.
+        // Mode semua toko hanya memproses koneksi API yang siap dipakai
+        // (token aktif atau kedaluwarsa yang masih bisa direfresh). Mode toko
+        // spesifik tetap melewati preflight agar error dekripsi/koneksi dapat
+        // dilaporkan dengan jelas kepada operator.
         $stores = $storesQuery->get();
+        if (! $resolvedStoreId) {
+            $stores = $stores
+                ->filter(fn (Store $store) => in_array($store->connection_status, ['CONNECTED', 'TOKEN_EXPIRED'], true))
+                ->values();
+        }
 
         if ($stores->isEmpty()) {
             if ($resolvedStoreId) {
-                $this->error('Toko tidak ditemukan, tidak aktif, atau bukan Shopee.');
+                $this->error('Toko tidak ditemukan, tidak aktif, bukan Shopee, atau belum terhubung ke API.');
                 return self::FAILURE;
             }
-            $this->info('Tidak ada toko Shopee aktif.');
+            $this->info('Tidak ada toko Shopee aktif yang terhubung ke API.');
             return self::SUCCESS;
         }
 

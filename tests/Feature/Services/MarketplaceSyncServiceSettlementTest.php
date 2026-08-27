@@ -1233,19 +1233,23 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->assertDatabaseCount('marketplace_order_settlements', 0);
     }
 
-    public function test_order_belum_dikirim_tidak_dipanggil_ke_escrow()
+    public function test_order_ready_to_ship_dipanggil_ke_escrow_tetapi_processed_tidak()
     {
         $this->createOrder(['order_status' => 'READY_TO_SHIP', 'channel_order_id' => 'ORD-READY']);
         $this->createOrder(['order_status' => 'PROCESSED', 'channel_order_id' => 'ORD-PROCESSED']);
 
         $this->mockDriver(function (MockInterface $mock) {
-            $mock->shouldNotReceive('getEscrowDetail');
+            $mock->shouldReceive('getEscrowDetail')
+                ->once()
+                ->withArgs(fn ($store, $orderSn) => $orderSn === 'ORD-READY')
+                ->andReturn($this->escrowResponse([]));
         });
 
         $result = app(MarketplaceSyncService::class)->syncSettlements($this->store);
 
-        $this->assertSame(0, $result['found']);
-        $this->assertSame(0, $result['processed']);
+        $this->assertSame(1, $result['found']);
+        $this->assertSame(1, $result['processed']);
+        $this->assertSame(1, $result['skipped']);
     }
 
     public function test_order_berubah_status_sebelum_api_menjadi_skipped()
