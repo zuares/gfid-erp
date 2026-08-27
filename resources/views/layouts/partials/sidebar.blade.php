@@ -1899,7 +1899,7 @@
 
                     <div class="collapse {{ $openPersediaan ? 'show' : '' }}" id="navPersediaan">
                         @if ($hasInvIntelligence || $hasWhIntelligence)
-                            @php $subhead('Intelligence'); @endphp
+                            @php $subhead('Ringkasan'); @endphp
                             @if ($hasInvIntelligence)
                                 <x-sidebar.sub-link href="{{ route('inventory.intelligence') }}" icon="bi bi-cpu"
                                     :active="request()->routeIs('inventory.intelligence') || request()->routeIs('inventory.intelligence.*')">
@@ -1939,6 +1939,10 @@
                                 Cetak Barcode
                             </x-sidebar.sub-link>
                         @endif
+
+                        @if ($hasInvTransfersIndex || $hasInvTransfersCreate || $hasInvAdjustmentsIndex)
+                            @php $subhead('Operasional'); @endphp
+                        @endif
                         @if ($hasInvTransfersIndex)
                             <x-sidebar.sub-link href="{{ route('inventory.transfers.index') }}" icon="bi bi-arrow-repeat"
                                 :active="request()->routeIs('inventory.transfers.index')">
@@ -1948,7 +1952,7 @@
                         @if ($hasInvTransfersCreate)
                             <x-sidebar.sub-link href="{{ route('inventory.transfers.create') }}" icon="bi bi-plus-circle"
                                 :active="request()->routeIs('inventory.transfers.create')">
-                                Transfer Baru
+                                Buat Transfer
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasInvAdjustmentsIndex)
@@ -1956,6 +1960,10 @@
                                 :active="request()->routeIs('inventory.adjustments.*')">
                                 Koreksi Persediaan
                             </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasInvWipAdjIndex || $hasInvWipCutReconcile)
+                            @php $subhead('Koreksi'); @endphp
                         @endif
                         @if ($hasInvWipAdjIndex)
                             <x-sidebar.sub-link href="{{ route('inventory.wip_adjustments.index') }}" icon="bi bi-receipt"
@@ -2029,7 +2037,7 @@
                         @if ($canManageRts && $hasRtsDirectReceiveIndex)
                             <x-sidebar.sub-link href="{{ route('rts.direct-receives.index') }}" icon="bi bi-lightning"
                                 :active="request()->routeIs('rts.direct-receives.*')">
-                                RTS Dadakan
+                                Setor Jahit Dadakan
                             </x-sidebar.sub-link>
                         @endif
                     </div>
@@ -2044,7 +2052,7 @@
                         data-bs-toggle="collapse" data-bs-target="#navPembelian"
                         aria-expanded="{{ $openPembelian ? 'true' : 'false' }}" aria-controls="navPembelian">
                         <span class="icon"><i class="bi bi-receipt"></i></span>
-                        <span>Pembelian</span>
+                        <span>Pengadaan</span>
                         <span class="chevron">▸</span>
                     </button>
 
@@ -2191,7 +2199,7 @@
                         @if ($hasProdCuttingJobsIndex)
                             <x-sidebar.sub-link href="{{ route('production.cutting_jobs.index') }}" icon="bi bi-scissors"
                                 :active="request()->routeIs('production.cutting_jobs.*')">
-                                Potong
+                                Pekerjaan Potong
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasProdSewPickupsIndex)
@@ -2203,7 +2211,7 @@
                         @if ($hasProdSewReturnsIndex)
                             <x-sidebar.sub-link href="{{ route('production.sewing.returns.index') }}" icon="bi bi-inbox"
                                 :active="request()->routeIs('production.sewing.returns.index')">
-                                Setoran Jahit
+                                Setor Jahit
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasProdSewRejectReturnsIndex)
@@ -2447,7 +2455,7 @@
             @endif
 
             {{-- MASTER DATA --}}
-            <x-sidebar.label text="Data Induk" />
+            <x-sidebar.label text="Data Master" />
             <li class="mb-1">
                 <button class="sidebar-link sidebar-toggle {{ $openMaster ? 'is-open' : '' }}" type="button"
                     data-bs-toggle="collapse" data-bs-target="#navMaster"
