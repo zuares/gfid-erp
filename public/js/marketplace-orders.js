@@ -116,17 +116,30 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         const values = sources.flatMap(source => keys.map(key => Number(source?.[key])))
             .filter(value => Number.isFinite(value) && value > 0);
 
-        return values.length ? Math.abs(values[0]) : 0;
+        if (values.length) return Math.abs(values[0]);
+
+        // Beberapa response escrow hanya mengisi voucher pada masing-masing
+        // item, bukan pada level order. Jumlahkan satu alias pertama yang
+        // tersedia per item agar nilai tidak terhitung ganda.
+        const itemLists = sources.flatMap(source => [source?.items, source?.item_list])
+            .filter(items => Array.isArray(items));
+        return itemLists.flat().reduce((total, item) => {
+            const itemValue = keys.map(key => Number(item?.[key]))
+                .find(value => Number.isFinite(value) && value > 0) || 0;
+            return total + Math.abs(itemValue);
+        }, 0);
     }
 
     function voucherSummaryHtml(o) {
-        const sellerVoucher = voucherAmount(o, ['voucher_from_seller', 'seller_voucher_rebate', 'seller_voucher']);
-        const shopeeVoucher = voucherAmount(o, ['voucher_from_shopee', 'voucher_from_platform', 'platform_voucher']);
-        if (sellerVoucher <= 0 && shopeeVoucher <= 0) return '';
+        const sellerVoucher = voucherAmount(o, ['voucher_from_seller', 'seller_voucher_rebate', 'seller_voucher', 'discount_from_voucher_seller']);
+        const shopeeVoucher = voucherAmount(o, ['voucher_from_shopee', 'voucher_from_platform', 'platform_voucher', 'discount_from_voucher_shopee']);
+        const hasVoucherPayload = !!(o.settlement || o.raw_json?.income_details);
+        if (!hasVoucherPayload && sellerVoucher <= 0 && shopeeVoucher <= 0) return '';
+        const valueHtml = value => hasVoucherPayload ? esc(fmtRp(value)) : 'Belum tersedia';
 
         return `<div class="ord-voucher-summary" title="Pembagian voucher pada order">
-            ${sellerVoucher > 0 ? `<span class="ord-voucher-chip seller">🏷️ Penjual <strong>${esc(fmtRp(sellerVoucher))}</strong></span>` : ''}
-            ${shopeeVoucher > 0 ? `<span class="ord-voucher-chip shopee">🛍️ Shopee <strong>${esc(fmtRp(shopeeVoucher))}</strong></span>` : ''}
+            <span class="ord-voucher-chip seller">🏷️ Penjual <strong>${valueHtml(sellerVoucher)}</strong></span>
+            <span class="ord-voucher-chip shopee">🛍️ Shopee <strong>${valueHtml(shopeeVoucher)}</strong></span>
         </div>`;
     }
 
