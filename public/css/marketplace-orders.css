@@ -1165,6 +1165,13 @@ body[data-theme="dark"] .ord-subtab.active .ord-badge {
 .ord-payment-income .ord-income-value {
     justify-content: space-between;
 }
+.ord-track-print-stack .ord-shipping-action {
+    width: 100%;
+}
+.ord-track-print-stack .ord-shipping-action .btn-ship-primary,
+.ord-track-print-stack .ord-shipping-action .btn-ship-outline {
+    width: 100%;
+}
 body[data-theme="dark"] .ord-shipping-status {
     color: #c7d2fe;
     background: rgba(67,56,202,.22);

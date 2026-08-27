@@ -2759,7 +2759,6 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                     ${fBadge}
                     ${issueBadge}
                 </div>
-                ${shippingActionHtml}
             `;
 
             const paymentCell = `<td class="ord-payment-cell">
@@ -2793,7 +2792,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 ${paymentCell}
                 ${voucherCell}
                 <td class="ord-ams-cell">${amsHtml(o)}</td>
-                <td class="ord-track-print-cell"><div class="ord-track-print-stack">${shippingStatusHtml}${trackPrintHtml}</div></td>
+                <td class="ord-track-print-cell"><div class="ord-track-print-stack">${shippingStatusHtml}${shippingActionHtml}${trackPrintHtml}</div></td>
             </tr>`;
         }).join('');
 
@@ -2835,7 +2834,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <th>Pembayaran &amp; Penghasilan</th>
                 <th>Voucher &amp; Diskon</th>
                 <th>AMS</th>
-                <th>Status / Lacak / Cetak</th>
+                <th>Pengiriman / Lacak / Cetak</th>
             </tr></thead>
             <tbody>${tableRows}</tbody>
         </table></div>
