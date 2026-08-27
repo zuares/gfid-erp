@@ -21,7 +21,7 @@
     </div>
 
     <div class="alert alert-info d-flex gap-2 align-items-start"><i class="bi bi-info-circle-fill mt-1"></i><div><strong>Yang perlu dilakukan:</strong> pastikan periode dan angka sudah benar, cek balance <strong>Dr = Cr</strong>, lalu klik <strong>Post settlement ke jurnal</strong>. Proses ini membuat satu batch jurnal dan aman diulang.</div></div>
-    <div class="alert alert-warning"><i class="bi bi-shield-lock me-1"></i> HPP (Rp {{ $fmt($preview['excluded_from_gl']['hpp']) }}) tetap dikecualikan karena mengikuti posting shipment. Biaya iklan subledger (Rp {{ $fmt($preview['included_in_gl']['amount']) }}) dari <strong>{{ str_replace('_', ' ', $preview['included_in_gl']['source']) }}</strong> masuk ke akun <strong>{{ $preview['included_in_gl']['account_code'] }} {{ $preview['included_in_gl']['account_name'] }}</strong>. Biaya iklan order/settlement tidak dimasukkan dan tidak diposting untuk mencegah double count.</div>
+    <div class="alert alert-warning"><i class="bi bi-shield-lock me-1"></i> HPP (Rp {{ $fmt($preview['excluded_from_gl']['hpp']) }}) tetap dikecualikan karena mengikuti posting shipment. Top up saldo iklan (Rp {{ $fmt($preview['included_in_gl']['wallet_ad_topup']) }}) dipindahkan dari 1302 ke <strong>{{ $preview['included_in_gl']['ad_wallet_account_code'] }} {{ $preview['included_in_gl']['ad_wallet_account_name'] }}</strong>. Biaya iklan subledger (Rp {{ $fmt($preview['included_in_gl']['amount']) }}) dari <strong>{{ str_replace('_', ' ', $preview['included_in_gl']['source']) }}</strong> masuk ke akun <strong>{{ $preview['included_in_gl']['account_code'] }} {{ $preview['included_in_gl']['account_name'] }}</strong> dengan lawan saldo prepaid, bukan 1302. Biaya iklan order/settlement tidak dimasukkan.</div>
     @if (($preview['included_in_gl']['source'] ?? 'none') !== 'wallet_actual' && ($preview['included_in_gl']['amount'] ?? 0) > 0)
         <div class="alert alert-info"><i class="bi bi-arrow-repeat me-1"></i> Posting ini masih memakai fallback Ads Daily untuk toko yang belum memiliki transaksi wallet. Untuk posting final yang paling akurat, kembali dan jalankan <strong>Sync biaya iklan</strong> terlebih dahulu.</div>
     @endif
@@ -41,7 +41,7 @@
                     </div>
                 @endforeach
             </div>
-            <div class="text-muted mt-2" style="font-size:.8rem;">Biaya settlement masih memakai akun gabungan sesuai aturan existing. Biaya iklan wallet aktual atau fallback Ads Daily menggunakan akun advertising 6206 dan mengurangi saldo marketplace 1302.</div>
+            <div class="text-muted mt-2" style="font-size:.8rem;">Biaya settlement masih memakai akun gabungan sesuai aturan existing. SPM top up menggunakan 1302 → saldo iklan prepaid 1304. Pemakaian iklan menggunakan 1304 → biaya iklan 6206. Penarikan ke bank tetap Dr Bank / Cr 1302.</div>
         </div>
     </div>
 

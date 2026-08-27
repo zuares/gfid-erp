@@ -66,7 +66,15 @@ class MarketplaceFinancialStatementController extends Controller
             ->orderBy('name')
             ->get();
 
-        $totals = ['stores' => 0, 'created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
+        $totals = [
+            'stores' => 0,
+            'created' => 0,
+            'updated' => 0,
+            'skipped' => 0,
+            'ad_usage' => 0,
+            'ad_topup' => 0,
+            'errors' => [],
+        ];
         $from = \Carbon\Carbon::parse($filters['date_from'])->startOfDay();
         $to = \Carbon\Carbon::parse($filters['date_to'])->endOfDay();
 
@@ -80,7 +88,7 @@ class MarketplaceFinancialStatementController extends Controller
             try {
                 $result = $syncService->sync($store, $from, $to);
                 $totals['stores']++;
-                foreach (['created', 'updated', 'skipped'] as $key) {
+                foreach (['created', 'updated', 'skipped', 'ad_usage', 'ad_topup'] as $key) {
                     $totals[$key] += (int) ($result[$key] ?? 0);
                 }
             } catch (Throwable $e) {
@@ -92,11 +100,13 @@ class MarketplaceFinancialStatementController extends Controller
         }
 
         $message = sprintf(
-            'Sync biaya iklan wallet selesai: %d toko, %d baru, %d diperbarui, %d dilewati.',
+            'Sync wallet Shopee selesai: %d toko, %d baru, %d diperbarui, %d dilewati, %d pemakaian iklan, %d top-up saldo iklan.',
             $totals['stores'],
             $totals['created'],
             $totals['updated'],
             $totals['skipped'],
+            $totals['ad_usage'],
+            $totals['ad_topup'],
         );
         if ($totals['errors'] !== []) {
             $message .= ' Gagal: ' . implode(' | ', $totals['errors']);
@@ -141,6 +151,7 @@ class MarketplaceFinancialStatementController extends Controller
                 ['Laba Rugi', 'GP', 'Laba kotor', $statement['summary']['gross_profit']],
                 ['Rekonsiliasi Iklan', 'ADS-GL', 'Biaya iklan yang masuk subledger', -($statement['summary']['ad_cost_for_gl'] ?? 0)],
                 ['Rekonsiliasi Iklan', 'ADS-WALLET', 'Biaya iklan aktual wallet Shopee', -$statement['summary']['wallet_ad_cost']],
+                ['Rekonsiliasi Iklan', 'ADS-TOPUP', 'Top up saldo iklan / SPM_DEDUCT', -($statement['summary']['wallet_ad_topup'] ?? 0)],
                 ['Rekonsiliasi Iklan', 'ADS-DAILY', 'Ads Daily spend', -$statement['summary']['ads_daily_spend']],
                 ['Rekonsiliasi Iklan', 'ADS-VAR', 'Selisih wallet vs Ads Daily', $statement['summary']['ad_cost_variance']],
                 ['Laba Rugi', 'OP', 'Laba operasional setelah iklan wallet', $statement['summary']['operating_profit_after_wallet_ads'] ?? $statement['summary']['operating_profit']],

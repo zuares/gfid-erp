@@ -77,6 +77,13 @@ class AccountSeeder extends Seeder
                 'is_cash' => 0,
                 'is_active' => 1,
             ]);
+            DB::table('accounts')->updateOrInsert(['code' => '1304'], [
+                'code' => '1304',
+                'name' => 'Saldo Iklan Marketplace / Prepaid',
+                'type' => 'asset',
+                'is_cash' => 0,
+                'is_active' => 1,
+            ]);
             DB::table('accounts')->updateOrInsert(['code' => '1401'], [
                 'code' => '1401',
                 'name' => 'PPN Masukan',

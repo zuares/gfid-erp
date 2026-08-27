@@ -10,6 +10,7 @@ class MarketplaceFinancialStatementService
 {
     private const WALLET_AD_CHARGE_TYPES = ['450', 'paid_ads_charge', 'paid-ads-charge'];
     private const WALLET_AD_REFUND_TYPES = ['451', 'paid_ads_refund', 'paid-ads-refund'];
+    private const WALLET_AD_TOPUP_TYPES = ['SPM_DEDUCT', 'spm_deduct', 'spm-deduct'];
 
     public function __construct(private MarketplaceProfitReportService $profitReport)
     {
@@ -80,6 +81,7 @@ class MarketplaceFinancialStatementService
                 'wallet_ad_cost' => $summary['wallet_ad_cost'],
                 'wallet_ad_charge' => $summary['wallet_ad_charge'],
                 'wallet_ad_refund' => $summary['wallet_ad_refund'],
+                'wallet_ad_topup' => $summary['wallet_ad_topup'],
                 'ads_daily_spend' => $summary['ads_daily_spend'],
                 'ad_cost_variance' => $summary['ad_cost_variance'],
                 'ad_cost_for_gl' => $summary['ad_cost_for_gl'],
@@ -167,6 +169,11 @@ class MarketplaceFinancialStatementService
             ->selectRaw('store_id, COALESCE(SUM(ABS(amount)), 0) AS total')
             ->groupBy('store_id')
             ->pluck('total', 'store_id');
+        $topupRows = (clone $walletBase)
+            ->whereIn('transaction_type', self::WALLET_AD_TOPUP_TYPES)
+            ->selectRaw('store_id, COALESCE(SUM(ABS(amount)), 0) AS total')
+            ->groupBy('store_id')
+            ->pluck('total', 'store_id');
         $walletCountByStore = (clone $walletBase)
             ->whereIn('transaction_type', array_merge(self::WALLET_AD_CHARGE_TYPES, self::WALLET_AD_REFUND_TYPES))
             ->selectRaw('store_id, COUNT(*) AS total')
@@ -183,11 +190,13 @@ class MarketplaceFinancialStatementService
         $storeIds = collect([
             ...array_keys($chargeRows->all()),
             ...array_keys($refundRows->all()),
+            ...array_keys($topupRows->all()),
             ...array_keys($walletCountByStore->all()),
             ...array_keys($adsDailyByStore->all()),
         ])->unique()->values();
         $charge = round((float) $chargeRows->sum(), 2);
         $refund = round((float) $refundRows->sum(), 2);
+        $topup = round((float) $topupRows->sum(), 2);
         $walletNet = round($charge - $refund, 2);
         $walletCount = (int) $walletCountByStore->sum();
         $adsDailySpend = round((float) $adsDailyByStore->sum(), 2);
@@ -224,6 +233,7 @@ class MarketplaceFinancialStatementService
             'wallet_ad_charge' => $charge,
             'wallet_ad_refund' => $refund,
             'wallet_ad_cost' => $walletNet,
+            'wallet_ad_topup' => $topup,
             'wallet_ad_transaction_count' => (int) $walletCount,
             'ads_daily_spend' => $adsDailySpend,
             'ad_cost_variance' => round($walletNet - $adsDailySpend, 2),

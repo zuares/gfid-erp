@@ -9,10 +9,11 @@ return [
     // laporan profit tidak mengunci aturan pajak di source code.
     'ads_vat_percent' => (float) env('MARKETPLACE_ADS_VAT_PERCENT', 11),
 
-    // Mapping COA marketplace. Tahap awal hanya menyiapkan master akun;
-    // posting otomatis tetap menggunakan aturan existing sampai tahap 2.
+    // Mapping COA marketplace. Saldo iklan dipisahkan dari clearing agar
+    // pemakaian iklan tidak mengurangi 1302 untuk kedua kalinya.
     'accounting_accounts' => [
         'marketplace_receivable' => env('MARKETPLACE_ACCOUNT_RECEIVABLE', '1302'),
+        'ad_wallet' => env('MARKETPLACE_ACCOUNT_AD_WALLET', '1304'),
         'sales' => env('MARKETPLACE_ACCOUNT_SALES', '4101'),
         'sales_return' => env('MARKETPLACE_ACCOUNT_SALES_RETURN', '4201'),
         'commission_fee' => env('MARKETPLACE_ACCOUNT_COMMISSION', '6202'),

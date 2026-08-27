@@ -14,7 +14,7 @@ return new class extends Migration
             $table->string('external_transaction_id', 100);
             $table->string('transaction_type', 50);
             // Signed amount normalized to the seller wallet perspective:
-            // charge = negative, refund = positive.
+            // charge/top-up debit = negative, refund = positive.
             $table->decimal('amount', 15, 2);
             $table->string('money_flow', 20)->nullable();
             $table->string('wallet_type', 50)->nullable();

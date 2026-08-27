@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Channel;
 use App\Models\Journal;
 use App\Models\MarketplaceAccountingPosting;
+use App\Models\MarketplaceAdWalletTransaction;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
@@ -140,6 +141,41 @@ class MarketplaceAccountingPostingTest extends TestCase
         $this->assertDatabaseCount('journals', 0);
     }
 
+    public function test_wallet_topup_uses_prepaid_ad_account_without_crediting_clearing_for_usage(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-POSTING-ADS-' . uniqid(),
+        ]);
+        $store = $this->seedFinancialData();
+        $this->createWalletAdTransaction($store, 'SPM-TOPUP-001', 'SPM_DEDUCT', -50, '2026-08-10 10:00:00');
+        $this->createWalletAdTransaction($store, 'SPM-CHARGE-001', 'paid_ads_charge', -30, '2026-08-11 10:00:00');
+
+        $filters = [
+            'store_id' => $store->id,
+            'date_basis' => 'ordered_at',
+            'date_from' => '2026-08-01',
+            'date_to' => '2026-08-31',
+        ];
+
+        $response = $this->actingAs($owner)->get(route('marketplace.reports.financial-statement.posting-preview', $filters));
+        $response->assertOk()->assertSee('Top up saldo iklan');
+
+        $preview = app(\App\Services\Marketplace\MarketplaceAccountingPostingService::class)->preview($filters);
+        $lines = collect($preview['lines']);
+        $accountLine = fn (string $code, string $side) => (float) $lines
+            ->where('account_code', $code)
+            ->sum($side);
+
+        $this->assertSame(50.0, $accountLine('1304', 'debit'));
+        $this->assertSame(80.0, $accountLine('1304', 'credit'));
+        $this->assertSame(50.0, $accountLine('1302', 'credit'));
+        $this->assertSame(30.0, $accountLine('6206', 'debit'));
+        $this->assertSame(50.0, (float) $preview['included_in_gl']['wallet_ad_topup']);
+        $this->assertSame(30.0, (float) $preview['included_in_gl']['amount']);
+        $this->assertSame($preview['total_debit'], $preview['total_credit']);
+    }
+
     public function test_non_owner_cannot_post_marketplace_accounting(): void
     {
         $admin = User::factory()->create([
@@ -203,7 +239,9 @@ class MarketplaceAccountingPostingTest extends TestCase
             ['4101', 'Penjualan', 'revenue'],
             ['4201', 'Retur Penjualan', 'revenue'],
             ['1302', 'Saldo Marketplace / Clearing', 'asset'],
+            ['1304', 'Saldo Iklan Marketplace / Prepaid', 'asset'],
             ['6201', 'Biaya Marketplace', 'expense'],
+            ['6206', 'Biaya Iklan Marketplace', 'expense'],
         ] as [$code, $name, $type]) {
             Account::create(['code' => $code, 'name' => $name, 'type' => $type, 'is_active' => true]);
         }
@@ -216,6 +254,20 @@ class MarketplaceAccountingPostingTest extends TestCase
             'name' => 'Posting Test Store',
             'status' => 'active',
             'is_active' => true,
+        ]);
+    }
+
+    private function createWalletAdTransaction(Store $store, string $id, string $type, float $amount, string $createdAt): void
+    {
+        MarketplaceAdWalletTransaction::create([
+            'store_id' => $store->id,
+            'external_transaction_id' => $id,
+            'transaction_type' => $type,
+            'amount' => $amount,
+            'money_flow' => $amount < 0 ? 'MONEY_OUT' : 'MONEY_IN',
+            'status' => 'COMPLETED',
+            'transaction_created_at' => $createdAt,
+            'source_payload' => [],
         ]);
     }
 }

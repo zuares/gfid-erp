@@ -297,12 +297,13 @@
         <div class="card-body">
             <div class="mp-section-title mb-3"><i class="bi bi-megaphone"></i> Rekonsiliasi biaya iklan</div>
             <div class="row g-3">
+                <div class="col-6 col-md-3"><div class="text-muted small">Top up saldo iklan</div><div class="fw-bold">Rp {{ $fmt($summary['wallet_ad_topup'] ?? 0) }}</div></div>
                 <div class="col-6 col-md-3"><div class="text-muted small">Charge wallet</div><div class="fw-bold">Rp {{ $fmt($summary['wallet_ad_charge'] ?? 0) }}</div></div>
                 <div class="col-6 col-md-3"><div class="text-muted small">Refund wallet</div><div class="fw-bold">Rp {{ $fmt($summary['wallet_ad_refund'] ?? 0) }}</div></div>
                 <div class="col-6 col-md-3"><div class="text-muted small">Ads Daily spend</div><div class="fw-bold">Rp {{ $fmt($summary['ads_daily_spend'] ?? 0) }}</div></div>
-                <div class="col-6 col-md-3"><div class="text-muted small">Selisih</div><div class="fw-bold {{ abs((float) ($summary['ad_cost_variance'] ?? 0)) > 0.01 ? 'text-warning-emphasis' : 'text-success' }}">Rp {{ $fmt($summary['ad_cost_variance'] ?? 0) }}</div></div>
+                <div class="col-6 col-md-3"><div class="text-muted small">Selisih wallet vs Ads Daily</div><div class="fw-bold {{ abs((float) ($summary['ad_cost_variance'] ?? 0)) > 0.01 ? 'text-warning-emphasis' : 'text-success' }}">Rp {{ $fmt($summary['ad_cost_variance'] ?? 0) }}</div></div>
             </div>
-            <div class="small text-muted mt-3">Biaya wallet memakai tanggal transaksi Shopee. Jika wallet belum tersinkron untuk toko tertentu, Ads Daily dipakai sebagai fallback agar biaya tetap masuk subledger. Saat posting, nilainya masuk ke akun 6206 dan mengurangi saldo marketplace 1302; angka ini bersifat period-level dan tidak dialokasikan ulang ke laba per order.</div>
+            <div class="small text-muted mt-3">SPM top up dipindahkan dari 1302 ke 1304 sebagai saldo iklan prepaid. Ads Daily/wallet actual mengakui pemakaian ke akun 6206 dengan lawan 1304, sedangkan penarikan bank tetap menggunakan 1302. Angka ini bersifat period-level dan tidak dialokasikan ulang ke laba per order.</div>
             @if (($summary['ad_cost_for_gl_source'] ?? 'none') !== 'wallet_actual' && ($summary['ad_cost_for_gl'] ?? 0) > 0)
                 <div class="alert alert-warning small mt-3 mb-0"><i class="bi bi-info-circle me-1"></i> Sumber posting saat ini: <strong>{{ $adCostSource }}</strong>. Klik <strong>Sync biaya iklan</strong> sebelum posting final agar angka wallet Shopee menjadi sumber utama bila tersedia.</div>
             @endif

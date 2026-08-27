@@ -11,13 +11,15 @@ use RuntimeException;
 class ShopeeWalletAdCostSyncService
 {
     private const TRANSACTION_TYPES = [
-        '450' => -1, // PAID_ADS_CHARGE
-        '451' => 1,  // PAID_ADS_REFUND
+        '450' => ['sign' => -1, 'kind' => 'ad_cost'], // PAID_ADS_CHARGE
+        '451' => ['sign' => 1, 'kind' => 'ad_refund'], // PAID_ADS_REFUND
+        'SPM_DEDUCT' => ['sign' => -1, 'kind' => 'ad_wallet_topup'],
     ];
 
     private const TYPE_ALIASES = [
         '450' => ['450', 'paid_ads_charge', 'paid-ads-charge'],
         '451' => ['451', 'paid_ads_refund', 'paid-ads-refund'],
+        'SPM_DEDUCT' => ['spm_deduct', 'spm-deduct'],
     ];
 
     public function __construct(private readonly ShopeeChannel $shopee)
@@ -25,15 +27,19 @@ class ShopeeWalletAdCostSyncService
     }
 
     /**
-     * Sync actual paid-ads wallet mutations. The endpoint accepts at most
-     * fifteen calendar days, so longer periods are split into windows.
+     * Sync wallet movements related to ads. Shopee can return the general
+     * wallet list even when transaction_type=450 is sent, so rows are
+     * classified locally instead of trusting the request filter.
      *
-     * @return array{created:int,updated:int,skipped:int,pages:int,requests:int,errors:int}
+     * @return array{created:int,updated:int,skipped:int,pages:int,requests:int,errors:int,ad_usage:int,ad_topup:int}
      */
     public function sync(Store $store, Carbon $from, Carbon $to, int $pageSize = 100): array
     {
         if ($pageSize < 1 || $pageSize > 100) {
             throw new RuntimeException('page size harus berada di antara 1 dan 100.');
+        }
+        if ($to->lt($from)) {
+            throw new RuntimeException('periode sync wallet tidak valid: tanggal akhir sebelum tanggal mulai.');
         }
 
         $totals = [
@@ -43,6 +49,8 @@ class ShopeeWalletAdCostSyncService
             'pages' => 0,
             'requests' => 0,
             'errors' => 0,
+            'ad_usage' => 0,
+            'ad_topup' => 0,
         ];
         $periodTo = $to->copy()->endOfDay();
         $windowFrom = $from->copy()->startOfDay();
@@ -53,19 +61,9 @@ class ShopeeWalletAdCostSyncService
                 $windowTo = $periodTo->copy();
             }
 
-            foreach (self::TRANSACTION_TYPES as $transactionType => $sign) {
-                $result = $this->syncWindow(
-                    $store,
-                    $windowFrom,
-                    $windowTo,
-                    $pageSize,
-                    $transactionType,
-                    $sign,
-                );
-
-                foreach ($totals as $key => $value) {
-                    $totals[$key] += (int) ($result[$key] ?? 0);
-                }
+            $result = $this->syncWindow($store, $windowFrom, $windowTo, $pageSize);
+            foreach ($totals as $key => $value) {
+                $totals[$key] += (int) ($result[$key] ?? 0);
             }
 
             $windowFrom = $windowTo->copy()->addSecond()->startOfDay();
@@ -74,15 +72,9 @@ class ShopeeWalletAdCostSyncService
         return $totals;
     }
 
-    private function syncWindow(
-        Store $store,
-        Carbon $from,
-        Carbon $to,
-        int $pageSize,
-        string $transactionType,
-        int $sign,
-    ): array {
-        $totals = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'pages' => 0, 'requests' => 0, 'errors' => 0];
+    private function syncWindow(Store $store, Carbon $from, Carbon $to, int $pageSize): array
+    {
+        $totals = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'pages' => 0, 'requests' => 0, 'errors' => 0, 'ad_usage' => 0, 'ad_topup' => 0];
         $pageNo = 0;
 
         do {
@@ -94,15 +86,14 @@ class ShopeeWalletAdCostSyncService
                 $from->timestamp,
                 $to->timestamp,
                 null,
-                $transactionType,
+                null,
                 null,
                 null,
             );
 
             if (! empty($result['error'])) {
                 throw new RuntimeException(sprintf(
-                    'Shopee wallet transaction type %s gagal: %s',
-                    $transactionType,
+                    'Shopee wallet transaction gagal: %s',
                     (string) ($result['message'] ?? $result['error']),
                 ));
             }
@@ -120,10 +111,8 @@ class ShopeeWalletAdCostSyncService
                     continue;
                 }
 
-                // Some Shopee responses/proxies can return more than the
-                // requested type. Never let a mixed response overwrite an
-                // existing charge with a refund (or vice versa).
-                if (! $this->matchesTransactionType($row, $transactionType)) {
+                $canonicalType = $this->classifyTransactionType($row);
+                if ($canonicalType === null) {
                     $totals['skipped']++;
                     continue;
                 }
@@ -143,11 +132,12 @@ class ShopeeWalletAdCostSyncService
                     continue;
                 }
 
+                $meta = self::TRANSACTION_TYPES[$canonicalType];
                 $date = Carbon::createFromTimestamp($createdTime, config('app.timezone'));
                 $payload = [
-                    'transaction_type' => (string) (data_get($row, 'transaction_type') ?? $transactionType),
-                    'amount' => round($amount * $sign, 2),
-                    'money_flow' => $sign < 0 ? 'MONEY_OUT' : 'MONEY_IN',
+                    'transaction_type' => (string) (data_get($row, 'transaction_type') ?? $canonicalType),
+                    'amount' => round($amount * $meta['sign'], 2),
+                    'money_flow' => $meta['sign'] < 0 ? 'MONEY_OUT' : 'MONEY_IN',
                     'wallet_type' => data_get($row, 'wallet_type'),
                     'order_sn' => data_get($row, 'order_sn'),
                     'status' => data_get($row, 'status'),
@@ -170,6 +160,11 @@ class ShopeeWalletAdCostSyncService
                 );
 
                 $totals[$existing ? 'updated' : 'created']++;
+                if ($meta['kind'] === 'ad_wallet_topup') {
+                    $totals['ad_topup']++;
+                } else {
+                    $totals['ad_usage']++;
+                }
             }
 
             $pageNo += count($rows);
@@ -204,18 +199,20 @@ class ShopeeWalletAdCostSyncService
         return abs((float) str_replace(',', '', trim((string) $value)));
     }
 
-    private function matchesTransactionType(array $row, string $requestedType): bool
+    private function classifyTransactionType(array $row): ?string
     {
         $rawType = data_get($row, 'transaction_type') ?? data_get($row, 'type');
         if ($rawType === null || trim((string) $rawType) === '') {
-            // If Shopee omits the type, trust the server-side filter.
-            return true;
+            return null;
         }
 
-        return in_array(
-            strtolower(trim((string) $rawType)),
-            self::TYPE_ALIASES[$requestedType] ?? [$requestedType],
-            true,
-        );
+        $normalized = strtolower(trim((string) $rawType));
+        foreach (self::TYPE_ALIASES as $canonicalType => $aliases) {
+            if (in_array($normalized, $aliases, true)) {
+                return $canonicalType;
+            }
+        }
+
+        return null;
     }
 }

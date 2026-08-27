@@ -27,9 +27,9 @@ class MarketplaceAccountingPostingService
      *
      * HPP is deliberately not included here because it may already be posted
      * by shipment COGS. Actual wallet advertising is included as a separate
-     * cash mutation: Dr advertising / Cr marketplace clearing. When wallet
-     * transactions are not available for a store, the statement service may
-     * use Ads Daily as an explicitly-labelled fallback for the same period.
+     * cash mutation: withdrawal remains Dr Bank / Cr marketplace clearing in
+     * the payout flow. Ads wallet funding is Dr prepaid ads / Cr marketplace
+     * clearing, while ad usage is Dr advertising / Cr prepaid ads.
      */
     public function preview(array $filters): array
     {
@@ -52,18 +52,24 @@ class MarketplaceAccountingPostingService
         $summary = $statement['summary'];
         $otherAdjustment = (float) $summary['other_settlement_adjustment'];
         $adCostForGl = round((float) ($summary['ad_cost_for_gl'] ?? $summary['wallet_ad_cost'] ?? 0), 2);
+        $adWalletTopup = round((float) ($summary['wallet_ad_topup'] ?? 0), 2);
         $lines = [
             $this->line($accounts[$this->accountCode('marketplace_receivable')], (float) $summary['payout'], 0),
             $this->line($accounts[$this->accountCode('sales_return')], (float) $summary['seller_discount'] + (float) $summary['refund'], 0),
             $this->line($accounts[$this->accountCode('other_fee')], (float) $summary['marketplace_fees'] + max(-$otherAdjustment, 0), 0),
             $this->line($accounts[$this->accountCode('other_fee')], 0, max($otherAdjustment, 0)),
             $this->line($accounts[$this->accountCode('sales')], 0, (float) $summary['gross_sales']),
-            // Advertising is a period-level deduction from marketplace saldo.
-            // A net refund is represented by the inverse entry. The statement
-            // tells us whether this came from wallet actuals or Ads Daily fallback.
+            // SPM_DEDUCT moves funds from marketplace clearing to the ad wallet;
+            // it is not an expense. Ads Daily/wallet actuals recognize usage
+            // against the prepaid ad-wallet account, avoiding a second credit
+            // to 1302 when the bank withdrawal is already net of advertising.
+            $this->line($accounts[$this->accountCode('ad_wallet')], max($adWalletTopup, 0), 0),
+            $this->line($accounts[$this->accountCode('marketplace_receivable')], 0, max($adWalletTopup, 0)),
+            $this->line($accounts[$this->accountCode('marketplace_receivable')], max(-$adWalletTopup, 0), 0),
+            $this->line($accounts[$this->accountCode('ad_wallet')], 0, max(-$adWalletTopup, 0)),
             $this->line($accounts[$this->accountCode('advertising')], max($adCostForGl, 0), 0),
-            $this->line($accounts[$this->accountCode('marketplace_receivable')], 0, max($adCostForGl, 0)),
-            $this->line($accounts[$this->accountCode('marketplace_receivable')], max(-$adCostForGl, 0), 0),
+            $this->line($accounts[$this->accountCode('ad_wallet')], 0, max($adCostForGl, 0)),
+            $this->line($accounts[$this->accountCode('ad_wallet')], max(-$adCostForGl, 0), 0),
             $this->line($accounts[$this->accountCode('advertising')], 0, max(-$adCostForGl, 0)),
         ];
 
@@ -84,19 +90,22 @@ class MarketplaceAccountingPostingService
             'lines' => $lines,
             'total_debit' => $totalDebit,
             'total_credit' => $totalCredit,
-            'accounting_scope' => 'Settlement marketplace: penjualan, retur/diskon, fee, adjustment, dan saldo marketplace / clearing.',
+            'accounting_scope' => 'Settlement marketplace: penjualan, retur/diskon, fee, adjustment, saldo marketplace / clearing, saldo iklan prepaid, dan biaya iklan.',
             'excluded_from_gl' => [
                 'hpp' => (float) $summary['hpp'],
                 'settlement_ad_cost' => (float) ($summary['ad_cost'] ?? 0),
-                'reason' => 'HPP dapat sudah diposting dari shipment COGS. Biaya iklan settlement tidak diposting terpisah agar tidak double count; biaya iklan subledger diposting ke akun advertising.',
+                'reason' => 'HPP dapat sudah diposting dari shipment COGS. Biaya iklan order/settlement tidak diposting. Penarikan bank tetap diproses di modul payout; biaya iklan subledger menggunakan saldo iklan prepaid agar 1302 tidak berkurang dua kali.',
             ],
             'included_in_gl' => [
                 'wallet_ad_cost' => (float) ($summary['wallet_ad_cost'] ?? 0),
+                'wallet_ad_topup' => $adWalletTopup,
                 'amount' => $adCostForGl,
                 'source' => $summary['ad_cost_for_gl_source'] ?? 'none',
                 'ads_daily_fallback_spend' => (float) ($summary['ads_daily_fallback_spend'] ?? 0),
                 'account_code' => $this->accountCode('advertising'),
                 'account_name' => $accounts[$this->accountCode('advertising')]->name,
+                'ad_wallet_account_code' => $this->accountCode('ad_wallet'),
+                'ad_wallet_account_name' => $accounts[$this->accountCode('ad_wallet')]->name,
             ],
         ];
     }
@@ -298,6 +307,7 @@ class MarketplaceAccountingPostingService
             $this->accountCode('sales_return'),
             $this->accountCode('marketplace_receivable'),
             $this->accountCode('other_fee'),
+            $this->accountCode('ad_wallet'),
             $this->accountCode('advertising'),
         ];
     }

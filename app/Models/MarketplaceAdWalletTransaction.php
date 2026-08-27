@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MarketplaceAdWalletTransaction extends Model
 {
+    // SPM_DEDUCT is a transfer from marketplace clearing to the separate
+    // prepaid ad wallet; 450/451 are usage/refund movements.
     protected $table = 'marketplace_ad_wallet_transactions';
 
     protected $fillable = [

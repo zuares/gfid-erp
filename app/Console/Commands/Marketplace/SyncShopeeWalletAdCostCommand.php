@@ -16,7 +16,7 @@ class SyncShopeeWalletAdCostCommand extends Command
         {--to= : Tanggal akhir (Y-m-d)}
         {--page-size=100 : Jumlah data per halaman (1-100)}';
 
-    protected $description = 'Sinkronisasi biaya iklan aktual dari wallet Shopee (transaction type 450/451).';
+    protected $description = 'Sinkronisasi mutasi saldo iklan Shopee (Paid Ads 450/451 dan SPM_DEDUCT).';
 
     public function handle(ShopeeWalletAdCostSyncService $syncService): int
     {
@@ -64,11 +64,13 @@ class SyncShopeeWalletAdCostCommand extends Command
             try {
                 $result = $syncService->sync($store, $from, $to, $pageSize);
                 $this->line(sprintf(
-                    '%s: created=%d updated=%d skipped=%d pages=%d requests=%d',
+                    '%s: created=%d updated=%d skipped=%d ad_usage=%d ad_topup=%d pages=%d requests=%d',
                     $store->name,
                     $result['created'],
                     $result['updated'],
                     $result['skipped'],
+                    $result['ad_usage'] ?? 0,
+                    $result['ad_topup'] ?? 0,
                     $result['pages'],
                     $result['requests'],
                 ));

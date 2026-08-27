@@ -29,13 +29,6 @@ class ShopeeWalletAdCostSyncTest extends TestCase
                         'wallet_type' => 'seller_balance',
                         'reason' => 'Paid ads charge',
                     ],
-                ],
-                'more' => false,
-            ],
-        ];
-        $refund = [
-            'response' => [
-                'transaction_list' => [
                     [
                         'transaction_id' => 1002,
                         'transaction_type' => 'paid_ads_refund',
@@ -45,17 +38,21 @@ class ShopeeWalletAdCostSyncTest extends TestCase
                         'wallet_type' => 'seller_balance',
                         'reason' => 'Paid ads refund',
                     ],
+                    [
+                        'transaction_id' => 1003,
+                        'transaction_type' => 'SPM_DEDUCT',
+                        'amount' => -5000,
+                        'status' => 'COMPLETED',
+                        'create_time' => 1787220000,
+                        'wallet_type' => 'shopee_pay',
+                        'reason' => 'SPM create wallet transaction',
+                    ],
                 ],
                 'more' => false,
             ],
         ];
 
-        Http::fake(function ($request) use ($fixture, $refund) {
-            return Http::response(
-                ($request->data()['transaction_type'] ?? null) === '451' ? $refund : $fixture,
-                200,
-            );
-        });
+        Http::fake(['*/api/v2/payment/get_wallet_transaction_list*' => Http::response($fixture, 200)]);
 
         $from = now()->subDays(2)->startOfDay();
         $to = now()->endOfDay();
@@ -63,7 +60,7 @@ class ShopeeWalletAdCostSyncTest extends TestCase
 
         $first = $service->sync($store, $from, $to);
 
-        $this->assertSame(2, $first['created']);
+        $this->assertSame(3, $first['created']);
         $this->assertSame(0, $first['updated']);
         $this->assertDatabaseHas('marketplace_ad_wallet_transactions', [
             'store_id' => $store->id,
@@ -79,14 +76,21 @@ class ShopeeWalletAdCostSyncTest extends TestCase
             'amount' => 2000,
             'money_flow' => 'MONEY_IN',
         ]);
-        $this->assertSame(-13000.0, (float) MarketplaceAdWalletTransaction::sum('amount'));
+        $this->assertDatabaseHas('marketplace_ad_wallet_transactions', [
+            'store_id' => $store->id,
+            'external_transaction_id' => '1003',
+            'transaction_type' => 'SPM_DEDUCT',
+            'amount' => -5000,
+            'money_flow' => 'MONEY_OUT',
+        ]);
+        $this->assertSame(-18000.0, (float) MarketplaceAdWalletTransaction::sum('amount'));
 
         $second = $service->sync($store, $from, $to);
 
         $this->assertSame(0, $second['created']);
-        $this->assertSame(2, $second['updated']);
-        $this->assertDatabaseCount('marketplace_ad_wallet_transactions', 2);
-        Http::assertSentCount(4); // 2 transaction types per sync.
+        $this->assertSame(3, $second['updated']);
+        $this->assertDatabaseCount('marketplace_ad_wallet_transactions', 3);
+        Http::assertSentCount(2); // 1 general wallet request per sync.
     }
 
     public function test_sync_memecah_periode_lebih_dari_lima_belas_hari(): void
@@ -100,7 +104,7 @@ class ShopeeWalletAdCostSyncTest extends TestCase
         $to = now()->endOfDay();
         $result = app(ShopeeWalletAdCostSyncService::class)->sync($store, $from, $to);
 
-        $this->assertSame(6, $result['requests']); // 3 windows x 2 types.
+        $this->assertSame(3, $result['requests']); // 3 windows x 1 general wallet request.
         $ranges = collect(Http::recorded())
             ->map(fn (array $record) => [
                 $record[0]->data()['create_time_from'],
@@ -111,8 +115,7 @@ class ShopeeWalletAdCostSyncTest extends TestCase
 
         $this->assertSame($from->timestamp, $ranges[0][0]);
         $this->assertSame($from->copy()->addDays(14)->endOfDay()->timestamp, $ranges[0][1]);
-        $this->assertSame('450', $ranges[0][2]);
-        $this->assertSame('451', $ranges[1][2]);
+        $this->assertNull($ranges[0][2]);
     }
 
     public function test_sync_mengabaikan_respons_campuran_agar_charge_tidak_menjadi_refund(): void
@@ -147,7 +150,7 @@ class ShopeeWalletAdCostSyncTest extends TestCase
         );
 
         $this->assertSame(2, $result['created']);
-        $this->assertSame(2, $result['skipped']);
+        $this->assertSame(0, $result['skipped']);
         $this->assertDatabaseHas('marketplace_ad_wallet_transactions', [
             'external_transaction_id' => '2001',
             'amount' => -10000,

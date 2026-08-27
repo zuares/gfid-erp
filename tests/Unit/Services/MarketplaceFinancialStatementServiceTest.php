@@ -84,6 +84,16 @@ class MarketplaceFinancialStatementServiceTest extends TestCase
             'transaction_created_at' => '2026-08-11 10:00:00',
             'source_payload' => [],
         ]);
+        MarketplaceAdWalletTransaction::create([
+            'store_id' => $store->id,
+            'external_transaction_id' => 'AD-TOPUP-1',
+            'transaction_type' => 'SPM_DEDUCT',
+            'amount' => -75,
+            'money_flow' => 'MONEY_OUT',
+            'status' => 'COMPLETED',
+            'transaction_created_at' => '2026-08-12 10:00:00',
+            'source_payload' => [],
+        ]);
         MarketplaceAdsDaily::create([
             'store_id' => $store->id,
             'date' => '2026-08-10',
@@ -106,6 +116,7 @@ class MarketplaceFinancialStatementServiceTest extends TestCase
         $this->assertSame(150.0, $statement['summary']['wallet_ad_charge']);
         $this->assertSame(20.0, $statement['summary']['wallet_ad_refund']);
         $this->assertSame(130.0, $statement['summary']['wallet_ad_cost']);
+        $this->assertSame(75.0, $statement['summary']['wallet_ad_topup']);
         $this->assertSame(100.0, $statement['summary']['ads_daily_spend']);
         $this->assertSame(30.0, $statement['summary']['ad_cost_variance']);
     }
