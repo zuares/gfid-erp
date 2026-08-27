@@ -26,6 +26,34 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         return `<span class="badge-status st-draft">${esc(s)}</span>`;
     }
 
+    function orderDateText(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return fmt(value);
+
+        return date.toLocaleString('id-ID', {
+            weekday: 'short',
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    }
+
+    function shippingStatusFallback(status) {
+        const labels = {
+            UNPAID: 'Belum dibayar',
+            READY_TO_SHIP: 'Siap dikirim',
+            PROCESSED: 'Sedang diproses',
+            READY_TO_HANDOVER: 'Siap diserahkan',
+            SHIPPED: 'Sudah dikirim',
+            TO_CONFIRM_RECEIVE: 'Menunggu konfirmasi',
+            COMPLETED: 'Selesai',
+            CANCELLED: 'Dibatalkan',
+        };
+        return labels[String(status || '').toUpperCase()] || '';
+    }
+
     function orderCopyHtml(orderNumber) {
         const value = String(orderNumber || '—');
         return `<button type="button" class="ord-order-copy" data-order-number="${esc(value)}"
@@ -1980,11 +2008,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             if (o.ordered_at) {
                 const d = new Date(o.ordered_at);
                 if (!isNaN(d.valueOf())) {
-                    const dd = String(d.getDate()).padStart(2, '0');
-                    const mm = d.toLocaleString('id-ID', { month: 'short' });
-                    const hh = String(d.getHours()).padStart(2, '0');
-                    const min = String(d.getMinutes()).padStart(2, '0');
-                    dateTimeText = `${dd} ${mm} · ${hh}:${min}`;
+                    dateTimeText = orderDateText(o.ordered_at);
                 }
             }
             const carrier     = (o.shipping_carrier || '').toLowerCase();
@@ -2508,9 +2532,9 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 todayNoon.setHours(12, 0, 0, 0);
                 
                 if (['ready', 'processed', 'ready_to_handover'].includes(activeTab) && d < todayNoon) {
-                    dateHtml = `<span style="color:#ef4444; font-weight:600; font-size:0.65rem; background:#fef2f2; padding:1px 4px; border-radius:4px; border:1px solid #fecaca;" title="Pesanan masuk sebelum jam 12 hari ini / kemarin">${fmt(dateVal)}</span>`;
+                    dateHtml = `<span style="color:#ef4444; font-weight:600; font-size:0.65rem; background:#fef2f2; padding:1px 4px; border-radius:4px; border:1px solid #fecaca;" title="Pesanan masuk sebelum jam 12 hari ini / kemarin">${esc(orderDateText(dateVal))}</span>`;
                 } else {
-                    dateHtml = `<span style="color:#94a3b8; font-size:0.65rem; font-weight:500;">${fmt(dateVal)}</span>`;
+                    dateHtml = `<span style="color:#94a3b8; font-size:0.65rem; font-weight:500;">${esc(orderDateText(dateVal))}</span>`;
                 }
             }
 
@@ -2522,9 +2546,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 else if (o.logistics_status === 'LOGISTICS_NOT_START') statusText = 'Belum Dimulai';
                 else if (o.logistics_status === 'LOGISTICS_SHIPPED') statusText = 'Sudah Dikirim';
                 
-                if (!(activeTab === 'processed' && o.logistics_status === 'LOGISTICS_REQUEST_CREATED')) {
-                    logBadge = `<span style="font-size:0.65rem; color:#4338ca; background:#e0e7ff; border:none; border-radius:99px; padding:2px 8px; font-weight:700; display:inline-block; margin-bottom:2px;">📡 ${statusText}</span>`;
-                }
+                logBadge = `<span class="ord-shipping-status">📡 ${esc(statusText)}</span>`;
             }
 
             let itemsHtml = `<div class="ord-items-cell">
@@ -2686,10 +2708,10 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 ? `onclick="window.location='/marketplace/issues'" style="cursor:pointer"`
                 : `onclick="window.showOrderDetail(${o.id})" style="cursor:pointer" title="Klik untuk melihat detail"`;
 
-            if (activeTab === 'ready' || activeTab === 'processed') {
-                perluKirimBadge = '';
-                logBadge = '';
-            }
+            const shippingStatusHtml = logBadge
+                || (shippingStatusFallback(o.order_status)
+                    ? `<span class="ord-shipping-status fallback">📦 ${esc(shippingStatusFallback(o.order_status))}</span>`
+                    : '<span class="ord-payment-empty">—</span>');
             const fBadge = urgent && !['ready', 'processed'].includes(activeTab) ? fulfillmentBadge(o) : '';
 
             // Badge masalah di tab Sudah Proses
@@ -2707,16 +2729,16 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 }
             }
             
-            let pengirimanHtml = '';
+            let shippingInfoHtml = '';
             if (o.shipping_awb_no) {
-                pengirimanHtml += `<div class="ord-shipping-awb"><span class="ord-shipping-label">Resi</span><span class="ord-shipping-awb-value">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span></div>`;
+                shippingInfoHtml = `<div class="ord-shipping-awb"><span class="ord-shipping-label">No. Resi</span><span class="ord-shipping-awb-value">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span></div>`;
             } else if (o.shipping_carrier) {
-                pengirimanHtml += `<div class="ord-shipping-carrier">${esc(o.shipping_carrier)}</div>`;
+                shippingInfoHtml = `<div class="ord-shipping-carrier">${esc(o.shipping_carrier)}</div>`;
             }
-            if (logisticsBtn) {
-                pengirimanHtml += `<div class="ord-shipping-action">${logisticsBtn}</div>`;
-            }
-            if (pengirimanHtml) pengirimanHtml = `<div class="ord-shipping-stack">${pengirimanHtml}</div>`;
+            if (shippingInfoHtml) shippingInfoHtml = `<div class="ord-shipping-stack">${shippingInfoHtml}</div>`;
+            const shippingActionHtml = logisticsBtn
+                ? `<div class="ord-shipping-action">${logisticsBtn}</div>`
+                : '';
 
             const trackHtml = ['shipped', 'completed'].includes(activeTab) && o.order_status !== 'UNPAID'
                 ? `<button class="ord-action-btn track" onclick="event.stopPropagation(); trackOrder(${o.store_id}, '${o.channel_order_id}', event)">🔍 Lacak</button>`
@@ -2727,23 +2749,30 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
 
             const orderIdContent = `
                 <div class="ord-id">${orderIdHtml}</div>
+                ${shippingInfoHtml}
                 <div class="ord-date" style="margin-top:4px">${dateHtml}</div>
                 ${orderContextHtml(o)}
-                ${buyerPaymentMethodHtml(o)}
                 <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;">
                     ${perluKirimBadge}
                     ${instantBadge}
                     ${printedBadge}
-                    ${logBadge}
                     ${fBadge}
                     ${issueBadge}
                 </div>
-                ${pengirimanHtml}
+                ${shippingActionHtml}
             `;
 
-            const buyerPaidCell = `<td class="ord-payment-cell">${buyerPaidHtml(o)}</td>`;
+            const paymentCell = `<td class="ord-payment-cell">
+                <div class="ord-payment-summary">
+                    ${buyerPaymentMethodHtml(o)}
+                    ${buyerPaidHtml(o)}
+                    <div class="ord-payment-income">
+                        <span class="ord-payment-income-label">Penghasilan</span>
+                        ${escrowHtml(o)}
+                    </div>
+                </div>
+            </td>`;
             const voucherCell = `<td class="ord-voucher-cell">${voucherSummaryHtml(o) || '<span class="ord-payment-empty">—</span>'}</td>`;
-            const incomeCell = `<td class="ord-income-cell">${escrowHtml(o)}</td>`;
             
             const firstColHtml = activeTab === 'processed' 
                 ? `<div style="display:flex; gap:0.6rem; align-items:flex-start;">
@@ -2761,24 +2790,22 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <td>${itemsHtml}</td>
                 ${resolveTd}
                 ${scanTd}
-                ${buyerPaidCell}
+                ${paymentCell}
                 ${voucherCell}
-                ${incomeCell}
                 <td class="ord-ams-cell">${amsHtml(o)}</td>
-                <td class="ord-track-print-cell">${trackPrintHtml}</td>
+                <td class="ord-track-print-cell"><div class="ord-track-print-stack">${shippingStatusHtml}${trackPrintHtml}</div></td>
             </tr>`;
         }).join('');
 
         const hasResolveCol = activeTab === 'processed' && subTabProcessed !== 'packing';
         const hasScanCol    = activeTab === 'processed' && subTabProcessed !== 'packing';
-        // col widths: order (+ pengiriman) | items | resolve? | scan? | buyer paid | voucher | income | AMS | lacak+cetak
-        const colItems  = hasResolveCol ? '16%' : '25%';
-        const colOrder = hasResolveCol ? '18%' : '23%';
-        const colPaid = hasResolveCol ? '10%' : '12%';
-        const colVoucher = hasResolveCol ? '10%' : '14%';
-        const colIncome = hasResolveCol ? '9%' : '10%';
+        // col widths: order (+ resi) | items | resolve? | scan? | pembayaran (+ penghasilan) | voucher | AMS | lacak+cetak
+        const colItems  = hasResolveCol ? '14%' : '23%';
+        const colOrder = hasResolveCol ? '20%' : '24%';
+        const colPaid = hasResolveCol ? '18%' : '20%';
+        const colVoucher = hasResolveCol ? '13%' : '16%';
         const colAms = '6%';
-        const colTrackPrint = hasResolveCol ? '13%' : '10%';
+        const colTrackPrint = hasResolveCol ? '13%' : '11%';
         
         const firstHeaderHtml = activeTab === 'processed'
             ? `<div style="display:flex; align-items:center;">
@@ -2797,7 +2824,6 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 ${hasScanCol    ? '<col style="width:9%">' : ''}
                 <col style="width:${colPaid}">
                 <col style="width:${colVoucher}">
-                <col style="width:${colIncome}">
                 <col style="width:${colAms}">
                 <col style="width:${colTrackPrint}">
             </colgroup>
@@ -2806,11 +2832,10 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <th>Item Produk</th>
                 ${hasResolveCol ? '<th>✅ Item Pengganti</th>' : ''}
                 ${hasScanCol    ? '<th>📦 Item Scan</th>'    : ''}
-                <th>Pembayaran</th>
+                <th>Pembayaran &amp; Penghasilan</th>
                 <th>Voucher &amp; Diskon</th>
-                <th>Penghasilan</th>
                 <th>AMS</th>
-                <th>Lacak / Cetak</th>
+                <th>Status / Lacak / Cetak</th>
             </tr></thead>
             <tbody>${tableRows}</tbody>
         </table></div>
