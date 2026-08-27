@@ -30,6 +30,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     let currentPage      = 1;
     let lastPage         = 1;
     let totalOrders      = 0;
+    let ordersLoadSeq     = 0;
 
     const urlParams = new URLSearchParams(window.location.search);
     const urlTab = urlParams.get('tab');
@@ -452,13 +453,11 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             return;
         }
 
-        renderTable();
-        updateToolbar();
-        updatePickingPrintStrip();
-
-        if (tab === 'processed') {
-            autoFetchMissingAwbs();
-        }
+        // Setiap tab memakai query backend yang berbeda. Jangan merender ulang
+        // array tab sebelumnya karena filterByTab adalah no-op dan data yang
+        // sudah dimuat bisa berasal dari tab lain.
+        currentPage = 1;
+        loadOrders();
     };
 
     // ── Tab Retur / Refund / Batal (data LIVE dari API Shopee) ──────────────
@@ -883,10 +882,12 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
 
     // ── Load ──────────────────────────────────────────────────────────────
     async function loadOrders() {
+        const loadSeq = ++ordersLoadSeq;
         $('ordersBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
         // Kirim rentang tanggal aktif ke backend supaya order lama hasil backfill
         // ikut terambil (backend tidak lagi terpaku 200 order terbaru saja).
         const res = await api(localOrdersUrl()).catch(() => ({data: []}));
+        if (loadSeq !== ordersLoadSeq) return;
         applyOrdersResponse(res);
 
         if (activeStore && !isNaN(activeStore)) {
@@ -912,6 +913,10 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         restoreSavedTab();
         render();
         updateLastSyncTime();
+
+        if (activeTab === 'processed') {
+            autoFetchMissingAwbs();
+        }
 
         if (window.autoArrangeAfterSync) {
             window.autoArrangeAfterSync = false;

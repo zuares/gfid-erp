@@ -137,7 +137,10 @@ trait MarketplaceOrdersPaginatedTrait
         } elseif ($tab === 'processed') {
             $query->whereIn('order_status', ['PROCESSED', 'READY_TO_HANDOVER']);
             if ($subTab === 'packing') {
-                $query->whereNull('shipping_awb_no');
+                // Belum Packing = sudah diproses di marketplace, tetapi belum
+                // pernah discan sebagai order di modul Shipments.
+                $query->where('order_status', 'PROCESSED')
+                    ->whereDoesntHave('fulfillment.shipmentScans');
             } elseif ($subTab === 'ready') {
                 $query->whereNotNull('shipping_awb_no');
             }
