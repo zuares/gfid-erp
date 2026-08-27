@@ -31,6 +31,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     let lastPage         = 1;
     let totalOrders      = 0;
     let ordersLoadSeq     = 0;
+    let orderCounts       = null;
+    let searchReloadTimer = null;
 
     const urlParams = new URLSearchParams(window.location.search);
     const urlTab = urlParams.get('tab');
@@ -82,6 +84,17 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         lp.set('limit', 50);
 
         return '/api/marketplace/local-orders-paginated' + (lp.toString() ? ('?' + lp.toString()) : '');
+    }
+
+    function localOrderCountsUrl() {
+        const lp = new URLSearchParams();
+        if (typeof IS_DUMMY_MODE !== 'undefined' && IS_DUMMY_MODE) lp.set('dummy', '1');
+        if (getFrom()) lp.set('date_from', getFrom());
+        if (getTo())   lp.set('date_to', getTo());
+        if (getSearch()) lp.set('search', getSearch());
+        if (activeStore && activeStore !== '') lp.set('store', activeStore);
+
+        return '/api/marketplace/local-order-counts' + (lp.toString() ? ('?' + lp.toString()) : '');
     }
 
     // Endpoint ini memakai paginator Laravel (res.data adalah array), tetapi
@@ -208,13 +221,16 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         const clearBtn = $('searchClearBtn');
         clearBtn.classList.toggle('visible', input.value.length > 0);
         render();
+
+        clearTimeout(searchReloadTimer);
+        searchReloadTimer = setTimeout(() => loadOrders(), 300);
     };
 
     window.clearSearch = function () {
         $('filterSearch').value = '';
         $('searchClearBtn').classList.remove('visible');
         $('filterSearch').focus();
-        render();
+        loadOrders();
     };
 
     // ── Store dropdown ────────────────────────────────────────────────────
@@ -915,6 +931,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         restoreSavedTab();
         render();
         updateLastSyncTime();
+        loadOrderCounts(loadSeq, api(localOrderCountsUrl()).catch(() => null));
 
         if (activeTab === 'processed') {
             autoFetchMissingAwbs();
@@ -934,6 +951,14 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 }
             }, 500);
         }
+    }
+
+    async function loadOrderCounts(loadSeq, request) {
+        const res = await request;
+        if (!res || loadSeq !== ordersLoadSeq) return;
+
+        orderCounts = res;
+        renderBadges();
     }
 
     function inRange(o) { return true; }
@@ -1367,7 +1392,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         ['issues', 'ready', 'processed', 'processed_instant', 'shipped', 'completed'].forEach(tab => {
             const el = $('badge-' + tab);
             if (!el) return;
-            const count = tab === 'all' ? rows.length : filterByTab(rows, tab).length;
+            const hasServerCount = orderCounts && Object.prototype.hasOwnProperty.call(orderCounts, tab);
+            const count = hasServerCount ? Number(orderCounts[tab]) : filterByTab(rows, tab).length;
             el.textContent = count;
         });
         

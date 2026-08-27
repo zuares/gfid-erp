@@ -10,22 +10,47 @@ trait MarketplaceOrdersPaginatedTrait
     public function localOrderCounts(): JsonResponse
     {
         // Simple counts for all relevant statuses without eager loading.
-        $baseQuery = MarketplaceOrder::query();
-        $this->excludeKilatOrders($baseQuery);
-        
         $dateFrom = request()->query('date_from');
         $dateTo   = request()->query('date_to');
-        
-        if ($dateFrom || $dateTo) {
-            $baseQuery->where(function ($q) use ($dateFrom, $dateTo) {
-                $q->whereNull('ordered_at');
-                $q->orWhere(function ($range) use ($dateFrom, $dateTo) {
-                    if ($dateFrom) $range->where('ordered_at', '>=', $dateFrom . ' 00:00:00');
-                    if ($dateTo)   $range->where('ordered_at', '<=', $dateTo . ' 23:59:59');
+        $store = request()->query('store');
+        $search = trim((string) request()->query('search', ''));
+
+        $applyScope = function ($query) use ($dateFrom, $dateTo, $store, $search) {
+            $this->excludeKilatOrders($query);
+
+            if ($dateFrom || $dateTo) {
+                $query->where(function ($q) use ($dateFrom, $dateTo) {
+                    $q->whereNull('ordered_at');
+                    $q->orWhere(function ($range) use ($dateFrom, $dateTo) {
+                        if ($dateFrom) $range->where('ordered_at', '>=', $dateFrom . ' 00:00:00');
+                        if ($dateTo)   $range->where('ordered_at', '<=', $dateTo . ' 23:59:59');
+                    });
                 });
-            });
-        }
-        
+            }
+
+            if ($store) {
+                $query->whereHas('store', fn ($q) => $q->where('name', $store));
+            }
+
+            if ($search !== '') {
+                $query->where(function ($q) use ($search) {
+                    $q->where('channel_order_id', 'like', "%{$search}%")
+                        ->orWhere('external_order_id', 'like', "%{$search}%")
+                        ->orWhere('shipping_awb_no', 'like', "%{$search}%")
+                        ->orWhereHas('items', function ($itemQuery) use ($search) {
+                            $itemQuery->where('model_sku', 'like', "%{$search}%")
+                                ->orWhere('item_sku', 'like', "%{$search}%")
+                                ->orWhere('variant_name', 'like', "%{$search}%")
+                                ->orWhereHas('internalItem', fn ($internalQuery) =>
+                                    $internalQuery->where('code', 'like', "%{$search}%"));
+                        });
+                });
+            }
+        };
+
+        $baseQuery = MarketplaceOrder::query();
+        $applyScope($baseQuery);
+
         $counts = $baseQuery->select('order_status', \DB::raw('count(*) as total'))
             ->groupBy('order_status')
             ->pluck('total', 'order_status')
@@ -35,7 +60,7 @@ trait MarketplaceOrdersPaginatedTrait
         $issuesQuery = MarketplaceOrder::whereHas('items', function ($q) {
             $q->where('data_status', '!=', 'valid')->orWhereNull('data_status');
         });
-        $this->excludeKilatOrders($issuesQuery);
+        $applyScope($issuesQuery);
         $issuesCount = $issuesQuery->count();
 
         // Calculate processed_instant count
@@ -45,7 +70,7 @@ trait MarketplaceOrdersPaginatedTrait
                   ->orWhere('shipping_carrier', 'like', '%same day%')
                   ->orWhere('shipping_carrier', 'like', '%sameday%');
             });
-        $this->excludeKilatOrders($processedInstantQuery);
+        $applyScope($processedInstantQuery);
         $processedInstantCount = $processedInstantQuery->count();
 
         return response()->json([
