@@ -4429,6 +4429,69 @@ class MarketplaceController extends Controller
         return abs((float) $s->seller_voucher);
     }
 
+    /**
+     * Ambil diskon bundle dari payload Escrow Detail Shopee.
+     * Diskon bundle biasanya muncul di item sebagai seller_discount dengan
+     * activity_type="bundle_deal", bukan sebagai voucher seller/platform.
+     */
+    private function settlementBundleDiscountAmount(MarketplaceOrderSettlement $s): float
+    {
+        $raw = is_array($s->raw_json) ? $s->raw_json : [];
+
+        foreach (['bundle_discount', 'bundle_discount_amount', 'discount_from_bundle', 'discount_from_bundle_deal'] as $key) {
+            $value = data_get($raw, $key);
+            if ($value !== null && $value !== '' && $this->settlementFeeAmount($value) > 0) {
+                return $this->settlementFeeAmount($value);
+            }
+        }
+
+        $items = data_get($raw, 'items', []);
+        if (! is_array($items)) {
+            return 0.0;
+        }
+
+        $total = 0.0;
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $activityType = strtolower((string) ($item['activity_type'] ?? ''));
+            $isBundle = str_contains($activityType, 'bundle');
+            if (! $isBundle && is_array($item['promotion_list'] ?? null)) {
+                foreach ($item['promotion_list'] as $promotion) {
+                    if (is_array($promotion) && str_contains(strtolower((string) ($promotion['promotion_type'] ?? '')), 'bundle')) {
+                        $isBundle = true;
+                        break;
+                    }
+                }
+            }
+
+            if (! $isBundle) {
+                continue;
+            }
+
+            $explicit = null;
+            foreach (['bundle_discount', 'bundle_discount_amount', 'discount_from_bundle', 'discount_from_bundle_deal'] as $key) {
+                if (isset($item[$key]) && $item[$key] !== '') {
+                    $explicit = $this->settlementFeeAmount($item[$key]);
+                    break;
+                }
+            }
+
+            if ($explicit !== null && $explicit > 0) {
+                $total += $explicit;
+                continue;
+            }
+
+            $sellingPrice = $this->settlementFeeAmount($item['selling_price'] ?? 0);
+            $discountedPrice = $this->settlementFeeAmount($item['discounted_price'] ?? 0);
+            $total += max($sellingPrice - $discountedPrice, 0.0);
+        }
+
+        return $total;
+    }
+
     private function settlementAdjustmentAmount(MarketplaceOrderSettlement $s): float
     {
         $raw = is_array($s->raw_json) ? $s->raw_json : [];

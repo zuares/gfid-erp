@@ -130,11 +130,13 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     function voucherSummaryHtml(o) {
         const sellerVoucher = voucherAmount(o, ['voucher_toko_total', 'voucher_from_seller', 'seller_voucher_rebate', 'seller_voucher', 'discount_from_voucher_seller']);
         const shopeeVoucher = voucherAmount(o, ['voucher_platform_total', 'voucher_from_shopee', 'voucher_from_platform', 'platform_voucher', 'discount_from_voucher_shopee']);
+        const bundleDiscount = voucherAmount(o, ['bundle_discount_total', 'bundle_discount', 'bundle_discount_amount', 'discount_from_bundle', 'discount_from_bundle_deal']);
         const hasVoucherPayload = !!o.settlement;
-        if (!hasVoucherPayload && sellerVoucher <= 0 && shopeeVoucher <= 0) return '';
+        if (!hasVoucherPayload && sellerVoucher <= 0 && shopeeVoucher <= 0 && bundleDiscount <= 0) return '';
         const valueHtml = value => hasVoucherPayload ? esc(fmtRp(value)) : 'Belum tersedia';
 
-        return `<div class="ord-voucher-summary" title="Pembagian voucher pada order">
+        return `<div class="ord-voucher-summary" title="Voucher dan diskon dari Escrow Detail Shopee">
+            <span class="ord-voucher-chip bundle">🎁 Bundle <strong>${valueHtml(bundleDiscount)}</strong></span>
             <span class="ord-voucher-chip seller">🏷️ Penjual <strong>${valueHtml(sellerVoucher)}</strong></span>
             <span class="ord-voucher-chip shopee">🛍️ Shopee <strong>${valueHtml(shopeeVoucher)}</strong></span>
         </div>`;
@@ -2684,7 +2686,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 ${hasResolveCol ? '<th>✅ Item Pengganti</th>' : ''}
                 ${hasScanCol    ? '<th>📦 Item Scan</th>'    : ''}
                 <th>Bayar Pembeli</th>
-                <th>Voucher</th>
+                <th>Voucher &amp; Diskon</th>
                 <th>Pengiriman</th>
             </tr></thead>
             <tbody>${tableRows}</tbody>

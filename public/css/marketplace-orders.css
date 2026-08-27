@@ -267,8 +267,10 @@ body[data-theme="dark"] .ord-card { border-color: var(--glass-border); box-shado
 .ord-voucher-chip strong { font-size: .63rem; font-weight: 800; }
 .ord-voucher-chip.seller { color: #92400e; background: #fffbeb; border-color: #fde68a; }
 .ord-voucher-chip.shopee { color: #9f1239; background: #fff1f2; border-color: #fecdd3; }
+.ord-voucher-chip.bundle { color: #6d28d9; background: #f5f3ff; border-color: #ddd6fe; }
 body[data-theme="dark"] .ord-voucher-chip.seller { color: #fde68a; background: rgba(120, 53, 15, .24); border-color: rgba(251, 191, 36, .35); }
 body[data-theme="dark"] .ord-voucher-chip.shopee { color: #fda4af; background: rgba(159, 18, 57, .2); border-color: rgba(251, 113, 133, .35); }
+body[data-theme="dark"] .ord-voucher-chip.bundle { color: #ddd6fe; background: rgba(109, 40, 217, .22); border-color: rgba(167, 139, 250, .35); }
 .ord-card-section { border-top: 1px solid var(--shp-border); }
 /* Accordion trigger */
 .ord-acc-toggle {
