@@ -47,7 +47,10 @@ class MarketplaceEscrowTest extends TestCase
         $this->get(route('marketplace.escrow'))
             ->assertOk()
             ->assertSee('Escrow Shopee')
-            ->assertSee('tanpa cache database');
+            ->assertSee('tanpa cache database')
+            ->assertSee('Buyer transaction fee')
+            ->assertSee('Final escrow product GST')
+            ->assertSee('Items');
     }
 
     public function test_list_forwards_date_window_and_normalizes_payload(): void
