@@ -358,6 +358,11 @@ class PurchaseOrderController extends Controller
         // snapshot qty, harga, dan konversi pada baris PO.
         $purchase_order = $this->service->recalculate($purchase_order);
 
+        // Repair status pembayaran lama yang menyisakan nominal pembulatan kecil.
+        if ($purchase_order->activePayments()->exists()) {
+            $this->recalcPaymentStatus($purchase_order);
+        }
+
         $purchase_order->load([
             'supplier',
             'paymentMethod',
@@ -439,11 +444,11 @@ class PurchaseOrderController extends Controller
             ->where('type', 'dp_apply')
             ->sum('amount');
 
-        $dpAvailable = max(0, round($dpTotal - $dpAppliedTotal, 2));
+        $dpAvailable = PurchaseOrder::normalizePaymentRemainder($dpTotal - $dpAppliedTotal);
 
         $settled = $paidPaymentTotal + $dpAppliedTotal;
         $apDebt = max(0, round($grnPostedTotal - $returnPostedTotal, 2));
-        $apOutstanding = max(0, round($apDebt - $settled, 2));
+        $apOutstanding = PurchaseOrder::normalizePaymentRemainder($apDebt - $settled);
 
         // Cek apakah semua PO line sudah fully received (dari GRN posted)
         // → dipakai untuk disable tombol "+ GRN baru"
@@ -1033,7 +1038,7 @@ class PurchaseOrderController extends Controller
         $grand = round((float) $order->grand_total, 2);
         $payNow = round($payNow, 2);
 
-        $eps = 0.01;
+        $eps = PurchaseOrder::paymentRoundingTolerance();
         // Nominal di atas total PO tetap dicatat sebagai DP agar selisihnya
         // menjadi piutang supplier, bukan pelunasan AP yang kelebihan.
         $type = ($payNow <= $grand + $eps && abs($payNow - $grand) < $eps) ? 'payment' : 'dp';
@@ -1070,7 +1075,7 @@ class PurchaseOrderController extends Controller
 
         $paid = round($paid, 2);
         $grand = round((float) $order->grand_total, 2);
-        $eps = 0.01;
+        $eps = PurchaseOrder::paymentRoundingTolerance();
 
         $status = 'unpaid';
         if ($paid > $eps && $paid > $grand + $eps) {

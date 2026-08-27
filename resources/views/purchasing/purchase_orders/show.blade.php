@@ -148,15 +148,14 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         // DP APPLY total (buat UI)
         $dpAppliedTotal =
             (float) ($dpAppliedTotal ?? ($order->activePayments()?->where('type', 'dp_apply')->sum('amount') ?? 0));
-        $dpAvailable = max(0, round($dpTotal - $dpAppliedTotal, 2));
+        $dpAvailable = \App\Models\PurchaseOrder::normalizePaymentRemainder($dpTotal - $dpAppliedTotal);
 
         // outstanding hutang (should include dp_apply)
-        $apOutstanding =
-            (float) ($apOutstanding ?? max(0, round($apDebt - $paidPaymentTotal - $dpAppliedTotal, 2)));
+        $apOutstanding = \App\Models\PurchaseOrder::normalizePaymentRemainder(
+            (float) ($apOutstanding ?? ($apDebt - $paidPaymentTotal - $dpAppliedTotal))
+        );
 
-        // Tampilkan pecahan rupiah jika saldo aktual memang memiliki desimal.
-        // Tanpa ini, sisa Rp0,98 terlihat sebagai Rp1 dan tombol "Sisa"
-        // mengirim nominal yang lebih besar dari hutang sebenarnya.
+        // Sisa sampai Rp1 dianggap selisih pembulatan dan ditampilkan sebagai nol.
         $formatPaymentMoney = static function ($value): string {
             $value = (float) $value;
             $decimals = abs($value - round($value)) > 0.0001 ? 2 : 0;
@@ -194,14 +193,14 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         $hasAp = $grnPostedTotal > 0.0001;
         $poGrandTotal = (float) ($order->grand_total ?? 0);
         $dpRemaining = max(0, round($poGrandTotal - $dpTotal, 2));
-        $supplierReceivable = max(0, round((float) ($order->paid_amount ?? 0) - $poGrandTotal, 2));
-        $canPaySettlement = $canPay && $hasAp && $apOutstanding > 0.01;
+        $supplierReceivable = \App\Models\PurchaseOrder::normalizePaymentRemainder((float) ($order->paid_amount ?? 0) - $poGrandTotal);
+        $canPaySettlement = $canPay && $hasAp && $apOutstanding > 0;
         // DP boleh melebihi nilai PO agar selisihnya tercatat sebagai piutang supplier.
         $canPayDp = $canPay && $poGrandTotal > 0.01;
         $canOpenPayment = $canPaySettlement || $canPayDp;
 
         // apply DP guard
-        $canApplyDp = $canPay && $hasAp && $dpAvailable > 0.01 && $apOutstanding > 0.01;
+        $canApplyDp = $canPay && $hasAp && $dpAvailable > 0 && $apOutstanding > 0;
         $maxApplyDp = max(0, round(min($dpAvailable, $apOutstanding), 2));
         $linePurchaseUnits = ($order->lines ?? collect())
             ->map(fn ($line) => $line->effectivePurchaseUnit())
@@ -763,9 +762,9 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
 
                             <div class="col-6 col-md-3">
                                 <label class="form-label small fw-semibold">Jenis</label>
-                                @php $defaultPaymentType = $hasAp ? old('type', 'payment') : 'dp'; @endphp
+                                @php $defaultPaymentType = $canPaySettlement ? old('type', 'payment') : 'dp'; @endphp
                                 <select name="type" class="form-select form-select-sm" required id="typeSelectModal">
-                                    @if ($hasAp)
+                                    @if ($canPaySettlement)
                                         <option value="payment" @selected($defaultPaymentType === 'payment')>Pelunasan</option>
                                     @endif
                                     <option value="dp" @selected($defaultPaymentType === 'dp')>DP (Uang Muka)</option>
@@ -858,7 +857,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                             {{ old('supplier_invoice_id') == $inv->id ? 'selected' : '' }}>
                                             {{ $inv->invoice_no }}
                                             @if ($inv->supplier_invoice_ref) [{{ $inv->supplier_invoice_ref }}] @endif
-                                            — {{ rupiah($inv->total_amount - $inv->paid_amount) }} outstanding
+                                            — {{ rupiah($inv->outstanding()) }} outstanding
                                             ({{ strtoupper($inv->status) }})
                                         </option>
                                     @endforeach

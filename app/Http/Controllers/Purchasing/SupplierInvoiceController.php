@@ -48,12 +48,14 @@ class SupplierInvoiceController extends Controller
 
         $invoices = $query->paginate(20)->withQueryString();
 
+        $tolerance = PurchaseOrder::paymentRoundingTolerance();
         $summary = (object) [
             'total'        => SupplierInvoice::count(),
             'draft_count'  => SupplierInvoice::where('status', 'draft')->count(),
             'posted_count' => SupplierInvoice::whereIn('status', ['posted', 'partial_paid', 'paid'])->count(),
             'unpaid_total' => SupplierInvoice::whereIn('status', ['posted', 'partial_paid'])
-                ->selectRaw('SUM(total_amount - paid_amount) as total')->value('total') ?? 0,
+                ->whereRaw('ROUND(total_amount - paid_amount, 2) > ?', [$tolerance])
+                ->selectRaw('COALESCE(SUM(total_amount - paid_amount), 0) as total')->value('total') ?? 0,
         ];
 
         $suppliers = \App\Models\Supplier::orderBy('name')->get(['id', 'name', 'code']);

@@ -79,7 +79,11 @@ class PurchasePaymentController extends Controller
             ->whereIn('payment_status', ['unpaid', 'partial'])
             ->whereHas('purchaseReceipts', fn($s) => $s->where('status', 'posted'))
             ->orderByDesc('date')
-            ->get(['id', 'code', 'date', 'supplier_id', 'grand_total', 'paid_amount', 'payment_status']);
+            ->get(['id', 'code', 'date', 'supplier_id', 'grand_total', 'paid_amount', 'payment_status'])
+            ->filter(fn (PurchaseOrder $po) => PurchaseOrder::normalizePaymentRemainder(
+                (float) $po->grand_total - (float) $po->paid_amount
+            ) > 0)
+            ->values();
 
         return view('purchasing.purchase_payments.index', compact(
             'payments', 'summary', 'suppliers', 'paymentMethods', 'cashAccounts', 'openPos'
@@ -179,19 +183,23 @@ class PurchasePaymentController extends Controller
         //    DP tidak mengurangi hutang (DP masuk 1151)
         // =====================================================
         if (($data['type'] ?? '') === 'payment') {
-            $outstanding = $this->calcApOutstandingByGrn($purchase_order);
+            $rawOutstanding = $this->rawApOutstandingByGrn($purchase_order);
 
-            if ($outstanding <= 0.0001) {
+            if ($rawOutstanding <= 0.0001) {
                 throw ValidationException::withMessages([
                     'amount' => 'Tidak ada hutang yang bisa dibayar (belum ada GRN posted atau hutang sudah lunas).',
                 ]);
             }
 
-            if ($amount > $outstanding + 0.01) {
+            if ($amount > $rawOutstanding + PurchaseOrder::paymentRoundingTolerance()) {
                 throw ValidationException::withMessages([
                     'amount' => 'Nominal melebihi sisa hutang.',
                 ]);
             }
+
+            // Jika UI menampilkan saldo pecahan sebagai Rp1, terima inputnya
+            // tetapi simpan hanya saldo riil agar jurnal tidak overpay.
+            $amount = min(round($amount, 2), $rawOutstanding);
         }
 
         // Auto-link ke Supplier Invoice aktif milik PO ini (jika tidak dipilih manual)
@@ -305,7 +313,7 @@ class PurchasePaymentController extends Controller
         // hitung DP tersedia
         $dpTotal = (float) $purchase_order->activePayments()->where('type', 'dp')->sum('amount');
         $dpApplied = (float) $purchase_order->activePayments()->where('type', 'dp_apply')->sum('amount');
-        $dpAvailable = max(0, round($dpTotal - $dpApplied, 2));
+        $dpAvailable = PurchaseOrder::normalizePaymentRemainder($dpTotal - $dpApplied);
 
         // hitung hutang outstanding bersih (GRN posted - return posted - payment - dp_apply)
         $debt = $this->netDebtByGrn($purchase_order);
@@ -390,7 +398,7 @@ class PurchasePaymentController extends Controller
     protected function recalcPaymentStatus(PurchaseOrder $order): void
     {
         $grand = round((float) $order->grand_total, 2);
-        $eps = 0.01;
+        $eps = PurchaseOrder::paymentRoundingTolerance();
 
         $agg = $order->activePayments()
             ->selectRaw("
@@ -400,7 +408,7 @@ class PurchasePaymentController extends Controller
 
         $paid = round((float) ($agg->paid ?? 0), 2);
 
-        if ($grand <= $eps || $paid <= $eps) {
+        if ($grand <= 0.0001 || $paid <= 0.0001) {
             $order->paid_amount = 0;
             $order->payment_status = 'unpaid';
             $order->save();
@@ -438,6 +446,14 @@ class PurchasePaymentController extends Controller
      * total_grn_posted - total_return_posted - total_payment(type=payment) - dp_apply
      */
     protected function calcApOutstandingByGrn(PurchaseOrder $order): float
+    {
+        return PurchaseOrder::normalizePaymentRemainder($this->rawApOutstandingByGrn($order));
+    }
+
+    /**
+     * Saldo AP riil sebelum toleransi pembulatan diterapkan.
+     */
+    protected function rawApOutstandingByGrn(PurchaseOrder $order): float
     {
         $debt = (float) $this->netDebtByGrn($order);
 
@@ -611,7 +627,7 @@ class PurchasePaymentController extends Controller
             ->sum('amount');
 
         $totalAmount = (float) $invoice->total_amount;
-        $eps = 0.01;
+        $eps = PurchaseOrder::paymentRoundingTolerance();
 
         $newStatus = 'posted';
         if ($totalPaid >= $totalAmount - $eps && $totalAmount > 0) {

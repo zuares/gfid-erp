@@ -469,7 +469,7 @@
           @foreach ($invOutstandingList as $inv)
           @php
             $overdue     = $inv->due_date && $inv->due_date < now()->startOfDay();
-            $outstanding = max(0, ($inv->total_amount ?? 0) - ($inv->paid_amount ?? 0));
+            $outstanding = $inv->outstanding();
           @endphp
           <tr class="dash-row">
             <td>

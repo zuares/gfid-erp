@@ -1249,7 +1249,7 @@ class PurchaseReturnController extends Controller
             ->where('resolution_type', '!=', 'replacement')
             ->sum('total');
 
-        return max(0, round($debt - $paid - $dpApplied - $returned, 2));
+        return PurchaseOrder::normalizePaymentRemainder($debt - $paid - $dpApplied - $returned);
     }
 
     protected function journalEffectPreview(PurchaseReturn $ret, $returnRows): array

@@ -215,6 +215,24 @@ class PurchaseOrder extends Model
         return ($this->received_status ?? 'not_received') === 'not_received';
     }
 
+    /**
+     * Toleransi pembulatan nominal purchasing dalam rupiah.
+     */
+    public static function paymentRoundingTolerance(): float
+    {
+        return max(0.0, (float) config('accounting.purchase_payment_tolerance', 1.00));
+    }
+
+    /**
+     * Sisa nominal <= toleransi dianggap nol agar status dan UI konsisten.
+     */
+    public static function normalizePaymentRemainder(float $amount): float
+    {
+        $remainder = round(max(0.0, $amount), 2);
+
+        return $remainder <= static::paymentRoundingTolerance() ? 0.0 : $remainder;
+    }
+
     public function payments()
     {
         return $this->hasMany(\App\Models\PurchasePayment::class, 'purchase_order_id')

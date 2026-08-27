@@ -95,7 +95,11 @@ class SupplierInvoice extends Model
 
     public function outstanding(): float
     {
-        return max(0, round((float) $this->total_amount - (float) $this->paid_amount, 2));
+        $outstanding = round(max(0, (float) $this->total_amount - (float) $this->paid_amount), 2);
+
+        return $outstanding <= (float) config('accounting.purchase_payment_tolerance', 1.00)
+            ? 0.0
+            : $outstanding;
     }
 
     /**
@@ -125,7 +129,7 @@ class SupplierInvoice extends Model
 
         $total   = (float) $this->total_amount;
         $paid    = (float) $this->paid_amount;
-        $epsilon = 0.01;
+        $epsilon = (float) config('accounting.purchase_payment_tolerance', 1.00);
 
         if ($total <= 0) {
             return;

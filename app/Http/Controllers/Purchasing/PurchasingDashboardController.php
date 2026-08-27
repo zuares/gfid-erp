@@ -112,23 +112,29 @@ class PurchasingDashboardController extends Controller
                 ->limit(10)
                 ->get();
 
-            $invOutstandingCount = SupplierInvoice::whereIn('status', ['posted', 'partial_paid'])->count();
-            $invOutstandingTotal = (float) SupplierInvoice::whereIn('status', ['posted', 'partial_paid'])
+            $tolerance = PurchaseOrder::paymentRoundingTolerance();
+            $invOutstandingQuery = SupplierInvoice::whereIn('status', ['posted', 'partial_paid'])
+                ->whereRaw('ROUND(total_amount - paid_amount, 2) > ?', [$tolerance]);
+            $invOutstandingCount = (clone $invOutstandingQuery)->count();
+            $invOutstandingTotal = (float) (clone $invOutstandingQuery)
                 ->selectRaw('COALESCE(SUM(total_amount - paid_amount), 0) as outstanding')
                 ->value('outstanding');
 
             $invOverdueCount = SupplierInvoice::whereIn('status', ['posted', 'partial_paid'])
                 ->whereNotNull('due_date')
                 ->where('due_date', '<', $today)
+                ->whereRaw('ROUND(total_amount - paid_amount, 2) > ?', [$tolerance])
                 ->count();
 
             $invOverdueTotal = (float) SupplierInvoice::whereIn('status', ['posted', 'partial_paid'])
                 ->whereNotNull('due_date')
                 ->where('due_date', '<', $today)
+                ->whereRaw('ROUND(total_amount - paid_amount, 2) > ?', [$tolerance])
                 ->selectRaw('COALESCE(SUM(total_amount - paid_amount), 0) as outstanding')
                 ->value('outstanding');
 
             $invOutstandingList = SupplierInvoice::whereIn('status', ['posted', 'partial_paid'])
+                ->whereRaw('ROUND(total_amount - paid_amount, 2) > ?', [$tolerance])
                 ->with(['supplier', 'purchaseOrder:id,code'])
                 ->orderBy('due_date')
                 ->orderByDesc('invoice_date')
@@ -139,6 +145,7 @@ class PurchasingDashboardController extends Controller
             $invUpcoming = SupplierInvoice::whereIn('status', ['posted', 'partial_paid'])
                 ->whereNotNull('due_date')
                 ->whereBetween('due_date', [$today, now()->addDays(7)->toDateString()])
+                ->whereRaw('ROUND(total_amount - paid_amount, 2) > ?', [$tolerance])
                 ->with('supplier')
                 ->orderBy('due_date')
                 ->limit(5)

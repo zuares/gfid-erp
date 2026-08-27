@@ -261,7 +261,7 @@
                  placeholder="Cari kode PO atau nama supplier…" autocomplete="off">
           <div id="poList" style="display:grid;gap:.45rem;max-height:220px;overflow-y:auto;">
             @forelse ($openPos as $po)
-            @php $outstanding = max(0, (float) $po->grand_total - (float) $po->paid_amount); @endphp
+            @php $outstanding = \App\Models\PurchaseOrder::normalizePaymentRemainder((float) $po->grand_total - (float) $po->paid_amount); @endphp
             <div class="po-card" data-po-id="{{ $po->id }}" data-po-code="{{ $po->code }}"
                  data-supplier="{{ $po->supplier?->name }}" data-outstanding="{{ $outstanding }}"
                  onclick="selectPo(this)">
