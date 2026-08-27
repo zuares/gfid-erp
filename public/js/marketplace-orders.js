@@ -219,7 +219,14 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         const amount = escrowAmount(o);
         if (amount === null) return '<span class="ord-payment-empty">—</span>';
 
-        return `<span class="ord-income-value" title="Penghasilan dari Escrow Detail Shopee">${esc(fmtRp(amount))}</span>`;
+        const isActual = Boolean(o.settlement?.settlement_time);
+        const status = isActual ? 'ACT' : 'EST';
+        const statusTitle = isActual ? 'Sudah cair berdasarkan settlement time' : 'Masih estimasi, belum ada settlement time';
+
+        return `<span class="ord-income-value ${isActual ? 'actual' : 'estimated'}" title="Penghasilan dari Escrow Detail Shopee — ${statusTitle}">
+            <span class="ord-income-status">${status}</span>
+            <strong>${esc(fmtRp(amount))}</strong>
+        </span>`;
     }
 
     function itemPaymentSummaryHtml(o) {

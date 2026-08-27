@@ -275,11 +275,16 @@ body[data-theme="dark"] .ord-payment-line.buyer { color: #a7f3d0; background: rg
 body[data-theme="dark"] .ord-payment-line.seller { color: #bfdbfe; background: rgba(30, 64, 175, .22); border-color: rgba(96, 165, 250, .35); }
 .ord-income-cell { text-align: right; }
 .ord-income-value {
-    display: inline-flex; padding: .18rem .35rem; border-radius: 5px;
+    display: inline-flex; align-items: center; gap: .28rem; padding: .18rem .35rem; border-radius: 5px;
     color: #047857; background: #ecfdf5; border: 1px solid #a7f3d0;
     font-size: .67rem; font-weight: 800; white-space: nowrap;
 }
-body[data-theme="dark"] .ord-income-value { color: #a7f3d0; background: rgba(5, 150, 105, .2); border-color: rgba(52, 211, 153, .35); }
+.ord-income-value.estimated { color: #a16207; background: #fefce8; border-color: #fde68a; }
+.ord-income-value.actual { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
+.ord-income-status { font-size: .56rem; letter-spacing: .03em; }
+.ord-income-value strong { font-size: .67rem; font-weight: 800; }
+body[data-theme="dark"] .ord-income-value.estimated { color: #fde68a; background: rgba(161, 98, 7, .22); border-color: rgba(250, 204, 21, .35); }
+body[data-theme="dark"] .ord-income-value.actual { color: #a7f3d0; background: rgba(5, 150, 105, .2); border-color: rgba(52, 211, 153, .35); }
 .ord-ams-cell { text-align: right; }
 .ord-ams-value {
     display: inline-flex; padding: .18rem .35rem; border-radius: 5px;
