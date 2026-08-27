@@ -1586,20 +1586,21 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         const internalCode = i.internal_item?.code || null;
         const internalName = i.internal_item?.name || null;
 
-        let bodyHtml = '';
+        let titleHtml = '';
+        let detailsHtml = '';
         if (internalCode) {
-            bodyHtml = `<div class="ord-item-name" style="color:#4c1d95">${esc(internalCode)}</div>`;
+            titleHtml = `<div class="ord-item-name" style="color:#4c1d95">${esc(internalCode)}</div>`;
             if (internalName) {
-                bodyHtml += `<div class="ord-item-variant">${esc(internalName)}</div>`;
+                detailsHtml = `<div class="ord-item-variant">${esc(internalName)}</div>`;
             }
         } else {
             const mSku = i.model_sku || i.item_sku || null;
             const variantName = i.variant_name || i.item_name || null;
             const dispName = variantName || mSku || 'Item tidak diketahui';
-            bodyHtml = `<div class="ord-item-name" style="color:#64748b">${esc(dispName)}</div>`
-                + `<span class="ord-item-nomap">Belum mapping</span>`;
+            titleHtml = `<div class="ord-item-name" style="color:#64748b">${esc(dispName)}</div>`;
+            detailsHtml = `<span class="ord-item-nomap">Belum mapping</span>`;
         }
-        bodyHtml += itemSalePriceHtml(i);
+        const bodyHtml = `<div class="ord-item-title-row">${titleHtml}${itemSalePriceHtml(i)}</div>${detailsHtml}`;
 
         const qtyClass = urgent ? 'ord-item-qty urgent' : 'ord-item-qty';
         return `<div class="ord-item-card">
