@@ -12,6 +12,7 @@
     $dataLastDate = !empty($summary['data_last_order_at'])
         ? \Carbon\Carbon::parse($summary['data_last_order_at'])->translatedFormat('d M Y')
         : 'Belum ada';
+    $operatingProfitAfterWalletAds = (float) ($summary['operating_profit_after_wallet_ads'] ?? $summary['operating_profit'] ?? 0);
     $visibleItems = array_slice($statement['items'], 0, 100);
     $visibleOrders = array_slice($statement['orders'], 0, 100);
 @endphp
@@ -68,6 +69,13 @@
         <div class="d-flex flex-wrap gap-2 page-actions">
             <a class="btn btn-outline-secondary" href="{{ route('marketplace.reports.profit', $filters) }}"><i class="bi bi-graph-up-arrow me-1"></i> Detail Profit</a>
             <a class="btn btn-outline-warning" href="{{ route('marketplace.reports.financial-closing', $filters) }}"><i class="bi bi-lock-fill me-1"></i> Closing & Audit</a>
+            <form method="POST" action="{{ route('marketplace.reports.financial-statement.sync-ad-wallet') }}">
+                @csrf
+                @foreach ($filters as $key => $value)
+                    <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                @endforeach
+                <button class="btn btn-outline-primary" type="submit" title="Tarik biaya iklan wallet Shopee untuk periode ini"><i class="bi bi-arrow-repeat me-1"></i> Sync biaya iklan</button>
+            </form>
             <a class="btn btn-primary" href="{{ route('marketplace.reports.financial-statement.export', $filters) }}"><i class="bi bi-download me-1"></i> Export Statement</a>
         </div>
     </div>
@@ -191,7 +199,7 @@
             ['label' => $includeShipped ? 'Penjualan bersih berjalan' : 'Penjualan bersih', 'value' => $summary['net_sales_before_settlement'], 'class' => 'primary'],
             ['label' => $includeShipped ? 'Payout berjalan' : 'Payout aktual', 'value' => $summary['payout'], 'class' => 'info'],
             ['label' => $includeShipped ? 'Laba kotor berjalan' : 'Laba kotor', 'value' => $summary['gross_profit'], 'class' => 'success'],
-            ['label' => $includeShipped ? 'Laba operasional berjalan' : 'Laba operasional', 'value' => $summary['operating_profit'], 'class' => 'success'],
+            ['label' => $includeShipped ? 'Laba operasional berjalan' : 'Laba operasional setelah iklan', 'value' => $operatingProfitAfterWalletAds, 'class' => 'success'],
             ['label' => 'Margin operasional', 'value' => $pct($summary['margin_pct']), 'class' => 'dark', 'text' => true],
         ] as $card)
             <div class="col-6 col-xl-{{ $loop->last ? '2' : '2' }}"><div class="card summary-card shadow-sm h-100 border-{{ $card['class'] }}"><div class="card-body"><div class="text-muted small">{{ $card['label'] }}</div><div class="fs-5 fw-bold text-{{ $card['class'] }} mt-1">{!! !empty($card['text']) ? $card['value'] : 'Rp ' . $fmt($card['value']) !!}</div></div></div></div>
@@ -258,7 +266,8 @@
                         <tr><td>HPP</td><td class="text-end text-danger">(Rp {{ $fmt($summary['hpp']) }})</td></tr>
                         <tr class="table-light fw-semibold"><td>Laba kotor</td><td class="text-end">Rp {{ $fmt($summary['gross_profit']) }}</td></tr>
                         <tr><td>Biaya iklan order/settlement</td><td class="text-end text-danger">(Rp {{ $fmt($summary['ad_cost']) }})</td></tr>
-                        <tr class="table-success fw-bold"><td>Laba operasional</td><td class="text-end">Rp {{ $fmt($summary['operating_profit']) }}</td></tr>
+                        <tr><td>Biaya iklan wallet aktual</td><td class="text-end text-danger">(Rp {{ $fmt($summary['wallet_ad_cost'] ?? 0) }})</td></tr>
+                        <tr class="table-success fw-bold"><td>Laba operasional setelah iklan</td><td class="text-end">Rp {{ $fmt($operatingProfitAfterWalletAds) }}</td></tr>
                     </tbody>
                 </table></div>
             </div>
@@ -292,7 +301,7 @@
                 <div class="col-6 col-md-3"><div class="text-muted small">Ads Daily spend</div><div class="fw-bold">Rp {{ $fmt($summary['ads_daily_spend'] ?? 0) }}</div></div>
                 <div class="col-6 col-md-3"><div class="text-muted small">Selisih</div><div class="fw-bold {{ abs((float) ($summary['ad_cost_variance'] ?? 0)) > 0.01 ? 'text-warning-emphasis' : 'text-success' }}">Rp {{ $fmt($summary['ad_cost_variance'] ?? 0) }}</div></div>
             </div>
-            <div class="small text-muted mt-3">Biaya wallet memakai tanggal transaksi Shopee. Angka ini belum mengubah laba operasional per order; gunakan selisih untuk audit sinkronisasi dan perbedaan waktu pencatatan.</div>
+            <div class="small text-muted mt-3">Biaya wallet memakai tanggal transaksi Shopee dan masuk ke akun 6206 saat posting. Karena sifatnya period-level, angka ini mengubah laba operasional total, tetapi tidak dialokasikan ulang ke laba per order.</div>
         </div>
     </div>
     </div>

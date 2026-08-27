@@ -21,7 +21,7 @@
     </div>
 
     <div class="alert alert-info d-flex gap-2 align-items-start"><i class="bi bi-info-circle-fill mt-1"></i><div><strong>Yang perlu dilakukan:</strong> pastikan periode dan angka sudah benar, cek balance <strong>Dr = Cr</strong>, lalu klik <strong>Post settlement ke jurnal</strong>. Proses ini membuat satu batch jurnal dan aman diulang.</div></div>
-    <div class="alert alert-warning"><i class="bi bi-shield-lock me-1"></i> Posting hanya memasukkan settlement marketplace. HPP (Rp {{ $fmt($preview['excluded_from_gl']['hpp']) }}) dan iklan (Rp {{ $fmt($preview['excluded_from_gl']['ad_cost']) }}) tetap menjadi metrik subledger sampai sumber kredit/asetnya ditetapkan.</div>
+    <div class="alert alert-warning"><i class="bi bi-shield-lock me-1"></i> HPP (Rp {{ $fmt($preview['excluded_from_gl']['hpp']) }}) tetap dikecualikan karena mengikuti posting shipment. Biaya iklan wallet aktual (Rp {{ $fmt($preview['included_in_gl']['wallet_ad_cost']) }}) sudah masuk ke akun <strong>{{ $preview['included_in_gl']['account_code'] }} {{ $preview['included_in_gl']['account_name'] }}</strong>. Biaya iklan settlement (Rp {{ $fmt($preview['excluded_from_gl']['settlement_ad_cost']) }}) tidak diposting ulang agar tidak double count.</div>
 
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-white fw-semibold">Mapping COA marketplace</div>
@@ -38,7 +38,7 @@
                     </div>
                 @endforeach
             </div>
-            <div class="text-muted mt-2" style="font-size:.8rem;">Akun biaya rinci sudah disiapkan untuk Tahap 2. Preview dan posting saat ini masih memakai akun biaya gabungan sesuai aturan existing.</div>
+            <div class="text-muted mt-2" style="font-size:.8rem;">Biaya settlement masih memakai akun gabungan sesuai aturan existing. Biaya iklan wallet aktual menggunakan akun advertising dan mengurangi saldo 1302.</div>
         </div>
     </div>
 

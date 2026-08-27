@@ -40,9 +40,16 @@ class MarketplaceFinancialStatementService
         $summary['provisional'] = $this->statementRow($summary['provisional'] ?? []);
 
         // Wallet ads are period-level cash mutations. They are intentionally
-        // reported separately from settlement.ad_cost until an allocation
-        // policy to individual orders has been approved.
+        // reported separately from settlement.ad_cost because they are actual
+        // wallet movements and cannot safely be allocated to individual orders.
         $summary = array_merge($summary, $this->adCostReconciliation($report['filters']));
+        $summary['operating_profit_after_wallet_ads'] = round(
+            (float) ($summary['operating_profit'] ?? 0) - (float) ($summary['wallet_ad_cost'] ?? 0),
+            2,
+        );
+        $summary['margin_after_wallet_ads_pct'] = (float) ($summary['gross_sales'] ?? 0) > 0
+            ? round(($summary['operating_profit_after_wallet_ads'] / (float) $summary['gross_sales']) * 100, 2)
+            : 0.0;
 
         $stores = array_map(fn (array $row) => $this->statementRow($row), $report['stores']);
         $daily = array_map(function (array $row) {

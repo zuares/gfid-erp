@@ -7,8 +7,11 @@ use App\Models\Store;
 use App\Models\Account;
 use App\Models\MarketplaceAccountingPosting;
 use App\Services\Marketplace\MarketplaceAccountingPostingService;
+use App\Services\Marketplace\Ads\ShopeeWalletAdCostSyncService;
 use App\Services\Marketplace\MarketplaceFinancialStatementService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
+use Throwable;
 
 class MarketplaceFinancialStatementController extends Controller
 {
@@ -52,6 +55,58 @@ class MarketplaceFinancialStatementController extends Controller
                 : 'Posting accounting marketplace diproses.');
     }
 
+    public function syncAdWallet(Request $request, ShopeeWalletAdCostSyncService $syncService)
+    {
+        $filters = $this->filters($request);
+        $stores = Store::query()
+            ->where('status', 'active')
+            ->where('is_active', true)
+            ->whereHas('channel', fn ($query) => $query->whereIn('code', ['shopee', 'shp', 'SHOPEE']))
+            ->when($filters['store_id'], fn ($query, $storeId) => $query->whereKey($storeId))
+            ->orderBy('name')
+            ->get();
+
+        $totals = ['stores' => 0, 'created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
+        $from = \Carbon\Carbon::parse($filters['date_from'])->startOfDay();
+        $to = \Carbon\Carbon::parse($filters['date_to'])->endOfDay();
+
+        foreach ($stores as $store) {
+            $lock = Cache::lock("marketplace:ad_wallet_sync:{$store->id}", 1800);
+            if (! $lock->get()) {
+                $totals['errors'][] = "{$store->name}: sync biaya iklan sedang berjalan.";
+                continue;
+            }
+
+            try {
+                $result = $syncService->sync($store, $from, $to);
+                $totals['stores']++;
+                foreach (['created', 'updated', 'skipped'] as $key) {
+                    $totals[$key] += (int) ($result[$key] ?? 0);
+                }
+            } catch (Throwable $e) {
+                report($e);
+                $totals['errors'][] = "{$store->name}: {$e->getMessage()}";
+            } finally {
+                $lock->release();
+            }
+        }
+
+        $message = sprintf(
+            'Sync biaya iklan wallet selesai: %d toko, %d baru, %d diperbarui, %d dilewati.',
+            $totals['stores'],
+            $totals['created'],
+            $totals['updated'],
+            $totals['skipped'],
+        );
+        if ($totals['errors'] !== []) {
+            $message .= ' Gagal: ' . implode(' | ', $totals['errors']);
+        }
+
+        return redirect()
+            ->route('marketplace.reports.financial-statement', $filters)
+            ->with('status', $message);
+    }
+
     public function void(Request $request, MarketplaceAccountingPosting $posting, MarketplaceAccountingPostingService $postingService)
     {
         $data = $request->validate([
@@ -88,7 +143,7 @@ class MarketplaceFinancialStatementController extends Controller
                 ['Rekonsiliasi Iklan', 'ADS-WALLET', 'Biaya iklan aktual wallet Shopee', -$statement['summary']['wallet_ad_cost']],
                 ['Rekonsiliasi Iklan', 'ADS-DAILY', 'Ads Daily spend', -$statement['summary']['ads_daily_spend']],
                 ['Rekonsiliasi Iklan', 'ADS-VAR', 'Selisih wallet vs Ads Daily', $statement['summary']['ad_cost_variance']],
-                ['Laba Rugi', 'OP', 'Laba operasional', $statement['summary']['operating_profit']],
+                ['Laba Rugi', 'OP', 'Laba operasional setelah iklan wallet', $statement['summary']['operating_profit_after_wallet_ads'] ?? $statement['summary']['operating_profit']],
             ];
 
             foreach ($lines as $line) {

@@ -54,6 +54,8 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
                 ->name('reports.financial-statement.posting-preview');
             Route::post('reports/financial-statement/post', [MarketplaceFinancialStatementController::class, 'post'])
                 ->name('reports.financial-statement.post');
+            Route::post('reports/financial-statement/sync-ad-wallet', [MarketplaceFinancialStatementController::class, 'syncAdWallet'])
+                ->name('reports.financial-statement.sync-ad-wallet');
             Route::post('reports/financial-statement/postings/{posting}/void', [MarketplaceFinancialStatementController::class, 'void'])
                 ->name('reports.financial-statement.postings.void');
             Route::get('reports/financial-closing', [MarketplaceFinancialClosingController::class, 'index'])
