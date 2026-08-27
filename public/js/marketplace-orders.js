@@ -28,10 +28,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
 
     function buyerPaidAmount(o) {
         const paid = Number(o.total_paid_customer);
-        if (Number.isFinite(paid) && paid > 0) return paid;
-
-        const total = Number(o.total_amount);
-        return Number.isFinite(total) && total > 0 ? total : 0;
+        return Number.isFinite(paid) && paid >= 0 ? paid : 0;
     }
 
     function buyerPaidHtml(o) {
