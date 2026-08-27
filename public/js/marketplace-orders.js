@@ -67,10 +67,11 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     }
 
     function itemSalePriceHtml(i) {
-        const sale = Number(i.price_after_discount);
+        const original = Number(i.price_original ?? i.price);
+        const discounted = Number(i.price_after_discount);
+        const sale = Number.isFinite(discounted) && discounted > 0 ? discounted : original;
         if (!Number.isFinite(sale) || sale <= 0) return '';
 
-        const original = Number(i.price_original ?? i.price);
         const originalHtml = Number.isFinite(original) && original > sale
             ? `<del>${esc(fmtRp(original))}</del>`
             : '';
