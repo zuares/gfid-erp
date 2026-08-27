@@ -140,6 +140,17 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-finance', [
     ->name('sync-finance')
     ->withoutOverlapping();
 
+// Biaya iklan wallet Shopee adalah sumber subledger terpisah dari order,
+// settlement, dan HPP. Ambil rolling 15 hari agar koreksi transaksi terbaru
+// ikut tersinkron; service memecah rentang yang lebih panjang saat backfill.
+Schedule::call(fn () => Artisan::call('marketplace:sync-shopee-ad-wallet', [
+        '--from' => now()->subDays(14)->toDateString(),
+        '--to' => now()->toDateString(),
+    ]))
+    ->cron('52 */4 * * *')
+    ->name('sync-shopee-ad-wallet')
+    ->withoutOverlapping();
+
 Schedule::call(fn () => Artisan::call('marketplace:sync-chats'))
     ->everyMinute()
     ->name('sync-chats')

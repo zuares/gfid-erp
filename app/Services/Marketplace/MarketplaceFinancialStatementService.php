@@ -114,12 +114,14 @@ class MarketplaceFinancialStatementService
         $refund = (float) ($row['refund'] ?? 0);
         $payout = (float) ($row['payout'] ?? 0);
         $hpp = (float) ($row['hpp'] ?? 0);
-        $adCost = (float) ($row['ad_cost'] ?? 0);
         $netSales = $grossSales - $sellerDiscount;
         $expectedPayout = $netSales - $fees - $refund;
         $otherAdjustment = $payout - $expectedPayout;
         $grossProfit = $payout - $hpp;
-        $operatingProfit = $grossProfit - $adCost;
+        // Settlement/order ad_cost is intentionally excluded from the
+        // subledger. The accounting source is wallet actual (or Ads Daily
+        // fallback), otherwise the same advertising cost can be counted twice.
+        $operatingProfit = $grossProfit;
 
         return array_merge($row, [
             'net_sales_before_settlement' => round($netSales, 2),
@@ -127,6 +129,7 @@ class MarketplaceFinancialStatementService
             'other_settlement_adjustment' => round($otherAdjustment, 2),
             'gross_profit' => round($grossProfit, 2),
             'operating_profit' => round($operatingProfit, 2),
+            'settlement_ad_cost_excluded' => round((float) ($row['ad_cost'] ?? 0), 2),
             'margin_pct' => $grossSales > 0 ? round(($operatingProfit / $grossSales) * 100, 2) : 0.0,
             'payout_rate_pct' => $grossSales > 0 ? round(($payout / $grossSales) * 100, 2) : 0.0,
             'fee_rate_pct' => $grossSales > 0 ? round(($fees / $grossSales) * 100, 2) : 0.0,

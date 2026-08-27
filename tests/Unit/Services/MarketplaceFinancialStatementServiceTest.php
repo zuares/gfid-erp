@@ -101,7 +101,7 @@ class MarketplaceFinancialStatementServiceTest extends TestCase
         $this->assertSame(230.0, $statement['summary']['expected_payout_before_other_adjustments']);
         $this->assertSame(5.0, $statement['summary']['other_settlement_adjustment']);
         $this->assertSame(135.0, $statement['summary']['gross_profit']);
-        $this->assertSame(125.0, $statement['summary']['operating_profit']);
+        $this->assertSame(135.0, $statement['summary']['operating_profit']);
         $this->assertSame(0.0, $statement['reconciliation']['difference']);
         $this->assertSame(150.0, $statement['summary']['wallet_ad_charge']);
         $this->assertSame(20.0, $statement['summary']['wallet_ad_refund']);

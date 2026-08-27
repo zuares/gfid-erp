@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\Store;
-use App\Services\Marketplace\Ads\ShopeeWalletAdCostSyncService;
 use App\Services\MarketplaceSyncService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -42,7 +41,6 @@ class MarketplaceSyncFinanceCommand extends Command
      */
     public function handle(
         MarketplaceSyncService $syncService,
-        ShopeeWalletAdCostSyncService $adWalletSyncService,
     ): int
     {
         $months = (int) $this->option('months');
@@ -347,39 +345,6 @@ class MarketplaceSyncFinanceCommand extends Command
                 
                 $currentEndDateRetur = $currentStartDateRetur - 1;
                 sleep(1);
-            }
-
-            // 4. PULL ACTUAL PAID-ADS WALLET MUTATIONS
-            if ($settlementSupported) {
-                $this->info("Mulai sinkronisasi biaya iklan aktual wallet untuk {$rangeLabel}...");
-                if ($dryRun) {
-                    $this->info("   [DRY-RUN] Melewati sinkronisasi biaya iklan wallet.");
-                } else {
-                    $adWalletLock = Cache::lock("marketplace:ad_wallet_sync:{$store->id}", 1800);
-                    if (! $adWalletLock->get()) {
-                        $this->warn("   Biaya iklan wallet dilewati: toko {$store->name} sedang diproses.");
-                        $failureCount++;
-                    } else {
-                        try {
-                            $adResult = $adWalletSyncService->sync(
-                                $store,
-                                Carbon::createFromTimestamp($targetDate, config('app.timezone'))->startOfDay(),
-                                Carbon::createFromTimestamp($syncEndTimestamp, config('app.timezone'))->endOfDay(),
-                            );
-                            $this->info(sprintf(
-                                "   ✓ Ads wallet: %d baru, %d diperbarui, %d dilewati.",
-                                $adResult['created'] ?? 0,
-                                $adResult['updated'] ?? 0,
-                                $adResult['skipped'] ?? 0,
-                            ));
-                        } catch (\Throwable $e) {
-                            $failureCount++;
-                            $this->error("   Gagal sync biaya iklan wallet: " . $e->getMessage());
-                        } finally {
-                            $adWalletLock->release();
-                        }
-                    }
-                }
             }
 
             $this->info("--------------------------------------------------");

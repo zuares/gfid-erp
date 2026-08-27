@@ -266,7 +266,6 @@
                         <tr class="table-info fw-semibold"><td>Payout aktual</td><td class="text-end">Rp {{ $fmt($summary['payout']) }}</td></tr>
                         <tr><td>HPP</td><td class="text-end text-danger">(Rp {{ $fmt($summary['hpp']) }})</td></tr>
                         <tr class="table-light fw-semibold"><td>Laba kotor</td><td class="text-end">Rp {{ $fmt($summary['gross_profit']) }}</td></tr>
-                        <tr><td>Biaya iklan order/settlement</td><td class="text-end text-danger">(Rp {{ $fmt($summary['ad_cost']) }})</td></tr>
                         <tr><td>Biaya iklan wallet aktual</td><td class="text-end text-danger">(Rp {{ $fmt($summary['wallet_ad_cost'] ?? 0) }})</td></tr>
                         <tr><td>Biaya iklan masuk subledger <span class="text-muted small">({{ $adCostSource }})</span></td><td class="text-end text-danger">(Rp {{ $fmt($summary['ad_cost_for_gl'] ?? 0) }})</td></tr>
                         <tr class="table-success fw-bold"><td>Laba operasional setelah iklan</td><td class="text-end">Rp {{ $fmt($operatingProfitAfterWalletAds) }}</td></tr>
