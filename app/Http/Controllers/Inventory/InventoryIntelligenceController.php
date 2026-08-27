@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Inventory;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\SupplierItem;
 use App\Services\Inventory\InventoryIntelligenceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,7 +16,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 /**
  * Inventory Intelligence Dashboard (Phase 1).
  *
- * Pola: index() shell + data() JSON per-tab (lazy async). Read-only.
+ * Pola: index() shell + data() JSON per-tab (lazy async). Perhitungan read-only;
+ * lead time manual disimpan ke mapping supplier SKU.
  * Sumber metrik: InventoryIntelligenceService (di atas inventorySnapshot).
  *
  * Tab:
@@ -53,6 +55,7 @@ class InventoryIntelligenceController extends Controller
                 'initialPartial' => $this->partialFor($initialTab),
                 'categoryOptions' => ItemCategory::where('active', 1)->orderBy('name')->get(),
                 'selectedItemLabel' => $selectedItem ? $selectedItem->code . ' — ' . $selectedItem->name : '',
+                'canEditLeadTime' => $this->canEditLeadTime($request),
             ],
             $this->tabData($initialTab, $filters),
         ));
@@ -76,6 +79,7 @@ class InventoryIntelligenceController extends Controller
                 'categoryOptions' => ItemCategory::where('active', 1)->orderBy('name')->get(),
                 'filters' => $filters,
                 'selectedItemLabel' => $selectedItem ? $selectedItem->code . ' — ' . $selectedItem->name : '',
+                'canEditLeadTime' => $this->canEditLeadTime($request),
             ]
         );
 
@@ -121,6 +125,36 @@ class InventoryIntelligenceController extends Controller
             'forecastDays' => $isProcurement ? $filters['procurement_days'] : $filters['production_days'],
             'forecastField' => $isProcurement ? 'procurement_forecast' : 'production_forecast',
             'suggestionLabel' => $isProcurement ? 'Saran Pengadaan FOB' : 'Saran Produksi',
+        ]);
+    }
+
+    /** Simpan lead time manual pada mapping supplier aktif yang diprioritaskan untuk SKU. */
+    public function updateLeadTime(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'item_id' => ['required', 'integer', 'exists:items,id'],
+            'lead_time_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
+        ]);
+
+        $mapping = SupplierItem::query()
+            ->where('item_id', (int) $data['item_id'])
+            ->where('active', true)
+            ->orderByDesc('is_primary')
+            ->orderByDesc('updated_at')
+            ->first();
+
+        if (!$mapping) {
+            return response()->json([
+                'message' => 'SKU belum memiliki mapping supplier aktif. Atur supplier utama terlebih dahulu.',
+            ], 422);
+        }
+
+        $mapping->lead_time_days = $data['lead_time_days'] ?? null;
+        $mapping->save();
+
+        return response()->json([
+            'ok' => true,
+            'lead_time_days' => $mapping->lead_time_days,
         ]);
     }
 
@@ -217,6 +251,12 @@ class InventoryIntelligenceController extends Controller
         return $request->input('source') === 'external' ? 'external' : 'own';
     }
 
+    private function canEditLeadTime(Request $request): bool
+    {
+        return $request->user()?->isOwner()
+            || in_array(strtolower((string) $request->user()?->role), ['admin'], true);
+    }
+
     /** Nama blade partial untuk sebuah tab. */
     private function partialFor(string $tab): string
     {
@@ -243,7 +283,7 @@ class InventoryIntelligenceController extends Controller
         }
 
         $rows = Cache::remember(
-            'inv-intel:rows:' . md5(json_encode($filters)),
+            'inv-intel:rows:v2:' . md5(json_encode($filters)),
             300,
             fn () => $this->service->rows($filters),
         );

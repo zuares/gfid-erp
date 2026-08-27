@@ -45,6 +45,9 @@ Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
             ->name('intelligence.slip');
         Route::get('intelligence/export', [InventoryIntelligenceController::class, 'export'])
             ->name('intelligence.export');
+        Route::post('intelligence/lead-time', [InventoryIntelligenceController::class, 'updateLeadTime'])
+            ->middleware('role:owner,admin')
+            ->name('intelligence.lead_time');
 
         // ================== WAREHOUSE INTELLIGENCE ==================
         Route::get('warehouse-intelligence', [WarehouseIntelligenceController::class, 'index'])

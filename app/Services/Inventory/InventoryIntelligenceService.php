@@ -15,13 +15,13 @@ use Illuminate\Support\Facades\DB;
  * Menggabungkan snapshot stok + laju jual dengan metadata item (finished_good)
  * lalu menurunkan metrik forecast realtime:
  *   - forecast_30   = ADS × 30
- *   - forecast_60   = ADS × 60 (khusus saran pengadaan FOB)
+ *   - procurement_forecast = ADS × max(horizon pengadaan, lead time supplier)
  *   - suggested_qty = saran sesuai default_supply_source
  *   - production_suggested_qty / procurement_suggested_qty tetap tersedia
  *     untuk item Hybrid agar user bisa memilih jalurnya
  *   - status        = sehat / menipis / kritis / stockout / no_demand
  *
- * Read-only. Tidak membuat tabel/kolom. Sumber kebenaran sama dgn modul Produksi.
+ * Perhitungan read-only. Tidak membuat tabel/kolom. Sumber kebenaran sama dgn modul Produksi.
  */
 class InventoryIntelligenceService
 {
@@ -54,11 +54,13 @@ class InventoryIntelligenceService
             ->get()
             ->keyBy('id');
 
+        [$leadTimesByItem, $leadTimesByCategory] = $this->leadTimeMappings($items);
+
         $series = $this->demandSeries($filters, self::FORECAST_HORIZON);
         $productionHorizon = $this->productionHorizon($filters);
         $procurementHorizon = $this->procurementHorizon($filters);
 
-        return $items->map(function ($item) use ($snapshot, $series, $productionHorizon, $procurementHorizon) {
+        return $items->map(function ($item) use ($snapshot, $series, $productionHorizon, $procurementHorizon, $leadTimesByItem, $leadTimesByCategory) {
             $s = $snapshot->get($item->id);
 
             $readyRts = (float) ($s->ready_stock ?? 0);
@@ -78,8 +80,17 @@ class InventoryIntelligenceService
 
             $forecast30 = round($ads * self::FORECAST_HORIZON, 1);
             $forecast60 = round($ads * self::PROCUREMENT_HORIZON, 1);
+            $directLeadTime = $leadTimesByItem->get($item->id)?->first();
+            $categoryLeadTime = $leadTimesByCategory->get($item->item_category_id)?->first();
+            $leadTimeDays = $directLeadTime?->lead_time_days ?? $categoryLeadTime?->lead_time_days;
+            $leadTimeSource = $directLeadTime?->lead_time_days !== null
+                ? 'item'
+                : ($categoryLeadTime?->lead_time_days !== null ? 'category' : null);
+            $effectiveProcurementDays = max($procurementHorizon, (int) ($leadTimeDays ?? 0));
+
             $productionForecast = round($ads * $productionHorizon, 1);
-            $procurementForecast = round($ads * $procurementHorizon, 1);
+            // Horizon pengadaan tidak boleh lebih pendek dari waktu tunggu supplier.
+            $procurementForecast = round($ads * $effectiveProcurementDays, 1);
             $productionSuggested = $item->canMake() && $ads > 0
                 ? max(0.0, round($productionForecast - $availableStock, 0))
                 : 0.0;
@@ -138,9 +149,16 @@ class InventoryIntelligenceService
                 'production_days' => $productionHorizon,
                 'production_forecast' => $productionForecast,
                 'procurement_days' => $procurementHorizon,
+                'procurement_effective_days' => $effectiveProcurementDays,
                 'procurement_forecast' => $procurementForecast,
                 'production_suggested_qty' => $productionSuggested,
                 'procurement_suggested_qty' => $procurementSuggested,
+                'lead_time_days' => $leadTimeDays !== null ? (int) $leadTimeDays : null,
+                'lead_time_source' => $leadTimeSource,
+                'lead_time_supplier_name' => $leadTimeSource === 'category'
+                    ? ($categoryLeadTime?->supplier_name ?? null)
+                    : ($directLeadTime?->supplier_name ?? null),
+                'lead_time_mapping_id' => $directLeadTime?->supplier_item_id,
                 'suggested_qty' => $suggested,
                 'unit_cost' => $unitCost,
                 'suggested_value' => $suggestedValue,
@@ -151,6 +169,53 @@ class InventoryIntelligenceService
         })
             ->sortBy('sku')
             ->values();
+    }
+
+    /**
+     * Lead time aktif per SKU, dengan fallback ke mapping supplier kategori.
+     * Mapping SKU yang paling utama/terbaru dipakai untuk kebutuhan edit inline.
+     */
+    private function leadTimeMappings(Collection $items): array
+    {
+        $itemIds = $items->keys()->values();
+        $categoryIds = $items->pluck('item_category_id')->filter()->unique()->values();
+
+        if ($itemIds->isEmpty()) {
+            return [collect(), collect()];
+        }
+
+        $byItem = DB::table('supplier_items as si')
+            ->join('suppliers as s', 's.id', '=', 'si.supplier_id')
+            ->whereIn('si.item_id', $itemIds)
+            ->where('si.active', true)
+            ->orderByDesc('si.is_primary')
+            ->orderByDesc('si.updated_at')
+            ->orderByDesc('si.id')
+            ->get([
+                'si.id as supplier_item_id',
+                'si.item_id',
+                'si.lead_time_days',
+                's.name as supplier_name',
+            ])
+            ->groupBy('item_id');
+
+        $byCategory = $categoryIds->isEmpty()
+            ? collect()
+            : DB::table('supplier_category_mappings as scm')
+                ->join('suppliers as s', 's.id', '=', 'scm.supplier_id')
+                ->whereIn('scm.item_category_id', $categoryIds)
+                ->where('scm.active', true)
+                ->orderByDesc('scm.is_primary')
+                ->orderByDesc('scm.updated_at')
+                ->orderByDesc('scm.id')
+                ->get([
+                    'scm.item_category_id',
+                    'scm.lead_time_days',
+                    's.name as supplier_name',
+                ])
+                ->groupBy('item_category_id');
+
+        return [$byItem, $byCategory];
     }
 
     /**

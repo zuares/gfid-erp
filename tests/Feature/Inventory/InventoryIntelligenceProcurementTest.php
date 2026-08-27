@@ -2,6 +2,8 @@
 
 use App\Models\InventoryStock;
 use App\Models\Item;
+use App\Models\Supplier;
+use App\Models\SupplierItem;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryIntelligenceService;
 use Carbon\Carbon;
@@ -84,4 +86,66 @@ it('uses a 60-day FOB forecast and counts process WIP once', function () {
 
     expect($rowProduction60->production_days)->toBe(60)
         ->and($rowProduction60->production_forecast)->toBe(120.0);
+});
+
+it('extends procurement forecast to the manually configured supplier lead time', function () {
+    $item = Item::create([
+        'code' => 'FOB-LEAD-TEST',
+        'name' => 'FOB Lead Time Test',
+        'unit' => 'pcs',
+        'type' => 'finished_good',
+        'production_source' => Item::PRODUCTION_BUY,
+        'last_purchase_price' => 100000,
+        'active' => true,
+    ]);
+
+    $supplier = Supplier::create([
+        'code' => 'SUP-LEAD-TEST',
+        'name' => 'Supplier Lead Time Test',
+        'type' => 'supplier',
+        'active' => true,
+    ]);
+
+    SupplierItem::create([
+        'item_id' => $item->id,
+        'supplier_id' => $supplier->id,
+        'is_primary' => true,
+        'lead_time_days' => 90,
+        'active' => true,
+    ]);
+
+    $warehouse = Warehouse::create([
+        'code' => 'WH-RTS',
+        'name' => 'WH-RTS',
+        'type' => 'fg',
+        'active' => true,
+    ]);
+
+    InventoryStock::create([
+        'warehouse_id' => $warehouse->id,
+        'item_id' => $item->id,
+        'qty' => 10,
+    ]);
+
+    $today = Carbon::today();
+    for ($daysAgo = 0; $daysAgo < 30; $daysAgo++) {
+        DB::table('daily_item_sales')->insert([
+            'date' => $today->copy()->subDays($daysAgo)->toDateString(),
+            'item_id' => $item->id,
+            'qty_sold' => 2,
+            'value_sold' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    $row = app(InventoryIntelligenceService::class)
+        ->rows(['procurement_days' => 30])
+        ->firstWhere('item_id', $item->id);
+
+    expect($row->lead_time_days)->toBe(90)
+        ->and($row->lead_time_source)->toBe('item')
+        ->and($row->procurement_effective_days)->toBe(90)
+        ->and($row->procurement_forecast)->toBe(180.0)
+        ->and($row->procurement_suggested_qty)->toBe(170.0);
 });

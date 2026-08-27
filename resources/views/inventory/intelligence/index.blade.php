@@ -417,6 +417,7 @@
             const DATA_URL = @json(route('inventory.intelligence.data'));
             const SLIP_URL = @json(route('inventory.intelligence.slip'));
             const EXPORT_URL = @json(route('inventory.intelligence.export'));
+            const LEAD_TIME_URL = @json(route('inventory.intelligence.lead_time'));
             const SERVER_INITIAL = @json($initialTab);
             const TAB_DESC = @json($tabDesc);
             let selectedProductionDays = Number(@json($filters['production_days'] ?? 30)) || 30;
@@ -711,6 +712,36 @@
                 }
                 if (!e.target.matches(II_SEL)) return;
                 applyTableFilter(e.target.closest('[data-tab-panel]'));
+            });
+
+            document.addEventListener('change', async (e) => {
+                const input = e.target.closest('[data-ii-lead-time-input]');
+                if (!input) return;
+
+                const previous = input.value;
+                input.disabled = true;
+                try {
+                    const response = await fetch(LEAD_TIME_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        },
+                        body: JSON.stringify({
+                            item_id: input.dataset.itemId,
+                            lead_time_days: input.value === '' ? null : Number(input.value),
+                        }),
+                    });
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(payload.message || 'Gagal menyimpan lead time.');
+
+                    await applyFilters();
+                } catch (error) {
+                    input.disabled = false;
+                    input.value = previous;
+                    alert(error.message || 'Gagal menyimpan lead time.');
+                }
             });
 
             // ---- Tab switching ----

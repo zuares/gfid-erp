@@ -35,7 +35,7 @@
     </div>
     <div class="col-6 col-xl">
         <div class="card-main h-100 p-3">
-            <div class="text-muted-ii small">Forecast {{ $procurementDays }} hari</div>
+            <div class="text-muted-ii small">Forecast minimum {{ $procurementDays }} hari</div>
             <div class="fw-bold fs-5">{{ $fmt($totalForecast) }} pcs</div>
         </div>
     </div>
@@ -62,7 +62,7 @@
 <div class="filter-bar mb-3">
     <div class="d-flex flex-wrap gap-2 align-items-center">
         <div class="filter-placeholder d-flex flex-wrap align-items-center gap-2"></div>
-        <span class="text-muted-ii" style="font-size:.72rem;">Forecast {{ $procurementDays }} hari · stok ready + WIP proses</span>
+        <span class="text-muted-ii" style="font-size:.72rem;">Forecast minimum {{ $procurementDays }} hari · menyesuaikan lead time supplier</span>
         <div class="vr mx-1 d-none d-md-block" style="opacity: .15;"></div>
         <input type="search" class="form-control form-control-sm ii-search" data-ii-search
             placeholder="Cari SKU / produk / kategori…" autocomplete="off" style="max-width:200px;">
@@ -112,9 +112,10 @@
                 <thead style="background: rgba(241, 245, 249, 0.5);">
                     <tr>
                         <th data-ii-sort-key="sku" data-ii-sort-type="text" style="padding-left: 1.25rem;">SKU & Produk</th>
+                        <th class="text-end">Lead Time</th>
                         <th data-ii-sort-key="stock" data-ii-sort-type="number" class="text-end">Stok Tersedia</th>
                         <th data-ii-sort-key="ads" data-ii-sort-type="number" class="text-end">Jual / Hari</th>
-                        <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Prediksi penjualan {{ $procurementDays }} hari ke depan">Forecast {{ $procurementDays }}hr</th>
+                        <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Forecast minimal {{ $procurementDays }} hari, diperpanjang mengikuti lead time">Forecast</th>
                         <th data-ii-sort-key="suggested" data-ii-sort-type="number" class="text-end" style="padding-right: 1.25rem; width: 140px;">Saran Pengadaan</th>
                     </tr>
                 </thead>
@@ -142,6 +143,30 @@
                                 </div>
                             </td>
 
+                            <td class="text-end" style="min-width: 150px;">
+                                @if ($r->lead_time_mapping_id && ($canEditLeadTime ?? false))
+                                    <div class="d-inline-flex align-items-center gap-1">
+                                        <input type="number" class="form-control form-control-sm text-end"
+                                            data-ii-lead-time-input data-item-id="{{ $r->item_id }}"
+                                            value="{{ $r->lead_time_days ?? '' }}" min="0" max="3650"
+                                            placeholder="-" style="width: 78px;">
+                                        <span class="text-muted-ii">hari</span>
+                                    </div>
+                                    <div class="text-muted-ii" style="font-size:.62rem;">
+                                        {{ $r->lead_time_supplier_name ?? 'Supplier SKU' }}
+                                    </div>
+                                @elseif ($r->lead_time_days !== null)
+                                    <div class="fw-semibold">{{ $r->lead_time_days }} hari</div>
+                                    <div class="text-muted-ii" style="font-size:.62rem;">{{ $r->lead_time_source === 'category' ? 'Dari kategori' : ($r->lead_time_supplier_name ?? 'Supplier SKU') }}</div>
+                                @else
+                                    <span class="text-danger" style="font-size:.72rem;">Belum diisi</span>
+                                @endif
+                                @if (($canEditLeadTime ?? false) && !$r->lead_time_mapping_id)
+                                    <a href="{{ route('purchasing.supplier_items.index', ['mode' => 'item', 'q' => $r->sku]) }}"
+                                        class="d-block" style="font-size:.62rem;">Atur supplier</a>
+                                @endif
+                            </td>
+
                             <td class="text-end">
                                 <div class="fw-semibold">{{ $fmt($r->available_stock) }}</div>
                                 <div class="text-muted-ii" style="font-size: .65rem; white-space: nowrap;">
@@ -149,7 +174,10 @@
                                 </div>
                             </td>
                             <td class="text-end fw-semibold">{{ $fmt($r->ads, 1) }}</td>
-                            <td class="text-end text-muted">{{ $fmt($r->procurement_forecast) }}</td>
+                            <td class="text-end text-muted">
+                                <div>{{ $fmt($r->procurement_forecast) }}</div>
+                                <div style="font-size:.62rem;">{{ $r->procurement_effective_days }} hari</div>
+                            </td>
                             <td class="text-end fw-bold" style="padding-right: 1.25rem; color: #059669;">
                                 <div>{{ $fmt($r->suggested_qty) }} pcs</div>
                                 <div class="text-muted-ii" style="font-size:.65rem;">{{ $fmtRp($r->suggested_value) }}</div>
@@ -159,7 +187,7 @@
                 </tbody>
                 <tfoot>
                     <tr class="fw-semibold">
-                        <td colspan="4" class="text-end">Total saran pengadaan</td>
+                        <td colspan="5" class="text-end">Total saran pengadaan</td>
                         <td class="text-end" style="padding-right: 1.25rem; color: #059669;">
                             <b data-ii-filtered-total>{{ $fmt($totalSuggested) }}</b>
                         </td>
