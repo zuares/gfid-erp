@@ -203,7 +203,7 @@ trait MarketplaceOrdersPaginatedTrait
         // menyertakan pseudo-order ini, jadi endpoint paginated juga harus
         // mengembalikannya saat sub-tab Kilat dibuka.
         if ($tab === 'ready' && $subTab === 'kilat' && (int) request()->query('page', 1) === 1) {
-            $pureBookingRows = $this->pureKilatBookingRows($dateFrom, $dateTo, $store, $search);
+            $pureBookingRows = $this->pureKilatBookingRows($store, $search);
 
             if ($pureBookingRows->isNotEmpty()) {
                 $payload = $paginator->toArray();
@@ -223,7 +223,7 @@ trait MarketplaceOrdersPaginatedTrait
         return response()->json($paginator);
     }
 
-    private function pureKilatBookingRows(?string $dateFrom, ?string $dateTo, ?string $store, ?string $search): \Illuminate\Support\Collection
+    private function pureKilatBookingRows(?string $store, ?string $search): \Illuminate\Support\Collection
     {
         if (! \Illuminate\Support\Facades\Schema::hasTable('marketplace_bookings')) {
             return collect();
@@ -233,22 +233,11 @@ trait MarketplaceOrdersPaginatedTrait
             ->whereIn('booking_status', ['PENDING', 'READY_TO_SHIP', 'PROCESSED'])
             ->get();
 
-        $from = $dateFrom ? \Carbon\Carbon::parse($dateFrom)->startOfDay() : null;
-        $to = $dateTo ? \Carbon\Carbon::parse($dateTo)->endOfDay() : null;
-
-        $bookings = $bookings->filter(function ($booking) use ($from, $to, $store, $search) {
+        // Booking aktif adalah antrean operasional, bukan histori penjualan.
+        // Tetap tampilkan meskipun created_at lebih lama dari rentang tanggal
+        // halaman Orders, agar jumlahnya konsisten dengan /marketplace/kilat.
+        $bookings = $bookings->filter(function ($booking) use ($store, $search) {
             if ($store && $booking->store?->name !== $store) {
-                return false;
-            }
-
-            $bookingDate = $booking->create_time
-                ? \Carbon\Carbon::createFromTimestamp((int) $booking->create_time)
-                : ($booking->created_at ? \Carbon\Carbon::parse($booking->created_at) : null);
-
-            if ($bookingDate && $from && $bookingDate->lt($from)) {
-                return false;
-            }
-            if ($bookingDate && $to && $bookingDate->gt($to)) {
                 return false;
             }
 
