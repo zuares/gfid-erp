@@ -327,6 +327,12 @@
     $hasMarketplaceReconcileQueue = $router->has('marketplace.reconcile.queue');
     $hasMarketplaceReconcileItemsIndex = $router->has('marketplace.reconcile.items');
 
+    // Impor Toko Online
+    $hasImportMarketplaceIndex = $router->has('imports.marketplace.index');
+    $hasImportMarketplaceDraft = $router->has('imports.marketplace.draft');
+    $hasImportMarketplaceIncomeIndex = $router->has('imports.marketplace_income.index');
+    $hasImportMarketplaceIncomeDraft = $router->has('imports.marketplace_income.draft');
+
     // Sales
     $hasSalesInvoicesIndex = $router->has('sales.invoices.index');
     $hasSalesInvoicesCreate = $router->has('sales.invoices.create');
@@ -443,6 +449,11 @@
         $hasMarketplaceReconcileQueue = $hasMarketplaceReconcileItemsIndex = false;
     }
 
+    if (!$canModule('imports')) {
+        $hasImportMarketplaceIndex = $hasImportMarketplaceDraft = false;
+        $hasImportMarketplaceIncomeIndex = $hasImportMarketplaceIncomeDraft = false;
+    }
+
     if (!$canModule('sales')) {
         $hasSalesInvoicesIndex = $hasSalesInvoicesCreate = false;
         $hasSalesShipmentsIndex = $hasSalesShipmentsCreate = false;
@@ -527,7 +538,9 @@
         request()->routeIs('marketplace.reports.*') ||
         request()->routeIs('marketplace.ads') ||
         request()->routeIs('marketplace.analytics') ||
-        request()->routeIs('marketplace.issues');
+        request()->routeIs('marketplace.issues') ||
+        request()->routeIs('imports.marketplace.*') ||
+        request()->routeIs('imports.marketplace_income.*');
 
     $openAi = request()->routeIs('ai.*');
     $whatsappOpen = request()->routeIs('whatsapp.*') || request()->routeIs('settings.whatsapp.*');
@@ -1553,7 +1566,7 @@
                     @endif
 
                     {{-- SALES & MARKETPLACE --}}
-                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues)
+                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues || $hasImportMarketplaceIndex || $hasImportMarketplaceDraft || $hasImportMarketplaceIncomeIndex || $hasImportMarketplaceIncomeDraft)
                     <div class="mobile-sidebar-section-label">Toko Online</div>
                     <li class="mb-1">
                         <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}"
@@ -1707,6 +1720,34 @@
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.analytics') ? 'active' : '' }}">
                                     <span class="icon">📊</span><span>Analisa Penjualan</span>
                                 </a>
+                            @endif
+
+                            @if ($hasImportMarketplaceIndex || $hasImportMarketplaceDraft || $hasImportMarketplaceIncomeIndex || $hasImportMarketplaceIncomeDraft)
+                                <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Impor</div>
+                                @if ($hasImportMarketplaceIndex)
+                                    <a href="{{ route('imports.marketplace.index') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('imports.marketplace.*') ? 'active' : '' }}">
+                                        <span class="icon">⬆️</span><span>Impor Pengiriman</span>
+                                    </a>
+                                @endif
+                                @if ($hasImportMarketplaceDraft)
+                                    <a href="{{ route('imports.marketplace.draft') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('imports.marketplace.draft') ? 'active' : '' }}">
+                                        <span class="icon">🕘</span><span>Draft Pengiriman</span>
+                                    </a>
+                                @endif
+                                @if ($hasImportMarketplaceIncomeIndex)
+                                    <a href="{{ route('imports.marketplace_income.index') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('imports.marketplace_income.*') ? 'active' : '' }}">
+                                        <span class="icon">💰</span><span>Impor Toko Online Income</span>
+                                    </a>
+                                @endif
+                                @if ($hasImportMarketplaceIncomeDraft)
+                                    <a href="{{ route('imports.marketplace_income.draft') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('imports.marketplace_income.draft') ? 'active' : '' }}">
+                                        <span class="icon">🕘</span><span>Draft Income</span>
+                                    </a>
+                                @endif
                             @endif
                         </div>
                     </li>

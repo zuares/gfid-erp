@@ -330,10 +330,7 @@
         $open('marketplace.issues') ||
         $open('marketplace.reports.*') ||
         $open('marketplace.reconcile.*') ||
-        $open('marketplace.reconciliations.*');
-
-    // ✅ imports group
-    $openImpor =
+        $open('marketplace.reconciliations.*') ||
         $open('imports.marketplace.*') ||
         $open('imports.marketplace_income.*');
 
@@ -1544,7 +1541,11 @@
                 $hasMarketplaceFinancialQuality,
                 $hasMarketplaceAds,
                 $hasMarketplaceAnalytics,
-                $hasMarketplaceIssues
+                $hasMarketplaceIssues,
+                $hasImportMarketplaceIndex,
+                $hasImportMarketplaceDraft,
+                $hasImportMarketplaceIncomeIndex,
+                $hasImportMarketplaceIncomeDraft
             ))
                 <x-sidebar.label text="Toko Online" />
                 <li class="mb-1">
@@ -1712,52 +1713,39 @@
                                 Analisa Penjualan
                             </x-sidebar.sub-link>
                         @endif
+
+                        @if ($hasImportMarketplaceIndex || $hasImportMarketplaceDraft || $hasImportMarketplaceIncomeIndex || $hasImportMarketplaceIncomeDraft)
+                            @php $subhead('Impor'); @endphp
+                            @if ($hasImportMarketplaceIndex)
+                                <x-sidebar.sub-link href="{{ route('imports.marketplace.index') }}" icon="bi bi-upload"
+                                    :active="request()->routeIs('imports.marketplace.*')">
+                                    Impor Pengiriman
+                                </x-sidebar.sub-link>
+                            @endif
+                            @if ($hasImportMarketplaceDraft)
+                                <x-sidebar.sub-link href="{{ route('imports.marketplace.draft') }}" icon="bi bi-clock-history"
+                                    :active="request()->routeIs('imports.marketplace.draft')">
+                                    Draft Pengiriman
+                                </x-sidebar.sub-link>
+                            @endif
+                            @if ($hasImportMarketplaceIncomeIndex)
+                                <x-sidebar.sub-link href="{{ route('imports.marketplace_income.index') }}" icon="bi bi-cash-stack"
+                                    :active="request()->routeIs('imports.marketplace_income.*')">
+                                    Impor Toko Online Income
+                                </x-sidebar.sub-link>
+                            @endif
+                            @if ($hasImportMarketplaceIncomeDraft)
+                                <x-sidebar.sub-link href="{{ route('imports.marketplace_income.draft') }}" icon="bi bi-clock-history"
+                                    :active="request()->routeIs('imports.marketplace_income.draft')">
+                                    Draft Income
+                                </x-sidebar.sub-link>
+                            @endif
+                        @endif
                             <x-sidebar.sub-link href="{{ route('marketplace.shopee-api-logs') }}" icon="bi bi-hdd-network"
                                 :active="request()->routeIs('marketplace.shopee-api-logs')">
                                 Log API Shopee
                             </x-sidebar.sub-link>
                     </div>
-                </li>
-            @endif
-
-            {{-- IMPOR --}}
-            @if ($canShow(
-                $hasImportMarketplaceIndex,
-                $hasImportMarketplaceDraft,
-                $hasImportMarketplaceCreate,
-                $hasImportMarketplaceExport,
-                $hasImportMarketplaceIncomeCreate,
-                $hasImportMarketplaceIncomeIndex
-            ))
-                <x-sidebar.label text="Impor" />
-                <li class="simple-group">
-                    @if ($hasImportMarketplaceIndex)
-                        <x-sidebar.simple-link href="{{ route('imports.marketplace.index') }}" icon="bi bi-upload"
-                            :active="request()->routeIs('imports.marketplace.*')">
-                            Impor Pengiriman
-                        </x-sidebar.simple-link>
-                    @endif
-
-                    @if ($hasImportMarketplaceDraft)
-                        <x-sidebar.simple-link href="{{ route('imports.marketplace.draft') }}" icon="bi bi-clock-history"
-                            :active="request()->routeIs('imports.marketplace.draft')">
-                            Draft Pengiriman
-                        </x-sidebar.simple-link>
-                    @endif
-
-                    @if ($hasImportMarketplaceIncomeIndex)
-                        <x-sidebar.simple-link href="{{ route('imports.marketplace_income.index') }}" icon="bi bi-cash-stack"
-                            :active="request()->routeIs('imports.marketplace_income.*')">
-                            Import Toko Online Income
-                        </x-sidebar.simple-link>
-                    @endif
-
-                    @if ($hasImportMarketplaceIncomeDraft)
-                        <x-sidebar.simple-link href="{{ route('imports.marketplace_income.draft') }}" icon="bi bi-clock-history"
-                            :active="request()->routeIs('imports.marketplace_income.draft')">
-                            Draft Income
-                        </x-sidebar.simple-link>
-                    @endif
                 </li>
             @endif
 
