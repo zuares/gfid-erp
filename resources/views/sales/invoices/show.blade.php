@@ -6,6 +6,7 @@
 @php
   $fmt = fn($n, $dec = 0) => number_format((float)($n ?? 0), $dec, ',', '.');
   $status = (string)($invoice->status ?? 'draft');
+  $isMarketplaceInvoice = in_array(strtolower(trim((string)($invoice->channel ?? ''))), ['shopee', 'tiktok', 'lazada', 'tokopedia'], true);
   $shipmentCount = $invoice->shipments?->count() ?? 0;
 
   $subtotal = (float) ($invoice->subtotal ?? 0);
@@ -30,6 +31,11 @@
         {{-- STATUS --}}
         @if ($status === 'posted')
           <span class="badge b-ok">Posted</span>
+          @if ($invoice->journal_id)
+            <span class="badge b-ok">Jurnal #{{ $invoice->journal_id }}</span>
+          @elseif (!$isMarketplaceInvoice)
+            <span class="badge b-warn">Jurnal belum ada</span>
+          @endif
         @elseif ($status === 'unpriced')
           <span class="badge b-warn">Unpriced</span>
         @else
@@ -51,11 +57,11 @@
           <a href="{{ route('sales.shipments.create', $invoice) }}" class="btnx btnx-primary">Buat Shipment</a>
         @endif
 
-        @if ($status !== 'posted')
+        @if (!$isMarketplaceInvoice && ($status !== 'posted' || !$invoice->journal_id))
           <form action="{{ route('sales.invoices.post', $invoice) }}" method="POST"
-                onsubmit="return confirm('Post invoice ini? Stok akan keluar saat shipment diposting dari WH-RTS.');">
+                onsubmit="return confirm('{{ $status === 'posted' ? 'Buat jurnal untuk invoice ini?' : 'Post invoice ini dan buat jurnal penjualan?' }}');">
             @csrf
-            <button type="submit" class="btnx btnx-primary">Post</button>
+            <button type="submit" class="btnx btnx-primary">{{ $status === 'posted' ? 'Buat Jurnal' : 'Post & Buat Jurnal' }}</button>
           </form>
         @endif
 
@@ -115,6 +121,9 @@
             @else
               <span class="muted">Tidak diisi</span>
             @endif
+            @if ($invoice->channel)
+              <div class="muted">Channel: {{ ucfirst($invoice->channel) }}</div>
+            @endif
           </div>
         </div>
       </div>
@@ -129,6 +138,12 @@
       </div>
     </div>
   </div>
+
+  @if ($isMarketplaceInvoice && $status !== 'posted')
+    <div class="alertx alertx-info">
+      Invoice marketplace tidak diposting dari halaman ini. Gunakan posting settlement marketplace agar omzet tidak tercatat dua kali.
+    </div>
+  @endif
 
   {{-- ITEMS --}}
   <div class="cardx">

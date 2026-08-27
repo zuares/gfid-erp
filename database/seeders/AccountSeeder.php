@@ -98,6 +98,13 @@ class AccountSeeder extends Seeder
                 'is_cash' => 0,
                 'is_active' => 1,
             ]);
+            DB::table('accounts')->updateOrInsert(['code' => '2201'], [
+                'code' => '2201',
+                'name' => 'PPN Keluaran',
+                'type' => 'liability',
+                'is_cash' => 0,
+                'is_active' => 1,
+            ]);
             DB::table('accounts')->updateOrInsert(['code' => '3101'], [
                 'code' => '3101',
                 'name' => 'Modal Pemilik',

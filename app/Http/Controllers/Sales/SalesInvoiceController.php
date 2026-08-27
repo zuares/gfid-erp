@@ -11,9 +11,11 @@ use App\Models\Shipment;
 use App\Models\Store;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryService;
+use App\Services\Accounting\SalesInvoiceAccountingService;
 use App\Services\Sales\SalesInvoiceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class SalesInvoiceController extends Controller
 {
@@ -321,37 +323,19 @@ class SalesInvoiceController extends Controller
             ->with('success', "Invoice {$invoice->code} berhasil diperbarui.");
     }
 
-    public function post(SalesInvoice $invoice)
+    public function post(SalesInvoice $invoice, SalesInvoiceAccountingService $accounting)
     {
-        if ($invoice->status === 'posted') {
-            return back()->with('info', "Invoice {$invoice->code} sudah berstatus posted.");
-        }
-
-        $invoice->load('lines');
-
-        if ($invoice->lines->isEmpty()) {
-            return back()->with('error', 'Invoice tidak memiliki item, tidak bisa diposting.');
-        }
-
-        if ($invoice->status === 'unpriced') {
-            return back()->with('error', 'Invoice masih UNPRICED (harga belum diisi). Lengkapi harga sebelum posting.');
-        }
-
-        if (($invoice->grand_total ?? 0) <= 0) {
-            return back()->with('error', 'Grand total invoice 0. Lengkapi harga sebelum posting.');
-        }
-
         try {
-            DB::transaction(function () use ($invoice) {
-                $invoice->update(['status' => 'posted']);
-            });
+            $accounting->post($invoice, auth()->id());
+        } catch (ValidationException $e) {
+            return back()
+                ->withErrors($e->errors())
+                ->with('error', collect($e->errors())->flatten()->first());
         } catch (\Throwable $e) {
+            report($e);
             return back()->with('error', 'Gagal memposting invoice: ' . $e->getMessage());
         }
 
-        return back()->with(
-            'success',
-            "Invoice {$invoice->code} berhasil diposting. Stok akan berkurang saat Shipment diposting dari WH-RTS."
-        );
+        return back()->with('success', "Invoice {$invoice->code} berhasil diposting dan jurnal penjualan sudah dibuat.");
     }
 }

@@ -11,7 +11,7 @@ class SalesInvoice extends Model
         'code', 'date', 'customer_id', 'warehouse_id',
         'status', 'subtotal', 'discount_total',
         'tax_percent', 'tax_amount', 'grand_total',
-        'currency', 'remarks', 'created_by',
+        'currency', 'remarks', 'created_by', 'journal_id', 'posted_at',
     ];
 
     protected $casts = [
@@ -21,6 +21,7 @@ class SalesInvoice extends Model
         'tax_percent' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'grand_total' => 'decimal:2',
+        'posted_at' => 'datetime',
         'status' => 'string',
     ];
 
@@ -46,6 +47,11 @@ class SalesInvoice extends Model
     public function shipments()
     {
         return $this->hasMany(Shipment::class, 'sales_invoice_id');
+    }
+
+    public function journal()
+    {
+        return $this->belongsTo(\App\Models\Journal::class, 'journal_id');
     }
 
 }
