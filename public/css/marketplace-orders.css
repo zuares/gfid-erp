@@ -342,6 +342,32 @@ body[data-theme="dark"] .ord-table thead tr th { background: rgba(15,23,42,0.98)
 }
 .ord-date { font-size: .68rem; color: #94a3b8; margin-top: .15rem; }
 
+.ord-buyer-paid {
+    display: inline-flex;
+    align-items: baseline;
+    gap: .35rem;
+    margin-top: .35rem;
+    padding: .16rem .45rem;
+    border: 1px solid #a7f3d0;
+    border-radius: 6px;
+    background: #ecfdf5;
+    color: #047857;
+    font-size: .63rem;
+    line-height: 1.35;
+    white-space: nowrap;
+}
+
+.ord-buyer-paid strong {
+    font-size: .7rem;
+    font-weight: 800;
+}
+
+body[data-theme="dark"] .ord-buyer-paid {
+    background: rgba(6, 78, 59, .25);
+    border-color: rgba(52, 211, 153, .35);
+    color: #a7f3d0;
+}
+
 /* ── Item cards (focal point) ── */
 .ord-items-cell { display: flex; flex-direction: column; gap: .3rem; }
 .ord-item-card {

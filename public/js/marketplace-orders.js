@@ -26,6 +26,21 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         return `<span class="badge-status st-draft">${esc(s)}</span>`;
     }
 
+    function buyerPaidAmount(o) {
+        const paid = Number(o.total_paid_customer);
+        if (Number.isFinite(paid) && paid > 0) return paid;
+
+        const total = Number(o.total_amount);
+        return Number.isFinite(total) && total > 0 ? total : 0;
+    }
+
+    function buyerPaidHtml(o) {
+        return `<div class="ord-buyer-paid" title="Nominal yang dibayar pembeli">
+            <span>👤 Dibayar pembeli</span>
+            <strong>${esc(fmtRp(buyerPaidAmount(o)))}</strong>
+        </div>`;
+    }
+
     let orders           = [];
     let currentPage      = 1;
     let lastPage         = 1;
@@ -1787,6 +1802,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <div class="ord-card-header">
                     <div class="ord-card-meta">
                         <div class="ord-id">${orderIdHtml}</div>
+                        ${buyerPaidHtml(o)}
                         <div class="ord-card-sub">
                             ${instantBadge}
                             ${storeText ? `<span class="ord-card-sub-text">${esc(storeText)}</span>` : ''}
@@ -2448,6 +2464,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             const orderIdContent = `
                 <div class="ord-id">${orderIdHtml}</div>
                 <div class="ord-date" style="margin-top:4px">${dateHtml}</div>
+                ${buyerPaidHtml(o)}
                 <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;">
                     ${perluKirimBadge}
                     ${instantBadge}
