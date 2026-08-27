@@ -4313,11 +4313,9 @@ class MarketplaceController extends Controller
     {
         $raw = is_array($s->raw_json) ? $s->raw_json : [];
 
-        foreach (['voucher_from_shopee', 'voucher_from_platform', 'platform_voucher'] as $key) {
-            $value = data_get($raw, $key);
-            if ($value !== null && $value !== '') {
-                return $this->settlementFeeAmount($value);
-            }
+        $value = data_get($raw, 'voucher_from_shopee');
+        if ($value !== null && $value !== '') {
+            return $this->settlementFeeAmount($value);
         }
 
         return 0.0;
@@ -4419,14 +4417,12 @@ class MarketplaceController extends Controller
     {
         $raw = is_array($s->raw_json) ? $s->raw_json : [];
 
-        foreach (['voucher_from_seller', 'seller_voucher_rebate', 'seller_voucher'] as $key) {
-            $value = data_get($raw, $key);
-            if ($value !== null && $value !== '') {
-                return $this->settlementFeeAmount($value);
-            }
+        $value = data_get($raw, 'voucher_from_seller');
+        if ($value !== null && $value !== '') {
+            return $this->settlementFeeAmount($value);
         }
 
-        return abs((float) $s->seller_voucher);
+        return 0.0;
     }
 
     /**

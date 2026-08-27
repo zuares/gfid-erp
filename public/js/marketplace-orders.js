@@ -128,8 +128,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     }
 
     function voucherSummaryHtml(o) {
-        const sellerVoucher = voucherAmount(o, ['voucher_toko_total', 'voucher_from_seller', 'seller_voucher_rebate', 'seller_voucher', 'discount_from_voucher_seller']);
-        const shopeeVoucher = voucherAmount(o, ['voucher_platform_total', 'voucher_from_shopee', 'voucher_from_platform', 'platform_voucher', 'discount_from_voucher_shopee']);
+        const sellerVoucher = voucherAmount(o, ['voucher_toko_total', 'voucher_from_seller']);
+        const shopeeVoucher = voucherAmount(o, ['voucher_platform_total', 'voucher_from_shopee']);
         const bundleDiscount = voucherAmount(o, ['bundle_discount_total', 'bundle_discount', 'bundle_discount_amount', 'discount_from_bundle', 'discount_from_bundle_deal']);
         const hasVoucherPayload = !!o.settlement;
         if (!hasVoucherPayload && sellerVoucher <= 0 && shopeeVoucher <= 0 && bundleDiscount <= 0) return '';
