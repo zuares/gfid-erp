@@ -120,8 +120,15 @@ class MarketplaceOrderController extends Controller
                 } catch (\Exception $e) {}
 
                 if ($liveData) {
-                    if (!empty($resEscrow['response']['order_income'])) {
-                        $liveData['income_details'] = $resEscrow['response']['order_income'];
+                    $incomeDetails = $resEscrow['response']['order_income'] ?? [];
+                    if (!empty($incomeDetails)) {
+                        $liveData['income_details'] = $incomeDetails;
+                        $buyerTotal = $incomeDetails['buyer_total_amount']
+                            ?? $incomeDetails['buyer_paid_amount']
+                            ?? null;
+                        if (is_numeric($buyerTotal)) {
+                            $order->total_paid_customer = (float) $buyerTotal;
+                        }
                     }
                     $order->raw_json = $liveData;
                     $order->save();

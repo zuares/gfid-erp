@@ -27,6 +27,9 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     }
 
     function buyerPaidAmount(o) {
+        const escrowPaid = Number(o.settlement?.buyer_payment_amount);
+        if (Number.isFinite(escrowPaid) && escrowPaid > 0) return escrowPaid;
+
         const paid = Number(o.total_paid_customer);
         return Number.isFinite(paid) && paid >= 0 ? paid : 0;
     }

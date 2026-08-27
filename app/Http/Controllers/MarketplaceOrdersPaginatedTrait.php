@@ -101,6 +101,7 @@ trait MarketplaceOrdersPaginatedTrait
         $with = [
             'store.channel',
             'items',
+            'settlement:id,order_id,buyer_payment_amount,final_income,settlement_time,data_status',
             'items.internalItem' => fn ($q) => $q->select('id', 'code', 'item_category_id')->with('category:id,code,name'),
             'fulfillment:' . $fulfillmentSelect,
             'fulfillment.lines',
