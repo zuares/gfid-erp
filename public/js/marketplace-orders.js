@@ -1892,9 +1892,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             // ── Section: Item Produk (Tampil default tanpa accordion di mobile)
             const itemCards = items.map(i => renderItemCard(i, urgent)).join('');
             const itemsSection = `<div class="ord-card-section" style="padding:0.6rem 0.9rem; border-top:1px dashed #e2e8f0; background:#f8fafc">
-                <div class="ord-items-invoice-head"><span>Item Produk (${items.length})</span></div>
+                <div class="ord-items-invoice-head"><span>Item Produk (${items.length})</span>${itemPaymentSummaryHtml(o)}</div>
                 <div class="ord-items-cell" style="padding:0">${itemCards}</div>
-                <div class="ord-items-invoice-foot">${itemPaymentSummaryHtml(o)}</div>
             </div>`;
 
             // ── Section: Item Resolve (hanya packing, accordion)
@@ -2423,9 +2422,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             }
 
             let itemsHtml = `<div class="ord-items-cell">
-                <div class="ord-items-invoice-head"><span>Item Produk (${items.length})</span></div>`
+                <div class="ord-items-invoice-head"><span>Item Produk (${items.length})</span>${itemPaymentSummaryHtml(o)}</div>`
                 + items.map(i => renderItemCard(i, urgent)).join('')
-                + `<div class="ord-items-invoice-foot">${itemPaymentSummaryHtml(o)}</div>`
                 + `</div>`;
                 
             if (activeTab === 'shipped' && o.fulfillment_scan_log?.length) {

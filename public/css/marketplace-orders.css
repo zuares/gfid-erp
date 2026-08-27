@@ -254,12 +254,6 @@ body[data-theme="dark"] .ord-card { border-color: var(--glass-border); box-shado
 }
 .ord-items-invoice-head .ord-buyer-paid { margin-top: 0; font-size: .62rem; }
 .ord-items-invoice-head .ord-buyer-paid strong { font-size: .68rem; }
-.ord-items-invoice-foot {
-    display: flex; justify-content: flex-end; margin-top: .1rem;
-    padding: .35rem .05rem 0; border-top: 1px dashed #e2e8f0;
-}
-.ord-items-invoice-foot .ord-item-payment-summary { justify-content: flex-end; }
-.ord-items-invoice-foot .ord-buyer-paid { margin-top: 0; }
 .ord-voucher-summary { display: inline-flex; flex-wrap: wrap; gap: .25rem; }
 .ord-voucher-chip {
     display: inline-flex; align-items: baseline; gap: .22rem;
