@@ -69,12 +69,35 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         return Number.isFinite(escrowPaid) && escrowPaid >= 0 ? escrowPaid : null;
     }
 
-    function buyerPaidHtml(o) {
-        const amount = buyerPaidAmount(o);
-        if (amount === null) return '<span class="ord-payment-empty">—</span>';
+    function sellerSellingPriceAmount(o) {
+        const normalized = o.settlement?.order_selling_price;
+        if (normalized !== null && normalized !== undefined && normalized !== '') {
+            const value = Number(normalized);
+            if (Number.isFinite(value)) return Math.abs(value);
+        }
 
-        return `<div class="ord-buyer-paid ord-buyer-paid-number" title="Nominal dari Escrow Detail Shopee">
-            <strong>${esc(fmtRp(amount))}</strong>
+        const raw = o.settlement?.raw_json;
+        if (!raw || typeof raw !== 'object' || !Object.prototype.hasOwnProperty.call(raw, 'order_selling_price')) return null;
+
+        const value = Number(raw.order_selling_price);
+        return Number.isFinite(value) ? Math.abs(value) : null;
+    }
+
+    function buyerPaidHtml(o) {
+        const buyerPaid = buyerPaidAmount(o);
+        const sellerSellingPrice = sellerSellingPriceAmount(o);
+        if (buyerPaid === null && sellerSellingPrice === null) return '<span class="ord-payment-empty">—</span>';
+
+        return `<div class="ord-payment-stack">
+            ${buyerPaid !== null ? `<div class="ord-payment-line buyer" title="Nominal dibayar pembeli dari Escrow Detail Shopee">
+                <span class="ord-payment-label">Dibayar pembeli</span>
+                <strong>${esc(fmtRp(buyerPaid))}</strong>
+            </div>` : ''}
+            ${sellerSellingPrice !== null ? `<div class="ord-payment-line seller" title="Total harga jual seller sebelum promo dan voucher dari Escrow Detail Shopee">
+                <span class="ord-payment-label">Harga jual seller</span>
+                <span class="ord-payment-note">sebelum promo/voucher</span>
+                <strong>${esc(fmtRp(sellerSellingPrice))}</strong>
+            </div>` : ''}
         </div>`;
     }
 
@@ -2749,7 +2772,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <th>Item Produk</th>
                 ${hasResolveCol ? '<th>✅ Item Pengganti</th>' : ''}
                 ${hasScanCol    ? '<th>📦 Item Scan</th>'    : ''}
-                <th>Bayar Pembeli</th>
+                <th>Pembayaran</th>
                 <th>Voucher &amp; Diskon</th>
                 <th>Penghasilan</th>
                 <th>AMS</th>

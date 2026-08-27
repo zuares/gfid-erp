@@ -1174,6 +1174,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
                 'voucher_from_seller' => 10000,
                 'voucher_from_external_party' => 2500,
                 'escrow_amount' => 55901,
+                'order_selling_price' => 97950,
             ],
         ]);
 
@@ -1194,6 +1195,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame(10000.0, (float) ($row['voucher_toko_total'] ?? -1));
         $this->assertSame(2500.0, (float) ($row['voucher_external_total'] ?? -1));
         $this->assertSame(55901.0, (float) ($row['escrow_amount'] ?? -1));
+        $this->assertSame(97950.0, (float) ($row['order_selling_price'] ?? -1));
         $this->assertSame(14099.0, (float) ($row['voucher_total'] ?? -1));
         $this->assertSame(65901.0, (float) ($row['gross_after_voucher'] ?? -1));
         $this->assertSame(70000.0, (float) ($row['gross_after_voucher_toko'] ?? -1));

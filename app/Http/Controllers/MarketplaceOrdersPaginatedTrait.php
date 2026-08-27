@@ -223,6 +223,7 @@ trait MarketplaceOrdersPaginatedTrait
                 $arr['settlement']['voucher_external_total'] = $this->settlementVoucherExternalAmount($o->settlement);
                 $arr['settlement']['bundle_discount_total'] = $this->settlementBundleDiscountAmount($o->settlement);
                 $arr['settlement']['escrow_amount'] = $this->settlementEscrowAmount($o->settlement);
+                $arr['settlement']['order_selling_price'] = $this->settlementOrderSellingPrice($o->settlement);
                 $arr['settlement']['ams_total'] = $this->settlementAmsAmount($o->settlement);
             }
             

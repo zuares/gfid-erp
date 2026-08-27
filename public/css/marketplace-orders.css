@@ -258,6 +258,21 @@ body[data-theme="dark"] .ord-card { border-color: var(--glass-border); box-shado
 .ord-voucher-cell .ord-voucher-summary { flex-direction: column; align-items: stretch; }
 .ord-voucher-cell .ord-voucher-chip { justify-content: space-between; }
 .ord-payment-cell .ord-buyer-paid { margin-top: 0; }
+.ord-payment-stack { display: flex; flex-direction: column; gap: .28rem; min-width: 0; }
+.ord-payment-line {
+    display: flex; flex-direction: column; align-items: flex-end; min-width: 0;
+    padding: .18rem .35rem; border: 1px solid; border-radius: 6px;
+    line-height: 1.25; white-space: nowrap;
+}
+.ord-payment-line .ord-payment-label { font-size: .57rem; font-weight: 700; color: #475569; }
+.ord-payment-line .ord-payment-note { font-size: .51rem; color: #64748b; }
+.ord-payment-line strong { font-size: .68rem; font-weight: 800; }
+.ord-payment-line.buyer { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
+.ord-payment-line.seller { color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
+body[data-theme="dark"] .ord-payment-line .ord-payment-label { color: #cbd5e1; }
+body[data-theme="dark"] .ord-payment-line .ord-payment-note { color: #94a3b8; }
+body[data-theme="dark"] .ord-payment-line.buyer { color: #a7f3d0; background: rgba(6, 78, 59, .25); border-color: rgba(52, 211, 153, .35); }
+body[data-theme="dark"] .ord-payment-line.seller { color: #bfdbfe; background: rgba(30, 64, 175, .22); border-color: rgba(96, 165, 250, .35); }
 .ord-income-cell { text-align: right; }
 .ord-income-value {
     display: inline-flex; padding: .18rem .35rem; border-radius: 5px;

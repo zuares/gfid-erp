@@ -3849,6 +3849,7 @@ class MarketplaceController extends Controller
             $voucherPlatformAmount = $this->settlementVoucherPlatformAmount($s);
             $voucherExternalAmount = $this->settlementVoucherExternalAmount($s);
             $escrowAmount = $this->settlementEscrowAmount($s);
+            $orderSellingPrice = $this->settlementOrderSellingPrice($s);
             $voucherAmount = $voucherTokoAmount + $voucherPlatformAmount;
             $grossAfterVoucherTotal = max($grossAmount - $voucherAmount, 0);
             $grossAfterVoucherToko = max($grossAmount - $voucherTokoAmount, 0);
@@ -3936,6 +3937,7 @@ class MarketplaceController extends Controller
                 'voucher_external_total' => $voucherExternalAmount,
                 'voucher_total' => $voucherAmount,
                 'escrow_amount' => $escrowAmount,
+                'order_selling_price' => $orderSellingPrice,
                 'seller_coin_cash_back' => (float) $s->seller_coin_cash_back,
                 'actual_shipping_fee' => (float) $s->actual_shipping_fee,
                 'shipping_fee_subsidy' => (float) $s->shipping_fee_subsidy,
@@ -4450,6 +4452,17 @@ class MarketplaceController extends Controller
         }
 
         return $this->settlementFeeAmount($raw['escrow_amount']);
+    }
+
+    private function settlementOrderSellingPrice(MarketplaceOrderSettlement $s): ?float
+    {
+        $raw = is_array($s->raw_json) ? $s->raw_json : [];
+
+        if (! array_key_exists('order_selling_price', $raw) || $raw['order_selling_price'] === null || $raw['order_selling_price'] === '') {
+            return null;
+        }
+
+        return $this->settlementFeeAmount($raw['order_selling_price']);
     }
 
     /**
