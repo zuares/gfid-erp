@@ -1060,15 +1060,15 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     };
 
     async function autoFetchMissingAwbs() {
-        const rows = orders.filter(o => (o.order_status === 'PROCESSED' || o.order_status === 'SHIPPED') && !o.shipping_awb_no);
+        const awbStatuses = ['PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'TO_CONFIRM_RECEIVE', 'COMPLETED'];
+        const rows = orders.filter(o => awbStatuses.includes(o.order_status) && !o.shipping_awb_no);
         if (rows.length === 0) return;
         
         let updatedCount = 0;
         for (const o of rows) {
             try {
                 const sn = o.booking_sn || o.channel_order_id;
-                const res = await fetch(`/api/marketplace/stores/${o.store_id}/orders/${sn}/sync-awb`);
-                const data = await res.json();
+                const data = await api(`/api/marketplace/stores/${o.store_id}/orders/${encodeURIComponent(sn)}/sync-awb`);
                 if (data.success && data.awb) {
                     o.shipping_awb_no = data.awb;
                     updatedCount++;
@@ -1076,7 +1076,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             } catch(e) {}
         }
         
-        if (updatedCount > 0 && activeTab === 'processed') {
+        if (updatedCount > 0) {
             renderTable();
         }
     }
@@ -1193,7 +1193,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         updateLastSyncTime();
         loadOrderCounts(loadSeq, api(localOrderCountsUrl()).catch(() => null));
 
-        if (activeTab === 'processed') {
+        if (['processed', 'processed_instant', 'shipped', 'completed'].includes(activeTab)) {
             autoFetchMissingAwbs();
         }
 
@@ -2706,16 +2706,20 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             
             let pengirimanHtml = '';
             if (o.shipping_awb_no) {
-                pengirimanHtml += `<div style="margin-bottom:6px"><span style="font-size:0.55rem; color:#059669; font-weight:700; padding:1px 6px; background:#d1fae5; border:1px solid #34d399; border-radius:4px; display:inline-block; word-break:break-all;">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span></div>`;
+                pengirimanHtml += `<div class="ord-shipping-awb"><span class="ord-shipping-label">Resi</span><span class="ord-shipping-awb-value">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span></div>`;
             } else if (o.shipping_carrier) {
-                pengirimanHtml += `<div style="margin-bottom:6px"><span style="font-size:0.7rem; color:#64748b; font-weight:700; padding:1px 6px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; display:inline-block;">${esc(o.shipping_carrier)}</span></div>`;
+                pengirimanHtml += `<div class="ord-shipping-carrier">${esc(o.shipping_carrier)}</div>`;
             }
             if (logisticsBtn) {
-                pengirimanHtml += `<div>${logisticsBtn}</div>`;
+                pengirimanHtml += `<div class="ord-shipping-action">${logisticsBtn}</div>`;
             }
+            if (pengirimanHtml) pengirimanHtml = `<div class="ord-shipping-stack">${pengirimanHtml}</div>`;
 
             const trackHtml = ['shipped', 'completed'].includes(activeTab) && o.order_status !== 'UNPAID'
                 ? `<button class="ord-action-btn track" onclick="event.stopPropagation(); trackOrder(${o.store_id}, '${o.channel_order_id}', event)">🔍 Lacak</button>`
+                : '<span class="ord-payment-empty">—</span>';
+            const trackPrintHtml = (trackHtml !== '<span class="ord-payment-empty">—</span>' || printHtml)
+                ? `<div class="ord-track-print-stack">${trackHtml}${printHtml || ''}</div>`
                 : '<span class="ord-payment-empty">—</span>';
 
             const orderIdContent = `
@@ -2731,6 +2735,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                     ${fBadge}
                     ${issueBadge}
                 </div>
+                ${pengirimanHtml}
             `;
 
             const buyerPaidCell = `<td class="ord-payment-cell">${buyerPaidHtml(o)}</td>`;
@@ -2757,31 +2762,27 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 ${voucherCell}
                 ${incomeCell}
                 <td class="ord-ams-cell">${amsHtml(o)}</td>
-                <td>${pengirimanHtml}</td>
-                <td class="ord-track-cell">${trackHtml}</td>
-                <td class="ord-print-cell">${printHtml || '<span class="ord-payment-empty">—</span>'}</td>
+                <td class="ord-track-print-cell">${trackPrintHtml}</td>
             </tr>`;
         }).join('');
 
         const hasResolveCol = activeTab === 'processed' && subTabProcessed !== 'packing';
         const hasScanCol    = activeTab === 'processed' && subTabProcessed !== 'packing';
-        // col widths: order | items | resolve? | scan? | buyer paid | voucher | income | AMS | pengiriman | lacak | cetak
+        // col widths: order (+ pengiriman) | items | resolve? | scan? | buyer paid | voucher | income | AMS | lacak+cetak
         const colItems  = hasResolveCol ? '16%' : '25%';
-        const colOrder = hasResolveCol ? '13%' : '17%';
+        const colOrder = hasResolveCol ? '18%' : '23%';
         const colPaid = hasResolveCol ? '10%' : '12%';
         const colVoucher = hasResolveCol ? '10%' : '14%';
         const colIncome = hasResolveCol ? '9%' : '10%';
         const colAms = '6%';
-        const colShipping = hasResolveCol ? '6%' : '6%';
-        const colTrack = hasResolveCol ? '6%' : '5%';
-        const colPrint = hasResolveCol ? '6%' : '5%';
+        const colTrackPrint = hasResolveCol ? '13%' : '10%';
         
         const firstHeaderHtml = activeTab === 'processed'
             ? `<div style="display:flex; align-items:center;">
                 <input type="checkbox" id="chkSelectAllOrders" class="form-check-input" style="width:1.1rem;height:1.1rem;cursor:pointer;accent-color:#0284c7;margin-right:8px;" onclick="const isChecked = this.checked; document.querySelectorAll('.chk-print-order').forEach(el => { el.checked = isChecked; const sn = el.getAttribute('data-order-sn'); if(isChecked) window.selectedPrintOrders.add(sn); else window.selectedPrintOrders.delete(sn); })">
-                <span>Nomor Order</span>
+                <span>Order &amp; Pengiriman</span>
                </div>`
-            : `Nomor Order`;
+            : `Order &amp; Pengiriman`;
 
         body.innerHTML = `
         <div class="gf-table-scroll">
@@ -2795,9 +2796,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <col style="width:${colVoucher}">
                 <col style="width:${colIncome}">
                 <col style="width:${colAms}">
-                <col style="width:${colShipping}">
-                <col style="width:${colTrack}">
-                <col style="width:${colPrint}">
+                <col style="width:${colTrackPrint}">
             </colgroup>
             <thead><tr>
                 <th>${firstHeaderHtml}</th>
@@ -2808,9 +2807,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <th>Voucher &amp; Diskon</th>
                 <th>Penghasilan</th>
                 <th>AMS</th>
-                <th>Pengiriman</th>
-                <th>Lacak</th>
-                <th>Cetak</th>
+                <th>Lacak / Cetak</th>
             </tr></thead>
             <tbody>${tableRows}</tbody>
         </table></div>
