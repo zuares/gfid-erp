@@ -2649,6 +2649,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 printHtml = printResiBtn;
             } else if (activeTab === 'processed') {
                 printHtml = `<div class="ord-action-stack">${printResiBtn}${printGreetingBtn}</div>`;
+            } else if (['shipped', 'completed'].includes(activeTab) && o.order_status !== 'UNPAID') {
+                printHtml = printResiBtn;
             } else if (['READY_TO_SHIP', 'PROCESSED', 'SHIPPED'].includes(o.order_status)) {
                 printHtml = printResiBtn;
             }
@@ -2712,7 +2714,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 pengirimanHtml += `<div>${logisticsBtn}</div>`;
             }
 
-            const trackHtml = ['shipped', 'completed'].includes(activeTab) && o.shipping_awb_no
+            const trackHtml = ['shipped', 'completed'].includes(activeTab) && o.order_status !== 'UNPAID'
                 ? `<button class="ord-action-btn track" onclick="event.stopPropagation(); trackOrder(${o.store_id}, '${o.channel_order_id}', event)">🔍 Lacak</button>`
                 : '<span class="ord-payment-empty">—</span>';
 
