@@ -343,6 +343,8 @@
     $hasSalesReportShipmentAnalytics = $router->has('sales.reports.shipment_analytics');
 
     // Persediaan
+    $hasInvIntelligence = $router->has('inventory.intelligence');
+    $hasWhIntelligence = $router->has('inventory.warehouse_intelligence');
     $hasInvStocksItems = $router->has('inventory.stocks.items');
     $hasInvStocksLots = $router->has('inventory.stocks.lots');
     $hasInvStockCard = $router->has('inventory.stock_card.index');
@@ -450,6 +452,7 @@
     }
 
     if (!$canModule('inventory')) {
+        $hasInvIntelligence = $hasWhIntelligence = false;
         $hasInvStocksItems = $hasInvStocksLots = $hasInvStockCard = false;
         $hasInvTransfersIndex = $hasInvTransfersCreate = $hasInvAdjustmentsIndex = false;
         $hasInvWipAdjIndex = $hasInvWipCutReconcile = false;
