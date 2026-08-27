@@ -49,13 +49,21 @@
                    style="min-height:38px;border-radius:999px;border-color:rgba(15,23,42,.12);font-size:.83rem;font-weight:700;box-shadow:none;width:150px"
                    value="{{ $to }}">
         </div>
+        <div>
+            <label class="form-label fw-bold" style="font-size:.74rem">Basis marketplace</label>
+            <select name="date_basis" class="form-select"
+                    style="min-height:38px;border-radius:999px;border-color:rgba(15,23,42,.12);font-size:.83rem;font-weight:700;box-shadow:none;width:170px">
+                <option value="ordered_at" @selected($dateBasis === 'ordered_at')>Tanggal order</option>
+                <option value="settlement_time" @selected($dateBasis === 'settlement_time')>Tanggal settlement</option>
+            </select>
+        </div>
         <button type="submit" class="pl-btn" style="background:#0f172a;color:#fff;border-color:#0f172a">Tampilkan</button>
         {{-- Shortcuts --}}
         @php
             $shortcuts = [
-                'Bulan Ini'  => ['from'=>now()->startOfMonth()->format('Y-m-d'),'to'=>now()->format('Y-m-d')],
-                'Bulan Lalu' => ['from'=>now()->subMonth()->startOfMonth()->format('Y-m-d'),'to'=>now()->subMonth()->endOfMonth()->format('Y-m-d')],
-                'Tahun Ini'  => ['from'=>now()->startOfYear()->format('Y-m-d'),'to'=>now()->format('Y-m-d')],
+                'Bulan Ini'  => ['from'=>now()->startOfMonth()->format('Y-m-d'),'to'=>now()->format('Y-m-d'),'date_basis'=>$dateBasis],
+                'Bulan Lalu' => ['from'=>now()->subMonth()->startOfMonth()->format('Y-m-d'),'to'=>now()->subMonth()->endOfMonth()->format('Y-m-d'),'date_basis'=>$dateBasis],
+                'Tahun Ini'  => ['from'=>now()->startOfYear()->format('Y-m-d'),'to'=>now()->format('Y-m-d'),'date_basis'=>$dateBasis],
             ];
         @endphp
         @foreach($shortcuts as $label => $q)
@@ -70,7 +78,7 @@
             <div style="font-size:1.4rem; font-weight:950; color:#15803d" class="pl-num">Rp {{ $fmt($totalRevenue) }}</div>
         </div>
         <div class="pl-summary-card" style="background:#fee2e2; border:1px solid #fecaca">
-            <div style="font-size:.7rem; font-weight:900; text-transform:uppercase; color:#991b1b; letter-spacing:.05em">Total Beban</div>
+            <div style="font-size:.7rem; font-weight:900; text-transform:uppercase; color:#991b1b; letter-spacing:.05em">HPP + Beban Operasional</div>
             <div style="font-size:1.4rem; font-weight:950; color:#dc2626" class="pl-num">Rp {{ $fmt($totalCogs + $totalExpenses) }}</div>
         </div>
         <div class="pl-summary-card {{ $netProfit >= 0 ? 'bg-dark text-white' : '' }}"
@@ -121,6 +129,21 @@
                     <span class="pl-num pl-negative">Rp {{ $fmt($totalCogs) }}</span>
                 </div>
             </div>
+
+            @if(abs($inventoryVariance) >= 0.01)
+                <div class="pl-card mt-3" style="background:#fffbeb;border-color:#fde68a">
+                    <div class="pl-section-head" style="background:#fef3c7">Penyesuaian Persediaan</div>
+                    <div class="pl-row">
+                        <span><span class="pl-row-code">6115</span>Selisih Stock Opname</span>
+                        <span class="pl-num {{ $inventoryVariance >= 0 ? 'pl-negative' : 'pl-positive' }}">
+                            {{ $inventoryVariance < 0 ? '(' : '' }}Rp {{ $fmt(abs($inventoryVariance)) }}{{ $inventoryVariance < 0 ? ')' : '' }}
+                        </span>
+                    </div>
+                    <div style="padding:.55rem 1rem;color:#92400e;font-size:.73rem">
+                        Kredit bersih dicatat sebagai gain persediaan dan tetap diperhitungkan dalam laba bersih.
+                    </div>
+                </div>
+            @endif
 
             {{-- Gross Profit --}}
             <div class="pl-card mt-3" style="background:#f0fdf4; border-color:#bbf7d0">

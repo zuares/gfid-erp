@@ -13,6 +13,7 @@ use App\Models\ItemPurchaseTreatment;
 use App\Models\Account;
 use App\Models\Supplier;
 use App\Models\SupplierItem;
+use App\Services\Production\ItemBomCostService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
@@ -223,14 +224,16 @@ class ItemController extends Controller
         ], 201);
     }
 
-    public function show(Item $item)
+    public function show(Item $item, ItemBomCostService $bomCostService)
     {
         $item->load(['category', 'barcodes', 'itemTypeOption', 'purchaseTreatment']);
         $itemBom = ItemBom::query()
             ->withCount('lines')
+            ->with(['lines.material'])
             ->where('item_id', $item->id)
             ->latest('id')
             ->first();
+        $bomEstimate = $itemBom ? $bomCostService->estimate($itemBom) : null;
 
         // snapshot HPP aktif (kalau ada)
         $activeSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
@@ -239,6 +242,7 @@ class ItemController extends Controller
             'item' => $item,
             'activeSnapshot' => $activeSnapshot,
             'itemBom' => $itemBom,
+            'bomEstimate' => $bomEstimate,
             'typeLabels' => $this->typeLabels(),
         ]);
     }
@@ -378,7 +382,7 @@ class ItemController extends Controller
             ->with('success', 'Item baru berhasil dibuat beserta barcode-nya.');
     }
 
-    public function edit(Item $item)
+    public function edit(Item $item, ItemBomCostService $bomCostService)
     {
         $item->load(['barcodes', 'suppliers', 'itemTypeOption', 'purchaseTreatment']);
 
@@ -387,11 +391,12 @@ class ItemController extends Controller
         $expenseAccounts = Account::where('type', 'expense')->where('is_active', true)->orderBy('name')->get();
         $activeSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
         $itemBom = ItemBom::query()->where('item_id', $item->id)->first();
+        $bomEstimate = $itemBom ? $bomCostService->estimate($itemBom) : null;
         $typeLabels = $this->typeLabels();
         $itemTypeOptions = $this->itemTypeOptions();
         $purchaseTreatmentOptions = $this->purchaseTreatmentOptions();
         
-        return view('master.items.edit', compact('item', 'categories', 'suppliers', 'expenseAccounts', 'activeSnapshot', 'itemBom', 'typeLabels', 'itemTypeOptions', 'purchaseTreatmentOptions'));
+        return view('master.items.edit', compact('item', 'categories', 'suppliers', 'expenseAccounts', 'activeSnapshot', 'itemBom', 'bomEstimate', 'typeLabels', 'itemTypeOptions', 'purchaseTreatmentOptions'));
     }
 
     public function update(Request $request, Item $item)

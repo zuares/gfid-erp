@@ -65,6 +65,7 @@
     .item-name { color:#0f172a; font-weight:650; letter-spacing:0; }
     .item-muted { color:#64748b; font-size:.74rem; }
     .item-meta { color:#64748b; font-size:.7rem; margin-top:2px; }
+    .item-bom-badge { display:inline-flex; align-items:center; gap:4px; margin-top:4px; padding:2px 6px; border-radius:999px; color:#047857; background:#ecfdf5; border:1px solid #a7f3d0; font-size:.64rem; font-weight:800; }
     .item-type { display:inline-flex; border-radius:7px; padding:.16rem .48rem; color:#475569; background:rgba(148,163,184,.1); border:1px solid rgba(148,163,184,.3); font-size:.68rem; font-weight:650; }
     .item-status { display:inline-flex; align-items:center; gap:.35rem; border-radius:7px; padding:.16rem .48rem; font-size:.68rem; font-weight:650; white-space:nowrap; }
     .item-status:before { content:''; width:7px; height:7px; border-radius:50%; background:currentColor; flex:0 0 7px; }
@@ -108,6 +109,7 @@
     body[data-theme="dark"] .item-table tbody td { border-top-color:#334155; }
     body[data-theme="dark"] .item-table tbody tr:hover { background:#111827; }
     body[data-theme="dark"] .item-code, body[data-theme="dark"] .item-type { background:rgba(148,163,184,.12); border-color:rgba(148,163,184,.35); color:#cbd5e1; }
+    body[data-theme="dark"] .item-bom-badge { color:#a7f3d0; background:#064e3b; border-color:#047857; }
     body[data-theme="dark"] .item-filter .form-control, body[data-theme="dark"] .item-filter .form-select, body[data-theme="dark"] .modal-content { background:#0f172a; border-color:#475569; color:#f8fafc; }
     @media (max-width:1100px) { .item-filter { grid-template-columns:repeat(3,minmax(0,1fr)); } .item-filter-search { grid-column:1 / -1; } }
     @media (max-width:700px) {
@@ -265,6 +267,9 @@
                                 <td>
                                     <span class="item-type">{{ $item->itemTypeOption?->name ?? ($typeLabels[$item->type] ?? $item->type) }}</span>
                                     <div class="item-meta">{{ $item->category?->code ?? 'Tanpa kategori' }}{{ $item->category ? ' · '.$item->category->name : '' }}</div>
+                                    @if(($item->active_boms_count ?? 0) > 0)
+                                        <span class="item-bom-badge"><i class="bi bi-diagram-3"></i>{{ $item->active_boms_count }} BOM aktif</span>
+                                    @endif
                                 </td>
                                 <td>
                                     @if(in_array($item->type, ['finished_good', 'wip'], true))
@@ -324,7 +329,7 @@
                         </div>
                         <div class="item-mobile-card-meta">
                             <div><div class="item-mobile-card-label">Tipe</div><div class="item-mobile-card-value">{{ $item->itemTypeOption?->name ?? ($typeLabels[$item->type] ?? $item->type) }}</div></div>
-                            <div><div class="item-mobile-card-label">Kategori</div><div class="item-mobile-card-value">{{ $item->category?->code ?? 'Tanpa kategori' }}</div></div>
+                            <div><div class="item-mobile-card-label">Kategori</div><div class="item-mobile-card-value">{{ $item->category?->code ?? 'Tanpa kategori' }} @if(($item->active_boms_count ?? 0) > 0)<span class="item-bom-badge"><i class="bi bi-diagram-3"></i>{{ $item->active_boms_count }} BOM</span>@endif</div></div>
                             <div><div class="item-mobile-card-label">Pasok</div><div class="item-mobile-card-value">@if(in_array($item->type, ['finished_good', 'wip'], true))<span class="item-status {{ $modeClass }}">{{ $item->supply_mode_label }}</span>@else-@endif</div></div>
                             <div><div class="item-mobile-card-label">HPP / Barcode</div><div class="item-mobile-card-value">{{ $hpp > 0 ? 'Rp '.$fmt($hpp) : 'Belum di-set' }} · {{ $barcodeCount }}</div></div>
                         </div>

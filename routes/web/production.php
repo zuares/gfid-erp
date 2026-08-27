@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Inventory\InventoryAdjustmentController;
 use App\Http\Controllers\Production\CuttingJobController;
+use App\Http\Controllers\Production\BundleAssemblyController;
 use App\Http\Controllers\Production\WipOpnameController;
 use App\Http\Controllers\Production\WipCleanupController;
 use App\Http\Controllers\Production\WipNormalizationController;
@@ -263,6 +264,22 @@ Route::middleware(['web', 'auth', 'access:production'])
 
         Route::post('packing_jobs/{packing_job}/unpost', [PackingJobController::class, 'unpost'])
             ->name('packing_jobs.unpost');
+
+        /*
+    |--------------------------------------------------------------------------
+    | BUNDLE ASSEMBLY
+    |--------------------------------------------------------------------------
+    | Physical assembly: consume BOM components and receive the bundle SKU.
+    | Marketplace mapping/shipment tetap memakai alur yang sudah ada.
+     */
+        Route::prefix('bundle-assemblies')->name('bundle_assemblies.')->group(function () {
+            Route::get('/', [BundleAssemblyController::class, 'index'])->name('index');
+            Route::get('/create', [BundleAssemblyController::class, 'create'])->name('create');
+            Route::post('/', [BundleAssemblyController::class, 'store'])->name('store');
+            Route::get('/{bundleAssembly}', [BundleAssemblyController::class, 'show'])->name('show');
+            Route::post('/{bundleAssembly}/post', [BundleAssemblyController::class, 'post'])->name('post');
+            Route::post('/{bundleAssembly}/void', [BundleAssemblyController::class, 'void'])->name('void');
+        });
 
         /*
     |--------------------------------------------------------------------------

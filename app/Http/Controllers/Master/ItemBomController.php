@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\ItemBom;
 use App\Models\ItemBomLine;
+use App\Services\Production\ItemBomCostService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -118,13 +119,15 @@ class ItemBomController extends Controller
         ]);
     }
 
-    public function edit(ItemBom $bom)
+    public function edit(ItemBom $bom, ItemBomCostService $bomCostService)
     {
         $bom->load([
             'item:id,code,name',
             'lines' => fn($q) => $q->orderBy('sort_order')
-                ->with('material:id,code,name,unit'),
+                ->with('material:id,code,name,unit,hpp,base_unit_cost'),
         ]);
+
+        $bomEstimate = $bomCostService->estimate($bom);
 
         // Pemakaian kain AKTUAL terakhir per material (dari cutting job non-void)
         // untuk item BOM ini. Dipakai form sebagai pembanding standar vs realita.
@@ -195,7 +198,7 @@ class ItemBomController extends Controller
             }
         }
 
-        return view('master.item_boms.form', compact('bom', 'rows', 'usageByMaterial'));
+        return view('master.item_boms.form', compact('bom', 'rows', 'usageByMaterial', 'bomEstimate'));
     }
 
     public function store(Request $request)
@@ -219,7 +222,7 @@ class ItemBomController extends Controller
                 ]
             );
 
-            $this->syncLines($bom, $data['lines']);
+            $this->syncLines($bom, $data['lines'], (int) $item->id);
 
             return redirect()
                 ->route('master.item_boms.edit', $bom)
@@ -244,7 +247,7 @@ class ItemBomController extends Controller
                 'active' => (bool) $data['active'],
             ]);
 
-            $this->syncLines($bom, $data['lines']);
+            $this->syncLines($bom, $data['lines'], (int) $bom->item_id);
 
             return redirect()
                 ->route('master.item_boms.edit', $bom)
@@ -370,9 +373,9 @@ class ItemBomController extends Controller
         ];
     }
 
-    private function syncLines(ItemBom $bom, array $lines): void
+    private function syncLines(ItemBom $bom, array $lines, int $parentItemId): void
     {
-        $this->validateBomComponents($lines);
+        $this->validateBomComponents($lines, $parentItemId);
         ItemBomLine::where('item_bom_id', $bom->id)->delete();
 
         foreach ($lines as $l) {
@@ -392,7 +395,7 @@ class ItemBomController extends Controller
         }
     }
 
-    private function validateBomComponents(array $lines): void
+    private function validateBomComponents(array $lines, int $parentItemId): void
     {
         $ids = collect($lines)
             ->pluck('material_item_id')
@@ -400,6 +403,12 @@ class ItemBomController extends Controller
             ->filter()
             ->unique()
             ->values();
+
+        if ($ids->contains($parentItemId)) {
+            throw ValidationException::withMessages([
+                'lines' => 'Item induk tidak boleh menjadi komponennya sendiri.',
+            ]);
+        }
 
         $eligibleCount = Item::query()
             ->whereIn('id', $ids)

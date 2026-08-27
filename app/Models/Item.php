@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Item extends Model
 {
@@ -210,6 +211,29 @@ class Item extends Model
     public function boms(): HasMany
     {
         return $this->hasMany(ItemBom::class);
+    }
+
+    /**
+     * One active BOM is currently supported per item. The existing boms()
+     * relation is kept for backwards compatibility with older callers.
+     */
+    public function bom(): HasOne
+    {
+        return $this->hasOne(ItemBom::class);
+    }
+
+    public function activeBom(): HasOne
+    {
+        return $this->hasOne(ItemBom::class)->where('active', true);
+    }
+
+    public function hasActiveBom(): bool
+    {
+        if ($this->relationLoaded('boms')) {
+            return $this->boms->contains(fn (ItemBom $bom): bool => (bool) $bom->active);
+        }
+
+        return $this->boms()->where('active', true)->exists();
     }
 
     // Kalau kamu sudah punya product_category_id

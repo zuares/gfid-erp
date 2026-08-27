@@ -395,6 +395,7 @@
 
     // Produksi dashboard (konsolidasi semua report)
     $hasProdDashboard = $router->has('production.dashboard');
+    $hasProdBundleAssemblies = $router->has('production.bundle_assemblies.index');
 
     // Rekonsiliasi gap cost (owner only)
     $hasProdReconcile = $router->has('production.reconcile.index');
@@ -1185,6 +1186,15 @@
                                 <a href="{{ route('production.packing_jobs.index') }}"
                                    class="mobile-sidebar-link {{ request()->routeIs('production.packing_jobs.*') ? 'active' : '' }}">
                                     <span class="icon"><i class="bi bi-box-seam"></i></span><span>Packing</span>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if ($hasProdBundleAssemblies)
+                            <li>
+                                <a href="{{ route('production.bundle_assemblies.index') }}"
+                                   class="mobile-sidebar-link {{ request()->routeIs('production.bundle_assemblies.*') ? 'active' : '' }}">
+                                    <span class="icon"><i class="bi bi-boxes"></i></span><span>Assembly Bundle</span>
                                 </a>
                             </li>
                         @endif

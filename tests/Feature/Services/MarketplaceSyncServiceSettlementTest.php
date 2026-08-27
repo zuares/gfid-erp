@@ -1470,6 +1470,33 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->assertSame('packed', $order->status);
     }
 
+    public function test_sync_order_completed_tidak_diturunkan_oleh_status_logistik_delivery_done()
+    {
+        $orderSn = 'ORDER-COMPLETED-DELIVERY-DONE';
+        $order = $this->createOrder([
+            'channel_order_id' => $orderSn,
+            'order_status' => 'SHIPPED',
+            'status' => 'shipped',
+        ]);
+
+        $method = new \ReflectionMethod(MarketplaceSyncService::class, 'upsertOrders');
+        $method->setAccessible(true);
+        $method->invoke(app(MarketplaceSyncService::class), $this->store, [[
+            'order_sn' => $orderSn,
+            'order_status' => 'COMPLETED',
+            'total_amount' => 100000,
+            'package_list' => [[
+                'logistics_status' => 'LOGISTICS_DELIVERY_DONE',
+            ]],
+            'item_list' => [],
+        ]]);
+
+        $order->refresh();
+
+        $this->assertSame('COMPLETED', $order->order_status);
+        $this->assertSame('completed', $order->status);
+    }
+
     public function test_sync_order_membuka_kembali_error_settlement_saat_status_sudah_eligible()
     {
         $orderSn = 'ORDER-READY-TO-SHIPPED';
