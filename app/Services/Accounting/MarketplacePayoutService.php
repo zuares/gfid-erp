@@ -38,7 +38,7 @@ class MarketplacePayoutService
             $marketplaceClearingAccount = Account::where('code', self::MARKETPLACE_CLEARING_ACCOUNT_CODE)
                 ->where('is_active', true)
                 ->first();
-            if (! $marketplaceReceivableAccount) {
+            if (! $marketplaceClearingAccount) {
                 throw ValidationException::withMessages([
                     'account' => 'Akun 1302 Saldo Marketplace / Clearing tidak ditemukan.',
                 ]);
