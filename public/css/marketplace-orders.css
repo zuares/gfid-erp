@@ -248,8 +248,23 @@ body[data-theme="dark"] .ord-card { border-color: var(--glass-border); box-shado
     color: #64748b; font-size: .63rem; font-weight: 800;
     letter-spacing: .04em; text-transform: uppercase;
 }
+.ord-item-payment-summary {
+    display: flex; align-items: center; justify-content: flex-end;
+    flex-wrap: wrap; gap: .25rem; min-width: 0;
+}
 .ord-items-invoice-head .ord-buyer-paid { margin-top: 0; font-size: .62rem; }
 .ord-items-invoice-head .ord-buyer-paid strong { font-size: .68rem; }
+.ord-voucher-summary { display: inline-flex; flex-wrap: wrap; gap: .25rem; }
+.ord-voucher-chip {
+    display: inline-flex; align-items: baseline; gap: .22rem;
+    padding: .14rem .38rem; border: 1px solid; border-radius: 6px;
+    font-size: .59rem; line-height: 1.35; white-space: nowrap;
+}
+.ord-voucher-chip strong { font-size: .63rem; font-weight: 800; }
+.ord-voucher-chip.seller { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+.ord-voucher-chip.shopee { color: #9f1239; background: #fff1f2; border-color: #fecdd3; }
+body[data-theme="dark"] .ord-voucher-chip.seller { color: #fde68a; background: rgba(120, 53, 15, .24); border-color: rgba(251, 191, 36, .35); }
+body[data-theme="dark"] .ord-voucher-chip.shopee { color: #fda4af; background: rgba(159, 18, 57, .2); border-color: rgba(251, 113, 133, .35); }
 .ord-card-section { border-top: 1px solid var(--shp-border); }
 /* Accordion trigger */
 .ord-acc-toggle {
@@ -472,7 +487,8 @@ body[data-theme="dark"] .ord-item-price del { color: #64748b; }
     .ord-card-meta .ord-id { font-size: .8rem; }
     .ord-order-context { gap: .25rem; }
     .ord-items-invoice-head { align-items: flex-start; }
-    .ord-items-invoice-head .ord-buyer-paid { max-width: 70%; }
+    .ord-item-payment-summary { max-width: 72%; }
+    .ord-items-invoice-head .ord-buyer-paid { max-width: 100%; }
 }
 .ord-more {
     font-size: .68rem; color: #64748b; padding: .15rem .5rem;

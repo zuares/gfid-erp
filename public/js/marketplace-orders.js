@@ -107,6 +107,33 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         </div>`;
     }
 
+    function voucherAmount(o, keys) {
+        const sources = [
+            o.settlement,
+            o.settlement?.raw_json,
+            o.raw_json?.income_details,
+        ];
+        const values = sources.flatMap(source => keys.map(key => Number(source?.[key])))
+            .filter(value => Number.isFinite(value) && value > 0);
+
+        return values.length ? Math.abs(values[0]) : 0;
+    }
+
+    function voucherSummaryHtml(o) {
+        const sellerVoucher = voucherAmount(o, ['voucher_from_seller', 'seller_voucher_rebate', 'seller_voucher']);
+        const shopeeVoucher = voucherAmount(o, ['voucher_from_shopee', 'voucher_from_platform', 'platform_voucher']);
+        if (sellerVoucher <= 0 && shopeeVoucher <= 0) return '';
+
+        return `<div class="ord-voucher-summary" title="Pembagian voucher pada order">
+            ${sellerVoucher > 0 ? `<span class="ord-voucher-chip seller">🏷️ Penjual <strong>${esc(fmtRp(sellerVoucher))}</strong></span>` : ''}
+            ${shopeeVoucher > 0 ? `<span class="ord-voucher-chip shopee">🛍️ Shopee <strong>${esc(fmtRp(shopeeVoucher))}</strong></span>` : ''}
+        </div>`;
+    }
+
+    function itemPaymentSummaryHtml(o) {
+        return `<div class="ord-item-payment-summary">${buyerPaidHtml(o)}${voucherSummaryHtml(o)}</div>`;
+    }
+
     function orderContextHtml(o) {
         const storeName = o.store?.name || '';
         const channel = o.store?.channel || null;
@@ -1852,7 +1879,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             // ── Section: Item Produk (Tampil default tanpa accordion di mobile)
             const itemCards = items.map(i => renderItemCard(i, urgent)).join('');
             const itemsSection = `<div class="ord-card-section" style="padding:0.6rem 0.9rem; border-top:1px dashed #e2e8f0; background:#f8fafc">
-                <div class="ord-items-invoice-head"><span>Item Produk (${items.length})</span>${buyerPaidHtml(o)}</div>
+                <div class="ord-items-invoice-head"><span>Item Produk (${items.length})</span>${itemPaymentSummaryHtml(o)}</div>
                 <div class="ord-items-cell" style="padding:0">${itemCards}</div>
             </div>`;
 
@@ -2382,7 +2409,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             }
 
             let itemsHtml = `<div class="ord-items-cell">
-                <div class="ord-items-invoice-head"><span>Item Produk (${items.length})</span>${buyerPaidHtml(o)}</div>`
+                <div class="ord-items-invoice-head"><span>Item Produk (${items.length})</span>${itemPaymentSummaryHtml(o)}</div>`
                 + items.map(i => renderItemCard(i, urgent)).join('')
                 + `</div>`;
                 
