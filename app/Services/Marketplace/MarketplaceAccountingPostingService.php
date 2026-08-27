@@ -27,7 +27,9 @@ class MarketplaceAccountingPostingService
      *
      * HPP is deliberately not included here because it may already be posted
      * by shipment COGS. Actual wallet advertising is included as a separate
-     * cash mutation: Dr advertising / Cr marketplace clearing.
+     * cash mutation: Dr advertising / Cr marketplace clearing. When wallet
+     * transactions are not available for a store, the statement service may
+     * use Ads Daily as an explicitly-labelled fallback for the same period.
      */
     public function preview(array $filters): array
     {
@@ -49,19 +51,20 @@ class MarketplaceAccountingPostingService
 
         $summary = $statement['summary'];
         $otherAdjustment = (float) $summary['other_settlement_adjustment'];
-        $walletAdCost = round((float) ($summary['wallet_ad_cost'] ?? 0), 2);
+        $adCostForGl = round((float) ($summary['ad_cost_for_gl'] ?? $summary['wallet_ad_cost'] ?? 0), 2);
         $lines = [
             $this->line($accounts[$this->accountCode('marketplace_receivable')], (float) $summary['payout'], 0),
             $this->line($accounts[$this->accountCode('sales_return')], (float) $summary['seller_discount'] + (float) $summary['refund'], 0),
             $this->line($accounts[$this->accountCode('other_fee')], (float) $summary['marketplace_fees'] + max(-$otherAdjustment, 0), 0),
             $this->line($accounts[$this->accountCode('other_fee')], 0, max($otherAdjustment, 0)),
             $this->line($accounts[$this->accountCode('sales')], 0, (float) $summary['gross_sales']),
-            // Wallet ad charges are actual deductions from marketplace saldo.
-            // A net refund is represented by the inverse entry.
-            $this->line($accounts[$this->accountCode('advertising')], max($walletAdCost, 0), 0),
-            $this->line($accounts[$this->accountCode('marketplace_receivable')], 0, max($walletAdCost, 0)),
-            $this->line($accounts[$this->accountCode('marketplace_receivable')], max(-$walletAdCost, 0), 0),
-            $this->line($accounts[$this->accountCode('advertising')], 0, max(-$walletAdCost, 0)),
+            // Advertising is a period-level deduction from marketplace saldo.
+            // A net refund is represented by the inverse entry. The statement
+            // tells us whether this came from wallet actuals or Ads Daily fallback.
+            $this->line($accounts[$this->accountCode('advertising')], max($adCostForGl, 0), 0),
+            $this->line($accounts[$this->accountCode('marketplace_receivable')], 0, max($adCostForGl, 0)),
+            $this->line($accounts[$this->accountCode('marketplace_receivable')], max(-$adCostForGl, 0), 0),
+            $this->line($accounts[$this->accountCode('advertising')], 0, max(-$adCostForGl, 0)),
         ];
 
         $lines = array_values(array_filter($lines, fn (array $line) => $line['debit'] > 0 || $line['credit'] > 0));
@@ -85,10 +88,13 @@ class MarketplaceAccountingPostingService
             'excluded_from_gl' => [
                 'hpp' => (float) $summary['hpp'],
                 'settlement_ad_cost' => (float) ($summary['ad_cost'] ?? 0),
-                'reason' => 'HPP dapat sudah diposting dari shipment COGS. Biaya iklan settlement tidak diposting terpisah agar tidak double count; biaya iklan wallet aktual diposting ke akun advertising.',
+                'reason' => 'HPP dapat sudah diposting dari shipment COGS. Biaya iklan settlement tidak diposting terpisah agar tidak double count; biaya iklan subledger diposting ke akun advertising.',
             ],
             'included_in_gl' => [
-                'wallet_ad_cost' => $walletAdCost,
+                'wallet_ad_cost' => (float) ($summary['wallet_ad_cost'] ?? 0),
+                'amount' => $adCostForGl,
+                'source' => $summary['ad_cost_for_gl_source'] ?? 'none',
+                'ads_daily_fallback_spend' => (float) ($summary['ads_daily_fallback_spend'] ?? 0),
                 'account_code' => $this->accountCode('advertising'),
                 'account_name' => $accounts[$this->accountCode('advertising')]->name,
             ],

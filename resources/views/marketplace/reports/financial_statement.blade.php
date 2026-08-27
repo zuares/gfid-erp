@@ -13,6 +13,7 @@
         ? \Carbon\Carbon::parse($summary['data_last_order_at'])->translatedFormat('d M Y')
         : 'Belum ada';
     $operatingProfitAfterWalletAds = (float) ($summary['operating_profit_after_wallet_ads'] ?? $summary['operating_profit'] ?? 0);
+    $adCostSource = str_replace('_', ' ', $summary['ad_cost_for_gl_source'] ?? 'none');
     $visibleItems = array_slice($statement['items'], 0, 100);
     $visibleOrders = array_slice($statement['orders'], 0, 100);
 @endphp
@@ -267,6 +268,7 @@
                         <tr class="table-light fw-semibold"><td>Laba kotor</td><td class="text-end">Rp {{ $fmt($summary['gross_profit']) }}</td></tr>
                         <tr><td>Biaya iklan order/settlement</td><td class="text-end text-danger">(Rp {{ $fmt($summary['ad_cost']) }})</td></tr>
                         <tr><td>Biaya iklan wallet aktual</td><td class="text-end text-danger">(Rp {{ $fmt($summary['wallet_ad_cost'] ?? 0) }})</td></tr>
+                        <tr><td>Biaya iklan masuk subledger <span class="text-muted small">({{ $adCostSource }})</span></td><td class="text-end text-danger">(Rp {{ $fmt($summary['ad_cost_for_gl'] ?? 0) }})</td></tr>
                         <tr class="table-success fw-bold"><td>Laba operasional setelah iklan</td><td class="text-end">Rp {{ $fmt($operatingProfitAfterWalletAds) }}</td></tr>
                     </tbody>
                 </table></div>
@@ -301,7 +303,10 @@
                 <div class="col-6 col-md-3"><div class="text-muted small">Ads Daily spend</div><div class="fw-bold">Rp {{ $fmt($summary['ads_daily_spend'] ?? 0) }}</div></div>
                 <div class="col-6 col-md-3"><div class="text-muted small">Selisih</div><div class="fw-bold {{ abs((float) ($summary['ad_cost_variance'] ?? 0)) > 0.01 ? 'text-warning-emphasis' : 'text-success' }}">Rp {{ $fmt($summary['ad_cost_variance'] ?? 0) }}</div></div>
             </div>
-            <div class="small text-muted mt-3">Biaya wallet memakai tanggal transaksi Shopee dan masuk ke akun 6206 saat posting. Karena sifatnya period-level, angka ini mengubah laba operasional total, tetapi tidak dialokasikan ulang ke laba per order.</div>
+            <div class="small text-muted mt-3">Biaya wallet memakai tanggal transaksi Shopee. Jika wallet belum tersinkron untuk toko tertentu, Ads Daily dipakai sebagai fallback agar biaya tetap masuk subledger. Saat posting, nilainya masuk ke akun 6206 dan mengurangi saldo marketplace 1302; angka ini bersifat period-level dan tidak dialokasikan ulang ke laba per order.</div>
+            @if (($summary['ad_cost_for_gl_source'] ?? 'none') !== 'wallet_actual' && ($summary['ad_cost_for_gl'] ?? 0) > 0)
+                <div class="alert alert-warning small mt-3 mb-0"><i class="bi bi-info-circle me-1"></i> Sumber posting saat ini: <strong>{{ $adCostSource }}</strong>. Klik <strong>Sync biaya iklan</strong> sebelum posting final agar angka wallet Shopee menjadi sumber utama bila tersedia.</div>
+            @endif
         </div>
     </div>
     </div>

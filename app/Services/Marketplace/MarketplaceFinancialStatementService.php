@@ -44,7 +44,7 @@ class MarketplaceFinancialStatementService
         // wallet movements and cannot safely be allocated to individual orders.
         $summary = array_merge($summary, $this->adCostReconciliation($report['filters']));
         $summary['operating_profit_after_wallet_ads'] = round(
-            (float) ($summary['operating_profit'] ?? 0) - (float) ($summary['wallet_ad_cost'] ?? 0),
+            (float) ($summary['operating_profit'] ?? 0) - (float) ($summary['ad_cost_for_gl'] ?? 0),
             2,
         );
         $summary['margin_after_wallet_ads_pct'] = (float) ($summary['gross_sales'] ?? 0) > 0
@@ -82,6 +82,8 @@ class MarketplaceFinancialStatementService
                 'wallet_ad_refund' => $summary['wallet_ad_refund'],
                 'ads_daily_spend' => $summary['ads_daily_spend'],
                 'ad_cost_variance' => $summary['ad_cost_variance'],
+                'ad_cost_for_gl' => $summary['ad_cost_for_gl'],
+                'ad_cost_for_gl_source' => $summary['ad_cost_for_gl_source'],
             ],
         ];
     }
@@ -154,25 +156,66 @@ class MarketplaceFinancialStatementService
         // Shopee/proxies are not stable enough to distinguish charge/refund.
         $chargeRows = (clone $walletBase)
             ->whereIn('transaction_type', self::WALLET_AD_CHARGE_TYPES)
-            ->selectRaw('COALESCE(SUM(ABS(amount)), 0) AS total')
-            ->first();
+            ->selectRaw('store_id, COALESCE(SUM(ABS(amount)), 0) AS total')
+            ->groupBy('store_id')
+            ->pluck('total', 'store_id');
         $refundRows = (clone $walletBase)
             ->whereIn('transaction_type', self::WALLET_AD_REFUND_TYPES)
-            ->selectRaw('COALESCE(SUM(ABS(amount)), 0) AS total')
-            ->first();
-        $walletCount = (clone $walletBase)
+            ->selectRaw('store_id, COALESCE(SUM(ABS(amount)), 0) AS total')
+            ->groupBy('store_id')
+            ->pluck('total', 'store_id');
+        $walletCountByStore = (clone $walletBase)
             ->whereIn('transaction_type', array_merge(self::WALLET_AD_CHARGE_TYPES, self::WALLET_AD_REFUND_TYPES))
-            ->count();
+            ->selectRaw('store_id, COUNT(*) AS total')
+            ->groupBy('store_id')
+            ->pluck('total', 'store_id');
 
-        $adsDailySpend = MarketplaceAdsDaily::query()
+        $adsDailyByStore = MarketplaceAdsDaily::query()
             ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
             ->when($filters['store_id'], fn ($query, $storeId) => $query->where('store_id', $storeId))
-            ->sum('spend');
+            ->selectRaw('store_id, COALESCE(SUM(spend), 0) AS total')
+            ->groupBy('store_id')
+            ->pluck('total', 'store_id');
 
-        $charge = round((float) ($chargeRows->total ?? 0), 2);
-        $refund = round((float) ($refundRows->total ?? 0), 2);
+        $storeIds = collect([
+            ...array_keys($chargeRows->all()),
+            ...array_keys($refundRows->all()),
+            ...array_keys($walletCountByStore->all()),
+            ...array_keys($adsDailyByStore->all()),
+        ])->unique()->values();
+        $charge = round((float) $chargeRows->sum(), 2);
+        $refund = round((float) $refundRows->sum(), 2);
         $walletNet = round($charge - $refund, 2);
-        $adsDailySpend = round((float) $adsDailySpend, 2);
+        $walletCount = (int) $walletCountByStore->sum();
+        $adsDailySpend = round((float) $adsDailyByStore->sum(), 2);
+        $adCostForGl = 0.0;
+        $adsDailyFallbackSpend = 0.0;
+        $walletStoreCount = 0;
+        $fallbackStoreCount = 0;
+
+        foreach ($storeIds as $storeId) {
+            $storeKey = (string) $storeId;
+            $storeHasWalletTransactions = (int) ($walletCountByStore->get($storeId) ?? $walletCountByStore->get($storeKey) ?? 0) > 0;
+            $storeWalletCost = (float) ($chargeRows->get($storeId) ?? $chargeRows->get($storeKey) ?? 0)
+                - (float) ($refundRows->get($storeId) ?? $refundRows->get($storeKey) ?? 0);
+            $storeAdsDailySpend = (float) ($adsDailyByStore->get($storeId) ?? $adsDailyByStore->get($storeKey) ?? 0);
+
+            if ($storeHasWalletTransactions) {
+                $adCostForGl += $storeWalletCost;
+                $walletStoreCount++;
+            } elseif ($storeAdsDailySpend !== 0.0) {
+                $adCostForGl += $storeAdsDailySpend;
+                $adsDailyFallbackSpend += $storeAdsDailySpend;
+                $fallbackStoreCount++;
+            }
+        }
+
+        $source = match (true) {
+            $walletStoreCount > 0 && $fallbackStoreCount > 0 => 'mixed_wallet_actual_and_ads_daily_fallback',
+            $walletStoreCount > 0 => 'wallet_actual',
+            $fallbackStoreCount > 0 => 'ads_daily_fallback',
+            default => 'none',
+        };
 
         return [
             'wallet_ad_charge' => $charge,
@@ -181,7 +224,12 @@ class MarketplaceFinancialStatementService
             'wallet_ad_transaction_count' => (int) $walletCount,
             'ads_daily_spend' => $adsDailySpend,
             'ad_cost_variance' => round($walletNet - $adsDailySpend, 2),
-            'ad_cost_date_basis' => 'wallet_transaction_created_at',
+            'ad_cost_for_gl' => round($adCostForGl, 2),
+            'ad_cost_for_gl_source' => $source,
+            'ads_daily_fallback_spend' => round($adsDailyFallbackSpend, 2),
+            'wallet_store_count' => $walletStoreCount,
+            'ads_daily_fallback_store_count' => $fallbackStoreCount,
+            'ad_cost_date_basis' => 'wallet_transaction_created_at; fallback ads_daily.date',
         ];
     }
 }
