@@ -3847,6 +3847,8 @@ class MarketplaceController extends Controller
             $grossAmount = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
             $buyerPaidAmount = $this->settlementBuyerPaidAmount($s);
             $voucherPlatformAmount = $this->settlementVoucherPlatformAmount($s);
+            $voucherExternalAmount = $this->settlementVoucherExternalAmount($s);
+            $escrowAmount = $this->settlementEscrowAmount($s);
             $voucherAmount = $voucherTokoAmount + $voucherPlatformAmount;
             $grossAfterVoucherTotal = max($grossAmount - $voucherAmount, 0);
             $grossAfterVoucherToko = max($grossAmount - $voucherTokoAmount, 0);
@@ -3931,7 +3933,9 @@ class MarketplaceController extends Controller
                 'seller_voucher' => (float) $s->seller_voucher,
                 'voucher_platform_total' => $voucherPlatformAmount,
                 'voucher_toko_total' => $voucherTokoAmount,
+                'voucher_external_total' => $voucherExternalAmount,
                 'voucher_total' => $voucherAmount,
+                'escrow_amount' => $escrowAmount,
                 'seller_coin_cash_back' => (float) $s->seller_coin_cash_back,
                 'actual_shipping_fee' => (float) $s->actual_shipping_fee,
                 'shipping_fee_subsidy' => (float) $s->shipping_fee_subsidy,
@@ -4423,6 +4427,29 @@ class MarketplaceController extends Controller
         }
 
         return 0.0;
+    }
+
+    private function settlementVoucherExternalAmount(MarketplaceOrderSettlement $s): float
+    {
+        $raw = is_array($s->raw_json) ? $s->raw_json : [];
+
+        $value = data_get($raw, 'voucher_from_external_party');
+        if ($value !== null && $value !== '') {
+            return $this->settlementFeeAmount($value);
+        }
+
+        return 0.0;
+    }
+
+    private function settlementEscrowAmount(MarketplaceOrderSettlement $s): ?float
+    {
+        $raw = is_array($s->raw_json) ? $s->raw_json : [];
+
+        if (! array_key_exists('escrow_amount', $raw) || $raw['escrow_amount'] === null || $raw['escrow_amount'] === '') {
+            return null;
+        }
+
+        return $this->settlementFeeAmount($raw['escrow_amount']);
     }
 
     /**

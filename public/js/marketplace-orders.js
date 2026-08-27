@@ -130,15 +130,17 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     function voucherSummaryHtml(o) {
         const sellerVoucher = voucherAmount(o, ['voucher_toko_total', 'voucher_from_seller']);
         const shopeeVoucher = voucherAmount(o, ['voucher_platform_total', 'voucher_from_shopee']);
+        const externalVoucher = voucherAmount(o, ['voucher_external_total', 'voucher_from_external_party']);
         const bundleDiscount = voucherAmount(o, ['bundle_discount_total', 'bundle_discount', 'bundle_discount_amount', 'discount_from_bundle', 'discount_from_bundle_deal']);
         const hasVoucherPayload = !!o.settlement;
-        if (!hasVoucherPayload && sellerVoucher <= 0 && shopeeVoucher <= 0 && bundleDiscount <= 0) return '';
+        if (!hasVoucherPayload && sellerVoucher <= 0 && shopeeVoucher <= 0 && externalVoucher <= 0 && bundleDiscount <= 0) return '';
         const valueHtml = value => hasVoucherPayload ? esc(fmtRp(value)) : 'Belum tersedia';
 
         return `<div class="ord-voucher-summary" title="Voucher dan diskon dari Escrow Detail Shopee">
             <span class="ord-voucher-chip bundle">🎁 Bundle <strong>${valueHtml(bundleDiscount)}</strong></span>
             <span class="ord-voucher-chip seller">🏷️ Penjual <strong>${valueHtml(sellerVoucher)}</strong></span>
             <span class="ord-voucher-chip shopee">🛍️ Shopee <strong>${valueHtml(shopeeVoucher)}</strong></span>
+            <span class="ord-voucher-chip external">🤝 Eksternal <strong>${valueHtml(externalVoucher)}</strong></span>
         </div>`;
     }
 
@@ -174,6 +176,27 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         if (amount === null) return '<span class="ord-payment-empty">—</span>';
 
         return `<span class="ord-ams-value" title="AMS dari Escrow Detail Shopee">${esc(fmtRp(amount))}</span>`;
+    }
+
+    function escrowAmount(o) {
+        const normalized = o.settlement?.escrow_amount;
+        if (normalized !== null && normalized !== undefined && normalized !== '') {
+            const value = Number(normalized);
+            if (Number.isFinite(value)) return Math.abs(value);
+        }
+
+        const raw = o.settlement?.raw_json;
+        if (!raw || typeof raw !== 'object' || !Object.prototype.hasOwnProperty.call(raw, 'escrow_amount')) return null;
+
+        const value = Number(raw.escrow_amount);
+        return Number.isFinite(value) ? Math.abs(value) : null;
+    }
+
+    function escrowHtml(o) {
+        const amount = escrowAmount(o);
+        if (amount === null) return '<span class="ord-payment-empty">—</span>';
+
+        return `<span class="ord-income-value" title="Penghasilan dari Escrow Detail Shopee">${esc(fmtRp(amount))}</span>`;
     }
 
     function itemPaymentSummaryHtml(o) {
@@ -2663,6 +2686,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
 
             const buyerPaidCell = `<td class="ord-payment-cell">${buyerPaidHtml(o)}</td>`;
             const voucherCell = `<td class="ord-voucher-cell">${voucherSummaryHtml(o) || '<span class="ord-payment-empty">—</span>'}</td>`;
+            const incomeCell = `<td class="ord-income-cell">${escrowHtml(o)}</td>`;
             
             const firstColHtml = activeTab === 'processed' 
                 ? `<div style="display:flex; gap:0.6rem; align-items:flex-start;">
@@ -2682,6 +2706,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 ${scanTd}
                 ${buyerPaidCell}
                 ${voucherCell}
+                ${incomeCell}
                 <td class="ord-ams-cell">${amsHtml(o)}</td>
                 <td>${pengirimanHtml}</td>
             </tr>`;
@@ -2689,13 +2714,14 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
 
         const hasResolveCol = activeTab === 'processed' && subTabProcessed !== 'packing';
         const hasScanCol    = activeTab === 'processed' && subTabProcessed !== 'packing';
-        // col widths: order | items | resolve? | scan? | buyer paid | voucher | AMS | pengiriman
-        const colItems  = hasResolveCol ? '20%' : '31%';
-        const colOrder = hasResolveCol ? '15%' : '20%';
-        const colPaid = hasResolveCol ? '12%' : '14%';
-        const colVoucher = hasResolveCol ? '13%' : '16%';
-        const colAms = '8%';
-        const colShipping = hasResolveCol ? '8%' : '11%';
+        // col widths: order | items | resolve? | scan? | buyer paid | voucher | income | AMS | pengiriman
+        const colItems  = hasResolveCol ? '17%' : '27%';
+        const colOrder = hasResolveCol ? '14%' : '18%';
+        const colPaid = hasResolveCol ? '11%' : '13%';
+        const colVoucher = hasResolveCol ? '12%' : '15%';
+        const colIncome = hasResolveCol ? '10%' : '12%';
+        const colAms = '7%';
+        const colShipping = hasResolveCol ? '7%' : '8%';
         
         const firstHeaderHtml = activeTab === 'processed'
             ? `<div style="display:flex; align-items:center;">
@@ -2714,6 +2740,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 ${hasScanCol    ? '<col style="width:12%">' : ''}
                 <col style="width:${colPaid}">
                 <col style="width:${colVoucher}">
+                <col style="width:${colIncome}">
                 <col style="width:${colAms}">
                 <col style="width:${colShipping}">
             </colgroup>
@@ -2724,6 +2751,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 ${hasScanCol    ? '<th>📦 Item Scan</th>'    : ''}
                 <th>Bayar Pembeli</th>
                 <th>Voucher &amp; Diskon</th>
+                <th>Penghasilan</th>
                 <th>AMS</th>
                 <th>Pengiriman</th>
             </tr></thead>
