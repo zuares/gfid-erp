@@ -233,6 +233,7 @@ trait MarketplaceOrdersPaginatedTrait
     {
         $query->where(function ($q) {
             $q->whereNull('booking_sn')
+                ->orWhere('booking_sn', '')
                 ->orWhere('shipping_carrier', 'like', '%instant%')
                 ->orWhere('shipping_carrier', 'like', '%same day%')
                 ->orWhere('shipping_carrier', 'like', '%sameday%');
