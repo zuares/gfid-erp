@@ -47,7 +47,7 @@ class TrialBalanceController extends Controller
                 'balance_debit'  => $net > 0 ? $net : 0.0,
                 'balance_credit' => $net < 0 ? abs($net) : 0.0,
             ];
-        })->filter(fn($r) => $r->debit > 0 || $r->credit > 0);
+        });
 
         $totalDebit        = $rows->sum('debit');
         $totalCredit       = $rows->sum('credit');

@@ -18,6 +18,8 @@ class JournalController extends Controller
             'cash_receipt' => 'Penerimaan Kas/Bank',
             'cash_receipt_void' => 'Pembatalan Penerimaan',
 
+            'account_reclass_inventory_adjustment' => 'Reclass Adjustment Stok (6101 → 6115)',
+
             'opening_balance' => 'Saldo Awal',
             'opening_balance_void' => 'Pembatalan Saldo Awal',
 

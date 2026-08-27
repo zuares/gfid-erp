@@ -550,13 +550,11 @@ class MarketplaceSyncService
      * Status order yang boleh dicek ke escrow.
      *
      * Shopee dapat melepas dana ketika status order lokal belum sempat berubah
-     * menjadi COMPLETED. Karena itu status READY_TO_SHIP/MATCHED dan shipped
-     * ikut dicek; bila API belum menyediakan income, validator akan melewati
-     * response tanpa membuat settlement dummy.
+     * menjadi COMPLETED. Karena itu status shipped/pending ikut dicek; bila
+     * API belum menyediakan income, validator akan melewati response tanpa
+     * membuat settlement dummy.
      */
     public const SETTLEMENT_ELIGIBLE_ORDER_STATUSES = [
-        'READY_TO_SHIP',
-        'MATCHED',
         'SHIPPED',
         'TO_CONFIRM_RECEIVE',
         'TO_RETURN',
