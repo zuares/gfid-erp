@@ -86,6 +86,7 @@ class InventoryIntelligenceService
             $leadTimeSource = $directLeadTime?->lead_time_days !== null
                 ? 'item'
                 : ($categoryLeadTime?->lead_time_days !== null ? 'category' : null);
+            $supplierMapping = $directLeadTime ?? $categoryLeadTime;
             // Periode pengadaan adalah kebutuhan setelah barang tiba; lead time
             // ditambahkan agar stok tetap mencukupi selama menunggu supplier.
             $effectiveProcurementDays = $procurementHorizon + (int) ($leadTimeDays ?? 0);
@@ -160,6 +161,9 @@ class InventoryIntelligenceService
                     ? ($categoryLeadTime?->supplier_name ?? null)
                     : ($directLeadTime?->supplier_name ?? null),
                 'lead_time_mapping_id' => $directLeadTime?->supplier_item_id,
+                'procurement_supplier_id' => $supplierMapping?->supplier_id,
+                'procurement_supplier_name' => $supplierMapping?->supplier_name,
+                'procurement_supplier_phone' => $supplierMapping?->supplier_phone,
                 'suggested_qty' => $suggested,
                 'unit_cost' => $unitCost,
                 'suggested_value' => $suggestedValue,
@@ -196,7 +200,9 @@ class InventoryIntelligenceService
                 'si.id as supplier_item_id',
                 'si.item_id',
                 'si.lead_time_days',
+                'si.supplier_id',
                 's.name as supplier_name',
+                's.phone as supplier_phone',
             ])
             ->groupBy('item_id');
 
@@ -212,7 +218,9 @@ class InventoryIntelligenceService
                 ->get([
                     'scm.item_category_id',
                     'scm.lead_time_days',
+                    'scm.supplier_id',
                     's.name as supplier_name',
+                    's.phone as supplier_phone',
                 ])
                 ->groupBy('item_category_id');
 

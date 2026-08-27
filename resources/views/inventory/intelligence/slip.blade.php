@@ -4,6 +4,39 @@
     $isProcurement = ($draftType ?? 'production') === 'procurement';
     $forecastDays = $forecastDays ?? ($isProcurement ? 60 : 30);
     $suggestionLabel = $suggestionLabel ?? ($isProcurement ? 'Saran Pengadaan FOB' : 'Saran Produksi');
+    $normalizePhone = function ($phone) {
+        $phone = preg_replace('/\D+/', '', (string) $phone) ?? '';
+
+        return str_starts_with($phone, '0') ? '62' . substr($phone, 1) : $phone;
+    };
+    $supplierGroups = $isProcurement
+        ? $lines->groupBy(fn ($line) => $line->procurement_supplier_id ?: 'unassigned')
+            ->map(function ($supplierLines, $supplierId) use ($categoryLabel, $normalizePhone, $suggestionLabel) {
+                $first = $supplierLines->first();
+                $name = $first->procurement_supplier_name ?? 'Supplier belum ditentukan';
+                $phone = $normalizePhone($first->procurement_supplier_phone ?? '');
+                $message = "*Draft {$suggestionLabel}*\n"
+                    . "Supplier: {$name}\n"
+                    . "Kategori: " . ($categoryLabel ?? 'Semua') . "\n\n"
+                    . $supplierLines->map(fn ($line) => "{$line->sku} - {$line->product}: " . number_format((float) $line->suggested_qty, 0, ',', '.') . ' pcs')
+                        ->implode("\n")
+                    . "\n\n*Total: " . number_format((float) $supplierLines->sum('suggested_qty'), 0, ',', '.') . " pcs*";
+
+                return (object) [
+                    'id' => $supplierId,
+                    'name' => $name,
+                    'phone' => $phone,
+                    'message' => $message,
+                ];
+            })
+            ->values()
+        : collect();
+    $whatsappMessage = "*Draft {$suggestionLabel}*\n"
+        . "Kategori: " . ($categoryLabel ?? 'Semua') . "\n"
+        . "Jumlah SKU: {$skuCount}\n\n"
+        . $lines->map(fn ($line) => "{$line->sku} - {$line->product}: {$fmt($line->suggested_qty)} pcs")
+            ->implode("\n")
+        . "\n\n*Total: {$fmt($totalSuggested)} pcs*";
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -28,6 +61,8 @@
             flex: 1 1 auto; text-align: center; }
         .btn:disabled { opacity: .55; cursor: progress; }
         .btn-dark { background: var(--ink); color: #fff; border-color: var(--ink); }
+        .btn-whatsapp { background: #16a34a; color: #fff; border-color: #16a34a; }
+        .btn-whatsapp:hover { background: #15803d; border-color: #15803d; }
         .btn-spacer { display: none; }
 
         .sheet { margin: 12px; background: #fff; padding: 18px 16px;
@@ -105,6 +140,17 @@
 <body>
     <div class="slip-toolbar">
         <span class="btn-spacer"></span>
+        @if ($isProcurement)
+            @foreach ($supplierGroups as $supplierGroup)
+                <button type="button" class="btn btn-whatsapp" @disabled($supplierGroup->phone === '')
+                    title="{{ $supplierGroup->phone === '' ? 'Nomor WhatsApp supplier belum diisi' : 'Kirim ke ' . $supplierGroup->name }}"
+                    onclick="shareSupplierToWhatsApp(@js($supplierGroup->phone), @js($supplierGroup->message))">
+                    WA {{ $supplierGroup->name }}
+                </button>
+            @endforeach
+        @else
+            <button type="button" class="btn btn-whatsapp" onclick="shareToWhatsApp()">Kirim WhatsApp</button>
+        @endif
         <button type="button" class="btn" id="btnPng" onclick="downloadImage('png')">Unduh PNG</button>
         <button type="button" class="btn" id="btnPdf" onclick="downloadImage('pdf')">Unduh PDF</button>
         <button type="button" class="btn btn-dark" onclick="window.print()">Cetak</button>
@@ -182,6 +228,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
         const FILE_NAME = @json($fileName);
+        const WHATSAPP_MESSAGE = @json($whatsappMessage);
+
+        function shareToWhatsApp() {
+            const url = 'https://wa.me/?text=' + encodeURIComponent(WHATSAPP_MESSAGE);
+            window.open(url, '_blank', 'noopener');
+        }
+
+        function shareSupplierToWhatsApp(phone, message) {
+            if (!phone) return;
+
+            const url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(message);
+            window.open(url, '_blank', 'noopener');
+        }
 
         async function captureCanvas() {
             const sheet = document.getElementById('slipSheet');
