@@ -372,15 +372,24 @@
     .an-cohort-legend-swatch.muted { background:#e2e8f0; }
     .an-cohort-matrix-body { padding-top:.65rem; }
     .an-cohort-note { margin:0 0 .7rem; padding:.55rem .65rem; border:1px solid #fde68a; border-radius:9px; background:#fffbeb; color:#92400e; font-size:.64rem; font-weight:700; line-height:1.45; }
+    .an-cohort-reading-bar { display:flex; align-items:center; gap:.7rem; flex-wrap:wrap; margin:0 0 .7rem; padding:.55rem .65rem; border:1px solid var(--dsh-border); border-radius:9px; background:var(--hero-bg,#f8fafc); }
+    .an-cohort-reading-item { display:inline-flex; align-items:center; gap:.28rem; color:var(--text,#0f172a); font-size:.62rem; font-weight:850; }
+    .an-cohort-reading-item i { color:#2563eb; font-size:.72rem; }
+    .an-cohort-reading-item small { color:var(--dsh-muted); font-size:.58rem; font-weight:650; }
+    .an-cohort-reading-hint { margin-left:auto; color:var(--dsh-muted); font-size:.6rem; font-weight:700; }
     .an-cohort-table-wrap { border:1px solid var(--dsh-border); border-radius:10px; }
     .an-cohort-table { min-width:720px; }
     .an-cohort-table th, .an-cohort-table td { text-align:right; white-space:nowrap; }
     .an-cohort-table th:first-child, .an-cohort-table td:first-child { text-align:left; position:sticky; left:0; z-index:3; background:var(--card,#fff); }
-    .an-cohort-table thead th { background:var(--hero-bg,#f8fafc); }
+    .an-cohort-table thead th { background:var(--hero-bg,#f8fafc); vertical-align:bottom; }
+    .an-cohort-table thead th small { display:block; margin-top:.12rem; color:var(--dsh-muted); font-size:.53rem; font-weight:650; text-transform:none; letter-spacing:0; }
     .an-cohort-table tbody tr:hover td { background:rgba(37,99,235,.035); }
     .an-cohort-row-title { font-weight:850; color:var(--text,#0f172a); }
     .an-cohort-row-sub { display:block; margin-top:.12rem; color:var(--dsh-muted); font-size:.6rem; font-weight:650; }
-    .an-cohort-cell { min-width:68px; border:0; border-radius:7px; padding:.42rem .48rem; color:var(--text,#0f172a); background:rgba(37,99,235,var(--heat,.08)); font-size:.68rem; font-weight:850; cursor:pointer; }
+    .an-cohort-base-value { display:block; color:var(--text,#0f172a); font-weight:900; }
+    .an-cohort-cell { min-width:78px; border:0; border-radius:7px; padding:.35rem .42rem; color:var(--text,#0f172a); background:rgba(37,99,235,var(--heat,.08)); font-size:.68rem; font-weight:850; cursor:pointer; }
+    .an-cohort-cell-value, .an-cohort-cell-sub { display:block; }
+    .an-cohort-cell-sub { margin-top:.12rem; color:var(--dsh-muted); font-size:.53rem; font-weight:700; }
     .an-cohort-cell:hover, .an-cohort-cell:focus-visible { outline:2px solid #2563eb; outline-offset:1px; }
     .an-cohort-cell.product { background:rgba(217,119,6,var(--heat,.1)); }
     .an-cohort-cell.is-empty { background:transparent; color:#cbd5e1; cursor:default; }
@@ -398,7 +407,7 @@
     body[data-theme="dark"] .an-cohort-field input, body[data-theme="dark"] .an-cohort-field select { background:#0f172a; color:#e2e8f0; }
     body[data-theme="dark"] .an-cohort-table th:first-child, body[data-theme="dark"] .an-cohort-table td:first-child, body[data-theme="dark"] .an-cohort-table .an-cohort-sticky { background:var(--card,#1e293b); }
     @media (max-width:1100px) { .an-cohort-filter-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } .an-cohort-apply { width:100%; } .an-cohort-layout { grid-template-columns:1fr; } }
-    @media (max-width:760px) { .an-cohort-header { flex-direction:column; } .an-cohort-header-meta { align-items:flex-start; } .an-cohort-filter-head { align-items:flex-start; } .an-cohort-filter-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-cohort-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-cohort-field, .an-cohort-field input, .an-cohort-field select { width:100%; min-width:0; } .an-cohort-apply { grid-column:1/-1; } }
+    @media (max-width:760px) { .an-cohort-header { flex-direction:column; } .an-cohort-header-meta { align-items:flex-start; } .an-cohort-filter-head { align-items:flex-start; } .an-cohort-filter-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-cohort-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-cohort-field, .an-cohort-field input, .an-cohort-field select { width:100%; min-width:0; } .an-cohort-apply { grid-column:1/-1; } .an-cohort-reading-hint { width:100%; margin-left:0; padding-top:.35rem; border-top:1px solid var(--dsh-border); } }
     @media (max-width:420px) { .an-cohort-filter-grid, .an-cohort-summary-grid { grid-template-columns:1fr; } .an-cohort-apply { grid-column:auto; } .an-cohort-filter-head { flex-direction:column; } }
 </style>
 @endpush
@@ -574,6 +583,7 @@
     let returnType = 'return_refund';
     let cohortPayload = null;
     let cohortLoading = false;
+    let cohortOptionsKey = null;
     let revenueChartInstance = null;
     let chartLibraryPromise = null;
     let chartRenderToken = 0;
@@ -1426,12 +1436,48 @@
             ['qty_sold', 'Qty Sold'], ['revenue', 'Revenue'], ['gross_profit', 'Gross Profit'], ['gross_margin_pct', 'Gross Margin %'], ['net_profit', 'Net Profit'],
         ],
     };
+    const cohortMetricHints = {
+        retention_pct: 'Persentase customer dari cohort yang kembali aktif pada periode tersebut.',
+        active_customers: 'Jumlah customer unik yang aktif pada periode tersebut.',
+        orders: 'Jumlah order yang tercatat dari cohort pada periode tersebut.',
+        qty_sold: 'Total unit produk yang terjual pada periode tersebut.',
+        revenue: 'Nilai omzet kotor dari transaksi pada periode tersebut.',
+        gross_profit: 'Omzet dikurangi fee marketplace dan HPP yang ter-cover.',
+        gross_margin_pct: 'Gross profit sebagai persentase dari revenue.',
+        net_profit: 'Gross profit setelah alokasi biaya iklan.',
+    };
     function syncCohortMetricOptions() {
         const mode = $('anCohortMode').value === 'product' ? 'product' : 'customer';
         const current = $('anCohortMetric').value;
         const options = cohortMetricOptions[mode];
         $('anCohortMetric').innerHTML = options.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
         $('anCohortMetric').value = options.some(([value]) => value === current) ? current : options[0][0];
+        $('anCohortMetricHint').textContent = cohortMetricHints[$('anCohortMetric').value] || 'Pilih metric untuk melihat definisinya.';
+    }
+    function setCohortSelectOptions(id, placeholder, values) {
+        const select = $(id);
+        const current = String(select.value || '');
+        const uniqueValues = [...new Set((Array.isArray(values) ? values : []).map(value => String(value || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id'));
+        if (current && !uniqueValues.includes(current)) uniqueValues.unshift(current);
+        select.innerHTML = `<option value="">${placeholder}</option>${uniqueValues.map(value => `<option value="${esc(value)}">${esc(value)}</option>`).join('')}`;
+        select.value = current;
+    }
+    async function loadCohortOptions(force = false) {
+        const key = [from(), to(), selectedStore(), $('anCohortMarketplace').value].join('|');
+        if (!force && cohortOptionsKey === key) return;
+        const params = new URLSearchParams({ date_from: from(), date_to: to(), _ts: Date.now().toString() });
+        if (selectedStore()) params.set('store_id', selectedStore());
+        if ($('anCohortMarketplace').value) params.set('marketplace', $('anCohortMarketplace').value);
+        try {
+            const result = await api('/api/marketplace/analytics-cohort-options?' + params.toString(), { cache:'no-store' });
+            cohortOptionsKey = key;
+            setCohortSelectOptions('anCohortMarketplace', 'All marketplaces', result?.marketplaces);
+            setCohortSelectOptions('anCohortCategory', 'All categories', result?.categories);
+            setCohortSelectOptions('anCohortProduct', 'All products', result?.products);
+            setCohortSelectOptions('anCohortSku', 'All SKUs', result?.skus);
+        } catch (error) {
+            console.warn('Cohort filter options failed', error);
+        }
     }
     const cohortFormat = (value, metric) => {
         if (value === null || value === undefined || value === '') return '—';
@@ -1456,7 +1502,7 @@
         const activeStore = stores.find(store => String(store.id ?? store.store_id) === selectedStore());
         const filters = [
             ['Periode', `${from()} — ${to()}`],
-            ['Toko', activeStore?.store_name || 'Semua toko'],
+            ['Toko', activeStore?.store_name || activeStore?.name || 'Semua toko'],
             ['Marketplace', $('anCohortMarketplace').value.trim()],
             ['Kategori', $('anCohortCategory').value.trim()],
             ['Produk', $('anCohortProduct').value.trim()],
@@ -1494,23 +1540,25 @@
         if (value === null || value === undefined) return '<span class="an-cohort-cell is-empty">—</span>';
         const intensity = Math.min(.46, .08 + (Math.abs(Number(value || 0)) / Math.max(maxValue, 1)) * .38);
         const encoded = esc(JSON.stringify({ ...context, ...detail, metric, metric_label: payloadMetricLabel(metric), is_product: isProduct }));
-        return `<button type="button" class="an-cohort-cell ${isProduct ? 'product' : ''}" style="--heat:${intensity}" data-cohort-detail="${encoded}">${cohortFormat(value, metric)}</button>`;
+        const supportingValue = isProduct ? `Rev ${money(detail.revenue)}` : `${Number(detail.active_customers || 0).toLocaleString('id-ID')} active`;
+        return `<button type="button" class="an-cohort-cell ${isProduct ? 'product' : ''}" style="--heat:${intensity}" aria-label="${esc(`${payloadMetricLabel(metric)} ${cohortFormat(value, metric)}, ${supportingValue}`)}" data-cohort-detail="${encoded}"><span class="an-cohort-cell-value">${cohortFormat(value, metric)}</span><span class="an-cohort-cell-sub">${esc(supportingValue)}</span></button>`;
     }
     const payloadMetricLabel = metric => ({retention_pct:'Retention %',active_customers:'Active Customers',orders:'Orders',qty_sold:'Qty Sold',revenue:'Revenue',gross_profit:'Gross Profit',gross_margin_pct:'Gross Margin %',net_profit:'Net Profit'})[metric] || metric;
+    const cohortHeader = (label, sub = '') => `<th>${label}${sub ? `<small>${sub}</small>` : ''}</th>`;
     function renderCohortTable(payload) {
         const mode = payload?.mode === 'product' ? 'product' : 'customer';
         const metric = payload?.metric || (mode === 'product' ? 'revenue' : 'retention_pct');
         const maxPeriod = Math.max(0, Number(payload?.max_period || 0));
         const periods = Array.from({ length: maxPeriod + 1 }, (_, index) => index);
         if (mode === 'customer') {
-            $('anCohortHead').innerHTML = `<tr><th>Cohort</th><th>Base</th>${periods.map(index => `<th>M${index}</th>`).join('')}</tr>`;
+            $('anCohortHead').innerHTML = `<tr>${cohortHeader('Cohort', 'first transaction')}${cohortHeader('Base', 'customers')}${periods.map(index => cohortHeader(`M${index}`, index === 0 ? 'same month' : `+${index} month`)).join('')}</tr>`;
             const maxValue = Math.max(...(payload?.rows || []).flatMap(row => Object.values(row.periods || {}).map(period => Number(period[metric] || 0))), 1);
-            $('anCohortBody').innerHTML = payload?.rows?.length ? payload.rows.map(row => `<tr><td class="an-cohort-sticky"><span class="an-cohort-row-title">${esc(cohortMonthLabel(row.cohort_month))}</span><span class="an-cohort-row-sub">First transaction month</span></td><td>${Number(row.cohort_size || 0).toLocaleString('id-ID')}</td>${periods.map(index => cohortCell(row.periods?.[index], metric, false, maxValue, { cohort_month:row.cohort_month })).join('')}</tr>`).join('') : `<tr><td colspan="${periods.length + 2}"><div class="an-empty">Tidak ada cohort customer untuk filter ini.</div></td></tr>`;
+            $('anCohortBody').innerHTML = payload?.rows?.length ? payload.rows.map(row => `<tr><td class="an-cohort-sticky"><span class="an-cohort-row-title">${esc(cohortMonthLabel(row.cohort_month))}</span><span class="an-cohort-row-sub">First transaction month</span></td><td><span class="an-cohort-base-value">${Number(row.cohort_size || 0).toLocaleString('id-ID')}</span><span class="an-cohort-row-sub">customers</span></td>${periods.map(index => cohortCell(row.periods?.[index], metric, false, maxValue, { cohort_month:row.cohort_month })).join('')}</tr>`).join('') : `<tr><td colspan="${periods.length + 2}"><div class="an-empty">Tidak ada cohort customer untuk filter ini.</div></td></tr>`;
             return;
         }
-        $('anCohortHead').innerHTML = `<tr><th>Produk</th><th>SKU</th><th>Kategori</th><th>Cohort</th>${periods.map(index => `<th>M${index}</th>`).join('')}</tr>`;
+        $('anCohortHead').innerHTML = `<tr>${cohortHeader('Product', 'catalog item')}${cohortHeader('SKU')}${cohortHeader('Category')}${cohortHeader('Cohort', 'first transaction')}${periods.map(index => cohortHeader(`M${index}`, index === 0 ? 'same month' : `+${index} month`)).join('')}</tr>`;
         const maxValue = Math.max(...(payload?.rows || []).flatMap(row => Object.values(row.periods || {}).map(period => Number(period[metric] || 0))), 1);
-        $('anCohortBody').innerHTML = payload?.rows?.length ? payload.rows.map(row => `<tr><td class="an-cohort-sticky"><span class="an-cohort-row-title">${esc(row.product_name)}</span></td><td class="an-cohort-sticky">${esc(row.sku)}</td><td>${esc(row.category)}</td><td>${esc(cohortMonthLabel(row.cohort_month))}</td>${periods.map(index => cohortCell(row.periods?.[index], metric, true, maxValue, { cohort_month:row.cohort_month, product_name:row.product_name, sku:row.sku, category:row.category })).join('')}</tr>`).join('') : `<tr><td colspan="${periods.length + 4}"><div class="an-empty">Tidak ada cohort product untuk filter ini.</div></td></tr>`;
+        $('anCohortBody').innerHTML = payload?.rows?.length ? payload.rows.map(row => `<tr><td class="an-cohort-sticky"><span class="an-cohort-row-title">${esc(row.product_name)}</span><span class="an-cohort-row-sub">Product cohort</span></td><td class="an-cohort-sticky">${esc(row.sku)}</td><td>${esc(row.category)}</td><td>${esc(cohortMonthLabel(row.cohort_month))}</td>${periods.map(index => cohortCell(row.periods?.[index], metric, true, maxValue, { cohort_month:row.cohort_month, product_name:row.product_name, sku:row.sku, category:row.category })).join('')}</tr>`).join('') : `<tr><td colspan="${periods.length + 4}"><div class="an-empty">Tidak ada cohort product untuk filter ini.</div></td></tr>`;
     }
     function openCohortDetail(detail) {
         const label = detail.is_product ? detail.product_name : cohortMonthLabel(detail.cohort_month);
@@ -1520,6 +1568,9 @@
             ? [['Nilai', cohortFormat(detail[detail.metric], detail.metric)], ['Orders', Number(detail.orders || 0).toLocaleString('id-ID')], ['Qty Sold', Number(detail.qty_sold || 0).toLocaleString('id-ID')], ['Revenue', money(detail.revenue)], ['Gross Profit', money(detail.gross_profit)], ['Coverage', `${Number(detail.financial_coverage_pct || 0).toFixed(1)}%`]]
             : [['Nilai', cohortFormat(detail[detail.metric], detail.metric)], ['Active Customers', Number(detail.active_customers || 0).toLocaleString('id-ID')], ['Orders', Number(detail.orders || 0).toLocaleString('id-ID')], ['Qty Sold', Number(detail.qty_sold || 0).toLocaleString('id-ID')], ['Revenue', money(detail.revenue)]];
         $('cohortDetailSummary').innerHTML = entries.map(([key, value]) => cashStat(key, value)).join('');
+        $('cohortDetailNote').textContent = detail.is_product
+            ? 'Nilai ini menunjukkan performa produk pada umur cohort tersebut. Coverage menunjukkan bagian order dengan settlement lengkap.'
+            : 'Nilai ini menunjukkan performa customer cohort pada umur tersebut. M0 adalah bulan transaksi pertama; M1+ adalah aktivitas berulang.';
         $('cohortDetailModal').classList.add('is-open');
         $('cohortDetailModal').setAttribute('aria-hidden', 'false');
         document.body.classList.add('an-modal-open');
@@ -1537,6 +1588,7 @@
         renderCohortActiveFilters();
         $('anCohortBody').innerHTML = '<tr><td colspan="8"><div class="an-empty">Memuat cohort…</div></td></tr>';
         try {
+            await loadCohortOptions();
             cohortPayload = await api('/api/marketplace/analytics-cohort?' + cohortParams().toString(), { cache:'no-store' });
             renderCohortKpis(cohortPayload);
             renderCohortTable(cohortPayload);
@@ -1668,7 +1720,8 @@
     $('anCohortMode').addEventListener('change', syncCohortMetricOptions);
     $('anCohortApply').addEventListener('click', loadCohort);
     $('anCohortReset').addEventListener('click', resetCohortFilters);
-    ['anCohortMarketplace','anCohortCategory','anCohortProduct','anCohortSku'].forEach(id => $(id).addEventListener('keydown', event => { if (event.key === 'Enter') loadCohort(); }));
+    ['anCohortCategory','anCohortProduct','anCohortSku'].forEach(id => $(id).addEventListener('change', renderCohortActiveFilters));
+    $('anCohortMarketplace').addEventListener('change', () => { renderCohortActiveFilters(); loadCohortOptions(true); });
     document.querySelectorAll('[data-cohort-close]').forEach(element => element.addEventListener('click', closeCohortDetail));
     $('anCohortBody').addEventListener('click', event => {
         const button = event.target.closest('[data-cohort-detail]');

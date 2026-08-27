@@ -51,6 +51,41 @@ class MarketplaceCohortService
             : $this->customerCohort($filters);
     }
 
+    public function options(array $filters): array
+    {
+        $filters = $this->normalizeFilters($filters);
+        $optionFilters = array_merge($filters, [
+            'category' => null,
+            'product' => null,
+            'sku' => null,
+        ]);
+
+        $marketplaceExpression = "COALESCE(NULLIF(TRIM(ch.name), ''), NULLIF(TRIM(ch.code), ''))";
+        $marketplaces = $this->baseOrderQuery($optionFilters)
+            ->selectRaw("{$marketplaceExpression} AS value")
+            ->whereRaw("{$marketplaceExpression} IS NOT NULL")
+            ->distinct()
+            ->orderBy('value')
+            ->limit(100)
+            ->pluck('value')
+            ->map(fn ($value) => (string) $value)
+            ->filter()
+            ->values()
+            ->all();
+
+        $itemQuery = $this->productOrderItemQuery($optionFilters, true);
+        $categoryExpression = "COALESCE(NULLIF(ic.name, ''), 'Tanpa kategori')";
+        $productExpression = $this->productNameExpression();
+        $skuExpression = $this->skuExpression('moi');
+
+        return [
+            'marketplaces' => $marketplaces,
+            'categories' => $this->distinctOptionValues($itemQuery, $categoryExpression),
+            'products' => $this->distinctOptionValues($itemQuery, $productExpression),
+            'skus' => $this->distinctOptionValues($itemQuery, $skuExpression),
+        ];
+    }
+
     private function customerCohort(array $filters): array
     {
         $buyerKey = $this->buyerKeyExpression('mo');
@@ -358,6 +393,21 @@ class MarketplaceCohortService
             ->selectRaw('COALESCE(moi.marketplace_order_id, moi.order_id) AS order_id')
             ->selectRaw('SUM(CASE WHEN COALESCE(moi.qty, 0) > 0 THEN moi.qty ELSE 0 END) AS qty_sold')
             ->groupByRaw('COALESCE(moi.marketplace_order_id, moi.order_id)');
+    }
+
+    private function distinctOptionValues(Builder $query, string $expression, int $limit = 250): array
+    {
+        return (clone $query)
+            ->selectRaw("{$expression} AS value")
+            ->whereRaw("{$expression} IS NOT NULL")
+            ->distinct()
+            ->orderBy('value')
+            ->limit($limit)
+            ->pluck('value')
+            ->map(fn ($value) => (string) $value)
+            ->filter()
+            ->values()
+            ->all();
     }
 
     private function customerSummary(array $rows, int $maxPeriod): array

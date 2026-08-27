@@ -170,6 +170,20 @@ class MarketplaceController extends Controller
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
+    public function analyticsCohortOptions(Request $request, MarketplaceCohortService $cohortService): JsonResponse
+    {
+        $filters = $request->validate([
+            'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'marketplace' => ['nullable', 'string', 'max:100'],
+            'date_from' => ['required', 'date'],
+            'date_to' => ['required', 'date', 'after_or_equal:date_from'],
+        ]);
+
+        return response()
+            ->json($cohortService->options($filters))
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+
     public function analyticsCashOrders(Request $request, MarketplaceAnalyticsSummaryService $summaryService): JsonResponse
     {
         $filters = $request->validate([

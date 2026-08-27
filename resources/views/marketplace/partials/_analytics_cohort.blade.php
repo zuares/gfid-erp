@@ -19,13 +19,13 @@
         <div class="an-cohort-filter-grid">
             <div class="an-cohort-field"><label for="anCohortMode">View</label><select id="anCohortMode"><option value="customer">Customer cohort</option><option value="product">Product cohort</option></select></div>
             <div class="an-cohort-field"><label for="anCohortMetric">Primary metric</label><select id="anCohortMetric"></select></div>
-            <div class="an-cohort-field"><label for="anCohortMarketplace">Marketplace</label><input id="anCohortMarketplace" type="search" placeholder="All marketplaces" autocomplete="off"></div>
-            <div class="an-cohort-field"><label for="anCohortCategory">Category</label><input id="anCohortCategory" type="search" placeholder="All categories" autocomplete="off"></div>
-            <div class="an-cohort-field"><label for="anCohortProduct">Product</label><input id="anCohortProduct" type="search" placeholder="All products" autocomplete="off"></div>
-            <div class="an-cohort-field"><label for="anCohortSku">SKU</label><input id="anCohortSku" type="search" placeholder="All SKUs" autocomplete="off"></div>
+            <div class="an-cohort-field"><label for="anCohortMarketplace">Marketplace</label><select id="anCohortMarketplace"><option value="">All marketplaces</option></select></div>
+            <div class="an-cohort-field"><label for="anCohortCategory">Category</label><select id="anCohortCategory"><option value="">All categories</option></select></div>
+            <div class="an-cohort-field"><label for="anCohortProduct">Product</label><select id="anCohortProduct"><option value="">All products</option></select></div>
+            <div class="an-cohort-field"><label for="anCohortSku">SKU</label><select id="anCohortSku"><option value="">All SKUs</option></select></div>
             <button class="an-btn an-btn-dark an-cohort-apply" id="anCohortApply" type="button"><i class="bi bi-play-fill me-1"></i>Run analysis</button>
         </div>
-        <div class="an-cohort-active-filters" id="anCohortActiveFilters"><span class="an-cohort-filter-caption">Active scope</span><span class="an-filter-chip">Periode: <strong id="anCohortActivePeriod">—</strong></span><span class="an-filter-chip">Toko: <strong id="anCohortActiveStore">Semua toko</strong></span></div>
+        <div class="an-cohort-active-filters" id="anCohortActiveFilters"><span class="an-cohort-filter-caption">Active scope</span><span class="an-filter-chip">Periode: <strong>—</strong></span><span class="an-filter-chip">Toko: <strong>Semua toko</strong></span></div>
     </div>
 
     <div class="an-cohort-summary-grid" id="anCohortKpis">
@@ -43,7 +43,13 @@
             </div>
             <div class="an-enterprise-body an-cohort-matrix-body">
                 <div class="an-cohort-note" id="anCohortNote" aria-live="polite">Buka tab Cohort untuk memuat data.</div>
-                <div class="an-table-wrap an-cohort-table-wrap"><table class="an-table an-cohort-table"><thead id="anCohortHead"><tr><th>Cohort</th><th>Base</th><th>M0</th><th>M1</th><th>M2</th><th>M3</th><th>M4</th><th>M5</th></tr></thead><tbody id="anCohortBody" aria-live="polite"><tr><td colspan="8"><div class="an-empty">Buka tab Cohort untuk memuat data.</div></td></tr></tbody></table></div>
+                <div class="an-cohort-reading-bar" id="anCohortReadingBar">
+                    <span class="an-cohort-reading-item"><i class="bi bi-people" aria-hidden="true"></i><strong>Base</strong><small>ukuran cohort</small></span>
+                    <span class="an-cohort-reading-item"><i class="bi bi-calendar2-check" aria-hidden="true"></i><strong>M0</strong><small>bulan transaksi pertama</small></span>
+                    <span class="an-cohort-reading-item"><i class="bi bi-arrow-right" aria-hidden="true"></i><strong>M1+</strong><small>bulan setelahnya</small></span>
+                    <span class="an-cohort-reading-hint" id="anCohortMetricHint">Pilih metric untuk melihat definisinya.</span>
+                </div>
+                <div class="an-table-wrap an-cohort-table-wrap"><table class="an-table an-cohort-table"><caption class="visually-hidden">Cohort matrix berdasarkan periode transaksi pertama</caption><thead id="anCohortHead"><tr><th>Cohort</th><th>Base</th><th>M0</th><th>M1</th><th>M2</th><th>M3</th><th>M4</th><th>M5</th></tr></thead><tbody id="anCohortBody" aria-live="polite"><tr><td colspan="8"><div class="an-empty">Buka tab Cohort untuk memuat data.</div></td></tr></tbody></table></div>
             </div>
         </section>
         <aside class="an-enterprise-card an-cohort-guide-card">
