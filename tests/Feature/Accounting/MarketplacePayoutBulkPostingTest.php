@@ -16,7 +16,7 @@ class MarketplacePayoutBulkPostingTest extends TestCase
     {
         $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'BULK-POST-1']);
         $bank = $this->createAccount('1101', 'Bank Test', true);
-        $receivableAccount = $this->createAccount('1302', 'Piutang Marketplace');
+        $receivableAccount = $this->createAccount('1302', 'Saldo Marketplace / Clearing');
 
         $included = $this->createPayout($bank, '2026-08-10', 'Shopee', 'draft');
         $outsideDate = $this->createPayout($bank, '2026-07-10', 'Shopee', 'draft');
@@ -46,7 +46,7 @@ class MarketplacePayoutBulkPostingTest extends TestCase
     {
         $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'BULK-POST-2']);
         $bank = $this->createAccount('1102', 'Bank Test 2', true);
-        $this->createAccount('1302', 'Piutang Marketplace');
+        $this->createAccount('1302', 'Saldo Marketplace / Clearing');
 
         $draft = $this->createPayout($bank, '2026-08-10', 'Shopee', 'draft');
         $posted = $this->createPayout($bank, '2026-08-11', 'Shopee', 'posted');

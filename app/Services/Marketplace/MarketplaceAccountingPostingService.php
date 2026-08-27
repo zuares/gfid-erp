@@ -74,7 +74,7 @@ class MarketplaceAccountingPostingService
             'lines' => $lines,
             'total_debit' => $totalDebit,
             'total_credit' => $totalCredit,
-            'accounting_scope' => 'Settlement marketplace: penjualan, retur/diskon, fee, adjustment, dan piutang marketplace.',
+            'accounting_scope' => 'Settlement marketplace: penjualan, retur/diskon, fee, adjustment, dan saldo marketplace / clearing.',
             'excluded_from_gl' => [
                 'hpp' => (float) $summary['hpp'],
                 'ad_cost' => (float) $summary['ad_cost'],

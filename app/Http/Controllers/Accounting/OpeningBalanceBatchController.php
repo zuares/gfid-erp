@@ -269,7 +269,7 @@ class OpeningBalanceBatchController extends Controller
             'value' => (float) $r->grand_total,
         ])->values();
 
-        // Piutang Marketplace — top 20 invoice/order
+        // Saldo Marketplace / Clearing — top 20 invoice/order
         $piutangMpRows = DB::table('sales_invoices')
             ->where(function ($q) {
                 $q->whereNull('status')
@@ -495,7 +495,7 @@ class OpeningBalanceBatchController extends Controller
             '1202' => ['title' => 'Persediaan WIP per Gudang',         'rows' => $wipDetail,           'note' => null],
             '1203' => ['title' => 'Persediaan Barang Jadi per Gudang',  'rows' => $fgDetail,            'note' => null],
             '1301' => ['title' => 'Invoice Belum Lunas (Non-MP)',        'rows' => $piutangDagangDetail, 'note' => $piutangDagangDetail->count() >= 20 ? 'Menampilkan 20 terbesar.' : null],
-            '1302' => ['title' => 'Piutang Marketplace Belum Cair',     'rows' => $piutangMpDetail,     'note' => $piutangMpDetail->count() >= 20 ? 'Menampilkan 20 terbesar.' : null],
+            '1302' => ['title' => 'Saldo Marketplace Belum Ditarik',   'rows' => $piutangMpDetail,     'note' => $piutangMpDetail->count() >= 20 ? 'Menampilkan 20 terbesar.' : null],
             '2102' => ['title' => 'Hutang Upah Borongan Belum Dibayar', 'rows' => $hutangUpahDetail,    'note' => $hutangUpahNote],
         ];
 

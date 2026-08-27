@@ -72,7 +72,7 @@ class AccountSeeder extends Seeder
             ]);
             DB::table('accounts')->updateOrInsert(['code' => '1302'], [
                 'code' => '1302',
-                'name' => 'Piutang Marketplace',
+                'name' => 'Saldo Marketplace / Clearing',
                 'type' => 'asset',
                 'is_cash' => 0,
                 'is_active' => 1,

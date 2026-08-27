@@ -202,7 +202,7 @@ class MarketplaceAccountingPostingTest extends TestCase
         foreach ([
             ['4101', 'Penjualan', 'revenue'],
             ['4201', 'Retur Penjualan', 'revenue'],
-            ['1302', 'Piutang Marketplace', 'asset'],
+            ['1302', 'Saldo Marketplace / Clearing', 'asset'],
             ['6201', 'Biaya Marketplace', 'expense'],
         ] as [$code, $name, $type]) {
             Account::create(['code' => $code, 'name' => $name, 'type' => $type, 'is_active' => true]);
