@@ -102,7 +102,11 @@ trait MarketplaceOrdersPaginatedTrait
             'store.channel',
             'items',
             'settlement:id,order_id,buyer_payment_amount,seller_voucher,raw_json,final_income,settlement_time,data_status',
-            'items.internalItem' => fn ($q) => $q->select('id', 'code', 'item_category_id')->with('category:id,code,name'),
+            'items.internalItem' => fn ($q) => $q
+                ->select('id', 'code', 'name', 'unit', 'stock_unit', 'item_category_id')
+                ->with('category:id,code,name')
+                ->withSum('inventoryStocks as stock_on_hand', 'qty')
+                ->withSum('inventoryStocks as stock_allocated', 'allocated_qty'),
             'fulfillment:' . $fulfillmentSelect,
             'fulfillment.lines',
             'fulfillment.lines.item:id,code,name',
@@ -195,6 +199,20 @@ trait MarketplaceOrdersPaginatedTrait
         // Map items exactly like in localOrders
         $paginator->getCollection()->transform(function ($o) use ($hasScanLog) {
             $arr = $o->toArray();
+
+            if (isset($arr['items']) && is_array($arr['items'])) {
+                foreach ($arr['items'] as &$orderItem) {
+                    if (! empty($orderItem['internal_item'])) {
+                        $onHand = (float) ($orderItem['internal_item']['stock_on_hand'] ?? 0);
+                        $allocated = (float) ($orderItem['internal_item']['stock_allocated'] ?? 0);
+                        $orderItem['internal_item']['stock_available'] = $onHand - $allocated;
+                        $orderItem['internal_item']['stock_unit'] = $orderItem['internal_item']['stock_unit']
+                            ?: ($orderItem['internal_item']['unit'] ?? 'pcs');
+                        unset($orderItem['internal_item']['stock_on_hand'], $orderItem['internal_item']['stock_allocated']);
+                    }
+                }
+                unset($orderItem);
+            }
 
             // Samakan angka voucher dengan endpoint Income Detail. Field ini
             // sudah menormalisasi sumber voucher seller/platform dari escrow,

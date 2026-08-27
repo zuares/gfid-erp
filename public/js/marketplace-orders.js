@@ -1696,6 +1696,12 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     function renderItemCard(i, urgent) {
         const internalCode = i.internal_item?.code || null;
         const internalName = i.internal_item?.name || null;
+        const marketplaceSku = i.model_sku || i.item_sku || null;
+        const stockValue = Number(i.internal_item?.stock_available);
+        const stockUnit = i.internal_item?.stock_unit || i.internal_item?.unit || 'pcs';
+        const stockHtml = internalCode && Number.isFinite(stockValue)
+            ? `<span class="ord-item-stock ${stockValue < 0 ? 'is-negative' : ''}">Stok ${esc(stockValue.toLocaleString('id-ID'))} ${esc(stockUnit)}</span>`
+            : '';
 
         let titleHtml = '';
         let detailsHtml = '';
@@ -1704,14 +1710,19 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             if (internalName) {
                 detailsHtml = `<div class="ord-item-variant">${esc(internalName)}</div>`;
             }
+            detailsHtml += marketplaceSku
+                ? `<div class="ord-item-source">Marketplace: ${esc(marketplaceSku)}</div>`
+                : '';
         } else {
-            const mSku = i.model_sku || i.item_sku || null;
             const variantName = i.variant_name || i.item_name || null;
-            const dispName = variantName || mSku || 'Item tidak diketahui';
+            const dispName = variantName || marketplaceSku || 'Item tidak diketahui';
             titleHtml = `<div class="ord-item-name" style="color:#64748b">${esc(dispName)}</div>`;
-            detailsHtml = `<span class="ord-item-nomap">Belum mapping</span>`;
+            detailsHtml = `<span class="ord-item-nomap">Belum mapping</span>`
+                + (marketplaceSku && variantName !== marketplaceSku
+                    ? `<div class="ord-item-source">Marketplace: ${esc(marketplaceSku)}</div>`
+                    : '');
         }
-        const bodyHtml = `<div class="ord-item-title-row">${titleHtml}${itemSalePriceHtml(i)}</div>${detailsHtml}`;
+        const bodyHtml = `<div class="ord-item-title-row">${titleHtml}${itemSalePriceHtml(i)}</div>${detailsHtml}${stockHtml}`;
 
         const qtyClass = urgent ? 'ord-item-qty urgent' : 'ord-item-qty';
         return `<div class="ord-item-card">
@@ -2422,7 +2433,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             }
 
             let itemsHtml = `<div class="ord-items-cell">
-                <div class="ord-items-invoice-head"><span>Item Produk (${items.length})</span>${itemPaymentSummaryHtml(o)}</div>`
+                <div class="ord-items-invoice-head"><span>Item Produk (${items.length})</span></div>`
                 + items.map(i => renderItemCard(i, urgent)).join('')
                 + `</div>`;
                 
@@ -2620,6 +2631,9 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                     ${issueBadge}
                 </div>
             `;
+
+            const buyerPaidCell = `<td class="ord-payment-cell">${buyerPaidHtml(o)}</td>`;
+            const voucherCell = `<td class="ord-voucher-cell">${voucherSummaryHtml(o) || '<span class="ord-payment-empty">—</span>'}</td>`;
             
             const firstColHtml = activeTab === 'processed' 
                 ? `<div style="display:flex; gap:0.6rem; align-items:flex-start;">
@@ -2637,15 +2651,20 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <td>${itemsHtml}</td>
                 ${resolveTd}
                 ${scanTd}
+                ${buyerPaidCell}
+                ${voucherCell}
                 <td>${pengirimanHtml}</td>
             </tr>`;
         }).join('');
 
         const hasResolveCol = activeTab === 'processed' && subTabProcessed !== 'packing';
         const hasScanCol    = activeTab === 'processed' && subTabProcessed !== 'packing';
-        // col widths: order | items | resolve? | scan? | pengiriman
-        const colItems  = hasResolveCol ? '28%' : '60%';
-        const colShipping = hasResolveCol ? '20%' : '16%';
+        // col widths: order | items | resolve? | scan? | buyer paid | voucher | pengiriman
+        const colItems  = hasResolveCol ? '22%' : '36%';
+        const colOrder = hasResolveCol ? '17%' : '20%';
+        const colPaid = hasResolveCol ? '13%' : '14%';
+        const colVoucher = hasResolveCol ? '14%' : '16%';
+        const colShipping = hasResolveCol ? '10%' : '14%';
         
         const firstHeaderHtml = activeTab === 'processed'
             ? `<div style="display:flex; align-items:center;">
@@ -2658,10 +2677,12 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         <div class="gf-table-scroll">
         <table class="ord-table">
             <colgroup>
-                <col style="width:22%">
+                <col style="width:${colOrder}">
                 <col style="width:${colItems}">
-                ${hasResolveCol ? '<col style="width:15%">' : ''}
-                ${hasScanCol    ? '<col style="width:15%">' : ''}
+                ${hasResolveCol ? '<col style="width:12%">' : ''}
+                ${hasScanCol    ? '<col style="width:12%">' : ''}
+                <col style="width:${colPaid}">
+                <col style="width:${colVoucher}">
                 <col style="width:${colShipping}">
             </colgroup>
             <thead><tr>
@@ -2669,6 +2690,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <th>Item Produk</th>
                 ${hasResolveCol ? '<th>✅ Item Pengganti</th>' : ''}
                 ${hasScanCol    ? '<th>📦 Item Scan</th>'    : ''}
+                <th>Bayar Pembeli</th>
+                <th>Voucher</th>
                 <th>Pengiriman</th>
             </tr></thead>
             <tbody>${tableRows}</tbody>
