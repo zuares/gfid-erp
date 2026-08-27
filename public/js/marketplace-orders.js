@@ -66,23 +66,21 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
 
     function buyerPaidAmount(o) {
         const escrowPaid = Number(o.settlement?.buyer_payment_amount);
-        if (Number.isFinite(escrowPaid) && escrowPaid > 0) return escrowPaid;
-
-        const paid = Number(o.total_paid_customer);
-        return Number.isFinite(paid) && paid >= 0 ? paid : 0;
+        return Number.isFinite(escrowPaid) && escrowPaid >= 0 ? escrowPaid : null;
     }
 
     function buyerPaidHtml(o) {
-        return `<div class="ord-buyer-paid" title="Nominal yang dibayar pembeli">
-            <span>👤 Dibayar pembeli</span>
-            <strong>${esc(fmtRp(buyerPaidAmount(o)))}</strong>
+        const amount = buyerPaidAmount(o);
+        if (amount === null) return '<span class="ord-payment-empty">—</span>';
+
+        return `<div class="ord-buyer-paid ord-buyer-paid-number" title="Nominal dari Escrow Detail Shopee">
+            <strong>${esc(fmtRp(amount))}</strong>
         </div>`;
     }
 
     function paymentMethodLabel(o) {
-        const raw = o.payment_method
-            || o.raw_json?.payment_method
-            || o.raw_json?.payment_info?.payment_method
+        const raw = o.settlement?.raw_json?.buyer_payment_method
+            || o.settlement?.raw_json?.payment_method
             || '';
         const value = String(raw).trim();
         if (!value) return 'Belum tercatat';
@@ -111,7 +109,6 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         const sources = [
             o.settlement,
             o.settlement?.raw_json,
-            o.raw_json?.income_details,
         ];
         const values = sources.flatMap(source => keys.map(key => Number(source?.[key])))
             .filter(value => Number.isFinite(value) && value > 0);
@@ -133,7 +130,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     function voucherSummaryHtml(o) {
         const sellerVoucher = voucherAmount(o, ['voucher_toko_total', 'voucher_from_seller', 'seller_voucher_rebate', 'seller_voucher', 'discount_from_voucher_seller']);
         const shopeeVoucher = voucherAmount(o, ['voucher_platform_total', 'voucher_from_shopee', 'voucher_from_platform', 'platform_voucher', 'discount_from_voucher_shopee']);
-        const hasVoucherPayload = !!(o.settlement || o.raw_json?.income_details);
+        const hasVoucherPayload = !!o.settlement;
         if (!hasVoucherPayload && sellerVoucher <= 0 && shopeeVoucher <= 0) return '';
         const valueHtml = value => hasVoucherPayload ? esc(fmtRp(value)) : 'Belum tersedia';
 
@@ -1695,7 +1692,6 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     // ── Render satu item card ─────────────────────────────────────────────
     function renderItemCard(i, urgent) {
         const internalCode = i.internal_item?.code || null;
-        const internalName = i.internal_item?.name || null;
         const marketplaceSku = i.model_sku || i.item_sku || null;
         const stockValue = Number(i.internal_item?.stock_available);
         const stockUnit = i.internal_item?.stock_unit || i.internal_item?.unit || 'pcs';
@@ -1707,9 +1703,6 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         let detailsHtml = '';
         if (internalCode) {
             titleHtml = `<div class="ord-item-name" style="color:#4c1d95">${esc(internalCode)}</div>`;
-            if (internalName) {
-                detailsHtml = `<div class="ord-item-variant">${esc(internalName)}</div>`;
-            }
             detailsHtml += marketplaceSku
                 ? `<div class="ord-item-source">Marketplace: ${esc(marketplaceSku)}</div>`
                 : '';

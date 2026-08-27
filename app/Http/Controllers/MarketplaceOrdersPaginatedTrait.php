@@ -214,9 +214,9 @@ trait MarketplaceOrdersPaginatedTrait
                 unset($orderItem);
             }
 
-            // Samakan angka voucher dengan endpoint Income Detail. Field ini
-            // sudah menormalisasi sumber voucher seller/platform dari escrow,
-            // termasuk response yang hanya menyimpan nilainya di raw_json.
+            // Gunakan angka voucher dari settlement hasil Escrow Detail Shopee.
+            // Field ini menormalisasi sumber voucher seller/platform, termasuk
+            // response escrow yang hanya menyimpan nilainya di raw_json.
             if ($o->settlement) {
                 $arr['settlement']['voucher_toko_total'] = $this->settlementVoucherTokoAmount($o->settlement);
                 $arr['settlement']['voucher_platform_total'] = $this->settlementVoucherPlatformAmount($o->settlement);
