@@ -170,6 +170,14 @@ class PayoutService
         if (! in_array($code, self::SHOPEE_CODES, true)) {
             throw new RuntimeException('Modul payout hanya tersedia untuk toko Shopee.');
         }
+
+        try {
+            if (! $store->is_active || $store->connection_status !== 'CONNECTED') {
+                throw new RuntimeException('Toko Shopee belum terhubung. Hubungkan toko terlebih dahulu sebelum mengambil payout.');
+            }
+        } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+            throw new RuntimeException('Kredensial toko Shopee tidak dapat dibaca. Hubungkan ulang toko terlebih dahulu.');
+        }
     }
 
     private function assertSuccessfulResponse(array $response): void

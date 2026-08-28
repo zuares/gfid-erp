@@ -157,4 +157,19 @@ class MarketplacePayoutTest extends TestCase
             ->assertJsonPath('success', false)
             ->assertJsonPath('message', 'Modul payout hanya tersedia untuk toko Shopee.');
     }
+
+    public function test_unconnected_shopee_store_is_rejected_without_calling_api(): void
+    {
+        $store = $this->store();
+        $store->update(['credentials' => null, 'token_expires_at' => null]);
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('getPayoutInfo');
+        });
+
+        $this->getJson("/api/marketplace/stores/{$store->id}/payout-info?date_from=2026-08-01&date_to=2026-08-10")
+            ->assertStatus(502)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Toko Shopee belum terhubung. Hubungkan toko terlebih dahulu sebelum mengambil payout.');
+    }
 }
