@@ -442,8 +442,12 @@ class PieceworkPayrollController extends Controller
             ->with(['employee', 'category', 'item'])
             ->where('payroll_period_id', $period->id)
             ->where('employee_id', $employeeId)
-            ->orderBy('item_category_id')
-            ->orderBy('item_id')
+            ->when($cfg['module'] === 'daily', function ($query) {
+                return $query->orderBy('work_date');
+            }, function ($query) {
+                return $query->orderBy('item_category_id')
+                    ->orderBy('item_id');
+            })
             ->get();
 
         abort_if($lines->isEmpty(), 404, 'Operator tidak memiliki data pada periode ini.');
