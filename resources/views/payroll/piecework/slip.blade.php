@@ -324,7 +324,7 @@
 
                 @if ($isDaily)
                     <section class="slip-stats" aria-label="Ringkasan kehadiran">
-                        <div class="slip-stat"><div class="slip-stat-label">Hari Dibayar</div><div class="slip-stat-value">{{ rtrim(rtrim(number_format((float) $totalQty, 2, ',', '.'), '0'), ',') }}</div></div>
+                        <div class="slip-stat"><div class="slip-stat-label">Hari Efektif</div><div class="slip-stat-value">{{ rtrim(rtrim(number_format((float) $totalQty, 2, ',', '.'), '0'), ',') }}</div></div>
                         <div class="slip-stat"><div class="slip-stat-label">Hadir</div><div class="slip-stat-value">{{ number_format((int) $presentCount, 0, ',', '.') }} hari</div></div>
                         <div class="slip-stat"><div class="slip-stat-label">Libur</div><div class="slip-stat-value">{{ number_format((int) $holidayCount, 0, ',', '.') }} hari</div></div>
                         <div class="slip-stat total"><div class="slip-stat-label">Total Dibayarkan</div><div class="slip-stat-value">{{ number_format((float) $totalAmount, 0, ',', '.') }}</div></div>
@@ -350,7 +350,7 @@
                     <div class="slip-table-wrap">
                         @if ($isDaily)
                             <table class="slip-table">
-                                <thead><tr><th>Tanggal</th><th>Status</th><th class="slip-right">Tarif / Hari</th><th class="slip-right">Hari Dibayar</th><th class="slip-right">Jumlah</th></tr></thead>
+                                <thead><tr><th>Tanggal</th><th>Status</th><th class="slip-right">Upah Harian</th><th class="slip-right">Hari Efektif</th><th class="slip-right">Jumlah</th></tr></thead>
                                 <tbody>
                                     @foreach ($lines as $line)
                                         @php

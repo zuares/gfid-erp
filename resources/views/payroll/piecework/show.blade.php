@@ -471,7 +471,7 @@
 
 @section('content')
     @php
-        $qtyLabel = $module === 'daily' ? 'Hari Dibayar' : ($module === 'sewing' ? 'Qty Ambil' : 'Qty Payroll');
+        $qtyLabel = $module === 'daily' ? 'Hari Efektif' : ($module === 'sewing' ? 'Qty Ambil' : 'Qty Payroll');
         $pageLabel = $module === 'daily' ? 'Payroll Harian' : 'Payroll Borongan';
         $moduleRoute = function (string $action, array $parameters = []) use ($module) {
             if ($module === 'daily') {
@@ -591,7 +591,7 @@
                                     @if ($module === 'daily')
                                         <th class="pw-right">Hadir</th>
                                         <th class="pw-right">Libur</th>
-                                        <th class="pw-right">Hari Dibayar</th>
+                                        <th class="pw-right">Hari Efektif</th>
                                     @else
                                         <th class="pw-right">{{ $qtyLabel }}</th>
                                     @endif
@@ -658,7 +658,7 @@
                         </div>
                         <div>
                             <div class="pw-summary-total-amount">{{ number_format((float) $grandTotalAmount, 0, ',', '.') }}</div>
-                            <div class="pw-summary-total-qty">{{ $module === 'daily' ? 'Hari dibayar: ' : 'Qty: ' }}{{ rtrim(rtrim(number_format((float) $grandTotalQty, 2, '.', ''), '0'), '.') }}</div>
+                            <div class="pw-summary-total-qty">{{ $module === 'daily' ? 'Hari efektif: ' : 'Qty: ' }}{{ rtrim(rtrim(number_format((float) $grandTotalQty, 2, '.', ''), '0'), '.') }}</div>
                         </div>
                     </div>
                 </div>
@@ -708,7 +708,7 @@
                                         <th>Tanggal</th>
                                         <th>Operator</th>
                                         <th>Status Kehadiran</th>
-                                        <th class="pw-right">Tarif / Hari</th>
+                                        <th class="pw-right">Upah Harian</th>
                                         <th class="pw-right">Total</th>
                                     </tr>
                                 </thead>
@@ -742,7 +742,7 @@
                                                     </form>
                                                 @endif
                                             </td>
-                                            <td data-label="Tarif / Hari" class="pw-right" style="white-space:nowrap">
+                                            <td data-label="Upah Harian" class="pw-right" style="white-space:nowrap">
                                                 {{ number_format((float) ($l->rate_per_day ?: $l->rate_per_pcs), 0, ',', '.') }}
                                             </td>
                                             <td data-label="Total" class="pw-right" style="font-weight:800;white-space:nowrap">
