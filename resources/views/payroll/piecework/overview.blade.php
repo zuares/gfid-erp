@@ -735,6 +735,9 @@
             'from' => request('from'),
             'to' => request('to'),
         ], fn($value) => $value !== null && $value !== ''));
+        $resetFilterUrl = route('payroll.piecework.overview', array_filter([
+            'module' => $activeModule === 'all' ? null : $activeModule,
+        ], fn($value) => $value !== null && $value !== ''));
         $moduleRoute = function (string $module, string $action, $period) {
             if ($module === 'daily') {
                 return route("payroll.daily.{$action}", ['period' => $period]);
@@ -860,7 +863,7 @@
                         autocomplete="off" readonly data-gf-date="off">
                     <button class="pw-btn" type="submit">Terapkan</button>
                     @if (request()->filled('from') || request()->filled('to'))
-                        <a class="pw-btn" href="{{ $tabUrl($activeModule) }}">Reset</a>
+                        <a class="pw-btn pw-reset-filter" href="{{ $resetFilterUrl }}">Reset</a>
                     @endif
                 </form>
             </div>
@@ -1159,6 +1162,16 @@
 
             function bindRealtimeControls() {
                 document.querySelectorAll('#pw-module-tabs a').forEach(function (link) {
+                    if (link.dataset.realtimeBound === '1') return;
+                    link.dataset.realtimeBound = '1';
+                    link.addEventListener('click', function (event) {
+                        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                        event.preventDefault();
+                        refreshOverview(link.href, true);
+                    });
+                });
+
+                document.querySelectorAll('.pw-reset-filter').forEach(function (link) {
                     if (link.dataset.realtimeBound === '1') return;
                     link.dataset.realtimeBound = '1';
                     link.addEventListener('click', function (event) {
