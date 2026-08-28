@@ -3,194 +3,47 @@
 @section('title', 'Marketplace • Pesanan Kilat')
 
 @push('head')
+<link rel="stylesheet" href="{{ asset('css/marketplace-orders.css?v=' . time()) }}">
 <style>
-    :root{
-        --shp-accent:#334155;
-        --shp-accent-2:#1f2937;
-        --shp-border:rgba(148,163,184,.18);
-        --shp-border-strong:rgba(148,163,184,.30);
-        --shp-muted:#64748b;
+    /* Keep kilat on the same visual system as Marketplace Orders. */
+    .kilat-title-wrap { min-width: 0; }
+    .kilat-title-sub { color: var(--shp-muted); font-size: .74rem; margin-top: .12rem; }
+    .kilat-store-filter {
+        min-height: 32px; max-width: 180px; padding: .28rem 2rem .28rem .65rem;
+        border: 1px solid rgba(148,163,184,.35); border-radius: 7px;
+        color: #475569; background: var(--card,#fff); font-size: .74rem; font-weight: 600;
     }
-    
-    .page-wrap{ max-width:1040px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
-    
-    .card-main{
-        background: var(--card, #fff);
-        border-radius: 8px;
-        border: 1px solid var(--shp-border);
-        box-shadow: none;
-        overflow:hidden;
+    .kilat-store-filter:focus { border-color: #2563eb; outline: 0; box-shadow: 0 0 0 2px rgba(37,99,235,.12); }
+    .kilat-subtabs {
+        display: none; gap: .25rem; align-items: center; flex-wrap: wrap;
+        background: var(--card,#fff); padding: 5px; border-radius: 8px;
+        border: 1px solid var(--shp-border); margin-bottom: 1rem; width: fit-content;
     }
-    body[data-theme="dark"] .card-main{
-        border-color: rgba(51,65,85,.85);
-        background: var(--card, #0f172a);
+    .kilat-placeholder {
+        display: inline-flex; align-items: center; gap: .3rem; color: #94a3b8;
+        font-size: .68rem; font-style: italic;
     }
-
-    .ship-topbar{
-        position:sticky;
-        top:0;
-        z-index:300;
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        gap:.6rem;
-        flex-wrap:wrap;
-        padding:.45rem .75rem;
-        margin-inline:-.75rem;
-        margin-bottom:.65rem;
-        background:var(--card,#fff);
-        border-bottom:1px solid var(--shp-border);
+    .kilat-empty-state { display: flex; flex-direction: column; align-items: center; gap: .35rem; }
+    .kilat-empty-title { color: #334155; font-size: .9rem; font-weight: 800; }
+    .kilat-empty-copy { color: #94a3b8; font-size: .75rem; font-weight: 500; }
+    .kilat-empty-preview {
+        display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem;
+        width: min(100%, 420px); margin-top: .7rem;
     }
-    body[data-theme="dark"] .ship-topbar{ background:var(--card,#0f172a); }
-    .title{ font-weight: 750; font-size:1.15rem; letter-spacing: 0; margin:0; display:flex; align-items:center; gap:.5rem; color:var(--shp-accent); }
-    body[data-theme="dark"] .title{ color:#f8fafc; }
-    
-    .controls { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; }
-    @media (min-width: 1024px) {
-        .ship-topbar { flex-wrap: nowrap; overflow-x: auto; }
-        .ship-topbar::-webkit-scrollbar { display: none; }
-        .controls { flex-wrap: nowrap; }
+    .kilat-empty-preview span {
+        min-height: 28px; border: 1px dashed #cbd5e1; border-radius: 6px;
+        background: #f8fafc; color: #cbd5e1; font-size: .62rem; padding: .35rem .25rem;
     }
-    
-    .ord-search-bar {
-        display: flex; align-items: center; gap: .4rem;
-        background: transparent; border: 1px solid rgba(148,163,184,.35);
-        border-radius: 7px; padding: .32rem .75rem;
-        transition: border-color .15s; flex: 1; min-width: 180px; max-width: 320px;
-    }
-    .ord-search-bar:focus-within { border-color: var(--shp-accent); box-shadow: 0 0 0 2px rgba(148,163,184,.15); }
-    body[data-theme="dark"] .ord-search-bar { border-color: rgba(148,163,184,.25); }
-    body[data-theme="dark"] .ord-search-bar:focus-within { border-color: #94a3b8; box-shadow: 0 0 0 2px rgba(148,163,184,.1); }
-    .ord-search-bar input {
-        border: none; background: transparent; outline: none;
-        font-size: .78rem; width: 100%; color: #0f172a;
-    }
-    body[data-theme="dark"] .ord-search-bar input { color: #f8fafc; }
-    body[data-theme="dark"] .ord-search-bar input::placeholder { color: #64748b; }
-
-    .btn-ship-primary{ background:var(--shp-accent)!important; border-color:var(--shp-accent)!important; color:#fff!important; padding:.32rem .75rem; border-radius:7px; font-weight:600; font-size:.78rem; display:inline-flex; align-items:center; gap:.35rem; cursor:pointer; transition: all .15s; }
-    .btn-ship-primary:hover{ background:var(--shp-accent-2)!important; border-color:var(--shp-accent-2)!important; }
-    .btn-ship-outline{ color:#475569!important; background:transparent!important; border:1px solid rgba(148,163,184,.35)!important; padding:.32rem .75rem; border-radius:7px; font-weight:600; font-size:.78rem; display:inline-flex; align-items:center; gap:.35rem; cursor:pointer; transition: all .15s; }
-    .btn-ship-outline:hover{ background:rgba(148,163,184,.08)!important; color:#111827!important; }
-    body[data-theme="dark"] .btn-ship-outline { color: #9ca3af!important; border-color: rgba(148,163,184,.25)!important; }
-    body[data-theme="dark"] .btn-ship-outline:hover { background: rgba(148,163,184,.15)!important; color: #fff!important; }
-
-    .btn-toolbar {
-        display: inline-flex; align-items: center; gap: .35rem;
-        background: transparent; border: 1px solid rgba(148,163,184,.35); border-radius: 7px;
-        padding: .25rem .6rem; font-size: .72rem; font-weight: 600;
-        color: #475569; cursor: pointer; transition: all .15s; white-space: nowrap; box-shadow: none;
-    }
-    .btn-toolbar:hover { background: rgba(148,163,184,.08); color: #111827; }
-    body[data-theme="dark"] .btn-toolbar { color: #9ca3af; border-color: rgba(148,163,184,.25); }
-    body[data-theme="dark"] .btn-toolbar:hover { background: rgba(148,163,184,.15); color: #fff; }
-    
-    .btn-toolbar.primary { background: var(--shp-accent); color: #fff; border-color: var(--shp-accent); }
-    .btn-toolbar.primary:hover { background: var(--shp-accent-2); border-color: var(--shp-accent-2); color: #fff; }
-
-    /* Tabs */
-    .ord-tabs {
-        display: flex; gap: .5rem; flex-wrap: wrap;
-        background: #ffffff;
-        padding: .7rem;
-        border-radius: 12px;
-        margin-bottom: 1rem;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
-        position: sticky; top: 60px; z-index: 30;
-    }
-    body[data-theme="dark"] .ord-tabs {
-        background: rgba(15, 23, 42, 0.4);
-        border-color: rgba(255,255,255,0.1);
-    }
-    .ord-tab {
-        display: flex; align-items: center; gap: .45rem;
-        background: #f8fafc; border: 1px solid #f1f5f9; padding: .45rem .85rem;
-        font-size: .8rem; font-weight: 600; color: #475569;
-        border-radius: 8px; cursor: pointer; transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative; white-space: nowrap; flex-shrink: 0;
-    }
-    .ord-tab:hover:not(.active) { background: #f1f5f9; color: #1e293b; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-    body[data-theme="dark"] .ord-tab:hover:not(.active) { background: rgba(255,255,255,0.05); color: #fff; }
-    .ord-tab.active { 
-        color: #fff; 
-        background: linear-gradient(135deg, #2563eb, #1d4ed8); 
-        border-color: #1e40af; 
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
-    }
-    .ord-tab.active .ord-badge { background: rgba(255,255,255,0.25) !important; color: #fff !important; border-color: rgba(255,255,255,0.1) !important; box-shadow: none !important; }
-    .ord-badge.urgent { background: #fef2f2; color: #dc2626; border: none; }
-    .ord-tab.active .ord-badge.urgent { background: #dc2626; color: #fff; border: none; }
-    
+    body[data-theme="dark"] .kilat-store-filter { color: #cbd5e1; background: #0f172a; border-color: rgba(148,163,184,.25); }
+    body[data-theme="dark"] .kilat-subtabs { background: #0f172a; }
+    body[data-theme="dark"] .kilat-empty-title { color: #f8fafc; }
+    body[data-theme="dark"] .kilat-empty-preview span { background: rgba(255,255,255,.03); border-color: rgba(148,163,184,.3); color: #64748b; }
     @media (max-width: 640px) {
-        .ord-tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; top: 60px; }
-        .ord-tabs::-webkit-scrollbar { display: none; }
+        .kilat-title-sub { display: none; }
+        .kilat-store-filter { max-width: 145px; }
+        .kilat-subtabs { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; }
+        .kilat-subtabs .ord-subtab { flex: 0 0 auto !important; }
     }
-
-    /* Table */
-    .ord-table { width: 100%; border-collapse: separate; border-spacing: 0; }
-    .ord-table thead tr th {
-        font-size: .68rem; font-weight: 600; letter-spacing: 0;
-        color: #64748b; text-transform: none; padding: .52rem .62rem;
-        border-bottom: 1px solid var(--shp-border); background: var(--card,#fff); white-space: nowrap;
-        position: sticky; top: 0; z-index: 10; text-align: left;
-    }
-    body[data-theme="dark"] .ord-table thead tr th { background: rgba(15,23,42,0.98); color: #9ca3af; border-bottom-color: rgba(51, 65, 85, 0.85); }
-    .ord-table tbody tr { transition: all .2s ease; }
-    .ord-table tbody tr:hover td { background: #f8fafc; box-shadow: inset 0 2px 4px -2px rgba(0,0,0,0.03); }
-    body[data-theme="dark"] .ord-table tbody tr:hover td { background: rgba(255,255,255,0.02); }
-    .ord-table tbody tr td {
-        padding: .7rem .62rem; border-top: 1px solid rgba(148, 163, 184, 0.16); border-bottom: 0;
-        vertical-align: top; font-size: .78rem;
-    }
-    .ord-table tbody tr:first-child td { border-top: none; }
-    body[data-theme="dark"] .ord-table tbody tr td { border-top-color: rgba(51, 65, 85, 0.85); color: #f8fafc; }
-
-    .ord-badge {
-        font-size: .63rem; font-weight: 800; padding: .1rem .35rem;
-        border-radius: 999px; background: #e2e8f0; color: #475569;
-        min-width: 17px; text-align: center; line-height: 1.4;
-    }
-    .ord-id { font-size: .75rem; font-weight: 800; color: #0f172a; font-family: 'SF Mono', 'Menlo', monospace; letter-spacing: -.01em; word-break: break-all; }
-    body[data-theme="dark"] .ord-id { color: #f8fafc; }
-    .ord-date { font-size: .68rem; color: #94a3b8; margin-top: .15rem; }
-    .ord-store { display: inline-flex; align-items: center; gap: .25rem; font-size: .72rem; font-weight: 600; color: #475569; background: #f1f5f9; padding: .15rem .45rem; border-radius: 6px; }
-    body[data-theme="dark"] .ord-store { color: #cbd5e1; background: rgba(255,255,255,0.1); }
-    
-    .ord-empty { text-align: center; padding: 4rem 1rem; color: #64748b; font-size: .95rem; font-weight: 500; }
-    .ord-empty-icon { font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.7; }
-
-    .fstatus { display:inline-block; font-size:.68rem; font-weight:700; padding:.1rem .45rem; border-radius:999px; vertical-align:middle; }
-    .fstatus-none    { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
-    .fstatus-draft   { background:#fefce8; color:#a16207; border:1px solid #fde68a; }
-    .fstatus-pending { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
-    .fstatus-done    { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
-
-    /* Inline Items */
-    .ord-items-cell { display: flex; flex-direction: column; gap: 6px; padding: 6px; background: #f8fafc; border-radius: 8px; border: 1px solid rgba(148,163,184,.15); }
-    body[data-theme="dark"] .ord-items-cell { background: rgba(0,0,0,0.15); border-color: rgba(255,255,255,0.05); }
-    .ord-item-card { display: flex; align-items: flex-start; gap: 8px; font-size: .75rem; padding: 4px; }
-    .ord-item-qty { font-weight: 800; color: var(--shp-accent); background: rgba(148,163,184,.1); padding: 1px 5px; border-radius: 4px; font-size: .7rem; }
-    body[data-theme="dark"] .ord-item-qty { color: #94a3b8; background: rgba(255,255,255,0.1); }
-    .ord-item-body { flex: 1; min-width: 0; }
-    .ord-item-name { font-weight: 600; color: #1e293b; line-height: 1.3; margin-bottom: 2px; }
-    body[data-theme="dark"] .ord-item-name { color: #f1f5f9; }
-    .ord-item-variant { font-size: .68rem; color: #64748b; }
-
-    /* Forms & Modal */
-    .modal-content { border-radius: 12px; border: none; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-    body[data-theme="dark"] .modal-content { background: var(--card,#0f172a); border: 1px solid rgba(255,255,255,0.1); }
-    .form-control-custom { border-radius: 7px; border: 1px solid rgba(148,163,184,.35); padding: 0.4rem 0.75rem; font-size: 0.78rem; transition: border-color .15s; background: transparent; }
-    .form-control-custom:focus { border-color: var(--shp-accent); outline: none; }
-    body[data-theme="dark"] .form-control-custom { border-color: rgba(148,163,184,.25); color: #f8fafc; }
-
-    /* Sub-tabs (selaras halaman Orders) */
-    .ord-subtab { display:inline-flex; align-items:center; gap:.3rem; background:transparent; border:none; padding:.3rem .7rem; font-size:.75rem; font-weight:600; color:#64748b; border-radius:6px; cursor:pointer; white-space:nowrap; }
-    .ord-subtab:hover { background:#eef2f7; color:#1e293b; }
-    .ord-subtab.active { background:#fff; color:#0f172a; box-shadow:0 1px 2px rgba(0,0,0,.08); }
-    body[data-theme="dark"] .ord-subtab.active { background:rgba(255,255,255,0.12); color:#fff; }
-    .ord-badge.bg-secondary { background:#e2e8f0; color:#475569; border-color:transparent; }
-    .awb-track { text-decoration:none; margin-left:4px; }
 </style>
 @endpush
 
@@ -198,22 +51,32 @@
 <div class="page-wrap">
     {{-- ── TOPBAR ── --}}
     <div class="ship-topbar">
-        <h1 class="title">
-            ⚡ Pesanan Kilat 
-            <span class="ord-badge" style="background:#fefce8;color:#a16207;border:1px solid #fde68a;">Booking Shopee</span>
-        </h1>
+        <div class="kilat-title-wrap">
+            <h1 class="title">
+                ⚡ Pesanan Kilat
+                <span class="orders-title-badge">Booking Shopee</span>
+            </h1>
+            <div class="kilat-title-sub">Kelola booking pengiriman cepat dari Shopee.</div>
+        </div>
         <div class="controls">
-            <div class="ord-search-bar">
+            <div class="ord-search-bar" style="background:var(--card);">
                 <span style="opacity:0.5; font-size:0.9em;">🔍</span>
                 <input type="text" id="searchInput" placeholder="Cari SN / Pesanan / Resi..." autocomplete="off">
+                <button class="ord-search-clear" id="searchClearBtn" type="button" title="Hapus pencarian">✕</button>
             </div>
-            <button class="btn-ship-outline" id="btnRefresh" title="Segarkan Data" style="padding: 0.32rem 0.6rem;">🔃</button>
-            <button class="btn-ship-primary" id="btnSync">🔄 <span class="mobile-hide">Sync Shopee</span></button>
+            <select id="storeFilter" class="kilat-store-filter mobile-hide" aria-label="Filter toko">
+                <option value="">Semua Toko</option>
+                @foreach ($stores as $store)
+                    <option value="{{ $store->id }}">{{ $store->name }}</option>
+                @endforeach
+            </select>
+            <button class="btn-ship-outline" id="btnRefresh" title="Segarkan Data">🔃 <span class="mobile-hide">Segarkan</span></button>
+            <button class="btn-ship-primary" id="btnSync">🔄 <span class="mobile-hide">Sync Pesanan</span></button>
         </div>
     </div>
 
     {{-- Penjelasan singkat agar owner tidak bingung --}}
-    <div id="kiltHelp" style="display:flex; align-items:center; gap:.5rem; background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:8px; padding:.5rem .8rem; font-size:.75rem; margin-bottom:.75rem; line-height:1.4;">
+    <div id="kiltHelp" class="orders-help">
         <span style="font-size:1rem">💡</span>
         <span>Pesanan <strong>Kilat</strong> dikelola gudang Shopee. Alur: <strong>Perlu Proses Penjual</strong> → <strong>Dikirim ke DC</strong> → <strong>Dikirim ke Pembeli</strong>. Kolom di bawah menampilkan status tiap pesanan secara ringkas.</span>
     </div>
@@ -238,7 +101,7 @@
     </div>
 
     {{-- Sub-tab untuk tab "Perlu Proses Penjual" (tampil hanya saat tab itu aktif) --}}
-    <div id="subTabReadyContainer" style="display:none; gap:0.25rem; align-items:center; background:#f8fafc; padding:3px; border-radius:8px; border:1px solid var(--shp-border); margin-bottom:1rem; width:fit-content;">
+    <div id="subTabReadyContainer" class="kilat-subtabs">
         <button class="ord-subtab active" data-sub="all" onclick="switchSubTabReady('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-ready-all">—</span></button>
         <button class="ord-subtab" data-sub="to_arrange" onclick="switchSubTabReady('to_arrange', this)">Perlu Diatur <span class="ord-badge bg-secondary urgent" id="badge-sub-ready-arrange">—</span></button>
         <button class="ord-subtab" data-sub="packing" onclick="switchSubTabReady('packing', this)">📦 Sedang Dikemas <span class="ord-badge bg-secondary" id="badge-sub-ready-packing">—</span></button>
@@ -248,20 +111,27 @@
     <div class="card-main">
         <div class="table-responsive">
             <table class="ord-table">
+                <colgroup>
+                    <col style="width:24%">
+                    <col style="width:23%">
+                    <col style="width:20%">
+                    <col style="width:16%">
+                    <col style="width:6%">
+                    <col style="width:11%">
+                </colgroup>
                 <thead>
                     <tr>
-                        <th>Toko</th>
-                        <th>Booking / Pesanan</th>
-                        <th>Status</th>
-                        <th>Kurir</th>
-                        <th>No. AWB / Resi</th>
-                        <th>Dibuat</th>
-                        <th style="text-align:right">Aksi</th>
+                        <th>Order &amp; Pengiriman</th>
+                        <th>Item Produk</th>
+                        <th>Pembayaran &amp; Penghasilan</th>
+                        <th>Voucher &amp; Diskon</th>
+                        <th>AMS</th>
+                        <th>Pengiriman / Lacak / Cetak</th>
                     </tr>
                 </thead>
                 <tbody id="kiltBody">
                     <tr>
-                        <td colspan="7">
+                        <td colspan="6">
                             <div class="ord-empty">
                                 <div class="spinner-border text-primary mb-2" style="width:1.5rem; height:1.5rem; border-width:2px;" role="status"></div>
                                 <div>Memuat Data...</div>
@@ -453,9 +323,12 @@
     const btnRefresh = document.getElementById('btnRefresh');
     const btnSync = document.getElementById('btnSync');
     const searchInput = document.getElementById('searchInput');
+    const searchClearBtn = document.getElementById('searchClearBtn');
+    const storeFilter = document.getElementById('storeFilter');
     let bookings = [];
     let loading = false;
     let currentTab = 'all';
+    let selectedStore = '';
     let subReady = 'all'; // sub-tab di dalam "Perlu Proses Penjual": all | to_arrange | packing
 
     function fmtDate(ts){
@@ -517,20 +390,27 @@
     function renderEmpty(filteredCount = 0) {
         if(filteredCount === 0 && bookings.length > 0) {
             return `<tr>
-                <td colspan="7">
+                <td colspan="6">
                     <div class="ord-empty">
                         <div class="ord-empty-icon">📂</div>
-                        <div>Tidak ada pesanan di tab ini.</div>
+                        <div class="kilat-empty-title">Tidak ada pesanan di tampilan ini</div>
+                        <div class="kilat-empty-copy">Coba ubah tab, toko, atau kata pencarian.</div>
                     </div>
                 </td>
             </tr>`;
         }
         return `<tr>
-            <td colspan="7">
+            <td colspan="6">
                 <div class="ord-empty">
-                    <div class="ord-empty-icon">📭</div>
-                    <div>Belum ada pesanan kilat</div>
-                    <div style="font-size:0.8rem; margin-top:4px">Tekan "Sync Shopee" untuk menarik data.</div>
+                    <div class="ord-empty-icon">⚡</div>
+                    <div class="kilat-empty-state">
+                        <div class="kilat-empty-title">Belum ada data pesanan kilat</div>
+                        <div class="kilat-empty-copy">Data booking akan muncul setelah sinkronisasi Shopee.</div>
+                        <div class="kilat-empty-preview" aria-hidden="true">
+                            <span>Order &amp; Pengiriman</span><span>Item Produk</span><span>Pembayaran</span>
+                            <span>Voucher</span><span>AMS</span><span>Lacak / Cetak</span>
+                        </div>
+                    </div>
                 </div>
             </td>
         </tr>`;
@@ -538,7 +418,7 @@
     
     function renderLoading(msg, sub) {
         return `<tr>
-            <td colspan="7">
+            <td colspan="6">
                 <div class="ord-empty">
                     <div class="spinner-border text-primary mb-2" style="width:1.5rem; height:1.5rem; border-width:2px;" role="status"></div>
                     <div style="font-weight:600; color:#334155;">${msg}</div>
@@ -574,8 +454,9 @@
     }
 
     function filterBookings(arr) {
-        if (currentTab === 'all') return arr;
-        let out = arr.filter(b => bucketOf(b) === currentTab);
+        let out = selectedStore ? arr.filter(b => String(b.store_id) === String(selectedStore)) : arr;
+        if (currentTab === 'all') return out;
+        out = out.filter(b => bucketOf(b) === currentTab);
         if (currentTab === 'ready' && subReady !== 'all') {
             out = out.filter(b => readySub(b) === subReady);
         }
@@ -614,7 +495,7 @@
 
     // Sel AWB ringkas untuk tabel: nomor + ikon lacak SPX bila ada.
     function awbCell(resi){
-        if(!resi) return '<span style="color:#cbd5e1">—</span>';
+        if(!resi) return '<span class="kilat-placeholder">Belum ada resi</span>';
         const url = courierTrackUrl(resi);
         const link = url ? ` <a href="${url}" target="_blank" rel="noopener" class="awb-track" title="Lacak di SPX">🔎</a>` : '';
         return `<span style="font-weight:700">${resi}</span>${link}`;
@@ -631,7 +512,7 @@
         }
         tbody.innerHTML = '';
         filtered.forEach(b => {
-            const store = b.store_name || ('Toko #' + b.store_id);
+            const store = b.store_name || 'Toko belum terhubung';
             let aksi = `<button class="btn-toolbar" onclick="showDetail('${b.store_id}','${b.booking_sn}')">ℹ️ Detail</button>`;
             if(b.needs_shipping){
                 aksi += `<button class="btn-toolbar primary" onclick="arrangeShip('${b.store_id}','${b.booking_sn}')">🚚 Atur Kirim</button>`;
@@ -657,6 +538,21 @@
                 }
             }
 
+            const carrierHtml = b.shipping_carrier
+                ? `<span class="ord-shipping-carrier">${b.shipping_carrier}</span>`
+                : `<span class="kilat-placeholder">Belum dipilih</span>`;
+            const trackingHtml = b.tracking_number
+                ? `<span class="ord-shipping-awb-value">${awbCell(b.tracking_number)}</span>`
+                : `<span class="kilat-placeholder">Belum ada resi</span>`;
+            const shippingStatus = b.meta?.courier_status || b.booking_status;
+            const shippingStatusHtml = shippingStatus
+                ? `<span class="ord-shipping-status fallback">🚚 ${String(shippingStatus).replace(/_/g, ' ')}</span>`
+                : `<span class="ord-payment-empty">—</span>`;
+            const shippingHtml = `<div class="ord-shipping-stack">
+                <span class="ord-shipping-label">Kurir</span>${carrierHtml}
+                <span class="ord-shipping-label">No. Resi</span>${trackingHtml}
+            </div>`;
+
             let itemsHtml = '';
             if (b.items && b.items.length > 0) {
                 const lines = b.items.map(it => `
@@ -670,28 +566,27 @@
                     </div>
                 `).join('');
                 itemsHtml = `<div class="ord-items-cell" style="margin-top:8px">${lines}</div>`;
+            } else {
+                itemsHtml = `<div class="ord-items-cell" style="margin-top:8px"><span class="kilat-placeholder">📦 Detail produk belum tersedia</span></div>`;
             }
             
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td><span class="ord-store">🏪 ${store}</span></td>
                 <td>
-                    <div class="ord-id">${b.booking_sn}</div>
-                    ${(b.order_sn && b.order_sn !== b.booking_sn) ? `<div class="ord-date">📦 ${b.order_sn}</div>` : ''}
-                    ${itemsHtml}
-                </td>
-                <td>
-                    ${statusBadge(b.booking_status)}
-                    <div>${metaStatusHtml}</div>
-                </td>
-                <td style="font-size:0.75rem;font-weight:600;color:var(--shp-accent)">${b.shipping_carrier || '—'}</td>
-                <td style="font-size:0.75rem;font-family:monospace">${awbCell(b.tracking_number)}</td>
-                <td class="ord-date" style="margin-top:0">${fmtDate(b.create_time)}</td>
-                <td style="text-align:right">
-                    <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end">
-                        ${aksi}
+                    <div class="ord-id">${b.booking_sn || '<span class="kilat-placeholder">Nomor booking belum tersedia</span>'}</div>
+                    ${(b.order_sn && b.order_sn !== b.booking_sn) ? `<div class="ord-date">📦 ${b.order_sn}</div>` : `<div class="ord-date">Pesanan marketplace belum tertaut</div>`}
+                    <div class="ord-order-context">
+                        ${statusBadge(b.booking_status)}
+                        <span class="ord-order-store">🏪 ${store}</span>
                     </div>
+                    <div class="ord-date" style="margin-top:4px">${b.create_time ? fmtDate(b.create_time) : '<span class="kilat-placeholder">Tanggal belum tersedia</span>'}</div>
                 </td>`;
+            tr.innerHTML += `
+                <td>${itemsHtml}</td>
+                <td><div class="ord-payment-summary"><span class="ord-payment-empty">Data pembayaran belum tersedia</span><span class="ord-payment-empty">Penghasilan —</span></div></td>
+                <td><span class="ord-payment-empty">Voucher belum tersedia</span></td>
+                <td class="ord-ams-cell"><span class="ord-payment-empty">—</span></td>
+                <td class="ord-track-print-cell"><div class="ord-track-print-stack">${shippingHtml}${shippingStatusHtml}${metaStatusHtml}<div class="ord-action-stack">${aksi}</div></div></td>`;
             tbody.appendChild(tr);
         });
     }
@@ -712,7 +607,7 @@
             render();
         }catch(e){
             tbody.innerHTML = `<tr>
-                <td colspan="7">
+                <td colspan="6">
                     <div class="ord-empty" style="color:#dc2626">
                         <div class="ord-empty-icon">⚠️</div>
                         <div style="font-weight:600">Gagal memuat data</div>
@@ -740,7 +635,21 @@
     });
 
     let t = null;
-    searchInput.addEventListener('keyup', () => { clearTimeout(t); t = setTimeout(load, 400); });
+    searchInput.addEventListener('input', () => {
+        const hasValue = searchInput.value.trim().length > 0;
+        searchClearBtn.classList.toggle('visible', hasValue);
+        clearTimeout(t);
+        t = setTimeout(load, 400);
+    });
+    searchClearBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        searchClearBtn.classList.remove('visible');
+        load();
+    });
+    storeFilter.addEventListener('change', () => {
+        selectedStore = storeFilter.value;
+        render();
+    });
 
     const detailModalEl = document.getElementById('detailModal');
     
