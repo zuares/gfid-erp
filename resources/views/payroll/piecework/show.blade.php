@@ -176,6 +176,73 @@
             color: rgba(245, 158, 11, 1)
         }
 
+        .pw-summary-section {
+            margin-top: 1rem
+        }
+
+        .pw-summary-section-title {
+            margin-bottom: .5rem;
+            color: var(--text);
+            font-size: .78rem;
+            font-weight: 800
+        }
+
+        .pw-summary-table-wrap {
+            overflow-x: auto;
+            border: 1px solid rgba(148, 163, 184, .15);
+            border-radius: 8px
+        }
+
+        .pw-summary-table {
+            min-width: 520px
+        }
+
+        .pw-summary-table th,
+        .pw-summary-table td {
+            padding: .48rem .55rem;
+            font-size: .76rem
+        }
+
+        .pw-summary-total {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-top: 1rem;
+            padding-top: .85rem;
+            border-top: 2px solid rgba(148, 163, 184, .28)
+        }
+
+        .pw-summary-total-label {
+            color: var(--muted);
+            font-size: .72rem;
+            font-weight: 800;
+            letter-spacing: .04em;
+            text-transform: uppercase
+        }
+
+        .pw-summary-total-note {
+            margin-top: .2rem;
+            color: var(--muted);
+            font-size: .72rem
+        }
+
+        .pw-summary-total-amount {
+            color: var(--text);
+            font-size: 1.1rem;
+            font-weight: 900;
+            letter-spacing: -.02em;
+            text-align: right;
+            white-space: nowrap
+        }
+
+        .pw-summary-total-qty {
+            margin-top: .18rem;
+            color: var(--muted);
+            font-size: .72rem;
+            text-align: right
+        }
+
         .pw-daily-status-form {
             display: flex;
             align-items: center;
@@ -389,6 +456,10 @@
             .pw-daily-table .pw-right {
                 text-align: left
             }
+
+            .pw-summary-total {
+                align-items: flex-start
+            }
         }
     </style>
 @endpush
@@ -446,11 +517,7 @@
             <div class="pw-card">
                 <div class="pw-h">
                     <div style="font-weight:900">Ringkasan</div>
-                    <div class="pw-row">
-                        <span class="pw-chip">Qty:
-                            {{ rtrim(rtrim(number_format((float) $grandTotalQty, 2, '.', ''), '0'), '.') }}</span>
-                        <span class="pw-chip">Total: {{ number_format((float) $grandTotalAmount, 0, ',', '.') }}</span>
-                    </div>
+                    <div class="pw-sub">Rekap per operator{{ $module === 'daily' ? ' dan per hari' : '' }}</div>
                 </div>
 
                 <div class="pw-b">
@@ -557,6 +624,48 @@
                         </table>
                     </div>
 
+                    @if ($module === 'daily')
+                        <div class="pw-summary-section">
+                            <div class="pw-summary-section-title">Ringkasan Per Hari</div>
+                            <div class="pw-summary-table-wrap">
+                                <table class="pw-table pw-summary-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Tanggal</th>
+                                            <th class="pw-right">Operator</th>
+                                            <th class="pw-right">Hadir</th>
+                                            <th class="pw-right">Libur</th>
+                                            <th class="pw-right">Hari Dibayar</th>
+                                            <th class="pw-right">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($summaryByDate as $s)
+                                            @php
+                                                $summaryDate = \Carbon\Carbon::parse($s['work_date'])->locale('id');
+                                            @endphp
+                                            <tr>
+                                                <td>
+                                                    <div style="font-weight:800">{{ $summaryDate->translatedFormat('l') }}</div>
+                                                    <div class="pw-sub">{{ $summaryDate->format('d/m/Y') }}</div>
+                                                </td>
+                                                <td class="pw-right">{{ number_format((int) $s['operator_count'], 0, ',', '.') }}</td>
+                                                <td class="pw-right">{{ number_format((int) $s['present_count'], 0, ',', '.') }}</td>
+                                                <td class="pw-right">{{ number_format((int) $s['holiday_count'], 0, ',', '.') }}</td>
+                                                <td class="pw-right">{{ rtrim(rtrim(number_format((float) $s['paid_days'], 2, '.', ''), '0'), '.') }}</td>
+                                                <td class="pw-right" style="font-weight:800">{{ number_format((float) $s['total_amount'], 0, ',', '.') }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="6" style="padding:1rem;color:var(--muted)">Tidak ada data harian.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    @endif
+
                     @if (!empty($allowSlipAll))
                         <div class="pw-row" style="margin-top:.75rem">
                             <a class="pw-btn"
@@ -564,6 +673,17 @@
                                 All</a>
                         </div>
                     @endif
+
+                    <div class="pw-summary-total">
+                        <div>
+                            <div class="pw-summary-total-label">Total Payroll</div>
+                            <div class="pw-summary-total-note">{{ $module === 'daily' ? 'Setelah rekap kehadiran seluruh operator' : 'Total seluruh baris payroll' }}</div>
+                        </div>
+                        <div>
+                            <div class="pw-summary-total-amount">{{ number_format((float) $grandTotalAmount, 0, ',', '.') }}</div>
+                            <div class="pw-summary-total-qty">{{ $module === 'daily' ? 'Hari dibayar: ' : 'Qty: ' }}{{ rtrim(rtrim(number_format((float) $grandTotalQty, 2, '.', ''), '0'), '.') }}</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
