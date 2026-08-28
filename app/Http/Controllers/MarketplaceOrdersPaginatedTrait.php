@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Item;
 use App\Models\MarketplaceOrder;
 use Illuminate\Http\JsonResponse;
 
@@ -197,9 +198,10 @@ trait MarketplaceOrdersPaginatedTrait
 
         $paginator = $query->latest('ordered_at')->paginate($limit);
         $buyerPurchaseCounts = $this->buyerPurchaseCounts($paginator->getCollection());
+        $baseStockReferences = $this->baseStockReferences($paginator->getCollection());
 
         // Map items exactly like in localOrders
-        $paginator->getCollection()->transform(function ($o) use ($hasScanLog, $buyerPurchaseCounts) {
+        $paginator->getCollection()->transform(function ($o) use ($hasScanLog, $buyerPurchaseCounts, $baseStockReferences) {
             $arr = $o->toArray();
 
             $buyerKey = $this->buyerIdentityKey($o);
@@ -217,6 +219,17 @@ trait MarketplaceOrdersPaginatedTrait
                         $orderItem['internal_item']['stock_available'] = $onHand - $allocated;
                         $orderItem['internal_item']['stock_unit'] = $orderItem['internal_item']['stock_unit']
                             ?: ($orderItem['internal_item']['unit'] ?? 'pcs');
+
+                        $stockReferenceCode = $this->baseStockReferenceCode($orderItem['internal_item']['code'] ?? null);
+                        $stockReference = $stockReferenceCode
+                            ? ($baseStockReferences[mb_strtoupper($stockReferenceCode)] ?? null)
+                            : null;
+                        if ($stockReference) {
+                            $orderItem['internal_item']['stock_available'] = $stockReference['stock_available'];
+                            $orderItem['internal_item']['stock_unit'] = $stockReference['stock_unit'];
+                            $orderItem['internal_item']['stock_reference_code'] = $stockReference['code'];
+                        }
+
                         unset($orderItem['internal_item']['stock_on_hand'], $orderItem['internal_item']['stock_allocated']);
                     }
                 }
@@ -238,6 +251,35 @@ trait MarketplaceOrdersPaginatedTrait
                     : null;
                 $arr['settlement']['ams_total'] = $this->settlementAmsAmount($o->settlement);
             }
+
+            // Bedakan "voucher nol" (data valid dari Shopee) dengan "escrow
+            // belum masuk" agar operator tidak menganggap data yang masih
+            // antre sebagai nominal nol. Alert muncul setelah 30 menit.
+            $eligibleForEscrow = in_array($o->order_status, [
+                'READY_TO_SHIP', 'MATCHED', 'SHIPPED', 'TO_CONFIRM_RECEIVE',
+                'TO_RETURN', 'RETURNING', 'COMPLETED',
+            ], true);
+            $ageMinutes = $o->ordered_at ? max(0, (int) $o->ordered_at->diffInMinutes(now())) : null;
+            $errorCode = $o->settlement_sync_error_code;
+            $retryableErrors = [
+                'connection_exception', 'rate_limit', 'rate_limited',
+                'rate_limit_cooldown', 'server_error', 'service_unavailable', 'timeout',
+            ];
+            $escrowState = ! $eligibleForEscrow
+                ? 'not_required'
+                : ($o->settlement
+                    ? 'synced'
+                    : ($errorCode && ! in_array($errorCode, $retryableErrors, true)
+                        ? 'failed'
+                        : ($ageMinutes !== null && $ageMinutes >= 30
+                            ? 'overdue'
+                            : ($o->settlement_sync_last_attempt_at ? 'retrying' : 'queued'))));
+            $arr['escrow_sync'] = [
+                'state' => $escrowState,
+                'age_minutes' => $ageMinutes,
+                'last_attempt_at' => $o->settlement_sync_last_attempt_at?->toISOString(),
+                'error_code' => $errorCode,
+            ];
             
             $carrier   = strtolower((string) $o->shipping_carrier);
             $isInstant = str_contains($carrier, 'instant') || str_contains($carrier, 'same day') || str_contains($carrier, 'sameday');
@@ -274,7 +316,7 @@ trait MarketplaceOrdersPaginatedTrait
     }
 
     /**
-     * Hitung pembelian sukses per pembeli di toko yang sama. Query dilakukan
+     * Hitung order selesai per pembeli di toko yang sama. Query dilakukan
      * per halaman secara agregat agar UI bisa menandai repeat order tanpa N+1.
      *
      * @param \Illuminate\Support\Collection<int,MarketplaceOrder> $orders
@@ -308,7 +350,6 @@ trait MarketplaceOrdersPaginatedTrait
             ->values();
 
         $counts = [];
-        $excludedStatuses = ['UNPAID', 'CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING'];
 
         foreach (['username', 'name'] as $type) {
             $groups = $identities
@@ -324,7 +365,7 @@ trait MarketplaceOrdersPaginatedTrait
                 $column = $type === 'username' ? 'buyer_username' : 'buyer_name';
                 $result = MarketplaceOrder::query()
                     ->where('store_id', (int) $storeId)
-                    ->whereNotIn('order_status', $excludedStatuses)
+                    ->where('order_status', 'COMPLETED')
                     ->whereNotNull($column)
                     ->where($column, '!=', '')
                     ->whereIn($column, $values)
@@ -361,9 +402,54 @@ trait MarketplaceOrdersPaginatedTrait
 
     private function isCountableBuyerOrder(MarketplaceOrder $order): bool
     {
-        return ! in_array(strtoupper((string) $order->order_status), [
-            'UNPAID', 'CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING',
-        ], true);
+        return strtoupper((string) $order->order_status) === 'COMPLETED';
+    }
+
+    /**
+     * Varian internal dengan akhiran angka (mis. S2RDM-2) memakai stok item
+     * induknya (S2RDM), bila item induk tersebut tersedia.
+     *
+     * @param \Illuminate\Support\Collection<int,MarketplaceOrder> $orders
+     * @return array<string,array{code:string,stock_available:float,stock_unit:string}>
+     */
+    private function baseStockReferences($orders): array
+    {
+        $codes = $orders
+            ->flatMap(fn (MarketplaceOrder $order) => $order->items
+                ->map(fn ($item) => $this->baseStockReferenceCode($item->internalItem?->code)))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($codes->isEmpty()) {
+            return [];
+        }
+
+        return Item::query()
+            ->whereIn('code', $codes->all())
+            ->select('id', 'code', 'unit', 'stock_unit')
+            ->withSum('inventoryStocks as stock_on_hand', 'qty')
+            ->withSum('inventoryStocks as stock_allocated', 'allocated_qty')
+            ->get()
+            ->mapWithKeys(function (Item $item): array {
+                $code = trim((string) $item->code);
+
+                return [mb_strtoupper($code) => [
+                    'code' => $code,
+                    'stock_available' => (float) ($item->stock_on_hand ?? 0) - (float) ($item->stock_allocated ?? 0),
+                    'stock_unit' => trim((string) ($item->stock_unit ?: $item->unit ?: 'pcs')),
+                ]];
+            })
+            ->all();
+    }
+
+    private function baseStockReferenceCode(?string $code): ?string
+    {
+        $code = trim((string) $code);
+
+        return preg_match('/^(.+)-\d+$/', $code, $matches) && trim($matches[1]) !== ''
+            ? trim($matches[1])
+            : null;
     }
 
     private function excludeKilatOrders($query): void

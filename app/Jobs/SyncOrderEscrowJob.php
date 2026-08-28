@@ -23,7 +23,9 @@ class SyncOrderEscrowJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 3;
+    // Percobaan awal langsung, lalu retry 1, 5, dan 15 menit. Ini memberi
+    // Shopee waktu menyiapkan detail escrow tanpa menunggu batch histori.
+    public int $tries = 4;
     public int $timeout = 120;
     public int $uniqueFor = 3600;
 
@@ -41,7 +43,7 @@ class SyncOrderEscrowJob implements ShouldQueue, ShouldBeUnique
 
     protected function nextDelay(): int
     {
-        return [300, 900][$this->attempts() - 1] ?? 900;
+        return [60, 300, 900][$this->attempts() - 1] ?? 900;
     }
 
     public function handle(MarketplaceSyncService $sync): void

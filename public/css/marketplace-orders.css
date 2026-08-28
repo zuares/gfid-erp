@@ -276,10 +276,21 @@ body[data-theme="dark"] .ord-repeat-badge { color: #ddd6fe; background: rgba(109
 .ord-payment-line strong { font-size: .68rem; font-weight: 800; }
 .ord-payment-line.buyer { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
 .ord-payment-line.seller { color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
+.ord-escrow-sync {
+    display: inline-flex; align-self: flex-end; align-items: center; max-width: 100%;
+    padding: .14rem .34rem; border: 1px solid; border-radius: 5px;
+    font-size: .56rem; font-weight: 750; line-height: 1.3; white-space: nowrap;
+}
+.ord-escrow-sync.waiting { color: #a16207; background: #fefce8; border-color: #fde68a; }
+.ord-escrow-sync.overdue,
+.ord-escrow-sync.failed { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
 body[data-theme="dark"] .ord-payment-line .ord-payment-label { color: #cbd5e1; }
 body[data-theme="dark"] .ord-payment-line .ord-payment-note { color: #94a3b8; }
 body[data-theme="dark"] .ord-payment-line.buyer { color: #a7f3d0; background: rgba(6, 78, 59, .25); border-color: rgba(52, 211, 153, .35); }
 body[data-theme="dark"] .ord-payment-line.seller { color: #bfdbfe; background: rgba(30, 64, 175, .22); border-color: rgba(96, 165, 250, .35); }
+body[data-theme="dark"] .ord-escrow-sync.waiting { color: #fde68a; background: rgba(161, 98, 7, .22); border-color: rgba(250, 204, 21, .35); }
+body[data-theme="dark"] .ord-escrow-sync.overdue,
+body[data-theme="dark"] .ord-escrow-sync.failed { color: #fecaca; background: rgba(185, 28, 28, .22); border-color: rgba(248, 113, 113, .35); }
 .ord-income-cell { text-align: right; }
 .ord-income-stack { display: flex; flex-direction: column; align-items: flex-end; gap: .28rem; min-width: 0; }
 .ord-income-value {
@@ -562,9 +573,9 @@ body[data-theme="dark"] .ord-payment-method {
 body[data-theme="dark"] .ord-item-stock { color: #bbf7d0; background: rgba(22, 101, 52, .22); border-color: rgba(74, 222, 128, .3); }
 body[data-theme="dark"] .ord-item-stock.is-negative { color: #fecaca; background: rgba(185, 28, 28, .22); border-color: rgba(248, 113, 113, .3); }
 .ord-item-price {
-    display: flex; align-items: baseline; justify-content: flex-end;
+    display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
     min-width: 0; max-width: 100%; overflow: hidden;
-    gap: .28rem; margin-top: 0; font-size: .68rem; color: #047857;
+    gap: .04rem; margin-top: 0; font-size: .68rem; color: #047857;
     white-space: nowrap; text-align: right;
 }
 .ord-item-price del,

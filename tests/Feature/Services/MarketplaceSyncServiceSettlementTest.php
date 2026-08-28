@@ -170,6 +170,42 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         ]);
     }
 
+    public function test_sync_settlements_dapat_memprioritaskan_order_terbaru()
+    {
+        $older = $this->createOrder([
+            'channel_order_id' => 'ORDER-OLDER',
+            'ordered_at' => now()->subHours(2),
+        ]);
+        $newer = $this->createOrder([
+            'channel_order_id' => 'ORDER-NEWER',
+            'ordered_at' => now(),
+        ]);
+
+        $this->mockDriver(function (MockInterface $mock) use ($newer) {
+            $mock->shouldReceive('getEscrowDetail')
+                ->once()
+                ->withArgs(fn ($store, $sn) => $sn === $newer->channel_order_id)
+                ->andReturn($this->escrowResponse([
+                    'final_income' => 45000,
+                    'order_sn' => $newer->channel_order_id,
+                ]));
+        });
+
+        $result = app(MarketplaceSyncService::class)->syncSettlements(
+            $this->store,
+            limit: 1,
+            newestFirst: true,
+        );
+
+        $this->assertSame(1, $result['synced']);
+        $this->assertDatabaseHas('marketplace_order_settlements', [
+            'channel_order_id' => $newer->channel_order_id,
+        ]);
+        $this->assertDatabaseMissing('marketplace_order_settlements', [
+            'channel_order_id' => $older->channel_order_id,
+        ]);
+    }
+
     // ── 2. Order tidak eligible dilewati (tidak masuk query) ───────────────────
     public function test_order_tidak_eligible_dilewati()
     {

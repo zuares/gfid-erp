@@ -112,6 +112,18 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-returns'))
     ->name('sync-returns')
     ->withoutOverlapping();
 
+// Jalur pengaman order BARU: tidak memakai cursor backlog, sehingga order hari
+// ini tidak menunggu sync settlement histori yang dapat berhenti di batas runtime.
+Schedule::call(fn () => Artisan::call('marketplace:sync-settlements', [
+        '--from' => now()->subDay()->toDateString(),
+        '--to' => now()->toDateString(),
+        '--limit' => 100,
+        '--newest-first' => true,
+    ]))
+    ->everyFiveMinutes()
+    ->name('sync-recent-settlements')
+    ->withoutOverlapping();
+
 Schedule::call(fn () => Artisan::call('marketplace:sync-settlements', [
         '--all' => true,
     ]))

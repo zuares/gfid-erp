@@ -4,8 +4,12 @@ namespace Tests\Feature;
 
 use App\Http\Middleware\EnsureModuleAccess;
 use App\Models\Channel;
+use App\Models\InventoryStock;
+use App\Models\Item;
 use App\Models\MarketplaceOrder;
+use App\Models\MarketplaceOrderItem;
 use App\Models\Store;
+use App\Models\Warehouse;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -89,5 +93,76 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
         $response->assertOk();
         $this->assertSame(0, $row['buyer_previous_order_count']);
         $this->assertFalse($row['is_repeat_buyer']);
+    }
+
+    public function test_order_yang_belum_completed_tidak_menjadikan_pembeli_repeat(): void
+    {
+        $this->createOrder('REPEAT-IN-PROGRESS', 'SHIPPED', 'buyer-belum-selesai');
+        $current = $this->createOrder('REPEAT-CURRENT', 'READY_TO_SHIP', 'buyer-belum-selesai');
+
+        $response = $this->getJson('/api/marketplace/local-orders-paginated?tab=ready&limit=50');
+        $row = collect($response->json('data'))->firstWhere('id', $current->id);
+
+        $response->assertOk();
+        $this->assertSame(0, $row['buyer_previous_order_count']);
+        $this->assertFalse($row['is_repeat_buyer']);
+    }
+
+    public function test_order_eligible_tanpa_escrow_lama_ditandai_tertunda(): void
+    {
+        $order = $this->createOrder('ESCROW-OVERDUE', 'READY_TO_SHIP', 'buyer-escrow');
+        $order->update(['ordered_at' => now()->subMinutes(31)]);
+
+        $response = $this->getJson('/api/marketplace/local-orders-paginated?tab=ready&limit=50');
+        $row = collect($response->json('data'))->firstWhere('id', $order->id);
+
+        $response->assertOk();
+        $this->assertSame('overdue', $row['escrow_sync']['state']);
+        $this->assertGreaterThanOrEqual(31, $row['escrow_sync']['age_minutes']);
+    }
+
+    public function test_varian_berakhiran_angka_memakai_stok_item_induk(): void
+    {
+        $warehouse = Warehouse::create([
+            'code' => 'WH-ROOT-STOCK',
+            'name' => 'Warehouse Root Stock',
+            'type' => 'internal',
+            'active' => true,
+        ]);
+        $rootItem = Item::create([
+            'code' => 'S2RDM',
+            'name' => 'S2RDM',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+        $variantItem = Item::create([
+            'code' => 'S2RDM-2',
+            'name' => 'S2RDM Varian 2',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+        InventoryStock::create([
+            'warehouse_id' => $warehouse->id,
+            'item_id' => $rootItem->id,
+            'qty' => 10,
+            'allocated_qty' => 3,
+        ]);
+        $order = $this->createOrder('ROOT-STOCK-ORDER', 'READY_TO_SHIP', 'buyer-root-stock');
+        MarketplaceOrderItem::create([
+            'marketplace_order_id' => $order->id,
+            'order_id' => $order->id,
+            'internal_item_id' => $variantItem->id,
+            'item_sku' => 'SKU-S2RDM-2',
+            'qty' => 1,
+        ]);
+
+        $response = $this->getJson('/api/marketplace/local-orders-paginated?tab=ready&limit=50');
+        $row = collect($response->json('data'))->firstWhere('id', $order->id);
+
+        $response->assertOk();
+        $this->assertEquals(7.0, $row['items'][0]['internal_item']['stock_available']);
+        $this->assertSame('S2RDM', $row['items'][0]['internal_item']['stock_reference_code']);
     }
 }

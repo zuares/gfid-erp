@@ -111,21 +111,41 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         return Number.isFinite(value) ? Math.abs(value) : null;
     }
 
+    function escrowSyncHtml(o) {
+        const sync = o.escrow_sync;
+        if (!sync || ['synced', 'not_required'].includes(sync.state)) return '';
+
+        const age = Number(sync.age_minutes);
+        const ageText = Number.isFinite(age) && age > 0 ? ` · ${age} mnt` : '';
+        const labels = {
+            queued: ['waiting', '⏳ Menunggu escrow Shopee'],
+            retrying: ['waiting', '🔄 Mengulang escrow Shopee'],
+            overdue: ['overdue', '⚠️ Escrow tertunda'],
+            failed: ['failed', '⚠️ Escrow perlu dicek'],
+        };
+        const [stateClass, label] = labels[sync.state] || labels.queued;
+        const title = sync.error_code
+            ? `Sinkronisasi escrow: ${sync.error_code}`
+            : 'Menunggu data Escrow Detail dari Shopee';
+        return `<span class="ord-escrow-sync ${stateClass}" title="${esc(title)}">${label}${esc(ageText)}</span>`;
+    }
+
     function buyerPaidHtml(o) {
         const buyerPaid = buyerPaidAmount(o);
         const sellerSellingPrice = sellerSellingPriceAmount(o);
-        if (buyerPaid === null && sellerSellingPrice === null) return '<span class="ord-payment-empty">—</span>';
+        const syncHtml = escrowSyncHtml(o);
+        if (buyerPaid === null && sellerSellingPrice === null && !syncHtml) return '<span class="ord-payment-empty">—</span>';
 
         return `<div class="ord-payment-stack">
             ${buyerPaid !== null ? `<div class="ord-payment-line buyer" title="Nominal dibayar pembeli dari Escrow Detail Shopee">
                 <span class="ord-payment-label">Dibayar pembeli</span>
                 <strong>${esc(fmtRp(buyerPaid))}</strong>
             </div>` : ''}
-            ${sellerSellingPrice !== null ? `<div class="ord-payment-line seller" title="Total harga jual seller sebelum promo dan voucher dari Escrow Detail Shopee">
+            ${sellerSellingPrice !== null ? `<div class="ord-payment-line seller" title="Total harga jual seller dari Escrow Detail Shopee">
                 <span class="ord-payment-label">Harga jual seller</span>
-                <span class="ord-payment-note">sebelum promo/voucher</span>
                 <strong>${esc(fmtRp(sellerSellingPrice))}</strong>
             </div>` : ''}
+            ${syncHtml}
         </div>`;
     }
 
@@ -1825,8 +1845,9 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         const marketplaceSku = i.model_sku || i.item_sku || null;
         const stockValue = Number(i.internal_item?.stock_available);
         const stockUnit = i.internal_item?.stock_unit || i.internal_item?.unit || 'pcs';
+        const stockReference = i.internal_item?.stock_reference_code || null;
         const stockHtml = internalCode && Number.isFinite(stockValue)
-            ? `<span class="ord-item-stock ${stockValue < 0 ? 'is-negative' : ''}">Stok ${esc(stockValue.toLocaleString('id-ID'))} ${esc(stockUnit)}</span>`
+            ? `<span class="ord-item-stock ${stockValue < 0 ? 'is-negative' : ''}">Stok${stockReference ? ` ${esc(stockReference)}` : ''}: ${esc(stockValue.toLocaleString('id-ID'))} ${esc(stockUnit)}</span>`
             : '';
 
         let titleHtml = '';
@@ -1834,7 +1855,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         if (internalCode) {
             titleHtml = `<div class="ord-item-name" style="color:#4c1d95">${esc(internalCode)}</div>`;
             detailsHtml += marketplaceSku
-                ? `<div class="ord-item-source">Marketplace: ${esc(marketplaceSku)}</div>`
+                ? `<div class="ord-item-source">MP: ${esc(marketplaceSku)}</div>`
                 : '';
         } else {
             const variantName = i.variant_name || i.item_name || null;
@@ -1842,7 +1863,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             titleHtml = `<div class="ord-item-name" style="color:#64748b">${esc(dispName)}</div>`;
             detailsHtml = `<span class="ord-item-nomap">Belum mapping</span>`
                 + (marketplaceSku && variantName !== marketplaceSku
-                    ? `<div class="ord-item-source">Marketplace: ${esc(marketplaceSku)}</div>`
+                    ? `<div class="ord-item-source">MP: ${esc(marketplaceSku)}</div>`
                     : '');
         }
         const titleRowClass = internalCode
@@ -2735,7 +2756,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             let shippingInfoHtml = '';
             if (o.shipping_awb_no) {
                 shippingInfoHtml = `<div class="ord-shipping-awb"><span class="ord-shipping-label">No. Resi</span><span class="ord-shipping-awb-value">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span></div>`;
-            } else if (o.shipping_carrier) {
+            } else if (o.shipping_carrier && String(o.shipping_carrier).trim().toLowerCase() !== 'platform') {
                 shippingInfoHtml = `<div class="ord-shipping-carrier">${esc(o.shipping_carrier)}</div>`;
             }
             if (shippingInfoHtml) shippingInfoHtml = `<div class="ord-shipping-stack">${shippingInfoHtml}</div>`;
@@ -2795,7 +2816,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 ${paymentCell}
                 ${voucherCell}
                 <td class="ord-ams-cell">${amsHtml(o)}</td>
-                <td class="ord-track-print-cell"><div class="ord-track-print-stack">${shippingStatusHtml}${shippingActionHtml}${trackPrintHtml}</div></td>
+                <td class="ord-track-print-cell"><div class="ord-track-print-stack">${shippingActionHtml}${shippingStatusHtml}${trackPrintHtml}</div></td>
             </tr>`;
         }).join('');
 

@@ -611,6 +611,8 @@ class MarketplaceSyncService
      *                        cooldown — lihat PENDING_SETTLEMENT_REFRESH_COOLDOWN_MINUTES.
      * @param  int  $limit  Maks order yang diambil dalam satu pemanggilan (satu batch)
      * @param  int  $afterId  Cursor — hanya ambil order dengan id > afterId (untuk mode --all di command)
+     * @param  bool  $newestFirst  Prioritaskan ordered_at terbaru. Hanya aman
+     *                              untuk satu batch; jangan digunakan bersama cursor --all.
      * @return array{found:int, processed:int, synced:int, new:int, updated:int, skipped:int, errors:int, last_processed_id:int|null, failed_order_ids:array<int,string>, last_call_meta:array|null, message:string}
      */
     public function syncSettlements(
@@ -623,13 +625,19 @@ class MarketplaceSyncService
         int $afterId = 0,
         bool $waitForRateLimit = false,
         ?callable $progress = null,
+        bool $newestFirst = false,
     ): array {
         $driver = $this->gateway;
 
         $query = MarketplaceOrder::where('store_id', $store->id)
             ->where('id', '>', $afterId)
-            ->whereIn('order_status', self::SETTLEMENT_ELIGIBLE_ORDER_STATUSES)
-            ->orderBy('id');
+            ->whereIn('order_status', self::SETTLEMENT_ELIGIBLE_ORDER_STATUSES);
+
+        if ($newestFirst) {
+            $query->orderByDesc('ordered_at')->orderByDesc('id');
+        } else {
+            $query->orderBy('id');
+        }
 
         if (! $resync) {
             // Eligible untuk batch REGULER (bukan --resync) kalau salah satu:

@@ -136,6 +136,13 @@ class MarketplaceSyncSettlementsCommandTest extends TestCase
             ->assertFailed();
     }
 
+    public function test_newest_first_bersama_all_ditolak()
+    {
+        $this->artisan('marketplace:sync-settlements', ['--newest-first' => true, '--all' => true])
+            ->expectsOutputToContain('--newest-first tidak dapat digunakan bersama --all')
+            ->assertFailed();
+    }
+
     // ── --store hanya memproses satu toko ───────────────────────────────────
     public function test_filter_store_hanya_memproses_satu_toko()
     {

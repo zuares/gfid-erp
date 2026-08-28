@@ -61,6 +61,7 @@ class SyncSettlementsCommand extends Command
         {--to= : Tanggal akhir (Y-m-d) — memfilter kolom ordered_at, akhir hari di timezone aplikasi}
         {--limit=200 : Maks order per batch (1-500)}
         {--resync : Ambil ulang meski sudah ada settlement tersimpan (tanpa membuat histori)}
+        {--newest-first : Prioritaskan order terbaru (satu batch, tidak dapat bersama --all)}
         {--all : Ulangi batch berbasis cursor id sampai tidak ada order tersisa, tidak ada kemajuan, atau batas pengaman tercapai}
         {--inspect : Tampilkan struktur field raw response (masked) — hanya valid bersama --order}';
 
@@ -94,6 +95,7 @@ class SyncSettlementsCommand extends Command
 
         $limit    = (int) $this->option('limit');
         $resync   = (bool) $this->option('resync');
+        $newestFirst = (bool) $this->option('newest-first');
         $all      = (bool) $this->option('all');
         $inspect  = (bool) $this->option('inspect');
         $orderOpt = $this->option('order');
@@ -237,6 +239,7 @@ class SyncSettlementsCommand extends Command
                     $resync,
                     $limit,
                     $all,
+                    $newestFirst,
                     function (array $payload) use ($store): void {
                         $this->writeProgress($store, $payload);
                     },
@@ -334,6 +337,7 @@ class SyncSettlementsCommand extends Command
         bool $resync,
         int $limit,
         bool $all,
+        bool $newestFirst,
         ?callable $progressCallback = null,
     ): array {
         $totals = ['found' => 0, 'processed' => 0, 'synced' => 0, 'skipped' => 0, 'errors' => 0, 'last_call_meta' => null];
@@ -371,6 +375,7 @@ class SyncSettlementsCommand extends Command
                 limit: $limit,
                 afterId: $afterId,
                 progress: $batchProgress,
+                newestFirst: $newestFirst,
             );
 
             $totals['found']     += $result['found'];
@@ -503,6 +508,10 @@ class SyncSettlementsCommand extends Command
 
         if ($order && $this->option('all')) {
             return '--all tidak diperlukan saat --order dipakai (satu order sudah spesifik). Jalankan tanpa --all.';
+        }
+
+        if ($this->option('newest-first') && $this->option('all')) {
+            return '--newest-first tidak dapat digunakan bersama --all karena mode --all memakai cursor ID menaik.';
         }
 
         return null;
