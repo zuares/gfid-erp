@@ -1,4 +1,9 @@
-    <div class="ord-tabs" id="ordTabs">
+<div class="ord-live-bar" id="ordersLiveBar" aria-live="polite" title="Daftar order diperbarui otomatis setiap 30 detik saat halaman terbuka">
+    <span class="ord-live-status" id="ordersLiveStatus"><span class="ord-live-dot"></span><span id="ordersLiveStatusText">Live</span></span>
+    <span class="ord-live-auto">· Auto / 30 dtk</span>
+    <button type="button" class="ord-live-refresh" id="ordersLiveRefresh" onclick="refreshOrdersLive()" title="Segarkan tab ini sekarang" aria-label="Segarkan tab ini">↻</button>
+</div>
+<div class="ord-tabs" id="ordTabs">
         <button class="ord-tab" data-tab="issues" onclick="switchTab('issues',this)">
             ⚠️ Bermasalah <span class="ord-badge" id="badge-issues" style="background:#fef2f2;color:#dc2626;border-color:#fecaca">—</span>
         </button>
@@ -20,9 +25,4 @@
         <button class="ord-tab" data-tab="sync" onclick="switchTab('sync',this)">
             🔄 Sync <span class="ord-badge" id="badge-sync" style="background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe">—</span>
         </button>
-    </div>
-    <div class="ord-live-bar" id="ordersLiveBar" aria-live="polite" title="Daftar order diperbarui otomatis setiap 30 detik saat halaman terbuka">
-        <span class="ord-live-status" id="ordersLiveStatus"><span class="ord-live-dot"></span><span id="ordersLiveStatusText">Live</span></span>
-        <span class="ord-live-auto">· Auto / 30 dtk</span>
-        <button type="button" class="ord-live-refresh" id="ordersLiveRefresh" onclick="refreshOrdersLive()" title="Segarkan tab ini sekarang" aria-label="Segarkan tab ini">↻</button>
     </div>
