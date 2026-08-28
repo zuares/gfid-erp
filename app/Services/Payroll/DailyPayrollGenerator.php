@@ -13,7 +13,8 @@ class DailyPayrollGenerator
     /**
      * Siapkan draft payroll harian per operator dan per tanggal.
      * Default kehadiran adalah hadir agar draft langsung menampilkan estimasi
-     * payroll. Status tetap bisa disesuaikan sebelum finalisasi.
+     * payroll. Hari Minggu otomatis menjadi libur dan tidak dibayar. Status
+     * hari kerja lainnya tetap bisa disesuaikan sebelum finalisasi.
      */
     public static function generate(
         $periodStart,
@@ -58,20 +59,24 @@ class DailyPayrollGenerator
             for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
                 foreach ($employees as $employee) {
                     $rate = round((float) $employee->daily_rate, 2);
-                    $totalAmount += $rate;
+                    // Regenerate juga harus mengembalikan setiap hari Minggu ke Libur.
+                    $isSunday = $date->isSunday();
+                    $factor = $isSunday ? 0.0 : 1.0;
+                    $amount = round($rate * $factor, 2);
+                    $totalAmount += $amount;
 
                     PieceworkPayrollLine::create([
                         'payroll_period_id' => $period->id,
                         'employee_id' => $employee->id,
                         'work_date' => $date->toDateString(),
-                        'attendance_status' => 'hadir',
-                        'attendance_factor' => 1,
+                        'attendance_status' => $isSunday ? 'libur' : 'hadir',
+                        'attendance_factor' => $factor,
                         'item_category_id' => null,
                         'item_id' => null,
-                        'total_qty_ok' => 1,
+                        'total_qty_ok' => $factor,
                         'rate_per_pcs' => $rate,
                         'rate_per_day' => $rate,
-                        'amount' => $rate,
+                        'amount' => $amount,
                     ]);
                 }
             }
