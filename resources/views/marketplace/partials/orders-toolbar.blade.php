@@ -15,16 +15,17 @@
                 <button class="ord-subtab" data-sub="pending" onclick="switchSubTabReady('pending', this)" title="Status platform masih tertunda">⏳ Tertunda <span class="ord-badge bg-secondary" id="badge-sub-ready-pending">—</span></button>
                 <button class="ord-subtab" data-sub="blocked" onclick="switchSubTabReady('blocked', this)" title="Platform belum mengizinkan pengaturan pengiriman">🚫 Belum Bisa Atur <span class="ord-badge bg-secondary" id="badge-sub-ready-blocked">—</span></button>
                 <button class="ord-subtab" data-sub="unpaid" onclick="switchSubTabReady('unpaid', this)">Belum Bayar <span class="ord-badge bg-secondary" id="badge-sub-ready-unpaid">—</span></button>
+                <button class="ord-subtab" data-sub="cancel" onclick="switchSubTabReady('cancel', this)">🚫 Batal <span class="ord-badge bg-secondary" id="badge-sub-ready-cancel">—</span></button>
             </div>
             <div id="subTabShippedContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
                 <button class="ord-subtab" data-sub="all" onclick="switchSubTabShipped('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-shipped-all">—</span></button>
                 <button class="ord-subtab active" data-sub="shipped" onclick="switchSubTabShipped('shipped', this)">Dikirim <span class="ord-badge bg-secondary" id="badge-sub-shipped-shipped">—</span></button>
                 <button class="ord-subtab" data-sub="confirm" onclick="switchSubTabShipped('confirm', this)">Menunggu <span class="ord-badge bg-secondary" id="badge-sub-shipped-confirm">—</span></button>
+                <button class="ord-subtab" data-sub="failed" onclick="switchSubTabShipped('failed', this)">🚨 Pengiriman Gagal <span class="ord-badge bg-secondary" id="badge-sub-shipped-failed">—</span></button>
             </div>
             <div id="subTabRrcContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
                 <button class="ord-subtab active" data-sub="return" onclick="switchSubTabRrc('return', this)">↩️ Retur <span class="ord-badge bg-secondary" id="badge-sub-rrc-return">—</span></button>
                 <button class="ord-subtab" data-sub="refund" onclick="switchSubTabRrc('refund', this)">💸 Refund <span class="ord-badge bg-secondary" id="badge-sub-rrc-refund">—</span></button>
-                <button class="ord-subtab" data-sub="cancel" onclick="switchSubTabRrc('cancel', this)">🚫 Batal <span class="ord-badge bg-secondary" id="badge-sub-rrc-cancel">—</span></button>
                 <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.1rem 0.5rem;margin-left:4px" onclick="loadRrc(true)" title="Muat ulang dari database">🔄 Segarkan</button>
                 <button class="btn btn-sm btn-outline-primary" id="btnSyncRrc" style="font-size:0.7rem;padding:0.1rem 0.5rem" onclick="syncRrc()" title="Tarik data terbaru dari Shopee lalu simpan ke database">⬇️ Tarik dari Shopee</button>
             </div>

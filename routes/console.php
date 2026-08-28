@@ -89,6 +89,16 @@ Schedule::command('marketplace:verify-processed-orders', [
     ->name('verify-processed-orders')
     ->withoutOverlapping();
 
+// Tracking pengiriman diperiksa terpisah dari status order agar order gagal
+// kirim bisa terlihat lebih awal tanpa memanggil API saat halaman dibuka.
+Schedule::command('marketplace:sync-failed-deliveries', [
+        '--apply' => true,
+        '--limit' => 30,
+    ])
+    ->cron('11,41 * * * *')
+    ->name('sync-failed-deliveries')
+    ->withoutOverlapping();
+
 // Repair data lokal yang rusak tanpa memajukan status order berdasarkan
 // fulfillment lokal saja. Pemindahan status ditangani verifier API di atas.
 Schedule::command('marketplace:repair-stuck-orders', [

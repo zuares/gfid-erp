@@ -52,6 +52,9 @@ trait MarketplaceOrdersPaginatedTrait
         $baseQuery = MarketplaceOrder::query();
         $applyScope($baseQuery);
 
+        $failedDeliveryQuery = MarketplaceOrder::query();
+        $applyScope($failedDeliveryQuery);
+
         $counts = $baseQuery->select('order_status', \DB::raw('count(*) as total'))
             ->groupBy('order_status')
             ->pluck('total', 'order_status')
@@ -69,8 +72,13 @@ trait MarketplaceOrdersPaginatedTrait
             'processed' => ($counts['PROCESSED'] ?? 0) + ($counts['READY_TO_HANDOVER'] ?? 0),
             'shipped' => ($counts['SHIPPED'] ?? 0) + ($counts['TO_CONFIRM_RECEIVE'] ?? 0),
             'completed' => $counts['COMPLETED'] ?? 0,
+            'failed_delivery' => $failedDeliveryQuery
+                ->whereIn('order_status', ['SHIPPED', 'TO_CONFIRM_RECEIVE'])
+                ->where('delivery_failed', true)
+                ->count(),
             'unpaid' => $counts['UNPAID'] ?? 0,
-            'rrc' => ($counts['CANCELLED'] ?? 0) + ($counts['IN_CANCEL'] ?? 0) + ($counts['CANCELLED_BEFORE_SHIPPING'] ?? 0) + ($counts['TO_RETURN'] ?? 0) + ($counts['RETURNED'] ?? 0),
+            'cancel' => ($counts['CANCELLED'] ?? 0) + ($counts['IN_CANCEL'] ?? 0) + ($counts['CANCELLED_BEFORE_SHIPPING'] ?? 0),
+            'rrc' => ($counts['TO_RETURN'] ?? 0) + ($counts['RETURNED'] ?? 0),
             'issues' => $issuesCount
         ]);
     }
@@ -151,6 +159,8 @@ trait MarketplaceOrdersPaginatedTrait
         } elseif ($tab === 'ready') {
             if ($subTab === 'unpaid') {
                 $query->where('order_status', 'UNPAID');
+            } elseif ($subTab === 'cancel') {
+                $query->whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING']);
             } else {
                 // Approximate logic for kilat/instant handling
                 $query->whereIn('order_status', ['READY_TO_SHIP', 'MATCHED']);
@@ -172,10 +182,13 @@ trait MarketplaceOrdersPaginatedTrait
             }
         } elseif ($tab === 'shipped') {
             $query->whereIn('order_status', ['SHIPPED', 'TO_CONFIRM_RECEIVE']);
+            if ($subTab === 'failed') {
+                $query->where('delivery_failed', true);
+            }
         } elseif ($tab === 'completed') {
             $query->where('order_status', 'COMPLETED');
         } elseif ($tab === 'rrc') {
-            $query->whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING', 'TO_RETURN', 'RETURNED']);
+            $query->whereIn('order_status', ['TO_RETURN', 'RETURNED']);
         }
 
         $paginator = $query->latest('ordered_at')->paginate($limit);
@@ -192,6 +205,10 @@ trait MarketplaceOrdersPaginatedTrait
             $previousPurchaseCount = max(0, $purchaseCount - $currentOrderCounts);
             $arr['buyer_previous_order_count'] = $previousPurchaseCount;
             $arr['is_repeat_buyer'] = $previousPurchaseCount > 0;
+            $arr['delivery_failed'] = (bool) $o->delivery_failed;
+            $arr['tracking_status'] = $o->tracking_status;
+            $arr['tracking_description'] = $o->tracking_description;
+            $arr['tracking_checked_at'] = $o->tracking_checked_at?->toIso8601String();
 
             if (isset($arr['items']) && is_array($arr['items'])) {
                 foreach ($arr['items'] as &$orderItem) {

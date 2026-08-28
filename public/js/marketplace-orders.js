@@ -794,10 +794,10 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         loadOrders();
     };
 
-    // ── Tab Retur / Refund / Batal (data LIVE dari API Shopee) ──────────────
+    // ── Tab Retur / Refund (data LIVE dari API Shopee) ──────────────────────
     let rrcSub = 'return';
     let rrcLoadSeq = 0;
-    const rrcLabels = { return: 'Retur', refund: 'Refund', cancel: 'Batal' };
+    const rrcLabels = { return: 'Retur', refund: 'Refund' };
 
     window.switchSubTabRrc = function (sub, btn) {
         rrcSub = sub;
@@ -1756,6 +1756,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         if (badgeSubReadyPending) badgeSubReadyPending.textContent = pendingCount;
         const badgeSubReadyBlocked = $('badge-sub-ready-blocked');
         if (badgeSubReadyBlocked) badgeSubReadyBlocked.textContent = blockedCount;
+        const badgeSubReadyCancel = $('badge-sub-ready-cancel');
+        if (badgeSubReadyCancel) badgeSubReadyCancel.textContent = Number(orderCounts?.cancel ?? 0);
         
         const shippedRows = filterByTab(rows, 'shipped');
         let shippedOnlyCount = 0;
@@ -1770,6 +1772,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         if (badgeSubShippedShipped) badgeSubShippedShipped.textContent = shippedOnlyCount;
         const badgeSubShippedConfirm = $('badge-sub-shipped-confirm');
         if (badgeSubShippedConfirm) badgeSubShippedConfirm.textContent = confirmCount;
+        const badgeSubShippedFailed = $('badge-sub-shipped-failed');
+        if (badgeSubShippedFailed) badgeSubShippedFailed.textContent = Number(orderCounts?.failed_delivery ?? 0);
 
     }
 
@@ -2483,6 +2487,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 if (subTabReady === 'pending') return isPendingOrder(o);
                 if (subTabReady === 'blocked') return isKilatPlatformBlocked(o);
                 if (subTabReady === 'unpaid')  return isUnpaidOrder(o);
+                if (subTabReady === 'cancel')  return ['CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING'].includes(o.order_status);
                 if (subTabReady === 'process') {
                     return !isUnpaidOrder(o)
                         && !isPendingOrder(o)
@@ -2496,6 +2501,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             rows = rows.filter(o => {
                 if (subTabShipped === 'shipped') return o.order_status === 'SHIPPED';
                 if (subTabShipped === 'confirm') return o.order_status === 'TO_CONFIRM_RECEIVE';
+                if (subTabShipped === 'failed') return o.delivery_failed === true;
                 return true;
             });
         }

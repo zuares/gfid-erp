@@ -10,6 +10,7 @@ use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\Store;
 use App\Models\Warehouse;
+use App\Services\Marketplace\MarketplaceTrackingStatusService;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -190,5 +191,41 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
             ->assertOk()
             ->assertDontSee('data-tab="processed_instant"', false)
             ->assertSee('Sedang Dikemas');
+    }
+
+    public function test_order_batal_ada_di_subtab_perlu_dikirim_bukan_retur_refund(): void
+    {
+        $cancelled = $this->createOrder('CANCELLED-ORDER', 'CANCELLED', 'buyer-cancelled');
+
+        $ready = $this->getJson('/api/marketplace/local-orders-paginated?tab=ready&sub_tab=cancel&limit=50');
+        $rrc = $this->getJson('/api/marketplace/local-orders-paginated?tab=rrc&limit=50');
+
+        $ready->assertOk()->assertJsonFragment(['id' => $cancelled->id]);
+        $rrc->assertOk()->assertJsonMissing(['id' => $cancelled->id]);
+        $this->get('/marketplace/orders')
+            ->assertOk()
+            ->assertSee('data-sub="cancel"', false)
+            ->assertDontSee('switchSubTabRrc(\'cancel\'', false);
+    }
+
+    public function test_tracking_gagal_masuk_subtab_pengiriman_gagal(): void
+    {
+        $failedOrder = $this->createOrder('FAILED-DELIVERY-ORDER', 'SHIPPED', 'buyer-failed-delivery');
+        app(MarketplaceTrackingStatusService::class)->record($failedOrder, [[
+            'logistics_status' => 'FAILED_DELIVERY',
+            'description' => 'Pengiriman gagal karena penerima tidak dapat dihubungi.',
+        ]]);
+
+        $shipped = $this->getJson('/api/marketplace/local-orders-paginated?tab=shipped&sub_tab=failed&limit=50');
+        $counts = $this->getJson('/api/marketplace/local-order-counts');
+
+        $shipped->assertOk()
+            ->assertJsonFragment(['id' => $failedOrder->id])
+            ->assertJsonPath('data.0.delivery_failed', true)
+            ->assertJsonPath('data.0.tracking_status', 'FAILED_DELIVERY');
+        $counts->assertOk()->assertJsonPath('failed_delivery', 1);
+        $this->get('/marketplace/orders')
+            ->assertOk()
+            ->assertSee('Pengiriman Gagal');
     }
 }

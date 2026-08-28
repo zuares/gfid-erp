@@ -6,6 +6,7 @@ use App\Models\MarketplaceOrder;
 use App\Models\Store;
 use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Marketplace\MarketplaceLogisticsService;
+use App\Services\Marketplace\MarketplaceTrackingStatusService;
 use App\Services\Channels\ChannelManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class MarketplaceLogisticsController extends Controller
     public function __construct(
         protected MarketplaceApiGateway $gateway,
         protected MarketplaceLogisticsService $logistics,
+        protected MarketplaceTrackingStatusService $trackingStatus,
         protected ChannelManager $manager
     ) {}
 
@@ -1074,9 +1076,16 @@ class MarketplaceLogisticsController extends Controller
                 ]);
             }
 
+            $localOrder = \App\Models\MarketplaceOrder::where('store_id', $store->id)
+                ->where('channel_order_id', $orderSn)
+                ->first();
+
             // AUTO-HEALING: Jika di riwayat resi ada kata pengembalian, paksa status order jadi TO_RETURN
             $trackingList = $result['response']['tracking_info'] ?? $result['tracking_info'] ?? [];
             if (!empty($trackingList)) {
+                $trackingState = $localOrder
+                    ? $this->trackingStatus->record($localOrder, $trackingList)
+                    : null;
                 $isReturning = false;
                 foreach ($trackingList as $t) {
                     $status = $t['logistics_status'] ?? '';
@@ -1093,10 +1102,6 @@ class MarketplaceLogisticsController extends Controller
                 }
 
                 if ($isReturning) {
-                    $localOrder = \App\Models\MarketplaceOrder::where('store_id', $store->id)
-                        ->where('channel_order_id', $orderSn)
-                        ->first();
-                        
                     if ($localOrder && !in_array($localOrder->order_status, ['TO_RETURN', 'CANCELLED', 'RETURNED'])) {
                         $localOrder->update(['order_status' => 'TO_RETURN']);
                         \Illuminate\Support\Facades\Log::info("Auto-upgraded order {$orderSn} to TO_RETURN via tracking info check.");
@@ -1104,7 +1109,12 @@ class MarketplaceLogisticsController extends Controller
                 }
             }
 
-            return response()->json($result['response'] ?? $result);
+            $response = $result['response'] ?? $result;
+            if (isset($trackingState)) {
+                $response['failed_delivery'] = $trackingState['failed'];
+            }
+
+            return response()->json($response);
         } catch (\Exception $e) {
             return $this->errorResponse($e);
         }

@@ -15,7 +15,7 @@
             Selesai <span class="ord-badge" id="badge-completed">—</span>
         </button>
         <button class="ord-tab" data-tab="rrc" onclick="switchTab('rrc',this)">
-            🔁 Retur & Batal <span class="ord-badge" id="badge-rrc" style="background:#fef2f2;color:#b91c1c;border-color:#fecaca">—</span>
+            ↩️ Retur & Refund <span class="ord-badge" id="badge-rrc" style="background:#fef2f2;color:#b91c1c;border-color:#fecaca">—</span>
         </button>
         <button class="ord-tab" data-tab="sync" onclick="switchTab('sync',this)">
             🔄 Sync <span class="ord-badge" id="badge-sync" style="background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe">—</span>
