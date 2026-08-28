@@ -173,4 +173,22 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
         $this->assertEquals(7.0, $row['items'][0]['internal_item']['stock_available']);
         $this->assertSame('S2RDM', $row['items'][0]['internal_item']['stock_reference_code']);
     }
+
+    public function test_order_instan_masuk_tab_statusnya_tanpa_tab_khusus(): void
+    {
+        $readyOrder = $this->createOrder('INSTANT-READY', 'READY_TO_SHIP', 'buyer-instant');
+        $readyOrder->update(['shipping_carrier' => 'Instant']);
+        $processedOrder = $this->createOrder('INSTANT-PROCESSED', 'PROCESSED', 'buyer-instant');
+        $processedOrder->update(['shipping_carrier' => 'Same Day']);
+
+        $ready = $this->getJson('/api/marketplace/local-orders-paginated?tab=ready&limit=50');
+        $processed = $this->getJson('/api/marketplace/local-orders-paginated?tab=processed&limit=50');
+
+        $ready->assertOk()->assertJsonFragment(['id' => $readyOrder->id]);
+        $processed->assertOk()->assertJsonFragment(['id' => $processedOrder->id]);
+        $this->get('/marketplace/orders')
+            ->assertOk()
+            ->assertDontSee('data-tab="processed_instant"', false)
+            ->assertSee('Sedang Dikemas');
+    }
 }

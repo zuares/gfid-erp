@@ -1249,7 +1249,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         updateLastSyncTime();
         loadOrderCounts(loadSeq, api(localOrderCountsUrl()).catch(() => null));
 
-        if (['processed', 'processed_instant', 'shipped', 'completed'].includes(activeTab)) {
+        if (['processed', 'shipped', 'completed'].includes(activeTab)) {
             autoFetchMissingAwbs();
         }
 
@@ -1705,7 +1705,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     // ── Badges ────────────────────────────────────────────────────────────
     function renderBadges() {
         const rows = applyFilters(orders.filter(inRange));
-        ['issues', 'ready', 'processed', 'processed_instant', 'shipped', 'completed'].forEach(tab => {
+        ['issues', 'ready', 'processed', 'shipped', 'completed'].forEach(tab => {
             const el = $('badge-' + tab);
             if (!el) return;
             const hasServerCount = orderCounts && Object.prototype.hasOwnProperty.call(orderCounts, tab);
@@ -2008,19 +2008,6 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 } else {
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; font-weight:700; border:1px solid #cbd5e1" onclick="window.location='/sales/shipments'">📦 Ke Shipment</button>`;
                 }
-            } else if (activeTab === 'processed_instant') {
-                // Tab Instan (mobile): sediakan Atur Pengiriman manual + Cetak Resi
-                // supaya user tidak bingung. Backend aman meski sudah auto-arrange.
-                if (o.order_status === 'UNPAID') {
-                    actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border-color:#22c55e; color:#16a34a; background:#f0fdf4; font-weight:700" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
-                } else {
-                    const bkSn = o.is_kilat && o.booking_sn ? `'${o.booking_sn}'` : 'null';
-                    actionBtn = `
-                    <div style="display:flex; flex-direction:column; gap:6px; width:100%;">
-                        <button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:none; background:var(--shp-accent); color:#fff; font-weight:700; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1)" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>
-                        <button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border:1px solid #64748b; color:#475569; font-weight:700" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}', ${bkSn})">🖨 Cetak Resi</button>
-                    </div>`;
-                }
             } else {
                 if (o.order_status === 'UNPAID') {
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border-color:#22c55e; color:#16a34a; background:#f0fdf4; font-weight:700" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
@@ -2135,7 +2122,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     }
 
     function renderProcessCardList(rows, tabName = 'ready') {
-        const isProcessed = tabName === 'processed' || tabName === 'processed_instant' || tabName === 'ready_to_handover';
+        const isProcessed = tabName === 'processed' || tabName === 'ready_to_handover';
         
         let selectAllHtml = '';
         if (isProcessed && rows.length > 0) {
@@ -2664,20 +2651,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             const bkArg = (o.is_kilat && o.booking_sn) ? `, '${o.booking_sn}'` : '';
 
             // Logistics Buttons
-            if (activeTab === 'processed_instant') {
-                // Tab Instan: selalu sediakan tombol "Atur Pengiriman" manual (+ Cetak
-                // Resi) supaya user tidak bingung. Order instan Shopee umumnya sudah
-                // auto-arrange, tapi backend aman — error already_arranged diperlakukan
-                // sebagai sukses (lihat MarketplaceLogisticsController::arrangeShipment).
-                if (o.order_status === 'UNPAID') {
-                    logisticsBtn = `<button class="btn-ship-outline" style="color:#16a34a!important;border-color:#bbf7d0!important;background:#f0fdf4!important;font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
-                } else {
-                    logisticsBtn = `
-                    <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
-                        <button class="btn-ship-primary" style="font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); openArrangeShipment(${o.store_id}, '${o.channel_order_id}')">🚚 Atur Pengiriman</button>
-                    </div>`;
-                }
-            } else if (activeTab === 'processed') {
+            if (activeTab === 'processed') {
                 logisticsBtn = '';
             } else if (activeTab === 'ready') {
                 if (o.order_status === 'UNPAID') {
@@ -2700,9 +2674,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             let printHtml = '';
             const printResiBtn = `<button class="ord-action-btn print" onclick="event.stopPropagation(); printDocument(${o.store_id}, '${o.channel_order_id}'${bkArg})">🖨 Cetak</button>`;
             const printGreetingBtn = `<button class="ord-action-btn greeting" onclick="event.stopPropagation(); printSingleGreeting(${o.store_id}, '${o.channel_order_id}')">💌 Kartu</button>`;
-            if (activeTab === 'processed_instant' && o.order_status !== 'UNPAID') {
-                printHtml = printResiBtn;
-            } else if (activeTab === 'processed') {
+            if (activeTab === 'processed') {
                 printHtml = `<div class="ord-action-stack">${printResiBtn}${printGreetingBtn}</div>`;
             } else if (['shipped', 'completed'].includes(activeTab) && o.order_status !== 'UNPAID') {
                 printHtml = printResiBtn;

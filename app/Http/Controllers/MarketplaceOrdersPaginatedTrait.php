@@ -64,20 +64,9 @@ trait MarketplaceOrdersPaginatedTrait
         $applyScope($issuesQuery);
         $issuesCount = $issuesQuery->count();
 
-        // Calculate processed_instant count
-        $processedInstantQuery = MarketplaceOrder::whereIn('order_status', ['PROCESSED', 'READY_TO_HANDOVER'])
-            ->where(function($q) {
-                $q->where('shipping_carrier', 'like', '%instant%')
-                  ->orWhere('shipping_carrier', 'like', '%same day%')
-                  ->orWhere('shipping_carrier', 'like', '%sameday%');
-            });
-        $applyScope($processedInstantQuery);
-        $processedInstantCount = $processedInstantQuery->count();
-
         return response()->json([
             'ready' => ($counts['READY_TO_SHIP'] ?? 0) + ($counts['MATCHED'] ?? 0),
             'processed' => ($counts['PROCESSED'] ?? 0) + ($counts['READY_TO_HANDOVER'] ?? 0),
-            'processed_instant' => $processedInstantCount,
             'shipped' => ($counts['SHIPPED'] ?? 0) + ($counts['TO_CONFIRM_RECEIVE'] ?? 0),
             'completed' => $counts['COMPLETED'] ?? 0,
             'unpaid' => $counts['UNPAID'] ?? 0,
@@ -181,13 +170,6 @@ trait MarketplaceOrdersPaginatedTrait
             } elseif ($subTab === 'ready') {
                 $query->whereNotNull('shipping_awb_no');
             }
-        } elseif ($tab === 'processed_instant') {
-            $query->whereIn('order_status', ['PROCESSED', 'READY_TO_HANDOVER'])
-                  ->where(function($q) {
-                      $q->where('shipping_carrier', 'like', '%instant%')
-                        ->orWhere('shipping_carrier', 'like', '%same day%')
-                        ->orWhere('shipping_carrier', 'like', '%sameday%');
-                  });
         } elseif ($tab === 'shipped') {
             $query->whereIn('order_status', ['SHIPPED', 'TO_CONFIRM_RECEIVE']);
         } elseif ($tab === 'completed') {

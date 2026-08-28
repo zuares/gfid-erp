@@ -6,10 +6,7 @@
             Perlu Dikirim <span class="ord-badge urgent" id="badge-ready">—</span>
         </button>
         <button class="ord-tab" data-tab="processed" onclick="switchTab('processed',this)">
-            Dikemas <span class="ord-badge" id="badge-processed" style="background:rgba(148,163,184,.15);color:#334155;border-color:rgba(148,163,184,.25)">—</span>
-        </button>
-        <button class="ord-tab" data-tab="processed_instant" onclick="switchTab('processed_instant',this)">
-            ⚡ Instan <span class="ord-badge" id="badge-processed_instant" style="background:#fef08a;color:#854d0e;border-color:#fde047">—</span>
+            Sedang Dikemas <span class="ord-badge" id="badge-processed" style="background:rgba(148,163,184,.15);color:#334155;border-color:rgba(148,163,184,.25)">—</span>
         </button>
         <button class="ord-tab" data-tab="shipped" onclick="switchTab('shipped',this)">
             Dikirim <span class="ord-badge" id="badge-shipped">—</span>
