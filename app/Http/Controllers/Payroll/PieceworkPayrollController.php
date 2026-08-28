@@ -43,6 +43,65 @@ class PieceworkPayrollController extends Controller
     }
 
     /**
+     * OVERVIEW: daftar periode cutting + sewing dalam satu halaman.
+     */
+    public function overview(Request $request): View
+    {
+        $module = strtolower((string) $request->input('module', 'all'));
+        $allowedModules = ['all', 'cutting', 'sewing'];
+
+        if (!in_array($module, $allowedModules, true)) {
+            $module = 'all';
+        }
+
+        $query = PieceworkPayrollPeriod::query()
+            ->withSum('lines as lines_total_qty', 'total_qty_ok')
+            ->withSum('lines as lines_total_amount', 'amount')
+            ->selectSub(
+                PieceworkPayrollLine::query()
+                    ->selectRaw('COUNT(DISTINCT employee_id)')
+                    ->whereColumn('payroll_period_id', 'piecework_payroll_periods.id'),
+                'operator_count'
+            )
+            ->orderByDesc('period_start')
+            ->orderByDesc('id');
+
+        if ($module !== 'all') {
+            $query->where('module', $module);
+        }
+
+        if ($request->filled('from')) {
+            $query->whereDate('period_start', '>=', $request->input('from'));
+        }
+
+        if ($request->filled('to')) {
+            $query->whereDate('period_end', '<=', $request->input('to'));
+        }
+
+        $periods = $query->paginate(15)->withQueryString();
+
+        return view('payroll.piecework.overview', [
+            'module' => $module,
+            'periods' => $periods,
+        ]);
+    }
+
+    /**
+     * STORE OVERVIEW: generate periode dari form gabungan.
+     */
+    public function storeOverview(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'module' => ['required', 'in:cutting,sewing'],
+        ], [
+            'module.required' => 'Modul payroll wajib dipilih.',
+            'module.in' => 'Modul payroll tidak valid.',
+        ]);
+
+        return $this->store($request, (string) $request->input('module'));
+    }
+
+    /**
      * INDEX: daftar periode
      */
     public function index(Request $request, string $module): View

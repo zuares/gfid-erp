@@ -27,9 +27,15 @@ Route::middleware(['web', 'auth', 'access:payroll'])->group(function () {
     |--------------------------------------------------------------------------
     | PIECEWORK PAYROLL (CUTTING & SEWING)
     |--------------------------------------------------------------------------
-    | module: cutting | sewing
+    | Overview gabungan + detail per module: cutting | sewing
     |--------------------------------------------------------------------------
      */
+    Route::get('payroll/piecework', [PieceworkPayrollController::class, 'overview'])
+        ->name('payroll.piecework.overview');
+
+    Route::post('payroll/piecework', [PieceworkPayrollController::class, 'storeOverview'])
+        ->name('payroll.piecework.store_overview');
+
     Route::prefix('payroll/piecework/{module}')
         ->whereIn('module', ['cutting', 'sewing'])
         ->name('payroll.piecework.')

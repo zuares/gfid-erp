@@ -632,8 +632,7 @@
 
     // Penggajian active helpers (optional)
     $activeModule = request()->route()?->parameter('module');
-    $pieceworkCuttingActive = request()->routeIs('payroll.piecework.*') && $activeModule === 'cutting';
-    $pieceworkSewingActive = request()->routeIs('payroll.piecework.*') && $activeModule === 'sewing';
+    $pieceworkActive = request()->routeIs('payroll.piecework.*');
 @endphp
 
 {{-- OVERLAY --}}
@@ -2278,14 +2277,9 @@
                             @endif
 
                             @if ($hasPieceworkIndex)
-                                <a href="{{ route('payroll.piecework.index', ['module' => 'cutting']) }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ $pieceworkCuttingActive ? 'active' : '' }}">
-                                    <span class="icon">✂️</span><span>Gaji Potong</span>
-                                </a>
-
-                                <a href="{{ route('payroll.piecework.index', ['module' => 'sewing']) }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ $pieceworkSewingActive ? 'active' : '' }}">
-                                    <span class="icon">🧵</span><span>Gaji Jahit (Ambil)</span>
+                                <a href="{{ route('payroll.piecework.overview') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ $pieceworkActive ? 'active' : '' }}">
+                                    <span class="icon">💰</span><span>Payroll Borongan</span>
                                 </a>
                             @endif
 

@@ -169,7 +169,7 @@
 @endpush
 
 @section('content')
-    @php($qtyLabel = $module === 'sewing' ? 'Qty Ambil' : 'Qty OK')
+    @php($qtyLabel = $module === 'sewing' ? 'Qty Ambil' : 'Qty Payroll')
     <div class="pw-wrap">
         <div class="pw-top">
             <div>

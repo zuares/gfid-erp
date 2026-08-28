@@ -48,21 +48,32 @@ class CuttingPayrollGenerator
                 ]);
             }
 
-            // 2. Agregasi dari Cutting Job + Bundles
+            // 2. Agregasi dari Cutting Job + Bundles.
+            //
+            // Bundle yang belum QC tetap dibayar berdasarkan qty_pcs.
+            // Setelah QC, gunakan qty_qc_ok agar reject tidak ikut dibayar.
             $rows = CuttingJobBundle::query()
                 ->join('cutting_jobs', 'cutting_job_bundles.cutting_job_id', '=', 'cutting_jobs.id')
                 ->join('items', 'cutting_job_bundles.finished_item_id', '=', 'items.id')
-            // filter tanggal & status job
+                // Filter tanggal; job/bundle void tidak boleh masuk payroll.
                 ->whereBetween('cutting_jobs.date', [$start, $end])
-                ->where('cutting_jobs.status', 'qc_done')
-            // hanya yang qty_qc_ok > 0
-                ->where('cutting_job_bundles.qty_qc_ok', '>', 0)
-            // agregasi operator, kategori, item
+                ->where('cutting_jobs.status', '!=', 'voided')
+                ->where('cutting_job_bundles.status', '!=', 'voided')
+                // Sebelum QC: gross qty_pcs. Sesudah QC: hanya qty_qc_ok.
+                ->whereRaw("CASE
+                    WHEN cutting_job_bundles.status IN ('cut', 'cutting', 'draft')
+                        THEN COALESCE(cutting_job_bundles.qty_pcs, 0)
+                    ELSE COALESCE(cutting_job_bundles.qty_qc_ok, 0)
+                END > 0")
                 ->selectRaw('
                 COALESCE(cutting_job_bundles.operator_id, cutting_jobs.operator_id) as employee_id,
                 COALESCE(cutting_job_bundles.item_category_id, items.item_category_id) as item_category_id,
                 cutting_job_bundles.finished_item_id as item_id,
-                SUM(cutting_job_bundles.qty_qc_ok) as total_qty_ok
+                SUM(CASE
+                    WHEN cutting_job_bundles.status IN (\'cut\', \'cutting\', \'draft\')
+                        THEN COALESCE(cutting_job_bundles.qty_pcs, 0)
+                    ELSE COALESCE(cutting_job_bundles.qty_qc_ok, 0)
+                END) as total_qty_ok
             ')
                 ->groupByRaw('
                 COALESCE(cutting_job_bundles.operator_id, cutting_jobs.operator_id),
