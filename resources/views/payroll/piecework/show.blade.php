@@ -475,6 +475,10 @@
         $pageLabel = $module === 'daily' ? 'Payroll Harian' : 'Payroll Borongan';
         $moduleRoute = function (string $action, array $parameters = []) use ($module) {
             if ($module === 'daily') {
+                if ($action === 'slip') {
+                    return route('payroll.daily.slip_preview', $parameters);
+                }
+
                 return route("payroll.daily.{$action}", $parameters);
             }
 

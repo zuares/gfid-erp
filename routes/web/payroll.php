@@ -108,6 +108,9 @@ Route::middleware(['web', 'auth', 'access:payroll'])->group(function () {
             Route::delete('/{period}', [PieceworkPayrollController::class, 'dailyDestroy'])
                 ->name('destroy');
 
+            Route::get('/{period}/slip/{employee}/preview', [PieceworkPayrollController::class, 'dailySlipPreview'])
+                ->name('slip_preview');
+
             Route::get('/{period}/slip/{employee}', [PieceworkPayrollController::class, 'dailySlip'])
                 ->name('slip');
 

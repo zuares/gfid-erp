@@ -400,7 +400,15 @@ class PieceworkPayrollController extends Controller
         return $this->show('daily', $period);
     }
 
-    public function dailySlip(PieceworkPayrollPeriod $period, int $employeeId): View
+    public function dailySlip(PieceworkPayrollPeriod $period, int $employeeId): RedirectResponse
+    {
+        return redirect()->route('payroll.daily.slip_preview', [
+            'period' => $period,
+            'employee' => $employeeId,
+        ]);
+    }
+
+    public function dailySlipPreview(PieceworkPayrollPeriod $period, int $employeeId): View
     {
         return $this->slip('daily', $period, $employeeId);
     }

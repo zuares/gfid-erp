@@ -5,6 +5,12 @@
 @push('head')
     <style>
         .slip-page { max-width: 860px; margin: 0 auto; padding: 1rem .85rem 3rem }
+        @media screen {
+            .slip-page[data-paper-size="threeply_quarter"] { width:100%; max-width: 456px }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="landscape"] { max-width: 528px }
+            .slip-page[data-paper-size="threeply"] { max-width: 760px }
+            .slip-page[data-paper-size="a5"] { max-width: 570px }
+        }
         .slip-actions { display:flex; justify-content:space-between; align-items:center; gap:.75rem; margin-bottom:.85rem }
         .slip-action-btn { display:inline-flex; align-items:center; justify-content:center; gap:.4rem; min-height:36px; padding:.45rem .7rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.78rem; font-weight:700; text-decoration:none }
         .slip-action-btn.primary { border-color:var(--accent); background:var(--accent); color:#fff }
@@ -96,7 +102,7 @@
             body:has(.slip-page) .app-main .page-wrap { display:block !important; width:100% !important; max-width:none !important; margin:0 !important; padding:0 !important }
             .slip-page { max-width:100%; padding:0 }
             .slip-card { border:1px solid #b8b8b8; border-radius:0; box-shadow:none }
-            .slip-inner { padding:5mm 6mm 6mm }
+            .slip-inner { padding:3mm 4mm 4mm }
             .slip-brand-mark img { width:24px; height:24px }
             .slip-brand-name { font-size:.72rem }
             .slip-brand-sub, .slip-number { font-size:.52rem }
@@ -143,11 +149,11 @@
             .slip-summary-page, .slip-details-page { break-after:auto; break-before:auto; page-break-after:auto; page-break-before:auto; padding-top:0 }
             .slip-page[data-paper-size="threeply_quarter"] .slip-info,
             .slip-page[data-paper-size="threeply_quarter"] .slip-stats { grid-template-columns:repeat(2, 1fr) }
-            .slip-page[data-paper-size="threeply_quarter"] .slip-inner { padding:3.5mm 4mm 4mm }
-            .slip-page[data-paper-size="threeply_quarter"] .slip-table { font-size:.58rem }
-            .slip-page[data-paper-size="threeply_quarter"] .slip-table th { padding:.28rem .3rem; font-size:.45rem }
-            .slip-page[data-paper-size="threeply_quarter"] .slip-table td { padding:.3rem .3rem }
-            .slip-page[data-paper-size="threeply_quarter"] .slip-table tfoot td { padding:.34rem .3rem }
+            .slip-page[data-paper-size="threeply_quarter"] .slip-inner { padding:2mm 2.5mm 2.5mm }
+            .slip-page[data-paper-size="threeply_quarter"] .slip-table { font-size:.64rem }
+            .slip-page[data-paper-size="threeply_quarter"] .slip-table th { padding:.3rem .32rem; font-size:.5rem }
+            .slip-page[data-paper-size="threeply_quarter"] .slip-table td { padding:.34rem .32rem }
+            .slip-page[data-paper-size="threeply_quarter"] .slip-table tfoot td { padding:.38rem .32rem }
         }
     </style>
 @endpush
@@ -327,7 +333,7 @@
             };
             const styleId = 'slip-paper-size-style';
             const paperStorageKey = 'gfid-payroll-slip-paper-size-v2';
-            const orientationStorageKey = 'gfid-payroll-slip-orientation-v2';
+            const orientationStorageKey = 'gfid-payroll-slip-orientation-v3';
             const slipPage = document.querySelector('.slip-page');
 
             function applyPrintSettings(paperValue, orientationValue) {
@@ -363,7 +369,7 @@
             }
 
             const savedSize = localStorage.getItem(paperStorageKey) || 'threeply_quarter';
-            const savedOrientation = localStorage.getItem(orientationStorageKey) || 'portrait';
+            const savedOrientation = localStorage.getItem(orientationStorageKey) || 'landscape';
             applyPrintSettings(savedSize, savedOrientation);
             paperSelect.addEventListener('change', function () {
                 applyPrintSettings(this.value, orientationSelect.value);
