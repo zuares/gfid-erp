@@ -3292,6 +3292,77 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     };
 
     // ── Logistics ────────────────────────────────────────────────────────
+    window.trackOrder = async function (storeId, orderSn, event) {
+        event?.preventDefault();
+        event?.stopPropagation();
+
+        if (!storeId || !orderSn) return;
+
+        let modalEl = document.getElementById('marketplaceTrackingModal');
+        if (!modalEl) {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal fade" id="marketplaceTrackingModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                        <div class="modal-content border-0 shadow" style="border-radius:12px;">
+                            <div class="modal-header border-bottom-0 pb-0">
+                                <div>
+                                    <h5 class="modal-title fw-bold mb-1" style="font-size:1.1rem;color:#0f172a;">Lacak Pengiriman</h5>
+                                    <div class="small text-muted" id="marketplaceTrackingOrder"></div>
+                                </div>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                            </div>
+                            <div class="modal-body" id="marketplaceTrackingBody"></div>
+                        </div>
+                    </div>
+                </div>
+            `);
+            modalEl = document.getElementById('marketplaceTrackingModal');
+        }
+
+        const body = document.getElementById('marketplaceTrackingBody');
+        const orderLabel = document.getElementById('marketplaceTrackingOrder');
+        orderLabel.textContent = String(orderSn);
+        body.innerHTML = '<div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div><br>Mengambil riwayat pengiriman…</div>';
+
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+
+        try {
+            const data = await api(`/api/marketplace/stores/${encodeURIComponent(storeId)}/orders/${encodeURIComponent(orderSn)}/tracking`);
+            const tracking = data.response?.tracking_info || data.tracking_info || [];
+
+            if (!Array.isArray(tracking) || !tracking.length) {
+                body.innerHTML = '<div class="text-center py-4" style="color:#a16207;font-weight:600">ℹ️ Belum ada riwayat perjalanan paket.</div>';
+                return;
+            }
+
+            const timeline = tracking.map((item, index) => {
+                const updateTime = Number(item.update_time);
+                const date = Number.isFinite(updateTime) && updateTime > 0
+                    ? new Date(updateTime * 1000)
+                    : null;
+                const timeText = date && !Number.isNaN(date.getTime())
+                    ? date.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : 'Waktu belum tersedia';
+                const isLatest = index === 0;
+                const description = item.description || item.logistics_status || 'Pembaruan pengiriman';
+
+                return `<div style="position:relative;margin-bottom:1rem;padding-left:1.15rem;">
+                    <span style="position:absolute;left:-.15rem;top:.3rem;width:10px;height:10px;border-radius:50%;background:${isLatest ? '#2563eb' : '#cbd5e1'};border:2px solid #fff;box-shadow:0 0 0 1px ${isLatest ? '#2563eb' : '#cbd5e1'}"></span>
+                    <div style="font-size:.86rem;font-weight:${isLatest ? '700' : '500'};color:${isLatest ? '#0f172a' : '#475569'};line-height:1.4">${esc(description)}</div>
+                    <div style="font-size:.73rem;color:#94a3b8;margin-top:.16rem">${esc(timeText)}</div>
+                </div>`;
+            }).join('');
+
+            body.innerHTML = `<div style="position:relative;padding:.35rem .1rem .1rem 1rem;">
+                <span style="position:absolute;left:.13rem;top:.65rem;bottom:1.15rem;width:2px;background:#e2e8f0"></span>
+                ${timeline}
+            </div>`;
+        } catch (error) {
+            body.innerHTML = `<div class="text-center py-4" style="color:#b91c1c">❌ ${esc(error.message || 'Gagal mengambil riwayat pengiriman.')}</div>`;
+        }
+    };
+
     // bookingSn diisi hanya untuk Pesanan Kilat murni (booking belum MATCHED ke
     // order lokal) — pengiriman diatur lewat endpoint booking, bukan order.
     window.openArrangeShipment = async function (storeId, orderSn, bookingSn = null) {
