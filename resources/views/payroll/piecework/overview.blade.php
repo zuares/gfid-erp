@@ -536,11 +536,6 @@
             transform: translateY(1px)
         }
 
-        .pw-submit i {
-            font-size: .78rem;
-            line-height: 1
-        }
-
         @media (max-width: 800px) {
             .pw-generate-form {
                 grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
@@ -761,10 +756,7 @@
                             value="" placeholder="Pilih tanggal mulai – tanggal akhir"
                             autocomplete="off" readonly data-gf-date="off" required>
                     </div>
-                    <button class="pw-btn primary pw-submit" type="submit">
-                        <i class="bi bi-lightning-charge-fill" aria-hidden="true"></i>
-                        <span>Generate Draft</span>
-                    </button>
+                    <button class="pw-btn primary pw-submit" type="submit">Generate Draft</button>
                 </form>
             </div>
         </details>
