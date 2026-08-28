@@ -214,6 +214,9 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
         app(MarketplaceTrackingStatusService::class)->record($failedOrder, [[
             'logistics_status' => 'FAILED_DELIVERY',
             'description' => 'Pengiriman gagal karena penerima tidak dapat dihubungi.',
+        ], [
+            'logistics_status' => 'RETURN_INITIATED',
+            'description' => 'Paket sedang dikembalikan ke penjual.',
         ]]);
 
         $shipped = $this->getJson('/api/marketplace/local-orders-paginated?tab=shipped&sub_tab=failed&limit=50');

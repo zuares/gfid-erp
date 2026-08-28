@@ -6,6 +6,7 @@ use App\Models\MarketplaceOrder;
 use App\Services\Channels\ChannelManager;
 use App\Services\Marketplace\MarketplaceTrackingStatusService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 
 class SyncFailedDeliveryTrackingCommand extends Command
 {
@@ -13,6 +14,9 @@ class SyncFailedDeliveryTrackingCommand extends Command
         {--store= : Hanya toko tertentu (stores.id)}
         {--order= : Hanya channel_order_id tertentu}
         {--limit=30 : Maksimum order yang dicek per eksekusi}
+        {--backfill : Periksa histori pengiriman/retur, diproses bertahap dengan checkpoint}
+        {--from= : Tanggal awal backfill (YYYY-MM-DD)}
+        {--to= : Tanggal akhir backfill (YYYY-MM-DD)}
         {--apply : Simpan hasil tracking ke database (default hanya preview)}';
 
     protected $description = 'Sinkron status gagal kirim dari tracking Shopee untuk order yang sedang dikirim.';
@@ -22,16 +26,34 @@ class SyncFailedDeliveryTrackingCommand extends Command
         $limit = max(1, min(100, (int) $this->option('limit')));
         $apply = (bool) $this->option('apply');
         $orderSn = trim((string) $this->option('order'));
+        $backfill = (bool) $this->option('backfill');
+        $from = trim((string) $this->option('from'));
+        $to = trim((string) $this->option('to'));
+
+        if (($from !== '' && ! $this->isDate($from)) || ($to !== '' && ! $this->isDate($to)) || ($from !== '' && $to !== '' && $from > $to)) {
+            $this->error('Rentang --from/--to harus memakai YYYY-MM-DD yang valid.');
+            return self::FAILURE;
+        }
+
+        $checkpointKey = $this->checkpointKey((string) $this->option('store'), $from, $to);
+        $afterId = $backfill && $orderSn === '' ? (int) Cache::get($checkpointKey, 0) : 0;
 
         $query = MarketplaceOrder::query()
             ->with('store.channel')
-            ->whereIn('order_status', ['SHIPPED', 'TO_CONFIRM_RECEIVE'])
-            ->orderByDesc('shipped_at')
-            ->orderByDesc('id');
+            ->whereIn('order_status', $backfill
+                ? ['SHIPPED', 'TO_CONFIRM_RECEIVE', 'TO_RETURN', 'RETURNING', 'RETURNED']
+                : ['SHIPPED', 'TO_CONFIRM_RECEIVE']);
+
+        if ($backfill) {
+            $query->where('id', '>', $afterId)->orderBy('id');
+            $this->applyDateRange($query, $from, $to);
+        } else {
+            $query->orderByDesc('shipped_at')->orderByDesc('id');
+        }
 
         if ($orderSn !== '') {
             $query->where('channel_order_id', $orderSn);
-        } else {
+        } elseif (! $backfill) {
             $query->where(function ($q) {
                 $q->whereNull('tracking_checked_at')
                     ->orWhere('tracking_checked_at', '<=', now()->subMinutes(30));
@@ -65,9 +87,10 @@ class SyncFailedDeliveryTrackingCommand extends Command
                 }
 
                 $trackingInfo = $response['response']['tracking_info'] ?? $response['tracking_info'] ?? [];
+                $trackingInfo = is_array($trackingInfo) ? $trackingInfo : [];
                 $state = $apply
-                    ? $trackingStatus->record($order, is_array($trackingInfo) ? $trackingInfo : [])
-                    : ['failed' => $this->containsFailure(is_array($trackingInfo) ? $trackingInfo : [])];
+                    ? $trackingStatus->record($order, $trackingInfo)
+                    : $trackingStatus->summarize($trackingInfo);
                 $stats['checked']++;
                 $stats[$state['failed'] ? 'failed' : 'clear']++;
                 $this->line(sprintf('[%s] %s %s', $state['failed'] ? 'FAILED' : 'CLEAR', $store->name, $order->channel_order_id));
@@ -82,24 +105,49 @@ class SyncFailedDeliveryTrackingCommand extends Command
             $stats['checked'], $stats['failed'], $stats['clear'], $stats['skipped'], $stats['errors']
         ));
 
-        return $stats['errors'] > 0 ? self::FAILURE : self::SUCCESS;
-    }
-
-    /** @param array<int,array<string,mixed>> $trackingInfo */
-    private function containsFailure(array $trackingInfo): bool
-    {
-        foreach ($trackingInfo as $event) {
-            $status = strtoupper(trim((string) ($event['logistics_status'] ?? $event['status'] ?? '')));
-            $description = mb_strtolower((string) ($event['description'] ?? $event['status_description'] ?? ''));
-            if (in_array($status, ['FAILED_DELIVERY', 'DELIVERY_FAILED', 'UNDELIVERED', 'RETURN_TO_SELLER', 'RETURNED_TO_SELLER'], true)
-                || str_contains($description, 'gagal dikirim')
-                || str_contains($description, 'gagal pengiriman')
-                || str_contains($description, 'delivery failed')
-                || str_contains($description, 'undelivered')) {
-                return true;
+        if ($backfill && $orderSn === '') {
+            $lastId = (int) ($orders->last()?->id ?? 0);
+            if ($orders->count() === $limit && $lastId > 0) {
+                Cache::put($checkpointKey, $lastId, now()->addDays(7));
+                $this->comment("Checkpoint tersimpan di ID {$lastId}. Jalankan ulang perintah yang sama untuk batch berikutnya.");
+            } else {
+                Cache::forget($checkpointKey);
+                $this->info('Backfill selesai; tidak ada batch berikutnya.');
             }
         }
 
-        return false;
+        return $stats['errors'] > 0 ? self::FAILURE : self::SUCCESS;
+    }
+
+    private function checkpointKey(string $store, string $from, string $to): string
+    {
+        return 'marketplace:failed-delivery-backfill:' . sha1($store . '|' . $from . '|' . $to);
+    }
+
+    private function isDate(string $value): bool
+    {
+        return (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)
+            && \DateTimeImmutable::createFromFormat('!Y-m-d', $value)?->format('Y-m-d') === $value;
+    }
+
+    private function applyDateRange($query, string $from, string $to): void
+    {
+        if ($from !== '') {
+            $query->where(function ($q) use ($from) {
+                $q->where('shipped_at', '>=', $from . ' 00:00:00')
+                    ->orWhere(function ($fallback) use ($from) {
+                        $fallback->whereNull('shipped_at')->where('ordered_at', '>=', $from . ' 00:00:00');
+                    });
+            });
+        }
+
+        if ($to !== '') {
+            $query->where(function ($q) use ($to) {
+                $q->where('shipped_at', '<=', $to . ' 23:59:59')
+                    ->orWhere(function ($fallback) use ($to) {
+                        $fallback->whereNull('shipped_at')->where('ordered_at', '<=', $to . ' 23:59:59');
+                    });
+            });
+        }
     }
 }
