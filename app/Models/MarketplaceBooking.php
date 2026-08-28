@@ -29,7 +29,10 @@ class MarketplaceBooking extends Model
         $sn = $this->order_sn ?: $this->booking_sn;
         if (!$sn) return null;
         return MarketplaceOrder::where('store_id', $this->store_id)
-            ->where('channel_order_id', $sn)
+            ->where(function ($query) use ($sn) {
+                $query->where('channel_order_id', $sn)
+                    ->orWhere('booking_sn', $this->booking_sn);
+            })
             ->first();
     }
 

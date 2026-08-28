@@ -573,8 +573,8 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
-                    <div class="ord-id">${b.booking_sn || '<span class="kilat-placeholder">Nomor booking belum tersedia</span>'}</div>
-                    ${(b.order_sn && b.order_sn !== b.booking_sn) ? `<div class="ord-date">📦 ${b.order_sn}</div>` : `<div class="ord-date">Pesanan marketplace belum tertaut</div>`}
+                    <div class="ord-id">${b.booking_sn ? `No. Booking: ${b.booking_sn}` : '<span class="kilat-placeholder">Nomor booking belum tersedia</span>'}</div>
+                    ${(b.order_sn && b.order_sn !== b.booking_sn) ? `<div class="ord-date">No. Pesanan: ${b.order_sn}</div>` : `<div class="ord-date kilat-placeholder">No. Pesanan belum tertaut</div>`}
                     <div class="ord-order-context">
                         ${statusBadge(b.booking_status)}
                         <span class="ord-order-store">🏪 ${store}</span>

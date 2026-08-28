@@ -287,6 +287,32 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         $this->assertSame('ACTIVE-BOOKING', $bookings[0]['booking_sn']);
     }
 
+    public function test_daftar_booking_mengambil_nomor_pesanan_dari_tautan_booking(): void
+    {
+        $bookingSn = 'BOOKING-LINKED-ORDER';
+        MarketplaceBooking::create([
+            'store_id' => $this->store->id,
+            'booking_sn' => $bookingSn,
+            'booking_status' => 'MATCHED',
+        ]);
+        MarketplaceOrder::create([
+            'store_id' => $this->store->id,
+            'channel_order_id' => 'ORDER-LINKED-REAL',
+            'external_order_id' => 'ORDER-LINKED-REAL',
+            'booking_sn' => $bookingSn,
+            'order_status' => 'MATCHED',
+            'order_date' => now(),
+            'ordered_at' => now(),
+        ]);
+
+        $response = app(\App\Http\Controllers\MarketplaceBookingController::class)
+            ->stored(Request::create('/api/marketplace/bookings/stored', 'GET'));
+        $booking = collect($response->getData(true)['data'])
+            ->firstWhere('booking_sn', $bookingSn);
+
+        $this->assertSame('ORDER-LINKED-REAL', $booking['order_sn']);
+    }
+
     public function test_detail_booking_mengembalikan_item_list_dari_get_booking_detail(): void
     {
         $bookingSn = 'BOOKING-DETAIL-ITEM';
