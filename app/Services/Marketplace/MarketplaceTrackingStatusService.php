@@ -9,10 +9,16 @@ class MarketplaceTrackingStatusService
     private const FAILED_STATUSES = [
         'FAILED_DELIVERY',
         'DELIVERY_FAILED',
+        'LOGISTICS_DELIVERY_FAILED',
         'UNDELIVERED',
         'RETURN_TO_SELLER',
         'RETURNED_TO_SELLER',
     ];
+
+    public function isFailedPackageStatus(?string $status): bool
+    {
+        return in_array(strtoupper(trim((string) $status)), self::FAILED_STATUSES, true);
+    }
 
     /**
      * Simpan ringkasan tracking terakhir dan tandai kegagalan pengiriman
@@ -90,7 +96,7 @@ class MarketplaceTrackingStatusService
 
     private function isFailedDelivery(string $status, string $description): bool
     {
-        if (in_array($status, self::FAILED_STATUSES, true)) {
+        if ($this->isFailedPackageStatus($status)) {
             return true;
         }
 

@@ -231,4 +231,28 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
             ->assertOk()
             ->assertSee('Pengiriman Gagal');
     }
+
+    public function test_order_cancelled_dengan_status_paket_gagal_masuk_subtab_pengiriman_gagal(): void
+    {
+        $failedOrder = $this->createOrder('CANCELLED-DELIVERY-FAILED', 'CANCELLED', 'buyer-cancelled-delivery');
+        $failedOrder->update(['raw_json' => [
+            'package_list' => [[
+                'logistics_status' => 'LOGISTICS_DELIVERY_FAILED',
+            ]],
+        ]]);
+
+        $shipped = $this->getJson('/api/marketplace/local-orders-paginated?tab=shipped&sub_tab=failed&limit=50');
+        $counts = $this->getJson('/api/marketplace/local-order-counts');
+
+        $shipped->assertOk()
+            ->assertJsonFragment(['id' => $failedOrder->id])
+            ->assertJsonPath('data.0.delivery_failed', true);
+        $counts->assertOk()->assertJsonPath('failed_delivery', 1);
+
+        $this->artisan('marketplace:sync-failed-deliveries', [
+            '--order' => 'CANCELLED-DELIVERY-FAILED',
+            '--apply' => true,
+        ])->assertExitCode(0);
+        $this->assertTrue((bool) $failedOrder->fresh()->delivery_failed);
+    }
 }

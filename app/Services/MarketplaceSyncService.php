@@ -2492,6 +2492,10 @@ class MarketplaceSyncService
                     ?? $detail['shipping_carrier']
                     ?? $detail['checkout_shipping_carrier']
                     ?? null;
+                $failedPackage = collect($packages)->first(function ($package) {
+                    return is_array($package)
+                        && strtoupper((string) ($package['logistics_status'] ?? '')) === 'LOGISTICS_DELIVERY_FAILED';
+                });
 
                 // Canonical timeline. Tidak mengarang tanggal dari status; hanya
                 // menyimpan timestamp yang benar-benar dikirim API.
@@ -2669,6 +2673,15 @@ class MarketplaceSyncService
                         'raw_json'  => $detail,
                     ]
                 );
+
+                if ($failedPackage) {
+                    $order->update([
+                        'delivery_failed' => true,
+                        'delivery_failed_at' => $order->delivery_failed_at ?: now(),
+                        'tracking_status' => 'LOGISTICS_DELIVERY_FAILED',
+                        'tracking_description' => $order->tracking_description ?: 'Status paket Shopee: pengiriman gagal.',
+                    ]);
+                }
 
                 // Error order_not_found yang tercatat saat order masih terlalu
                 // dini (READY_TO_SHIP/PROCESSED) tidak boleh mengunci settlement

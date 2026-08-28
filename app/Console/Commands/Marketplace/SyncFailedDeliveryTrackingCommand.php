@@ -40,9 +40,15 @@ class SyncFailedDeliveryTrackingCommand extends Command
 
         $query = MarketplaceOrder::query()
             ->with('store.channel')
-            ->whereIn('order_status', $backfill
-                ? ['SHIPPED', 'TO_CONFIRM_RECEIVE', 'TO_RETURN', 'RETURNING', 'RETURNED']
-                : ['SHIPPED', 'TO_CONFIRM_RECEIVE']);
+            ->where(function ($status) use ($backfill) {
+                $status->whereIn('order_status', $backfill
+                    ? ['SHIPPED', 'TO_CONFIRM_RECEIVE', 'TO_RETURN', 'RETURNING', 'RETURNED', 'CANCELLED']
+                    : ['SHIPPED', 'TO_CONFIRM_RECEIVE'])
+                    ->orWhere(function ($failedCancellation) {
+                        $failedCancellation->whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING'])
+                            ->where('raw_json', 'like', '%LOGISTICS_DELIVERY_FAILED%');
+                    });
+            });
 
         if ($backfill) {
             $query->where('id', '>', $afterId)->orderBy('id');
@@ -68,6 +74,22 @@ class SyncFailedDeliveryTrackingCommand extends Command
         $stats = ['checked' => 0, 'failed' => 0, 'clear' => 0, 'skipped' => 0, 'errors' => 0];
 
         foreach ($orders as $order) {
+            if ($this->hasRawPackageDeliveryFailure($order)) {
+                if ($apply) {
+                    $order->update([
+                        'delivery_failed' => true,
+                        'delivery_failed_at' => $order->delivery_failed_at ?: now(),
+                        'tracking_status' => 'LOGISTICS_DELIVERY_FAILED',
+                        'tracking_description' => $order->tracking_description ?: 'Status paket Shopee: pengiriman gagal.',
+                        'tracking_checked_at' => now(),
+                    ]);
+                }
+                $stats['checked']++;
+                $stats['failed']++;
+                $this->line(sprintf('[FAILED] %s %s (status paket)', $order->store?->name ?? ('#' . $order->store_id), $order->channel_order_id));
+                continue;
+            }
+
             $store = $order->store;
             if (! $store || ! $store->is_active || $store->connection_status !== 'CONNECTED') {
                 $stats['skipped']++;
@@ -122,6 +144,17 @@ class SyncFailedDeliveryTrackingCommand extends Command
     private function checkpointKey(string $store, string $from, string $to): string
     {
         return 'marketplace:failed-delivery-backfill:' . sha1($store . '|' . $from . '|' . $to);
+    }
+
+    private function hasRawPackageDeliveryFailure(MarketplaceOrder $order): bool
+    {
+        foreach ((array) data_get($order->raw_json, 'package_list', []) as $package) {
+            if (strtoupper((string) data_get($package, 'logistics_status', '')) === 'LOGISTICS_DELIVERY_FAILED') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function isDate(string $value): bool

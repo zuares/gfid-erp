@@ -54,6 +54,7 @@ trait MarketplaceOrdersPaginatedTrait
 
         $failedDeliveryQuery = MarketplaceOrder::query();
         $applyScope($failedDeliveryQuery);
+        $this->applyFailedDeliveryScope($failedDeliveryQuery);
 
         $counts = $baseQuery->select('order_status', \DB::raw('count(*) as total'))
             ->groupBy('order_status')
@@ -72,10 +73,7 @@ trait MarketplaceOrdersPaginatedTrait
             'processed' => ($counts['PROCESSED'] ?? 0) + ($counts['READY_TO_HANDOVER'] ?? 0),
             'shipped' => ($counts['SHIPPED'] ?? 0) + ($counts['TO_CONFIRM_RECEIVE'] ?? 0),
             'completed' => $counts['COMPLETED'] ?? 0,
-            'failed_delivery' => $failedDeliveryQuery
-                ->whereIn('order_status', ['SHIPPED', 'TO_CONFIRM_RECEIVE'])
-                ->where('delivery_failed', true)
-                ->count(),
+            'failed_delivery' => $failedDeliveryQuery->count(),
             'unpaid' => $counts['UNPAID'] ?? 0,
             'cancel' => ($counts['CANCELLED'] ?? 0) + ($counts['IN_CANCEL'] ?? 0) + ($counts['CANCELLED_BEFORE_SHIPPING'] ?? 0),
             'rrc' => ($counts['TO_RETURN'] ?? 0) + ($counts['RETURNED'] ?? 0),
@@ -181,9 +179,10 @@ trait MarketplaceOrdersPaginatedTrait
                 $query->whereNotNull('shipping_awb_no');
             }
         } elseif ($tab === 'shipped') {
-            $query->whereIn('order_status', ['SHIPPED', 'TO_CONFIRM_RECEIVE']);
             if ($subTab === 'failed') {
-                $query->where('delivery_failed', true);
+                $this->applyFailedDeliveryScope($query);
+            } else {
+                $query->whereIn('order_status', ['SHIPPED', 'TO_CONFIRM_RECEIVE']);
             }
         } elseif ($tab === 'completed') {
             $query->where('order_status', 'COMPLETED');
@@ -205,7 +204,7 @@ trait MarketplaceOrdersPaginatedTrait
             $previousPurchaseCount = max(0, $purchaseCount - $currentOrderCounts);
             $arr['buyer_previous_order_count'] = $previousPurchaseCount;
             $arr['is_repeat_buyer'] = $previousPurchaseCount > 0;
-            $arr['delivery_failed'] = (bool) $o->delivery_failed;
+            $arr['delivery_failed'] = $this->isDeliveryFailed($o);
             $arr['tracking_status'] = $o->tracking_status;
             $arr['tracking_description'] = $o->tracking_description;
             $arr['tracking_checked_at'] = $o->tracking_checked_at?->toIso8601String();
@@ -500,6 +499,26 @@ trait MarketplaceOrdersPaginatedTrait
         return preg_match('/^(.+)-\d+$/', $code, $matches) && trim($matches[1]) !== ''
             ? trim($matches[1])
             : null;
+    }
+
+    private function applyFailedDeliveryScope($query): void
+    {
+        $query->where(function ($failed) {
+            $failed->where('delivery_failed', true)
+                ->orWhere(function ($legacy) {
+                    $legacy->whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING'])
+                        ->where('raw_json', 'like', '%LOGISTICS_DELIVERY_FAILED%');
+                });
+        });
+    }
+
+    private function isDeliveryFailed(MarketplaceOrder $order): bool
+    {
+        $packageStatus = strtoupper((string) data_get($order->raw_json, 'package_list.0.logistics_status', ''));
+
+        return (bool) $order->delivery_failed
+            || (in_array(strtoupper((string) $order->order_status), ['CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING'], true)
+                && $packageStatus === 'LOGISTICS_DELIVERY_FAILED');
     }
 
     private function excludeKilatOrders($query): void
