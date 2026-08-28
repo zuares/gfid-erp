@@ -3330,9 +3330,21 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         try {
             const data = await api(`/api/marketplace/stores/${encodeURIComponent(storeId)}/orders/${encodeURIComponent(orderSn)}/tracking`);
             const tracking = data.response?.tracking_info || data.tracking_info || [];
+            const returnShipment = data.return_shipment;
+            const returnTrackingNumber = returnShipment?.tracking_number;
+            const returnShipmentHtml = returnShipment
+                ? `<div style="margin:0 0 1rem;padding:.75rem .85rem;border:1px solid #fecaca;border-radius:.65rem;background:#fff7ed;">
+                    <div style="font-size:.69rem;font-weight:800;letter-spacing:.03em;color:#b45309;text-transform:uppercase">Pengiriman gagal · pengembalian ke penjual</div>
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:.75rem;margin-top:.3rem">
+                        <span style="font-size:.78rem;color:#92400e">No. resi pengembalian</span>
+                        <strong style="font-size:.92rem;color:#7c2d12;word-break:break-all">${returnTrackingNumber ? esc(returnTrackingNumber) : 'Belum diterbitkan'}</strong>
+                    </div>
+                    ${returnShipment.return_sn ? `<div style="margin-top:.28rem;font-size:.7rem;color:#a16207">Return SN: ${esc(returnShipment.return_sn)}</div>` : ''}
+                </div>`
+                : '';
 
             if (!Array.isArray(tracking) || !tracking.length) {
-                body.innerHTML = '<div class="text-center py-4" style="color:#a16207;font-weight:600">ℹ️ Belum ada riwayat perjalanan paket.</div>';
+                body.innerHTML = `${returnShipmentHtml}<div class="text-center py-4" style="color:#a16207;font-weight:600">ℹ️ Belum ada riwayat perjalanan paket.</div>`;
                 return;
             }
 
@@ -3354,7 +3366,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 </div>`;
             }).join('');
 
-            body.innerHTML = `<div style="position:relative;padding:.35rem .1rem .1rem 1rem;">
+            body.innerHTML = `${returnShipmentHtml}<div style="position:relative;padding:.35rem .1rem .1rem 1rem;">
                 <span style="position:absolute;left:.13rem;top:.65rem;bottom:1.15rem;width:2px;background:#e2e8f0"></span>
                 ${timeline}
             </div>`;

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MarketplaceOrder;
+use App\Models\MarketplaceReturn;
 use App\Models\Store;
 use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Marketplace\MarketplaceLogisticsService;
@@ -1112,6 +1113,49 @@ class MarketplaceLogisticsController extends Controller
             $response = $result['response'] ?? $result;
             if (isset($trackingState)) {
                 $response['failed_delivery'] = $trackingState['failed'];
+            }
+
+            // Pada pengiriman gagal, resi perjalanan balik berbeda dari resi
+            // pengiriman awal. Ambil dari data retur yang sudah tersinkron agar
+            // operator dapat melihatnya langsung di modal Lacak order.
+            $packageStatus = data_get($localOrder?->raw_json, 'package_list.0.logistics_status');
+            $isFailedDelivery = (bool) data_get($trackingState ?? [], 'failed', false)
+                || (bool) ($localOrder?->delivery_failed)
+                || $this->trackingStatus->isFailedPackageStatus($packageStatus);
+            if ($isFailedDelivery) {
+                $return = $localOrder
+                    ? MarketplaceReturn::query()
+                        ->where('store_id', $store->id)
+                        ->where('order_sn', $localOrder->channel_order_id)
+                        ->orderByDesc('update_time')
+                        ->orderByDesc('id')
+                        ->first()
+                    : null;
+
+                // Daftar retur kadang belum membawa nomor resi. Jika Return SN
+                // sudah ada, detail retur Shopee adalah sumber paling mutakhir.
+                if ($return && blank($return->tracking_number) && method_exists($driver, 'getReturnDetail')) {
+                    try {
+                        $returnDetail = $driver->getReturnDetail($store, $return->return_sn);
+                        $returnTrackingNumber = data_get($returnDetail, 'response.tracking_number');
+                        if (filled($returnTrackingNumber)) {
+                            $return->update(['tracking_number' => $returnTrackingNumber]);
+                        }
+                    } catch (\Throwable $e) {
+                        Log::notice('Gagal mengambil resi pengembalian Shopee.', [
+                            'store_id' => $store->id,
+                            'order_sn' => $orderSn,
+                            'return_sn' => $return->return_sn,
+                            'message' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                $response['return_shipment'] = [
+                    'return_sn' => $return?->return_sn,
+                    'tracking_number' => $return?->fresh()?->tracking_number,
+                    'status' => $return?->status,
+                ];
             }
 
             return response()->json($response);
