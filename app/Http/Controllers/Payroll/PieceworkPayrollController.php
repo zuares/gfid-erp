@@ -278,7 +278,9 @@ class PieceworkPayrollController extends Controller
 
         $grandTotalQty = (float) $lines->sum('total_qty_ok');
         $grandTotalAmount = (float) $lines->sum('amount');
-        $summaryByDate = collect();
+        $periodDays = Carbon::parse($period->period_start)
+            ->diffInDays(Carbon::parse($period->period_end)) + 1;
+        $averageDailyAmount = $periodDays > 0 ? $grandTotalAmount / $periodDays : 0.0;
 
         if ($cfg['module'] === 'daily') {
             $summaryByEmployee = $lines
@@ -298,21 +300,6 @@ class PieceworkPayrollController extends Controller
                 ->values();
 
             $grandTotalQty = (float) $lines->sum('attendance_factor');
-
-            $summaryByDate = $lines
-                ->filter(fn ($line) => $line->work_date)
-                ->groupBy(fn ($line) => $line->work_date->toDateString())
-                ->map(function ($group) {
-                    return [
-                        'work_date' => $group->first()->work_date,
-                        'operator_count' => $group->pluck('employee_id')->unique()->count(),
-                        'present_count' => $group->where('attendance_status', 'hadir')->count(),
-                        'holiday_count' => $group->where('attendance_status', 'libur')->count(),
-                        'paid_days' => (float) $group->sum('attendance_factor'),
-                        'total_amount' => (float) $group->sum('amount'),
-                    ];
-                })
-                ->values();
         }
 
         $cashAccounts = Account::query()
@@ -327,9 +314,10 @@ class PieceworkPayrollController extends Controller
             'period' => $period,
             'lines' => $lines,
             'summaryByEmployee' => $summaryByEmployee,
-            'summaryByDate' => $summaryByDate,
             'grandTotalQty' => $grandTotalQty,
             'grandTotalAmount' => $grandTotalAmount,
+            'periodDays' => $periodDays,
+            'averageDailyAmount' => $averageDailyAmount,
             'cashAccounts' => $cashAccounts,
             'allowSlipAll' => (bool) $cfg['allow_slip_all'],
         ]);
