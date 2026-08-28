@@ -468,8 +468,9 @@
 
         .pw-generate-form {
             display: grid;
-            grid-template-columns: minmax(180px, .85fr) minmax(300px, 1.35fr) minmax(145px, auto);
-            gap: 1rem;
+            grid-template-columns: minmax(0, .85fr) minmax(0, 1.25fr) minmax(125px, .65fr);
+            gap: 1.25rem;
+            padding: .15rem .1rem 0;
             align-items: end
         }
 
@@ -498,7 +499,8 @@
 
         .pw-submit {
             min-height: 38px;
-            min-width: 145px;
+            width: 100%;
+            min-width: 0;
             white-space: nowrap;
             justify-content: center
         }
