@@ -507,11 +507,38 @@
         }
 
         .pw-submit {
-            min-height: 36px;
-            width: 100%;
-            min-width: 0;
+            min-height: 34px;
+            width: auto;
+            min-width: 128px;
+            justify-self: end;
+            padding: .38rem .72rem;
+            border-color: var(--accent);
+            border-radius: 9px;
+            background: var(--accent);
+            color: #fff;
+            font-size: .72rem;
+            font-weight: 750;
             white-space: nowrap;
-            justify-content: center
+            justify-content: center;
+            box-shadow: 0 3px 8px color-mix(in srgb, var(--accent) 16%, transparent);
+            transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease
+        }
+
+        .pw-submit:hover,
+        .pw-submit:focus-visible {
+            border-color: color-mix(in srgb, var(--accent) 82%, #111827 18%);
+            background: color-mix(in srgb, var(--accent) 88%, #111827 12%);
+            color: #fff;
+            box-shadow: 0 5px 12px color-mix(in srgb, var(--accent) 22%, transparent)
+        }
+
+        .pw-submit:active {
+            transform: translateY(1px)
+        }
+
+        .pw-submit i {
+            font-size: .78rem;
+            line-height: 1
         }
 
         @media (max-width: 800px) {
@@ -525,7 +552,9 @@
             }
 
             .pw-generate-form .pw-submit {
-                grid-column: 1 / -1
+                grid-column: 1 / -1;
+                width: 100%;
+                justify-self: stretch
             }
         }
 
@@ -732,7 +761,10 @@
                             value="" placeholder="Pilih tanggal mulai – tanggal akhir"
                             autocomplete="off" readonly data-gf-date="off" required>
                     </div>
-                    <button class="pw-btn primary pw-submit" type="submit">Generate Draft</button>
+                    <button class="pw-btn primary pw-submit" type="submit">
+                        <i class="bi bi-lightning-charge-fill" aria-hidden="true"></i>
+                        <span>Generate Draft</span>
+                    </button>
                 </form>
             </div>
         </details>
