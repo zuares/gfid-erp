@@ -243,6 +243,17 @@
             .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-signature { font-size:.42rem }
             .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-signature-space { height:14px }
             .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-printed { font-size:.4rem }
+
+            .slip-page[data-print-part="all"] .slip-card,
+            .slip-page[data-print-part="all"] .slip-inner,
+            .slip-page[data-print-part="all"] .slip-summary-page,
+            .slip-page[data-print-part="all"] .slip-details-page,
+            .slip-page[data-print-part="all"] .slip-table { break-inside:auto; page-break-inside:auto }
+            .slip-page[data-print-part="all"] .slip-table thead { display:table-header-group }
+            .slip-page[data-print-part="all"] .slip-table tfoot { display:table-row-group }
+            .slip-page[data-print-part="all"] .slip-table tr { break-inside:avoid; page-break-inside:avoid }
+            .slip-page[data-print-part="all"] .slip-total,
+            .slip-page[data-print-part="all"] .slip-signatures { break-inside:avoid; page-break-inside:avoid }
         }
     </style>
 @endpush
@@ -391,7 +402,7 @@
                             </table>
                         @else
                             <table class="slip-table">
-                                <thead><tr>@if ($module === 'cutting')<th>Hari / Tanggal</th>@endif<th>Kategori</th><th>Produk / Item</th><th class="slip-right">{{ $pieceworkQtyLabel }}</th><th class="slip-right">{{ $pieceworkRateLabel }}</th><th class="slip-right">Total</th></tr></thead>
+                                <thead><tr>@if ($module === 'cutting')<th>Hari / Tanggal</th>@endif<th>Kode Kategori</th><th>Kode Barang</th><th class="slip-right">{{ $pieceworkQtyLabel }}</th><th class="slip-right">{{ $pieceworkRateLabel }}</th><th class="slip-right">Total</th></tr></thead>
                                 <tbody>
                                     @foreach ($lines as $line)
                                         <tr>
@@ -406,7 +417,7 @@
                                                     @endif
                                                 </td>
                                             @endif
-                                            <td>{{ $line->category?->name ?? '-' }}</td>
+                                            <td class="slip-item-code">{{ $line->category?->code ?? '-' }}</td>
                                             <td class="slip-item-code">{{ $line->item?->code ?? '-' }}</td>
                                             <td class="slip-right slip-mono">{{ number_format((float) $line->total_qty_ok, 2, ',', '.') }}</td>
                                             <td class="slip-right slip-mono">{{ number_format((float) $line->rate_per_pcs, 0, ',', '.') }}</td>

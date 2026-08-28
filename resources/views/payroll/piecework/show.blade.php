@@ -764,8 +764,8 @@
                                             <th>Hari / Tanggal</th>
                                         @endif
                                         <th>Employee</th>
-                                        <th class="pw-hide-sm">Category</th>
-                                        <th>Item</th>
+                                        <th>Kode Kategori</th>
+                                        <th>Kode Barang</th>
                                         <th class="pw-right">{{ $qtyLabel }}</th>
                                         <th class="pw-right pw-hide-sm">Rate</th>
                                         <th class="pw-right">Amount</th>
@@ -786,8 +786,8 @@
                                                 </td>
                                             @endif
                                             <td style="font-weight:700">{{ $l->employee?->name ?? '-' }}</td>
-                                            <td class="pw-hide-sm">{{ $l->category?->name ?? '-' }}</td>
-                                            <td>{{ $l->item?->name ?? '-' }}</td>
+                                            <td>{{ $l->category?->code ?? '-' }}</td>
+                                            <td>{{ $l->item?->code ?? '-' }}</td>
                                             <td class="pw-right">
                                                 {{ rtrim(rtrim(number_format((float) $l->total_qty_ok, 2, '.', ''), '0'), '.') }}
                                             </td>
