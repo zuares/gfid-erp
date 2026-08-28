@@ -94,12 +94,13 @@ class PieceworkPayrollController extends Controller
             $query->where('module', $module);
         }
 
-        if ($filterFrom !== '') {
-            $query->whereDate('period_start', '=', $filterFrom);
-        }
-
-        if ($filterTo !== '') {
-            $query->whereDate('period_end', '=', $filterTo);
+        if ($filterFrom !== '' && $filterTo !== '') {
+            $query->whereDate('period_start', '<=', $filterTo)
+                ->whereDate('period_end', '>=', $filterFrom);
+        } elseif ($filterFrom !== '') {
+            $query->whereDate('period_end', '>=', $filterFrom);
+        } elseif ($filterTo !== '') {
+            $query->whereDate('period_start', '<=', $filterTo);
         }
 
         $filteredPeriods = (clone $query)->get();
@@ -161,11 +162,13 @@ class PieceworkPayrollController extends Controller
             ->where('module', $cfg['module'])
             ->orderByDesc('period_start');
 
-        if ($request->filled('from')) {
-            $query->whereDate('period_start', '=', $request->input('from'));
-        }
-        if ($request->filled('to')) {
-            $query->whereDate('period_end', '=', $request->input('to'));
+        if ($request->filled('from') && $request->filled('to')) {
+            $query->whereDate('period_start', '<=', $request->input('to'))
+                ->whereDate('period_end', '>=', $request->input('from'));
+        } elseif ($request->filled('from')) {
+            $query->whereDate('period_end', '>=', $request->input('from'));
+        } elseif ($request->filled('to')) {
+            $query->whereDate('period_start', '<=', $request->input('to'));
         }
 
         $periods = $query->paginate(15)->withQueryString();
