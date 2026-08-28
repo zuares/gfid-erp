@@ -139,6 +139,8 @@
             .slip-page .slip-table tfoot td,
             .slip-page .slip-attendance { background:#fff !important; border-color:#000 !important; }
             .slip-page .slip-brand-mark img { filter:grayscale(1) contrast(2) }
+            .slip-summary-page { break-after:page; page-break-after:always }
+            .slip-details-page { break-before:page; page-break-before:always; padding-top:5mm }
         }
     </style>
 @endpush
@@ -203,6 +205,7 @@
 
         <article class="slip-card">
             <div class="slip-inner">
+                <div class="slip-summary-page">
                 <header class="slip-brand">
                     <div class="slip-brand-mark">
                         <img src="{{ asset('images/logo-mark.svg') }}" alt="{{ config('app.name', 'Greatfit') }}">
@@ -243,6 +246,16 @@
                     </section>
                 @endif
 
+                <div class="slip-total"><div><div class="slip-total-label">Total Dibayarkan</div><div class="slip-total-note">Nominal setelah perhitungan payroll periode ini</div></div><div class="slip-total-value">{{ number_format((float) $totalAmount, 0, ',', '.') }}</div></div>
+
+                <div class="slip-signatures">
+                    <div class="slip-signature">Diterima oleh,<div class="slip-signature-space"></div><div class="slip-signature-name">{{ $employee?->name ?? '........................' }}</div></div>
+                    <div class="slip-signature right">Disetujui oleh,<div class="slip-signature-space"></div><div class="slip-signature-name">{{ auth()->user()->name ?? '........................' }}</div></div>
+                </div>
+                <div class="slip-printed">Dicetak pada {{ id_datetime(now()) }}</div>
+                </div>
+
+                <div class="slip-details-page">
                 <section>
                     <div class="slip-section-title">{{ $isDaily ? 'Rincian Kehadiran' : 'Rincian Payroll' }}</div>
                     <div class="slip-table-wrap">
@@ -283,14 +296,7 @@
                 @if ($isDaily && ($pendingCount > 0 || $otherAttendanceCount > 0))
                     <div class="slip-subtitle" style="margin-top:.65rem">Catatan: {{ $pendingCount > 0 ? $pendingCount . ' hari belum diisi' : '' }}{{ $pendingCount > 0 && $otherAttendanceCount > 0 ? ', ' : '' }}{{ $otherAttendanceCount > 0 ? $otherAttendanceCount . ' hari berstatus khusus' : '' }}.</div>
                 @endif
-
-                <div class="slip-total"><div><div class="slip-total-label">Total Dibayarkan</div><div class="slip-total-note">Nominal setelah perhitungan payroll periode ini</div></div><div class="slip-total-value">{{ number_format((float) $totalAmount, 0, ',', '.') }}</div></div>
-
-                <div class="slip-signatures">
-                    <div class="slip-signature">Diterima oleh,<div class="slip-signature-space"></div><div class="slip-signature-name">{{ $employee?->name ?? '........................' }}</div></div>
-                    <div class="slip-signature right">Disetujui oleh,<div class="slip-signature-space"></div><div class="slip-signature-name">{{ auth()->user()->name ?? '........................' }}</div></div>
                 </div>
-                <div class="slip-printed">Dicetak pada {{ id_datetime(now()) }}</div>
             </div>
         </article>
     </div>
@@ -304,9 +310,9 @@
             if (!paperSelect || !orientationSelect) return;
 
             const paperSizes = {
-                a4: { size: 'A4', margin: '10mm' },
-                a5: { size: 'A5', margin: '8mm' },
-                threeply: { size: '9.5in 11in', margin: '7mm' },
+                a4: { size: 'A4', margin: '0' },
+                a5: { size: 'A5', margin: '0' },
+                threeply: { size: '9.5in 11in', margin: '0' },
             };
             const styleId = 'slip-paper-size-style';
 
