@@ -401,10 +401,16 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     const getTo     = () => $('mpDateTo').value;
     const getSearch = () => ($('filterSearch').value || '').toLowerCase().trim();
 
-    function setShippedLiveStatus(state = 'ready', updatedAt = new Date()) {
-        const status = $('shippedLiveStatus');
-        const text = $('shippedLiveStatusText');
-        const refresh = $('shippedLiveRefresh');
+    function isOrderListTab() {
+        // Retur/Refund memakai endpoint database tersendiri, namun tetap aman
+        // diperbarui otomatis. Tab Sync memiliki polling/progres sendiri.
+        return activeTab !== 'sync';
+    }
+
+    function setOrdersLiveStatus(state = 'ready', updatedAt = new Date()) {
+        const status = $('ordersLiveStatus');
+        const text = $('ordersLiveStatusText');
+        const refresh = $('ordersLiveRefresh');
         if (!status || !text || !refresh) return;
 
         status.classList.toggle('is-refreshing', state === 'refreshing');
@@ -420,14 +426,23 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         }
     }
 
+    function updateOrdersLiveVisibility() {
+        const bar = $('ordersLiveBar');
+        if (bar) bar.hidden = !isOrderListTab();
+    }
+
     function ordersLoadingHtml() {
-        if (activeTab !== 'shipped') {
-            return '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
-        }
+        const labels = {
+            ready: 'Memuat pesanan yang perlu dikirim',
+            processed: 'Memuat pesanan yang sedang dikemas',
+            shipped: 'Memuat status pengiriman',
+            completed: 'Memuat pesanan selesai',
+            issues: 'Memuat pesanan bermasalah',
+        };
         return `<div class="ord-shipped-loading">
             <div class="ord-shipped-loading-card">
                 <span class="prod-tab-spinner"></span>
-                <div class="ord-shipped-loading-title">Memuat status pengiriman</div>
+                <div class="ord-shipped-loading-title">${labels[activeTab] || 'Memuat pesanan'}</div>
                 <div class="ord-shipped-loading-sub">Daftar akan diperbarui otomatis tanpa menutup data saat refresh berikutnya.</div>
             </div>
         </div>`;
@@ -794,6 +809,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
 
     window.switchTab = function (tab, btn) {
         activeTab = tab;
+        updateOrdersLiveVisibility();
         sessionStorage.setItem('ord_active_tab', tab);
         document.querySelectorAll('.ord-tab').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
@@ -867,11 +883,13 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         } catch (e) { return '—'; }
     }
 
-    async function loadRrc(force) {
+    async function loadRrc(force = false, silent = false) {
         if (activeTab !== 'rrc') return;
         const seq = ++rrcLoadSeq;
         const body = $('ordersBody');
-        body.innerHTML = `<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat data ${rrcLabels[rrcSub]} dari database…</div>`;
+        if (!silent) {
+            body.innerHTML = `<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat data ${rrcLabels[rrcSub]} dari database…</div>`;
+        }
 
         // Baca dari DATABASE (tersimpan, tanpa batas rentang tanggal). Untuk menarik
         // data terbaru dari Shopee, gunakan tombol "Tarik dari Shopee" (syncRrc()).
@@ -888,8 +906,9 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             res = await api('/api/marketplace/returns/stored?' + params.toString());
         } catch (e) {
             if (seq !== rrcLoadSeq) return;
+            if (silent) return false;
             body.innerHTML = `<div class="ord-empty"><div class="ord-empty-icon">⚠️</div>Gagal mengambil data dari Shopee: ${esc(e.message || 'error')}</div>`;
-            return;
+            return false;
         }
         if (seq !== rrcLoadSeq) return; // sudah ada permintaan lebih baru
 
@@ -902,6 +921,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         if (badgeMain) badgeMain.textContent = rows.length;
 
         renderRrcList(rows, (res && res.errors) ? res.errors : [], (res && res.stores_queried) || 0);
+        return true;
     }
     window.loadRrc = loadRrc;
 
@@ -1271,8 +1291,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     // ── Load ──────────────────────────────────────────────────────────────
     async function loadOrders() {
         const loadSeq = ++ordersLoadSeq;
-        const isShippedLoad = activeTab === 'shipped';
-        if (isShippedLoad) setShippedLiveStatus('refreshing');
+        const isOrderLoad = isOrderListTab();
+        if (isOrderLoad) setOrdersLiveStatus('refreshing');
         $('ordersBody').innerHTML = ordersLoadingHtml();
         // Kirim rentang tanggal aktif ke backend supaya order lama hasil backfill
         // ikut terambil (backend tidak lagi terpaku 200 order terbaru saja).
@@ -1281,8 +1301,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             res = await api(localOrdersUrl());
         } catch (error) {
             if (loadSeq !== ordersLoadSeq) return;
-            if (isShippedLoad) setShippedLiveStatus('error');
-            $('ordersBody').innerHTML = `<div class="ord-empty"><div class="ord-empty-icon">⚠️</div>Gagal memuat status pengiriman. Data tidak diubah; coba segarkan kembali.</div>`;
+            if (isOrderLoad) setOrdersLiveStatus('error');
+            $('ordersBody').innerHTML = `<div class="ord-empty"><div class="ord-empty-icon">⚠️</div>Gagal memuat pesanan. Data tidak diubah; coba segarkan kembali.</div>`;
             return;
         }
         if (loadSeq !== ordersLoadSeq) return;
@@ -1311,7 +1331,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         restoreSavedTab();
         render();
         updateLastSyncTime();
-        if (activeTab === 'shipped') setShippedLiveStatus('ready');
+        updateOrdersLiveVisibility();
+        if (isOrderListTab()) setOrdersLiveStatus('ready');
         loadOrderCounts(loadSeq, api(localOrderCountsUrl()).catch(() => null));
 
         if (['processed', 'shipped', 'completed'].includes(activeTab)) {
@@ -4125,9 +4146,17 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     async function silentRefresh() {
         if (silentRefreshBusy) return;
         silentRefreshBusy = true;
-        const refreshingShipped = activeTab === 'shipped';
-        if (refreshingShipped) setShippedLiveStatus('refreshing');
+        const refreshingOrders = isOrderListTab();
+        if (refreshingOrders) setOrdersLiveStatus('refreshing');
         try {
+            if (activeTab === 'rrc') {
+                const refreshed = await loadRrc(true, true);
+                if (refreshingOrders && activeTab === 'rrc') {
+                    setOrdersLiveStatus(refreshed === false ? 'error' : 'ready');
+                }
+                return;
+            }
+
             const newOrders = await api(localOrdersUrl());
             applyOrdersResponse(newOrders);
             fulfillmentStatusMap.clear();
@@ -4140,18 +4169,18 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             // Hanya update render tanpa merusak UX loading screen yang sudah ada
             render();
             updateLastSyncTime();
-            if (refreshingShipped && activeTab === 'shipped') setShippedLiveStatus('ready');
+            if (refreshingOrders && isOrderListTab()) setOrdersLiveStatus('ready');
             // Status order baru/escrow dapat mengubah angka badge antar-tab.
             loadOrderCounts(ordersLoadSeq, api(localOrderCountsUrl()).catch(() => null));
         } catch(e) {
             // Data lama tetap ditampilkan. Status kecil memberi tahu operator
             // bahwa pembaruan berikutnya akan dicoba lagi, tanpa layar error penuh.
-            if (refreshingShipped && activeTab === 'shipped') setShippedLiveStatus('error');
+            if (refreshingOrders && isOrderListTab()) setOrdersLiveStatus('error');
         } finally {
             silentRefreshBusy = false;
         }
     }
-    window.refreshShippedLive = function () {
+    window.refreshOrdersLive = function () {
         void silentRefresh();
     };
 
@@ -4170,9 +4199,9 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     // ── Polling (tanpa Reverb) ───────────────────────────────────────────────
     let lastPollAt = Date.now();
     setInterval(() => {
-        // Tab Dikirim diprioritaskan agar perubahan status cepat terlihat;
-        // tab lain tetap memakai interval hemat request.
-        const pollInterval = activeTab === 'shipped' ? 8000 : 15000;
+        // Semua tab order utama dibaca lebih cepat agar perpindahan status
+        // dari sinkronisasi server langsung tampak tanpa refresh halaman.
+        const pollInterval = isOrderListTab() ? 8000 : 15000;
         if (Date.now() - lastPollAt >= pollInterval) {
             lastPollAt = Date.now();
             // Hanya poll jika halaman sedang aktif/terlihat
