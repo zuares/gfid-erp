@@ -121,30 +121,195 @@
         }
 
         .pw-table-wrap {
-            overflow-x: auto
+            max-height: 560px;
+            overflow: auto
+        }
+
+        .pw-mobile-periods {
+            display: none
+        }
+
+        .pw-period-card {
+            padding: .8rem;
+            border: 1px solid rgba(148, 163, 184, .2);
+            border-radius: 12px;
+            background: color-mix(in srgb, var(--card) 94%, var(--line) 6%)
+        }
+
+        .pw-period-card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .5rem;
+            margin-bottom: .65rem
+        }
+
+        .pw-period-stats {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .5rem;
+            margin-top: .8rem
+        }
+
+        .pw-period-stats > div {
+            padding: .55rem .6rem;
+            border: 1px solid rgba(148, 163, 184, .16);
+            border-radius: 9px;
+            background: color-mix(in srgb, var(--card) 88%, var(--line) 12%)
+        }
+
+        .pw-period-stats span {
+            display: block;
+            margin-bottom: .15rem;
+            color: var(--muted);
+            font-size: .68rem
+        }
+
+        .pw-period-stats strong {
+            display: block;
+            font-size: .82rem;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap
+        }
+
+        .pw-period-stat-wide {
+            grid-column: 1 / -1
+        }
+
+        .pw-period-card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .5rem;
+            margin-top: .75rem;
+            padding-top: .65rem;
+            border-top: 1px solid rgba(148, 163, 184, .16)
+        }
+
+        .pw-period-paid {
+            color: var(--muted);
+            font-size: .7rem
+        }
+
+        .pw-mobile-empty {
+            padding: .9rem;
+            color: var(--muted);
+            font-size: .8rem
         }
 
         .pw-table {
             width: 100%;
-            min-width: 760px;
+            min-width: 900px;
             border-collapse: separate;
             border-spacing: 0
         }
 
         .pw-table th {
-            font-size: .72rem;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            padding: .62rem .65rem;
+            font-size: .66rem;
+            font-weight: 800;
             text-transform: uppercase;
             letter-spacing: .08em;
             color: var(--muted);
             text-align: left;
-            padding: .58rem .65rem;
+            background: var(--card);
+            box-shadow: 0 1px 0 rgba(148, 163, 184, .22);
             border-bottom: 1px solid rgba(148, 163, 184, .18)
         }
 
         .pw-table td {
-            padding: .65rem;
+            padding: .62rem .65rem;
+            font-size: .8rem;
+            line-height: 1.35;
             border-bottom: 1px solid rgba(148, 163, 184, .12);
             vertical-align: middle
+        }
+
+        .pw-table tbody tr:hover {
+            background: color-mix(in srgb, var(--accent-soft) 8%, transparent)
+        }
+
+        .pw-period-cell {
+            min-width: 190px
+        }
+
+        .pw-period-week {
+            margin-bottom: .2rem;
+            color: var(--accent);
+            font-size: .72rem;
+            font-weight: 800
+        }
+
+        .pw-period-week .pw-sub {
+            margin: 0;
+            color: var(--muted);
+            font-size: inherit
+        }
+
+        .pw-period-main {
+            font-size: .81rem;
+            font-weight: 800;
+            white-space: nowrap
+        }
+
+        .pw-period-meta {
+            margin-top: .12rem;
+            color: var(--muted);
+            font-size: .69rem
+        }
+
+        .pw-basis {
+            color: var(--muted);
+            font-size: .75rem;
+            white-space: nowrap
+        }
+
+        .pw-number {
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap
+        }
+
+        .pw-amount {
+            font-size: .82rem;
+            font-weight: 850
+        }
+
+        .pw-status {
+            min-width: 84px
+        }
+
+        .pw-status .pw-sub {
+            font-size: .68rem;
+            white-space: nowrap
+        }
+
+        .pw-action .pw-btn {
+            padding: .36rem .58rem;
+            border-radius: 9px;
+            font-size: .76rem;
+            white-space: nowrap
+        }
+
+        .pw-action-wrap,
+        .pw-period-card-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: .35rem;
+            flex-wrap: wrap
+        }
+
+        .pw-action-wrap form,
+        .pw-period-card-actions form {
+            margin: 0
+        }
+
+        .pw-btn.danger {
+            border-color: rgba(239, 68, 68, .3);
+            color: rgb(220, 38, 38)
         }
 
         .pw-right {
@@ -185,6 +350,80 @@
             margin-top: .75rem
         }
 
+        .pw-generate-summary {
+            min-height: 66px;
+            padding: .78rem 1rem
+        }
+
+        .pw-generate-heading {
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+            min-width: 0
+        }
+
+        .pw-generate-icon {
+            display: inline-grid;
+            place-items: center;
+            width: 32px;
+            height: 32px;
+            flex: 0 0 32px;
+            border: 1px solid color-mix(in srgb, var(--accent) 32%, rgba(148, 163, 184, .3));
+            border-radius: 10px;
+            color: var(--accent);
+            background: color-mix(in srgb, var(--accent-soft) 22%, var(--card) 78%)
+        }
+
+        .pw-generate-copy {
+            min-width: 0
+        }
+
+        .pw-generate-title {
+            display: block;
+            font-size: .92rem;
+            line-height: 1.2
+        }
+
+        .pw-generate-copy .pw-sub {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap
+        }
+
+        .pw-generate-meta {
+            display: inline-flex;
+            align-items: center;
+            gap: .55rem
+        }
+
+        .pw-generate-chevron {
+            color: var(--muted);
+            font-size: 1.05rem;
+            line-height: 1;
+            transition: transform .18s ease
+        }
+
+        .pw-generate[open] .pw-generate-chevron {
+            transform: rotate(180deg)
+        }
+
+        .pw-generate-body {
+            padding: .95rem 1rem 1rem
+        }
+
+        .pw-generate-note {
+            display: flex;
+            align-items: center;
+            gap: .4rem;
+            margin-bottom: .85rem;
+            color: var(--muted);
+            font-size: .8rem
+        }
+
+        .pw-generate-note i {
+            color: var(--accent)
+        }
+
         .pw-generate summary {
             cursor: pointer;
             list-style: none
@@ -196,20 +435,28 @@
 
         .pw-generate-form {
             display: grid;
-            grid-template-columns: 1.1fr 1fr 1fr auto;
-            gap: .55rem;
+            grid-template-columns: minmax(190px, .8fr) minmax(280px, 1.4fr) auto;
+            gap: .75rem;
             align-items: end
         }
 
         .pw-field label {
             display: block;
-            margin-bottom: .3rem;
+            margin-bottom: .38rem;
             color: var(--muted);
-            font-size: .74rem
+            font-size: .73rem;
+            font-weight: 700;
+            letter-spacing: .02em
         }
 
         .pw-range-field {
-            grid-column: span 2
+            grid-column: auto
+        }
+
+        .pw-submit {
+            min-height: 36px;
+            white-space: nowrap;
+            justify-content: center
         }
 
         @media (max-width: 800px) {
@@ -217,8 +464,36 @@
                 grid-template-columns: 1fr 1fr
             }
 
+            .pw-range-field {
+                grid-column: span 1
+            }
+
             .pw-generate-form .pw-submit {
                 grid-column: 1 / -1
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            .pw-table-wrap {
+                display: none
+            }
+
+            .pw-mobile-periods {
+                display: grid;
+                gap: .6rem;
+                padding: .65rem
+            }
+
+            .pw-card > .pw-card-b {
+                padding: .75rem
+            }
+
+            .pw-card-h {
+                padding: .75rem
+            }
+
+            .pw-period-main {
+                font-size: .79rem
             }
         }
 
@@ -243,6 +518,14 @@
 
             .pw-range-field {
                 grid-column: auto
+            }
+
+            .pw-generate-heading {
+                gap: .5rem
+            }
+
+            .pw-generate-copy .pw-sub {
+                max-width: 215px
             }
         }
     </style>
@@ -288,97 +571,25 @@
             <div class="alert alert-danger">{{ session('error') }}</div>
         @endif
 
-        <div class="pw-card">
-            <div class="pw-card-h">
-                <div>
-                    <strong>Daftar Periode</strong>
-                    <div class="pw-sub">{{ $periods->total() }} periode · filter aktif: {{ $moduleLabels[$activeModule] }}</div>
-                </div>
-
-                <form class="pw-row" method="GET" action="{{ route('payroll.piecework.overview') }}" id="pw-filter-form">
-                    @if ($activeModule !== 'all')
-                        <input type="hidden" name="module" value="{{ $activeModule }}">
-                    @endif
-                    <input type="hidden" name="from" id="pw-filter-from" value="{{ request('from') }}" data-gf-date="off">
-                    <input type="hidden" name="to" id="pw-filter-to" value="{{ request('to') }}" data-gf-date="off">
-                    <input class="pw-in pw-date-range" type="text" id="pw-filter-range"
-                        value="" placeholder="Pilih rentang tanggal" aria-label="Rentang tanggal"
-                        autocomplete="off" readonly data-gf-date="off">
-                    <button class="pw-btn" type="submit">Terapkan</button>
-                    @if (request()->filled('from') || request()->filled('to'))
-                        <a class="pw-btn" href="{{ $tabUrl($activeModule) }}">Reset</a>
-                    @endif
-                </form>
-            </div>
-
-            <div class="pw-table-wrap">
-                <table class="pw-table">
-                    <thead>
-                        <tr>
-                            <th>Modul</th>
-                            <th>Periode</th>
-                            <th>Basis</th>
-                            <th class="pw-right">Operator</th>
-                            <th class="pw-right">Qty</th>
-                            <th class="pw-right">Total Amount</th>
-                            <th>Status</th>
-                            <th class="pw-right">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($periods as $period)
-                            @php
-                                $periodModule = strtolower($period->module);
-                                $isSewing = $periodModule === 'sewing';
-                                $totalQty = (float) ($period->lines_total_qty ?? 0);
-                                $totalAmount = (float) ($period->lines_total_amount ?? $period->total_amount ?? 0);
-                            @endphp
-                            <tr>
-                                <td>
-                                    <span class="pw-chip {{ $periodModule }}">{{ $moduleLabels[$periodModule] ?? ucfirst($periodModule) }}</span>
-                                </td>
-                                <td>
-                                    <div style="font-weight:800">{{ id_date($period->period_start) }} – {{ id_date($period->period_end) }}</div>
-                                    <div class="pw-sub">ID #{{ $period->id }}</div>
-                                </td>
-                                <td>{{ $isSewing ? 'Ambil Jahit' : 'Qty PCS / QC OK' }}</td>
-                                <td class="pw-right">{{ number_format((int) ($period->operator_count ?? 0), 0, ',', '.') }}</td>
-                                <td class="pw-right">{{ rtrim(rtrim(number_format($totalQty, 2, '.', ''), '0'), '.') }}</td>
-                                <td class="pw-right" style="font-weight:800">{{ number_format($totalAmount, 0, ',', '.') }}</td>
-                                <td>
-                                    @if ($period->status === 'final')
-                                        <span class="pw-chip final">FINAL</span>
-                                    @else
-                                        <span class="pw-chip draft">DRAFT</span>
-                                    @endif
-                                    @if ($period->paid_at)
-                                        <div class="pw-sub">Sudah dibayar</div>
-                                    @endif
-                                </td>
-                                <td class="pw-right">
-                                    <a class="pw-btn" href="{{ route('payroll.piecework.show', ['module' => $periodModule, 'period' => $period]) }}">Detail</a>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="8" style="padding:1.1rem;color:var(--muted)">Belum ada periode payroll.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="pw-card-b">
-                {{ $periods->links() }}
-            </div>
-        </div>
-
         <details class="pw-card pw-generate" {{ isset($errors) && $errors->any() ? 'open' : '' }}>
-            <summary class="pw-card-h">
-                <span><strong>＋ Generate Payroll</strong><span class="pw-sub" style="display:inline;margin-left:.4rem">Pilih modul dan rentang tanggal</span></span>
-                <span class="pw-chip">Draft</span>
+            <summary class="pw-card-h pw-generate-summary">
+                <span class="pw-generate-heading">
+                    <span class="pw-generate-icon" aria-hidden="true"><i class="bi bi-magic"></i></span>
+                    <span class="pw-generate-copy">
+                        <strong class="pw-generate-title">Generate Payroll</strong>
+                        <span class="pw-sub">Pilih modul dan satu rentang periode</span>
+                    </span>
+                </span>
+                <span class="pw-generate-meta">
+                    <span class="pw-chip">Draft</span>
+                    <span class="pw-generate-chevron" aria-hidden="true">⌄</span>
+                </span>
             </summary>
-            <div class="pw-card-b">
+            <div class="pw-card-b pw-generate-body">
+                <div class="pw-generate-note">
+                    <i class="bi bi-info-circle"></i>
+                    <span>Periode yang dipilih akan dibuat sebagai draft dan bisa diperiksa sebelum difinalkan.</span>
+                </div>
                 @if (isset($errors) && $errors->any())
                     <div class="alert alert-danger py-2">
                         <ul class="mb-0">
@@ -411,6 +622,165 @@
                 </form>
             </div>
         </details>
+
+        <div class="pw-card">
+            <div class="pw-card-h">
+                <div>
+                    <strong>Daftar Periode</strong>
+                    <div class="pw-sub">{{ $periods->total() }} periode · filter aktif: {{ $moduleLabels[$activeModule] }}</div>
+                </div>
+
+                <form class="pw-row" method="GET" action="{{ route('payroll.piecework.overview') }}" id="pw-filter-form">
+                    @if ($activeModule !== 'all')
+                        <input type="hidden" name="module" value="{{ $activeModule }}">
+                    @endif
+                    <input type="hidden" name="from" id="pw-filter-from" value="{{ request('from') }}" data-gf-date="off">
+                    <input type="hidden" name="to" id="pw-filter-to" value="{{ request('to') }}" data-gf-date="off">
+                    <input class="pw-in pw-date-range" type="text" id="pw-filter-range"
+                        value="" placeholder="Pilih rentang tanggal" aria-label="Rentang tanggal"
+                        autocomplete="off" readonly data-gf-date="off">
+                    <button class="pw-btn" type="submit">Terapkan</button>
+                    @if (request()->filled('from') || request()->filled('to'))
+                        <a class="pw-btn" href="{{ $tabUrl($activeModule) }}">Reset</a>
+                    @endif
+                </form>
+            </div>
+
+            <div class="pw-table-wrap">
+                <table class="pw-table">
+                    <thead>
+                        <tr>
+                            <th>Periode</th>
+                            <th class="pw-right">Operator</th>
+                            <th>Modul / Basis</th>
+                            <th class="pw-right">Qty</th>
+                            <th class="pw-right">Total Amount</th>
+                            <th>Status</th>
+                            <th class="pw-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($periods as $period)
+                            @php
+                                $periodModule = strtolower($period->module);
+                                $isSewing = $periodModule === 'sewing';
+                                $periodStart = \Carbon\Carbon::parse($period->period_start)->locale('id');
+                                $periodWeek = $periodStart->weekOfMonth;
+                                $periodMonth = $periodStart->translatedFormat('F Y');
+                                $totalQty = (float) ($period->lines_total_qty ?? 0);
+                                $totalAmount = (float) ($period->lines_total_amount ?? $period->total_amount ?? 0);
+                            @endphp
+                            <tr>
+                                <td class="pw-period-cell">
+                                    <div class="pw-period-week">Minggu ke-{{ $periodWeek }} <span class="pw-sub" style="display:inline">· {{ $periodMonth }}</span></div>
+                                    <div class="pw-period-main">{{ id_date($period->period_start) }} – {{ id_date($period->period_end) }}</div>
+                                    <div class="pw-period-meta">ID #{{ $period->id }}</div>
+                                </td>
+                                <td class="pw-right pw-number">{{ number_format((int) ($period->operator_count ?? 0), 0, ',', '.') }}</td>
+                                <td class="pw-basis">
+                                    <span class="pw-chip {{ $periodModule }}">{{ $moduleLabels[$periodModule] ?? ucfirst($periodModule) }}</span>
+                                    <div class="pw-period-meta">{{ $isSewing ? 'Ambil Jahit' : 'Qty PCS / QC OK' }}</div>
+                                </td>
+                                <td class="pw-right pw-number">{{ rtrim(rtrim(number_format($totalQty, 2, '.', ''), '0'), '.') }}</td>
+                                <td class="pw-right pw-number pw-amount">{{ number_format($totalAmount, 0, ',', '.') }}</td>
+                                <td class="pw-status">
+                                    @if ($period->status === 'final')
+                                        <span class="pw-chip final">FINAL</span>
+                                    @else
+                                        <span class="pw-chip draft">DRAFT</span>
+                                    @endif
+                                    @if ($period->paid_at)
+                                        <div class="pw-sub">Sudah dibayar</div>
+                                    @endif
+                                </td>
+                                <td class="pw-right pw-action">
+                                    <div class="pw-action-wrap">
+                                        <a class="pw-btn" href="{{ route('payroll.piecework.show', ['module' => $periodModule, 'period' => $period]) }}">Detail</a>
+                                        @if ($period->status === 'draft' && ! $period->paid_at)
+                                            <form method="POST" action="{{ route('payroll.piecework.destroy', ['module' => $periodModule, 'period' => $period]) }}"
+                                                onsubmit="return confirm('Hapus payroll periode ini? Data detail payroll juga akan dihapus.');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button class="pw-btn danger" type="submit">Hapus</button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7" style="padding:1.1rem;color:var(--muted)">Belum ada periode payroll.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pw-mobile-periods">
+                @forelse ($periods as $period)
+                    @php
+                        $periodModule = strtolower($period->module);
+                        $isSewing = $periodModule === 'sewing';
+                        $periodStart = \Carbon\Carbon::parse($period->period_start)->locale('id');
+                        $periodWeek = $periodStart->weekOfMonth;
+                        $periodMonth = $periodStart->translatedFormat('F Y');
+                        $totalQty = (float) ($period->lines_total_qty ?? 0);
+                        $totalAmount = (float) ($period->lines_total_amount ?? $period->total_amount ?? 0);
+                    @endphp
+                    <article class="pw-period-card">
+                        <div class="pw-period-card-top">
+                            <span class="pw-chip {{ $periodModule }}">{{ $moduleLabels[$periodModule] ?? ucfirst($periodModule) }}</span>
+                            @if ($period->status === 'final')
+                                <span class="pw-chip final">FINAL</span>
+                            @else
+                                <span class="pw-chip draft">DRAFT</span>
+                            @endif
+                        </div>
+                        <div class="pw-period-week">Minggu ke-{{ $periodWeek }} <span class="pw-sub">· {{ $periodMonth }}</span></div>
+                        <div class="pw-period-main">{{ id_date($period->period_start) }} – {{ id_date($period->period_end) }}</div>
+                        <div class="pw-period-meta">ID #{{ $period->id }} · {{ $isSewing ? 'Ambil Jahit' : 'Qty PCS / QC OK' }}</div>
+                        <div class="pw-period-stats">
+                            <div>
+                                <span>Operator</span>
+                                <strong>{{ number_format((int) ($period->operator_count ?? 0), 0, ',', '.') }}</strong>
+                            </div>
+                            <div>
+                                <span>Qty</span>
+                                <strong>{{ rtrim(rtrim(number_format($totalQty, 2, '.', ''), '0'), '.') }}</strong>
+                            </div>
+                            <div class="pw-period-stat-wide">
+                                <span>Total Amount</span>
+                                <strong>{{ number_format($totalAmount, 0, ',', '.') }}</strong>
+                            </div>
+                        </div>
+                        <div class="pw-period-card-footer">
+                            @if ($period->paid_at)
+                                <span class="pw-period-paid">Sudah dibayar</span>
+                            @else
+                                <span></span>
+                            @endif
+                            <div class="pw-period-card-actions">
+                                <a class="pw-btn" href="{{ route('payroll.piecework.show', ['module' => $periodModule, 'period' => $period]) }}">Detail</a>
+                                @if ($period->status === 'draft' && ! $period->paid_at)
+                                    <form method="POST" action="{{ route('payroll.piecework.destroy', ['module' => $periodModule, 'period' => $period]) }}"
+                                        onsubmit="return confirm('Hapus payroll periode ini? Data detail payroll juga akan dihapus.');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="pw-btn danger" type="submit">Hapus</button>
+                                    </form>
+                                @endif
+                            </div>
+                        </div>
+                    </article>
+                @empty
+                    <div class="pw-mobile-empty">Belum ada periode payroll.</div>
+                @endforelse
+            </div>
+
+            <div class="pw-card-b">
+                {{ $periods->links() }}
+            </div>
+        </div>
     </div>
 @endsection
 

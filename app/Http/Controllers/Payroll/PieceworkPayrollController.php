@@ -12,6 +12,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class PieceworkPayrollController extends Controller
 {
@@ -398,5 +399,35 @@ class PieceworkPayrollController extends Controller
         return redirect()
             ->route('payroll.piecework.show', [$cfg['module'], $period])
             ->with('status', "Payroll {$cfg['label']} berhasil digenerate ulang.");
+    }
+
+    /**
+     * DESTROY: hapus periode payroll yang masih draft beserta detailnya.
+     */
+    public function destroy(string $module, PieceworkPayrollPeriod $period): RedirectResponse
+    {
+        $cfg = $this->moduleConfig($module);
+        abort_unless($period->module === $cfg['module'], 404);
+
+        if (
+            $period->status !== 'draft'
+            || $period->paid_at
+            || $period->finalized_at
+            || $period->accrual_journal_id
+            || $period->payment_journal_id
+        ) {
+            return redirect()
+                ->route('payroll.piecework.overview', ['module' => $cfg['module']])
+                ->with('error', 'Payroll yang sudah FINAL atau memiliki pencatatan akuntansi tidak bisa dihapus.');
+        }
+
+        DB::transaction(function () use ($period): void {
+            $period->lines()->delete();
+            $period->delete();
+        });
+
+        return redirect()
+            ->route('payroll.piecework.overview', ['module' => $cfg['module']])
+            ->with('status', "Payroll {$cfg['label']} periode " . id_date($period->period_start) . ' s/d ' . id_date($period->period_end) . ' berhasil dihapus.');
     }
 }
