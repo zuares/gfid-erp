@@ -83,10 +83,10 @@
 
     {{-- TABS (label mengikuti alur Pesanan Kilat, ramah-owner) --}}
     <div class="ord-tabs" id="ordTabs">
-        <button class="ord-tab active" data-tab="all" onclick="switchTab('all', this)" title="Semua pesanan kilat">
+        <button class="ord-tab" data-tab="all" onclick="switchTab('all', this)" title="Semua pesanan kilat">
             📋 Semua <span class="ord-badge" id="badge-all">—</span>
         </button>
-        <button class="ord-tab" data-tab="ready" onclick="switchTab('ready', this)" title="Penjual perlu memproses / menyerahkan barang (READY_TO_SHIP/PROCESSED)">
+        <button class="ord-tab active" data-tab="ready" onclick="switchTab('ready', this)" title="Penjual perlu memproses / menyerahkan barang (READY_TO_SHIP/PROCESSED)">
             📦 Perlu Proses Penjual <span class="ord-badge urgent" id="badge-ready">—</span>
         </button>
         <button class="ord-tab" data-tab="shipped" onclick="switchTab('shipped', this)" title="Barang sudah dikirim ke gudang/DC Shopee (SHIPPED/COMPLETED)">
@@ -101,7 +101,7 @@
     </div>
 
     {{-- Sub-tab untuk tab "Perlu Proses Penjual" (tampil hanya saat tab itu aktif) --}}
-    <div id="subTabReadyContainer" class="kilat-subtabs">
+    <div id="subTabReadyContainer" class="kilat-subtabs" style="display:inline-flex">
         <button class="ord-subtab active" data-sub="all" onclick="switchSubTabReady('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-ready-all">—</span></button>
         <button class="ord-subtab" data-sub="to_arrange" onclick="switchSubTabReady('to_arrange', this)">Perlu Diatur <span class="ord-badge bg-secondary urgent" id="badge-sub-ready-arrange">—</span></button>
         <button class="ord-subtab" data-sub="packing" onclick="switchSubTabReady('packing', this)">📦 Sedang Dikemas <span class="ord-badge bg-secondary" id="badge-sub-ready-packing">—</span></button>
@@ -327,7 +327,7 @@
     const storeFilter = document.getElementById('storeFilter');
     let bookings = [];
     let loading = false;
-    let currentTab = 'all';
+    let currentTab = 'ready';
     let selectedStore = '';
     let subReady = 'all'; // sub-tab di dalam "Perlu Proses Penjual": all | to_arrange | packing
 
