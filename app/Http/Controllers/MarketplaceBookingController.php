@@ -45,7 +45,11 @@ class MarketplaceBookingController extends Controller
         $status = trim((string) $request->query('status', ''));
         $search = trim((string) $request->query('search', ''));
 
-        $storeIds = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+        // Samakan scope dengan shopeeStores(): booking dari toko nonaktif/legacy
+        // tidak boleh ikut tampil dan menghasilkan placeholder item yang menyesatkan.
+        $storeIds = Store::where('is_active', true)
+            ->where('status', 'active')
+            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
             ->pluck('id');
 
         $q = MarketplaceBooking::with('store')->whereIn('store_id', $storeIds);

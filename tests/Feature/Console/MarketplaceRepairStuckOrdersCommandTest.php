@@ -258,6 +258,35 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         $this->assertSame(2, data_get($booking->items, '0.model_quantity_purchased'));
     }
 
+    public function test_daftar_booking_hanya_memakai_toko_aktif(): void
+    {
+        $inactiveStore = Store::create([
+            'channel_id' => $this->shopee->id,
+            'code' => 'INACTIVE-STORE',
+            'name' => 'Toko Nonaktif',
+            'status' => 'inactive',
+            'is_active' => false,
+        ]);
+
+        MarketplaceBooking::create([
+            'store_id' => $this->store->id,
+            'booking_sn' => 'ACTIVE-BOOKING',
+            'items' => [['item_name' => 'Produk Aktif']],
+        ]);
+        MarketplaceBooking::create([
+            'store_id' => $inactiveStore->id,
+            'booking_sn' => 'INACTIVE-BOOKING',
+            'items' => null,
+        ]);
+
+        $response = app(\App\Http\Controllers\MarketplaceBookingController::class)
+            ->stored(Request::create('/api/marketplace/bookings/stored', 'GET'));
+        $bookings = $response->getData(true)['data'];
+
+        $this->assertCount(1, $bookings);
+        $this->assertSame('ACTIVE-BOOKING', $bookings[0]['booking_sn']);
+    }
+
     public function test_move_to_ready_memindahkan_order_processed_dengan_fulfillment_aktif(): void
     {
         $order = $this->createOrder('REPAIR-MOVE-READY', 'PROCESSED');
