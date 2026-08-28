@@ -6,10 +6,14 @@
     <style>
         .slip-page { width:100%; max-width:860px; box-sizing:border-box; margin:0 auto; padding:1rem .85rem 3rem }
         body:has(.slip-page) .gf-owner-floating-tools { display:none !important }
-        .slip-page[data-module="cutting"] .slip-table { font-size:.84rem }
-        .slip-page[data-module="cutting"] .slip-table th { font-size:.68rem }
-        .slip-page[data-module="cutting"] .slip-table td { font-size:.78rem }
-        .slip-page[data-module="cutting"] .slip-section-title { font-size:.84rem }
+        .slip-page[data-module="cutting"] .slip-table,
+        .slip-page[data-module="sewing"] .slip-table { font-size:.84rem }
+        .slip-page[data-module="cutting"] .slip-table th,
+        .slip-page[data-module="sewing"] .slip-table th { font-size:.68rem }
+        .slip-page[data-module="cutting"] .slip-table td,
+        .slip-page[data-module="sewing"] .slip-table td { font-size:.78rem }
+        .slip-page[data-module="cutting"] .slip-section-title,
+        .slip-page[data-module="sewing"] .slip-section-title { font-size:.84rem }
         .slip-actions { display:flex; justify-content:space-between; align-items:center; gap:.75rem; margin-bottom:.85rem }
         .slip-action-btn { display:inline-flex; align-items:center; justify-content:center; gap:.4rem; min-height:36px; padding:.45rem .7rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.78rem; font-weight:700; text-decoration:none }
         .slip-action-btn.primary { border-color:var(--accent); background:var(--accent); color:#fff }
@@ -402,16 +406,16 @@
                             </table>
                         @else
                             <table class="slip-table">
-                                <thead><tr>@if ($module === 'cutting')<th>Hari / Tanggal</th>@endif<th>Kode Kategori</th><th>Kode Barang</th><th class="slip-right">{{ $pieceworkQtyLabel }}</th><th class="slip-right">{{ $pieceworkRateLabel }}</th><th class="slip-right">Total</th></tr></thead>
+                                <thead><tr>@if (!$isDaily)<th>Hari / Tanggal</th>@endif<th>Kode Kategori</th><th>Kode Barang</th><th class="slip-right">{{ $pieceworkQtyLabel }}</th><th class="slip-right">{{ $pieceworkRateLabel }}</th><th class="slip-right">Total</th></tr></thead>
                                 <tbody>
                                     @foreach ($lines as $line)
                                         <tr>
-                                            @if ($module === 'cutting')
-                                                @php $cuttingDate = $line->work_date ? \Carbon\Carbon::parse($line->work_date)->locale('id') : null; @endphp
+                                            @if (!$isDaily)
+                                                @php $workDate = $line->work_date ? \Carbon\Carbon::parse($line->work_date)->locale('id') : null; @endphp
                                                 <td>
-                                                    @if ($cuttingDate)
-                                                        <div class="slip-date-day">{{ $cuttingDate->translatedFormat('l') }}</div>
-                                                        <div class="slip-date-value">{{ $cuttingDate->format('d/m/Y') }}</div>
+                                                    @if ($workDate)
+                                                        <div class="slip-date-day">{{ $workDate->translatedFormat('l') }}</div>
+                                                        <div class="slip-date-value">{{ $workDate->format('d/m/Y') }}</div>
                                                     @else
                                                         -
                                                     @endif
@@ -425,7 +429,7 @@
                                         </tr>
                                     @endforeach
                                 </tbody>
-                                <tfoot><tr><td colspan="{{ $module === 'cutting' ? 3 : 2 }}">Total Diterima</td><td class="slip-right slip-mono">{{ number_format((float) $totalQty, 2, ',', '.') }}</td><td></td><td class="slip-right slip-mono">{{ number_format((float) $totalAmount, 0, ',', '.') }}</td></tr></tfoot>
+                                <tfoot><tr><td colspan="{{ !$isDaily ? 3 : 2 }}">Total Diterima</td><td class="slip-right slip-mono">{{ number_format((float) $totalQty, 2, ',', '.') }}</td><td></td><td class="slip-right slip-mono">{{ number_format((float) $totalAmount, 0, ',', '.') }}</td></tr></tfoot>
                             </table>
                         @endif
                     </div>

@@ -44,6 +44,7 @@ class SewingPayrollGeneratorTest extends TestCase
         $period = SewingPayrollGenerator::generate('2026-08-01', '2026-08-07');
 
         $this->assertSame('sewing', $period->module);
+        $this->assertSame('2026-08-05', $period->lines->first()->work_date->toDateString());
         $this->assertSame(10.0, (float) $period->lines->sum('total_qty_ok'));
         $this->assertSame(15000.0, (float) $period->lines->sum('amount'));
         $this->assertSame(1500.0, (float) $period->lines->first()->rate_per_pcs);

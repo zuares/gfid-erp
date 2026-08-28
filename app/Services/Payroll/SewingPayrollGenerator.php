@@ -112,12 +112,14 @@ class SewingPayrollGenerator
                     $employeeId,
                     $categoryId,
                     $itemId,
+                    Carbon::parse($row->pickup_date)->toDateString(),
                     number_format($rateValue, 4, '.', ''),
                 ]);
 
                 if (! isset($grouped[$key])) {
                     $grouped[$key] = [
                         'employee_id' => $employeeId,
+                        'work_date' => Carbon::parse($row->pickup_date)->toDateString(),
                         'item_category_id' => $categoryId ?: null,
                         'item_id' => $itemId,
                         'total_qty_ok' => 0.0,
@@ -138,6 +140,7 @@ class SewingPayrollGenerator
                 PieceworkPayrollLine::create([
                     'payroll_period_id' => $period->id,
                     'employee_id' => $row['employee_id'],
+                    'work_date' => $row['work_date'],
                     'item_category_id' => $row['item_category_id'],
                     'item_id' => $row['item_id'],
                     'total_qty_ok' => $qty,
