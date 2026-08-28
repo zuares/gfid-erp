@@ -227,6 +227,12 @@
             border-bottom: 1px solid rgba(148, 163, 184, .18)
         }
 
+        .pw-table thead tr {
+            position: sticky;
+            top: 0;
+            z-index: 3
+        }
+
         .pw-table td {
             padding: .62rem .65rem;
             font-size: .8rem;

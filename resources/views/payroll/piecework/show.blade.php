@@ -118,11 +118,25 @@
             overflow-x: auto
         }
 
+        @media (min-width: 769px) {
+            .pw-table-wrap {
+                max-height: 60vh;
+                overflow: auto
+            }
+        }
+
+        .pw-table thead tr {
+            position: sticky;
+            top: 0;
+            z-index: 3
+        }
+
         .pw-table th {
             position: sticky;
             top: 0;
             z-index: 2;
             background: var(--card);
+            box-shadow: 0 1px 0 rgba(148, 163, 184, .22);
             font-size: .72rem;
             text-transform: uppercase;
             letter-spacing: .08em;
