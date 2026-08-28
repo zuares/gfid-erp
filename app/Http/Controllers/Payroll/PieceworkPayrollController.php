@@ -67,14 +67,12 @@ class PieceworkPayrollController extends Controller
     {
         $module = strtolower((string) $request->input('module', 'all'));
         $allowedModules = ['all', 'cutting', 'sewing', 'daily'];
-        $defaultFilterEnd = Carbon::today();
-        $defaultFilterStart = (clone $defaultFilterEnd)->subDays(6);
         $filterFrom = $request->filled('from')
             ? (string) $request->input('from')
-            : $defaultFilterStart->toDateString();
+            : '';
         $filterTo = $request->filled('to')
             ? (string) $request->input('to')
-            : $defaultFilterEnd->toDateString();
+            : '';
 
         if (!in_array($module, $allowedModules, true)) {
             $module = 'all';

@@ -742,8 +742,8 @@
 
             return route("payroll.piecework.{$action}", ['module' => $module, 'period' => $period]);
         };
-        $defaultStart = $filterFrom ?? now()->subDays(6)->toDateString();
-        $defaultEnd = $filterTo ?? now()->toDateString();
+        $defaultEnd = now()->toDateString();
+        $defaultStart = now()->subDays(6)->toDateString();
     @endphp
 
     <div class="pw-overview-wrap">
