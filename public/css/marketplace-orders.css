@@ -194,6 +194,33 @@ body[data-theme="dark"] .ord-tab.active {
 body[data-theme="dark"] .ord-subtab.active { background: rgba(51, 65, 85, 1); }
 .ord-subtab:hover:not(.active) { background: rgba(0,0,0,0.05); }
 body[data-theme="dark"] .ord-subtab:hover:not(.active) { background: rgba(255,255,255,0.05); }
+.ord-live-status {
+    display: inline-flex; align-items: center; gap: .28rem; margin-left: .28rem;
+    color: #047857; font-size: .62rem; font-weight: 800; white-space: nowrap;
+}
+.ord-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.14); }
+.ord-live-status.is-refreshing { color: #0369a1; }
+.ord-live-status.is-refreshing .ord-live-dot { background: #38bdf8; animation: ord-live-pulse .85s ease-in-out infinite; }
+.ord-live-status.is-error { color: #b45309; }
+.ord-live-status.is-error .ord-live-dot { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,.14); }
+.ord-live-refresh {
+    display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px;
+    padding: 0; border: 0; border-radius: 6px; background: transparent; color: #64748b;
+    font-size: 1rem; line-height: 1; cursor: pointer; transition: background .15s, transform .2s;
+}
+.ord-live-refresh:hover { color: #0369a1; background: #e0f2fe; }
+.ord-live-refresh.is-loading { color: #0284c7; pointer-events: none; animation: ord-live-spin .8s linear infinite; }
+.ord-shipped-loading { min-height: 240px; display: grid; place-items: center; padding: 2.25rem 1rem; color: #64748b; text-align: center; }
+.ord-shipped-loading-card { width: min(390px,100%); padding: 1rem; border: 1px solid #dbeafe; border-radius: 12px; background: linear-gradient(135deg,#f8fbff,#fff); }
+.ord-shipped-loading-title { color: #0f3b61; font-size: .86rem; font-weight: 800; margin-top: .55rem; }
+.ord-shipped-loading-sub { font-size: .72rem; margin-top: .18rem; }
+@keyframes ord-live-pulse { 50% { transform: scale(.65); opacity: .5; } }
+@keyframes ord-live-spin { to { transform: rotate(360deg); } }
+body[data-theme="dark"] .ord-live-status { color: #6ee7b7; }
+body[data-theme="dark"] .ord-live-refresh { color: #94a3b8; }
+body[data-theme="dark"] .ord-live-refresh:hover { color: #bae6fd; background: rgba(3,105,161,.22); }
+body[data-theme="dark"] .ord-shipped-loading-card { border-color: rgba(96,165,250,.28); background: rgba(30,41,59,.6); }
+body[data-theme="dark"] .ord-shipped-loading-title { color: #bfdbfe; }
 
 /* ── Mobile cards ── */
 .ord-cards { display: flex; flex-direction: column; gap: .5rem; }

@@ -22,6 +22,10 @@
                 <button class="ord-subtab active" data-sub="shipped" onclick="switchSubTabShipped('shipped', this)">Dikirim <span class="ord-badge bg-secondary" id="badge-sub-shipped-shipped">—</span></button>
                 <button class="ord-subtab" data-sub="confirm" onclick="switchSubTabShipped('confirm', this)">Menunggu <span class="ord-badge bg-secondary" id="badge-sub-shipped-confirm">—</span></button>
                 <button class="ord-subtab" data-sub="failed" onclick="switchSubTabShipped('failed', this)">🚨 Pengiriman Gagal <span class="ord-badge bg-secondary" id="badge-sub-shipped-failed">—</span></button>
+                <span class="ord-live-status" id="shippedLiveStatus" aria-live="polite" title="Daftar diperbarui otomatis setiap 8 detik saat tab ini terbuka">
+                    <span class="ord-live-dot"></span><span id="shippedLiveStatusText">Live</span>
+                </span>
+                <button type="button" class="ord-live-refresh" id="shippedLiveRefresh" onclick="refreshShippedLive()" title="Segarkan status pengiriman sekarang" aria-label="Segarkan status pengiriman">↻</button>
             </div>
             <div id="subTabRrcContainer" style="display:none; gap: 0.25rem; align-items: center; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid var(--shp-border); margin-left: 0.5rem;">
                 <button class="ord-subtab active" data-sub="return" onclick="switchSubTabRrc('return', this)">↩️ Retur <span class="ord-badge bg-secondary" id="badge-sub-rrc-return">—</span></button>

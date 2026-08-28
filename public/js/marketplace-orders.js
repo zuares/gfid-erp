@@ -401,6 +401,38 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     const getTo     = () => $('mpDateTo').value;
     const getSearch = () => ($('filterSearch').value || '').toLowerCase().trim();
 
+    function setShippedLiveStatus(state = 'ready', updatedAt = new Date()) {
+        const status = $('shippedLiveStatus');
+        const text = $('shippedLiveStatusText');
+        const refresh = $('shippedLiveRefresh');
+        if (!status || !text || !refresh) return;
+
+        status.classList.toggle('is-refreshing', state === 'refreshing');
+        status.classList.toggle('is-error', state === 'error');
+        refresh.classList.toggle('is-loading', state === 'refreshing');
+
+        if (state === 'refreshing') {
+            text.textContent = 'Memperbarui…';
+        } else if (state === 'error') {
+            text.textContent = 'Mencoba lagi…';
+        } else {
+            text.textContent = `Live · ${updatedAt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+        }
+    }
+
+    function ordersLoadingHtml() {
+        if (activeTab !== 'shipped') {
+            return '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
+        }
+        return `<div class="ord-shipped-loading">
+            <div class="ord-shipped-loading-card">
+                <span class="prod-tab-spinner"></span>
+                <div class="ord-shipped-loading-title">Memuat status pengiriman</div>
+                <div class="ord-shipped-loading-sub">Daftar akan diperbarui otomatis tanpa menutup data saat refresh berikutnya.</div>
+            </div>
+        </div>`;
+    }
+
     // Semua reload order wajib memakai scope yang sama. Sebelumnya silent
     // refresh memanggil endpoint polos sehingga setelah beberapa detik data
     // seluruh database menimpa hasil halaman yang sudah difilter.
@@ -755,6 +787,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         document.querySelectorAll('#subTabShippedContainer .ord-subtab').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         renderTable();
+        void silentRefresh();
         document.querySelectorAll('#subTabShippedContainer .ord-badge').forEach(b => b.classList.remove('urgent'));
         btn.querySelector('.ord-badge')?.classList.add('urgent');
     };
@@ -1238,10 +1271,20 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     // ── Load ──────────────────────────────────────────────────────────────
     async function loadOrders() {
         const loadSeq = ++ordersLoadSeq;
-        $('ordersBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
+        const isShippedLoad = activeTab === 'shipped';
+        if (isShippedLoad) setShippedLiveStatus('refreshing');
+        $('ordersBody').innerHTML = ordersLoadingHtml();
         // Kirim rentang tanggal aktif ke backend supaya order lama hasil backfill
         // ikut terambil (backend tidak lagi terpaku 200 order terbaru saja).
-        const res = await api(localOrdersUrl()).catch(() => ({data: []}));
+        let res;
+        try {
+            res = await api(localOrdersUrl());
+        } catch (error) {
+            if (loadSeq !== ordersLoadSeq) return;
+            if (isShippedLoad) setShippedLiveStatus('error');
+            $('ordersBody').innerHTML = `<div class="ord-empty"><div class="ord-empty-icon">⚠️</div>Gagal memuat status pengiriman. Data tidak diubah; coba segarkan kembali.</div>`;
+            return;
+        }
         if (loadSeq !== ordersLoadSeq) return;
         applyOrdersResponse(res);
 
@@ -1268,6 +1311,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         restoreSavedTab();
         render();
         updateLastSyncTime();
+        if (activeTab === 'shipped') setShippedLiveStatus('ready');
         loadOrderCounts(loadSeq, api(localOrderCountsUrl()).catch(() => null));
 
         if (['processed', 'shipped', 'completed'].includes(activeTab)) {
@@ -4081,6 +4125,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     async function silentRefresh() {
         if (silentRefreshBusy) return;
         silentRefreshBusy = true;
+        const refreshingShipped = activeTab === 'shipped';
+        if (refreshingShipped) setShippedLiveStatus('refreshing');
         try {
             const newOrders = await api(localOrdersUrl());
             applyOrdersResponse(newOrders);
@@ -4094,12 +4140,20 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             // Hanya update render tanpa merusak UX loading screen yang sudah ada
             render();
             updateLastSyncTime();
+            if (refreshingShipped && activeTab === 'shipped') setShippedLiveStatus('ready');
             // Status order baru/escrow dapat mengubah angka badge antar-tab.
             loadOrderCounts(ordersLoadSeq, api(localOrderCountsUrl()).catch(() => null));
-        } catch(e) {} finally {
+        } catch(e) {
+            // Data lama tetap ditampilkan. Status kecil memberi tahu operator
+            // bahwa pembaruan berikutnya akan dicoba lagi, tanpa layar error penuh.
+            if (refreshingShipped && activeTab === 'shipped') setShippedLiveStatus('error');
+        } finally {
             silentRefreshBusy = false;
         }
     }
+    window.refreshShippedLive = function () {
+        void silentRefresh();
+    };
 
     // Status order baru/escrow dapat mengubah angka badge antar-tab.
     // Ikut refresh counts agar tab langsung konsisten dengan daftar order.
@@ -4116,15 +4170,17 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     // ── Polling (tanpa Reverb) ───────────────────────────────────────────────
     let lastPollAt = Date.now();
     setInterval(() => {
-        // Polling setiap 15 detik
-        if (Date.now() - lastPollAt >= 15000) {
+        // Tab Dikirim diprioritaskan agar perubahan status cepat terlihat;
+        // tab lain tetap memakai interval hemat request.
+        const pollInterval = activeTab === 'shipped' ? 8000 : 15000;
+        if (Date.now() - lastPollAt >= pollInterval) {
             lastPollAt = Date.now();
             // Hanya poll jika halaman sedang aktif/terlihat
             if (!document.hidden) {
                 silentRefresh();
             }
         }
-    }, 5000);
+    }, 2000);
 
     // Re-render on resize (mobile ↔ desktop switch)
     // ── Review Modal (Sedang Proses) ────────────────────────────────────────
