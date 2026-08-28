@@ -95,9 +95,41 @@
             body:has(.slip-page) .app-main .page-wrap { display:block !important; width:100% !important; max-width:none !important; margin:0 !important; padding:0 !important }
             .slip-page { max-width:100%; padding:0 }
             .slip-card { border:1px solid #b8b8b8; border-radius:0; box-shadow:none }
-            .slip-inner { padding:1rem }
+            .slip-inner { padding:7mm 8mm 8mm }
+            .slip-brand-mark img { width:27px; height:27px }
+            .slip-brand-name { font-size:.8rem }
+            .slip-brand-sub, .slip-number { font-size:.58rem }
+            .slip-eyebrow { font-size:.56rem }
+            .slip-divider { margin:.55rem 0 }
+            .slip-heading { margin-bottom:.6rem }
+            .slip-title { font-size:1.05rem }
+            .slip-subtitle { margin-top:.12rem; font-size:.65rem }
+            .slip-status { min-height:21px; padding:.18rem .42rem; font-size:.56rem }
+            .slip-info { gap:.3rem; margin-bottom:.65rem }
+            .slip-info-item { padding:.4rem .45rem; border-radius:6px }
+            .slip-info-label { font-size:.53rem }
+            .slip-info-value { margin-top:.12rem; font-size:.66rem }
+            .slip-stats { gap:.3rem; margin-bottom:.75rem }
+            .slip-stat { padding:.45rem .5rem; border-radius:6px }
+            .slip-stat-label { font-size:.56rem }
+            .slip-stat-value { margin-top:.12rem; font-size:.78rem }
+            .slip-section-title { margin-bottom:.35rem; font-size:.66rem }
             .slip-table-wrap { overflow:visible }
             .slip-table { min-width:0 }
+            .slip-table { font-size:.68rem }
+            .slip-table th { padding:.42rem .45rem; font-size:.54rem }
+            .slip-table td { padding:.44rem .45rem }
+            .slip-table tfoot td { padding:.5rem .45rem }
+            .slip-date-value { margin-top:.05rem; font-size:.6rem }
+            .slip-attendance { padding:.18rem .35rem; font-size:.58rem }
+            .slip-total { margin-top:.7rem; padding-top:.55rem }
+            .slip-total-label { font-size:.58rem }
+            .slip-total-note { margin-top:.1rem; font-size:.58rem }
+            .slip-total-value { font-size:1.1rem }
+            .slip-signatures { gap:2rem; margin-top:1.1rem; padding-top:.6rem }
+            .slip-signature { font-size:.6rem }
+            .slip-signature-space { height:30px }
+            .slip-printed { margin-top:.7rem; font-size:.54rem }
             .slip-page, .slip-page * { color:#000 !important; box-shadow:none !important; }
             .slip-page .slip-card,
             .slip-page .slip-info-item,
