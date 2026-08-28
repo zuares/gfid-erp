@@ -89,11 +89,11 @@ class PieceworkPayrollController extends Controller
         }
 
         if ($request->filled('from')) {
-            $query->whereDate('period_start', '>=', $request->input('from'));
+            $query->whereDate('period_start', '=', $request->input('from'));
         }
 
         if ($request->filled('to')) {
-            $query->whereDate('period_end', '<=', $request->input('to'));
+            $query->whereDate('period_end', '=', $request->input('to'));
         }
 
         $periods = $query->paginate(15)->withQueryString();
@@ -146,10 +146,10 @@ class PieceworkPayrollController extends Controller
             ->orderByDesc('period_start');
 
         if ($request->filled('from')) {
-            $query->whereDate('period_start', '>=', $request->input('from'));
+            $query->whereDate('period_start', '=', $request->input('from'));
         }
         if ($request->filled('to')) {
-            $query->whereDate('period_end', '<=', $request->input('to'));
+            $query->whereDate('period_end', '=', $request->input('to'));
         }
 
         $periods = $query->paginate(15)->withQueryString();
