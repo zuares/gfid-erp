@@ -471,8 +471,8 @@
 
         .pw-generate-form {
             display: grid;
-            grid-template-columns: minmax(0, .85fr) minmax(0, 1.2fr) 150px;
-            column-gap: 1.25rem;
+            grid-template-columns: 200px minmax(0, 1fr) 150px;
+            column-gap: 1.5rem;
             row-gap: .8rem;
             padding: .05rem 0 0;
             align-items: end
