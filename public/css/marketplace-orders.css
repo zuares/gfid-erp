@@ -249,6 +249,8 @@ body[data-theme="dark"] .ord-card { border-color: var(--glass-border); box-shado
     white-space: nowrap; cursor: pointer;
 }
 .ord-repeat-badge:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 2px; }
+.ord-id .ord-repeat-badge,
+.pk-order-id .ord-repeat-badge { margin-left: .35rem; vertical-align: middle; font-family: inherit; }
 body[data-theme="dark"] .ord-repeat-badge { color: #ddd6fe; background: rgba(109, 40, 217, .22); border-color: rgba(167, 139, 250, .35); }
 .ord-items-invoice-head {
     display: flex; align-items: center; justify-content: space-between;

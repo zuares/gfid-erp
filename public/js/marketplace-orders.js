@@ -294,14 +294,19 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     function orderContextHtml(o) {
         const storeName = o.store?.name || '';
         const channel = o.store?.channel || null;
-        const repeatOrder = Number(o.buyer_previous_order_count || 0);
-        const repeatBuyer = o.is_repeat_buyer === true || repeatOrder > 0;
         return `<div class="ord-order-context">
             ${orderStatusBadge(o.order_status)}
             ${storeName ? `<span class="ord-order-store">🏪 ${esc(storeName)}</span>` : ''}
             ${channel ? channelPill(channel) : ''}
-            ${repeatBuyer ? `<span class="ord-repeat-badge" role="button" tabindex="0" title="Lihat ${repeatOrder} order selesai sebelumnya" onclick="event.stopPropagation(); window.showRepeatOrderHistory(${o.id})" onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); event.stopPropagation(); window.showRepeatOrderHistory(${o.id}); }">🔁 Repeat order · ke-${repeatOrder + 1}</span>` : ''}
         </div>`;
+    }
+
+    function repeatOrderBadgeHtml(o) {
+        const repeatOrder = Number(o.buyer_previous_order_count || 0);
+        const repeatBuyer = o.is_repeat_buyer === true || repeatOrder > 0;
+        return repeatBuyer
+            ? `<span class="ord-repeat-badge" role="button" tabindex="0" title="Lihat ${repeatOrder} order selesai sebelumnya" onclick="event.stopPropagation(); window.showRepeatOrderHistory(${o.id})" onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); event.stopPropagation(); window.showRepeatOrderHistory(${o.id}); }">🔁 Repeat · ke-${repeatOrder + 1}</span>`
+            : '';
     }
 
     function itemSalePriceHtml(i) {
@@ -2097,7 +2102,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             if (isAdvanceFulfillment) {
                 orderIdHtml = `No. Reservasi ${orderIdHtml}`;
             }
-            orderIdHtml += slaBadge;
+            orderIdHtml += repeatOrderBadgeHtml(o) + slaBadge;
 
             return `<div class="ord-card ${rowClass}${isPrinted && !isFulfilled ? ' row-printed' : ''}" style="overflow:hidden; animation-delay: ${idx * 0.04}s">
                 <div class="ord-card-header">
@@ -2342,7 +2347,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             if (isAdvanceFulfillment) {
                 orderIdHtml = `No. Reservasi ${orderIdHtml}`;
             }
-            orderIdHtml += slaBadge;
+            orderIdHtml += repeatOrderBadgeHtml(o) + slaBadge;
 
             return `<div class="pk-row ${isPrinted && !isFulfilled ? 'row-printed' : ''}" style="flex-direction:column; align-items:stretch">
                 <div style="display:flex; justify-content:space-between; align-items:center; width:100%">
@@ -2430,6 +2435,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                     <div class="pk-order-id">
                         ${o.is_kilat ? '<span title="Pesanan Kilat (Booking Shopee)" style="font-size:.6rem;font-weight:800;color:#a16207;background:#fefce8;border:1px solid #fde68a;border-radius:4px;padding:1px 5px;margin-right:5px;white-space:nowrap;">⚡ KILAT</span>' : ''}
                         ${orderCopyHtml(o.channel_order_id || '—')}
+                        ${repeatOrderBadgeHtml(o)}
                         ${o.shipping_awb_no ? `<span style="font-size:0.55rem; color:#059669; margin-left:8px; font-weight:600; padding:2px 6px; background:#d1fae5; border-radius:4px;">${printedDocOrderSns.has(o.channel_order_id) ? '🖨️ ' : ''}${esc(o.shipping_awb_no)}</span>` : ''}
                     </div>
                     <div class="pk-row-meta">
@@ -2726,7 +2732,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             if (isAdvanceFulfillment) {
                 orderIdHtml = `No. Reservasi ${orderIdHtml}`;
             }
-            orderIdHtml += slaBadge;
+            orderIdHtml += repeatOrderBadgeHtml(o) + slaBadge;
 
             const rowClick = activeTab === 'issues'
                 ? `onclick="window.location='/marketplace/issues'" style="cursor:pointer"`
