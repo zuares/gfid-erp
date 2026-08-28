@@ -5,6 +5,7 @@
 @push('head')
     <style>
         .slip-page { width:100%; max-width:860px; box-sizing:border-box; margin:0 auto; padding:1rem .85rem 3rem }
+        body:has(.slip-page) .gf-owner-floating-tools { display:none !important }
         .slip-actions { display:flex; justify-content:space-between; align-items:center; gap:.75rem; margin-bottom:.85rem }
         .slip-action-btn { display:inline-flex; align-items:center; justify-content:center; gap:.4rem; min-height:36px; padding:.45rem .7rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.78rem; font-weight:700; text-decoration:none }
         .slip-action-btn.primary { border-color:var(--accent); background:var(--accent); color:#fff }
@@ -14,6 +15,7 @@
         .slip-part-field { display:flex; flex-direction:column; gap:.2rem; color:var(--muted); font-size:.64rem; font-weight:800 }
         .slip-part-select { min-height:36px; padding:.45rem .6rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.76rem; font-weight:700 }
         .slip-preview-note { display:flex; align-items:center; gap:.45rem; margin-bottom:.75rem; color:var(--muted); font-size:.72rem }
+        .slip-details-meta { display:none }
         .slip-card { width:100%; max-width:100%; overflow:hidden; background:var(--card); border:1px solid rgba(148,163,184,.28); border-radius:14px; box-shadow:0 10px 28px rgba(15,23,42,.07) }
         .slip-inner { box-sizing:border-box; width:100%; max-width:100%; padding:1.35rem 1.5rem 1.5rem }
         .slip-brand { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem }
@@ -165,6 +167,11 @@
             .slip-page[data-paper-size="threeply_quarter"] .slip-table tfoot td { padding:.38rem .32rem }
             .slip-page[data-print-part="summary"] .slip-details-page,
             .slip-page[data-print-part="details"] .slip-summary-page { display:none !important }
+            .slip-page[data-print-part="details"] .slip-details-meta { display:grid; grid-template-columns:repeat(3,1fr); gap:.35rem; margin-bottom:.55rem; padding:.45rem .55rem .5rem; border:1px solid #000 }
+            .slip-details-meta-item { min-width:0 }
+            .slip-details-meta-label { font-size:.46rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase }
+            .slip-details-meta-value { overflow:hidden; margin-top:.08rem; font-size:.6rem; font-weight:800; text-overflow:ellipsis; white-space:nowrap }
+            .slip-page[data-paper-size="threeply_quarter"][data-print-part="details"] .slip-details-meta { grid-template-columns:repeat(2,1fr); padding:.32rem .4rem .38rem }
         }
     </style>
 @endpush
@@ -243,10 +250,6 @@
                 <header class="slip-brand">
                     <div class="slip-brand-mark">
                         <img src="{{ asset('images/logo-mark.svg') }}" alt="{{ config('app.name', 'Greatfit') }}">
-                        <div>
-                            <div class="slip-brand-name">{{ config('app.name', 'Greatfit') }}</div>
-                            <div class="slip-brand-sub">Payroll &amp; Operasional</div>
-                        </div>
                     </div>
                     <div class="slip-document">
                         <div class="slip-eyebrow">{{ $documentLabel }}</div>
@@ -267,7 +270,7 @@
                 <section class="slip-info" aria-label="Informasi slip">
                     <div class="slip-info-item"><div class="slip-info-label">Nama Operator</div><div class="slip-info-value">{{ $employee?->name ?? '-' }}</div></div>
                     <div class="slip-info-item"><div class="slip-info-label">Kode Operator</div><div class="slip-info-value">{{ $employee?->code ?? '-' }}</div></div>
-                    <div class="slip-info-item"><div class="slip-info-label">Jabatan</div><div class="slip-info-value">{{ $roleLabel }}</div></div>
+                    <div class="slip-info-item"><div class="slip-info-label">Role</div><div class="slip-info-value">{{ $roleLabel }}</div></div>
                     <div class="slip-info-item"><div class="slip-info-label">Periode</div><div class="slip-info-value">{{ $periodStart->format('d/m/Y') }} – {{ $periodEnd->format('d/m/Y') }}</div></div>
                 </section>
 
@@ -276,13 +279,18 @@
                         <div class="slip-stat"><div class="slip-stat-label">Hari Dibayar</div><div class="slip-stat-value">{{ rtrim(rtrim(number_format((float) $totalQty, 2, ',', '.'), '0'), ',') }}</div></div>
                         <div class="slip-stat"><div class="slip-stat-label">Hadir</div><div class="slip-stat-value">{{ number_format((int) $presentCount, 0, ',', '.') }} hari</div></div>
                         <div class="slip-stat"><div class="slip-stat-label">Libur</div><div class="slip-stat-value">{{ number_format((int) $holidayCount, 0, ',', '.') }} hari</div></div>
-                        <div class="slip-stat total"><div class="slip-stat-label">Total Penghasilan</div><div class="slip-stat-value">{{ number_format((float) $totalAmount, 0, ',', '.') }}</div></div>
+                        <div class="slip-stat total"><div class="slip-stat-label">Total Dibayarkan</div><div class="slip-stat-value">{{ number_format((float) $totalAmount, 0, ',', '.') }}</div></div>
                     </section>
                 @endif
 
                 </div>
 
                 <div class="slip-details-page">
+                <div class="slip-details-meta" aria-label="Identitas rincian payroll">
+                    <div class="slip-details-meta-item"><div class="slip-details-meta-label">Nama Operator</div><div class="slip-details-meta-value">{{ $employee?->name ?? '-' }}</div></div>
+                    <div class="slip-details-meta-item"><div class="slip-details-meta-label">Role</div><div class="slip-details-meta-value">{{ $roleLabel }}</div></div>
+                    <div class="slip-details-meta-item"><div class="slip-details-meta-label">Periode</div><div class="slip-details-meta-value">{{ $periodStart->format('d/m/Y') }} – {{ $periodEnd->format('d/m/Y') }}</div></div>
+                </div>
                 <section>
                     <div class="slip-section-title">{{ $isDaily ? 'Rincian Kehadiran' : 'Rincian Payroll' }}</div>
                     <div class="slip-table-wrap">
