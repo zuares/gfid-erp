@@ -34,9 +34,9 @@
         .slip-brand-mark img { width:34px; height:34px; object-fit:contain }
         .slip-brand-name { color:var(--text); font-size:.95rem; font-weight:900; letter-spacing:.02em }
         .slip-brand-sub { margin-top:.1rem; color:var(--muted); font-size:.68rem }
-        .slip-document { text-align:right }
-        .slip-eyebrow { color:var(--accent); font-size:.68rem; font-weight:900; letter-spacing:.11em }
-        .slip-number { margin-top:.22rem; color:var(--muted); font-size:.72rem; font-variant-numeric:tabular-nums }
+        .slip-document { text-align:right; text-transform:uppercase }
+        .slip-eyebrow { color:var(--accent); font-size:.68rem; font-weight:900; letter-spacing:.11em; text-transform:uppercase }
+        .slip-number { margin-top:.22rem; color:var(--muted); font-size:.72rem; font-variant-numeric:tabular-nums; text-transform:uppercase }
         .slip-divider { height:1px; margin:1.1rem 0; background:rgba(148,163,184,.22) }
         .slip-heading { display:flex; justify-content:space-between; align-items:flex-end; gap:1rem; margin-bottom:1rem }
         .slip-title { margin:0; color:var(--text); font-size:1.28rem; font-weight:900; letter-spacing:-.025em }
