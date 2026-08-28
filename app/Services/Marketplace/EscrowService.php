@@ -251,12 +251,24 @@ class EscrowService
             $income = array_merge($buyerPaymentInfo, $income);
         }
 
+        // Untuk order completed, waktu release bisa dikirim di root response
+        // (bukan di order_income). Bawa field ini keluar agar kolom release
+        // tetap bisa ditampilkan oleh halaman escrow live.
+        $rawReleaseTime = $root['escrow_release_time']
+            ?? $root['release_time']
+            ?? $income['escrow_release_time']
+            ?? $income['release_time']
+            ?? null;
+        $releaseTime = $this->timestamp($rawReleaseTime);
+
         return [
             'order_sn' => (string) ($root['order_sn'] ?? $orderSn),
             'buyer_user_name' => $root['buyer_user_name'] ?? null,
             'return_order_sn_list' => is_array($root['return_order_sn_list'] ?? null)
                 ? array_values($root['return_order_sn_list'])
                 : [],
+            'escrow_release_time' => is_numeric($rawReleaseTime) ? (int) $rawReleaseTime : null,
+            'escrow_release_at' => $releaseTime?->toIso8601String(),
             'buyer_payment_info' => is_array($buyerPaymentInfo) ? $buyerPaymentInfo : [],
             'income' => $income,
             'raw_response' => $this->withoutMeta($rawResponse),

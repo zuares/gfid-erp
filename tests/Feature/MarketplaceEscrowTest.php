@@ -110,6 +110,7 @@ class MarketplaceEscrowTest extends TestCase
                 ->andReturn([
                     'response' => [
                         'order_sn' => 'ORDER-DETAIL',
+                        'escrow_release_time' => 1754395200,
                         'buyer_user_name' => 'buyer-1',
                         'return_order_sn_list' => ['RETURN-1'],
                         'order_income' => ['escrow_amount' => 98765, 'commission_fee' => 1234],
@@ -121,6 +122,8 @@ class MarketplaceEscrowTest extends TestCase
         $this->getJson("/api/marketplace/stores/{$store->id}/escrow-detail?order_sn=ORDER-DETAIL")
             ->assertOk()
             ->assertJsonPath('data.order_sn', 'ORDER-DETAIL')
+            ->assertJsonPath('data.escrow_release_time', 1754395200)
+            ->assertJsonPath('data.escrow_release_at', Carbon::createFromTimestamp(1754395200, config('app.timezone'))->toIso8601String())
             ->assertJsonPath('data.income.escrow_amount', 98765)
             ->assertJsonPath('data.raw_response.response.order_income.commission_fee', 1234)
             ->assertJsonMissingPath('data.raw_response._meta');
