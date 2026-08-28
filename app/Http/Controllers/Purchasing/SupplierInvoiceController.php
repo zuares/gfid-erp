@@ -8,6 +8,7 @@ use App\Models\PurchaseOrder;
 use App\Models\SupplierInvoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class SupplierInvoiceController extends Controller
 {
@@ -96,6 +97,10 @@ class SupplierInvoiceController extends Controller
                     ->where('rec.purchase_order_id', $order->id)
                     ->where('pr.status', 'posted')
                     ->whereNull('pr.voided_at')
+                    ->where(function ($q) {
+                        $q->whereNull('pr.resolution_type')
+                            ->orWhere('pr.resolution_type', '!=', 'replacement');
+                    })
                     ->sum('pr.total');
             }
         }
@@ -136,6 +141,22 @@ class SupplierInvoiceController extends Controller
         $discountAmount   = $this->num($data['discount_amount'] ?? 0);
         $returnDeduction  = $this->num($data['return_deduction_amount'] ?? 0);
         $totalAmount      = max(0, round($subtotal - $discountAmount - $returnDeduction, 2));
+
+        if (!empty($data['purchase_order_id'])) {
+            $order = PurchaseOrder::query()->find((int) $data['purchase_order_id']);
+
+            if (!$order || (int) $order->supplier_id !== (int) $data['supplier_id']) {
+                throw ValidationException::withMessages([
+                    'purchase_order_id' => 'Supplier invoice harus memakai PO dan supplier yang sama.',
+                ]);
+            }
+
+            if ($order->status === 'cancelled') {
+                throw ValidationException::withMessages([
+                    'purchase_order_id' => 'PO yang sudah dibatalkan tidak dapat dibuatkan supplier invoice.',
+                ]);
+            }
+        }
 
         // Generate invoice_no
         $suppCode = DB::table('suppliers')
@@ -204,6 +225,10 @@ class SupplierInvoiceController extends Controller
                 ->where('rec.purchase_order_id', $order->id)
                 ->where('pr.status', 'posted')
                 ->whereNull('pr.voided_at')
+                ->where(function ($q) {
+                    $q->whereNull('pr.resolution_type')
+                        ->orWhere('pr.resolution_type', '!=', 'replacement');
+                })
                 ->sum('pr.total');
         }
 

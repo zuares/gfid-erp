@@ -421,12 +421,17 @@ class PurchaseOrderController extends Controller
         // =========================================================
         $grnPostedTotal = (float) $purchase_order->purchaseReceipts
             ->where('status', 'posted')
+            ->filter(fn ($grn) => !$grn->is_replacement)
             ->sum('grand_total');
 
         $returnPostedTotal = (float) PurchaseReturn::query()
             ->where('purchase_order_id', $purchase_order->id)
             ->where('status', 'posted')
             ->whereNull('voided_at')
+            ->where(function ($q) {
+                $q->whereNull('resolution_type')
+                    ->orWhere('resolution_type', '!=', 'replacement');
+            })
             ->sum('total');
 
         $paidPaymentTotal = (float) $purchase_order->payments
@@ -453,6 +458,7 @@ class PurchaseOrderController extends Controller
         // Cek apakah semua PO line sudah fully received (dari GRN posted)
         // → dipakai untuk disable tombol "+ GRN baru"
         $poLines = $purchase_order->lines;
+        $rejectedByLine = collect();
         $canCreateGrn = true; // default: boleh
         $receivedByLine = collect();
         $returnedByLine = collect();
@@ -460,10 +466,29 @@ class PurchaseOrderController extends Controller
             $poLineIds = $poLines->pluck('id');
             $receivedByLine = PurchaseReceiptLine::query()
                 ->whereIn('purchase_order_line_id', $poLineIds)
-                ->whereHas('receipt', fn($q) => $q->where('status', 'posted'))
+                ->whereHas('receipt', function ($q) {
+                    $q->where('status', 'posted')
+                        ->where(function ($q) {
+                            $q->whereNull('is_replacement')
+                                ->orWhere('is_replacement', false);
+                        });
+                })
                 ->selectRaw('purchase_order_line_id, SUM(qty_received) as total_received')
                 ->groupBy('purchase_order_line_id')
                 ->pluck('total_received', 'purchase_order_line_id');
+
+            $rejectedByLine = PurchaseReceiptLine::query()
+                ->whereIn('purchase_order_line_id', $poLineIds)
+                ->whereHas('receipt', function ($q) {
+                    $q->where('status', 'posted')
+                        ->where(function ($q) {
+                            $q->whereNull('is_replacement')
+                                ->orWhere('is_replacement', false);
+                        });
+                })
+                ->selectRaw('purchase_order_line_id, SUM(qty_reject) as total_rejected')
+                ->groupBy('purchase_order_line_id')
+                ->pluck('total_rejected', 'purchase_order_line_id');
 
             $returnedByLine = \App\Models\PurchaseReturnLine::query()
                 ->join('purchase_returns as pr', 'pr.id', '=', 'purchase_return_lines.purchase_return_id')
@@ -476,8 +501,11 @@ class PurchaseOrderController extends Controller
                 ->pluck('total_returned', 'purchase_order_line_id');
 
             // Masih bisa GRN kalau ada minimal 1 line yang belum lunas terima
-            $canCreateGrn = $poLines->contains(function ($line) use ($receivedByLine) {
-                return (float) ($receivedByLine[$line->id] ?? 0) < (float) $line->qty;
+            $canCreateGrn = $poLines->contains(function ($line) use ($receivedByLine, $rejectedByLine) {
+                $accounted = (float) ($receivedByLine[$line->id] ?? 0)
+                    + (float) ($rejectedByLine[$line->id] ?? 0);
+
+                return $accounted < (float) $line->qty;
             });
         }
 
@@ -523,6 +551,7 @@ class PurchaseOrderController extends Controller
             'apOutstanding' => $apOutstanding,
             'canCreateGrn' => $canCreateGrn,
             'receivedByLine' => $receivedByLine,
+            'rejectedByLine' => $rejectedByLine ?? collect(),
             'returnedByLine' => $returnedByLine,
             // Tahap 4
             'poInvoices' => $poInvoices,
@@ -1041,7 +1070,20 @@ class PurchaseOrderController extends Controller
         $eps = PurchaseOrder::paymentRoundingTolerance();
         // Nominal di atas total PO tetap dicatat sebagai DP agar selisihnya
         // menjadi piutang supplier, bukan pelunasan AP yang kelebihan.
-        $type = ($payNow <= $grand + $eps && abs($payNow - $grand) < $eps) ? 'payment' : 'dp';
+        // Pembayaran dari form PO terjadi sebelum/di luar proses GRN. Tanpa
+        // GRN posted, nominal penuh pun tetap merupakan DP, bukan pelunasan
+        // AP. Ini mencegah jurnal AP terbentuk sebelum barang diterima.
+        $hasPostedGrn = $order->purchaseReceipts()
+            ->where('status', 'posted')
+            ->where(function ($q) {
+                $q->whereNull('is_replacement')
+                    ->orWhere('is_replacement', false);
+            })
+            ->exists();
+
+        $type = $hasPostedGrn && ($payNow <= $grand + $eps && abs($payNow - $grand) < $eps)
+            ? 'payment'
+            : 'dp';
 
         DB::transaction(function () use ($request, $order, $cashAccountId, $payNow, $type) {
             $payment = PurchasePayment::create([

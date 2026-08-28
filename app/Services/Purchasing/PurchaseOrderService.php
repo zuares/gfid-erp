@@ -269,6 +269,10 @@ class PurchaseOrderService
             ->join('purchase_receipts', 'purchase_receipts.id', '=', 'purchase_receipt_lines.purchase_receipt_id')
             ->where('purchase_receipts.purchase_order_id', $order->id)
             ->whereIn('purchase_receipts.status', ['draft', 'posted'])
+            ->where(function ($q) {
+                $q->whereNull('purchase_receipts.is_replacement')
+                    ->orWhere('purchase_receipts.is_replacement', false);
+            })
             ->whereNotNull('purchase_receipt_lines.purchase_order_line_id')
             ->groupBy('purchase_receipt_lines.purchase_order_line_id')
             ->selectRaw('purchase_receipt_lines.purchase_order_line_id as line_id, SUM(purchase_receipt_lines.qty_received + purchase_receipt_lines.qty_reject) as used')

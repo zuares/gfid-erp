@@ -87,11 +87,16 @@ class BackfillPoReceivedStatus extends Command
             ->get()
             ->groupBy('purchase_order_id');
 
-        // Hitung total qty received per PO line (hanya dari GRN posted)
+        // Hitung total qty yang sudah diproses per PO line (diterima + reject).
+        // Replacement GRN tidak mengonsumsi kuota PO asal.
         $receivedQty = DB::table('purchase_receipt_lines as prl')
             ->join('purchase_receipts as pr', 'pr.id', '=', 'prl.purchase_receipt_id')
             ->where('pr.status', 'posted')
-            ->select('prl.purchase_order_line_id', DB::raw('SUM(prl.qty_received) as total_received'))
+            ->where(function ($q) {
+                $q->whereNull('pr.is_replacement')
+                    ->orWhere('pr.is_replacement', false);
+            })
+            ->select('prl.purchase_order_line_id', DB::raw('SUM(COALESCE(prl.qty_received, 0) + COALESCE(prl.qty_reject, 0)) as total_received'))
             ->groupBy('prl.purchase_order_line_id')
             ->pluck('total_received', 'purchase_order_line_id');
 

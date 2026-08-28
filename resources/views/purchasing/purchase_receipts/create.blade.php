@@ -594,7 +594,9 @@
                         $qtyPo           = (float) $line->qty;
                         $qtyRemaining    = (float)($line->qty_remaining ?? $qtyPo);
                         $qtyReceivedSoFar= (float)($line->qty_received_posted ?? 0);
-                        $pctDone         = $qtyPo > 0 ? round(($qtyReceivedSoFar / $qtyPo) * 100) : 0;
+                        $qtyRejectedSoFar= (float)($line->qty_rejected_posted ?? 0);
+                        $qtyAccountedSoFar = $qtyReceivedSoFar + $qtyRejectedSoFar;
+                        $pctDone         = $qtyPo > 0 ? min(100, round(($qtyAccountedSoFar / $qtyPo) * 100)) : 0;
                         $lineAllocation  = ($line->allocation ?? ($line->item?->default_allocation ?? 'hpp')) === 'expense' ? 'expense' : 'hpp';
                         $lineExpenseAcc  = $line->expenseAccount ?? null;
 
@@ -669,7 +671,10 @@
                                         <div class="progress-mini-bar" style="width:{{ $pctDone }}%;"></div>
                                     </div>
                                     <span style="font-size:.7rem;color:var(--muted);">
-                                        {{ number_format($qtyReceivedSoFar,2,',','.') }} / {{ number_format($qtyPo,2,',','.') }} ({{ $pctDone }}%)
+                                        {{ number_format($qtyAccountedSoFar,2,',','.') }} / {{ number_format($qtyPo,2,',','.') }} ({{ $pctDone }}%)
+                                        @if ($qtyRejectedSoFar > 0)
+                                            <span class="text-warning">· {{ number_format($qtyRejectedSoFar,2,',','.') }} reject</span>
+                                        @endif
                                     </span>
                                 </div>
                             @endif

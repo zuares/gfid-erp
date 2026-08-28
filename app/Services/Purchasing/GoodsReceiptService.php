@@ -182,7 +182,13 @@ class GoodsReceiptService
             $alreadyQuery = DB::table('purchase_receipt_lines as prl')
                 ->join('purchase_receipts as pr', 'pr.id', '=', 'prl.purchase_receipt_id')
                 ->whereIn('prl.purchase_order_line_id', $poLineIds)
-                ->whereIn('pr.status', ['draft', 'posted']);
+                ->whereIn('pr.status', ['draft', 'posted'])
+                // Replacement GRN mengganti barang retur, bukan penerimaan
+                // baru atas PO asal.
+                ->where(function ($q) {
+                    $q->whereNull('pr.is_replacement')
+                        ->orWhere('pr.is_replacement', false);
+                });
 
             if ($excludeReceiptId) {
                 $alreadyQuery->where('pr.id', '!=', $excludeReceiptId);
@@ -394,6 +400,14 @@ class GoodsReceiptService
     public function post(PurchaseReceipt $grn): PurchaseReceipt
     {
         return DB::transaction(function () use ($grn) {
+            // Kunci dokumen sebelum validasi dan mutasi stok. Tanpa ini dua
+            // request POST bersamaan sama-sama melihat status draft dan dapat
+            // menambah stok dua kali.
+            $grn = PurchaseReceipt::query()
+                ->whereKey($grn->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
             if ($grn->status !== 'draft') {
                 throw new \RuntimeException("Goods Receipt tidak dalam status draft.");
             }
@@ -501,6 +515,8 @@ class GoodsReceiptService
             // 2) SET STATUS POSTED
             // ==========================
             $grn->status = 'posted';
+            $grn->posted_at = now();
+            $grn->approved_by = auth()->id() ?: $grn->approved_by;
             $grn->save();
 
             // Sync received_status di PO terkait + pastikan PO terkunci (fallback
@@ -804,6 +820,11 @@ class GoodsReceiptService
     public function unpost(PurchaseReceipt $grn): PurchaseReceipt
     {
         return DB::transaction(function () use ($grn) {
+            $grn = PurchaseReceipt::query()
+                ->whereKey($grn->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
             if ($grn->status !== 'posted') {
                 throw new \RuntimeException("Hanya GRN yang sudah posted yang bisa di-unpost.");
             }
@@ -850,6 +871,8 @@ class GoodsReceiptService
             // $this->journal->voidBySource('grn_apply_dp', (int) $grn->id);
 
             $grn->status = 'draft';
+            $grn->posted_at = null;
+            $grn->approved_by = null;
             $grn->save();
 
             // Sync received_status di PO terkait
@@ -1530,7 +1553,9 @@ class GoodsReceiptService
 
         $poLineIds = $poLines->pluck('id')->all();
 
-        // Total qty yang sudah diterima per PO line (dari GRN posted saja)
+        // Total qty yang sudah diproses per PO line (diterima + reject).
+        // Reject juga menghabiskan qty PO; replacement diproses sebagai GRN
+        // terpisah dan tidak mengonsumsi kuota PO asal.
         $receivedByLine = DB::table('purchase_receipt_lines as prl')
             ->join('purchase_receipts as pr', 'pr.id', '=', 'prl.purchase_receipt_id')
             ->where('pr.purchase_order_id', $purchaseOrderId)
@@ -1540,20 +1565,20 @@ class GoodsReceiptService
                     ->orWhere('pr.is_replacement', false);
             })
             ->whereIn('prl.purchase_order_line_id', $poLineIds)
-            ->selectRaw('prl.purchase_order_line_id, SUM(prl.qty_received) as total_received')
+            ->selectRaw('prl.purchase_order_line_id, SUM(COALESCE(prl.qty_received, 0) + COALESCE(prl.qty_reject, 0)) as total_received')
             ->groupBy('prl.purchase_order_line_id')
             ->pluck('total_received', 'purchase_order_line_id');
 
         $totalLines = $poLines->count();
         $fullyReceivedCount = 0;
-        $anyReceived = false;
+        $anyAccounted = false;
 
         foreach ($poLines as $line) {
             $received = (float) ($receivedByLine[$line->id] ?? 0);
             $ordered  = (float) $line->qty;
 
             if ($received > 0) {
-                $anyReceived = true;
+                $anyAccounted = true;
             }
 
             if ($ordered > 0 && $received >= $ordered) {
@@ -1563,7 +1588,7 @@ class GoodsReceiptService
 
         if ($fullyReceivedCount >= $totalLines) {
             $status = 'fully_received';
-        } elseif ($anyReceived) {
+        } elseif ($anyAccounted) {
             $status = 'partial';
         } else {
             $status = 'not_received';

@@ -100,6 +100,11 @@ class PurchaseOrder extends Model
         return $this->hasMany(\App\Models\SupplierInvoice::class, 'purchase_order_id');
     }
 
+    public function purchaseReturns(): HasMany
+    {
+        return $this->hasMany(\App\Models\PurchaseReturn::class, 'purchase_order_id');
+    }
+
     /** PR-D — relasi balik ke Purchase Request asal (nullable) */
     public function purchaseRequest(): BelongsTo
     {

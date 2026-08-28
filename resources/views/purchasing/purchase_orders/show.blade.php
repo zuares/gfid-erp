@@ -377,7 +377,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         @if ($canSeeMoney)
         <div class="po-card po-kpi">
             <div class="po-label">Total PO</div>
-            <div class="po-value">{{ rupiah($calculatedGrandTotal) }}</div>
+            <div class="po-value">{{ rupiah($poGrandTotal) }}</div>
         </div>
         <div class="po-card po-kpi">
             <div class="po-label">Total GRN</div>
@@ -437,9 +437,10 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                 @foreach($order->lines as $line)
                                     @php
                                         $hasDiscount = (float) $line->discount > 0.0001;
-                                        $rcv = (float) $line->qty_received;
-                                        $ret = (float) $line->qty_returned;
-                                        $qtyOut = $line->qty - $rcv;
+                                        $rcv = (float) ($receivedByLine[$line->id] ?? 0);
+                                        $rej = (float) ($rejectedByLine[$line->id] ?? 0);
+                                        $ret = (float) ($returnedByLine[$line->id] ?? 0);
+                                        $qtyOut = max(0, (float) $line->qty - $rcv - $rej);
                                         // Selalu hitung dari snapshot baris agar detail
                                         // konsisten dengan qty, harga, dan konversi stok.
                                         $lineSubtotal = $line->calculatedLineTotal();
@@ -494,13 +495,19 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                                     <strong style="color:#b91c1c; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">{{ decimal_id($ret, 2) }} {{ $line->effectivePurchaseUnit() }}</strong>
                                                 </div>
                                             @endif
+                                            @if ($rej > 0)
+                                                <div class="d-flex justify-content-between mb-1" style="font-size:.78rem;">
+                                                    <span style="color:#64748b;">Reject</span>
+                                                    <strong style="color:#b45309; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">{{ decimal_id($rej, 2) }} {{ $line->effectivePurchaseUnit() }}</strong>
+                                                </div>
+                                            @endif
                                             @if ($qtyOut > 0)
                                                 <div class="d-flex justify-content-between" style="font-size:.78rem;">
                                                     <span style="color:#64748b;">Sisa</span>
                                                     <strong style="color:#d97706; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">{{ decimal_id($qtyOut, 2) }} {{ $line->effectivePurchaseUnit() }}</strong>
                                                 </div>
                                             @endif
-                                            @if ($rcv == 0 && $ret == 0 && $qtyOut == 0)
+                                            @if ($rcv == 0 && $rej == 0 && $ret == 0 && $qtyOut == 0)
                                                 <div class="text-end text-muted">-</div>
                                             @endif
                                         </td>
@@ -729,10 +736,11 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                     <span class="modal-kpi">Retur <strong class="mono">{{ rupiah($returnPostedTotal) }}</strong></span>
                                 @endif
                                 <span class="modal-kpi">Sisa <strong class="mono">{{ $formatPaymentMoney($apOutstanding) }}</strong></span>
+                                <span class="modal-kpi">DP tersedia <strong class="mono">{{ rupiah($dpAvailable) }}</strong></span>
                             @else
                                 <span class="modal-kpi">Total PO <strong class="mono">{{ rupiah($poGrandTotal) }}</strong></span>
                                 <span class="modal-kpi">DP tercatat <strong class="mono">{{ rupiah($dpTotal) }}</strong></span>
-                                <span class="modal-kpi">Sisa DP <strong class="mono">{{ rupiah($dpRemaining) }}</strong></span>
+                                <span class="modal-kpi">Sisa nilai PO <strong class="mono">{{ rupiah($dpRemaining) }}</strong></span>
                             @endif
                         </div>
                     </div>
@@ -748,7 +756,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                             @if (!$hasAp)
                                 <div class="col-12">
                                     <div class="alert alert-info py-2 px-3 mb-1 small">
-                                        PO masih draft dan belum ada GRN. Pembayaran ini akan dicatat sebagai DP; pelunasan tersedia setelah GRN POSTED.
+                                        Belum ada GRN POSTED. Nominal ini akan dicatat sebagai DP; pelunasan baru tersedia setelah barang diterima dan GRN diposting.
                                     </div>
                                 </div>
                             @endif
@@ -769,6 +777,9 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                     @endif
                                     <option value="dp" @selected($defaultPaymentType === 'dp')>DP (Uang Muka)</option>
                                 </select>
+                                <div class="form-text small" id="paymentTypeHint">
+                                    DP dicatat sebagai uang muka dan bisa di-offset setelah GRN POSTED.
+                                </div>
                             </div>
 
                             <div class="col-12 col-md-6">
@@ -830,7 +841,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                     <span class="input-group-text">Rp</span>
                                     <input type="text" name="amount" class="form-control mono" id="amountInput"
                                         placeholder="0" value="{{ old('amount') }}" required>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnFillRemaining">Sisa</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnFillRemaining">Isi sisa</button>
                                 </div>
                             </div>
 
@@ -848,9 +859,9 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
 
                             @php $unpaidInvList = $unpaidInvoices ?? collect(); @endphp
                             @if ($unpaidInvList->isNotEmpty())
-                            <div class="col-12">
+                            <div class="col-12" id="supplierInvoiceWrapModal">
                                 <label class="form-label small fw-semibold">Faktur Supplier <span class="text-muted fw-normal">(opsional)</span></label>
-                                <select name="supplier_invoice_id" class="form-select form-select-sm">
+                                <select name="supplier_invoice_id" id="supplierInvoiceSelectModal" class="form-select form-select-sm">
                                     <option value="">— Tidak dikaitkan ke faktur —</option>
                                     @foreach ($unpaidInvList as $inv)
                                         <option value="{{ $inv->id }}"
@@ -1017,6 +1028,9 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                 const remaining = {{ (float) $apOutstanding }};
                 const dpRemaining = {{ (float) $dpRemaining }};
                 const typeSelect = document.getElementById('typeSelectModal');
+                const paymentTypeHint = document.getElementById('paymentTypeHint');
+                const supplierInvoiceWrap = document.getElementById('supplierInvoiceWrapModal');
+                const supplierInvoiceSelect = document.getElementById('supplierInvoiceSelectModal');
 
                 function fmtMoneyInput(n) {
                     const value = Number(n || 0);
@@ -1044,6 +1058,8 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                     cashWrap?.classList.toggle('d-none', which !== 'cash');
                     bankWrap?.classList.toggle('d-none', which !== 'bank');
                     creditWrap?.classList.toggle('d-none', which !== 'credit');
+                    if (cashSelectCash) cashSelectCash.disabled = which !== 'cash';
+                    if (cashSelectBank) cashSelectBank.disabled = which !== 'bank';
                 }
 
                 function setBankError(show) {
@@ -1125,10 +1141,20 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                 }
 
                 function syncTypeRules() {
-  // tidak ada rule khusus lagi
-  applyAllValidations();
-}
-
+                    const isPayment = (typeSelect?.value || 'payment') === 'payment';
+                    supplierInvoiceWrap?.classList.toggle('d-none', !isPayment);
+                    if (supplierInvoiceSelect) {
+                        supplierInvoiceSelect.disabled = !isPayment;
+                        if (!isPayment) supplierInvoiceSelect.value = '';
+                    }
+                    if (paymentTypeHint) {
+                        paymentTypeHint.textContent = isPayment
+                            ? 'Pelunasan memakai hutang dari GRN POSTED dan tidak boleh melebihi sisa tagihan.'
+                            : 'DP dicatat sebagai uang muka dan bisa di-offset setelah GRN POSTED.';
+                    }
+                    if (btnFill) btnFill.textContent = isPayment ? 'Isi sisa tagihan' : 'Isi sisa PO';
+                    applyAllValidations();
+                }
 
                 btnFill?.addEventListener('click', function() {
                     if (!amountInput) return;

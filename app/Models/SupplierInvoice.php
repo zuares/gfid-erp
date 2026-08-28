@@ -142,5 +142,9 @@ class SupplierInvoice extends Model
         } else {
             $this->status = 'partial_paid';
         }
+
+        // Method ini dipakai langsung oleh controller, command, dan test.
+        // Simpan hasil sinkronisasi agar status tidak hanya berubah di memory.
+        $this->save();
     }
 }

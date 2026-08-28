@@ -140,8 +140,23 @@ class PurchaseReceiptController extends Controller
             ->with(['item', 'expenseAccount', 'purchaseOrder.supplier'])
             ->withCount('draftReceiptLines')
             ->withSum(['receiptLines as qty_received_posted' => function ($q) {
-                $q->whereHas('receipt', fn($r) => $r->where('status', 'posted'));
+                $q->whereHas('receipt', function ($r) {
+                    $r->where('status', 'posted')
+                        ->where(function ($r) {
+                            $r->whereNull('is_replacement')
+                                ->orWhere('is_replacement', false);
+                        });
+                });
             }], 'qty_received')
+            ->withSum(['receiptLines as qty_rejected_posted' => function ($q) {
+                $q->whereHas('receipt', function ($r) {
+                    $r->where('status', 'posted')
+                        ->where(function ($r) {
+                            $r->whereNull('is_replacement')
+                                ->orWhere('is_replacement', false);
+                        });
+                });
+            }], 'qty_reject')
             ->whereHas('purchaseOrder', function ($q) use ($selectedSupplierId) {
                 // Flow baru: GRN boleh dari PO draft ATAU approved (closed juga valid).
                 // Cancelled dikecualikan.
@@ -166,9 +181,12 @@ class PurchaseReceiptController extends Controller
         $lines->each(function (PurchaseOrderLine $line) {
             $line->has_draft_grn    = ((int) ($line->draft_receipt_lines_count ?? 0)) > 0;
             $qtyReceived            = (float) ($line->qty_received_posted ?? 0);
-            $line->qty_remaining    = max(0.0, (float) $line->qty - $qtyReceived);
-            $line->fully_received   = $qtyReceived >= (float) $line->qty;
-            $line->partially_received = !$line->fully_received && $qtyReceived > 0;
+            $qtyRejected            = (float) ($line->qty_rejected_posted ?? 0);
+            $qtyAccounted           = $qtyReceived + $qtyRejected;
+            $line->qty_rejected_posted = $qtyRejected;
+            $line->qty_remaining    = max(0.0, (float) $line->qty - $qtyAccounted);
+            $line->fully_received   = $qtyAccounted >= (float) $line->qty;
+            $line->partially_received = !$line->fully_received && $qtyAccounted > 0;
         });
 
         // Default hanya sebagai usulan; user memilih warehouse di form GRN.
@@ -207,8 +225,23 @@ class PurchaseReceiptController extends Controller
                 $q->with(['item', 'expenseAccount'])
                   ->withCount('draftReceiptLines')
                   ->withSum(['receiptLines as qty_received_posted' => function ($q) {
-                      $q->whereHas('receipt', fn($r) => $r->where('status', 'posted'));
-                  }], 'qty_received');
+                      $q->whereHas('receipt', function ($r) {
+                          $r->where('status', 'posted')
+                              ->where(function ($r) {
+                                  $r->whereNull('is_replacement')
+                                      ->orWhere('is_replacement', false);
+                              });
+                          });
+                  }], 'qty_received')
+                  ->withSum(['receiptLines as qty_rejected_posted' => function ($q) {
+                      $q->whereHas('receipt', function ($r) {
+                          $r->where('status', 'posted')
+                              ->where(function ($r) {
+                                  $r->whereNull('is_replacement')
+                                      ->orWhere('is_replacement', false);
+                              });
+                      });
+                  }], 'qty_reject');
             },
         ]);
 
@@ -219,9 +252,12 @@ class PurchaseReceiptController extends Controller
         $lines->each(function (PurchaseOrderLine $line) {
             $line->has_draft_grn      = ((int) ($line->draft_receipt_lines_count ?? 0)) > 0;
             $qtyReceived              = (float) ($line->qty_received_posted ?? 0);
-            $line->qty_remaining      = max(0.0, (float) $line->qty - $qtyReceived);
-            $line->fully_received     = $qtyReceived >= (float) $line->qty;
-            $line->partially_received = !$line->fully_received && $qtyReceived > 0;
+            $qtyRejected              = (float) ($line->qty_rejected_posted ?? 0);
+            $qtyAccounted             = $qtyReceived + $qtyRejected;
+            $line->qty_rejected_posted = $qtyRejected;
+            $line->qty_remaining      = max(0.0, (float) $line->qty - $qtyAccounted);
+            $line->fully_received     = $qtyAccounted >= (float) $line->qty;
+            $line->partially_received = !$line->fully_received && $qtyAccounted > 0;
         });
 
         $selectedSupplierId = $purchase_order->supplier_id;
@@ -566,7 +602,11 @@ class PurchaseReceiptController extends Controller
                 $cumulativeQuery = \DB::table('purchase_receipt_lines as prl')
                     ->join('purchase_receipts as pr', 'pr.id', '=', 'prl.purchase_receipt_id')
                     ->whereIn('prl.purchase_order_line_id', $ids->all())
-                    ->whereIn('pr.status', ['draft', 'posted']);
+                    ->whereIn('pr.status', ['draft', 'posted'])
+                    ->where(function ($q) {
+                        $q->whereNull('pr.is_replacement')
+                            ->orWhere('pr.is_replacement', false);
+                    });
 
                 // Kalau edit: kecualikan GRN yang sedang diedit
                 if ($existingReceipt) {

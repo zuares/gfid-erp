@@ -76,13 +76,48 @@ class PurchasePaymentController extends Controller
         // POs with outstanding debt for create form
         $openPos = PurchaseOrder::query()
             ->with('supplier')
-            ->whereIn('payment_status', ['unpaid', 'partial'])
-            ->whereHas('purchaseReceipts', fn($s) => $s->where('status', 'posted'))
+            ->whereHas('purchaseReceipts', function ($s) {
+                $s->where('status', 'posted')
+                    ->where(function ($q) {
+                        $q->whereNull('is_replacement')
+                            ->orWhere('is_replacement', false);
+                    });
+            })
+            ->withSum(['purchaseReceipts as posted_grn_total' => function ($q) {
+                $q->where('status', 'posted')
+                    ->where(function ($q) {
+                        $q->whereNull('is_replacement')
+                            ->orWhere('is_replacement', false);
+                    });
+            }], 'grand_total')
+            ->withSum(['purchaseReturns as posted_return_total' => function ($q) {
+                $q->where('status', 'posted')
+                    ->whereNull('voided_at')
+                    ->where(function ($q) {
+                        $q->whereNull('resolution_type')
+                            ->orWhere('resolution_type', '!=', 'replacement');
+                    });
+            }], 'total')
+            ->withSum(['activePayments as posted_payment_total' => function ($q) {
+                $q->where('type', 'payment');
+            }], 'amount')
+            ->withSum(['activePayments as posted_dp_apply_total' => function ($q) {
+                $q->where('type', 'dp_apply');
+            }], 'amount')
             ->orderByDesc('date')
             ->get(['id', 'code', 'date', 'supplier_id', 'grand_total', 'paid_amount', 'payment_status'])
-            ->filter(fn (PurchaseOrder $po) => PurchaseOrder::normalizePaymentRemainder(
-                (float) $po->grand_total - (float) $po->paid_amount
-            ) > 0)
+            ->map(function (PurchaseOrder $po) {
+                $debt = max(0, round(
+                    (float) ($po->posted_grn_total ?? 0)
+                    - (float) ($po->posted_return_total ?? 0),
+                    2
+                ));
+                $settled = (float) ($po->posted_payment_total ?? 0)
+                    + (float) ($po->posted_dp_apply_total ?? 0);
+                $po->payment_outstanding = PurchaseOrder::normalizePaymentRemainder($debt - $settled);
+                return $po;
+            })
+            ->filter(fn (PurchaseOrder $po) => (float) $po->payment_outstanding > 0)
             ->values();
 
         return view('purchasing.purchase_payments.index', compact(
@@ -112,6 +147,10 @@ class PurchasePaymentController extends Controller
 
         $grnPostedTotal = (float) $purchase_order->purchaseReceipts()
             ->where('status', 'posted')
+            ->where(function ($q) {
+                $q->whereNull('is_replacement')
+                    ->orWhere('is_replacement', false);
+            })
             ->sum('grand_total');
 
         if (($purchase_order->status ?? '') === 'cancelled') {
@@ -202,17 +241,66 @@ class PurchasePaymentController extends Controller
             $amount = min(round($amount, 2), $rawOutstanding);
         }
 
-        // Auto-link ke Supplier Invoice aktif milik PO ini (jika tidak dipilih manual)
-        $supplierInvoiceId = !empty($data['supplier_invoice_id'])
-            ? (int) $data['supplier_invoice_id']
-            : SupplierInvoice::where('purchase_order_id', $purchase_order->id)
-                ->whereIn('status', ['posted', 'partial_paid'])
-                ->orderBy('invoice_date')
-                ->value('id');
+        // DP tetap berada di akun Uang Muka Pembelian. DP tidak boleh
+        // otomatis mengurangi invoice supplier; offset dilakukan eksplisit
+        // melalui flow applyDp().
+        if (($data['type'] ?? '') === 'dp' && !empty($data['supplier_invoice_id'])) {
+            throw ValidationException::withMessages([
+                'supplier_invoice_id' => 'DP tidak boleh dikaitkan langsung ke invoice. Gunakan Offset DP setelah GRN POSTED.',
+            ]);
+        }
 
-        DB::transaction(function () use ($purchase_order, $data, $amount, $request, $cashAccountId, $supplierInvoiceId) {
+        $supplierInvoiceId = null;
+        if (($data['type'] ?? '') === 'payment') {
+            $supplierInvoiceId = !empty($data['supplier_invoice_id'])
+                ? (int) $data['supplier_invoice_id']
+                : SupplierInvoice::where('purchase_order_id', $purchase_order->id)
+                    ->where('supplier_id', $purchase_order->supplier_id)
+                    ->whereIn('status', ['posted', 'partial_paid'])
+                    ->orderBy('invoice_date')
+                    ->value('id');
+
+            if ($supplierInvoiceId) {
+                $invoiceMatchesOrder = SupplierInvoice::query()
+                    ->whereKey($supplierInvoiceId)
+                    ->where('purchase_order_id', $purchase_order->id)
+                    ->where('supplier_id', $purchase_order->supplier_id)
+                    ->whereIn('status', ['posted', 'partial_paid'])
+                    ->exists();
+
+                if (!$invoiceMatchesOrder) {
+                    throw ValidationException::withMessages([
+                        'supplier_invoice_id' => 'Invoice supplier harus milik PO dan supplier yang sama, serta belum lunas/void.',
+                    ]);
+                }
+            }
+        }
+
+        DB::transaction(function () use ($purchase_order, $data, &$amount, $request, $cashAccountId, $supplierInvoiceId) {
+            // Re-check dengan row lock agar dua pembayaran bersamaan tidak
+            // sama-sama memakai saldo hutang yang sama.
+            $lockedOrder = PurchaseOrder::query()
+                ->whereKey($purchase_order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (($data['type'] ?? '') === 'payment') {
+                $rawOutstanding = $this->rawApOutstandingByGrn($lockedOrder);
+                if ($rawOutstanding <= 0.0001) {
+                    throw ValidationException::withMessages([
+                        'amount' => 'Tidak ada hutang yang bisa dibayar setelah saldo diperbarui.',
+                    ]);
+                }
+                if ($amount > $rawOutstanding + PurchaseOrder::paymentRoundingTolerance()) {
+                    throw ValidationException::withMessages([
+                        'amount' => 'Nominal melebihi sisa hutang setelah saldo diperbarui.',
+                    ]);
+                }
+                $amount = min(round($amount, 2), $rawOutstanding);
+            }
+
             $payment = PurchasePayment::create([
-                'purchase_order_id' => (int) $purchase_order->id,
+                'purchase_order_id' => (int) $lockedOrder->id,
                 'supplier_invoice_id' => $supplierInvoiceId, // nullable
                 'date' => $data['date'],
                 'payment_method_id' => (int) $data['payment_method_id'],
@@ -235,7 +323,7 @@ class PurchasePaymentController extends Controller
                 $payment->save();
             }
 
-            $this->recalcPaymentStatus($purchase_order);
+            $this->recalcPaymentStatus($lockedOrder);
 
             // Tahap 4: sync paid_amount + status ke Supplier Invoice jika dipilih
             if ($supplierInvoiceId) {
@@ -340,7 +428,27 @@ class PurchasePaymentController extends Controller
         $amount = min($amountReq, $dpAvailable, $apOutstanding);
         $amount = round($amount, 2);
 
-        DB::transaction(function () use ($request, $purchase_order, $data, $amount) {
+        DB::transaction(function () use ($request, $purchase_order, $data, $amountReq, &$amount) {
+            $lockedOrder = PurchaseOrder::query()
+                ->whereKey($purchase_order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Recalculate both balances while the PO is locked. Ini mencegah
+            // dua request Offset DP memakai saldo DP/AP yang sama.
+            $dpTotal = (float) $lockedOrder->activePayments()->where('type', 'dp')->sum('amount');
+            $dpApplied = (float) $lockedOrder->activePayments()->where('type', 'dp_apply')->sum('amount');
+            $dpAvailable = PurchaseOrder::normalizePaymentRemainder($dpTotal - $dpApplied);
+            $apOutstanding = $this->calcApOutstandingByGrn($lockedOrder);
+
+            if ($dpAvailable <= 0.0001 || $apOutstanding <= 0.0001) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Saldo DP atau hutang sudah berubah. Muat ulang PO lalu coba lagi.',
+                ]);
+            }
+
+            $amount = round(min($amountReq, $dpAvailable, $apOutstanding), 2);
+
             // Pastikan ada PaymentMethod khusus DP_APPLY (mode=credit)
             $pmId = PaymentMethod::query()
                 ->where('code', 'DP_APPLY')
@@ -353,7 +461,7 @@ class PurchasePaymentController extends Controller
             }
 
             $payment = PurchasePayment::create([
-                'purchase_order_id' => (int) $purchase_order->id,
+                'purchase_order_id' => (int) $lockedOrder->id,
                 'date' => $data['date'],
                 'payment_method_id' => (int) $pmId,
                 'cash_account_id' => null,
@@ -374,7 +482,7 @@ class PurchasePaymentController extends Controller
                 $payment->save();
             }
 
-            $this->recalcPaymentStatus($purchase_order);
+            $this->recalcPaymentStatus($lockedOrder);
         });
 
         return back()->with('success', 'DP berhasil di-offset ke hutang.');
@@ -479,6 +587,10 @@ class PurchasePaymentController extends Controller
     {
         return (float) $order->purchaseReceipts()
             ->where('status', 'posted')
+            ->where(function ($q) {
+                $q->whereNull('is_replacement')
+                    ->orWhere('is_replacement', false);
+            })
             ->sum('grand_total');
     }
 
@@ -488,6 +600,10 @@ class PurchasePaymentController extends Controller
             ->where('purchase_order_id', $order->id)
             ->where('status', 'posted')
             ->whereNull('voided_at')
+            ->where(function ($q) {
+                $q->whereNull('resolution_type')
+                    ->orWhere('resolution_type', '!=', 'replacement');
+            })
             ->sum('total');
     }
 
@@ -624,6 +740,7 @@ class PurchasePaymentController extends Controller
         $totalPaid = (float) PurchasePayment::query()
             ->where('supplier_invoice_id', $invoiceId)
             ->whereNull('voided_at')
+            ->where('type', 'payment')
             ->sum('amount');
 
         $totalAmount = (float) $invoice->total_amount;
