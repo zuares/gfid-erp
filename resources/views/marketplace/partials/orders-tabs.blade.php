@@ -21,8 +21,8 @@
             🔄 Sync <span class="ord-badge" id="badge-sync" style="background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe">—</span>
         </button>
     </div>
-    <div class="ord-live-bar" id="ordersLiveBar" aria-live="polite" title="Daftar order diperbarui otomatis setiap 8 detik saat halaman terbuka">
+    <div class="ord-live-bar" id="ordersLiveBar" aria-live="polite" title="Daftar order diperbarui otomatis setiap 30 detik saat halaman terbuka">
         <span class="ord-live-status" id="ordersLiveStatus"><span class="ord-live-dot"></span><span id="ordersLiveStatusText">Live</span></span>
-        <span class="ord-live-auto">Pembaruan otomatis</span>
+        <span class="ord-live-auto">· Auto / 30 dtk</span>
         <button type="button" class="ord-live-refresh" id="ordersLiveRefresh" onclick="refreshOrdersLive()" title="Segarkan tab ini sekarang" aria-label="Segarkan tab ini">↻</button>
     </div>

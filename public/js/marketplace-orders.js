@@ -4199,9 +4199,9 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     // ── Polling (tanpa Reverb) ───────────────────────────────────────────────
     let lastPollAt = Date.now();
     setInterval(() => {
-        // Semua tab order utama dibaca lebih cepat agar perpindahan status
-        // dari sinkronisasi server langsung tampak tanpa refresh halaman.
-        const pollInterval = isOrderListTab() ? 8000 : 15000;
+        // Semua tab order utama diperbarui secara ringan tiap 30 detik.
+        // Event realtime server tetap langsung memicu pembaruan tanpa menunggu polling.
+        const pollInterval = isOrderListTab() ? 30000 : 15000;
         if (Date.now() - lastPollAt >= pollInterval) {
             lastPollAt = Date.now();
             // Hanya poll jika halaman sedang aktif/terlihat
