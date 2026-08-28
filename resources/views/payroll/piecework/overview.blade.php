@@ -506,7 +506,7 @@
             grid-column: auto
         }
 
-        .pw-submit {
+        .pw-generate-form .pw-submit {
             min-height: 34px;
             width: auto;
             min-width: 128px;
@@ -524,15 +524,15 @@
             transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease
         }
 
-        .pw-submit:hover,
-        .pw-submit:focus-visible {
+        .pw-generate-form .pw-submit:hover,
+        .pw-generate-form .pw-submit:focus-visible {
             border-color: var(--accent);
             background: var(--accent);
             color: #fff;
             box-shadow: 0 3px 8px color-mix(in srgb, var(--accent) 16%, transparent)
         }
 
-        .pw-submit:active {
+        .pw-generate-form .pw-submit:active {
             transform: translateY(1px)
         }
 
