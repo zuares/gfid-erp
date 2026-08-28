@@ -347,7 +347,8 @@
         }
 
         .pw-generate {
-            margin-top: .75rem
+            margin-top: .75rem;
+            margin-bottom: 1rem
         }
 
         .pw-generate-summary {
@@ -493,7 +494,8 @@
             }
 
             .pw-period-main {
-                font-size: .79rem
+                font-size: .79rem;
+                white-space: normal
             }
         }
 
@@ -650,8 +652,7 @@
                 <table class="pw-table">
                     <thead>
                         <tr>
-                            <th>Periode</th>
-                            <th class="pw-right">Operator</th>
+                            <th>Periode / Operator</th>
                             <th>Modul / Basis</th>
                             <th class="pw-right">Qty</th>
                             <th class="pw-right">Total Amount</th>
@@ -665,18 +666,20 @@
                                 $periodModule = strtolower($period->module);
                                 $isSewing = $periodModule === 'sewing';
                                 $periodStart = \Carbon\Carbon::parse($period->period_start)->locale('id');
+                                $periodEnd = \Carbon\Carbon::parse($period->period_end)->locale('id');
                                 $periodWeek = $periodStart->weekOfMonth;
                                 $periodMonth = $periodStart->translatedFormat('F Y');
+                                $periodDateRange = $periodStart->translatedFormat('l, d/m/Y') . ' – ' . $periodEnd->translatedFormat('l, d/m/Y');
+                                $operatorCount = (int) ($period->operator_count ?? 0);
                                 $totalQty = (float) ($period->lines_total_qty ?? 0);
                                 $totalAmount = (float) ($period->lines_total_amount ?? $period->total_amount ?? 0);
                             @endphp
                             <tr>
                                 <td class="pw-period-cell">
                                     <div class="pw-period-week">Minggu ke-{{ $periodWeek }} <span class="pw-sub" style="display:inline">· {{ $periodMonth }}</span></div>
-                                    <div class="pw-period-main">{{ id_date($period->period_start) }} – {{ id_date($period->period_end) }}</div>
-                                    <div class="pw-period-meta">ID #{{ $period->id }}</div>
+                                    <div class="pw-period-main">{{ $periodDateRange }}</div>
+                                    <div class="pw-period-meta">ID #{{ $period->id }} · {{ number_format($operatorCount, 0, ',', '.') }} operator</div>
                                 </td>
-                                <td class="pw-right pw-number">{{ number_format((int) ($period->operator_count ?? 0), 0, ',', '.') }}</td>
                                 <td class="pw-basis">
                                     <span class="pw-chip {{ $periodModule }}">{{ $moduleLabels[$periodModule] ?? ucfirst($periodModule) }}</span>
                                     <div class="pw-period-meta">{{ $isSewing ? 'Ambil Jahit' : 'Qty PCS / QC OK' }}</div>
@@ -709,7 +712,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" style="padding:1.1rem;color:var(--muted)">Belum ada periode payroll.</td>
+                                <td colspan="6" style="padding:1.1rem;color:var(--muted)">Belum ada periode payroll.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -722,8 +725,11 @@
                         $periodModule = strtolower($period->module);
                         $isSewing = $periodModule === 'sewing';
                         $periodStart = \Carbon\Carbon::parse($period->period_start)->locale('id');
+                        $periodEnd = \Carbon\Carbon::parse($period->period_end)->locale('id');
                         $periodWeek = $periodStart->weekOfMonth;
                         $periodMonth = $periodStart->translatedFormat('F Y');
+                        $periodDateRange = $periodStart->translatedFormat('l, d/m/Y') . ' – ' . $periodEnd->translatedFormat('l, d/m/Y');
+                        $operatorCount = (int) ($period->operator_count ?? 0);
                         $totalQty = (float) ($period->lines_total_qty ?? 0);
                         $totalAmount = (float) ($period->lines_total_amount ?? $period->total_amount ?? 0);
                     @endphp
@@ -737,13 +743,9 @@
                             @endif
                         </div>
                         <div class="pw-period-week">Minggu ke-{{ $periodWeek }} <span class="pw-sub">· {{ $periodMonth }}</span></div>
-                        <div class="pw-period-main">{{ id_date($period->period_start) }} – {{ id_date($period->period_end) }}</div>
-                        <div class="pw-period-meta">ID #{{ $period->id }} · {{ $isSewing ? 'Ambil Jahit' : 'Qty PCS / QC OK' }}</div>
+                        <div class="pw-period-main">{{ $periodDateRange }}</div>
+                        <div class="pw-period-meta">ID #{{ $period->id }} · {{ number_format($operatorCount, 0, ',', '.') }} operator · {{ $isSewing ? 'Ambil Jahit' : 'Qty PCS / QC OK' }}</div>
                         <div class="pw-period-stats">
-                            <div>
-                                <span>Operator</span>
-                                <strong>{{ number_format((int) ($period->operator_count ?? 0), 0, ',', '.') }}</strong>
-                            </div>
                             <div>
                                 <span>Qty</span>
                                 <strong>{{ rtrim(rtrim(number_format($totalQty, 2, '.', ''), '0'), '.') }}</strong>
