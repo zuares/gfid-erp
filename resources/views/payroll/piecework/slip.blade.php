@@ -4,7 +4,7 @@
 
 @push('head')
     <style>
-        .slip-page { max-width: 860px; margin: 0 auto; padding: 1rem .85rem 3rem }
+        .slip-page { width:100%; max-width:860px; box-sizing:border-box; margin:0 auto; padding:1rem .85rem 3rem }
         .slip-actions { display:flex; justify-content:space-between; align-items:center; gap:.75rem; margin-bottom:.85rem }
         .slip-action-btn { display:inline-flex; align-items:center; justify-content:center; gap:.4rem; min-height:36px; padding:.45rem .7rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.78rem; font-weight:700; text-decoration:none }
         .slip-action-btn.primary { border-color:var(--accent); background:var(--accent); color:#fff }
@@ -12,8 +12,8 @@
         .slip-paper-field { display:flex; flex-direction:column; gap:.2rem; color:var(--muted); font-size:.64rem; font-weight:800 }
         .slip-paper-select { min-height:36px; padding:.45rem .6rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.76rem; font-weight:700 }
         .slip-preview-note { display:flex; align-items:center; gap:.45rem; margin-bottom:.75rem; color:var(--muted); font-size:.72rem }
-        .slip-card { overflow:hidden; background:var(--card); border:1px solid rgba(148,163,184,.28); border-radius:14px; box-shadow:0 10px 28px rgba(15,23,42,.07) }
-        .slip-inner { padding:1.35rem 1.5rem 1.5rem }
+        .slip-card { width:100%; max-width:100%; overflow:hidden; background:var(--card); border:1px solid rgba(148,163,184,.28); border-radius:14px; box-shadow:0 10px 28px rgba(15,23,42,.07) }
+        .slip-inner { box-sizing:border-box; width:100%; max-width:100%; padding:1.35rem 1.5rem 1.5rem }
         .slip-brand { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem }
         .slip-brand-mark { display:flex; align-items:center; gap:.65rem }
         .slip-brand-mark img { width:34px; height:34px; object-fit:contain }
@@ -39,7 +39,7 @@
         .slip-stat.total { background:color-mix(in srgb,var(--accent-soft) 24%,var(--card) 76%) }
         .slip-stat.total .slip-stat-value { color:var(--accent) }
         .slip-section-title { margin-bottom:.55rem; color:var(--text); font-size:.78rem; font-weight:850 }
-        .slip-table-wrap { overflow-x:auto; border:1px solid rgba(148,163,184,.2); border-radius:10px }
+        .slip-table-wrap { width:100%; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid rgba(148,163,184,.2); border-radius:10px }
         .slip-table { width:100%; min-width:590px; border-collapse:separate; border-spacing:0; font-size:.78rem }
         .slip-table th { padding:.65rem .7rem; border-bottom:1px solid rgba(148,163,184,.2); background:rgba(148,163,184,.08); color:var(--muted); font-size:.64rem; font-weight:850; letter-spacing:.07em; text-align:left; text-transform:uppercase; white-space:nowrap }
         .slip-table td { padding:.68rem .7rem; border-bottom:1px solid rgba(148,163,184,.13); color:var(--text); vertical-align:middle }
@@ -64,13 +64,15 @@
         .slip-printed { margin-top:1.3rem; color:var(--muted); font-size:.65rem; text-align:center }
 
         @media (max-width:640px) {
-            .slip-page { padding:.65rem .55rem 2rem }
+            .slip-page { width:100%; padding:.55rem .4rem 1.75rem }
             .slip-inner { padding:1rem .85rem 1.1rem }
             .slip-actions { align-items:stretch; flex-direction:column }
-            .slip-print-tools { justify-content:stretch }
+            .slip-print-tools { width:100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:stretch; justify-content:stretch; gap:.45rem }
             .slip-paper-field { flex:1; min-width:0 }
-            .slip-paper-select, .slip-print-tools .slip-action-btn { width:100% }
+            .slip-paper-select, .slip-print-tools .slip-action-btn { width:100%; min-width:0 }
+            .slip-print-tools .slip-action-btn { grid-column:1 / -1 }
             .slip-brand { align-items:center }
+            .slip-document { min-width:0 }
             .slip-brand-mark img { width:29px; height:29px }
             .slip-brand-name { font-size:.82rem }
             .slip-brand-sub, .slip-number { font-size:.61rem }
@@ -78,10 +80,20 @@
             .slip-title { font-size:1.05rem }
             .slip-heading { align-items:flex-start; flex-direction:column; gap:.55rem }
             .slip-info, .slip-stats { grid-template-columns:repeat(2,1fr) }
-            .slip-info-item, .slip-stat { padding:.55rem .6rem }
+            .slip-info-item, .slip-stat { min-width:0; padding:.55rem .6rem }
+            .slip-info-value { overflow-wrap:anywhere; white-space:normal }
             .slip-stat-value { font-size:.9rem }
             .slip-total-value { font-size:1.12rem }
             .slip-signatures { gap:1rem }
+            .slip-table { min-width:540px }
+        }
+
+        @media (max-width:380px) {
+            .slip-inner { padding-inline:.65rem }
+            .slip-brand { align-items:flex-start; flex-wrap:wrap }
+            .slip-document { width:100%; text-align:left }
+            .slip-info, .slip-stats { grid-template-columns:1fr }
+            .slip-table { min-width:500px }
         }
 
         @media print {
