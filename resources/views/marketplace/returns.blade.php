@@ -171,6 +171,7 @@
                         <th class="ps-4">Toko</th>
                         <th>Tanggal</th>
                         <th>No. Retur / Pesanan</th>
+                        <th>Resi Pengembalian</th>
                         <th>Produk</th>
                         <th>Tipe & Alasan</th>
                         <th>Status</th>
@@ -180,7 +181,7 @@
                 </thead>
                 <tbody id="returnsBody">
                     <tr>
-                        <td colspan="8" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Memuat data dari semua toko...</div></td>
+                        <td colspan="9" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Memuat data dari semua toko...</div></td>
                     </tr>
                 </tbody>
             </table>
@@ -385,7 +386,7 @@
         if (_btnSync) _btnSync.disabled = true;
 
         if (reset) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Memuat data...</div></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Memuat data...</div></td></tr>`;
             allReturnsData = [];
         }
 
@@ -412,7 +413,7 @@
 
             // Update teks loading jika manual refresh
             if (reset && forceSync) {
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Menarik data langsung dari server Shopee...</div></td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><div class="mt-2 text-muted">Menarik data langsung dari server Shopee...</div></td></tr>`;
             }
 
             // Sinkronisasi paksa jika tombol Refresh ditekan
@@ -472,7 +473,7 @@
 
         } catch (e) {
             if (reset) {
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5 text-danger"><i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i>Gagal mengambil data retur: ${e.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-5 text-danger"><i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i>Gagal mengambil data retur: ${e.message}</td></tr>`;
             } else {
                 alert('Gagal mengambil data lebih lanjut: ' + e.message);
             }
@@ -515,7 +516,7 @@
         document.getElementById('kpiValue').innerText = 'Rp ' + totalValue.toLocaleString('id-ID');
 
         if (allReturnsData.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Saat ini tidak ada data retur. Semua aman! 🎉</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-5 text-muted">Saat ini tidak ada data retur. Semua aman! 🎉</td></tr>';
             return;
         }
 
@@ -565,8 +566,19 @@
             if (r.status === 'WAITING_SELLER_RECEIVE') {
                 btnHtml += `<button class="btn btn-sm btn-success fw-bold shadow-sm d-block w-100 mb-1" onclick="openConfirmModal('${r.return_sn}', '${r.store_id}')"><i class="bi bi-check2-all me-1"></i>Terima & Restock</button>`;
             }
-            if (r.needs_logistics && r.tracking_number) {
+            const isRefundOnly = Number(r.return_solution) === 1;
+            const canTrackReturn = !isRefundOnly && r.is_return_shipment !== false && r.tracking_number;
+            if (canTrackReturn) {
                 btnHtml += `<button class="btn btn-sm btn-outline-info d-block w-100" onclick="trackReturn('${r.return_sn}', '${r.store_id}')"><i class="bi bi-truck me-1"></i>Lacak: ${r.tracking_number}</button>`;
+            }
+
+            let returnTrackingHtml = '';
+            if (isRefundOnly) {
+                returnTrackingHtml = '<span class="text-muted small">Tidak ada pengembalian barang</span>';
+            } else if (r.tracking_number) {
+                returnTrackingHtml = `<div class="d-flex flex-column gap-1"><span class="badge bg-info-subtle text-info-emphasis border border-info-subtle text-wrap text-start" style="max-width:170px"><i class="bi bi-arrow-return-left me-1"></i>${r.tracking_number}</span><span class="small text-muted">Resi ke penjual</span></div>`;
+            } else {
+                returnTrackingHtml = '<span class="text-warning-emphasis small"><i class="bi bi-hourglass-split me-1"></i>Belum diterbitkan</span>';
             }
 
             const createDate = r.create_time ? new Date(r.create_time * 1000).toLocaleString('id-ID', {
@@ -586,6 +598,7 @@
                     <div class="fw-semibold text-primary mb-1">${r.return_sn}</div>
                     <div class="small text-muted"><i class="bi bi-box-seam me-1"></i>${r.order_sn}</div>
                 </td>
+                <td>${returnTrackingHtml}</td>
                 <td>${itemsHtml || '<span class="text-muted small">—</span>'}</td>
                 <td>
                     ${typeBadge}
@@ -601,7 +614,7 @@
         if (hasMore) {
             const trMore = document.createElement('tr');
             trMore.innerHTML = `
-                <td colspan="8" class="text-center py-3 bg-light">
+                <td colspan="9" class="text-center py-3 bg-light">
                     <button class="btn btn-sm btn-outline-primary fw-bold" onclick="loadMore()">Muat Lebih Banyak</button>
                 </td>
             `;

@@ -444,7 +444,26 @@ class MarketplaceReturnController extends Controller
                     ->get();
                 $total = $query->count();
 
-                $formattedReturns = $returns->map(function ($o) {
+                // Resi pada marketplace_orders adalah resi pengiriman awal.
+                // Untuk RTS, tampilkan hanya resi pengembalian dari record retur
+                // Shopee yang punya Return SN terkait — jangan sampai operator
+                // mengira resi awal sebagai resi barang kembali.
+                $orderSns = $returns->map(fn ($order) => $order->channel_order_id ?: $order->external_order_id)
+                    ->filter()
+                    ->unique()
+                    ->values();
+                $returnShipments = MarketplaceReturn::query()
+                    ->where('store_id', $store->id)
+                    ->whereIn('order_sn', $orderSns)
+                    ->orderByDesc('update_time')
+                    ->orderByDesc('id')
+                    ->get()
+                    ->unique('order_sn')
+                    ->keyBy('order_sn');
+
+                $formattedReturns = $returns->map(function ($o) use ($returnShipments) {
+                    $orderSn = $o->channel_order_id ?: $o->external_order_id;
+                    $returnShipment = $returnShipments->get($orderSn);
                     $items = $o->items->map(function ($itm) {
                         return [
                             'item_sku' => $itm->item_sku,
@@ -459,15 +478,17 @@ class MarketplaceReturnController extends Controller
 
                     return [
                         'store_id' => $o->store_id,
-                        'return_sn' => 'RTS-' . $o->external_order_id,
-                        'order_sn' => $o->external_order_id,
+                        'return_sn' => $returnShipment?->return_sn ?: 'RTS-' . $orderSn,
+                        'order_sn' => $orderSn,
                         'status' => 'FAILED_DELIVERY',
                         'reason' => 'Pengiriman Gagal (RTS) / Ditolak',
                         'reason_text_code' => 'RTS',
                         'return_solution' => 'RETURN_TO_SELLER',
                         'amount_before_discount' => $o->total_amount,
-                        'needs_logistics' => false,
-                        'tracking_number' => $o->shipping_awb_no,
+                        'needs_logistics' => (bool) $returnShipment?->needs_logistics,
+                        'tracking_number' => $returnShipment?->tracking_number,
+                        'original_tracking_number' => $o->shipping_awb_no,
+                        'is_return_shipment' => (bool) $returnShipment,
                         'create_time' => $o->cancelled_at ? $o->cancelled_at->timestamp : strtotime($o->order_date),
                         'update_time' => $o->updated_at->timestamp,
                         'item' => $items->toArray(),

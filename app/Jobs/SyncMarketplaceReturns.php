@@ -84,7 +84,29 @@ class SyncMarketplaceReturns implements ShouldQueue
                     $hasMore = $result['response']['more'] ?? false;
 
                     foreach ($returns as $r) {
-                        $this->processReturn($r);
+                        $return = $this->processReturn($r);
+
+                        // get_return_list tidak selalu menyertakan resi balik.
+                        // Lengkapi hanya retur fisik yang belum punya resi, agar
+                        // tab Retur dapat menampilkan nomor resi pengembalian.
+                        if ($return
+                            && $return->needs_logistics
+                            && blank($return->tracking_number)
+                            && method_exists($driver, 'getReturnDetail')) {
+                            try {
+                                $detailResult = $driver->getReturnDetail($this->store, $return->return_sn);
+                                if (empty($detailResult['error']) && is_array($detailResult['response'] ?? null)) {
+                                    $detail = $detailResult['response'];
+                                    $detail['return_sn'] = $detail['return_sn'] ?? $return->return_sn;
+                                    $detail['order_sn'] = $detail['order_sn'] ?? $return->order_sn;
+                                    $detail['needs_logistics'] = $detail['needs_logistics'] ?? $return->needs_logistics;
+                                    $detail['tracking_number'] = $detail['tracking_number'] ?? $return->tracking_number;
+                                    $this->processReturn($detail, false);
+                                }
+                            } catch (\Throwable $e) {
+                                Log::warning("Failed to fetch return tracking number {$return->return_sn}: " . $e->getMessage());
+                            }
+                        }
                     }
 
                     $pageNo += $pageSize;
@@ -126,10 +148,10 @@ class SyncMarketplaceReturns implements ShouldQueue
         }
     }
 
-    protected function processReturn(array $data, bool $syncItems = true)
+    protected function processReturn(array $data, bool $syncItems = true): ?MarketplaceReturn
     {
         $returnSn = $data['return_sn'] ?? null;
-        if (!$returnSn) return;
+        if (!$returnSn) return null;
 
         $returnObj = MarketplaceReturn::updateOrCreate(
             [
@@ -190,5 +212,7 @@ class SyncMarketplaceReturns implements ShouldQueue
                     ->delete();
             }
         }
+
+        return $returnObj;
     }
 }
