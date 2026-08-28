@@ -100,6 +100,45 @@
             cursor: pointer
         }
 
+        .pw-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: .65rem;
+            margin: .75rem 0
+        }
+
+        .pw-kpi-card {
+            min-width: 0;
+            padding: .7rem .75rem;
+            border: 1px solid rgba(148, 163, 184, .2);
+            border-radius: 11px;
+            background: color-mix(in srgb, var(--card) 94%, var(--line) 6%)
+        }
+
+        .pw-kpi-label {
+            color: var(--muted);
+            font-size: .68rem;
+            font-weight: 750
+        }
+
+        .pw-kpi-value {
+            margin-top: .22rem;
+            color: var(--text);
+            font-size: 1.05rem;
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap
+        }
+
+        .pw-kpi-card.amount .pw-kpi-value {
+            color: var(--accent)
+        }
+
+        .pw-periods-card.is-loading {
+            opacity: .58;
+            pointer-events: none
+        }
+
         .pw-select option {
             color: #111827
         }
@@ -665,6 +704,19 @@
                 flex: 1 1 auto;
                 justify-content: center
             }
+
+            .pw-kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: .45rem
+            }
+
+            .pw-kpi-card {
+                padding: .55rem .6rem
+            }
+
+            .pw-kpi-value {
+                font-size: .9rem
+            }
         }
     </style>
 @endpush
@@ -690,8 +742,8 @@
 
             return route("payroll.piecework.{$action}", ['module' => $module, 'period' => $period]);
         };
-        $defaultEnd = now()->toDateString();
-        $defaultStart = now()->subDays(6)->toDateString();
+        $defaultStart = $filterFrom ?? now()->subDays(6)->toDateString();
+        $defaultEnd = $filterTo ?? now()->toDateString();
     @endphp
 
     <div class="pw-overview-wrap">
@@ -701,7 +753,7 @@
                 <div class="pw-sub">Satu daftar periode untuk Cutting, Sewing, dan Harian. Detail, finalisasi, dan pembayaran tetap mengikuti modul masing-masing.</div>
             </div>
 
-            <div class="pw-tabs" aria-label="Filter modul payroll">
+            <div class="pw-tabs" id="pw-module-tabs" aria-label="Filter modul payroll">
                 @foreach ($moduleLabels as $tab => $label)
                     <a class="pw-tab {{ $activeModule === $tab ? 'active' : '' }}" href="{{ $tabUrl($tab) }}">
                         {{ $label }}
@@ -771,19 +823,38 @@
             </div>
         </details>
 
-        <div class="pw-card">
+        <div class="pw-kpi-grid" id="pw-filter-kpis" aria-live="polite">
+            <div class="pw-kpi-card">
+                <div class="pw-kpi-label">Total Periode</div>
+                <div class="pw-kpi-value">{{ number_format((int) ($kpis['period_count'] ?? 0), 0, ',', '.') }}</div>
+            </div>
+            <div class="pw-kpi-card">
+                <div class="pw-kpi-label">Total Qty</div>
+                <div class="pw-kpi-value">{{ rtrim(rtrim(number_format((float) ($kpis['total_qty'] ?? 0), 2, ',', '.'), '0'), ',') }}</div>
+            </div>
+            <div class="pw-kpi-card amount">
+                <div class="pw-kpi-label">Total Payroll</div>
+                <div class="pw-kpi-value">{{ number_format((float) ($kpis['total_amount'] ?? 0), 0, ',', '.') }}</div>
+            </div>
+            <div class="pw-kpi-card">
+                <div class="pw-kpi-label">Sudah Dibayar</div>
+                <div class="pw-kpi-value">{{ number_format((int) ($kpis['paid_count'] ?? 0), 0, ',', '.') }}</div>
+            </div>
+        </div>
+
+        <div class="pw-card pw-periods-card" id="pw-periods-card">
             <div class="pw-card-h">
                 <div>
                     <strong>Daftar Periode</strong>
-                    <div class="pw-sub">{{ $periods->total() }} periode · filter aktif: {{ $moduleLabels[$activeModule] }}</div>
+                    <div class="pw-sub">{{ $kpis['period_count'] ?? $periods->total() }} periode · filter aktif: {{ $moduleLabels[$activeModule] }}</div>
                 </div>
 
                 <form class="pw-row" method="GET" action="{{ route('payroll.piecework.overview') }}" id="pw-filter-form">
                     @if ($activeModule !== 'all')
                         <input type="hidden" name="module" value="{{ $activeModule }}">
                     @endif
-                    <input type="hidden" name="from" id="pw-filter-from" value="{{ request('from') }}" data-gf-date="off">
-                    <input type="hidden" name="to" id="pw-filter-to" value="{{ request('to') }}" data-gf-date="off">
+                    <input type="hidden" name="from" id="pw-filter-from" value="{{ $filterFrom }}" data-gf-date="off">
+                    <input type="hidden" name="to" id="pw-filter-to" value="{{ $filterTo }}" data-gf-date="off">
                     <input class="pw-in pw-date-range" type="text" id="pw-filter-range"
                         value="" placeholder="Pilih rentang tanggal" aria-label="Rentang tanggal"
                         autocomplete="off" readonly data-gf-date="off">
@@ -933,22 +1004,29 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            document.querySelectorAll('[data-pw-detail-url]').forEach(function (element) {
-                const navigateToDetail = function () {
-                    window.location.href = element.dataset.pwDetailUrl;
-                };
+            function bindDetailRows(root) {
+                (root || document).querySelectorAll('[data-pw-detail-url]').forEach(function (element) {
+                    if (element.dataset.pwDetailBound === '1') return;
+                    element.dataset.pwDetailBound = '1';
 
-                element.addEventListener('click', function (event) {
-                    if (event.target.closest('a, button, form, input, select, textarea, label')) return;
-                    navigateToDetail();
-                });
+                    const navigateToDetail = function () {
+                        window.location.href = element.dataset.pwDetailUrl;
+                    };
 
-                element.addEventListener('keydown', function (event) {
-                    if (event.key !== 'Enter' && event.key !== ' ') return;
-                    event.preventDefault();
-                    navigateToDetail();
+                    element.addEventListener('click', function (event) {
+                        if (event.target.closest('a, button, form, input, select, textarea, label')) return;
+                        navigateToDetail();
+                    });
+
+                    element.addEventListener('keydown', function (event) {
+                        if (event.key !== 'Enter' && event.key !== ' ') return;
+                        event.preventDefault();
+                        navigateToDetail();
+                    });
                 });
-            });
+            }
+
+            bindDetailRows(document);
 
             const generateForm = document.getElementById('pw-generate-form');
             const generateModule = document.getElementById('overview-module');
@@ -963,20 +1041,18 @@
                 syncGenerateAction();
             }
 
-            if (typeof window.flatpickr !== 'function') return;
-
             const localeId = Object.assign(
                 {},
-                (window.flatpickr.l10ns && window.flatpickr.l10ns.id) || {},
+                (window.flatpickr && window.flatpickr.l10ns && window.flatpickr.l10ns.id) || {},
                 { firstDayOfWeek: 1 }
             );
 
             function parse(value) {
-                return value ? window.flatpickr.parseDate(value, 'Y-m-d') : null;
+                return window.flatpickr && value ? window.flatpickr.parseDate(value, 'Y-m-d') : null;
             }
 
             function formatRange(dates) {
-                if (!dates.length) return '';
+                if (!dates.length || typeof window.flatpickr !== 'function') return '';
 
                 const format = date => window.flatpickr.formatDate(date, 'd/m/Y');
                 if (dates.length === 1) return format(dates[0]);
@@ -984,12 +1060,15 @@
                 return format(dates[0]) + ' – ' + format(dates[1]);
             }
 
-            function initRange(inputId, fromId, toId) {
+            function initRange(inputId, fromId, toId, onRangeChange) {
+                if (typeof window.flatpickr !== 'function') return;
+
                 const input = document.getElementById(inputId);
                 const from = document.getElementById(fromId);
                 const to = document.getElementById(toId);
 
                 if (!input || !from || !to) return;
+                if (input._flatpickr) input._flatpickr.destroy();
 
                 const defaults = [parse(from.value), parse(to.value)].filter(Boolean);
 
@@ -1018,12 +1097,104 @@
                         }
 
                         instance.input.value = formatRange(selectedDates);
+                        if (typeof onRangeChange === 'function') onRangeChange(selectedDates);
                     },
                 });
             }
 
-            initRange('pw-filter-range', 'pw-filter-from', 'pw-filter-to');
+            function formUrl(form) {
+                const url = new URL(form.action, window.location.origin);
+                new FormData(form).forEach(function (value, key) {
+                    if (value !== '') url.searchParams.set(key, value);
+                });
+                return url.toString();
+            }
+
+            function refreshOverview(url, pushHistory) {
+                const currentCard = document.getElementById('pw-periods-card');
+                if (currentCard) currentCard.classList.add('is-loading');
+
+                return fetch(url, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'text/html',
+                    },
+                })
+                    .then(function (response) {
+                        if (!response.ok) throw new Error('Gagal memuat filter payroll.');
+                        return response.text();
+                    })
+                    .then(function (html) {
+                        const documentParser = new DOMParser();
+                        const nextDocument = documentParser.parseFromString(html, 'text/html');
+                        const nextKpis = nextDocument.getElementById('pw-filter-kpis');
+                        const currentKpis = document.getElementById('pw-filter-kpis');
+                        const nextTabs = nextDocument.getElementById('pw-module-tabs');
+                        const currentTabs = document.getElementById('pw-module-tabs');
+                        const nextCard = nextDocument.getElementById('pw-periods-card');
+                        const activeCard = document.getElementById('pw-periods-card');
+                        const oldRange = document.getElementById('pw-filter-range');
+
+                        if (oldRange && oldRange._flatpickr) oldRange._flatpickr.destroy();
+                        if (nextKpis && currentKpis) currentKpis.replaceWith(nextKpis);
+                        if (nextTabs && currentTabs) currentTabs.replaceWith(nextTabs);
+                        if (nextCard && activeCard) activeCard.replaceWith(nextCard);
+
+                        bindDetailRows(document);
+                        bindRealtimeControls();
+                        initRange('pw-filter-range', 'pw-filter-from', 'pw-filter-to', function (selectedDates) {
+                            if (selectedDates.length === 2) scheduleFilterRefresh();
+                        });
+
+                        if (pushHistory) window.history.pushState({}, '', url);
+                    })
+                    .catch(function () {
+                        window.location.assign(url);
+                    })
+                    .finally(function () {
+                        const refreshedCard = document.getElementById('pw-periods-card');
+                        if (refreshedCard) refreshedCard.classList.remove('is-loading');
+                    });
+            }
+
+            function bindRealtimeControls() {
+                document.querySelectorAll('#pw-module-tabs a').forEach(function (link) {
+                    if (link.dataset.realtimeBound === '1') return;
+                    link.dataset.realtimeBound = '1';
+                    link.addEventListener('click', function (event) {
+                        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                        event.preventDefault();
+                        refreshOverview(link.href, true);
+                    });
+                });
+
+                const filterForm = document.getElementById('pw-filter-form');
+                if (filterForm && filterForm.dataset.realtimeBound !== '1') {
+                    filterForm.dataset.realtimeBound = '1';
+                    filterForm.addEventListener('submit', function (event) {
+                        event.preventDefault();
+                        refreshOverview(formUrl(filterForm), true);
+                    });
+                }
+            }
+
+            let filterRefreshTimer;
+            function scheduleFilterRefresh() {
+                window.clearTimeout(filterRefreshTimer);
+                filterRefreshTimer = window.setTimeout(function () {
+                    const filterForm = document.getElementById('pw-filter-form');
+                    if (filterForm) refreshOverview(formUrl(filterForm), true);
+                }, 150);
+            }
+
+            bindRealtimeControls();
+            initRange('pw-filter-range', 'pw-filter-from', 'pw-filter-to', function (selectedDates) {
+                if (selectedDates.length === 2) scheduleFilterRefresh();
+            });
             initRange('overview-period-range', 'overview-period-start', 'overview-period-end');
+            window.addEventListener('popstate', function () {
+                refreshOverview(window.location.href, false);
+            });
         });
     </script>
 @endpush

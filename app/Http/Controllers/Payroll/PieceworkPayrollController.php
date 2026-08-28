@@ -67,6 +67,14 @@ class PieceworkPayrollController extends Controller
     {
         $module = strtolower((string) $request->input('module', 'all'));
         $allowedModules = ['all', 'cutting', 'sewing', 'daily'];
+        $defaultFilterEnd = Carbon::today();
+        $defaultFilterStart = (clone $defaultFilterEnd)->subDays(6);
+        $filterFrom = $request->filled('from')
+            ? (string) $request->input('from')
+            : $defaultFilterStart->toDateString();
+        $filterTo = $request->filled('to')
+            ? (string) $request->input('to')
+            : $defaultFilterEnd->toDateString();
 
         if (!in_array($module, $allowedModules, true)) {
             $module = 'all';
@@ -88,19 +96,29 @@ class PieceworkPayrollController extends Controller
             $query->where('module', $module);
         }
 
-        if ($request->filled('from')) {
-            $query->whereDate('period_start', '=', $request->input('from'));
+        if ($filterFrom !== '') {
+            $query->whereDate('period_start', '=', $filterFrom);
         }
 
-        if ($request->filled('to')) {
-            $query->whereDate('period_end', '=', $request->input('to'));
+        if ($filterTo !== '') {
+            $query->whereDate('period_end', '=', $filterTo);
         }
 
+        $filteredPeriods = (clone $query)->get();
         $periods = $query->paginate(15)->withQueryString();
+        $kpis = [
+            'period_count' => $filteredPeriods->count(),
+            'total_qty' => (float) $filteredPeriods->sum('lines_total_qty'),
+            'total_amount' => (float) $filteredPeriods->sum('lines_total_amount'),
+            'paid_count' => $filteredPeriods->whereNotNull('paid_at')->count(),
+        ];
 
         return view('payroll.piecework.overview', [
             'module' => $module,
             'periods' => $periods,
+            'filterFrom' => $filterFrom,
+            'filterTo' => $filterTo,
+            'kpis' => $kpis,
         ]);
     }
 
@@ -462,6 +480,14 @@ class PieceworkPayrollController extends Controller
         abort_if($lines->isEmpty(), 404, 'Operator tidak memiliki data pada periode ini.');
 
         $employee = $lines->first()->employee;
+        $operatorOptions = PieceworkPayrollLine::query()
+            ->with('employee')
+            ->where('payroll_period_id', $period->id)
+            ->select('employee_id')
+            ->distinct()
+            ->get()
+            ->sortBy(fn (PieceworkPayrollLine $line) => mb_strtolower((string) ($line->employee?->name ?? '')))
+            ->values();
 
         $totalQty = (float) $lines->sum('total_qty_ok');
         $totalAmount = (float) $lines->sum('amount');
@@ -471,6 +497,7 @@ class PieceworkPayrollController extends Controller
             'moduleLabel' => $cfg['label'],
             'period' => $period,
             'employee' => $employee,
+            'operatorOptions' => $operatorOptions,
             'lines' => $lines,
             'totalQty' => $totalQty,
             'totalAmount' => $totalAmount,
