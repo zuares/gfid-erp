@@ -202,6 +202,7 @@ class ProcessShopeeWebhookJob implements ShouldQueue
                     }
                 }
 
+                $this->dispatchEscrowSyncIfEligible($store, $orderSn);
                 event(new \App\Events\OrderUpdated($store->id, $orderSn, $localOrder->fresh()->order_status));
             }
 
@@ -209,13 +210,31 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             Log::info("Order {$orderSn} not found locally. Syncing specific order via API.");
             try {
                 app(\App\Services\OmnichannelSyncService::class)->syncSpecificOrder($store, $orderSn);
+
+                $this->dispatchEscrowSyncIfEligible($store, $orderSn);
                 
                 // Broadcast an event to trigger UI refresh since we just synced a new order
-                event(new \App\Events\OrderUpdated($store->id, $orderSn, $status));
+                $syncedOrder = MarketplaceOrder::where('store_id', $store->id)
+                    ->where('channel_order_id', $orderSn)
+                    ->first();
+                event(new \App\Events\OrderUpdated($store->id, $orderSn, $syncedOrder?->order_status ?? $status));
             } catch (\Exception $e) {
                 Log::error("Failed to sync missing order {$orderSn}: " . $e->getMessage());
             }
         }
+    }
+
+    protected function dispatchEscrowSyncIfEligible(Store $store, string $orderSn): void
+    {
+        $order = MarketplaceOrder::where('store_id', $store->id)
+            ->where('channel_order_id', $orderSn)
+            ->first();
+
+        if (! $order || ! in_array($order->order_status, \App\Services\MarketplaceSyncService::SETTLEMENT_ELIGIBLE_ORDER_STATUSES, true)) {
+            return;
+        }
+
+        \App\Jobs\SyncOrderEscrowJob::dispatch($store->id, $orderSn);
     }
 
     protected function handleTrackingNoUpdate()

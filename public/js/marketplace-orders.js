@@ -312,7 +312,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             ? `<del>${esc(fmtRp(original))}</del>`
             : '';
         return `<div class="ord-item-price" title="Harga jual setelah diskon">
-            ${originalHtml}<span>${esc(fmtRp(sale))} / item</span>
+            ${originalHtml}<span>${esc(fmtRp(sale))}</span>
             ${qty > 1 ? `<strong>${esc(fmtRp(lineTotal))}</strong>` : ''}
         </div>`;
     }
@@ -1845,7 +1845,10 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                     ? `<div class="ord-item-source">Marketplace: ${esc(marketplaceSku)}</div>`
                     : '');
         }
-        const bodyHtml = `<div class="ord-item-title-row">${titleHtml}${itemSalePriceHtml(i)}</div>${detailsHtml}${stockHtml}`;
+        const titleRowClass = internalCode
+            ? 'ord-item-title-row ord-item-title-row-mapped'
+            : 'ord-item-title-row';
+        const bodyHtml = `<div class="${titleRowClass}">${titleHtml}${itemSalePriceHtml(i)}</div>${detailsHtml}${stockHtml}`;
 
         const qtyClass = urgent ? 'ord-item-qty urgent' : 'ord-item-qty';
         return `<div class="ord-item-card">
@@ -3933,8 +3936,22 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             // Hanya update render tanpa merusak UX loading screen yang sudah ada
             render();
             updateLastSyncTime();
+            // Status order baru/escrow dapat mengubah angka badge antar-tab.
+            loadOrderCounts(ordersLoadSeq, api(localOrderCountsUrl()).catch(() => null));
         } catch(e) {} finally {
             silentRefreshBusy = false;
+        }
+    }
+
+    // Status order baru/escrow dapat mengubah angka badge antar-tab.
+    // Ikut refresh counts agar tab langsung konsisten dengan daftar order.
+    if (window.Echo) {
+        try {
+            window.Echo.channel('marketplace').listen('OrderUpdated', function () {
+                if (!document.hidden) silentRefresh();
+            });
+        } catch (e) {
+            console.warn('Marketplace orders realtime listener failed:', e);
         }
     }
 

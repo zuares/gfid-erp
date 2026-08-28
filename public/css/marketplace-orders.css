@@ -530,10 +530,14 @@ body[data-theme="dark"] .ord-payment-method {
 .ord-item-qty.urgent { background: #fef3c7; color: #92400e; }
 .ord-item-body { flex: 1; min-width: 0; }
 .ord-item-title-row {
-    display: flex; align-items: baseline; justify-content: space-between;
-    gap: .5rem; min-width: 0;
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 46%);
+    align-items: baseline; gap: .5rem; min-width: 0;
 }
-.ord-item-title-row .ord-item-name { flex: 1; min-width: 0; }
+.ord-item-title-row-mapped { grid-template-columns: max-content minmax(0, 1fr); }
+.ord-item-title-row .ord-item-name { min-width: 0; }
+.ord-item-title-row-mapped .ord-item-name {
+    overflow: visible; text-overflow: clip; white-space: nowrap;
+}
 .ord-item-name {
     font-size: .8rem; font-weight: 800; color: #0f172a;
     font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
@@ -558,9 +562,15 @@ body[data-theme="dark"] .ord-payment-method {
 body[data-theme="dark"] .ord-item-stock { color: #bbf7d0; background: rgba(22, 101, 52, .22); border-color: rgba(74, 222, 128, .3); }
 body[data-theme="dark"] .ord-item-stock.is-negative { color: #fecaca; background: rgba(185, 28, 28, .22); border-color: rgba(248, 113, 113, .3); }
 .ord-item-price {
-    display: inline-flex; align-items: baseline; flex-shrink: 0;
+    display: flex; align-items: baseline; justify-content: flex-end;
+    min-width: 0; max-width: 100%; overflow: hidden;
     gap: .28rem; margin-top: 0; font-size: .68rem; color: #047857;
-    white-space: nowrap;
+    white-space: nowrap; text-align: right;
+}
+.ord-item-price del,
+.ord-item-price span,
+.ord-item-price strong {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis;
 }
 .ord-item-price del { color: #94a3b8; font-size: .62rem; }
 .ord-item-price strong { font-weight: 800; }
