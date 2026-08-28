@@ -216,6 +216,48 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         (new SyncMarketplaceBookings($this->store))->handle($manager);
     }
 
+    public function test_sync_booking_terarah_menyimpan_item_dari_order_list_nested(): void
+    {
+        $bookingSn = 'BOOKING-PUSH-ITEM';
+        MarketplaceBooking::create([
+            'store_id' => $this->store->id,
+            'booking_sn' => $bookingSn,
+            'booking_status' => 'PROCESSED',
+            'items' => [],
+        ]);
+
+        $driver = \Mockery::mock(\App\Services\Channels\Shopee\ShopeeChannel::class);
+        $driver->shouldReceive('getBookingDetail')->once()->with($this->store, $bookingSn)->andReturn([
+            'response' => [
+                'booking_list' => [[
+                    'booking_sn' => $bookingSn,
+                    'booking_status' => 'PROCESSED',
+                    'order_list' => [[
+                        'order_sn' => 'ORDER-FROM-PUSH',
+                        'shipping_carrier' => 'J&T Express',
+                        'item_list' => [[
+                            'item_id' => 123,
+                            'item_name' => 'Produk Push',
+                            'model_quantity_purchased' => 2,
+                        ]],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        $manager = $this->mock(ChannelManager::class);
+        $manager->shouldReceive('driver')->once()->with($this->store)->andReturn($driver);
+
+        (new SyncMarketplaceBookings($this->store, null, null, false, $bookingSn))
+            ->handle($manager);
+
+        $booking = MarketplaceBooking::where('booking_sn', $bookingSn)->firstOrFail();
+        $this->assertSame('ORDER-FROM-PUSH', $booking->order_sn);
+        $this->assertSame('J&T Express', $booking->shipping_carrier);
+        $this->assertSame('Produk Push', data_get($booking->items, '0.item_name'));
+        $this->assertSame(2, data_get($booking->items, '0.model_quantity_purchased'));
+    }
+
     public function test_move_to_ready_memindahkan_order_processed_dengan_fulfillment_aktif(): void
     {
         $order = $this->createOrder('REPAIR-MOVE-READY', 'PROCESSED');

@@ -29,13 +29,21 @@ class SyncMarketplaceBookings implements ShouldQueue
     public $timeFrom;
     public $timeTo;
     public $fullSync;
+    public $bookingSn;
 
-    public function __construct(Store $store, ?int $timeFrom = null, ?int $timeTo = null, bool $fullSync = false)
+    public function __construct(
+        Store $store,
+        ?int $timeFrom = null,
+        ?int $timeTo = null,
+        bool $fullSync = false,
+        ?string $bookingSn = null
+    )
     {
         $this->store    = $store;
         $this->timeFrom = $timeFrom;
         $this->timeTo   = $timeTo;
         $this->fullSync = $fullSync;
+        $this->bookingSn = $bookingSn;
     }
 
     public function handle(ChannelManager $manager): void
@@ -47,6 +55,17 @@ class SyncMarketplaceBookings implements ShouldQueue
 
         try {
             $driver = $manager->driver($this->store);
+
+            // Webhook booking tidak perlu menjalankan sync rentang waktu.
+            // Ambil hanya booking yang berubah agar item/status segera masuk DB
+            // tanpa menghabiskan kuota get_booking_list.
+            if ($this->bookingSn !== null && $this->bookingSn !== '') {
+                if (method_exists($driver, 'getBookingDetail')) {
+                    $this->enrichDetails($driver, [$this->bookingSn]);
+                }
+                return;
+            }
+
             if (! method_exists($driver, 'getBookingList')) {
                 return;
             }
@@ -186,22 +205,27 @@ class SyncMarketplaceBookings implements ShouldQueue
                     ->keyBy('booking_sn');
 
                 foreach ($list as $d) {
-                    $sn = $d['booking_sn'] ?? null;
+                    $normalized = $this->normalizeBookingDetail($d);
+                    $sn = $normalized['booking_sn'] ?? (count($chunk) === 1 ? $chunk[0] : null);
                     $m  = $sn ? ($models[$sn] ?? null) : null;
                     if (! $m) {
                         continue;
                     }
 
-                    if (! empty($d['order_sn']))         $m->order_sn = $d['order_sn'];
-                    if (! empty($d['shipping_carrier'])) $m->shipping_carrier = $d['shipping_carrier'];
+                    if (! empty($normalized['order_sn']))         $m->order_sn = $normalized['order_sn'];
+                    if (! empty($normalized['shipping_carrier'])) $m->shipping_carrier = $normalized['shipping_carrier'];
 
-                    $pkg = $d['package_number'] ?? ($d['package_list'][0]['package_number'] ?? null);
+                    $pkg = $normalized['package_number'];
                     if (! empty($pkg))                   $m->package_number = $pkg;
-                    if (! empty($d['item_list']))        $m->items = $d['item_list'];
-                    if (! empty($d['booking_status']))   $m->booking_status = $d['booking_status']; // Pastikan status terupdate
+                    if (! empty($normalized['tracking_number'])) $m->tracking_number = $normalized['tracking_number'];
+                    if (! empty($normalized['shipping_document_status'])) {
+                        $m->shipping_document_status = $normalized['shipping_document_status'];
+                    }
+                    if (! empty($normalized['item_list']))       $m->items = $normalized['item_list'];
+                    if (! empty($normalized['booking_status']))  $m->booking_status = $normalized['booking_status']; // Pastikan status terupdate
 
                     // Jika sudah diproses tapi belum punya resi, coba tarik resinya
-                    if (in_array((string) $m->booking_status, ['PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'COMPLETED']) && blank($m->tracking_number) && method_exists($driver, 'getBookingTrackingNumber')) {
+                    if (in_array(strtoupper((string) $m->booking_status), ['PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'COMPLETED']) && blank($m->tracking_number) && method_exists($driver, 'getBookingTrackingNumber')) {
                         try {
                             $trk = $driver->getBookingTrackingNumber($this->store, $sn);
                             $trkNum = $trk['response']['tracking_number'] ?? null;
@@ -219,14 +243,14 @@ class SyncMarketplaceBookings implements ShouldQueue
 
                     // Propagate booking_status ke order_status di marketplace_orders
                     // agar tab UI otomatis berubah tanpa menunggu webhook.
-                    if (! empty($d['order_sn']) || ! empty($m->order_sn)) {
-                        $realOrderSn = $d['order_sn'] ?? $m->order_sn;
+                    if (! empty($normalized['order_sn']) || ! empty($m->order_sn)) {
+                        $realOrderSn = $normalized['order_sn'] ?? $m->order_sn;
                         
                         // Panggil linkOrder untuk membersihkan duplicate order sisa jika get_booking_list
                         // sebelumnya gagal membawa order_sn, tetapi get_booking_detail berhasil.
                         $this->linkOrder($sn, $realOrderSn);
 
-                        $bookingStatusUpper = strtoupper((string) ($d['booking_status'] ?? $m->booking_status ?? ''));
+                        $bookingStatusUpper = strtoupper((string) ($normalized['booking_status'] ?? $m->booking_status ?? ''));
                         
                         if (! empty($bookingStatusUpper)) {
                             $orderStatusMap = [
@@ -261,14 +285,52 @@ class SyncMarketplaceBookings implements ShouldQueue
                         }
                     }
 
-                    if (! empty($d['order_sn'])) {
-                        $this->linkOrder($sn, $d['order_sn']);
+                    if (! empty($normalized['order_sn'])) {
+                        $this->linkOrder($sn, $normalized['order_sn']);
                     }
                 }
             } catch (\Throwable $e) {
                 Log::warning("SyncMarketplaceBookings enrichDetails [{$this->store->id}]: " . $e->getMessage());
             }
         }
+    }
+
+    /**
+     * Shopee dapat mengembalikan detail langsung di booking_list atau
+     * membungkusnya di order_list. Samakan bentuknya sebelum disimpan agar
+     * item dari get_booking_detail tidak hilang pada salah satu bentuk respons.
+     */
+    protected function normalizeBookingDetail(array $detail): array
+    {
+        $nestedOrder = [];
+        if (isset($detail['order_list']) && is_array($detail['order_list'])) {
+            $nestedOrder = is_array($detail['order_list'][0] ?? null)
+                ? $detail['order_list'][0]
+                : [];
+        }
+
+        $package = [];
+        foreach ([$detail['package_list'] ?? null, $nestedOrder['package_list'] ?? null] as $packages) {
+            if (is_array($packages) && is_array($packages[0] ?? null)) {
+                $package = $packages[0];
+                break;
+            }
+        }
+
+        return [
+            'booking_sn' => $detail['booking_sn'] ?? $nestedOrder['booking_sn'] ?? null,
+            'order_sn' => $detail['order_sn'] ?? $nestedOrder['order_sn'] ?? null,
+            'booking_status' => $detail['booking_status'] ?? $nestedOrder['booking_status'] ?? null,
+            'shipping_carrier' => $detail['shipping_carrier'] ?? $nestedOrder['shipping_carrier'] ?? null,
+            'tracking_number' => $detail['tracking_number'] ?? $nestedOrder['tracking_number'] ?? null,
+            'shipping_document_status' => $detail['shipping_document_status']
+                ?? $nestedOrder['shipping_document_status']
+                ?? null,
+            'package_number' => $detail['package_number']
+                ?? $nestedOrder['package_number']
+                ?? ($package['package_number'] ?? null),
+            'item_list' => $detail['item_list'] ?? $nestedOrder['item_list'] ?? [],
+        ];
     }
 
     /**

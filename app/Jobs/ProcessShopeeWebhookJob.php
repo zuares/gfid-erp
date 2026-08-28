@@ -363,6 +363,11 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             ['booking_status' => $bookingStatus]
         );
 
+        // Push status juga menjadi trigger enrichment item/order_sn dari
+        // get_booking_detail. Jalankan terarah per booking agar tidak sync
+        // seluruh rentang waktu setiap kali Shopee mengirim push.
+        \App\Jobs\SyncMarketplaceBookings::dispatch($store, null, null, false, $bookingSn);
+
         // Jika status webhook jadi PROCESSED/SHIPPED, otomatis coba tarik resinya
         if (in_array(strtoupper((string) $bookingStatus), ['PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'COMPLETED']) && blank($bModel->tracking_number)) {
             try {
@@ -426,9 +431,16 @@ class ProcessShopeeWebhookJob implements ShouldQueue
                 if (method_exists($driver, 'getBookingDetail')) {
                     $detailRes = $driver->getBookingDetail($store, $bookingSn);
                     if (empty($detailRes['error'])) {
-                        $bookings = $detailRes['response']['booking_list'] ?? [];
+                        $bookings = $detailRes['response']['booking_list']
+                            ?? $detailRes['response']['order_list']
+                            ?? [];
                         foreach ($bookings as $b) {
-                            if ($b['booking_sn'] === $bookingSn) {
+                            if (($b['booking_sn'] ?? null) === $bookingSn) {
+                                if (!empty($b['item_list']) && is_array($b['item_list'])) {
+                                    $bModel->update(['items' => $b['item_list']]);
+                                } elseif (!empty($b['order_list'][0]['item_list']) && is_array($b['order_list'][0]['item_list'])) {
+                                    $bModel->update(['items' => $b['order_list'][0]['item_list']]);
+                                }
                                 $ordersList = $b['order_list'] ?? [];
                                 if (!empty($ordersList[0]['order_sn'])) {
                                     $realOrderSn = $ordersList[0]['order_sn'];
@@ -492,6 +504,10 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             ['tracking_number' => $trackingNo]
         );
 
+        // Tracking push juga dapat menjadi event pertama yang kita terima untuk
+        // booking. Enrich item/order_sn secara terarah tanpa sync rentang waktu.
+        \App\Jobs\SyncMarketplaceBookings::dispatch($store, null, null, false, $bookingSn);
+
         $localOrder = MarketplaceOrder::where(function($q) use ($bookingSn) {
                 $q->where('channel_order_id', $bookingSn)
                   ->orWhere('booking_sn', $bookingSn);
@@ -510,20 +526,8 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             Log::info("Updated local order {$bookingSn} with shipping_awb_no: {$trackingNo}");
             event(new \App\Events\OrderUpdated($store->id, $localOrder->channel_order_id, $localOrder->order_status));
         } else {
-            Log::info("Order/Booking {$bookingSn} not found locally during booking_trackingno_update. Syncing via API.");
-            try {
-                // Untuk kilat, order_sn mungkin belum terbentuk atau belum ditarik. 
-                // Karena kita sudah mengupdate MarketplaceBooking di atas, kita cukup memicu event.
-                // Jika ingin menarik detail penuh, kita panggil syncBookings (atau getBookingDetail).
-                // Saat ini, updateOrCreate MarketplaceBooking di atas sudah cukup sebagai dasar data.
-                
-                // Gunakan SyncMarketplaceBookings job untuk menarik detail booking ini
-                dispatch_sync(new \App\Jobs\SyncMarketplaceBookings($store, $bookingSn, null, false));
-                
-                event(new \App\Events\OrderUpdated($store->id, $bookingSn, null));
-            } catch (\Exception $e) {
-                Log::error("Failed to sync missing booking/order {$bookingSn}: " . $e->getMessage());
-            }
+            Log::info("Order/Booking {$bookingSn} not found locally during booking_trackingno_update. Detail enrichment queued.");
+            event(new \App\Events\OrderUpdated($store->id, $bookingSn, null));
         }
     }
 
@@ -551,6 +555,10 @@ class ProcessShopeeWebhookJob implements ShouldQueue
             ['store_id' => $store->id, 'booking_sn' => $bookingSn],
             ['shipping_document_status' => $status]
         );
+
+        // Simpan metadata dokumen sekaligus lengkapi data booking jika push ini
+        // datang sebelum hasil get_booking_list masuk ke database.
+        \App\Jobs\SyncMarketplaceBookings::dispatch($store, null, null, false, $bookingSn);
 
         $localOrder = MarketplaceOrder::where(function($q) use ($bookingSn) {
                 $q->where('channel_order_id', $bookingSn)
