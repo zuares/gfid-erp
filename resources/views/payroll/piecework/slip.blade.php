@@ -303,8 +303,8 @@
         $pieceworkRateLabel = $module === 'cutting' ? 'Tarif / PCS' : 'Tarif';
         $pieceworkDetailTitle = $module === 'cutting' ? 'Rincian Hasil Cutting' : 'Rincian Hasil Sewing';
         $pieceworkDetailNote = $module === 'cutting'
-            ? 'Rincian hasil potong berdasarkan kategori dan item'
-            : 'Rincian pekerjaan berdasarkan kategori dan item';
+            ? 'Rincian hasil potong berdasarkan tanggal dan kode barang'
+            : 'Rincian pekerjaan berdasarkan tanggal dan kode barang';
     @endphp
 
     <div class="slip-page" data-module="{{ $module }}">
@@ -426,7 +426,7 @@
                             </table>
                         @else
                             <table class="slip-table">
-                                <thead><tr>@if (!$isDaily)<th>Hari / Tanggal</th>@endif<th>Kode Kategori</th><th>Kode Barang</th><th class="slip-right">{{ $pieceworkQtyLabel }}</th><th class="slip-right">{{ $pieceworkRateLabel }}</th><th class="slip-right">Total</th></tr></thead>
+                                <thead><tr>@if (!$isDaily)<th>Hari / Tanggal</th>@endif<th>Kode Barang</th><th class="slip-right">{{ $pieceworkQtyLabel }}</th><th class="slip-right">{{ $pieceworkRateLabel }}</th><th class="slip-right">Total</th></tr></thead>
                                 <tbody>
                                     @foreach ($lines as $line)
                                         <tr>
@@ -441,7 +441,6 @@
                                                     @endif
                                                 </td>
                                             @endif
-                                            <td>{{ $line->category?->name ?? '-' }}</td>
                                             <td class="slip-item-code">{{ $line->item?->code ?? '-' }}</td>
                                             <td class="slip-right slip-mono slip-qty">{{ number_format((float) $line->total_qty_ok, 2, ',', '.') }}</td>
                                             <td class="slip-right slip-mono">{{ number_format((float) $line->rate_per_pcs, 0, ',', '.') }}</td>
@@ -449,7 +448,7 @@
                                         </tr>
                                     @endforeach
                                 </tbody>
-                                <tfoot><tr><td colspan="{{ !$isDaily ? 3 : 2 }}">Total Diterima</td><td class="slip-right slip-mono">{{ number_format((float) $totalQty, 2, ',', '.') }}</td><td></td><td class="slip-right slip-mono">{{ number_format((float) $totalAmount, 0, ',', '.') }}</td></tr></tfoot>
+                                <tfoot><tr><td colspan="{{ !$isDaily ? 2 : 1 }}">Total Diterima</td><td class="slip-right slip-mono">{{ number_format((float) $totalQty, 2, ',', '.') }}</td><td></td><td class="slip-right slip-mono">{{ number_format((float) $totalAmount, 0, ',', '.') }}</td></tr></tfoot>
                             </table>
                         @endif
                     </div>
