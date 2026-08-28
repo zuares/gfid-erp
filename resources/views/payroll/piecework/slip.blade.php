@@ -15,6 +15,7 @@
         .slip-page[data-module="cutting"] .slip-section-title,
         .slip-page[data-module="sewing"] .slip-section-title { font-size:.84rem }
         .slip-actions { display:flex; justify-content:space-between; align-items:center; gap:.75rem; margin-bottom:.85rem }
+        .slip-actions-left { display:flex; align-items:flex-end; gap:.65rem; min-width:0 }
         .slip-action-btn { display:inline-flex; align-items:center; justify-content:center; gap:.4rem; min-height:36px; padding:.45rem .7rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.78rem; font-weight:700; text-decoration:none }
         .slip-action-btn.primary { border-color:var(--accent); background:var(--accent); color:#fff }
         .slip-print-tools { display:flex; align-items:flex-end; justify-content:flex-end; gap:.55rem; flex-wrap:wrap }
@@ -22,6 +23,8 @@
         .slip-paper-select { min-height:36px; padding:.45rem .6rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.76rem; font-weight:700 }
         .slip-part-field { display:flex; flex-direction:column; gap:.2rem; color:var(--muted); font-size:.64rem; font-weight:800 }
         .slip-part-select { min-height:36px; padding:.45rem .6rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.76rem; font-weight:700 }
+        .slip-operator-field { display:flex; flex-direction:column; gap:.2rem; min-width:190px; color:var(--muted); font-size:.64rem; font-weight:800 }
+        .slip-operator-select { min-height:36px; max-width:250px; padding:.45rem .6rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.76rem; font-weight:700 }
         .slip-preview-note { display:flex; align-items:center; gap:.45rem; margin-bottom:.75rem; color:var(--muted); font-size:.72rem }
         .slip-details-meta { display:none }
         .slip-card { width:100%; max-width:100%; overflow:hidden; background:var(--card); border:1px solid rgba(148,163,184,.28); border-radius:14px; box-shadow:0 10px 28px rgba(15,23,42,.07) }
@@ -65,6 +68,7 @@
         .slip-date-day { font-weight:800; line-height:1.25 }
         .slip-date-value { margin-top:.12rem; color:var(--muted); font-size:.7rem }
         .slip-item-code { font-variant-numeric:tabular-nums; font-weight:750; letter-spacing:.01em }
+        .slip-qty { font-weight:850 }
         .slip-attendance { display:inline-flex; align-items:center; padding:.25rem .48rem; border-radius:999px; background:rgba(148,163,184,.12); color:var(--muted); font-size:.68rem; font-weight:800 }
         .slip-attendance.hadir { background:rgba(16,185,129,.11); color:rgba(5,150,105,1) }
         .slip-attendance.libur { background:rgba(148,163,184,.14); color:var(--muted) }
@@ -84,6 +88,8 @@
             .slip-page { width:100%; padding:.55rem .4rem 1.75rem }
             .slip-inner { padding:1rem .85rem 1.1rem }
             .slip-actions { align-items:stretch; flex-direction:column }
+            .slip-actions-left { align-items:stretch; flex-direction:column }
+            .slip-operator-field, .slip-operator-select { width:100%; max-width:none; min-width:0 }
             .slip-print-tools { width:100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:stretch; justify-content:stretch; gap:.45rem }
             .slip-paper-field { flex:1; min-width:0 }
             .slip-part-field { grid-column:1 / -1; min-width:0 }
@@ -303,7 +309,21 @@
 
     <div class="slip-page" data-module="{{ $module }}">
         <div class="slip-actions no-print">
-            <a class="slip-action-btn" href="{{ $backUrl }}">← Kembali</a>
+            <div class="slip-actions-left">
+                <a class="slip-action-btn" href="{{ $backUrl }}">← Kembali</a>
+                @if (($operatorOptions ?? collect())->count() > 1)
+                    <label class="slip-operator-field" for="slip-operator-select">
+                        <span>Pilih slip operator</span>
+                        <select class="slip-operator-select" id="slip-operator-select" onchange="if (this.value) window.location.assign(this.value)">
+                            @foreach ($operatorOptions as $operatorOption)
+                                <option value="{{ $isDaily ? route('payroll.daily.slip_preview', ['period' => $period, 'employee' => $operatorOption->employee_id]) : route('payroll.piecework.slip', ['module' => $module, 'period' => $period, 'employee' => $operatorOption->employee_id]) }}" @selected((int) $operatorOption->employee_id === (int) $employee?->id)>
+                                    {{ $operatorOption->employee?->name ?? 'Operator #' . $operatorOption->employee_id }}{{ $operatorOption->employee?->code ? ' · ' . $operatorOption->employee->code : '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+                @endif
+            </div>
             <div class="slip-print-tools">
                 <label class="slip-paper-field" for="slip-paper-size">
                     <span>Ukuran kertas</span>
@@ -421,9 +441,9 @@
                                                     @endif
                                                 </td>
                                             @endif
-                                            <td class="slip-item-code">{{ $line->category?->code ?? '-' }}</td>
+                                            <td>{{ $line->category?->name ?? '-' }}</td>
                                             <td class="slip-item-code">{{ $line->item?->code ?? '-' }}</td>
-                                            <td class="slip-right slip-mono">{{ number_format((float) $line->total_qty_ok, 2, ',', '.') }}</td>
+                                            <td class="slip-right slip-mono slip-qty">{{ number_format((float) $line->total_qty_ok, 2, ',', '.') }}</td>
                                             <td class="slip-right slip-mono">{{ number_format((float) $line->rate_per_pcs, 0, ',', '.') }}</td>
                                             <td class="slip-right slip-mono" style="font-weight:850">{{ number_format((float) $line->amount, 0, ',', '.') }}</td>
                                         </tr>
