@@ -36,6 +36,12 @@ class PieceworkPayrollController extends Controller
                 'views' => 'payroll.piecework', // ✅ PENTING
                 'allow_slip_all' => true,
             ],
+            'daily' => [
+                'label' => 'Harian',
+                'generator' => \App\Services\Payroll\DailyPayrollGenerator::class,
+                'views' => 'payroll.piecework',
+                'allow_slip_all' => false,
+            ],
         ];
 
         abort_unless(isset($map[$module]), 404);
@@ -49,7 +55,7 @@ class PieceworkPayrollController extends Controller
     public function overview(Request $request): View
     {
         $module = strtolower((string) $request->input('module', 'all'));
-        $allowedModules = ['all', 'cutting', 'sewing'];
+        $allowedModules = ['all', 'cutting', 'sewing', 'daily'];
 
         if (!in_array($module, $allowedModules, true)) {
             $module = 'all';
@@ -93,7 +99,7 @@ class PieceworkPayrollController extends Controller
     public function storeOverview(Request $request): RedirectResponse
     {
         $request->validate([
-            'module' => ['required', 'in:cutting,sewing'],
+            'module' => ['required', 'in:cutting,sewing,daily'],
         ], [
             'module.required' => 'Modul payroll wajib dipilih.',
             'module.in' => 'Modul payroll tidak valid.',
@@ -216,9 +222,13 @@ class PieceworkPayrollController extends Controller
         $lines = PieceworkPayrollLine::query()
             ->with(['employee', 'category', 'item'])
             ->where('payroll_period_id', $period->id)
-            ->orderBy('employee_id')
-            ->orderBy('item_category_id')
-            ->orderBy('item_id')
+            ->when($cfg['module'] === 'daily', function ($query) {
+                return $query->orderBy('work_date')->orderBy('employee_id');
+            }, function ($query) {
+                return $query->orderBy('employee_id')
+                    ->orderBy('item_category_id')
+                    ->orderBy('item_id');
+            })
             ->get();
 
         $summaryByEmployee = $lines
@@ -238,6 +248,24 @@ class PieceworkPayrollController extends Controller
         $grandTotalQty = (float) $lines->sum('total_qty_ok');
         $grandTotalAmount = (float) $lines->sum('amount');
 
+        if ($cfg['module'] === 'daily') {
+            $summaryByEmployee = $lines
+                ->groupBy('employee_id')
+                ->map(function ($group) {
+                    $employee = $group->first()->employee;
+
+                    return [
+                        'employee_id' => $employee?->id,
+                        'employee_name' => $employee?->name ?? '-',
+                        'total_qty' => (float) $group->sum('attendance_factor'),
+                        'total_amount' => (float) $group->sum('amount'),
+                    ];
+                })
+                ->values();
+
+            $grandTotalQty = (float) $lines->sum('attendance_factor');
+        }
+
         $cashAccounts = Account::query()
             ->where('is_cash', true)
             ->where('is_active', true)
@@ -255,6 +283,57 @@ class PieceworkPayrollController extends Controller
             'cashAccounts' => $cashAccounts,
             'allowSlipAll' => (bool) $cfg['allow_slip_all'],
         ]);
+    }
+
+    /**
+     * Update kehadiran satu baris payroll harian.
+     */
+    public function updateDailyLine(Request $request, string $module, PieceworkPayrollPeriod $period, PieceworkPayrollLine $line): RedirectResponse
+    {
+        $cfg = $this->moduleConfig($module);
+        abort_unless($cfg['module'] === 'daily', 404);
+        abort_unless((int) $line->payroll_period_id === (int) $period->id, 404);
+
+        if ($period->status === 'final' || $period->paid_at) {
+            return back()->with('error', 'Payroll harian yang sudah FINAL atau dibayar tidak bisa diubah.');
+        }
+
+        $data = $request->validate([
+            'attendance_status' => ['required', 'in:pending,hadir,setengah_hari,izin,sakit,libur'],
+        ]);
+
+        $factor = match ($data['attendance_status']) {
+            'hadir' => 1.0,
+            'setengah_hari' => 0.5,
+            default => 0.0,
+        };
+        $rate = round((float) ($line->rate_per_day ?: $line->rate_per_pcs), 2);
+        $amount = round($factor * $rate, 2);
+
+        DB::transaction(function () use ($period, $line, $data, $factor, $rate, $amount): void {
+            $lockedPeriod = PieceworkPayrollPeriod::query()
+                ->lockForUpdate()
+                ->findOrFail($period->id);
+            $lockedLine = PieceworkPayrollLine::query()
+                ->where('payroll_period_id', $lockedPeriod->id)
+                ->lockForUpdate()
+                ->findOrFail($line->id);
+
+            $lockedLine->forceFill([
+                'attendance_status' => $data['attendance_status'],
+                'attendance_factor' => $factor,
+                'rate_per_day' => $rate,
+                'rate_per_pcs' => $rate,
+                'total_qty_ok' => $factor,
+                'amount' => $amount,
+            ])->save();
+
+            $lockedPeriod->forceFill([
+                'total_amount' => $lockedPeriod->lines()->sum('amount'),
+            ])->save();
+        });
+
+        return back()->with('status', 'Kehadiran payroll harian berhasil disimpan.');
     }
 
     /**
@@ -343,6 +422,12 @@ class PieceworkPayrollController extends Controller
     {
         $cfg = $this->moduleConfig($module);
         abort_unless($period->module === $cfg['module'], 404);
+
+        if ($cfg['module'] === 'daily' && $period->lines()->where('attendance_status', 'pending')->exists()) {
+            return redirect()
+                ->route('payroll.piecework.show', [$cfg['module'], $period])
+                ->with('error', 'Lengkapi status kehadiran payroll harian sebelum difinalkan.');
+        }
 
         try {
             $svc->finalize($period);

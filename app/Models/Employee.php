@@ -12,6 +12,7 @@ class Employee extends Model
         'role',
         'payment_type',
         'weekly_fixed_salary',
+        'daily_rate',
         'default_piece_rate',
         'active',
         'phone',
@@ -21,6 +22,7 @@ class Employee extends Model
     protected $casts = [
         'active' => 'boolean',
         'weekly_fixed_salary' => 'decimal:2',
+        'daily_rate' => 'decimal:2',
         'default_piece_rate' => 'decimal:2',
     ];
 

@@ -40,6 +40,14 @@
     </div>
 
     <div>
+        <label class="form-label">Tarif Harian</label>
+        <input type="number" step="0.01" min="0" name="daily_rate" class="form-control"
+            value="{{ old('daily_rate', $employee->daily_rate) }}"
+            placeholder="0">
+        <div class="gf-sub mt-1">Dipakai untuk payroll modul Harian.</div>
+    </div>
+
+    <div>
         <label class="form-label">Default Piece Rate</label>
         <input type="number" step="0.01" min="0" name="default_piece_rate" class="form-control"
             value="{{ old('default_piece_rate', $employee->default_piece_rate) }}"

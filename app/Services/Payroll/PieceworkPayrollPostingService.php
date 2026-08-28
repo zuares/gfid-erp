@@ -95,7 +95,8 @@ class PieceworkPayrollPostingService
             if (abs($difference) > 0.01) {
                 $inventoryCode = $period->module === 'finishing' ? '1203' : '1202';
                 $inventory = Account::where('code', $inventoryCode)->firstOrFail();
-                $desc = strtoupper($period->module).' Payroll Borongan (REKONSILIASI) '
+                $payrollLabel = $period->module === 'daily' ? 'Payroll Harian' : 'Payroll Borongan';
+                $desc = strtoupper($period->module).' '.$payrollLabel.' (REKONSILIASI) '
                     .$period->period_start.' s/d '.$period->period_end;
 
                 $lines = $difference > 0
@@ -209,7 +210,8 @@ class PieceworkPayrollPostingService
                 throw new \RuntimeException('Akun pembayaran harus akun Kas/Bank.');
             }
 
-            $desc = strtoupper($period->module).' Payroll Borongan (PAY) '
+            $payrollLabel = $period->module === 'daily' ? 'Payroll Harian' : 'Payroll Borongan';
+            $desc = strtoupper($period->module).' '.$payrollLabel.' (PAY) '
             .$period->period_start.' s/d '.$period->period_end
             .' via '.$paidFrom->name;
 

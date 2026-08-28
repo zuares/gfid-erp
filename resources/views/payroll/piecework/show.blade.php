@@ -176,6 +176,33 @@
             color: rgba(245, 158, 11, 1)
         }
 
+        .pw-daily-status-form {
+            display: flex;
+            align-items: center;
+            gap: .35rem;
+            min-width: 218px
+        }
+
+        .pw-daily-status {
+            min-width: 140px;
+            padding: .35rem .48rem;
+            border: 1px solid rgba(148, 163, 184, .28);
+            border-radius: 8px;
+            background: var(--card);
+            color: var(--text);
+            font-size: .78rem
+        }
+
+        .pw-daily-save {
+            padding: .36rem .52rem;
+            border: 1px solid color-mix(in srgb, var(--accent) 40%, rgba(148, 163, 184, .35));
+            border-radius: 8px;
+            background: color-mix(in srgb, var(--accent-soft) 18%, var(--card) 82%);
+            color: var(--text);
+            font-size: .74rem;
+            white-space: nowrap
+        }
+
         .pw-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -206,13 +233,24 @@
                 flex: 1;
                 justify-content: center
             }
+
+            .pw-daily-status-form {
+                min-width: 0;
+                width: 100%
+            }
+
+            .pw-daily-status {
+                flex: 1;
+                min-width: 0
+            }
         }
     </style>
 @endpush
 
 @section('content')
     @php
-        $qtyLabel = $module === 'sewing' ? 'Qty Ambil' : 'Qty Payroll';
+        $qtyLabel = $module === 'daily' ? 'Hari Dibayar' : ($module === 'sewing' ? 'Qty Ambil' : 'Qty Payroll');
+        $pageLabel = $module === 'daily' ? 'Payroll Harian' : 'Payroll Borongan';
         $periodStart = \Carbon\Carbon::parse($period->period_start)->locale('id');
         $periodEnd = \Carbon\Carbon::parse($period->period_end)->locale('id');
         $periodWeek = $periodStart->weekOfMonth;
@@ -222,7 +260,7 @@
     <div class="pw-wrap">
         <div class="pw-top">
             <div class="pw-heading">
-                <h1 class="pw-title">{{ $moduleLabel ?? ucfirst($module) }} • Payroll Borongan</h1>
+                <h1 class="pw-title">{{ $moduleLabel ?? ucfirst($module) }} • {{ $pageLabel }}</h1>
                 <div class="pw-sub">
                     Minggu ke-{{ $periodWeek }} · {{ $periodMonth }} · {{ $periodDateRange }} · ID #{{ $period->id }}
                     ·
@@ -365,44 +403,105 @@
             {{-- RIGHT: Detail lines --}}
             <div class="pw-card">
                 <div class="pw-h">
-                    <div style="font-weight:900">Detail Lines</div>
-                    <div class="pw-sub" style="margin:0">Tampil per operator → kategori → item.</div>
+                    <div style="font-weight:900">{{ $module === 'daily' ? 'Detail Kehadiran' : 'Detail Lines' }}</div>
+                    <div class="pw-sub" style="margin:0">{{ $module === 'daily' ? 'Tandai status kehadiran setiap operator dan tanggal.' : 'Tampil per operator → kategori → item.' }}</div>
                 </div>
 
                 <div class="pw-b" style="padding:0">
                     <div class="pw-table-wrap">
-                        <table class="pw-table">
-                            <thead>
-                                <tr>
-                                    <th>Employee</th>
-                                    <th class="pw-hide-sm">Category</th>
-                                    <th>Item</th>
-                                    <th class="pw-right">{{ $qtyLabel }}</th>
-                                    <th class="pw-right pw-hide-sm">Rate</th>
-                                    <th class="pw-right">Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($lines as $l)
+                        @if ($module === 'daily')
+                            @php
+                                $attendanceLabels = [
+                                    'pending' => 'Belum diisi',
+                                    'hadir' => 'Hadir',
+                                    'setengah_hari' => 'Setengah Hari',
+                                    'izin' => 'Izin',
+                                    'sakit' => 'Sakit',
+                                    'libur' => 'Libur',
+                                ];
+                            @endphp
+                            <table class="pw-table">
+                                <thead>
                                     <tr>
-                                        <td style="font-weight:700">{{ $l->employee?->name ?? '-' }}</td>
-                                        <td class="pw-hide-sm">{{ $l->category?->name ?? '-' }}</td>
-                                        <td>{{ $l->item?->name ?? '-' }}</td>
-                                        <td class="pw-right">
-                                            {{ rtrim(rtrim(number_format((float) $l->total_qty_ok, 2, '.', ''), '0'), '.') }}
-                                        </td>
-                                        <td class="pw-right pw-hide-sm">
-                                            {{ number_format((float) $l->rate_per_pcs, 0, ',', '.') }}</td>
-                                        <td class="pw-right" style="font-weight:800">
-                                            {{ number_format((float) $l->amount, 0, ',', '.') }}</td>
+                                        <th>Tanggal</th>
+                                        <th>Operator</th>
+                                        <th>Status Kehadiran</th>
+                                        <th class="pw-right">Tarif / Hari</th>
+                                        <th class="pw-right">Total</th>
                                     </tr>
-                                @empty
+                                </thead>
+                                <tbody>
+                                    @forelse($lines as $l)
+                                        <tr>
+                                            <td style="font-weight:700;white-space:nowrap">
+                                                {{ $l->work_date ? \Carbon\Carbon::parse($l->work_date)->locale('id')->translatedFormat('l, d/m/Y') : '-' }}
+                                            </td>
+                                            <td style="font-weight:700">{{ $l->employee?->name ?? '-' }}</td>
+                                            <td>
+                                                @if ($period->status === 'final' || $period->paid_at)
+                                                    <span class="pw-chip">{{ $attendanceLabels[$l->attendance_status] ?? '-' }}</span>
+                                                @else
+                                                    <form class="pw-daily-status-form" method="POST"
+                                                        action="{{ route('payroll.piecework.daily_line.update', ['module' => $module, 'period' => $period, 'line' => $l]) }}">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <select class="pw-daily-status" name="attendance_status" aria-label="Status kehadiran {{ $l->employee?->name }} {{ $l->work_date?->format('d/m/Y') }}">
+                                                            @foreach ($attendanceLabels as $status => $label)
+                                                                <option value="{{ $status }}" @selected(($l->attendance_status ?: 'pending') === $status)>{{ $label }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                        <button class="pw-daily-save" type="submit">Simpan</button>
+                                                    </form>
+                                                @endif
+                                            </td>
+                                            <td class="pw-right" style="white-space:nowrap">
+                                                {{ number_format((float) ($l->rate_per_day ?: $l->rate_per_pcs), 0, ',', '.') }}
+                                            </td>
+                                            <td class="pw-right" style="font-weight:800;white-space:nowrap">
+                                                {{ number_format((float) $l->amount, 0, ',', '.') }}
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="5" style="padding:1rem;color:var(--muted)">Tidak ada detail kehadiran.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        @else
+                            <table class="pw-table">
+                                <thead>
                                     <tr>
-                                        <td colspan="6" style="padding:1rem;color:var(--muted)">Tidak ada lines.</td>
+                                        <th>Employee</th>
+                                        <th class="pw-hide-sm">Category</th>
+                                        <th>Item</th>
+                                        <th class="pw-right">{{ $qtyLabel }}</th>
+                                        <th class="pw-right pw-hide-sm">Rate</th>
+                                        <th class="pw-right">Amount</th>
                                     </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    @forelse($lines as $l)
+                                        <tr>
+                                            <td style="font-weight:700">{{ $l->employee?->name ?? '-' }}</td>
+                                            <td class="pw-hide-sm">{{ $l->category?->name ?? '-' }}</td>
+                                            <td>{{ $l->item?->name ?? '-' }}</td>
+                                            <td class="pw-right">
+                                                {{ rtrim(rtrim(number_format((float) $l->total_qty_ok, 2, '.', ''), '0'), '.') }}
+                                            </td>
+                                            <td class="pw-right pw-hide-sm">
+                                                {{ number_format((float) $l->rate_per_pcs, 0, ',', '.') }}</td>
+                                            <td class="pw-right" style="font-weight:800">
+                                                {{ number_format((float) $l->amount, 0, ',', '.') }}</td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="6" style="padding:1rem;color:var(--muted)">Tidak ada lines.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        @endif
                     </div>
                 </div>
             </div>

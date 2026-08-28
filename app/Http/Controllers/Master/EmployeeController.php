@@ -99,6 +99,7 @@ class EmployeeController extends Controller
             'role' => ['required', Rule::in(self::ROLES)],
             'payment_type' => ['required', Rule::in(self::PAYMENT_TYPES)],
             'weekly_fixed_salary' => ['nullable', 'numeric', 'min:0'],
+            'daily_rate' => ['nullable', 'numeric', 'min:0'],
             'default_piece_rate' => ['nullable', 'numeric', 'min:0'],
             'phone' => ['nullable', 'string', 'max:50'],
             'address' => ['nullable', 'string'],
@@ -106,6 +107,7 @@ class EmployeeController extends Controller
         ]);
 
         $data['weekly_fixed_salary'] = $data['weekly_fixed_salary'] ?? 0;
+        $data['daily_rate'] = $data['daily_rate'] ?? 0;
         $data['default_piece_rate'] = $data['default_piece_rate'] ?? 0;
         $data['active'] = $request->boolean('active');
 

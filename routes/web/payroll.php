@@ -37,7 +37,7 @@ Route::middleware(['web', 'auth', 'access:payroll'])->group(function () {
         ->name('payroll.piecework.store_overview');
 
     Route::prefix('payroll/piecework/{module}')
-        ->whereIn('module', ['cutting', 'sewing'])
+        ->whereIn('module', ['cutting', 'sewing', 'daily'])
         ->name('payroll.piecework.')
         ->group(function () {
 
@@ -75,6 +75,10 @@ Route::middleware(['web', 'auth', 'access:payroll'])->group(function () {
             // REGENERATE (draft only)
             Route::post('/{period}/regenerate', [PieceworkPayrollController::class, 'regenerate'])
                 ->name('regenerate');
+
+            // UPDATE KEHADIRAN PAYROLL HARIAN (DRAFT SAJA)
+            Route::patch('/{period}/daily-line/{line}', [PieceworkPayrollController::class, 'updateDailyLine'])
+                ->name('daily_line.update');
         });
 
     /*

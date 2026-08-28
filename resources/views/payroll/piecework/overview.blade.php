@@ -675,6 +675,7 @@
             'all' => 'Semua Modul',
             'cutting' => 'Cutting',
             'sewing' => 'Sewing',
+            'daily' => 'Harian',
         ];
         $activeModule = $module ?? 'all';
         $tabUrl = fn(string $tab) => route('payroll.piecework.overview', array_filter([
@@ -689,8 +690,8 @@
     <div class="pw-overview-wrap">
         <div class="pw-overview-top">
             <div>
-                <h1 class="pw-title">Payroll Borongan</h1>
-                <div class="pw-sub">Satu daftar periode untuk Cutting dan Sewing. Detail, finalisasi, dan pembayaran tetap mengikuti modul masing-masing.</div>
+                <h1 class="pw-title">Payroll</h1>
+                <div class="pw-sub">Satu daftar periode untuk Cutting, Sewing, dan Harian. Detail, finalisasi, dan pembayaran tetap mengikuti modul masing-masing.</div>
             </div>
 
             <div class="pw-tabs" aria-label="Filter modul payroll">
@@ -746,6 +747,7 @@
                             <option value="">Pilih modul...</option>
                             <option value="cutting" @selected(old('module') === 'cutting')>Cutting</option>
                             <option value="sewing" @selected(old('module') === 'sewing')>Sewing</option>
+                            <option value="daily" @selected(old('module') === 'daily')>Harian</option>
                         </select>
                     </div>
                     <div class="pw-field pw-range-field">
@@ -800,6 +802,7 @@
                             @php
                                 $periodModule = strtolower($period->module);
                                 $isSewing = $periodModule === 'sewing';
+                                $isDaily = $periodModule === 'daily';
                                 $periodStart = \Carbon\Carbon::parse($period->period_start)->locale('id');
                                 $periodEnd = \Carbon\Carbon::parse($period->period_end)->locale('id');
                                 $periodWeek = $periodStart->weekOfMonth;
@@ -824,7 +827,7 @@
                                 </td>
                                 <td class="pw-basis">
                                     <span class="pw-chip {{ $periodModule }}">{{ $moduleLabels[$periodModule] ?? ucfirst($periodModule) }}</span>
-                                    <div class="pw-period-meta">{{ $isSewing ? 'Ambil Jahit' : 'Qty PCS / QC OK' }}</div>
+                                    <div class="pw-period-meta">{{ $isDaily ? 'Hari hadir' : ($isSewing ? 'Ambil Jahit' : 'Qty PCS / QC OK') }}</div>
                                 </td>
                                 <td class="pw-right pw-number">{{ rtrim(rtrim(number_format($totalQty, 2, '.', ''), '0'), '.') }}</td>
                                 <td class="pw-right pw-number pw-amount">{{ number_format($totalAmount, 0, ',', '.') }}</td>
@@ -856,6 +859,7 @@
                     @php
                         $periodModule = strtolower($period->module);
                         $isSewing = $periodModule === 'sewing';
+                        $isDaily = $periodModule === 'daily';
                         $periodStart = \Carbon\Carbon::parse($period->period_start)->locale('id');
                         $periodEnd = \Carbon\Carbon::parse($period->period_end)->locale('id');
                         $periodWeek = $periodStart->weekOfMonth;
@@ -876,7 +880,7 @@
                         </div>
                         <div class="pw-period-week">Minggu ke-{{ $periodWeek }} <span class="pw-sub">· {{ $periodMonth }}</span></div>
                         <div class="pw-period-main">{{ $periodDateRange }}</div>
-                        <div class="pw-period-meta">ID #{{ $period->id }} · {{ number_format($operatorCount, 0, ',', '.') }} operator · {{ $isSewing ? 'Ambil Jahit' : 'Qty PCS / QC OK' }} @if ($period->paid_at) · Sudah dibayar @endif</div>
+                        <div class="pw-period-meta">ID #{{ $period->id }} · {{ number_format($operatorCount, 0, ',', '.') }} operator · {{ $isDaily ? 'Hari hadir' : ($isSewing ? 'Ambil Jahit' : 'Qty PCS / QC OK') }} @if ($period->paid_at) · Sudah dibayar @endif</div>
                         <div class="pw-period-stats">
                             <div>
                                 <span>Qty</span>
