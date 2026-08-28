@@ -382,13 +382,13 @@
         }
 
         .pw-generate {
-            margin-top: .75rem;
-            margin-bottom: 1rem
+            margin-top: .85rem;
+            margin-bottom: 1.25rem
         }
 
         .pw-generate-summary {
-            min-height: 66px;
-            padding: .78rem 1rem
+            min-height: 54px;
+            padding: .62rem .85rem
         }
 
         .pw-generate-heading {
@@ -401,9 +401,9 @@
         .pw-generate-icon {
             display: inline-grid;
             place-items: center;
-            width: 32px;
-            height: 32px;
-            flex: 0 0 32px;
+            width: 28px;
+            height: 28px;
+            flex: 0 0 28px;
             border: 1px solid color-mix(in srgb, var(--accent) 32%, rgba(148, 163, 184, .3));
             border-radius: 10px;
             color: var(--accent);
@@ -416,7 +416,7 @@
 
         .pw-generate-title {
             display: block;
-            font-size: .92rem;
+            font-size: .86rem;
             line-height: 1.2
         }
 
@@ -444,16 +444,16 @@
         }
 
         .pw-generate-body {
-            padding: 1rem 1.05rem 1.05rem
+            padding: .8rem .85rem .9rem
         }
 
         .pw-generate-note {
             display: flex;
             align-items: flex-start;
             gap: .4rem;
-            margin-bottom: 1rem;
+            margin-bottom: .75rem;
             color: var(--muted);
-            font-size: .8rem
+            font-size: .74rem
         }
 
         .pw-generate-note i {
@@ -472,9 +472,9 @@
         .pw-generate-form {
             display: grid;
             grid-template-columns: minmax(0, .85fr) minmax(0, 1.2fr) 150px;
-            column-gap: 1.35rem;
-            row-gap: 1rem;
-            padding: .1rem 0 0;
+            column-gap: 1.25rem;
+            row-gap: .8rem;
+            padding: .05rem 0 0;
             align-items: end
         }
 
@@ -489,7 +489,7 @@
         .pw-generate-form .pw-select {
             width: 100%;
             min-width: 0;
-            height: 40px;
+            height: 36px;
             box-sizing: border-box
         }
 
@@ -497,7 +497,7 @@
             display: block;
             margin: 0;
             color: var(--muted);
-            font-size: .73rem;
+            font-size: .68rem;
             font-weight: 700;
             letter-spacing: .02em
         }
@@ -507,7 +507,7 @@
         }
 
         .pw-submit {
-            min-height: 40px;
+            min-height: 36px;
             width: 100%;
             min-width: 0;
             white-space: nowrap;
@@ -592,7 +592,7 @@
             }
 
             .pw-generate-body {
-                padding: .85rem
+                padding: .75rem
             }
 
             .pw-generate-form .pw-date-range {
