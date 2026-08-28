@@ -239,6 +239,17 @@
             background: color-mix(in srgb, var(--accent-soft) 8%, transparent)
         }
 
+        .pw-period-row,
+        .pw-period-card {
+            cursor: pointer
+        }
+
+        .pw-period-row:focus-visible,
+        .pw-period-card:focus-visible {
+            outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+            outline-offset: -2px
+        }
+
         .pw-period-cell {
             min-width: 190px
         }
@@ -254,6 +265,13 @@
             margin: 0;
             color: var(--muted);
             font-size: inherit
+        }
+
+        .pw-period-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .5rem
         }
 
         .pw-period-main {
@@ -677,7 +695,6 @@
                             <th>Modul / Basis</th>
                             <th class="pw-right">Qty</th>
                             <th class="pw-right">Total Amount</th>
-                            <th>Status</th>
                             <th class="pw-right">Aksi</th>
                         </tr>
                     </thead>
@@ -695,11 +712,18 @@
                                 $totalQty = (float) ($period->lines_total_qty ?? 0);
                                 $totalAmount = (float) ($period->lines_total_amount ?? $period->total_amount ?? 0);
                             @endphp
-                            <tr>
+                            <tr class="pw-period-row" data-pw-detail-url="{{ route('payroll.piecework.show', ['module' => $periodModule, 'period' => $period]) }}" tabindex="0">
                                 <td class="pw-period-cell">
-                                    <div class="pw-period-week">Minggu ke-{{ $periodWeek }} <span class="pw-sub" style="display:inline">· {{ $periodMonth }}</span></div>
+                                    <div class="pw-period-heading">
+                                        <div class="pw-period-week">Minggu ke-{{ $periodWeek }} <span class="pw-sub" style="display:inline">· {{ $periodMonth }}</span></div>
+                                        @if ($period->status === 'final')
+                                            <span class="pw-chip final">FINAL</span>
+                                        @else
+                                            <span class="pw-chip draft">DRAFT</span>
+                                        @endif
+                                    </div>
                                     <div class="pw-period-main">{{ $periodDateRange }}</div>
-                                    <div class="pw-period-meta">ID #{{ $period->id }} · {{ number_format($operatorCount, 0, ',', '.') }} operator</div>
+                                    <div class="pw-period-meta">ID #{{ $period->id }} · {{ number_format($operatorCount, 0, ',', '.') }} operator @if ($period->paid_at) · Sudah dibayar @endif</div>
                                 </td>
                                 <td class="pw-basis">
                                     <span class="pw-chip {{ $periodModule }}">{{ $moduleLabels[$periodModule] ?? ucfirst($periodModule) }}</span>
@@ -707,16 +731,6 @@
                                 </td>
                                 <td class="pw-right pw-number">{{ rtrim(rtrim(number_format($totalQty, 2, '.', ''), '0'), '.') }}</td>
                                 <td class="pw-right pw-number pw-amount">{{ number_format($totalAmount, 0, ',', '.') }}</td>
-                                <td class="pw-status">
-                                    @if ($period->status === 'final')
-                                        <span class="pw-chip final">FINAL</span>
-                                    @else
-                                        <span class="pw-chip draft">DRAFT</span>
-                                    @endif
-                                    @if ($period->paid_at)
-                                        <div class="pw-sub">Sudah dibayar</div>
-                                    @endif
-                                </td>
                                 <td class="pw-right pw-action">
                                     <div class="pw-action-wrap">
                                         <a class="pw-btn" href="{{ route('payroll.piecework.show', ['module' => $periodModule, 'period' => $period]) }}">Detail</a>
@@ -733,7 +747,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" style="padding:1.1rem;color:var(--muted)">Belum ada periode payroll.</td>
+                                <td colspan="5" style="padding:1.1rem;color:var(--muted)">Belum ada periode payroll.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -754,7 +768,7 @@
                         $totalQty = (float) ($period->lines_total_qty ?? 0);
                         $totalAmount = (float) ($period->lines_total_amount ?? $period->total_amount ?? 0);
                     @endphp
-                    <article class="pw-period-card">
+                    <article class="pw-period-card" data-pw-detail-url="{{ route('payroll.piecework.show', ['module' => $periodModule, 'period' => $period]) }}" tabindex="0">
                         <div class="pw-period-card-top">
                             <span class="pw-chip {{ $periodModule }}">{{ $moduleLabels[$periodModule] ?? ucfirst($periodModule) }}</span>
                             @if ($period->status === 'final')
@@ -763,9 +777,16 @@
                                 <span class="pw-chip draft">DRAFT</span>
                             @endif
                         </div>
-                        <div class="pw-period-week">Minggu ke-{{ $periodWeek }} <span class="pw-sub">· {{ $periodMonth }}</span></div>
+                        <div class="pw-period-heading">
+                            <div class="pw-period-week">Minggu ke-{{ $periodWeek }} <span class="pw-sub">· {{ $periodMonth }}</span></div>
+                            @if ($period->status === 'final')
+                                <span class="pw-chip final">FINAL</span>
+                            @else
+                                <span class="pw-chip draft">DRAFT</span>
+                            @endif
+                        </div>
                         <div class="pw-period-main">{{ $periodDateRange }}</div>
-                        <div class="pw-period-meta">ID #{{ $period->id }} · {{ number_format($operatorCount, 0, ',', '.') }} operator · {{ $isSewing ? 'Ambil Jahit' : 'Qty PCS / QC OK' }}</div>
+                        <div class="pw-period-meta">ID #{{ $period->id }} · {{ number_format($operatorCount, 0, ',', '.') }} operator · {{ $isSewing ? 'Ambil Jahit' : 'Qty PCS / QC OK' }} @if ($period->paid_at) · Sudah dibayar @endif</div>
                         <div class="pw-period-stats">
                             <div>
                                 <span>Qty</span>
@@ -810,6 +831,23 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('[data-pw-detail-url]').forEach(function (element) {
+                const navigateToDetail = function () {
+                    window.location.href = element.dataset.pwDetailUrl;
+                };
+
+                element.addEventListener('click', function (event) {
+                    if (event.target.closest('a, button, form, input, select, textarea, label')) return;
+                    navigateToDetail();
+                });
+
+                element.addEventListener('keydown', function (event) {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    navigateToDetail();
+                });
+            });
+
             if (typeof window.flatpickr !== 'function') return;
 
             const localeId = window.flatpickr.l10ns && window.flatpickr.l10ns.id

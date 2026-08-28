@@ -99,7 +99,7 @@ class PieceworkPayrollController extends Controller
             'module.in' => 'Modul payroll tidak valid.',
         ]);
 
-        return $this->store($request, (string) $request->input('module'));
+        return $this->store($request, (string) $request->input('module'), true);
     }
 
     /**
@@ -152,7 +152,7 @@ class PieceworkPayrollController extends Controller
      * - kalau existing draft: regenerate in-place
      * - kalau existing final: blok
      */
-    public function store(Request $request, string $module): RedirectResponse
+    public function store(Request $request, string $module, bool $returnToOverview = false): RedirectResponse
     {
         $cfg = $this->moduleConfig($module);
 
@@ -172,8 +172,11 @@ class PieceworkPayrollController extends Controller
             ->first();
 
         if ($existing && $existing->status === 'final') {
-            return redirect()
-                ->route('payroll.piecework.show', [$cfg['module'], $existing])
+            $redirect = $returnToOverview
+                ? redirect()->route('payroll.piecework.overview', ['module' => $cfg['module']])
+                : redirect()->route('payroll.piecework.show', [$cfg['module'], $existing]);
+
+            return $redirect
                 ->with('error', "Periode payroll {$cfg['label']} ini sudah FINAL, tidak bisa digenerate ulang.");
         }
 
@@ -190,6 +193,12 @@ class PieceworkPayrollController extends Controller
         $message = $existing
         ? "Payroll {$cfg['label']} periode " . id_date($period->period_start) . " s/d " . id_date($period->period_end) . " berhasil di-UPDATE (regenerate)."
         : "Payroll {$cfg['label']} berhasil digenerate untuk periode " . id_date($period->period_start) . " s/d " . id_date($period->period_end) . ".";
+
+        if ($returnToOverview) {
+            return redirect()
+                ->route('payroll.piecework.overview', ['module' => $cfg['module']])
+                ->with('status', $message);
+        }
 
         return redirect()
             ->route('payroll.piecework.show', [$cfg['module'], $period])

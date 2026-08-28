@@ -5,41 +5,52 @@
 @push('head')
     <style>
         .pw-wrap {
-            max-width: 1200px;
+            max-width: 1040px;
             margin: 0 auto;
             padding: .75rem .75rem 2.5rem
         }
 
         .pw-top {
+            position: sticky;
+            top: 0;
+            z-index: 300;
             display: flex;
             gap: .75rem;
             align-items: flex-start;
             justify-content: space-between;
-            margin: .25rem 0 .75rem
+            padding: .45rem .75rem;
+            margin: 0 -.75rem .65rem;
+            background: var(--card);
+            border-bottom: 1px solid rgba(148, 163, 184, .18);
+            box-shadow: none
+        }
+
+        .pw-heading {
+            min-width: 0
         }
 
         .pw-title {
             margin: 0;
-            font-size: 1.05rem;
-            font-weight: 900;
-            letter-spacing: -.02em
+            font-size: 1rem;
+            font-weight: 750;
+            letter-spacing: 0
         }
 
         .pw-sub {
-            margin: .2rem 0 0;
+            margin: 0;
             color: var(--muted);
-            font-size: .86rem
+            font-size: .78rem
         }
 
         .pw-card {
             background: var(--card);
             border: 1px solid rgba(148, 163, 184, .25);
-            border-radius: 14px;
-            box-shadow: 0 10px 26px rgba(15, 23, 42, .06)
+            border-radius: 10px;
+            box-shadow: none
         }
 
         .pw-h {
-            padding: .85rem .9rem;
+            padding: .7rem .8rem;
             border-bottom: 1px solid rgba(148, 163, 184, .18);
             display: flex;
             justify-content: space-between;
@@ -49,7 +60,7 @@
         }
 
         .pw-b {
-            padding: .9rem
+            padding: .8rem
         }
 
         .pw-btn {
@@ -59,10 +70,10 @@
             border: 1px solid rgba(148, 163, 184, .35);
             background: transparent;
             color: var(--text);
-            padding: .48rem .72rem;
-            border-radius: 12px;
+            padding: .42rem .65rem;
+            border-radius: 8px;
             text-decoration: none;
-            font-size: .88rem
+            font-size: .8rem
         }
 
         .pw-btn.primary {
@@ -103,7 +114,15 @@
             border-spacing: 0
         }
 
+        .pw-table-wrap {
+            overflow-x: auto
+        }
+
         .pw-table th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: var(--card);
             font-size: .72rem;
             text-transform: uppercase;
             letter-spacing: .08em;
@@ -164,22 +183,35 @@
                 flex-direction: column;
                 align-items: stretch
             }
+
+            .pw-top > .pw-row {
+                justify-content: stretch
+            }
+
+            .pw-top > .pw-row .pw-btn {
+                flex: 1;
+                justify-content: center
+            }
         }
     </style>
 @endpush
 
 @section('content')
-    @php($qtyLabel = $module === 'sewing' ? 'Qty Ambil' : 'Qty Payroll')
+    @php
+        $qtyLabel = $module === 'sewing' ? 'Qty Ambil' : 'Qty Payroll';
+        $periodStart = \Carbon\Carbon::parse($period->period_start)->locale('id');
+        $periodEnd = \Carbon\Carbon::parse($period->period_end)->locale('id');
+        $periodWeek = $periodStart->weekOfMonth;
+        $periodMonth = $periodStart->translatedFormat('F Y');
+        $periodDateRange = $periodStart->translatedFormat('l, d/m/Y') . ' – ' . $periodEnd->translatedFormat('l, d/m/Y');
+    @endphp
     <div class="pw-wrap">
         <div class="pw-top">
-            <div>
-                <h1 class="pw-title">
-                    {{ $moduleLabel ?? ucfirst($module) }} • {{ id_date($period->period_start) }} –
-                    {{ id_date($period->period_end) }}
-                </h1>
+            <div class="pw-heading">
+                <h1 class="pw-title">{{ $moduleLabel ?? ucfirst($module) }} • Payroll Borongan</h1>
                 <div class="pw-sub">
-                    ID #{{ $period->id }}
-                    •
+                    Minggu ke-{{ $periodWeek }} · {{ $periodMonth }} · {{ $periodDateRange }} · ID #{{ $period->id }}
+                    ·
                     @if ($period->status === 'final')
                         <span class="pw-chip final">FINAL</span>
                     @else
@@ -192,8 +224,8 @@
             </div>
 
             <div class="pw-row">
-                <a class="pw-btn" href="{{ route('payroll.piecework.index', ['module' => $module]) }}">← Back</a>
-                <a class="pw-btn" href="{{ route('payroll.piecework.create', ['module' => $module]) }}">＋ Generate</a>
+                <a class="pw-btn" href="{{ route('payroll.piecework.overview', ['module' => $module]) }}">Daftar Payroll</a>
+                <a class="pw-btn primary" href="{{ route('payroll.piecework.overview', ['module' => $module]) }}">＋ Generate</a>
             </div>
         </div>
 
@@ -270,39 +302,41 @@
                     <hr style="border:none;border-top:1px solid rgba(148,163,184,.18);margin:1rem 0">
 
                     {{-- SUMMARY TABLE --}}
-                    <table class="pw-table">
-                        <thead>
-                            <tr>
-                                <th>Operator</th>
-                                <th class="pw-right">{{ $qtyLabel }}</th>
-                                <th class="pw-right">Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($summaryByEmployee as $s)
+                    <div class="pw-table-wrap">
+                        <table class="pw-table">
+                            <thead>
                                 <tr>
-                                    <td>
-                                        <div style="font-weight:800">{{ $s['employee_name'] }}</div>
-                                        <div class="pw-row" style="margin-top:.3rem">
-                                            <a class="pw-btn"
-                                                href="{{ route('payroll.piecework.slip', ['module' => $module, 'period' => $period, 'employee' => $s['employee_id']]) }}">
-                                                Slip
-                                            </a>
-                                        </div>
-                                    </td>
-                                    <td class="pw-right">
-                                        {{ rtrim(rtrim(number_format((float) $s['total_qty'], 2, '.', ''), '0'), '.') }}
-                                    </td>
-                                    <td class="pw-right" style="font-weight:800">
-                                        {{ number_format((float) $s['total_amount'], 0, ',', '.') }}</td>
+                                    <th>Operator</th>
+                                    <th class="pw-right">{{ $qtyLabel }}</th>
+                                    <th class="pw-right">Amount</th>
                                 </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="3" style="padding:1rem;color:var(--muted)">Tidak ada data.</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                @forelse($summaryByEmployee as $s)
+                                    <tr>
+                                        <td>
+                                            <div style="font-weight:800">{{ $s['employee_name'] }}</div>
+                                            <div class="pw-row" style="margin-top:.3rem">
+                                                <a class="pw-btn"
+                                                    href="{{ route('payroll.piecework.slip', ['module' => $module, 'period' => $period, 'employee' => $s['employee_id']]) }}">
+                                                    Slip
+                                                </a>
+                                            </div>
+                                        </td>
+                                        <td class="pw-right">
+                                            {{ rtrim(rtrim(number_format((float) $s['total_qty'], 2, '.', ''), '0'), '.') }}
+                                        </td>
+                                        <td class="pw-right" style="font-weight:800">
+                                            {{ number_format((float) $s['total_amount'], 0, ',', '.') }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="3" style="padding:1rem;color:var(--muted)">Tidak ada data.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
 
                     @if (!empty($allowSlipAll))
                         <div class="pw-row" style="margin-top:.75rem">
@@ -322,38 +356,40 @@
                 </div>
 
                 <div class="pw-b" style="padding:0">
-                    <table class="pw-table">
-                        <thead>
-                            <tr>
-                                <th>Employee</th>
-                                <th class="pw-hide-sm">Category</th>
-                                <th>Item</th>
-                                <th class="pw-right">{{ $qtyLabel }}</th>
-                                <th class="pw-right pw-hide-sm">Rate</th>
-                                <th class="pw-right">Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($lines as $l)
+                    <div class="pw-table-wrap">
+                        <table class="pw-table">
+                            <thead>
                                 <tr>
-                                    <td style="font-weight:700">{{ $l->employee?->name ?? '-' }}</td>
-                                    <td class="pw-hide-sm">{{ $l->category?->name ?? '-' }}</td>
-                                    <td>{{ $l->item?->name ?? '-' }}</td>
-                                    <td class="pw-right">
-                                        {{ rtrim(rtrim(number_format((float) $l->total_qty_ok, 2, '.', ''), '0'), '.') }}
-                                    </td>
-                                    <td class="pw-right pw-hide-sm">
-                                        {{ number_format((float) $l->rate_per_pcs, 0, ',', '.') }}</td>
-                                    <td class="pw-right" style="font-weight:800">
-                                        {{ number_format((float) $l->amount, 0, ',', '.') }}</td>
+                                    <th>Employee</th>
+                                    <th class="pw-hide-sm">Category</th>
+                                    <th>Item</th>
+                                    <th class="pw-right">{{ $qtyLabel }}</th>
+                                    <th class="pw-right pw-hide-sm">Rate</th>
+                                    <th class="pw-right">Amount</th>
                                 </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" style="padding:1rem;color:var(--muted)">Tidak ada lines.</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                @forelse($lines as $l)
+                                    <tr>
+                                        <td style="font-weight:700">{{ $l->employee?->name ?? '-' }}</td>
+                                        <td class="pw-hide-sm">{{ $l->category?->name ?? '-' }}</td>
+                                        <td>{{ $l->item?->name ?? '-' }}</td>
+                                        <td class="pw-right">
+                                            {{ rtrim(rtrim(number_format((float) $l->total_qty_ok, 2, '.', ''), '0'), '.') }}
+                                        </td>
+                                        <td class="pw-right pw-hide-sm">
+                                            {{ number_format((float) $l->rate_per_pcs, 0, ',', '.') }}</td>
+                                        <td class="pw-right" style="font-weight:800">
+                                            {{ number_format((float) $l->amount, 0, ',', '.') }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="6" style="padding:1rem;color:var(--muted)">Tidak ada lines.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
