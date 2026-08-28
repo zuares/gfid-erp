@@ -5,12 +5,6 @@
 @push('head')
     <style>
         .slip-page { max-width: 860px; margin: 0 auto; padding: 1rem .85rem 3rem }
-        @media screen {
-            .slip-page[data-paper-size="threeply_quarter"] { width:100%; max-width: 456px }
-            .slip-page[data-paper-size="threeply_quarter"][data-orientation="landscape"] { max-width: 528px }
-            .slip-page[data-paper-size="threeply"] { max-width: 760px }
-            .slip-page[data-paper-size="a5"] { max-width: 570px }
-        }
         .slip-actions { display:flex; justify-content:space-between; align-items:center; gap:.75rem; margin-bottom:.85rem }
         .slip-action-btn { display:inline-flex; align-items:center; justify-content:center; gap:.4rem; min-height:36px; padding:.45rem .7rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.78rem; font-weight:700; text-decoration:none }
         .slip-action-btn.primary { border-color:var(--accent); background:var(--accent); color:#fff }
