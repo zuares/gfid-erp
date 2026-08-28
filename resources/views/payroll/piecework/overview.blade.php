@@ -299,11 +299,11 @@
                     @if ($activeModule !== 'all')
                         <input type="hidden" name="module" value="{{ $activeModule }}">
                     @endif
-                    <input type="hidden" name="from" id="pw-filter-from" value="{{ request('from') }}">
-                    <input type="hidden" name="to" id="pw-filter-to" value="{{ request('to') }}">
+                    <input type="hidden" name="from" id="pw-filter-from" value="{{ request('from') }}" data-gf-date="off">
+                    <input type="hidden" name="to" id="pw-filter-to" value="{{ request('to') }}" data-gf-date="off">
                     <input class="pw-in pw-date-range" type="text" id="pw-filter-range"
                         value="" placeholder="Pilih rentang tanggal" aria-label="Rentang tanggal"
-                        autocomplete="off" readonly>
+                        autocomplete="off" readonly data-gf-date="off">
                     <button class="pw-btn" type="submit">Terapkan</button>
                     @if (request()->filled('from') || request()->filled('to'))
                         <a class="pw-btn" href="{{ $tabUrl($activeModule) }}">Reset</a>
@@ -401,11 +401,11 @@
                     </div>
                     <div class="pw-field pw-range-field">
                         <label for="overview-period-range">Rentang Periode</label>
-                        <input type="hidden" name="period_start" id="overview-period-start" value="{{ old('period_start', $defaultStart) }}">
-                        <input type="hidden" name="period_end" id="overview-period-end" value="{{ old('period_end', $defaultEnd) }}">
+                        <input type="hidden" name="period_start" id="overview-period-start" value="{{ old('period_start', $defaultStart) }}" data-gf-date="off">
+                        <input type="hidden" name="period_end" id="overview-period-end" value="{{ old('period_end', $defaultEnd) }}" data-gf-date="off">
                         <input class="pw-in pw-date-range w-100" id="overview-period-range" type="text"
                             value="" placeholder="Pilih tanggal mulai – tanggal akhir"
-                            autocomplete="off" readonly required>
+                            autocomplete="off" readonly data-gf-date="off" required>
                     </div>
                     <button class="pw-btn primary pw-submit" type="submit">Generate Draft</button>
                 </form>
