@@ -11,6 +11,8 @@
         .slip-print-tools { display:flex; align-items:flex-end; justify-content:flex-end; gap:.55rem; flex-wrap:wrap }
         .slip-paper-field { display:flex; flex-direction:column; gap:.2rem; color:var(--muted); font-size:.64rem; font-weight:800 }
         .slip-paper-select { min-height:36px; padding:.45rem .6rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.76rem; font-weight:700 }
+        .slip-part-field { display:flex; flex-direction:column; gap:.2rem; color:var(--muted); font-size:.64rem; font-weight:800 }
+        .slip-part-select { min-height:36px; padding:.45rem .6rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.76rem; font-weight:700 }
         .slip-preview-note { display:flex; align-items:center; gap:.45rem; margin-bottom:.75rem; color:var(--muted); font-size:.72rem }
         .slip-card { width:100%; max-width:100%; overflow:hidden; background:var(--card); border:1px solid rgba(148,163,184,.28); border-radius:14px; box-shadow:0 10px 28px rgba(15,23,42,.07) }
         .slip-inner { box-sizing:border-box; width:100%; max-width:100%; padding:1.35rem 1.5rem 1.5rem }
@@ -69,7 +71,8 @@
             .slip-actions { align-items:stretch; flex-direction:column }
             .slip-print-tools { width:100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:stretch; justify-content:stretch; gap:.45rem }
             .slip-paper-field { flex:1; min-width:0 }
-            .slip-paper-select, .slip-print-tools .slip-action-btn { width:100%; min-width:0 }
+            .slip-part-field { grid-column:1 / -1; min-width:0 }
+            .slip-paper-select, .slip-part-select, .slip-print-tools .slip-action-btn { width:100%; min-width:0 }
             .slip-print-tools .slip-action-btn { grid-column:1 / -1 }
             .slip-brand { align-items:center }
             .slip-document { min-width:0 }
@@ -160,6 +163,8 @@
             .slip-page[data-paper-size="threeply_quarter"] .slip-table th { padding:.3rem .32rem; font-size:.5rem }
             .slip-page[data-paper-size="threeply_quarter"] .slip-table td { padding:.34rem .32rem }
             .slip-page[data-paper-size="threeply_quarter"] .slip-table tfoot td { padding:.38rem .32rem }
+            .slip-page[data-print-part="summary"] .slip-details-page,
+            .slip-page[data-print-part="details"] .slip-summary-page { display:none !important }
         }
     </style>
 @endpush
@@ -215,6 +220,14 @@
                     <select class="slip-paper-select" id="slip-paper-orientation">
                         <option value="portrait">Portrait</option>
                         <option value="landscape">Landscape</option>
+                    </select>
+                </label>
+                <label class="slip-part-field" for="slip-print-part">
+                    <span>Bagian cetak</span>
+                    <select class="slip-part-select" id="slip-print-part">
+                        <option value="all">Lengkap</option>
+                        <option value="summary">Header / Summary saja</option>
+                        <option value="details">Rincian saja</option>
                     </select>
                 </label>
                 <button class="slip-action-btn primary" type="button" onclick="window.print()">
@@ -311,6 +324,8 @@
                     <div class="slip-subtitle" style="margin-top:.65rem">Catatan: {{ $pendingCount > 0 ? $pendingCount . ' hari belum diisi' : '' }}{{ $pendingCount > 0 && $otherAttendanceCount > 0 ? ', ' : '' }}{{ $otherAttendanceCount > 0 ? $otherAttendanceCount . ' hari berstatus khusus' : '' }}.</div>
                 @endif
 
+                </div>
+
                 <div class="slip-total"><div><div class="slip-total-label">Total Dibayarkan</div><div class="slip-total-note">Nominal setelah perhitungan payroll periode ini</div></div><div class="slip-total-value">{{ number_format((float) $totalAmount, 0, ',', '.') }}</div></div>
 
                 <div class="slip-signatures">
@@ -318,7 +333,6 @@
                     <div class="slip-signature right">Disetujui oleh,<div class="slip-signature-space"></div><div class="slip-signature-name">{{ auth()->user()->name ?? '........................' }}</div></div>
                 </div>
                 <div class="slip-printed">Dicetak pada {{ id_datetime(now()) }}</div>
-                </div>
             </div>
         </article>
     </div>
@@ -329,7 +343,8 @@
         document.addEventListener('DOMContentLoaded', function () {
             const paperSelect = document.getElementById('slip-paper-size');
             const orientationSelect = document.getElementById('slip-paper-orientation');
-            if (!paperSelect || !orientationSelect) return;
+            const partSelect = document.getElementById('slip-print-part');
+            if (!paperSelect || !orientationSelect || !partSelect) return;
 
             const paperSizes = {
                 a4: { size: 'A4', margin: '0' },
@@ -340,11 +355,13 @@
             const styleId = 'slip-paper-size-style';
             const paperStorageKey = 'gfid-payroll-slip-paper-size-v2';
             const orientationStorageKey = 'gfid-payroll-slip-orientation-v3';
+            const partStorageKey = 'gfid-payroll-slip-print-part-v1';
             const slipPage = document.querySelector('.slip-page');
 
-            function applyPrintSettings(paperValue, orientationValue) {
+            function applyPrintSettings(paperValue, orientationValue, partValue) {
                 const selected = paperSizes[paperValue] ? paperSizes[paperValue] : paperSizes.a4;
                 const orientation = orientationValue === 'landscape' ? 'landscape' : 'portrait';
+                const part = ['all', 'summary', 'details'].includes(partValue) ? partValue : 'all';
                 let pageSize = selected.size;
 
                 if (selected.size === '9.5in 11in') {
@@ -366,22 +383,29 @@
                 printStyle.textContent = `@page { size: ${pageSize}; margin: ${selected.margin}; }`;
                 paperSelect.value = paperSizes[paperValue] ? paperValue : 'a4';
                 orientationSelect.value = orientation;
+                partSelect.value = part;
                 if (slipPage) {
                     slipPage.dataset.paperSize = paperSelect.value;
                     slipPage.dataset.orientation = orientationSelect.value;
+                    slipPage.dataset.printPart = partSelect.value;
                 }
                 localStorage.setItem(paperStorageKey, paperSelect.value);
                 localStorage.setItem(orientationStorageKey, orientationSelect.value);
+                localStorage.setItem(partStorageKey, partSelect.value);
             }
 
             const savedSize = localStorage.getItem(paperStorageKey) || 'threeply_quarter';
             const savedOrientation = localStorage.getItem(orientationStorageKey) || 'landscape';
-            applyPrintSettings(savedSize, savedOrientation);
+            const savedPart = localStorage.getItem(partStorageKey) || 'all';
+            applyPrintSettings(savedSize, savedOrientation, savedPart);
             paperSelect.addEventListener('change', function () {
-                applyPrintSettings(this.value, orientationSelect.value);
+                applyPrintSettings(this.value, orientationSelect.value, partSelect.value);
             });
             orientationSelect.addEventListener('change', function () {
-                applyPrintSettings(paperSelect.value, this.value);
+                applyPrintSettings(paperSelect.value, this.value, partSelect.value);
+            });
+            partSelect.addEventListener('change', function () {
+                applyPrintSettings(paperSelect.value, orientationSelect.value, this.value);
             });
         });
     </script>
