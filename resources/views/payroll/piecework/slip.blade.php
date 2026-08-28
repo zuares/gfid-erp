@@ -8,6 +8,9 @@
         .slip-actions { display:flex; justify-content:space-between; align-items:center; gap:.75rem; margin-bottom:.85rem }
         .slip-action-btn { display:inline-flex; align-items:center; justify-content:center; gap:.4rem; min-height:36px; padding:.45rem .7rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.78rem; font-weight:700; text-decoration:none }
         .slip-action-btn.primary { border-color:var(--accent); background:var(--accent); color:#fff }
+        .slip-print-tools { display:flex; align-items:flex-end; justify-content:flex-end; gap:.55rem; flex-wrap:wrap }
+        .slip-paper-field { display:flex; flex-direction:column; gap:.2rem; color:var(--muted); font-size:.64rem; font-weight:800 }
+        .slip-paper-select { min-height:36px; padding:.45rem .6rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.76rem; font-weight:700 }
         .slip-card { overflow:hidden; background:var(--card); border:1px solid rgba(148,163,184,.28); border-radius:14px; box-shadow:0 10px 28px rgba(15,23,42,.07) }
         .slip-inner { padding:1.35rem 1.5rem 1.5rem }
         .slip-brand { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem }
@@ -62,6 +65,10 @@
         @media (max-width:640px) {
             .slip-page { padding:.65rem .55rem 2rem }
             .slip-inner { padding:1rem .85rem 1.1rem }
+            .slip-actions { align-items:stretch; flex-direction:column }
+            .slip-print-tools { justify-content:stretch }
+            .slip-paper-field { flex:1; min-width:0 }
+            .slip-paper-select, .slip-print-tools .slip-action-btn { width:100% }
             .slip-brand { align-items:center }
             .slip-brand-mark img { width:29px; height:29px }
             .slip-brand-name { font-size:.82rem }
@@ -78,12 +85,28 @@
 
         @media print {
             .no-print { display:none !important }
-            body { background:#fff !important }
+            body:has(.slip-page) { padding-top:0 !important; background:#fff !important }
+            body:has(.slip-page) .app-navbar,
+            body:has(.slip-page) .sidebar-modern,
+            body:has(.slip-page) .mobile-sidebar,
+            body:has(.slip-page) .mobile-bottom-nav { display:none !important }
+            body:has(.slip-page) .app-shell,
+            body:has(.slip-page) .app-main,
+            body:has(.slip-page) .app-main .page-wrap { display:block !important; width:100% !important; max-width:none !important; margin:0 !important; padding:0 !important }
             .slip-page { max-width:100%; padding:0 }
             .slip-card { border:1px solid #b8b8b8; border-radius:0; box-shadow:none }
             .slip-inner { padding:1rem }
             .slip-table-wrap { overflow:visible }
             .slip-table { min-width:0 }
+            .slip-page, .slip-page * { color:#000 !important; box-shadow:none !important; }
+            .slip-page .slip-card,
+            .slip-page .slip-info-item,
+            .slip-page .slip-stat,
+            .slip-page .slip-stat.total,
+            .slip-page .slip-table th,
+            .slip-page .slip-table tfoot td,
+            .slip-page .slip-attendance { background:#fff !important; border-color:#000 !important; }
+            .slip-page .slip-brand-mark img { filter:grayscale(1) contrast(2) }
         }
     </style>
 @endpush
@@ -124,9 +147,19 @@
     <div class="slip-page">
         <div class="slip-actions no-print">
             <a class="slip-action-btn" href="{{ $backUrl }}">← Kembali</a>
-            <button class="slip-action-btn primary" type="button" onclick="window.print()">
-                <i class="bi bi-printer" aria-hidden="true"></i> Cetak Slip
-            </button>
+            <div class="slip-print-tools">
+                <label class="slip-paper-field" for="slip-paper-size">
+                    <span>Ukuran kertas</span>
+                    <select class="slip-paper-select" id="slip-paper-size">
+                        <option value="a4">A4 · Portrait</option>
+                        <option value="a5">A5 · Portrait</option>
+                        <option value="threeply">3PLY · 9,5 × 11 inci</option>
+                    </select>
+                </label>
+                <button class="slip-action-btn primary" type="button" onclick="window.print()">
+                    <i class="bi bi-printer" aria-hidden="true"></i> Cetak Slip
+                </button>
+            </div>
         </div>
 
         <article class="slip-card">
@@ -223,3 +256,40 @@
         </article>
     </div>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const paperSelect = document.getElementById('slip-paper-size');
+            if (!paperSelect) return;
+
+            const paperSizes = {
+                a4: { size: 'A4 portrait', margin: '10mm' },
+                a5: { size: 'A5 portrait', margin: '8mm' },
+                threeply: { size: '9.5in 11in', margin: '7mm' },
+            };
+            const styleId = 'slip-paper-size-style';
+
+            function applyPaperSize(value) {
+                const selected = paperSizes[value] || paperSizes.a4;
+                let printStyle = document.getElementById(styleId);
+
+                if (!printStyle) {
+                    printStyle = document.createElement('style');
+                    printStyle.id = styleId;
+                    document.head.appendChild(printStyle);
+                }
+
+                printStyle.textContent = `@page { size: ${selected.size}; margin: ${selected.margin}; }`;
+                paperSelect.value = paperSizes[value] ? value : 'a4';
+                localStorage.setItem('gfid-payroll-slip-paper-size', paperSelect.value);
+            }
+
+            const savedSize = localStorage.getItem('gfid-payroll-slip-paper-size') || 'a4';
+            applyPaperSize(savedSize);
+            paperSelect.addEventListener('change', function () {
+                applyPaperSize(this.value);
+            });
+        });
+    </script>
+@endpush
