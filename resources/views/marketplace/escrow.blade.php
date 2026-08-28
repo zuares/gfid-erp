@@ -117,7 +117,7 @@
     };
 
     const listUrl = () => {
-        const params = new URLSearchParams({ date_from: $('escrowFrom').value, date_to: $('escrowTo').value, page_no: state.page, page_size: 20 });
+        const params = new URLSearchParams({ date_from: $('escrowFrom').value, date_to: $('escrowTo').value, page_no: state.page, page_size: 100 });
         const path = $('escrowSource').value === 'released' ? 'escrow-list' : 'escrow-orders';
         return `/api/marketplace/stores/${encodeURIComponent($('escrowStore').value)}/${path}?${params}`;
     };
