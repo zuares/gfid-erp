@@ -12,8 +12,8 @@ class DailyPayrollGenerator
 {
     /**
      * Siapkan draft payroll harian per operator dan per tanggal.
-     * Kehadiran sengaja dimulai sebagai pending agar payroll tidak otomatis
-     * menghitung semua operator sebagai hadir.
+     * Default kehadiran adalah hadir agar draft langsung menampilkan estimasi
+     * payroll. Status tetap bisa disesuaikan sebelum finalisasi.
      */
     public static function generate(
         $periodStart,
@@ -53,25 +53,30 @@ class DailyPayrollGenerator
                 ]);
             }
 
+            $totalAmount = 0.0;
+
             for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
                 foreach ($employees as $employee) {
                     $rate = round((float) $employee->daily_rate, 2);
+                    $totalAmount += $rate;
 
                     PieceworkPayrollLine::create([
                         'payroll_period_id' => $period->id,
                         'employee_id' => $employee->id,
                         'work_date' => $date->toDateString(),
-                        'attendance_status' => 'pending',
-                        'attendance_factor' => 0,
+                        'attendance_status' => 'hadir',
+                        'attendance_factor' => 1,
                         'item_category_id' => null,
                         'item_id' => null,
-                        'total_qty_ok' => 0,
+                        'total_qty_ok' => 1,
                         'rate_per_pcs' => $rate,
                         'rate_per_day' => $rate,
-                        'amount' => 0,
+                        'amount' => $rate,
                     ]);
                 }
             }
+
+            $period->update(['total_amount' => round($totalAmount, 2)]);
 
             return $period->fresh(['lines']);
         });

@@ -526,10 +526,10 @@
 
         .pw-submit:hover,
         .pw-submit:focus-visible {
-            border-color: color-mix(in srgb, var(--accent) 82%, #111827 18%);
-            background: color-mix(in srgb, var(--accent) 88%, #111827 12%);
+            border-color: var(--accent);
+            background: var(--accent);
             color: #fff;
-            box-shadow: 0 5px 12px color-mix(in srgb, var(--accent) 22%, transparent)
+            box-shadow: 0 3px 8px color-mix(in srgb, var(--accent) 16%, transparent)
         }
 
         .pw-submit:active {

@@ -13,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class PieceworkPayrollController extends Controller
 {
@@ -105,7 +106,22 @@ class PieceworkPayrollController extends Controller
             'module.in' => 'Modul payroll tidak valid.',
         ]);
 
+        if ($request->input('module') === 'daily' && ! $this->dailyPayrollSchemaReady()) {
+            return back()
+                ->withInput()
+                ->with('error', 'Fitur payroll harian belum siap di server. Jalankan migration database terlebih dahulu.');
+        }
+
         return $this->store($request, (string) $request->input('module'), true);
+    }
+
+    private function dailyPayrollSchemaReady(): bool
+    {
+        return Schema::hasColumn('employees', 'daily_rate')
+            && Schema::hasColumn('piecework_payroll_lines', 'work_date')
+            && Schema::hasColumn('piecework_payroll_lines', 'attendance_status')
+            && Schema::hasColumn('piecework_payroll_lines', 'attendance_factor')
+            && Schema::hasColumn('piecework_payroll_lines', 'rate_per_day');
     }
 
     /**
@@ -189,12 +205,18 @@ class PieceworkPayrollController extends Controller
         $generatorClass = $cfg['generator'];
 
         /** @var \App\Models\PieceworkPayrollPeriod $period */
-        $period = $generatorClass::generate(
-            periodStart: $data['period_start'],
-            periodEnd: $data['period_end'],
-            createdByUserId: Auth::id(),
-            existingPeriod: $existing // boleh null, generator kamu sudah support ini di cutting & sewing (pastikan sewing juga)
-        );
+        try {
+            $period = $generatorClass::generate(
+                periodStart: $data['period_start'],
+                periodEnd: $data['period_end'],
+                createdByUserId: Auth::id(),
+                existingPeriod: $existing // boleh null, generator kamu sudah support ini di cutting & sewing (pastikan sewing juga)
+            );
+        } catch (\RuntimeException $e) {
+            return back()
+                ->withInput()
+                ->with('error', $e->getMessage());
+        }
 
         $message = $existing
         ? "Payroll {$cfg['label']} periode " . id_date($period->period_start) . " s/d " . id_date($period->period_end) . " berhasil di-UPDATE (regenerate)."
