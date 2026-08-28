@@ -536,6 +536,17 @@ body[data-theme="dark"] .ord-payment-method {
     border-radius: 7px; padding: .4rem .55rem;
 }
 .ord-table tbody tr:hover .ord-item-card { background: #fff; border-color: rgba(148,163,184,.25); }
+.ord-item-image,
+.ord-item-image-placeholder {
+    width: 36px; height: 36px; flex: 0 0 36px; border-radius: 6px;
+}
+.ord-item-image {
+    display: block; object-fit: cover; background: #e2e8f0; border: 1px solid rgba(148,163,184,.22);
+}
+.ord-item-image-placeholder {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #f1f5f9; border: 1px dashed #cbd5e1; font-size: .85rem;
+}
 .ord-item-qty {
     font-size: .72rem; font-weight: 800; background: #e2e8f0; color: #475569;
     border-radius: 5px; padding: .1rem .4rem; flex-shrink: 0; margin-top: .05rem;

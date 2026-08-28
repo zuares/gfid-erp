@@ -342,6 +342,27 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         </div>`;
     }
 
+    function itemImageHtml(i) {
+        const candidate = i?.image_url
+            || i?.image_info?.image_url
+            || i?.raw_json?.image_info?.image_url
+            || i?.images?.[0]
+            || '';
+        if (!candidate) {
+            return '<span class="ord-item-image-placeholder" aria-hidden="true">🛍️</span>';
+        }
+
+        try {
+            const imageUrl = new URL(String(candidate), window.location.origin);
+            if (!['http:', 'https:'].includes(imageUrl.protocol)) {
+                throw new Error('Protokol gambar tidak didukung');
+            }
+            return `<img class="ord-item-image" src="${esc(imageUrl.href)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ord-item-image-placeholder',textContent:'🛍️'}))">`;
+        } catch (error) {
+            return '<span class="ord-item-image-placeholder" aria-hidden="true">🛍️</span>';
+        }
+    }
+
     let orders           = [];
     let currentPage      = 1;
     let lastPage         = 1;
@@ -894,7 +915,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         const cards = rows.map(r => {
             const itemsHtml = (r.items || []).map(it => `
                 <div class="ord-item-card">
-                    ${(it.images && it.images[0]) ? `<img src="${esc(it.images[0])}" style="width:34px;height:34px;object-fit:cover;border-radius:6px;margin-right:6px" onerror="this.style.display='none'">` : ''}
+                    ${itemImageHtml(it)}
                     <div class="ord-item-qty">${it.quantity || 0}×</div>
                     <div class="ord-item-body">
                         <div class="ord-item-name">${esc(it.item_name || it.item_sku || '—')}</div>
@@ -1882,6 +1903,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
 
         const qtyClass = urgent ? 'ord-item-qty urgent' : 'ord-item-qty';
         return `<div class="ord-item-card">
+            ${itemImageHtml(i)}
             <div class="${qtyClass}">${i.qty || 1}×</div>
             <div class="ord-item-body">${bodyHtml}</div>
         </div>`;
