@@ -187,6 +187,11 @@ class TikTokShopChannel implements MarketplaceChannel
         return ['code' => -1, 'message' => 'Not supported for TikTok Shop'];
     }
 
+    public function getEscrowDetailBatch(Store $store, array $orderSnList): array
+    {
+        return ['code' => -1, 'message' => 'Not supported for TikTok Shop'];
+    }
+
     public function getEscrowList(
         Store $store,
         int $releaseTimeFrom,

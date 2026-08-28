@@ -380,8 +380,15 @@ class ShopeeChannel implements MarketplaceChannel
 
     public function getEscrowDetail(Store $store, string $orderSn): array
     {
-        return $this->get($store, '/api/v2/payment/get_escrow_detail', [
+        return $this->post($store, '/api/v2/payment/get_escrow_detail', [
             'order_sn' => $orderSn,
+        ]);
+    }
+
+    public function getEscrowDetailBatch(Store $store, array $orderSnList): array
+    {
+        return $this->post($store, '/api/v2/payment/get_escrow_detail_batch', [
+            'order_sn_list' => array_values(array_unique(array_map('strval', $orderSnList))),
         ]);
     }
 
@@ -422,7 +429,7 @@ class ShopeeChannel implements MarketplaceChannel
         int $pageNo = 1,
         int $pageSize = 100
     ): array {
-        return $this->get($store, '/api/v2/payment/get_escrow_list', [
+        return $this->post($store, '/api/v2/payment/get_escrow_list', [
             'release_time_from' => $releaseTimeFrom,
             'release_time_to'   => $releaseTimeTo,
             'page_no'           => max(1, $pageNo),

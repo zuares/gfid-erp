@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Middleware\EnsureModuleAccess;
 use App\Models\Channel;
 use App\Models\Store;
+use App\Models\MarketplaceOrder;
 use App\Services\Marketplace\MarketplaceApiGateway;
 use Carbon\Carbon;
 use Illuminate\Auth\Middleware\Authenticate;
@@ -123,6 +124,67 @@ class MarketplaceEscrowTest extends TestCase
             ->assertJsonPath('data.income.escrow_amount', 98765)
             ->assertJsonPath('data.raw_response.response.order_income.commission_fee', 1234)
             ->assertJsonMissingPath('data.raw_response._meta');
+    }
+
+    public function test_detail_batch_normalizes_success_and_failed_orders(): void
+    {
+        $store = $this->store();
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($store): void {
+            $mock->shouldReceive('getEscrowDetailBatch')
+                ->once()
+                ->withArgs(fn (Store $actual, array $orderSns): bool => $actual->is($store)
+                    && $orderSns === ['ORDER-1', 'ORDER-2'])
+                ->andReturn([
+                    'escrow_detail_list' => [
+                        [
+                            'escrow_detail' => [
+                                'order_sn' => 'ORDER-1',
+                                'buyer_user_name' => 'buyer-1',
+                                'order_income' => ['escrow_amount' => 50000],
+                            ],
+                        ],
+                        [
+                            'escrow_detail' => ['order_sn' => 'ORDER-2'],
+                            'fail_error' => 'order_not_found',
+                            'fail_message' => 'The order info not found.',
+                        ],
+                    ],
+                    '_meta' => ['http_status' => 200],
+                ]);
+        });
+
+        $this->postJson("/api/marketplace/stores/{$store->id}/escrow-detail-batch", [
+            'order_sn_list' => ['ORDER-1', 'ORDER-2'],
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.details.ORDER-1.income.escrow_amount', 50000)
+            ->assertJsonPath('data.failed.ORDER-2.error', 'order_not_found')
+            ->assertJsonMissingPath('data.raw_response._meta');
+    }
+
+    public function test_orders_returns_webhook_orders_without_escrow_persistence(): void
+    {
+        $store = $this->store();
+        MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'ORDER-PUSH',
+            'external_order_id' => 'ORDER-PUSH',
+            'order_status' => 'READY_TO_SHIP',
+            'status' => 'new',
+            'buyer_username' => 'buyer-push',
+            'total_amount' => 75000,
+            'currency' => 'IDR',
+            'ordered_at' => '2026-08-28 10:00:00',
+            'order_date' => '2026-08-28 10:00:00',
+        ]);
+
+        $this->getJson("/api/marketplace/stores/{$store->id}/escrow-orders?date_from=2026-08-28&date_to=2026-08-28")
+            ->assertOk()
+            ->assertJsonPath('source', 'local_orders_from_webhook')
+            ->assertJsonPath('data.items.0.order_sn', 'ORDER-PUSH')
+            ->assertJsonPath('data.items.0.order_status', 'READY_TO_SHIP')
+            ->assertJsonPath('data.items.0.source', 'webhook_order');
     }
 
     public function test_non_shopee_store_is_rejected(): void

@@ -137,6 +137,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores',                      [MarketplaceController::class, 'stores']);
     Route::get('/stores/{store}/shop-info',    [MarketplaceController::class, 'shopInfo']);
     Route::get('/stores/{store}/escrow-list', [EscrowController::class, 'list'])->name('marketplace.api.escrow-list');
+    Route::get('/stores/{store}/escrow-orders', [EscrowController::class, 'orders'])->name('marketplace.api.escrow-orders');
+    Route::post('/stores/{store}/escrow-detail-batch', [EscrowController::class, 'detailBatch'])->name('marketplace.api.escrow-detail-batch');
     Route::get('/stores/{store}/escrow-detail', [EscrowController::class, 'detail'])->name('marketplace.api.escrow-detail');
     Route::post('/stores/{store}/sync-orders', [MarketplaceController::class, 'syncOrders'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);

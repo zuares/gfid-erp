@@ -21,6 +21,12 @@ interface MarketplaceChannel
     public function getEscrowDetail(Store $store, string $orderSn): array;
 
     /**
+     * Ambil rincian income escrow beberapa order sekaligus.
+     * Shopee membatasi maksimal 50 order per request.
+     */
+    public function getEscrowDetailBatch(Store $store, array $orderSnList): array;
+
+    /**
      * Ambil daftar escrow berdasarkan waktu pencairan.
      * Shopee-only; channel lain boleh mengembalikan not_supported.
      */

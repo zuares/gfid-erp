@@ -36,16 +36,23 @@
                     <select id="escrowStore" class="form-select" aria-label="Pilih toko Shopee"><option value="">Memuat toko…</option></select>
                 </div>
                 <div class="escrow-field">
-                    <label for="escrowFrom">Release dari</label>
+                    <label for="escrowSource">Sumber daftar</label>
+                    <select id="escrowSource" class="form-select" aria-label="Pilih sumber daftar escrow">
+                        <option value="orders">Order baru + escrow (push)</option>
+                        <option value="released">Escrow release</option>
+                    </select>
+                </div>
+                <div class="escrow-field">
+                    <label for="escrowFrom">Tanggal dari</label>
                     <input id="escrowFrom" type="date" class="form-control">
                 </div>
                 <div class="escrow-field">
-                    <label for="escrowTo">Release sampai</label>
+                    <label for="escrowTo">Tanggal sampai</label>
                     <input id="escrowTo" type="date" class="form-control">
                 </div>
                 <button id="escrowLoad" type="button" class="btn btn-ship-primary btn-pill"><span class="escrow-load-label">Tampilkan escrow</span></button>
             </div>
-            <div class="escrow-help"><i class="bi bi-info-circle me-1"></i> Endpoint Shopee membatasi rentang release maksimal 15 hari. Setiap order akan dimuat ulang memakai <code>get_escrow_detail</code> agar seluruh kolom accounting tampil. Data diambil langsung saat tombol ditekan dan tidak disimpan ke database.</div>
+            <div class="escrow-help"><i class="bi bi-info-circle me-1"></i> Mode <strong>Order baru + escrow</strong> memakai order lokal yang masuk dari push, lalu detail accounting diambil live dengan batch maksimal 50 order. Mode <strong>Escrow release</strong> memakai rentang release Shopee (maksimal 15 hari). Tidak ada cache escrow baru.</div>
         </div>
 
         <div class="escrow-kpis">
@@ -79,7 +86,7 @@
 <script>
 (() => {
     const $ = (id) => document.getElementById(id);
-    const state = { stores: [], page: 1, more: false, items: [], details: {}, detailErrors: {}, detailLoading: {} };
+    const state = { stores: [], page: 1, more: false, items: [], details: {}, detailErrors: {}, detailLoading: {}, refreshTimer: null, loading: false };
     const today = new Date();
     const iso = (date) => date.toISOString().slice(0, 10);
     const from = new Date(today); from.setDate(from.getDate() - 14);
@@ -99,18 +106,20 @@
     const showAlert = (message, type = 'error') => { const el = $('escrowAlert'); el.textContent = message; el.className = `escrow-alert show ${type}`; };
     const hideAlert = () => { $('escrowAlert').className = 'escrow-alert'; };
     const selectedStore = () => state.stores.find((store) => String(store.id) === String($('escrowStore').value));
-    const api = async (url) => {
-        const response = await fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+    const api = async (url, options = {}) => {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const headers = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...(options.headers || {}) };
+        if (options.method && options.method !== 'GET') headers['X-CSRF-TOKEN'] = csrf;
+        const response = await fetch(url, { ...options, headers });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || payload.success === false) throw new Error(payload.message || `Request gagal (${response.status})`);
         return payload;
     };
 
     const listUrl = () => {
-        // Satu halaman sengaja 20 order karena setiap baris juga mengambil
-        // get_escrow_detail agar seluruh kolom accounting bisa ditampilkan.
         const params = new URLSearchParams({ date_from: $('escrowFrom').value, date_to: $('escrowTo').value, page_no: state.page, page_size: 20 });
-        return `/api/marketplace/stores/${encodeURIComponent($('escrowStore').value)}/escrow-list?${params}`;
+        const path = $('escrowSource').value === 'released' ? 'escrow-list' : 'escrow-orders';
+        return `/api/marketplace/stores/${encodeURIComponent($('escrowStore').value)}/${path}?${params}`;
     };
 
     const incomeLabels = {
@@ -133,7 +142,7 @@
     };
 
     const renderRows = (items) => {
-        if (!items.length) { $('escrowTableWrap').innerHTML = '<div class="escrow-empty">Tidak ada escrow pada rentang release yang dipilih.</div>'; return; }
+        if (!items.length) { $('escrowTableWrap').innerHTML = `<div class="escrow-empty">Tidak ada data pada rentang ${$('escrowSource').value === 'released' ? 'release' : 'order'} yang dipilih.</div>`; return; }
         const columns = incomeColumns(items);
         const headers = columns.map((key) => `<th class="escrow-detail-col">${escapeHtml(incomeLabels[key] || key.replaceAll('_', ' '))}</th>`).join('');
         const rows = items.map((item, index) => {
@@ -142,52 +151,53 @@
             const orderError = state.detailErrors[item.order_sn];
             const loading = state.detailLoading[item.order_sn];
             const loaded = Object.prototype.hasOwnProperty.call(state.details, item.order_sn);
-            const detailState = loading ? '<span class="escrow-detail-loading">Memuat detail…</span>' : (orderError ? `<span class="escrow-detail-error">${escapeHtml(orderError)}</span>` : (loaded ? '<span class="escrow-status">Lengkap</span>' : '<span class="escrow-detail-loading">Menunggu…</span>'));
+            const detailState = loading ? '<span class="escrow-detail-loading">Memuat detail…</span>' : (orderError ? `<span class="escrow-status" title="${escapeHtml(orderError)}">Pending</span>` : (loaded ? '<span class="escrow-status">Lengkap</span>' : '<span class="escrow-detail-loading">Menunggu…</span>'));
             const incomeCells = columns.map((key) => `<td class="escrow-detail-col">${detailValue(key, income[key])}</td>`).join('');
-            return `<tr><td><span class="escrow-order">${escapeHtml(item.order_sn || '—')}</span></td><td>${detailState}</td><td class="escrow-money">${money(item.payout_amount)}</td><td class="escrow-muted">${escapeHtml(dateTime(item.escrow_release_at))}</td><td class="escrow-detail-col">${escapeHtml(detail.buyer_user_name || '—')}</td><td class="escrow-detail-col">${escapeHtml((detail.return_order_sn_list || []).join(', ') || '—')}</td>${incomeCells}<td class="text-end"><button type="button" class="btn btn-sm btn-ship-outline btn-pill escrow-detail-btn" data-index="${index}">Raw</button></td></tr>`;
+            const payout = item.payout_amount ?? income.escrow_amount;
+            const date = item.escrow_release_at || item.ordered_at;
+            return `<tr><td><span class="escrow-order">${escapeHtml(item.order_sn || '—')}</span></td><td>${escapeHtml(item.order_status || '—')}</td><td>${detailState}</td><td>${money(item.order_total)}</td><td class="escrow-money">${money(payout)}</td><td class="escrow-muted">${escapeHtml(dateTime(date))}</td><td class="escrow-detail-col">${escapeHtml(detail.buyer_user_name || item.buyer_user_name || '—')}</td><td class="escrow-detail-col">${escapeHtml((detail.return_order_sn_list || []).join(', ') || '—')}</td>${incomeCells}<td class="text-end"><button type="button" class="btn btn-sm btn-ship-outline btn-pill escrow-detail-btn" data-index="${index}">Raw</button></td></tr>`;
         }).join('');
-        $('escrowTableWrap').innerHTML = `<table class="table escrow-table"><thead><tr><th>Order SN</th><th>Status detail</th><th>Payout amount</th><th>Waktu release</th><th class="escrow-detail-col">Buyer</th><th class="escrow-detail-col">Return order</th>${headers}<th></th></tr></thead><tbody>${rows}</tbody></table>`;
+        $('escrowTableWrap').innerHTML = `<table class="table escrow-table"><thead><tr><th>Order SN</th><th>Status order</th><th>Status detail</th><th>Nilai order</th><th>Payout amount</th><th>Waktu order/release</th><th class="escrow-detail-col">Buyer</th><th class="escrow-detail-col">Return order</th>${headers}<th></th></tr></thead><tbody>${rows}</tbody></table>`;
         document.querySelectorAll('.escrow-detail-btn').forEach((button) => button.addEventListener('click', () => openDetail(items[Number(button.dataset.index)]?.order_sn)));
     };
 
     const renderPagination = () => { $('escrowPagination').style.display = 'flex'; $('escrowPrev').disabled = state.page <= 1; $('escrowNext').disabled = !state.more; $('escrowPageInfo').textContent = `Halaman ${state.page}${state.more ? ' · masih ada data berikutnya' : ' · halaman terakhir'}`; };
     const setLoading = (loading) => { const button = $('escrowLoad'); button.disabled = loading; button.querySelector('.escrow-load-label').innerHTML = loading ? '<span class="escrow-spinner"></span> Memuat…' : 'Tampilkan escrow'; };
     const detailUrl = (orderSn) => `/api/marketplace/stores/${encodeURIComponent($('escrowStore').value)}/escrow-detail?order_sn=${encodeURIComponent(orderSn)}`;
+    const batchDetailUrl = () => `/api/marketplace/stores/${encodeURIComponent($('escrowStore').value)}/escrow-detail-batch`;
 
     const loadDetails = async () => {
         const queue = state.items.filter((item) => item.order_sn);
-        let cursor = 0;
+        if (!queue.length) return;
+        queue.forEach((item) => { state.detailLoading[item.order_sn] = true; });
+        renderRows(state.items);
         let completed = 0;
-        const worker = async () => {
-            while (cursor < queue.length) {
-                const item = queue[cursor++];
-                const orderSn = item.order_sn;
-                state.detailLoading[orderSn] = true;
+        for (let offset = 0; offset < queue.length; offset += 50) {
+            const orderSnList = queue.slice(offset, offset + 50).map((item) => item.order_sn);
+            try {
+                const payload = await api(batchDetailUrl(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_sn_list: orderSnList }) });
+                Object.assign(state.details, payload.data?.details || {});
+                Object.entries(payload.data?.failed || {}).forEach(([orderSn, failure]) => { state.detailErrors[orderSn] = failure.message || failure.error || 'Detail escrow belum tersedia.'; });
+            } catch (error) {
+                orderSnList.forEach((orderSn) => { state.detailErrors[orderSn] = error.message; });
+            } finally {
+                orderSnList.forEach((orderSn) => { state.detailLoading[orderSn] = false; });
+                completed += orderSnList.length;
+                $('escrowStatus').textContent = 'Memuat detail…';
+                $('escrowStatusNote').textContent = `${selectedStore()?.name || 'Toko'} · ${completed}/${queue.length} detail diproses batch`;
                 renderRows(state.items);
-                try {
-                    const payload = await api(detailUrl(orderSn));
-                    state.details[orderSn] = payload.data || {};
-                } catch (error) {
-                    state.detailErrors[orderSn] = error.message;
-                } finally {
-                    state.detailLoading[orderSn] = false;
-                    completed++;
-                    $('escrowStatus').textContent = 'Memuat detail…';
-                    $('escrowStatusNote').textContent = `${selectedStore()?.name || 'Toko'} · ${completed}/${queue.length} detail dimuat`;
-                    renderRows(state.items);
-                }
             }
-        };
-        await Promise.all(Array.from({ length: Math.min(3, queue.length) }, worker));
+        }
     };
 
     const loadList = async () => {
         hideAlert();
         if (!$('escrowStore').value) { showAlert('Pilih toko Shopee terlebih dahulu.'); return; }
-        if (!$('escrowFrom').value || !$('escrowTo').value) { showAlert('Tanggal release wajib diisi.'); return; }
+        if (!$('escrowFrom').value || !$('escrowTo').value) { showAlert('Rentang tanggal wajib diisi.'); return; }
         if ($('escrowFrom').value > $('escrowTo').value) { showAlert('Tanggal mulai tidak boleh melewati tanggal akhir.'); return; }
         const rangeDays = Math.round((new Date(`${$('escrowTo').value}T00:00:00`) - new Date(`${$('escrowFrom').value}T00:00:00`)) / 86400000) + 1;
-        if (rangeDays > 15) { showAlert('Rentang tanggal maksimal 15 hari sesuai batas endpoint Shopee.'); return; }
+        if ($('escrowSource').value === 'released' && rangeDays > 15) { showAlert('Rentang tanggal maksimal 15 hari sesuai batas endpoint escrow release Shopee.'); return; }
+        state.loading = true;
         setLoading(true); $('escrowStatus').textContent = 'Memuat…'; $('escrowTableWrap').innerHTML = '<div class="escrow-empty"><span class="escrow-spinner"></span> Mengambil data live dari Shopee…</div>';
         try {
             const payload = await api(listUrl()); state.items = payload.data.items || []; state.more = Boolean(payload.data.more); state.details = {}; state.detailErrors = {}; state.detailLoading = {};
@@ -196,7 +206,7 @@
             await loadDetails();
             $('escrowStatus').textContent = 'Berhasil'; $('escrowStatusNote').textContent = `${selectedStore()?.name || 'Toko'} · seluruh detail halaman dimuat live`;
         } catch (error) { $('escrowTableWrap').innerHTML = `<div class="escrow-empty">Tidak dapat memuat data escrow.</div>`; $('escrowPagination').style.display = 'none'; $('escrowStatus').textContent = 'Gagal'; $('escrowStatusNote').textContent = 'Periksa koneksi/credential Shopee'; showAlert(error.message); }
-        finally { setLoading(false); }
+        finally { state.loading = false; setLoading(false); }
     };
 
     const openDetail = async (orderSn) => {
@@ -214,7 +224,20 @@
             $('escrowStore').innerHTML = state.stores.length ? state.stores.map((store) => `<option value="${escapeHtml(store.id)}">${escapeHtml(store.name)}${store.connection_status === 'CONNECTED' ? ' · Connected' : ''}</option>`).join('') : '<option value="">Tidak ada toko Shopee aktif</option>';
         } catch (error) { $('escrowStore').innerHTML = '<option value="">Gagal memuat toko</option>'; showAlert(error.message); }
     };
-    $('escrowLoad').addEventListener('click', () => { state.page = 1; loadList(); }); $('escrowPrev').addEventListener('click', () => { if (state.page > 1) { state.page--; loadList(); } }); $('escrowNext').addEventListener('click', () => { if (state.more) { state.page++; loadList(); } }); $('escrowClose').addEventListener('click', () => $('escrowModalBackdrop').classList.remove('show')); $('escrowModalBackdrop').addEventListener('click', (event) => { if (event.target === $('escrowModalBackdrop')) $('escrowModalBackdrop').classList.remove('show'); }); document.addEventListener('keydown', (event) => { if (event.key === 'Escape') $('escrowModalBackdrop').classList.remove('show'); });
+    $('escrowLoad').addEventListener('click', () => { state.page = 1; loadList(); }); $('escrowSource').addEventListener('change', () => { state.page = 1; loadList(); }); $('escrowPrev').addEventListener('click', () => { if (state.page > 1) { state.page--; loadList(); } }); $('escrowNext').addEventListener('click', () => { if (state.more) { state.page++; loadList(); } }); $('escrowClose').addEventListener('click', () => $('escrowModalBackdrop').classList.remove('show')); $('escrowModalBackdrop').addEventListener('click', (event) => { if (event.target === $('escrowModalBackdrop')) $('escrowModalBackdrop').classList.remove('show'); }); document.addEventListener('keydown', (event) => { if (event.key === 'Escape') $('escrowModalBackdrop').classList.remove('show'); });
+    if (window.Echo) {
+        try {
+            window.Echo.channel('marketplace').listen('OrderUpdated', (event) => {
+                if (String(event.store_id) !== String($('escrowStore').value) || $('escrowSource').value !== 'orders') return;
+                clearTimeout(state.refreshTimer);
+                state.refreshTimer = setTimeout(() => {
+                    showAlert(`Order ${event.order_sn || 'baru'} diterima dari push. Daftar escrow diperbarui.`, 'info');
+                    state.page = 1;
+                    loadList();
+                }, 700);
+            });
+        } catch (error) { console.warn('Escrow realtime listener gagal:', error); }
+    }
     loadStores();
 })();
 </script>

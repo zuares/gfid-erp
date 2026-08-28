@@ -58,6 +58,9 @@ class ShopeeChannelMetaTest extends TestCase
 
         $this->assertSame(200, $result['_meta']['http_status']);
         $this->assertSame(1000, $result['response']['order_income']['final_income']);
+        Http::assertSent(fn ($request) => $request->method() === 'POST'
+            && str_contains($request->url(), '/api/v2/payment/get_escrow_detail')
+            && ($request->data()['order_sn'] ?? null) === 'ORDER-X');
     }
 
     public function test_http_status_tidak_hilang_saat_error_429_berbentuk_json_valid()
@@ -194,13 +197,39 @@ class ShopeeChannelMetaTest extends TestCase
 
         $this->assertSame('ORDER-RELEASED', $result['response']['escrow_list'][0]['order_sn']);
         Http::assertSent(function ($request) {
-            $url = $request->url();
+            $body = $request->data();
 
-            return str_contains($url, '/api/v2/payment/get_escrow_list')
-                && str_contains($url, 'release_time_from=1754006400')
-                && str_contains($url, 'release_time_to=1754438400')
-                && str_contains($url, 'page_no=2')
-                && str_contains($url, 'page_size=100');
+            return $request->method() === 'POST'
+                && str_contains($request->url(), '/api/v2/payment/get_escrow_list')
+                && ($body['release_time_from'] ?? null) === 1754006400
+                && ($body['release_time_to'] ?? null) === 1754438400
+                && ($body['page_no'] ?? null) === 2
+                && ($body['page_size'] ?? null) === 100;
+        });
+    }
+
+    public function test_getEscrowDetailBatch_memakai_post_dan_mengirim_order_sn_list(): void
+    {
+        $store = $this->createStore();
+
+        Http::fake([
+            '*/api/v2/payment/get_escrow_detail_batch*' => Http::response([
+                'escrow_detail_list' => [[
+                    'escrow_detail' => [
+                        'order_sn' => 'ORDER-1',
+                        'order_income' => ['escrow_amount' => 12345],
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $result = app(ShopeeChannel::class)->getEscrowDetailBatch($store, ['ORDER-1', 'ORDER-2', 'ORDER-1']);
+
+        $this->assertSame('ORDER-1', $result['escrow_detail_list'][0]['escrow_detail']['order_sn']);
+        Http::assertSent(function ($request) {
+            return $request->method() === 'POST'
+                && str_contains($request->url(), '/api/v2/payment/get_escrow_detail_batch')
+                && ($request->data()['order_sn_list'] ?? null) === ['ORDER-1', 'ORDER-2'];
         });
     }
 
