@@ -6,6 +6,10 @@
     <style>
         .slip-page { width:100%; max-width:860px; box-sizing:border-box; margin:0 auto; padding:1rem .85rem 3rem }
         body:has(.slip-page) .gf-owner-floating-tools { display:none !important }
+        .slip-page[data-module="cutting"] .slip-table { font-size:.84rem }
+        .slip-page[data-module="cutting"] .slip-table th { font-size:.68rem }
+        .slip-page[data-module="cutting"] .slip-table td { font-size:.78rem }
+        .slip-page[data-module="cutting"] .slip-section-title { font-size:.84rem }
         .slip-actions { display:flex; justify-content:space-between; align-items:center; gap:.75rem; margin-bottom:.85rem }
         .slip-action-btn { display:inline-flex; align-items:center; justify-content:center; gap:.4rem; min-height:36px; padding:.45rem .7rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.78rem; font-weight:700; text-decoration:none }
         .slip-action-btn.primary { border-color:var(--accent); background:var(--accent); color:#fff }
@@ -56,6 +60,7 @@
         .slip-mono { font-variant-numeric:tabular-nums }
         .slip-date-day { font-weight:800; line-height:1.25 }
         .slip-date-value { margin-top:.12rem; color:var(--muted); font-size:.7rem }
+        .slip-item-code { font-variant-numeric:tabular-nums; font-weight:750; letter-spacing:.01em }
         .slip-attendance { display:inline-flex; align-items:center; padding:.25rem .48rem; border-radius:999px; background:rgba(148,163,184,.12); color:var(--muted); font-size:.68rem; font-weight:800 }
         .slip-attendance.hadir { background:rgba(16,185,129,.11); color:rgba(5,150,105,1) }
         .slip-attendance.libur { background:rgba(148,163,184,.14); color:var(--muted) }
@@ -181,6 +186,16 @@
             .slip-details-meta-value { overflow:hidden; margin-top:.08rem; font-size:.6rem; font-weight:800; text-overflow:ellipsis; white-space:nowrap }
             .slip-page[data-paper-size="threeply_quarter"][data-print-part="details"] .slip-details-meta { grid-template-columns:repeat(2,1fr); padding:.32rem .4rem .38rem }
 
+            .slip-page[data-print-part="all"] .slip-summary-page,
+            .slip-page[data-print-part="all"] .slip-details-page { display:block !important; break-inside:avoid; page-break-inside:avoid }
+            .slip-page[data-print-part="all"] .slip-details-meta { display:none !important }
+            .slip-page[data-print-part="all"] .slip-table-wrap { overflow:visible }
+            .slip-page[data-print-part="all"] .slip-table { font-size:.68rem }
+            .slip-page[data-print-part="all"] .slip-table th { font-size:.54rem }
+            .slip-page[data-print-part="all"] .slip-table td { font-size:.62rem }
+            .slip-page[data-print-part="all"] .slip-date-value { font-size:.55rem }
+            .slip-page[data-print-part="all"] .slip-attendance { font-size:.55rem }
+
             .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-card { page-break-inside:avoid; break-inside:avoid }
             .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-inner { padding:2mm 2.5mm 2.2mm }
             .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-divider { margin:.25rem 0 }
@@ -217,7 +232,7 @@
             .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-section-count { font-size:.4rem }
             .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-table { font-size:.48rem }
             .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-table th { padding:.18rem .18rem; font-size:.38rem }
-            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-table td { padding:.17rem .18rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-table td { padding:.17rem .18rem; font-size:.46rem }
             .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-table tfoot td { padding:.2rem .18rem }
             .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-date-day { line-height:1.1 }
             .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-date-value { font-size:.42rem }
@@ -263,9 +278,15 @@
             ? $lines->whereNotIn('attendance_status', ['hadir', 'libur', 'pending'])->count()
             : null;
         $documentLabel = $isDaily ? 'SLIP GAJI HARIAN' : 'SLIP PAYROLL BORONGAN';
+        $pieceworkQtyLabel = $module === 'sewing' ? 'Qty Diambil' : 'Qty QC OK';
+        $pieceworkRateLabel = $module === 'cutting' ? 'Tarif / PCS' : 'Tarif';
+        $pieceworkDetailTitle = $module === 'cutting' ? 'Rincian Hasil Cutting' : 'Rincian Hasil Sewing';
+        $pieceworkDetailNote = $module === 'cutting'
+            ? 'Rincian hasil potong berdasarkan kategori dan item'
+            : 'Rincian pekerjaan berdasarkan kategori dan item';
     @endphp
 
-    <div class="slip-page">
+    <div class="slip-page" data-module="{{ $module }}">
         <div class="slip-actions no-print">
             <a class="slip-action-btn" href="{{ $backUrl }}">← Kembali</a>
             <div class="slip-print-tools">
@@ -342,8 +363,8 @@
                 <section>
                     <div class="slip-section-heading">
                         <div>
-                            <div class="slip-section-title">{{ $isDaily ? 'Rincian Penghasilan' : 'Rincian Payroll' }}</div>
-                            <div class="slip-section-note">{{ $isDaily ? 'Perhitungan berdasarkan kehadiran setiap tanggal' : 'Detail pekerjaan dan tarif operator' }}</div>
+                            <div class="slip-section-title">{{ $isDaily ? 'Rincian Penghasilan' : $pieceworkDetailTitle }}</div>
+                            <div class="slip-section-note">{{ $isDaily ? 'Perhitungan berdasarkan kehadiran setiap tanggal' : $pieceworkDetailNote }}</div>
                         </div>
                         <div class="slip-section-count">{{ $lines->count() }} {{ $isDaily ? 'hari' : 'baris' }}</div>
                     </div>
@@ -370,13 +391,30 @@
                             </table>
                         @else
                             <table class="slip-table">
-                                <thead><tr><th>Kategori</th><th>Item</th><th class="slip-right">{{ $module === 'sewing' ? 'Qty Ambil' : 'Qty OK' }}</th><th class="slip-right">Rate</th><th class="slip-right">Amount</th></tr></thead>
+                                <thead><tr>@if ($module === 'cutting')<th>Hari / Tanggal</th>@endif<th>Kategori</th><th>Produk / Item</th><th class="slip-right">{{ $pieceworkQtyLabel }}</th><th class="slip-right">{{ $pieceworkRateLabel }}</th><th class="slip-right">Total</th></tr></thead>
                                 <tbody>
                                     @foreach ($lines as $line)
-                                        <tr><td>{{ $line->category?->name ?? '-' }}</td><td>{{ $line->item?->name ?? '-' }}</td><td class="slip-right slip-mono">{{ number_format((float) $line->total_qty_ok, 2, ',', '.') }}</td><td class="slip-right slip-mono">{{ number_format((float) $line->rate_per_pcs, 0, ',', '.') }}</td><td class="slip-right slip-mono" style="font-weight:850">{{ number_format((float) $line->amount, 0, ',', '.') }}</td></tr>
+                                        <tr>
+                                            @if ($module === 'cutting')
+                                                @php $cuttingDate = $line->work_date ? \Carbon\Carbon::parse($line->work_date)->locale('id') : null; @endphp
+                                                <td>
+                                                    @if ($cuttingDate)
+                                                        <div class="slip-date-day">{{ $cuttingDate->translatedFormat('l') }}</div>
+                                                        <div class="slip-date-value">{{ $cuttingDate->format('d/m/Y') }}</div>
+                                                    @else
+                                                        -
+                                                    @endif
+                                                </td>
+                                            @endif
+                                            <td>{{ $line->category?->name ?? '-' }}</td>
+                                            <td class="slip-item-code">{{ $line->item?->code ?? '-' }}</td>
+                                            <td class="slip-right slip-mono">{{ number_format((float) $line->total_qty_ok, 2, ',', '.') }}</td>
+                                            <td class="slip-right slip-mono">{{ number_format((float) $line->rate_per_pcs, 0, ',', '.') }}</td>
+                                            <td class="slip-right slip-mono" style="font-weight:850">{{ number_format((float) $line->amount, 0, ',', '.') }}</td>
+                                        </tr>
                                     @endforeach
                                 </tbody>
-                                <tfoot><tr><td colspan="2">Total Diterima</td><td class="slip-right slip-mono">{{ number_format((float) $totalQty, 2, ',', '.') }}</td><td></td><td class="slip-right slip-mono">{{ number_format((float) $totalAmount, 0, ',', '.') }}</td></tr></tfoot>
+                                <tfoot><tr><td colspan="{{ $module === 'cutting' ? 3 : 2 }}">Total Diterima</td><td class="slip-right slip-mono">{{ number_format((float) $totalQty, 2, ',', '.') }}</td><td></td><td class="slip-right slip-mono">{{ number_format((float) $totalAmount, 0, ',', '.') }}</td></tr></tfoot>
                             </table>
                         @endif
                     </div>

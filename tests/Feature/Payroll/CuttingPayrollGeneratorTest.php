@@ -39,6 +39,7 @@ class CuttingPayrollGeneratorTest extends TestCase
 
         $period = CuttingPayrollGenerator::generate('2026-08-01', '2026-08-07');
 
+        $this->assertSame('2026-08-04', $period->lines->first()->work_date->toDateString());
         $this->assertSame(10.0, (float) $period->lines->sum('total_qty_ok'));
         $this->assertSame(15000.0, (float) $period->lines->sum('amount'));
     }
@@ -64,6 +65,7 @@ class CuttingPayrollGeneratorTest extends TestCase
 
         $period = CuttingPayrollGenerator::generate('2026-08-01', '2026-08-07');
 
+        $this->assertSame('2026-08-04', $period->lines->first()->work_date->toDateString());
         $this->assertSame(7.0, (float) $period->lines->sum('total_qty_ok'));
         $this->assertSame(10500.0, (float) $period->lines->sum('amount'));
     }

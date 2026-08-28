@@ -453,7 +453,8 @@ class PieceworkPayrollController extends Controller
             ->when($cfg['module'] === 'daily', function ($query) {
                 return $query->orderBy('work_date');
             }, function ($query) {
-                return $query->orderBy('item_category_id')
+                return $query->orderBy('work_date')
+                    ->orderBy('item_category_id')
                     ->orderBy('item_id');
             })
             ->get();

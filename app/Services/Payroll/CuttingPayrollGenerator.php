@@ -69,6 +69,7 @@ class CuttingPayrollGenerator
                 COALESCE(cutting_job_bundles.operator_id, cutting_jobs.operator_id) as employee_id,
                 COALESCE(cutting_job_bundles.item_category_id, items.item_category_id) as item_category_id,
                 cutting_job_bundles.finished_item_id as item_id,
+                cutting_jobs.date as work_date,
                 SUM(CASE
                     WHEN cutting_job_bundles.status IN (\'cut\', \'cutting\', \'draft\')
                         THEN COALESCE(cutting_job_bundles.qty_pcs, 0)
@@ -78,7 +79,8 @@ class CuttingPayrollGenerator
                 ->groupByRaw('
                 COALESCE(cutting_job_bundles.operator_id, cutting_jobs.operator_id),
                 COALESCE(cutting_job_bundles.item_category_id, items.item_category_id),
-                cutting_job_bundles.finished_item_id
+                cutting_job_bundles.finished_item_id,
+                cutting_jobs.date
             ')
                 ->get();
 
@@ -98,6 +100,7 @@ class CuttingPayrollGenerator
                 PieceworkPayrollLine::create([
                     'payroll_period_id' => $period->id,
                     'employee_id' => $row->employee_id,
+                    'work_date' => $row->work_date,
                     'item_category_id' => $row->item_category_id, // ⬅️ sekarang KEISI
                     'item_id' => $row->item_id,
                     'total_qty_ok' => $row->total_qty_ok,
