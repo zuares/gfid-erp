@@ -438,6 +438,43 @@ class ShopeeChannel implements MarketplaceChannel
     }
 
     /**
+     * Ambil daftar ringkas payout Cross-Border.
+     * Endpoint resmi menggunakan cursor pagination dan POST body.
+     */
+    public function getPayoutInfo(
+        Store $store,
+        int $payoutTimeFrom,
+        int $payoutTimeTo,
+        string $cursor = '',
+        int $pageSize = 100
+    ): array {
+        return $this->post($store, '/api/v2/payment/get_payout_info', [
+            'cursor'          => $cursor,
+            'page_size'       => min(100, max(1, $pageSize)),
+            'payout_time_from' => $payoutTimeFrom,
+            'payout_time_to'   => $payoutTimeTo,
+        ]);
+    }
+
+    /**
+     * Ambil rincian payout Cross-Border beserta order escrow dan adjustment.
+     */
+    public function getPayoutDetail(
+        Store $store,
+        int $payoutTimeFrom,
+        int $payoutTimeTo,
+        int $pageNo = 1,
+        int $pageSize = 100
+    ): array {
+        return $this->post($store, '/api/v2/payment/get_payout_detail', [
+            'page_no'         => max(1, $pageNo),
+            'page_size'       => min(100, max(1, $pageSize)),
+            'payout_time_from' => $payoutTimeFrom,
+            'payout_time_to'   => $payoutTimeTo,
+        ]);
+    }
+
+    /**
      * Ambil mutasi wallet toko local dari Shopee.
      *
      * Page number di endpoint ini menggunakan offset (mulai dari 0), bukan

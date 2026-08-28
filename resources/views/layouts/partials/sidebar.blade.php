@@ -106,6 +106,7 @@
     $hasMarketplacePencairanDana  = $router->has('marketplace.settlement');
     $hasMarketplaceIncomeDetail = $router->has('marketplace.income-detail');
     $hasMarketplaceEscrow = $router->has('marketplace.escrow');
+    $hasMarketplacePayout = $router->has('marketplace.payout');
     $hasMarketplaceProfit      = $router->has('marketplace.profit');
     $hasMarketplaceAds         = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics   = $router->has('marketplace.analytics');
@@ -1676,6 +1677,12 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.escrow') }}" icon="bi bi-safe2"
                                 :active="request()->routeIs('marketplace.escrow')">
                                 Escrow Shopee
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplacePayout)
+                            <x-sidebar.sub-link href="{{ route('marketplace.payout') }}" icon="bi bi-wallet2"
+                                :active="request()->routeIs('marketplace.payout')">
+                                Payout Shopee
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceProfit)

@@ -75,6 +75,7 @@ use App\Http\Controllers\Owner\SkuMappingController;
 use App\Http\Controllers\ShopeeStoreAuthController;
 use App\Http\Controllers\TikTokShopAuthController;
 use App\Http\Controllers\Marketplace\EscrowController;
+use App\Http\Controllers\Marketplace\PayoutController;
 
 // Marketplace — halaman
 Route::middleware(['auth', 'access:marketplace'])->group(function () {
@@ -98,6 +99,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/settlement',  [MarketplaceFinanceController::class, 'settlement'])->name('marketplace.settlement');
     Route::get('/marketplace/penghasilan',  [MarketplaceFinanceController::class, 'incomeDetail'])->name('marketplace.income-detail');
     Route::get('/marketplace/escrow', [EscrowController::class, 'index'])->name('marketplace.escrow');
+    Route::get('/marketplace/payout', [PayoutController::class, 'index'])->name('marketplace.payout');
     Route::get('/marketplace/penghasilan/produk', [MarketplaceFinanceController::class, 'incomeProducts'])->name('marketplace.income-detail.products');
     Route::get('/marketplace/profit',      [MarketplaceFinanceController::class, 'profit'])->name('marketplace.profit');
     Route::get('/marketplace/ads',         [MarketplaceController::class, 'ads'])->name('marketplace.ads');
@@ -140,6 +142,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/escrow-orders', [EscrowController::class, 'orders'])->name('marketplace.api.escrow-orders');
     Route::post('/stores/{store}/escrow-detail-batch', [EscrowController::class, 'detailBatch'])->name('marketplace.api.escrow-detail-batch');
     Route::get('/stores/{store}/escrow-detail', [EscrowController::class, 'detail'])->name('marketplace.api.escrow-detail');
+    Route::get('/stores/{store}/payout-info', [PayoutController::class, 'info'])->name('marketplace.api.payout-info');
+    Route::get('/stores/{store}/payout-detail', [PayoutController::class, 'detail'])->name('marketplace.api.payout-detail');
     Route::post('/stores/{store}/sync-orders', [MarketplaceController::class, 'syncOrders'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/stores/{store}/sync-orders-background', [MarketplaceController::class, 'syncOrdersBackground'])

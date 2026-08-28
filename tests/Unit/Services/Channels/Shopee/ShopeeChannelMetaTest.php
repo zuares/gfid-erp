@@ -233,6 +233,54 @@ class ShopeeChannelMetaTest extends TestCase
         });
     }
 
+    public function test_getPayoutInfo_memakai_post_dan_cursor_pagination(): void
+    {
+        $store = $this->createStore();
+
+        Http::fake([
+            '*/api/v2/payment/get_payout_info*' => Http::response([
+                'response' => ['payout_list' => ['payout_amount' => 12345]],
+            ], 200),
+        ]);
+
+        app(ShopeeChannel::class)->getPayoutInfo($store, 1754006400, 1754438400, 'CURSOR-X', 250);
+
+        Http::assertSent(function ($request) {
+            $body = $request->data();
+
+            return $request->method() === 'POST'
+                && str_contains($request->url(), '/api/v2/payment/get_payout_info')
+                && ($body['cursor'] ?? null) === 'CURSOR-X'
+                && ($body['payout_time_from'] ?? null) === 1754006400
+                && ($body['payout_time_to'] ?? null) === 1754438400
+                && ($body['page_size'] ?? null) === 100;
+        });
+    }
+
+    public function test_getPayoutDetail_memakai_post_dan_page_number(): void
+    {
+        $store = $this->createStore();
+
+        Http::fake([
+            '*/api/v2/payment/get_payout_detail*' => Http::response([
+                'response' => ['payout_list' => [], 'more' => false],
+            ], 200),
+        ]);
+
+        app(ShopeeChannel::class)->getPayoutDetail($store, 1754006400, 1754438400, 0, 250);
+
+        Http::assertSent(function ($request) {
+            $body = $request->data();
+
+            return $request->method() === 'POST'
+                && str_contains($request->url(), '/api/v2/payment/get_payout_detail')
+                && ($body['page_no'] ?? null) === 1
+                && ($body['payout_time_from'] ?? null) === 1754006400
+                && ($body['payout_time_to'] ?? null) === 1754438400
+                && ($body['page_size'] ?? null) === 100;
+        });
+    }
+
     public function test_getIncomeDetail_memakai_get_dan_parameter_resmi()
     {
         $store = $this->createStore();

@@ -202,6 +202,26 @@ class TikTokShopChannel implements MarketplaceChannel
         return ['code' => -1, 'error' => 'not_supported', 'message' => 'Not supported for TikTok Shop'];
     }
 
+    public function getPayoutInfo(
+        Store $store,
+        int $payoutTimeFrom,
+        int $payoutTimeTo,
+        string $cursor = '',
+        int $pageSize = 100
+    ): array {
+        return ['code' => -1, 'error' => 'not_supported', 'message' => 'Not supported for TikTok Shop'];
+    }
+
+    public function getPayoutDetail(
+        Store $store,
+        int $payoutTimeFrom,
+        int $payoutTimeTo,
+        int $pageNo = 1,
+        int $pageSize = 100
+    ): array {
+        return ['code' => -1, 'error' => 'not_supported', 'message' => 'Not supported for TikTok Shop'];
+    }
+
     // ─── Ads stubs (TikTok Ads API berbeda, belum diimplementasi) ────────────
 
     public function getShopToggleInfo(Store $store): array

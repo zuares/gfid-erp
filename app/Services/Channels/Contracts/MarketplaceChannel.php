@@ -39,6 +39,28 @@ interface MarketplaceChannel
     ): array;
 
     /**
+     * Ambil daftar ringkas payout Cross-Border dengan cursor pagination.
+     */
+    public function getPayoutInfo(
+        Store $store,
+        int $payoutTimeFrom,
+        int $payoutTimeTo,
+        string $cursor = '',
+        int $pageSize = 100
+    ): array;
+
+    /**
+     * Ambil rincian payout Cross-Border dengan page-number pagination.
+     */
+    public function getPayoutDetail(
+        Store $store,
+        int $payoutTimeFrom,
+        int $payoutTimeTo,
+        int $pageNo = 1,
+        int $pageSize = 100
+    ): array;
+
+    /**
      * Cek apakah iklan aktif di toko ini.
      * Endpoint: GET /api/v2/ads/get_shop_toggle_info
      */
