@@ -471,26 +471,31 @@
 
         .pw-generate-form {
             display: grid;
-            grid-template-columns: minmax(0, .85fr) minmax(0, 1.25fr) minmax(125px, .65fr);
-            column-gap: 1.5rem;
+            grid-template-columns: minmax(0, .85fr) minmax(0, 1.2fr) 150px;
+            column-gap: 1.35rem;
             row-gap: 1rem;
-            padding: .15rem .1rem 0;
+            padding: .1rem 0 0;
             align-items: end
         }
 
         .pw-field {
-            min-width: 0
+            display: flex;
+            min-width: 0;
+            flex-direction: column;
+            gap: .4rem
         }
 
         .pw-generate-form .pw-in,
         .pw-generate-form .pw-select {
             width: 100%;
-            min-width: 0
+            min-width: 0;
+            height: 40px;
+            box-sizing: border-box
         }
 
         .pw-field label {
             display: block;
-            margin-bottom: .38rem;
+            margin: 0;
             color: var(--muted);
             font-size: .73rem;
             font-weight: 700;
@@ -502,7 +507,7 @@
         }
 
         .pw-submit {
-            min-height: 38px;
+            min-height: 40px;
             width: 100%;
             min-width: 0;
             white-space: nowrap;
