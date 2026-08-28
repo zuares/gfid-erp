@@ -760,6 +760,9 @@
                             <table class="pw-table">
                                 <thead>
                                     <tr>
+                                        @if ($module === 'cutting')
+                                            <th>Hari / Tanggal</th>
+                                        @endif
                                         <th>Employee</th>
                                         <th class="pw-hide-sm">Category</th>
                                         <th>Item</th>
@@ -771,6 +774,17 @@
                                 <tbody>
                                     @forelse($lines as $l)
                                         <tr>
+                                            @if ($module === 'cutting')
+                                                <td style="white-space:nowrap">
+                                                    @if ($l->work_date)
+                                                        @php $cuttingDate = \Carbon\Carbon::parse($l->work_date)->locale('id'); @endphp
+                                                        <div class="pw-daily-day">{{ $cuttingDate->translatedFormat('l') }}</div>
+                                                        <div class="pw-daily-date">{{ $cuttingDate->format('d/m/Y') }}</div>
+                                                    @else
+                                                        <span class="pw-daily-date">-</span>
+                                                    @endif
+                                                </td>
+                                            @endif
                                             <td style="font-weight:700">{{ $l->employee?->name ?? '-' }}</td>
                                             <td class="pw-hide-sm">{{ $l->category?->name ?? '-' }}</td>
                                             <td>{{ $l->item?->name ?? '-' }}</td>
@@ -784,7 +798,7 @@
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="6" style="padding:1rem;color:var(--muted)">Tidak ada lines.</td>
+                                            <td colspan="{{ $module === 'cutting' ? 7 : 6 }}" style="padding:1rem;color:var(--muted)">Tidak ada lines.</td>
                                         </tr>
                                     @endforelse
                                 </tbody>
