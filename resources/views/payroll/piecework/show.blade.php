@@ -229,6 +229,40 @@
             vertical-align: middle
         }
 
+        .pw-daily-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem;
+            padding: .65rem .8rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .14)
+        }
+
+        .pw-daily-filter-field {
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            color: var(--muted);
+            font-size: .74rem;
+            font-weight: 700
+        }
+
+        .pw-daily-filter {
+            min-width: 150px;
+            padding: .35rem .5rem;
+            border: 1px solid rgba(148, 163, 184, .28);
+            border-radius: 8px;
+            background: var(--card);
+            color: var(--text);
+            font-size: .78rem;
+            font-weight: 600
+        }
+
+        .pw-daily-filter-count {
+            color: var(--muted);
+            font-size: .72rem
+        }
+
         .pw-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -266,6 +300,22 @@
             }
 
             .pw-daily-status {
+                flex: 1;
+                min-width: 0
+            }
+
+            .pw-daily-toolbar {
+                align-items: stretch;
+                flex-direction: column;
+                gap: .45rem;
+                padding: .65rem .75rem
+            }
+
+            .pw-daily-filter-field {
+                justify-content: space-between
+            }
+
+            .pw-daily-filter {
                 flex: 1;
                 min-width: 0
             }
@@ -347,6 +397,13 @@
     @php
         $qtyLabel = $module === 'daily' ? 'Hari Dibayar' : ($module === 'sewing' ? 'Qty Ambil' : 'Qty Payroll');
         $pageLabel = $module === 'daily' ? 'Payroll Harian' : 'Payroll Borongan';
+        $moduleRoute = function (string $action, array $parameters = []) use ($module) {
+            if ($module === 'daily') {
+                return route("payroll.daily.{$action}", $parameters);
+            }
+
+            return route("payroll.piecework.{$action}", ['module' => $module] + $parameters);
+        };
         $periodStart = \Carbon\Carbon::parse($period->period_start)->locale('id');
         $periodEnd = \Carbon\Carbon::parse($period->period_end)->locale('id');
         $periodWeek = $periodStart->weekOfMonth;
@@ -401,7 +458,7 @@
                     <div class="pw-row" style="margin-bottom:.75rem">
                         @if ($period->status !== 'final')
                             <form method="POST"
-                                action="{{ route('payroll.piecework.finalize', ['module' => $module, 'period' => $period]) }}">
+                                action="{{ $moduleRoute('finalize', ['period' => $period]) }}">
                                 @csrf
                                 <button class="pw-btn primary" type="submit"
                                     onclick="return confirm('Finalkan periode ini? Ini akan mencatat: Dr HPP (5101) / Cr Hutang Upah Borongan (2102).')">
@@ -410,7 +467,7 @@
                             </form>
 
                             <form method="POST"
-                                action="{{ route('payroll.piecework.regenerate', ['module' => $module, 'period' => $period]) }}">
+                                action="{{ $moduleRoute('regenerate', ['period' => $period]) }}">
                                 @csrf
                                 <button class="pw-btn danger" type="submit"
                                     onclick="return confirm('Regenerate draft ini? Lines akan dihitung ulang.')">
@@ -425,7 +482,7 @@
                     {{-- PAY (only if final & not paid) --}}
                     @if ($period->status === 'final' && !$period->paid_at)
                         <form class="pw-row" method="POST"
-                            action="{{ route('payroll.piecework.pay', ['module' => $module, 'period' => $period]) }}">
+                            action="{{ $moduleRoute('pay', ['period' => $period]) }}">
                             @csrf
                             <select class="pw-sel" name="paid_from_account_id" required>
                                 <option value="">Bayar dari...</option>
@@ -455,7 +512,13 @@
                             <thead>
                                 <tr>
                                     <th>Operator</th>
-                                    <th class="pw-right">{{ $qtyLabel }}</th>
+                                    @if ($module === 'daily')
+                                        <th class="pw-right">Hadir</th>
+                                        <th class="pw-right">Libur</th>
+                                        <th class="pw-right">Hari Dibayar</th>
+                                    @else
+                                        <th class="pw-right">{{ $qtyLabel }}</th>
+                                    @endif
                                     <th class="pw-right">Amount</th>
                                 </tr>
                             </thead>
@@ -466,20 +529,28 @@
                                             <div style="font-weight:800">{{ $s['employee_name'] }}</div>
                                             <div class="pw-row" style="margin-top:.3rem">
                                                 <a class="pw-btn"
-                                                    href="{{ route('payroll.piecework.slip', ['module' => $module, 'period' => $period, 'employee' => $s['employee_id']]) }}">
+                                                    href="{{ $moduleRoute('slip', ['period' => $period, 'employee' => $s['employee_id']]) }}">
                                                     Slip
                                                 </a>
                                             </div>
                                         </td>
-                                        <td class="pw-right">
-                                            {{ rtrim(rtrim(number_format((float) $s['total_qty'], 2, '.', ''), '0'), '.') }}
-                                        </td>
+                                        @if ($module === 'daily')
+                                            <td class="pw-right">{{ number_format((int) ($s['present_count'] ?? 0), 0, ',', '.') }}</td>
+                                            <td class="pw-right">{{ number_format((int) ($s['holiday_count'] ?? 0), 0, ',', '.') }}</td>
+                                            <td class="pw-right">
+                                                {{ rtrim(rtrim(number_format((float) $s['total_qty'], 2, '.', ''), '0'), '.') }}
+                                            </td>
+                                        @else
+                                            <td class="pw-right">
+                                                {{ rtrim(rtrim(number_format((float) $s['total_qty'], 2, '.', ''), '0'), '.') }}
+                                            </td>
+                                        @endif
                                         <td class="pw-right" style="font-weight:800">
                                             {{ number_format((float) $s['total_amount'], 0, ',', '.') }}</td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="3" style="padding:1rem;color:var(--muted)">Tidak ada data.</td>
+                                        <td colspan="{{ $module === 'daily' ? 5 : 3 }}" style="padding:1rem;color:var(--muted)">Tidak ada data.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -504,6 +575,24 @@
                 </div>
 
                 <div class="pw-b" style="padding:0">
+                    @if ($module === 'daily')
+                        <div class="pw-daily-toolbar">
+                            <label class="pw-daily-filter-field" for="pw-daily-day-filter">
+                                <span>Filter Hari</span>
+                                <select class="pw-daily-filter" id="pw-daily-day-filter">
+                                    <option value="all">Semua Hari</option>
+                                    <option value="1">Senin</option>
+                                    <option value="2">Selasa</option>
+                                    <option value="3">Rabu</option>
+                                    <option value="4">Kamis</option>
+                                    <option value="5">Jumat</option>
+                                    <option value="6">Sabtu</option>
+                                    <option value="0">Minggu</option>
+                                </select>
+                            </label>
+                            <span class="pw-daily-filter-count" id="pw-daily-filter-count">{{ $lines->count() }} baris</span>
+                        </div>
+                    @endif
                     <div class="pw-table-wrap {{ $module === 'daily' ? 'pw-daily-table-wrap' : '' }}">
                         @if ($module === 'daily')
                             @php
@@ -528,7 +617,7 @@
                                 </thead>
                                 <tbody>
                                     @forelse($lines as $l)
-                                        <tr>
+                                        <tr data-pw-day="{{ $l->work_date ? \Carbon\Carbon::parse($l->work_date)->dayOfWeek : '' }}">
                                             <td data-label="Tanggal" style="white-space:nowrap">
                                                 @if ($l->work_date)
                                                     @php $workDate = \Carbon\Carbon::parse($l->work_date)->locale('id'); @endphp
@@ -544,7 +633,7 @@
                                                     <span class="pw-chip">{{ $attendanceLabels[$l->attendance_status] ?? '-' }}</span>
                                                 @else
                                                     <form class="pw-daily-status-form" method="POST"
-                                                        action="{{ route('payroll.piecework.daily_line.update', ['module' => $module, 'period' => $period, 'line' => $l]) }}">
+                                                        action="{{ $moduleRoute('daily_line.update', ['period' => $period, 'line' => $l]) }}">
                                                         @csrf
                                                         @method('PATCH')
                                                         <select class="pw-daily-status" name="attendance_status" aria-label="Status kehadiran {{ $l->employee?->name }} {{ $l->work_date?->format('d/m/Y') }}">
@@ -610,3 +699,35 @@
         </div>
     </div>
 @endsection
+
+@if ($module === 'daily')
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const filter = document.getElementById('pw-daily-day-filter');
+                const count = document.getElementById('pw-daily-filter-count');
+                const rows = Array.from(document.querySelectorAll('.pw-daily-table tbody tr[data-pw-day]'));
+
+                if (!filter) return;
+
+                const updateRows = function () {
+                    const selectedDay = filter.value;
+                    let visibleRows = 0;
+
+                    rows.forEach(function (row) {
+                        const visible = selectedDay === 'all' || row.dataset.pwDay === selectedDay;
+                        row.hidden = !visible;
+                        if (visible) visibleRows += 1;
+                    });
+
+                    if (count) {
+                        count.textContent = visibleRows + ' baris';
+                    }
+                };
+
+                filter.addEventListener('change', updateRows);
+                updateRows();
+            });
+        </script>
+    @endpush
+@endif

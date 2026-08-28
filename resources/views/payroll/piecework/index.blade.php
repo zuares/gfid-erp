@@ -159,6 +159,15 @@
 @endpush
 
 @section('content')
+    @php
+        $moduleRoute = function (string $action, array $parameters = []) use ($module) {
+            if ($module === 'daily') {
+                return route("payroll.daily.{$action}", $parameters);
+            }
+
+            return route("payroll.piecework.{$action}", ['module' => $module] + $parameters);
+        };
+    @endphp
     <div class="pw-wrap">
         <div class="pw-top">
             <div>
@@ -167,7 +176,7 @@
             </div>
 
             <div class="pw-actions">
-                <a class="pw-btn primary" href="{{ route('payroll.piecework.create', ['module' => $module]) }}">＋ Generate</a>
+                <a class="pw-btn primary" href="{{ $moduleRoute('create') }}">＋ Generate</a>
             </div>
         </div>
 
@@ -177,12 +186,12 @@
                     <span class="pw-chip">Filter</span>
                 </div>
 
-                <form class="pw-row" method="GET" action="{{ route('payroll.piecework.index', ['module' => $module]) }}">
+                <form class="pw-row" method="GET" action="{{ $moduleRoute('index') }}">
                     <input class="pw-in" type="date" name="from" value="{{ request('from') }}">
                     <input class="pw-in" type="date" name="to" value="{{ request('to') }}">
                     <button class="pw-btn" type="submit">Terapkan</button>
                     @if (request()->filled('from') || request()->filled('to'))
-                        <a class="pw-btn" href="{{ route('payroll.piecework.index', ['module' => $module]) }}">Reset</a>
+                        <a class="pw-btn" href="{{ $moduleRoute('index') }}">Reset</a>
                     @endif
                 </form>
             </div>
@@ -224,7 +233,7 @@
                                 </td>
                                 <td class="pw-right pw-hide-sm">
                                     <a class="pw-btn"
-                                        href="{{ route('payroll.piecework.show', ['module' => $module, 'period' => $p]) }}">Detail</a>
+                                        href="{{ $moduleRoute('show', ['period' => $p]) }}">Detail</a>
                                 </td>
                             </tr>
                         @empty

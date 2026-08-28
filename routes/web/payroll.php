@@ -36,8 +36,13 @@ Route::middleware(['web', 'auth', 'access:payroll'])->group(function () {
     Route::post('payroll/piecework', [PieceworkPayrollController::class, 'storeOverview'])
         ->name('payroll.piecework.store_overview');
 
+    // Alias lama agar bookmark / link lama otomatis pindah ke URL Harian baru.
+    Route::get('payroll/piecework/daily/{period}', function ($period) {
+        return redirect()->route('payroll.daily.show', ['period' => $period]);
+    })->name('payroll.piecework.daily_legacy');
+
     Route::prefix('payroll/piecework/{module}')
-        ->whereIn('module', ['cutting', 'sewing', 'daily'])
+        ->whereIn('module', ['cutting', 'sewing'])
         ->name('payroll.piecework.')
         ->group(function () {
 
@@ -76,8 +81,46 @@ Route::middleware(['web', 'auth', 'access:payroll'])->group(function () {
             Route::post('/{period}/regenerate', [PieceworkPayrollController::class, 'regenerate'])
                 ->name('regenerate');
 
-            // UPDATE KEHADIRAN PAYROLL HARIAN (DRAFT SAJA)
-            Route::patch('/{period}/daily-line/{line}', [PieceworkPayrollController::class, 'updateDailyLine'])
+        });
+
+    /*
+    |--------------------------------------------------------------------------
+    | DAILY PAYROLL
+    |--------------------------------------------------------------------------
+    | Payroll harian memakai URL khusus agar tidak tampil sebagai piecework.
+    |--------------------------------------------------------------------------
+     */
+    Route::prefix('payroll/daily')
+        ->name('payroll.daily.')
+        ->group(function () {
+            Route::get('/', [PieceworkPayrollController::class, 'dailyIndex'])
+                ->name('index');
+
+            Route::get('/create', [PieceworkPayrollController::class, 'dailyCreate'])
+                ->name('create');
+
+            Route::post('/', [PieceworkPayrollController::class, 'dailyStore'])
+                ->name('store');
+
+            Route::get('/{period}', [PieceworkPayrollController::class, 'dailyShow'])
+                ->name('show');
+
+            Route::delete('/{period}', [PieceworkPayrollController::class, 'dailyDestroy'])
+                ->name('destroy');
+
+            Route::get('/{period}/slip/{employee}', [PieceworkPayrollController::class, 'dailySlip'])
+                ->name('slip');
+
+            Route::post('/{period}/finalize', [PieceworkPayrollController::class, 'dailyFinalize'])
+                ->name('finalize');
+
+            Route::post('/{period}/pay', [PieceworkPayrollController::class, 'dailyPay'])
+                ->name('pay');
+
+            Route::post('/{period}/regenerate', [PieceworkPayrollController::class, 'dailyRegenerate'])
+                ->name('regenerate');
+
+            Route::patch('/{period}/line/{line}', [PieceworkPayrollController::class, 'dailyLineUpdate'])
                 ->name('daily_line.update');
         });
 

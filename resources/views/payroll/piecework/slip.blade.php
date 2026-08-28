@@ -91,7 +91,12 @@
 @endpush
 
 @section('content')
-    @php($qtyLabel = $module === 'sewing' ? 'Qty Ambil' : 'Qty OK')
+    @php
+        $qtyLabel = $module === 'daily' ? 'Hari Dibayar' : ($module === 'sewing' ? 'Qty Ambil' : 'Qty OK');
+        $backUrl = $module === 'daily'
+            ? route('payroll.daily.show', ['period' => $period])
+            : route('payroll.piecework.show', ['module' => $module, 'period' => $period]);
+    @endphp
     <div class="pw-wrap">
         <div class="pw-card">
             <div class="pw-h">
@@ -103,7 +108,7 @@
                     </div>
                 </div>
                 <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-                    <a class="pw-btn" href="{{ route('payroll.piecework.show', ['module' => $module, 'period' => $period]) }}">←
+                    <a class="pw-btn" href="{{ $backUrl }}">←
                         Back</a>
                 </div>
             </div>

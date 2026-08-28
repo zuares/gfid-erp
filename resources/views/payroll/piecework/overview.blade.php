@@ -683,6 +683,13 @@
             'from' => request('from'),
             'to' => request('to'),
         ], fn($value) => $value !== null && $value !== ''));
+        $moduleRoute = function (string $module, string $action, $period) {
+            if ($module === 'daily') {
+                return route("payroll.daily.{$action}", ['period' => $period]);
+            }
+
+            return route("payroll.piecework.{$action}", ['module' => $module, 'period' => $period]);
+        };
         $defaultEnd = now()->toDateString();
         $defaultStart = now()->subDays(6)->toDateString();
     @endphp
@@ -739,7 +746,8 @@
                     </div>
                 @endif
 
-                <form class="pw-generate-form" method="POST" action="{{ route('payroll.piecework.store_overview') }}">
+                <form class="pw-generate-form" method="POST" action="{{ route('payroll.piecework.store_overview') }}"
+                    id="pw-generate-form" data-daily-action="{{ route('payroll.daily.store') }}">
                     @csrf
                     <div class="pw-field">
                         <label for="overview-module">Modul Payroll</label>
@@ -812,7 +820,7 @@
                                 $totalQty = (float) ($period->lines_total_qty ?? 0);
                                 $totalAmount = (float) ($period->lines_total_amount ?? $period->total_amount ?? 0);
                             @endphp
-                            <tr class="pw-period-row" data-pw-detail-url="{{ route('payroll.piecework.show', ['module' => $periodModule, 'period' => $period]) }}" tabindex="0">
+                            <tr class="pw-period-row" data-pw-detail-url="{{ $moduleRoute($periodModule, 'show', $period) }}" tabindex="0">
                                 <td class="pw-period-cell">
                                     <div class="pw-period-heading">
                                         <div class="pw-period-week">Minggu ke-{{ $periodWeek }} <span class="pw-sub" style="display:inline">· {{ $periodMonth }}</span></div>
@@ -833,9 +841,9 @@
                                 <td class="pw-right pw-number pw-amount">{{ number_format($totalAmount, 0, ',', '.') }}</td>
                                 <td class="pw-right pw-action">
                                     <div class="pw-action-wrap">
-                                        <a class="pw-btn" href="{{ route('payroll.piecework.show', ['module' => $periodModule, 'period' => $period]) }}">Detail</a>
+                                        <a class="pw-btn" href="{{ $moduleRoute($periodModule, 'show', $period) }}">Detail</a>
                                         @if ($period->status === 'draft' && ! $period->paid_at)
-                                            <form method="POST" action="{{ route('payroll.piecework.destroy', ['module' => $periodModule, 'period' => $period]) }}"
+                                            <form method="POST" action="{{ $moduleRoute($periodModule, 'destroy', $period) }}"
                                                 onsubmit="return confirm('Hapus payroll periode ini? Data detail payroll juga akan dihapus.');">
                                                 @csrf
                                                 @method('DELETE')
@@ -869,7 +877,7 @@
                         $totalQty = (float) ($period->lines_total_qty ?? 0);
                         $totalAmount = (float) ($period->lines_total_amount ?? $period->total_amount ?? 0);
                     @endphp
-                    <article class="pw-period-card" data-pw-detail-url="{{ route('payroll.piecework.show', ['module' => $periodModule, 'period' => $period]) }}" tabindex="0">
+                    <article class="pw-period-card" data-pw-detail-url="{{ $moduleRoute($periodModule, 'show', $period) }}" tabindex="0">
                         <div class="pw-period-card-top">
                             <span class="pw-chip {{ $periodModule }}">{{ $moduleLabels[$periodModule] ?? ucfirst($periodModule) }}</span>
                             @if ($period->status === 'final')
@@ -898,9 +906,9 @@
                                 <span></span>
                             @endif
                             <div class="pw-period-card-actions">
-                                <a class="pw-btn" href="{{ route('payroll.piecework.show', ['module' => $periodModule, 'period' => $period]) }}">Detail</a>
+                                <a class="pw-btn" href="{{ $moduleRoute($periodModule, 'show', $period) }}">Detail</a>
                                 @if ($period->status === 'draft' && ! $period->paid_at)
-                                    <form method="POST" action="{{ route('payroll.piecework.destroy', ['module' => $periodModule, 'period' => $period]) }}"
+                                    <form method="POST" action="{{ $moduleRoute($periodModule, 'destroy', $period) }}"
                                         onsubmit="return confirm('Hapus payroll periode ini? Data detail payroll juga akan dihapus.');">
                                         @csrf
                                         @method('DELETE')
@@ -941,6 +949,19 @@
                     navigateToDetail();
                 });
             });
+
+            const generateForm = document.getElementById('pw-generate-form');
+            const generateModule = document.getElementById('overview-module');
+            if (generateForm && generateModule) {
+                const overviewAction = generateForm.action;
+                const dailyAction = generateForm.dataset.dailyAction;
+                const syncGenerateAction = function () {
+                    generateForm.action = generateModule.value === 'daily' ? dailyAction : overviewAction;
+                };
+
+                generateModule.addEventListener('change', syncGenerateAction);
+                syncGenerateAction();
+            }
 
             if (typeof window.flatpickr !== 'function') return;
 

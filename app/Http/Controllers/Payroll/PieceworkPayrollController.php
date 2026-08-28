@@ -50,6 +50,16 @@ class PieceworkPayrollController extends Controller
         return $map[$module] + ['module' => $module];
     }
 
+    private function moduleRoute(string $module, string $action, array $parameters = []): string
+    {
+        if ($module === 'daily') {
+            unset($parameters['module']);
+            return route("payroll.daily.{$action}", $parameters);
+        }
+
+        return route("payroll.piecework.{$action}", ['module' => $module] + $parameters);
+    }
+
     /**
      * OVERVIEW: daftar periode cutting + sewing dalam satu halaman.
      */
@@ -196,7 +206,7 @@ class PieceworkPayrollController extends Controller
         if ($existing && $existing->status === 'final') {
             $redirect = $returnToOverview
                 ? redirect()->route('payroll.piecework.overview', ['module' => $cfg['module']])
-                : redirect()->route('payroll.piecework.show', [$cfg['module'], $existing]);
+                : redirect()->to($this->moduleRoute($cfg['module'], 'show', ['period' => $existing]));
 
             return $redirect
                 ->with('error', "Periode payroll {$cfg['label']} ini sudah FINAL, tidak bisa digenerate ulang.");
@@ -228,8 +238,7 @@ class PieceworkPayrollController extends Controller
                 ->with('status', $message);
         }
 
-        return redirect()
-            ->route('payroll.piecework.show', [$cfg['module'], $period])
+        return redirect()->to($this->moduleRoute($cfg['module'], 'show', ['period' => $period]))
             ->with('status', $message);
     }
 
@@ -280,6 +289,8 @@ class PieceworkPayrollController extends Controller
                         'employee_id' => $employee?->id,
                         'employee_name' => $employee?->name ?? '-',
                         'total_qty' => (float) $group->sum('attendance_factor'),
+                        'present_count' => $group->where('attendance_status', 'hadir')->count(),
+                        'holiday_count' => $group->where('attendance_status', 'libur')->count(),
                         'total_amount' => (float) $group->sum('amount'),
                     ];
                 })
@@ -356,6 +367,62 @@ class PieceworkPayrollController extends Controller
         });
 
         return back()->with('status', 'Kehadiran payroll harian berhasil disimpan.');
+    }
+
+    public function dailyIndex(Request $request): View
+    {
+        return $this->index($request, 'daily');
+    }
+
+    public function dailyCreate(Request $request): View
+    {
+        return $this->create($request, 'daily');
+    }
+
+    public function dailyStore(Request $request): RedirectResponse
+    {
+        if (! $this->dailyPayrollSchemaReady()) {
+            return back()
+                ->withInput()
+                ->with('error', 'Fitur payroll harian belum siap di server. Jalankan migration database terlebih dahulu.');
+        }
+
+        return $this->store($request, 'daily');
+    }
+
+    public function dailyShow(PieceworkPayrollPeriod $period): View
+    {
+        return $this->show('daily', $period);
+    }
+
+    public function dailySlip(PieceworkPayrollPeriod $period, int $employeeId): View
+    {
+        return $this->slip('daily', $period, $employeeId);
+    }
+
+    public function dailyDestroy(PieceworkPayrollPeriod $period): RedirectResponse
+    {
+        return $this->destroy('daily', $period);
+    }
+
+    public function dailyFinalize(PieceworkPayrollPeriod $period, PieceworkPayrollPostingService $svc): RedirectResponse
+    {
+        return $this->finalize('daily', $period, $svc);
+    }
+
+    public function dailyPay(Request $request, PieceworkPayrollPeriod $period, PieceworkPayrollPostingService $svc): RedirectResponse
+    {
+        return $this->pay($request, 'daily', $period, $svc);
+    }
+
+    public function dailyRegenerate(PieceworkPayrollPeriod $period): RedirectResponse
+    {
+        return $this->regenerate('daily', $period);
+    }
+
+    public function dailyLineUpdate(Request $request, PieceworkPayrollPeriod $period, PieceworkPayrollLine $line): RedirectResponse
+    {
+        return $this->updateDailyLine($request, 'daily', $period, $line);
     }
 
     /**
@@ -447,7 +514,7 @@ class PieceworkPayrollController extends Controller
 
         if ($cfg['module'] === 'daily' && $period->lines()->where('attendance_status', 'pending')->exists()) {
             return redirect()
-                ->route('payroll.piecework.show', [$cfg['module'], $period])
+                ->to($this->moduleRoute($cfg['module'], 'show', ['period' => $period]))
                 ->with('error', 'Lengkapi status kehadiran payroll harian sebelum difinalkan.');
         }
 
@@ -455,11 +522,11 @@ class PieceworkPayrollController extends Controller
             $svc->finalize($period);
 
             return redirect()
-                ->route('payroll.piecework.show', [$cfg['module'], $period])
+                ->to($this->moduleRoute($cfg['module'], 'show', ['period' => $period]))
                 ->with('status', "Periode payroll {$cfg['label']} berhasil difinalkan (HPP + Hutang dicatat).");
         } catch (\Throwable $e) {
             return redirect()
-                ->route('payroll.piecework.show', [$cfg['module'], $period])
+                ->to($this->moduleRoute($cfg['module'], 'show', ['period' => $period]))
                 ->with('error', $e->getMessage());
         }
     }
@@ -480,11 +547,11 @@ class PieceworkPayrollController extends Controller
             $svc->pay($period, (int) $data['paid_from_account_id']);
 
             return redirect()
-                ->route('payroll.piecework.show', [$cfg['module'], $period])
+                ->to($this->moduleRoute($cfg['module'], 'show', ['period' => $period]))
                 ->with('status', "Pembayaran payroll {$cfg['label']} berhasil dicatat (Hutang dilunasi).");
         } catch (\Throwable $e) {
             return redirect()
-                ->route('payroll.piecework.show', [$cfg['module'], $period])
+                ->to($this->moduleRoute($cfg['module'], 'show', ['period' => $period]))
                 ->with('error', $e->getMessage());
         }
     }
@@ -499,7 +566,7 @@ class PieceworkPayrollController extends Controller
 
         if ($period->status === 'final') {
             return redirect()
-                ->route('payroll.piecework.show', [$cfg['module'], $period])
+                ->to($this->moduleRoute($cfg['module'], 'show', ['period' => $period]))
                 ->with('error', 'Periode yang sudah FINAL tidak boleh digenerate ulang.');
         }
 
@@ -513,7 +580,7 @@ class PieceworkPayrollController extends Controller
         );
 
         return redirect()
-            ->route('payroll.piecework.show', [$cfg['module'], $period])
+            ->to($this->moduleRoute($cfg['module'], 'show', ['period' => $period]))
             ->with('status', "Payroll {$cfg['label']} berhasil digenerate ulang.");
     }
 

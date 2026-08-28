@@ -95,6 +95,14 @@
 @endpush
 
 @section('content')
+    @php
+        $storeRoute = $module === 'daily'
+            ? route('payroll.daily.store')
+            : route('payroll.piecework.store', ['module' => $module]);
+        $indexRoute = $module === 'daily'
+            ? route('payroll.daily.index')
+            : route('payroll.piecework.index', ['module' => $module]);
+    @endphp
     <div class="pw-wrap">
         <div class="pw-card">
             <div class="pw-h">
@@ -114,7 +122,7 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('payroll.piecework.store', ['module' => $module]) }}">
+                <form method="POST" action="{{ $storeRoute }}">
                     @csrf
 
                     <div class="pw-row">
@@ -133,7 +141,7 @@
 
                     <div class="pw-actions">
                         <button class="pw-btn primary" type="submit">Generate</button>
-                        <a class="pw-btn" href="{{ route('payroll.piecework.index', ['module' => $module]) }}">Kembali</a>
+                        <a class="pw-btn" href="{{ $indexRoute }}">Kembali</a>
                     </div>
                 </form>
             </div>
