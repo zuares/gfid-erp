@@ -136,10 +136,11 @@ class MarketplaceEscrowTest extends TestCase
                 ->withArgs(fn (Store $actual, array $orderSns): bool => $actual->is($store)
                     && $orderSns === ['ORDER-1', 'ORDER-2'])
                 ->andReturn([
-                    'escrow_detail_list' => [
+                    'response' => [
                         [
                             'escrow_detail' => [
                                 'order_sn' => 'ORDER-1',
+                                'buyer_payment_info' => ['shipping_fee' => 2000],
                                 'buyer_user_name' => 'buyer-1',
                                 'order_income' => ['escrow_amount' => 50000],
                             ],
@@ -159,6 +160,7 @@ class MarketplaceEscrowTest extends TestCase
         ])
             ->assertOk()
             ->assertJsonPath('data.details.ORDER-1.income.escrow_amount', 50000)
+            ->assertJsonPath('data.details.ORDER-1.income.shipping_fee', 2000)
             ->assertJsonPath('data.failed.ORDER-2.error', 'order_not_found')
             ->assertJsonMissingPath('data.raw_response._meta');
     }

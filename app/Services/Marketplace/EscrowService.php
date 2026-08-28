@@ -120,7 +120,16 @@ class EscrowService
         $response = $this->gateway->getEscrowDetailBatch($store, $orderSns);
         $this->assertSuccessfulResponse($response);
 
-        $rows = data_get($response, 'response.escrow_detail_list');
+        // Bentuk response resmi batch adalah response: [{escrow_detail: ...}].
+        // Beberapa gateway/versi lama membungkusnya sebagai escrow_detail_list,
+        // jadi kedua bentuk harus diterima agar detail tidak diam-diam kosong.
+        $rows = data_get($response, 'response');
+        if (is_array($rows) && array_key_exists('escrow_detail_list', $rows)) {
+            $rows = $rows['escrow_detail_list'];
+        }
+        if (is_array($rows) && ! array_is_list($rows) && isset($rows['escrow_detail'])) {
+            $rows = [$rows];
+        }
         if (! is_array($rows)) {
             $rows = data_get($response, 'escrow_detail_list', []);
         }
@@ -233,12 +242,22 @@ class EscrowService
             $income = [];
         }
 
+        // Batch response juga membawa buyer_payment_info di luar order_income.
+        // Gabungkan field-nya supaya tabel dinamis tetap menampilkan seluruh
+        // informasi accounting yang dikembalikan Shopee tanpa menimpa nilai
+        // order_income yang lebih spesifik.
+        $buyerPaymentInfo = $root['buyer_payment_info'] ?? [];
+        if (is_array($buyerPaymentInfo)) {
+            $income = array_merge($buyerPaymentInfo, $income);
+        }
+
         return [
             'order_sn' => (string) ($root['order_sn'] ?? $orderSn),
             'buyer_user_name' => $root['buyer_user_name'] ?? null,
             'return_order_sn_list' => is_array($root['return_order_sn_list'] ?? null)
                 ? array_values($root['return_order_sn_list'])
                 : [],
+            'buyer_payment_info' => is_array($buyerPaymentInfo) ? $buyerPaymentInfo : [],
             'income' => $income,
             'raw_response' => $this->withoutMeta($rawResponse),
         ];
