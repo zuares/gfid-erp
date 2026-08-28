@@ -203,6 +203,32 @@
             white-space: nowrap
         }
 
+        .pw-daily-day {
+            color: var(--text);
+            font-size: .78rem;
+            font-weight: 750;
+            line-height: 1.25
+        }
+
+        .pw-daily-date {
+            margin-top: .12rem;
+            color: var(--muted);
+            font-size: .72rem;
+            line-height: 1.25
+        }
+
+        .pw-daily-table {
+            font-size: .82rem
+        }
+
+        .pw-daily-table th {
+            white-space: nowrap
+        }
+
+        .pw-daily-table td {
+            vertical-align: middle
+        }
+
         .pw-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -242,6 +268,76 @@
             .pw-daily-status {
                 flex: 1;
                 min-width: 0
+            }
+
+            .pw-daily-table-wrap {
+                overflow: visible
+            }
+
+            .pw-daily-table,
+            .pw-daily-table tbody,
+            .pw-daily-table tr,
+            .pw-daily-table td {
+                display: block;
+                width: 100%;
+                box-sizing: border-box
+            }
+
+            .pw-daily-table {
+                font-size: .8rem
+            }
+
+            .pw-daily-table thead {
+                display: none
+            }
+
+            .pw-daily-table tbody tr {
+                padding: .7rem .75rem;
+                border-bottom: 1px solid rgba(148, 163, 184, .15)
+            }
+
+            .pw-daily-table tbody tr:last-child {
+                border-bottom: 0
+            }
+
+            .pw-daily-table tbody td {
+                display: grid;
+                grid-template-columns: 7rem minmax(0, 1fr);
+                gap: .65rem;
+                align-items: center;
+                padding: .32rem 0;
+                border: 0;
+                text-align: left
+            }
+
+            .pw-daily-table tbody td::before {
+                content: attr(data-label);
+                color: var(--muted);
+                font-size: .68rem;
+                font-weight: 700;
+                letter-spacing: .02em
+            }
+
+            .pw-daily-table tbody td.pw-daily-action-cell {
+                display: block;
+                padding-top: .55rem
+            }
+
+            .pw-daily-table tbody td.pw-daily-action-cell::before {
+                display: none
+            }
+
+            .pw-daily-table .pw-daily-status-form {
+                margin: 0;
+                width: 100%
+            }
+
+            .pw-daily-table .pw-daily-save {
+                min-height: 34px
+            }
+
+            .pw-daily-table .pw-right {
+                text-align: left
             }
         }
     </style>
@@ -408,7 +504,7 @@
                 </div>
 
                 <div class="pw-b" style="padding:0">
-                    <div class="pw-table-wrap">
+                    <div class="pw-table-wrap {{ $module === 'daily' ? 'pw-daily-table-wrap' : '' }}">
                         @if ($module === 'daily')
                             @php
                                 $attendanceLabels = [
@@ -420,7 +516,7 @@
                                     'libur' => 'Libur',
                                 ];
                             @endphp
-                            <table class="pw-table">
+                            <table class="pw-table pw-daily-table">
                                 <thead>
                                     <tr>
                                         <th>Tanggal</th>
@@ -433,11 +529,17 @@
                                 <tbody>
                                     @forelse($lines as $l)
                                         <tr>
-                                            <td style="font-weight:700;white-space:nowrap">
-                                                {{ $l->work_date ? \Carbon\Carbon::parse($l->work_date)->locale('id')->translatedFormat('l, d/m/Y') : '-' }}
+                                            <td data-label="Tanggal" style="white-space:nowrap">
+                                                @if ($l->work_date)
+                                                    @php $workDate = \Carbon\Carbon::parse($l->work_date)->locale('id'); @endphp
+                                                    <div class="pw-daily-day">{{ $workDate->translatedFormat('l') }}</div>
+                                                    <div class="pw-daily-date">{{ $workDate->format('d/m/Y') }}</div>
+                                                @else
+                                                    <span class="pw-daily-date">-</span>
+                                                @endif
                                             </td>
-                                            <td style="font-weight:700">{{ $l->employee?->name ?? '-' }}</td>
-                                            <td>
+                                            <td data-label="Operator" style="font-weight:700">{{ $l->employee?->name ?? '-' }}</td>
+                                            <td data-label="Status Kehadiran">
                                                 @if ($period->status === 'final' || $period->paid_at)
                                                     <span class="pw-chip">{{ $attendanceLabels[$l->attendance_status] ?? '-' }}</span>
                                                 @else
@@ -454,10 +556,10 @@
                                                     </form>
                                                 @endif
                                             </td>
-                                            <td class="pw-right" style="white-space:nowrap">
+                                            <td data-label="Tarif / Hari" class="pw-right" style="white-space:nowrap">
                                                 {{ number_format((float) ($l->rate_per_day ?: $l->rate_per_pcs), 0, ',', '.') }}
                                             </td>
-                                            <td class="pw-right" style="font-weight:800;white-space:nowrap">
+                                            <td data-label="Total" class="pw-right" style="font-weight:800;white-space:nowrap">
                                                 {{ number_format((float) $l->amount, 0, ',', '.') }}
                                             </td>
                                         </tr>
