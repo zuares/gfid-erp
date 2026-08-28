@@ -250,8 +250,9 @@
         }
 
         .pw-period-main {
-            font-size: .81rem;
-            font-weight: 800;
+            color: var(--muted);
+            font-size: .76rem;
+            font-weight: 650;
             white-space: nowrap
         }
 
@@ -494,7 +495,7 @@
             }
 
             .pw-period-main {
-                font-size: .79rem;
+                font-size: .77rem;
                 white-space: normal
             }
         }
@@ -750,7 +751,7 @@
                                 <span>Qty</span>
                                 <strong>{{ rtrim(rtrim(number_format($totalQty, 2, '.', ''), '0'), '.') }}</strong>
                             </div>
-                            <div class="pw-period-stat-wide">
+                            <div>
                                 <span>Total Amount</span>
                                 <strong>{{ number_format($totalAmount, 0, ',', '.') }}</strong>
                             </div>
