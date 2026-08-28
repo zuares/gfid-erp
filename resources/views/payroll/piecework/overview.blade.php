@@ -374,8 +374,11 @@
         }
 
         .pw-chip.draft {
-            border-color: rgba(245, 158, 11, .35);
-            color: rgb(217, 119, 6)
+            border-color: rgba(148, 163, 184, .3);
+            color: var(--muted);
+            background: rgba(148, 163, 184, .08);
+            font-size: .68rem;
+            font-weight: 700
         }
 
         .pw-generate {
@@ -469,7 +472,8 @@
         .pw-generate-form {
             display: grid;
             grid-template-columns: minmax(0, .85fr) minmax(0, 1.25fr) minmax(125px, .65fr);
-            gap: 1.25rem;
+            column-gap: 1.5rem;
+            row-gap: 1rem;
             padding: .15rem .1rem 0;
             align-items: end
         }
@@ -841,14 +845,7 @@
                                 <span class="pw-chip draft">DRAFT</span>
                             @endif
                         </div>
-                        <div class="pw-period-heading">
-                            <div class="pw-period-week">Minggu ke-{{ $periodWeek }} <span class="pw-sub">· {{ $periodMonth }}</span></div>
-                            @if ($period->status === 'final')
-                                <span class="pw-chip final">FINAL</span>
-                            @else
-                                <span class="pw-chip draft">DRAFT</span>
-                            @endif
-                        </div>
+                        <div class="pw-period-week">Minggu ke-{{ $periodWeek }} <span class="pw-sub">· {{ $periodMonth }}</span></div>
                         <div class="pw-period-main">{{ $periodDateRange }}</div>
                         <div class="pw-period-meta">ID #{{ $period->id }} · {{ number_format($operatorCount, 0, ',', '.') }} operator · {{ $isSewing ? 'Ambil Jahit' : 'Qty PCS / QC OK' }} @if ($period->paid_at) · Sudah dibayar @endif</div>
                         <div class="pw-period-stats">
