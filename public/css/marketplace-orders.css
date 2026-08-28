@@ -643,6 +643,24 @@ body[data-theme="dark"] .ord-item-price del { color: #64748b; }
     font-size: .72rem; color: #d97706; background: #fef3c7;
     border-radius: 5px; padding: .1rem .4rem; display: inline-block; font-weight: 700;
 }
+.ord-rrc-type {
+    display: inline-flex; align-items: center; width: fit-content; padding: .13rem .4rem;
+    border: 1px solid; border-radius: 999px; font-size: .61rem; font-weight: 800; line-height: 1.35;
+}
+.ord-rrc-type.return { color: #3730a3; background: #e0e7ff; border-color: #c7d2fe; }
+.ord-rrc-type.refund { color: #854d0e; background: #fef9c3; border-color: #fde68a; }
+.ord-rrc-type.cancel { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
+.ord-rrc-order { margin-top: .18rem; color: #64748b; font-size: .65rem; }
+.ord-rrc-reason { margin-top: .35rem; color: #a16207; font-size: .64rem; line-height: 1.45; }
+.ord-rrc-resi { margin-top: .38rem; color: #047857; font-size: .62rem; font-weight: 800; overflow-wrap: anywhere; }
+.ord-rrc-resi.pending { color: #a16207; font-weight: 650; }
+.ord-rrc-amount { color: #dc2626; font-size: .75rem; font-weight: 850; text-align: right; white-space: nowrap; }
+body[data-theme="dark"] .ord-rrc-type.return { color: #c7d2fe; background: rgba(55,48,163,.26); border-color: rgba(165,180,252,.35); }
+body[data-theme="dark"] .ord-rrc-type.refund { color: #fde68a; background: rgba(133,77,14,.24); border-color: rgba(253,230,138,.3); }
+body[data-theme="dark"] .ord-rrc-type.cancel { color: #fecaca; background: rgba(153,27,27,.25); border-color: rgba(254,202,202,.3); }
+body[data-theme="dark"] .ord-rrc-order { color: #94a3b8; }
+body[data-theme="dark"] .ord-rrc-resi { color: #6ee7b7; }
+body[data-theme="dark"] .ord-rrc-resi.pending { color: #fde68a; }
 
 @media (max-width: 640px) {
     .ord-card-meta .ord-id { font-size: .8rem; }

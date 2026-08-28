@@ -960,13 +960,12 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         }
 
         const kindBadge = (kind) => {
-            if (kind === 'cancel') return `<span style="font-size:.65rem;background:#fee2e2;color:#991b1b;border-radius:99px;padding:2px 8px;font-weight:800;">🚫 Batal</span>`;
-            if (kind === 'refund') return `<span style="font-size:.65rem;background:#fef9c3;color:#854d0e;border-radius:99px;padding:2px 8px;font-weight:800;">💸 Refund</span>`;
-            return `<span style="font-size:.65rem;background:#e0e7ff;color:#3730a3;border-radius:99px;padding:2px 8px;font-weight:800;">↩️ Retur</span>`;
+            if (kind === 'cancel') return '<span class="ord-rrc-type cancel">🚫 Batal</span>';
+            if (kind === 'refund') return '<span class="ord-rrc-type refund">💸 Refund</span>';
+            return '<span class="ord-rrc-type return">↩️ Retur</span>';
         };
 
-        const cards = rows.map(r => {
-            const itemsHtml = (r.items || []).map(it => `
+        const itemsHtml = (items) => (items || []).map(it => `
                 <div class="ord-item-card">
                     ${itemImageHtml(it)}
                     <div class="ord-item-qty">${it.quantity || 0}×</div>
@@ -975,10 +974,20 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                         ${it.variation_name ? `<div class="ord-item-variant">${esc(it.variation_name)}</div>` : ''}
                         ${(it.variation_sku || it.item_sku) ? `<div class="ord-item-variant" style="color:#94a3b8">SKU: ${esc(it.variation_sku || it.item_sku)}</div>` : ''}
                     </div>
-                </div>`).join('');
+                </div>`).join('') || '<span class="ord-payment-empty">—</span>';
 
-            const idLabel = r.return_sn || r.order_sn || '—';
-            const amount = r.amount ? ('Rp ' + Number(r.amount).toLocaleString('id-ID')) : '';
+        const statusHtml = (r) => {
+            const status = String(r.status || 'Menunggu proses');
+            const isDone = ['COMPLETED', 'REFUND_PAID', 'CLOSED'].includes(status);
+            const isCancelled = ['CANCELLED', 'REJECTED'].includes(status);
+            const className = isDone ? 'st-posted' : (isCancelled ? 'st-cancelled' : 'st-submitted');
+            return `<span class="badge-status ${className}">${esc(status)}</span>`;
+        };
+
+        const mobileCards = rows.map(r => {
+            const returnNo = r.return_sn || '—';
+            const orderNo = r.order_sn || '—';
+            const amount = Number(r.amount || 0);
 
             return `
             <div class="ord-card" style="padding:12px;margin-bottom:10px;">
@@ -986,23 +995,55 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                     <div style="min-width:180px">
                         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
                             ${kindBadge(r.kind)}
-                            <span style="font-weight:800;font-size:.85rem">${esc(idLabel)}</span>
+                            <span style="font-weight:800;font-size:.85rem">${esc(returnNo)}</span>
                         </div>
-                        <div style="font-size:.7rem;color:#64748b">Order: ${esc(r.order_sn || '—')}</div>
+                        <div style="font-size:.7rem;color:#64748b">Order: ${orderCopyHtml(orderNo)}</div>
                         <div style="font-size:.7rem;color:#94a3b8">${fmtUnix(r.create_time)} · ${esc(r.store_name || '')}</div>
-                        ${r.status ? `<div style="margin-top:4px"><span style="font-size:.65rem;background:#f1f5f9;color:#475569;border-radius:4px;padding:1px 6px;font-weight:700">${esc(r.status)}</span></div>` : ''}
+                        <div style="margin-top:4px">${statusHtml(r)}</div>
                         ${r.reason ? `<div style="margin-top:4px;font-size:.7rem;color:#b45309">Alasan: ${esc(r.reason)}</div>` : ''}
-                        ${r.tracking_number ? `<div style="margin-top:4px;font-size:.65rem;color:#059669;font-weight:700">Resi: ${esc(r.tracking_number)}</div>` : ''}
+                        ${r.tracking_number ? `<div class="ord-rrc-resi">↩ Resi pengembalian: ${esc(r.tracking_number)}</div>` : ''}
                     </div>
                     <div style="text-align:right;min-width:120px">
-                        ${amount ? `<div style="font-weight:800;color:#dc2626;font-size:.9rem">${amount}</div>` : ''}
+                        <div class="ord-rrc-amount">${esc(fmtRp(amount))}</div>
                     </div>
                 </div>
-                ${itemsHtml ? `<div class="ord-items-cell" style="margin-top:8px">${itemsHtml}</div>` : ''}
+                <div class="ord-items-cell" style="margin-top:8px">${itemsHtml(r.items)}</div>
             </div>`;
         }).join('');
 
-        body.innerHTML = warn + cards;
+        if (isMobile()) {
+            body.innerHTML = warn + mobileCards;
+            return;
+        }
+
+        const tableRows = rows.map(r => {
+            const returnNo = r.return_sn || '—';
+            const orderNo = r.order_sn || '—';
+            const amount = Number(r.amount || 0);
+            return `<tr>
+                <td>
+                    <div class="ord-id">${esc(returnNo)}</div>
+                    <div class="ord-rrc-order">Order ${orderCopyHtml(orderNo)}</div>
+                    <div class="ord-date">${esc(fmtUnix(r.create_time))} · ${esc(r.store_name || '—')}</div>
+                </td>
+                <td><div class="ord-items-cell">${itemsHtml(r.items)}</div></td>
+                <td>
+                    ${kindBadge(r.kind)}
+                    ${r.reason ? `<div class="ord-rrc-reason">${esc(r.reason)}</div>` : '<span class="ord-payment-empty">—</span>'}
+                </td>
+                <td>
+                    ${statusHtml(r)}
+                    ${r.tracking_number ? `<div class="ord-rrc-resi">↩ ${esc(r.tracking_number)}</div>` : '<div class="ord-rrc-resi pending">Resi pengembalian belum tersedia</div>'}
+                </td>
+                <td class="ord-rrc-amount">${esc(fmtRp(amount))}</td>
+            </tr>`;
+        }).join('');
+
+        body.innerHTML = `${warn}<div style="overflow:auto"><table class="ord-table ord-rrc-table">
+            <colgroup><col class="col-order"><col class="col-items-sm"><col class="col-store-sm"><col class="col-status"><col class="col-total"></colgroup>
+            <thead><tr><th>Retur / Pesanan</th><th>Item Produk</th><th>Tipe & Alasan</th><th>Status Pengembalian</th><th>Nilai Refund</th></tr></thead>
+            <tbody>${tableRows}</tbody>
+        </table></div>`;
     }
 
     // ── Tab Sync: status sinkronisasi per toko + riwayat sync ─────────────
