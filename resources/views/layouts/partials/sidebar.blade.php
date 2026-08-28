@@ -2438,7 +2438,7 @@
                         @if ($hasPieceworkIndex)
                             <x-sidebar.sub-link href="{{ route('payroll.piecework.overview') }}" icon="bi bi-cash-coin"
                                 :active="$pieceworkActive">
-                                Payroll Borongan
+                                Payroll
                             </x-sidebar.sub-link>
                         @endif
 

@@ -2279,7 +2279,7 @@
                             @if ($hasPieceworkIndex)
                                 <a href="{{ route('payroll.piecework.overview') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ $pieceworkActive ? 'active' : '' }}">
-                                    <span class="icon">💰</span><span>Payroll Borongan</span>
+                                    <span class="icon">💰</span><span>Payroll</span>
                                 </a>
                             @endif
 
