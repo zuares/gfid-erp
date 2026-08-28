@@ -441,14 +441,14 @@
         }
 
         .pw-generate-body {
-            padding: .95rem 1rem 1rem
+            padding: 1rem 1.05rem 1.05rem
         }
 
         .pw-generate-note {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: .4rem;
-            margin-bottom: .85rem;
+            margin-bottom: 1rem;
             color: var(--muted);
             font-size: .8rem
         }
@@ -468,9 +468,19 @@
 
         .pw-generate-form {
             display: grid;
-            grid-template-columns: minmax(190px, .8fr) minmax(280px, 1.4fr) auto;
-            gap: .75rem;
+            grid-template-columns: minmax(180px, .85fr) minmax(300px, 1.35fr) minmax(145px, auto);
+            gap: 1rem;
             align-items: end
+        }
+
+        .pw-field {
+            min-width: 0
+        }
+
+        .pw-generate-form .pw-in,
+        .pw-generate-form .pw-select {
+            width: 100%;
+            min-width: 0
         }
 
         .pw-field label {
@@ -487,14 +497,16 @@
         }
 
         .pw-submit {
-            min-height: 36px;
+            min-height: 38px;
+            min-width: 145px;
             white-space: nowrap;
             justify-content: center
         }
 
         @media (max-width: 800px) {
             .pw-generate-form {
-                grid-template-columns: 1fr 1fr
+                grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+                gap: .85rem
             }
 
             .pw-range-field {
@@ -560,19 +572,63 @@
             }
 
             .pw-generate-form {
-                grid-template-columns: 1fr
+                grid-template-columns: minmax(0, 1fr);
+                gap: .75rem
             }
 
             .pw-range-field {
                 grid-column: auto
             }
 
-            .pw-generate-heading {
-                gap: .5rem
+            .pw-generate-body {
+                padding: .85rem
             }
 
+            .pw-generate-form .pw-date-range {
+                min-width: 0
+            }
+
+            .pw-generate-heading {
+                flex: 1 1 auto;
+                gap: .5rem;
+                min-width: 0
+            }
+
+            .pw-generate-summary {
+                align-items: flex-start;
+                gap: .6rem
+            }
+
+            .pw-generate-copy {
+                min-width: 0
+            }
+
+            .pw-generate-title,
             .pw-generate-copy .pw-sub {
-                max-width: 215px
+                max-width: none;
+                white-space: normal;
+                overflow: visible;
+                text-overflow: clip
+            }
+
+            .pw-generate-meta {
+                flex: 0 0 auto
+            }
+
+            .pw-card-h > .pw-row {
+                width: 100%;
+                min-width: 0
+            }
+
+            .pw-card-h > .pw-row .pw-date-range {
+                flex: 1 1 100%;
+                width: 100%;
+                min-width: 0
+            }
+
+            .pw-card-h > .pw-row .pw-btn {
+                flex: 1 1 auto;
+                justify-content: center
             }
         }
     </style>
@@ -856,9 +912,11 @@
 
             if (typeof window.flatpickr !== 'function') return;
 
-            const localeId = window.flatpickr.l10ns && window.flatpickr.l10ns.id
-                ? window.flatpickr.l10ns.id
-                : 'default';
+            const localeId = Object.assign(
+                {},
+                (window.flatpickr.l10ns && window.flatpickr.l10ns.id) || {},
+                { firstDayOfWeek: 1 }
+            );
 
             function parse(value) {
                 return value ? window.flatpickr.parseDate(value, 'Y-m-d') : null;
@@ -867,7 +925,7 @@
             function formatRange(dates) {
                 if (!dates.length) return '';
 
-                const format = date => window.flatpickr.formatDate(date, 'j M Y');
+                const format = date => window.flatpickr.formatDate(date, 'd/m/Y');
                 if (dates.length === 1) return format(dates[0]);
 
                 return format(dates[0]) + ' – ' + format(dates[1]);
