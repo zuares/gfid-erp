@@ -300,7 +300,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             ${orderStatusBadge(o.order_status)}
             ${storeName ? `<span class="ord-order-store">🏪 ${esc(storeName)}</span>` : ''}
             ${channel ? channelPill(channel) : ''}
-            ${repeatBuyer ? `<span class="ord-repeat-badge" title="Pembeli ini sudah pernah melakukan ${repeatOrder} pembelian sebelumnya">🔁 Repeat order · ke-${repeatOrder + 1}</span>` : ''}
+            ${repeatBuyer ? `<span class="ord-repeat-badge" role="button" tabindex="0" title="Lihat ${repeatOrder} order selesai sebelumnya" onclick="event.stopPropagation(); window.showRepeatOrderHistory(${o.id})" onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); event.stopPropagation(); window.showRepeatOrderHistory(${o.id}); }">🔁 Repeat order · ke-${repeatOrder + 1}</span>` : ''}
         </div>`;
     }
 
@@ -3257,6 +3257,54 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     // ── Order Details ────────────────────────────────────────────────────
     window.showOrderDetail = function(orderId) {
         window.location.href = `/marketplace/orders/${orderId}`;
+    };
+
+    window.showRepeatOrderHistory = async function(orderId) {
+        if (!orderId) return;
+
+        if (typeof Swal === 'undefined') {
+            window.showOrderDetail(orderId);
+            return;
+        }
+
+        Swal.fire({
+            title: 'Riwayat Repeat Order',
+            html: '<div style="padding:1rem;color:#64748b">Memuat order selesai sebelumnya…</div>',
+            showConfirmButton: false,
+            showCloseButton: true,
+            width: 620,
+        });
+
+        try {
+            const response = await api(`/api/marketplace/local-orders/${orderId}/buyer-completed-orders`);
+            const history = Array.isArray(response.data) ? response.data : [];
+            const buyer = response.buyer_label || 'Pembeli';
+            const rows = history.map((previousOrder) => {
+                const itemText = (previousOrder.items || []).map((item) => {
+                    const label = item.code || item.name || 'Item';
+                    return `${Number(item.qty || 1)}× ${esc(label)}${item.name && item.name !== label ? ` <span style="color:#94a3b8">${esc(item.name)}</span>` : ''}`;
+                }).join('<br>') || '<span style="color:#94a3b8">Item tidak tersedia</span>';
+                const date = previousOrder.ordered_at ? orderDateText(previousOrder.ordered_at) : '—';
+                return `<button type="button" onclick="window.showOrderDetail(${Number(previousOrder.id)})" style="display:block;width:100%;text-align:left;padding:.75rem;border:1px solid #e2e8f0;border-radius:.6rem;background:#fff;margin:.5rem 0;cursor:pointer">
+                    <div style="display:flex;justify-content:space-between;gap:.75rem;font-weight:800;color:#1e293b"><span>${esc(previousOrder.order_sn || '—')}</span><span style="font-size:.72rem;color:#15803d">✓ COMPLETED</span></div>
+                    <div style="font-size:.72rem;color:#64748b;margin:.25rem 0 .45rem">${esc(date)}</div>
+                    <div style="font-size:.76rem;color:#334155;line-height:1.55">${itemText}</div>
+                </button>`;
+            }).join('');
+            Swal.update({
+                title: 'Riwayat Repeat Order',
+                html: `<div style="text-align:left"><div style="font-size:.8rem;color:#64748b;margin-bottom:.65rem">${esc(buyer)} · ${history.length} order selesai sebelumnya</div>${rows || '<div style="padding:1rem;color:#64748b;text-align:center">Belum ada order selesai sebelumnya.</div>'}</div>`,
+                showConfirmButton: false,
+                showCloseButton: true,
+            });
+        } catch (error) {
+            Swal.update({
+                title: 'Riwayat tidak tersedia',
+                html: `<div style="color:#b91c1c">${esc(error.message || 'Gagal memuat riwayat order.')}</div>`,
+                showConfirmButton: true,
+                confirmButtonText: 'Tutup',
+            });
+        }
     };
 
     // ── Logistics ────────────────────────────────────────────────────────

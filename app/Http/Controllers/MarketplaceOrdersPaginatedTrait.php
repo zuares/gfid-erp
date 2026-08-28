@@ -316,6 +316,57 @@ trait MarketplaceOrdersPaginatedTrait
     }
 
     /**
+     * Riwayat order selesai dari pembeli yang sama di toko yang sama.
+     * Identitas selalu diambil dari order saat ini agar tidak bisa diminta
+     * berdasarkan username pembeli secara bebas dari browser.
+     */
+    public function buyerCompletedOrders(MarketplaceOrder $order): JsonResponse
+    {
+        $username = trim((string) ($order->buyer_username ?? ''));
+        $name = trim((string) ($order->buyer_name ?? ''));
+
+        if ($username === '' && $name === '') {
+            return response()->json([
+                'data' => [],
+                'buyer_label' => null,
+            ]);
+        }
+
+        $identityColumn = $username !== '' ? 'buyer_username' : 'buyer_name';
+        $identityValue = $username !== '' ? $username : $name;
+        $orders = MarketplaceOrder::query()
+            ->where('store_id', $order->store_id)
+            ->where('order_status', 'COMPLETED')
+            ->whereKeyNot($order->getKey())
+            ->where($identityColumn, $identityValue)
+            ->with([
+                'items.internalItem:id,code,name',
+            ])
+            ->latest('ordered_at')
+            ->limit(20)
+            ->get()
+            ->map(function (MarketplaceOrder $completedOrder): array {
+                return [
+                    'id' => $completedOrder->id,
+                    'order_sn' => $completedOrder->channel_order_id ?: $completedOrder->external_order_id,
+                    'ordered_at' => $completedOrder->ordered_at?->toIso8601String(),
+                    'status' => $completedOrder->order_status,
+                    'items' => $completedOrder->items->map(fn ($item): array => [
+                        'qty' => (int) ($item->qty ?: 1),
+                        'code' => $item->internalItem?->code ?: ($item->model_sku ?: $item->item_sku),
+                        'name' => $item->internalItem?->name ?: ($item->variant_name ?: $item->item_name),
+                    ])->all(),
+                ];
+            })
+            ->all();
+
+        return response()->json([
+            'data' => $orders,
+            'buyer_label' => $identityValue,
+        ]);
+    }
+
+    /**
      * Hitung order selesai per pembeli di toko yang sama. Query dilakukan
      * per halaman secara agregat agar UI bisa menandai repeat order tanpa N+1.
      *

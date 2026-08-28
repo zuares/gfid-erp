@@ -181,6 +181,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/analytics-cash-orders',       [MarketplaceController::class, 'analyticsCashOrders']);
     Route::get('/analytics-return-orders',      [MarketplaceController::class, 'analyticsReturnOrders']);
     Route::get('/analytics-ad-cost',           [MarketplaceController::class, 'analyticsAdCost']);
+    Route::get('/local-orders/{order}/buyer-completed-orders', [MarketplaceController::class, 'buyerCompletedOrders']);
     Route::get('/local-orders-paginated',      [MarketplaceController::class, 'localOrdersPaginated']);
     Route::get('/local-order-counts',          [MarketplaceController::class, 'localOrderCounts']);
 

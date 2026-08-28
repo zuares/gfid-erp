@@ -246,8 +246,9 @@ body[data-theme="dark"] .ord-card { border-color: var(--glass-border); box-shado
     display: inline-flex; align-items: center; gap: .18rem; flex-shrink: 0;
     padding: .12rem .38rem; border: 1px solid #c4b5fd; border-radius: 999px;
     color: #6d28d9; background: #f5f3ff; font-size: .58rem; font-weight: 800;
-    white-space: nowrap;
+    white-space: nowrap; cursor: pointer;
 }
+.ord-repeat-badge:focus-visible { outline: 2px solid #8b5cf6; outline-offset: 2px; }
 body[data-theme="dark"] .ord-repeat-badge { color: #ddd6fe; background: rgba(109, 40, 217, .22); border-color: rgba(167, 139, 250, .35); }
 .ord-items-invoice-head {
     display: flex; align-items: center; justify-content: space-between;

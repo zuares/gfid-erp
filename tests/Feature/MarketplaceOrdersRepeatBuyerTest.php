@@ -81,6 +81,14 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
         $response->assertOk();
         $this->assertSame(1, $row['buyer_previous_order_count']);
         $this->assertTrue($row['is_repeat_buyer']);
+
+        $history = $this->getJson("/api/marketplace/local-orders/{$current->id}/buyer-completed-orders");
+
+        $history->assertOk()
+            ->assertJsonPath('buyer_label', 'buyer-repeat')
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.order_sn', 'REPEAT-PREVIOUS')
+            ->assertJsonPath('data.0.status', 'COMPLETED');
     }
 
     public function test_order_baru_tidak_ditandai_repeat(): void
