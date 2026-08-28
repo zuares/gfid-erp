@@ -87,7 +87,7 @@
 (() => {
     const $ = (id) => document.getElementById(id);
     const PAGE_SIZE = 100;
-    const state = { stores: [], page: 1, more: false, items: [], details: {}, detailErrors: {}, detailLoading: {}, refreshTimer: null, loading: false, storePages: {}, storeMore: {} };
+    const state = { stores: [], page: 1, more: false, items: [], details: {}, detailErrors: {}, detailLoading: {}, refreshTimer: null, loading: false, storePages: {}, storeMore: {}, storeReleaseTimes: {} };
     const today = new Date();
     const iso = (date) => date.toISOString().slice(0, 10);
     const from = new Date(today); from.setDate(from.getDate() - 14);
@@ -126,6 +126,10 @@
         const params = new URLSearchParams({ date_from: $('escrowFrom').value, date_to: $('escrowTo').value, page_no: pageNo, page_size: PAGE_SIZE });
         const path = $('escrowSource').value === 'released' ? 'escrow-list' : 'escrow-orders';
         return `/api/marketplace/stores/${encodeURIComponent(storeId)}/${path}?${params}`;
+    };
+    const releaseListUrl = (storeId, pageNo = 1) => {
+        const params = new URLSearchParams({ date_from: $('escrowFrom').value, date_to: $('escrowTo').value, page_no: pageNo, page_size: PAGE_SIZE });
+        return `/api/marketplace/stores/${encodeURIComponent(storeId)}/escrow-list?${params}`;
     };
 
     const incomeLabels = {
@@ -174,10 +178,42 @@
     const detailUrl = (storeId, orderSn) => `/api/marketplace/stores/${encodeURIComponent(storeId)}/escrow-detail?order_sn=${encodeURIComponent(orderSn)}`;
     const batchDetailUrl = (storeId) => `/api/marketplace/stores/${encodeURIComponent(storeId)}/escrow-detail-batch`;
     const decorateItems = (items, store) => (Array.isArray(items) ? items : []).map((item) => ({ ...item, store_id: store.id }));
+    const canLookupRelease = () => {
+        const rangeDays = Math.round((new Date(`${$('escrowTo').value}T00:00:00`) - new Date(`${$('escrowFrom').value}T00:00:00`)) / 86400000) + 1;
+        return rangeDays <= 15;
+    };
+    const fetchReleaseTimes = async (store) => {
+        if ($('escrowSource').value !== 'orders' || !canLookupRelease() || state.storeReleaseTimes[store.id]) return;
+        const releaseTimes = {};
+        let pageNo = 1;
+        let more = true;
+        while (more && pageNo <= 100) {
+            const payload = await api(releaseListUrl(store.id, pageNo));
+            (payload.data?.items || []).forEach((item) => {
+                if (item.order_sn && item.escrow_release_at) releaseTimes[item.order_sn] = { time: item.escrow_release_time, at: item.escrow_release_at };
+            });
+            more = Boolean(payload.data?.more);
+            pageNo++;
+        }
+        state.storeReleaseTimes[store.id] = releaseTimes;
+    };
+    const addReleaseTimes = (items, store) => items.map((item) => {
+        const release = state.storeReleaseTimes[store.id]?.[item.order_sn];
+        return release ? { ...item, escrow_release_time: release.time, escrow_release_at: release.at } : item;
+    });
     const fetchStorePage = async (store, pageNo) => {
         const payload = await api(listUrl(store.id, pageNo));
         state.storePages[store.id] = state.storePages[store.id] || {};
-        state.storePages[store.id][pageNo] = decorateItems(payload.data?.items, store);
+        let items = decorateItems(payload.data?.items, store);
+        if ($('escrowSource').value === 'orders') {
+            try {
+                await fetchReleaseTimes(store);
+                items = addReleaseTimes(items, store);
+            } catch (error) {
+                console.warn(`Lookup tanggal release toko ${store.name} gagal:`, error);
+            }
+        }
+        state.storePages[store.id][pageNo] = items;
         state.storeMore[store.id] = state.storeMore[store.id] || {};
         state.storeMore[store.id][pageNo] = Boolean(payload.data?.more);
     };
@@ -243,13 +279,13 @@
         if ($('escrowFrom').value > $('escrowTo').value) { showAlert('Tanggal mulai tidak boleh melewati tanggal akhir.'); return; }
         const rangeDays = Math.round((new Date(`${$('escrowTo').value}T00:00:00`) - new Date(`${$('escrowFrom').value}T00:00:00`)) / 86400000) + 1;
         if ($('escrowSource').value === 'released' && rangeDays > 15) { showAlert('Rentang tanggal maksimal 15 hari sesuai batas endpoint escrow release Shopee.'); return; }
-        if (state.page === 1) { state.storePages = {}; state.storeMore = {}; }
+        if (state.page === 1) { state.storePages = {}; state.storeMore = {}; state.storeReleaseTimes = {}; }
         state.loading = true;
         setLoading(true); $('escrowStatus').textContent = 'Memuat…'; $('escrowTableWrap').innerHTML = '<div class="escrow-empty"><span class="escrow-spinner"></span> Mengambil data live dari Shopee…</div>';
         try {
             const payload = $('escrowStore').value === 'all'
                 ? await loadAllStorePage(stores)
-                : await api(listUrl(stores[0].id)).then((response) => ({ items: decorateItems(response.data?.items, stores[0]), more: Boolean(response.data?.more) }));
+                : await fetchStorePage(stores[0], state.page).then(() => ({ items: state.storePages[stores[0].id]?.[state.page] || [], more: Boolean(state.storeMore[stores[0].id]?.[state.page]) }));
             state.items = payload.items || []; state.more = Boolean(payload.more); state.details = {}; state.detailErrors = {}; state.detailLoading = {};
             renderRows(state.items); renderPagination();
             $('escrowCount').textContent = state.items.length.toLocaleString('id-ID'); $('escrowTotal').textContent = money(state.items.reduce((sum, item) => sum + Number(item.payout_amount || 0), 0)); $('escrowStatus').textContent = state.items.length ? 'Memuat detail…' : 'Berhasil'; $('escrowStatusNote').textContent = `${activeStoreLabel()} · 0/${state.items.length} detail dimuat`;
