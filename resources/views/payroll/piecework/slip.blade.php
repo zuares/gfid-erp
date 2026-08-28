@@ -151,9 +151,16 @@
                 <label class="slip-paper-field" for="slip-paper-size">
                     <span>Ukuran kertas</span>
                     <select class="slip-paper-select" id="slip-paper-size">
-                        <option value="a4">A4 · Portrait</option>
-                        <option value="a5">A5 · Portrait</option>
+                        <option value="a4">A4</option>
+                        <option value="a5">A5</option>
                         <option value="threeply">3PLY · 9,5 × 11 inci</option>
+                    </select>
+                </label>
+                <label class="slip-paper-field" for="slip-paper-orientation">
+                    <span>Orientasi</span>
+                    <select class="slip-paper-select" id="slip-paper-orientation">
+                        <option value="portrait">Portrait</option>
+                        <option value="landscape">Landscape</option>
                     </select>
                 </label>
                 <button class="slip-action-btn primary" type="button" onclick="window.print()">
@@ -261,17 +268,27 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const paperSelect = document.getElementById('slip-paper-size');
-            if (!paperSelect) return;
+            const orientationSelect = document.getElementById('slip-paper-orientation');
+            if (!paperSelect || !orientationSelect) return;
 
             const paperSizes = {
-                a4: { size: 'A4 portrait', margin: '10mm' },
-                a5: { size: 'A5 portrait', margin: '8mm' },
+                a4: { size: 'A4', margin: '10mm' },
+                a5: { size: 'A5', margin: '8mm' },
                 threeply: { size: '9.5in 11in', margin: '7mm' },
             };
             const styleId = 'slip-paper-size-style';
 
-            function applyPaperSize(value) {
-                const selected = paperSizes[value] || paperSizes.a4;
+            function applyPrintSettings(paperValue, orientationValue) {
+                const selected = paperSizes[paperValue] ? paperSizes[paperValue] : paperSizes.a4;
+                const orientation = orientationValue === 'landscape' ? 'landscape' : 'portrait';
+                let pageSize = selected.size;
+
+                if (selected.size === '9.5in 11in') {
+                    pageSize = orientation === 'landscape' ? '11in 9.5in' : selected.size;
+                } else {
+                    pageSize += ` ${orientation}`;
+                }
+
                 let printStyle = document.getElementById(styleId);
 
                 if (!printStyle) {
@@ -280,15 +297,21 @@
                     document.head.appendChild(printStyle);
                 }
 
-                printStyle.textContent = `@page { size: ${selected.size}; margin: ${selected.margin}; }`;
-                paperSelect.value = paperSizes[value] ? value : 'a4';
+                printStyle.textContent = `@page { size: ${pageSize}; margin: ${selected.margin}; }`;
+                paperSelect.value = paperSizes[paperValue] ? paperValue : 'a4';
+                orientationSelect.value = orientation;
                 localStorage.setItem('gfid-payroll-slip-paper-size', paperSelect.value);
+                localStorage.setItem('gfid-payroll-slip-orientation', orientationSelect.value);
             }
 
             const savedSize = localStorage.getItem('gfid-payroll-slip-paper-size') || 'a4';
-            applyPaperSize(savedSize);
+            const savedOrientation = localStorage.getItem('gfid-payroll-slip-orientation') || 'portrait';
+            applyPrintSettings(savedSize, savedOrientation);
             paperSelect.addEventListener('change', function () {
-                applyPaperSize(this.value);
+                applyPrintSettings(this.value, orientationSelect.value);
+            });
+            orientationSelect.addEventListener('change', function () {
+                applyPrintSettings(paperSelect.value, this.value);
             });
         });
     </script>
