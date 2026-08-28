@@ -11,24 +11,31 @@
         }
 
         .pw-overview-top {
+            position: sticky;
+            top: 0;
+            z-index: 300;
             display: flex;
             gap: .75rem;
             align-items: flex-start;
             justify-content: space-between;
-            margin: .25rem 0 .75rem
+            padding: .45rem .75rem;
+            margin: 0 -.75rem .65rem;
+            background: var(--card);
+            border-bottom: 1px solid rgba(148, 163, 184, .18);
+            box-shadow: none
         }
 
         .pw-title {
             margin: 0;
-            font-size: 1.08rem;
-            font-weight: 900;
-            letter-spacing: -.02em
+            font-size: 1rem;
+            font-weight: 750;
+            letter-spacing: 0
         }
 
         .pw-sub {
-            margin: .2rem 0 0;
+            margin: 0;
             color: var(--muted);
-            font-size: .86rem
+            font-size: .78rem
         }
 
         .pw-card {
@@ -476,6 +483,14 @@
         }
 
         @media (max-width: 767.98px) {
+            .pw-period-stats {
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)
+            }
+
+            .pw-period-stat-wide {
+                grid-column: auto
+            }
+
             .pw-table-wrap {
                 display: none
             }
@@ -492,6 +507,11 @@
 
             .pw-card-h {
                 padding: .75rem
+            }
+
+            .pw-overview-top {
+                margin-inline: -.5rem;
+                padding-inline: .65rem
             }
 
             .pw-period-main {
