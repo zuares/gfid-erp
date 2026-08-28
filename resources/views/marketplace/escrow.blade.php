@@ -131,9 +131,9 @@
         items.forEach((item) => Object.keys(state.details[item.order_sn]?.income || {}).forEach((key) => { if (!keys.includes(key)) keys.push(key); }));
         return keys;
     };
-    const detailValue = (key, value) => {
+    const detailValue = (key, value, orderSn = '') => {
         if (value === null || value === undefined || value === '') return '<span class="escrow-muted">—</span>';
-        if (key === 'items' && Array.isArray(value)) return `<code>${escapeHtml(JSON.stringify(value))}</code>`;
+        if (key === 'items' && Array.isArray(value)) return `<button type="button" class="btn btn-sm btn-ship-outline btn-pill escrow-items-btn" data-order-sn="${escapeHtml(orderSn)}"><i class="bi bi-list-ul me-1"></i>Lihat ${value.length} item</button>`;
         if (Array.isArray(value)) return escapeHtml(value.join(', '));
         if (typeof value === 'object') return `<code>${escapeHtml(JSON.stringify(value))}</code>`;
         if (nonMoneyFields.has(key) && Number.isFinite(Number(value))) return escapeHtml(Number(value).toLocaleString('id-ID'));
@@ -152,13 +152,14 @@
             const loading = state.detailLoading[item.order_sn];
             const loaded = Object.prototype.hasOwnProperty.call(state.details, item.order_sn);
             const detailState = loading ? '<span class="escrow-detail-loading">Memuat detail…</span>' : (orderError ? `<span class="escrow-status" title="${escapeHtml(orderError)}">Pending</span>` : (loaded ? '<span class="escrow-status">Lengkap</span>' : '<span class="escrow-detail-loading">Menunggu…</span>'));
-            const incomeCells = columns.map((key) => `<td class="escrow-detail-col">${detailValue(key, income[key])}</td>`).join('');
+            const incomeCells = columns.map((key) => `<td class="escrow-detail-col">${detailValue(key, income[key], item.order_sn)}</td>`).join('');
             const payout = item.payout_amount ?? income.escrow_amount;
             const date = item.escrow_release_at || item.ordered_at;
             return `<tr><td><span class="escrow-order">${escapeHtml(item.order_sn || '—')}</span></td><td>${escapeHtml(item.order_status || '—')}</td><td>${detailState}</td><td>${money(item.order_total)}</td><td class="escrow-money">${money(payout)}</td><td class="escrow-muted">${escapeHtml(dateTime(date))}</td><td class="escrow-detail-col">${escapeHtml(detail.buyer_user_name || item.buyer_user_name || '—')}</td><td class="escrow-detail-col">${escapeHtml((detail.return_order_sn_list || []).join(', ') || '—')}</td>${incomeCells}<td class="text-end"><button type="button" class="btn btn-sm btn-ship-outline btn-pill escrow-detail-btn" data-index="${index}">Raw</button></td></tr>`;
         }).join('');
         $('escrowTableWrap').innerHTML = `<table class="table escrow-table"><thead><tr><th>Order SN</th><th>Status order</th><th>Status detail</th><th>Nilai order</th><th>Payout amount</th><th>Waktu order/release</th><th class="escrow-detail-col">Buyer</th><th class="escrow-detail-col">Return order</th>${headers}<th></th></tr></thead><tbody>${rows}</tbody></table>`;
         document.querySelectorAll('.escrow-detail-btn').forEach((button) => button.addEventListener('click', () => openDetail(items[Number(button.dataset.index)]?.order_sn)));
+        document.querySelectorAll('.escrow-items-btn').forEach((button) => button.addEventListener('click', () => openItems(button.dataset.orderSn)));
     };
 
     const renderPagination = () => { $('escrowPagination').style.display = 'flex'; $('escrowPrev').disabled = state.page <= 1; $('escrowNext').disabled = !state.more; $('escrowPageInfo').textContent = `Halaman ${state.page}${state.more ? ' · masih ada data berikutnya' : ' · halaman terakhir'}`; };
@@ -214,8 +215,19 @@
         try {
             const payload = state.details[orderSn]?.raw_response ? { data: state.details[orderSn] } : await api(detailUrl(orderSn)); const detail = payload.data || {}; state.details[orderSn] = detail; const income = detail.income || {};
             const fields = Object.entries(income).map(([key]) => [key, incomeLabels[key] || key.replaceAll('_', ' ')]);
-            $('escrowDetailBody').innerHTML = `<div class="escrow-detail-summary"><div class="escrow-detail-card"><div class="escrow-detail-label">Order SN</div><div class="escrow-detail-value">${escapeHtml(detail.order_sn)}</div></div><div class="escrow-detail-card"><div class="escrow-detail-label">Buyer</div><div class="escrow-detail-value">${escapeHtml(detail.buyer_user_name || '—')}</div></div><div class="escrow-detail-card"><div class="escrow-detail-label">Escrow amount</div><div class="escrow-detail-value escrow-money">${money(income.escrow_amount)}</div></div></div><div class="escrow-detail-section"><h3>Return order</h3><div class="escrow-return-list">${(detail.return_order_sn_list || []).length ? detail.return_order_sn_list.map((value) => `<span>${escapeHtml(value)}</span>`).join('') : '<span class="escrow-muted">Tidak ada return order</span>'}</div></div><div class="escrow-detail-section"><h3>Rincian income</h3><div class="escrow-income-grid">${fields.length ? fields.map(([key, label]) => `<div class="escrow-income-row"><span>${escapeHtml(label)}</span><span>${detailValue(key, income[key])}</span></div>`).join('') : '<span class="escrow-muted">Field income tidak dikembalikan Shopee.</span>'}</div></div><div class="escrow-detail-section"><h3>Raw response Shopee</h3><pre class="escrow-raw">${escapeHtml(json(detail.raw_response))}</pre></div>`;
+            $('escrowDetailBody').innerHTML = `<div class="escrow-detail-summary"><div class="escrow-detail-card"><div class="escrow-detail-label">Order SN</div><div class="escrow-detail-value">${escapeHtml(detail.order_sn)}</div></div><div class="escrow-detail-card"><div class="escrow-detail-label">Buyer</div><div class="escrow-detail-value">${escapeHtml(detail.buyer_user_name || '—')}</div></div><div class="escrow-detail-card"><div class="escrow-detail-label">Escrow amount</div><div class="escrow-detail-value escrow-money">${money(income.escrow_amount)}</div></div></div><div class="escrow-detail-section"><h3>Return order</h3><div class="escrow-return-list">${(detail.return_order_sn_list || []).length ? detail.return_order_sn_list.map((value) => `<span>${escapeHtml(value)}</span>`).join('') : '<span class="escrow-muted">Tidak ada return order</span>'}</div></div><div class="escrow-detail-section"><h3>Rincian income</h3><div class="escrow-income-grid">${fields.length ? fields.map(([key, label]) => `<div class="escrow-income-row"><span>${escapeHtml(label)}</span><span>${detailValue(key, income[key], detail.order_sn)}</span></div>`).join('') : '<span class="escrow-muted">Field income tidak dikembalikan Shopee.</span>'}</div></div><div class="escrow-detail-section"><h3>Raw response Shopee</h3><pre class="escrow-raw">${escapeHtml(json(detail.raw_response))}</pre></div>`;
+            document.querySelectorAll('#escrowDetailBody .escrow-items-btn').forEach((button) => button.addEventListener('click', () => openItems(detail.order_sn)));
         } catch (error) { $('escrowDetailBody').innerHTML = `<div class="escrow-empty">${escapeHtml(error.message)}</div>`; }
+    };
+
+    const openItems = (orderSn) => {
+        const detail = state.details[orderSn];
+        const items = detail?.income?.items;
+        if (!Array.isArray(items)) return;
+        $('escrowModalBackdrop').classList.add('show');
+        $('escrowModalTitle').textContent = `Items escrow · ${orderSn}`;
+        $('escrowModalSub').textContent = `${selectedStore()?.name || 'Toko'} · raw items dari Shopee`;
+        $('escrowDetailBody').innerHTML = `<div class="escrow-detail-section" style="border-top:0;padding-top:0;margin-top:0"><h3>${items.length} item dalam order</h3><pre class="escrow-raw">${escapeHtml(json(items))}</pre></div>`;
     };
 
     const loadStores = async () => {
