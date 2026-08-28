@@ -42,7 +42,10 @@
         .slip-stat-value { margin-top:.25rem; color:var(--text); font-size:1rem; font-weight:900; font-variant-numeric:tabular-nums }
         .slip-stat.total { background:color-mix(in srgb,var(--accent-soft) 24%,var(--card) 76%) }
         .slip-stat.total .slip-stat-value { color:var(--accent) }
-        .slip-section-title { margin-bottom:.55rem; color:var(--text); font-size:.78rem; font-weight:850 }
+        .slip-section-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; margin-bottom:.55rem }
+        .slip-section-title { color:var(--text); font-size:.78rem; font-weight:850 }
+        .slip-section-note { margin-top:.15rem; color:var(--muted); font-size:.68rem }
+        .slip-section-count { flex-shrink:0; color:var(--muted); font-size:.68rem; font-weight:750 }
         .slip-table-wrap { width:100%; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid rgba(148,163,184,.2); border-radius:10px }
         .slip-table { width:100%; min-width:590px; border-collapse:separate; border-spacing:0; font-size:.78rem }
         .slip-table th { padding:.65rem .7rem; border-bottom:1px solid rgba(148,163,184,.2); background:rgba(148,163,184,.08); color:var(--muted); font-size:.64rem; font-weight:850; letter-spacing:.07em; text-align:left; text-transform:uppercase; white-space:nowrap }
@@ -64,7 +67,8 @@
         .slip-signature { color:var(--muted); font-size:.72rem }
         .slip-signature.right { text-align:right }
         .slip-signature-space { height:48px }
-        .slip-signature-name { color:var(--text); font-weight:800 }
+        .slip-signature-line { width:min(180px,80%); border-top:1px solid currentColor }
+        .slip-signature.right .slip-signature-line { margin-left:auto }
         .slip-printed { margin-top:1.3rem; color:var(--muted); font-size:.65rem; text-align:center }
 
         @media (max-width:640px) {
@@ -90,6 +94,7 @@
             .slip-stat-value { font-size:.9rem }
             .slip-total-value { font-size:1.12rem }
             .slip-signatures { gap:1rem }
+            .slip-section-heading { align-items:flex-start; flex-direction:column; gap:.15rem }
             .slip-table { min-width:540px }
         }
 
@@ -131,7 +136,9 @@
             .slip-stat { padding:.32rem .38rem; border-radius:5px }
             .slip-stat-label { font-size:.49rem }
             .slip-stat-value { margin-top:.08rem; font-size:.68rem }
-            .slip-section-title { margin-bottom:.25rem; font-size:.58rem }
+            .slip-section-heading { margin-bottom:.25rem }
+            .slip-section-title { font-size:.58rem }
+            .slip-section-note, .slip-section-count { font-size:.5rem }
             .slip-table-wrap { overflow:visible }
             .slip-table { min-width:0 }
             .slip-table { font-size:.6rem }
@@ -156,6 +163,7 @@
             .slip-page .slip-table th,
             .slip-page .slip-table tfoot td,
             .slip-page .slip-attendance { background:#fff !important; border-color:#000 !important; }
+            .slip-signature-line { border-color:#000 }
             .slip-page .slip-brand-mark img { filter:grayscale(1) contrast(2) }
             .slip-summary-page, .slip-details-page { break-after:auto; break-before:auto; page-break-after:auto; page-break-before:auto; padding-top:0 }
             .slip-page[data-paper-size="threeply_quarter"] .slip-info,
@@ -172,6 +180,54 @@
             .slip-details-meta-label { font-size:.46rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase }
             .slip-details-meta-value { overflow:hidden; margin-top:.08rem; font-size:.6rem; font-weight:800; text-overflow:ellipsis; white-space:nowrap }
             .slip-page[data-paper-size="threeply_quarter"][data-print-part="details"] .slip-details-meta { grid-template-columns:repeat(2,1fr); padding:.32rem .4rem .38rem }
+
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-card { page-break-inside:avoid; break-inside:avoid }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-inner { padding:2mm 2.5mm 2.2mm }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-divider { margin:.25rem 0 }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-heading { margin-bottom:.3rem }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-info { gap:.16rem; margin-bottom:.32rem }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-info-item { padding:.22rem .26rem }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-stats { gap:.16rem; margin-bottom:.35rem }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-stat { padding:.22rem .26rem }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-section-heading { margin-bottom:.18rem }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-table th { padding:.2rem .22rem }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-table td { padding:.2rem .22rem }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-table tfoot td { padding:.24rem .22rem }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-date-value { margin-top:0 }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-total { margin-top:.35rem; padding-top:.28rem }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-signatures { gap:1rem; margin-top:.45rem; padding-top:.28rem }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-signature-space { height:18px }
+            .slip-page[data-orientation="portrait"][data-print-part="all"] .slip-printed { margin-top:.28rem }
+
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-inner { padding:1.2mm 1.8mm 1.3mm }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-brand-mark img { width:19px; height:19px }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-brand-name { font-size:.6rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-brand-sub,
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-number { font-size:.43rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-eyebrow { font-size:.42rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-title { font-size:.75rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-subtitle { font-size:.45rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-status { min-height:15px; padding:.1rem .24rem; font-size:.42rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-info-label { font-size:.39rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-info-value { font-size:.48rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-stat-label { font-size:.4rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-stat-value { font-size:.56rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-section-title { font-size:.5rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-section-note,
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-section-count { font-size:.4rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-table { font-size:.48rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-table th { padding:.18rem .18rem; font-size:.38rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-table td { padding:.17rem .18rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-table tfoot td { padding:.2rem .18rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-date-day { line-height:1.1 }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-date-value { font-size:.42rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-attendance { padding:.08rem .14rem; font-size:.4rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-total-label { font-size:.43rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-total-note { font-size:.41rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-total-value { font-size:.76rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-signature { font-size:.42rem }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-signature-space { height:14px }
+            .slip-page[data-paper-size="threeply_quarter"][data-orientation="portrait"][data-print-part="all"] .slip-printed { font-size:.4rem }
         }
     </style>
 @endpush
@@ -259,14 +315,6 @@
 
                 <div class="slip-divider"></div>
 
-                <section class="slip-heading">
-                    <div>
-                        <h1 class="slip-title">{{ $isDaily ? 'Slip Gaji Harian' : ($moduleLabel ?? ucfirst($module)) }}</h1>
-                        <div class="slip-subtitle">Dokumen penghasilan operator untuk periode yang dipilih</div>
-                    </div>
-                    <span class="slip-status {{ $statusClass }}">{{ $statusLabel }}</span>
-                </section>
-
                 <section class="slip-info" aria-label="Informasi slip">
                     <div class="slip-info-item"><div class="slip-info-label">Nama Operator</div><div class="slip-info-value">{{ $employee?->name ?? '-' }}</div></div>
                     <div class="slip-info-item"><div class="slip-info-label">Kode Operator</div><div class="slip-info-value">{{ $employee?->code ?? '-' }}</div></div>
@@ -292,7 +340,13 @@
                     <div class="slip-details-meta-item"><div class="slip-details-meta-label">Periode</div><div class="slip-details-meta-value">{{ $periodStart->format('d/m/Y') }} – {{ $periodEnd->format('d/m/Y') }}</div></div>
                 </div>
                 <section>
-                    <div class="slip-section-title">{{ $isDaily ? 'Rincian Kehadiran' : 'Rincian Payroll' }}</div>
+                    <div class="slip-section-heading">
+                        <div>
+                            <div class="slip-section-title">{{ $isDaily ? 'Rincian Penghasilan' : 'Rincian Payroll' }}</div>
+                            <div class="slip-section-note">{{ $isDaily ? 'Perhitungan berdasarkan kehadiran setiap tanggal' : 'Detail pekerjaan dan tarif operator' }}</div>
+                        </div>
+                        <div class="slip-section-count">{{ $lines->count() }} {{ $isDaily ? 'hari' : 'baris' }}</div>
+                    </div>
                     <div class="slip-table-wrap">
                         @if ($isDaily)
                             <table class="slip-table">
@@ -337,8 +391,8 @@
                 <div class="slip-total"><div><div class="slip-total-label">Total Dibayarkan</div><div class="slip-total-note">Nominal setelah perhitungan payroll periode ini</div></div><div class="slip-total-value">{{ number_format((float) $totalAmount, 0, ',', '.') }}</div></div>
 
                 <div class="slip-signatures">
-                    <div class="slip-signature">Diterima oleh,<div class="slip-signature-space"></div><div class="slip-signature-name">{{ $employee?->name ?? '........................' }}</div></div>
-                    <div class="slip-signature right">Disetujui oleh,<div class="slip-signature-space"></div><div class="slip-signature-name">{{ auth()->user()->name ?? '........................' }}</div></div>
+                    <div class="slip-signature">Diterima oleh,<div class="slip-signature-space"></div><div class="slip-signature-line"></div></div>
+                    <div class="slip-signature right">Disetujui oleh,<div class="slip-signature-space"></div><div class="slip-signature-line"></div></div>
                 </div>
                 <div class="slip-printed">Dicetak pada {{ id_datetime(now()) }}</div>
             </div>
@@ -362,9 +416,10 @@
             };
             const styleId = 'slip-paper-size-style';
             const paperStorageKey = 'gfid-payroll-slip-paper-size-v2';
-            const orientationStorageKey = 'gfid-payroll-slip-orientation-v3';
+            const orientationStorageKey = 'gfid-payroll-slip-orientation-v4';
             const partStorageKey = 'gfid-payroll-slip-print-part-v1';
             const slipPage = document.querySelector('.slip-page');
+            const isDailySlip = @json($isDaily);
 
             function applyPrintSettings(paperValue, orientationValue, partValue) {
                 const selected = paperSizes[paperValue] ? paperSizes[paperValue] : paperSizes.a4;
@@ -403,7 +458,7 @@
             }
 
             const savedSize = localStorage.getItem(paperStorageKey) || 'threeply_quarter';
-            const savedOrientation = localStorage.getItem(orientationStorageKey) || 'landscape';
+            const savedOrientation = localStorage.getItem(orientationStorageKey) || (isDailySlip ? 'portrait' : 'landscape');
             const savedPart = localStorage.getItem(partStorageKey) || 'all';
             applyPrintSettings(savedSize, savedOrientation, savedPart);
             paperSelect.addEventListener('change', function () {
