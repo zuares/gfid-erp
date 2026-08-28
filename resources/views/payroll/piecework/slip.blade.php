@@ -11,6 +11,7 @@
         .slip-print-tools { display:flex; align-items:flex-end; justify-content:flex-end; gap:.55rem; flex-wrap:wrap }
         .slip-paper-field { display:flex; flex-direction:column; gap:.2rem; color:var(--muted); font-size:.64rem; font-weight:800 }
         .slip-paper-select { min-height:36px; padding:.45rem .6rem; border:1px solid rgba(148,163,184,.3); border-radius:9px; background:var(--card); color:var(--text); font-size:.76rem; font-weight:700 }
+        .slip-preview-note { display:flex; align-items:center; gap:.45rem; margin-bottom:.75rem; color:var(--muted); font-size:.72rem }
         .slip-card { overflow:hidden; background:var(--card); border:1px solid rgba(148,163,184,.28); border-radius:14px; box-shadow:0 10px 28px rgba(15,23,42,.07) }
         .slip-inner { padding:1.35rem 1.5rem 1.5rem }
         .slip-brand { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem }
@@ -95,41 +96,41 @@
             body:has(.slip-page) .app-main .page-wrap { display:block !important; width:100% !important; max-width:none !important; margin:0 !important; padding:0 !important }
             .slip-page { max-width:100%; padding:0 }
             .slip-card { border:1px solid #b8b8b8; border-radius:0; box-shadow:none }
-            .slip-inner { padding:7mm 8mm 8mm }
-            .slip-brand-mark img { width:27px; height:27px }
-            .slip-brand-name { font-size:.8rem }
-            .slip-brand-sub, .slip-number { font-size:.58rem }
-            .slip-eyebrow { font-size:.56rem }
-            .slip-divider { margin:.55rem 0 }
-            .slip-heading { margin-bottom:.6rem }
-            .slip-title { font-size:1.05rem }
-            .slip-subtitle { margin-top:.12rem; font-size:.65rem }
-            .slip-status { min-height:21px; padding:.18rem .42rem; font-size:.56rem }
-            .slip-info { gap:.3rem; margin-bottom:.65rem }
-            .slip-info-item { padding:.4rem .45rem; border-radius:6px }
-            .slip-info-label { font-size:.53rem }
-            .slip-info-value { margin-top:.12rem; font-size:.66rem }
-            .slip-stats { gap:.3rem; margin-bottom:.75rem }
-            .slip-stat { padding:.45rem .5rem; border-radius:6px }
-            .slip-stat-label { font-size:.56rem }
-            .slip-stat-value { margin-top:.12rem; font-size:.78rem }
-            .slip-section-title { margin-bottom:.35rem; font-size:.66rem }
+            .slip-inner { padding:5mm 6mm 6mm }
+            .slip-brand-mark img { width:24px; height:24px }
+            .slip-brand-name { font-size:.72rem }
+            .slip-brand-sub, .slip-number { font-size:.52rem }
+            .slip-eyebrow { font-size:.5rem }
+            .slip-divider { margin:.4rem 0 }
+            .slip-heading { margin-bottom:.45rem }
+            .slip-title { font-size:.92rem }
+            .slip-subtitle { margin-top:.08rem; font-size:.56rem }
+            .slip-status { min-height:18px; padding:.14rem .35rem; font-size:.5rem }
+            .slip-info { gap:.22rem; margin-bottom:.5rem }
+            .slip-info-item { padding:.3rem .35rem; border-radius:5px }
+            .slip-info-label { font-size:.46rem }
+            .slip-info-value { margin-top:.08rem; font-size:.57rem }
+            .slip-stats { gap:.22rem; margin-bottom:.55rem }
+            .slip-stat { padding:.32rem .38rem; border-radius:5px }
+            .slip-stat-label { font-size:.49rem }
+            .slip-stat-value { margin-top:.08rem; font-size:.68rem }
+            .slip-section-title { margin-bottom:.25rem; font-size:.58rem }
             .slip-table-wrap { overflow:visible }
             .slip-table { min-width:0 }
-            .slip-table { font-size:.68rem }
-            .slip-table th { padding:.42rem .45rem; font-size:.54rem }
-            .slip-table td { padding:.44rem .45rem }
-            .slip-table tfoot td { padding:.5rem .45rem }
-            .slip-date-value { margin-top:.05rem; font-size:.6rem }
-            .slip-attendance { padding:.18rem .35rem; font-size:.58rem }
-            .slip-total { margin-top:.7rem; padding-top:.55rem }
-            .slip-total-label { font-size:.58rem }
-            .slip-total-note { margin-top:.1rem; font-size:.58rem }
-            .slip-total-value { font-size:1.1rem }
-            .slip-signatures { gap:2rem; margin-top:1.1rem; padding-top:.6rem }
-            .slip-signature { font-size:.6rem }
-            .slip-signature-space { height:30px }
-            .slip-printed { margin-top:.7rem; font-size:.54rem }
+            .slip-table { font-size:.6rem }
+            .slip-table th { padding:.32rem .35rem; font-size:.48rem }
+            .slip-table td { padding:.34rem .35rem }
+            .slip-table tfoot td { padding:.4rem .35rem }
+            .slip-date-value { margin-top:.03rem; font-size:.52rem }
+            .slip-attendance { padding:.14rem .28rem; font-size:.5rem }
+            .slip-total { margin-top:.55rem; padding-top:.4rem }
+            .slip-total-label { font-size:.52rem }
+            .slip-total-note { margin-top:.06rem; font-size:.5rem }
+            .slip-total-value { font-size:.92rem }
+            .slip-signatures { gap:1.5rem; margin-top:.75rem; padding-top:.45rem }
+            .slip-signature { font-size:.52rem }
+            .slip-signature-space { height:22px }
+            .slip-printed { margin-top:.45rem; font-size:.48rem }
             .slip-page, .slip-page * { color:#000 !important; box-shadow:none !important; }
             .slip-page .slip-card,
             .slip-page .slip-info-item,
@@ -139,8 +140,14 @@
             .slip-page .slip-table tfoot td,
             .slip-page .slip-attendance { background:#fff !important; border-color:#000 !important; }
             .slip-page .slip-brand-mark img { filter:grayscale(1) contrast(2) }
-            .slip-summary-page { break-after:page; page-break-after:always }
-            .slip-details-page { break-before:page; page-break-before:always; padding-top:5mm }
+            .slip-summary-page, .slip-details-page { break-after:auto; break-before:auto; page-break-after:auto; page-break-before:auto; padding-top:0 }
+            .slip-page[data-paper-size="threeply_quarter"] .slip-info,
+            .slip-page[data-paper-size="threeply_quarter"] .slip-stats { grid-template-columns:repeat(2, 1fr) }
+            .slip-page[data-paper-size="threeply_quarter"] .slip-inner { padding:3.5mm 4mm 4mm }
+            .slip-page[data-paper-size="threeply_quarter"] .slip-table { font-size:.58rem }
+            .slip-page[data-paper-size="threeply_quarter"] .slip-table th { padding:.28rem .3rem; font-size:.45rem }
+            .slip-page[data-paper-size="threeply_quarter"] .slip-table td { padding:.3rem .3rem }
+            .slip-page[data-paper-size="threeply_quarter"] .slip-table tfoot td { padding:.34rem .3rem }
         }
     </style>
 @endpush
@@ -185,9 +192,10 @@
                 <label class="slip-paper-field" for="slip-paper-size">
                     <span>Ukuran kertas</span>
                     <select class="slip-paper-select" id="slip-paper-size">
+                        <option value="threeply_quarter">3PLY dibagi 4 · 4,75 × 5,5 inci</option>
+                        <option value="threeply">3PLY penuh · 9,5 × 11 inci</option>
                         <option value="a4">A4</option>
                         <option value="a5">A5</option>
-                        <option value="threeply">3PLY · 9,5 × 11 inci</option>
                     </select>
                 </label>
                 <label class="slip-paper-field" for="slip-paper-orientation">
@@ -202,6 +210,7 @@
                 </button>
             </div>
         </div>
+        <div class="slip-preview-note no-print"><i class="bi bi-eye" aria-hidden="true"></i> Preview slip sebelum dicetak</div>
 
         <article class="slip-card">
             <div class="slip-inner">
@@ -246,13 +255,6 @@
                     </section>
                 @endif
 
-                <div class="slip-total"><div><div class="slip-total-label">Total Dibayarkan</div><div class="slip-total-note">Nominal setelah perhitungan payroll periode ini</div></div><div class="slip-total-value">{{ number_format((float) $totalAmount, 0, ',', '.') }}</div></div>
-
-                <div class="slip-signatures">
-                    <div class="slip-signature">Diterima oleh,<div class="slip-signature-space"></div><div class="slip-signature-name">{{ $employee?->name ?? '........................' }}</div></div>
-                    <div class="slip-signature right">Disetujui oleh,<div class="slip-signature-space"></div><div class="slip-signature-name">{{ auth()->user()->name ?? '........................' }}</div></div>
-                </div>
-                <div class="slip-printed">Dicetak pada {{ id_datetime(now()) }}</div>
                 </div>
 
                 <div class="slip-details-page">
@@ -296,6 +298,14 @@
                 @if ($isDaily && ($pendingCount > 0 || $otherAttendanceCount > 0))
                     <div class="slip-subtitle" style="margin-top:.65rem">Catatan: {{ $pendingCount > 0 ? $pendingCount . ' hari belum diisi' : '' }}{{ $pendingCount > 0 && $otherAttendanceCount > 0 ? ', ' : '' }}{{ $otherAttendanceCount > 0 ? $otherAttendanceCount . ' hari berstatus khusus' : '' }}.</div>
                 @endif
+
+                <div class="slip-total"><div><div class="slip-total-label">Total Dibayarkan</div><div class="slip-total-note">Nominal setelah perhitungan payroll periode ini</div></div><div class="slip-total-value">{{ number_format((float) $totalAmount, 0, ',', '.') }}</div></div>
+
+                <div class="slip-signatures">
+                    <div class="slip-signature">Diterima oleh,<div class="slip-signature-space"></div><div class="slip-signature-name">{{ $employee?->name ?? '........................' }}</div></div>
+                    <div class="slip-signature right">Disetujui oleh,<div class="slip-signature-space"></div><div class="slip-signature-name">{{ auth()->user()->name ?? '........................' }}</div></div>
+                </div>
+                <div class="slip-printed">Dicetak pada {{ id_datetime(now()) }}</div>
                 </div>
             </div>
         </article>
@@ -313,8 +323,12 @@
                 a4: { size: 'A4', margin: '0' },
                 a5: { size: 'A5', margin: '0' },
                 threeply: { size: '9.5in 11in', margin: '0' },
+                threeply_quarter: { size: '4.75in 5.5in', margin: '0' },
             };
             const styleId = 'slip-paper-size-style';
+            const paperStorageKey = 'gfid-payroll-slip-paper-size-v2';
+            const orientationStorageKey = 'gfid-payroll-slip-orientation-v2';
+            const slipPage = document.querySelector('.slip-page');
 
             function applyPrintSettings(paperValue, orientationValue) {
                 const selected = paperSizes[paperValue] ? paperSizes[paperValue] : paperSizes.a4;
@@ -323,6 +337,8 @@
 
                 if (selected.size === '9.5in 11in') {
                     pageSize = orientation === 'landscape' ? '11in 9.5in' : selected.size;
+                } else if (selected.size === '4.75in 5.5in') {
+                    pageSize = orientation === 'landscape' ? '5.5in 4.75in' : selected.size;
                 } else {
                     pageSize += ` ${orientation}`;
                 }
@@ -338,12 +354,16 @@
                 printStyle.textContent = `@page { size: ${pageSize}; margin: ${selected.margin}; }`;
                 paperSelect.value = paperSizes[paperValue] ? paperValue : 'a4';
                 orientationSelect.value = orientation;
-                localStorage.setItem('gfid-payroll-slip-paper-size', paperSelect.value);
-                localStorage.setItem('gfid-payroll-slip-orientation', orientationSelect.value);
+                if (slipPage) {
+                    slipPage.dataset.paperSize = paperSelect.value;
+                    slipPage.dataset.orientation = orientationSelect.value;
+                }
+                localStorage.setItem(paperStorageKey, paperSelect.value);
+                localStorage.setItem(orientationStorageKey, orientationSelect.value);
             }
 
-            const savedSize = localStorage.getItem('gfid-payroll-slip-paper-size') || 'a4';
-            const savedOrientation = localStorage.getItem('gfid-payroll-slip-orientation') || 'portrait';
+            const savedSize = localStorage.getItem(paperStorageKey) || 'threeply_quarter';
+            const savedOrientation = localStorage.getItem(orientationStorageKey) || 'portrait';
             applyPrintSettings(savedSize, savedOrientation);
             paperSelect.addEventListener('change', function () {
                 applyPrintSettings(this.value, orientationSelect.value);
