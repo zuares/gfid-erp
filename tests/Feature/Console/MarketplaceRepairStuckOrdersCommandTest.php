@@ -287,6 +287,38 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         $this->assertSame('ACTIVE-BOOKING', $bookings[0]['booking_sn']);
     }
 
+    public function test_detail_booking_mengembalikan_item_list_dari_get_booking_detail(): void
+    {
+        $bookingSn = 'BOOKING-DETAIL-ITEM';
+        MarketplaceBooking::create([
+            'store_id' => $this->store->id,
+            'booking_sn' => $bookingSn,
+        ]);
+
+        $driver = \Mockery::mock(\App\Services\Channels\Shopee\ShopeeChannel::class);
+        $driver->shouldReceive('getBookingDetail')->once()->with($this->store, $bookingSn)->andReturn([
+            'response' => [
+                'booking_list' => [[
+                    'booking_sn' => $bookingSn,
+                    'order_list' => [[
+                        'item_list' => [[
+                            'item_name' => 'Item dari get_booking_detail',
+                            'model_quantity_purchased' => 1,
+                        ]],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        $manager = $this->mock(ChannelManager::class);
+        $manager->shouldReceive('driver')->once()->with($this->store)->andReturn($driver);
+
+        $payload = app(\App\Http\Controllers\MarketplaceBookingController::class)
+            ->detail($this->store, $bookingSn)->getData(true);
+
+        $this->assertSame('Item dari get_booking_detail', $payload['order_list'][0]['item_list'][0]['item_name']);
+    }
+
     public function test_move_to_ready_memindahkan_order_processed_dengan_fulfillment_aktif(): void
     {
         $order = $this->createOrder('REPAIR-MOVE-READY', 'PROCESSED');

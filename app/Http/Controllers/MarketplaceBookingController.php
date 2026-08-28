@@ -164,6 +164,7 @@ class MarketplaceBookingController extends Controller
                 return response()->json(['error' => $res['message'] ?? $res['error']], 400);
             }
             $list = $res['response']['booking_list'] ?? $res['response']['order_list'] ?? [];
+            $list = $this->normalizeBookingDetailList($list);
             if (! empty($list) && method_exists($driver, 'getBookingTrackingNumber')) {
                 try {
                     $trk    = $driver->getBookingTrackingNumber($store, $bookingSn);
@@ -179,6 +180,38 @@ class MarketplaceBookingController extends Controller
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Pastikan item_list dari get_booking_detail selalu berada di level booking
+     * yang dibaca UI. Beberapa respons Shopee membungkusnya di order_list atau
+     * package_list, tergantung tipe booking.
+     */
+    protected function normalizeBookingDetailList(array $list): array
+    {
+        return collect($list)->map(function (array $booking): array {
+            $nestedOrder = is_array($booking['order_list'][0] ?? null)
+                ? $booking['order_list'][0]
+                : [];
+
+            $itemList = $booking['item_list'] ?? $nestedOrder['item_list'] ?? [];
+            if (empty($itemList)) {
+                $itemList = collect($booking['package_list'] ?? $nestedOrder['package_list'] ?? [])
+                    ->filter(fn ($package) => is_array($package) && is_array($package['item_list'] ?? null))
+                    ->flatMap(fn ($package) => $package['item_list'])
+                    ->values()
+                    ->all();
+            }
+
+            if (! empty($itemList)) {
+                $booking['item_list'] = $itemList;
+            }
+            if (empty($booking['order_sn']) && ! empty($nestedOrder['order_sn'])) {
+                $booking['order_sn'] = $nestedOrder['order_sn'];
+            }
+
+            return $booking;
+        })->values()->all();
     }
 
     /**

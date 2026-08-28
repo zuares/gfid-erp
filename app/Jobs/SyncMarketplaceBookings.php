@@ -317,6 +317,25 @@ class SyncMarketplaceBookings implements ShouldQueue
             }
         }
 
+        $itemList = $detail['item_list'] ?? $nestedOrder['item_list'] ?? [];
+        if (empty($itemList)) {
+            foreach ([$detail['package_list'] ?? null, $nestedOrder['package_list'] ?? null] as $packages) {
+                if (! is_array($packages)) {
+                    continue;
+                }
+
+                $packageItems = collect($packages)
+                    ->filter(fn ($p) => is_array($p) && is_array($p['item_list'] ?? null))
+                    ->flatMap(fn ($p) => $p['item_list'])
+                    ->values()
+                    ->all();
+                if (! empty($packageItems)) {
+                    $itemList = $packageItems;
+                    break;
+                }
+            }
+        }
+
         return [
             'booking_sn' => $detail['booking_sn'] ?? $nestedOrder['booking_sn'] ?? null,
             'order_sn' => $detail['order_sn'] ?? $nestedOrder['order_sn'] ?? null,
@@ -329,7 +348,7 @@ class SyncMarketplaceBookings implements ShouldQueue
             'package_number' => $detail['package_number']
                 ?? $nestedOrder['package_number']
                 ?? ($package['package_number'] ?? null),
-            'item_list' => $detail['item_list'] ?? $nestedOrder['item_list'] ?? [],
+            'item_list' => $itemList,
         ];
     }
 
