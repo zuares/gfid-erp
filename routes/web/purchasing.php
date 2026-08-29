@@ -98,6 +98,9 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
             // GRN
             // Draft GRN boleh dibuat oleh user purchasing; perubahan, hapus,
             // posting, dan unposting adalah aksi yang mengubah stok/jurnal.
+            Route::get('purchase-receipts/export', [PurchaseReceiptController::class, 'export'])
+                ->name('purchase_receipts.export');
+
             Route::resource('purchase-receipts', PurchaseReceiptController::class)
                 ->names('purchase_receipts')
                 ->except(['edit', 'update', 'destroy']);

@@ -7,10 +7,12 @@ use App\Models\Item;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderLine;
 use App\Models\PurchaseReceipt;
+use App\Models\PurchaseReceiptLine;
 use App\Models\Supplier;
 use App\Models\Warehouse;
 use App\Services\Purchasing\GoodsReceiptService;
 use App\Services\Purchasing\PurchaseOrderService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -52,7 +54,14 @@ class PurchaseReceiptController extends Controller
             $q->where(function($query) use ($searchTerm) {
                 $query->where('code', 'like', $searchTerm)
                       ->orWhere('surat_jalan_no', 'like', $searchTerm)
-                      ->orWhere('notes', 'like', $searchTerm);
+                      ->orWhere('notes', 'like', $searchTerm)
+                      ->orWhereHas('order', function ($orderQuery) use ($searchTerm) {
+                          $orderQuery->where('code', 'like', $searchTerm);
+                      })
+                      ->orWhereHas('lines.item', function ($itemQuery) use ($searchTerm) {
+                          $itemQuery->where('code', 'like', $searchTerm)
+                              ->orWhere('name', 'like', $searchTerm);
+                      });
             });
         }
 
@@ -123,6 +132,95 @@ class PurchaseReceiptController extends Controller
     }
 
     /**
+     * Export detail GRN dalam PDF sesuai filter yang sedang dipakai di daftar GRN.
+     */
+    public function export(Request $request)
+    {
+        $query = PurchaseReceiptLine::query()
+            ->with(['receipt.supplier', 'receipt.warehouse', 'receipt.order', 'item', 'purchaseOrderLine'])
+            ->whereHas('receipt', function ($receiptQuery) use ($request) {
+                if ($request->filled('supplier_id')) {
+                    $receiptQuery->where('supplier_id', (int) $request->supplier_id);
+                }
+
+                if ($request->filled('warehouse_id')) {
+                    $receiptQuery->where('warehouse_id', (int) $request->warehouse_id);
+                }
+
+                if ($request->filled('status')) {
+                    $receiptQuery->where('status', (string) $request->status);
+                }
+
+                if ($request->filled('from_date')) {
+                    $receiptQuery->whereDate('date', '>=', $request->from_date);
+                }
+
+                if ($request->filled('to_date')) {
+                    $receiptQuery->whereDate('date', '<=', $request->to_date);
+                }
+
+                if ($request->filled('q')) {
+                    $searchTerm = '%' . $request->q . '%';
+                    $receiptQuery->where(function ($searchQuery) use ($searchTerm) {
+                        $searchQuery->where('code', 'like', $searchTerm)
+                            ->orWhere('surat_jalan_no', 'like', $searchTerm)
+                            ->orWhere('notes', 'like', $searchTerm)
+                            ->orWhereHas('order', fn ($orderQuery) => $orderQuery->where('code', 'like', $searchTerm))
+                            ->orWhereHas('lines.item', function ($itemQuery) use ($searchTerm) {
+                                $itemQuery->where('code', 'like', $searchTerm)
+                                    ->orWhere('name', 'like', $searchTerm);
+                            });
+                    });
+                }
+            })
+            ->orderByDesc(
+                PurchaseReceipt::query()
+                    ->select('date')
+                    ->whereColumn('purchase_receipts.id', 'purchase_receipt_lines.purchase_receipt_id')
+                    ->limit(1)
+            )
+            ->orderByDesc('purchase_receipt_id')
+            ->orderBy('id');
+
+        $filename = 'grn-penerimaan-' . now()->format('Ymd-His') . '.pdf';
+
+        $rows = $query->limit(2000)->get();
+        $supplier = $request->filled('supplier_id')
+            ? Supplier::find((int) $request->supplier_id)
+            : null;
+        $warehouse = $request->filled('warehouse_id')
+            ? Warehouse::find((int) $request->warehouse_id)
+            : null;
+
+        $pdf = Pdf::loadView('purchasing.purchase_receipts.export', [
+            'rows' => $rows,
+            'supplier' => $supplier,
+            'warehouse' => $warehouse,
+            'filters' => [
+                'from_date' => $request->input('from_date'),
+                'to_date' => $request->input('to_date'),
+                'q' => $request->input('q'),
+                'warehouse_id' => $request->input('warehouse_id'),
+                'status' => $request->input('status'),
+            ],
+        ])->setPaper('a4', 'landscape');
+
+        $pdfContent = $pdf->output();
+        if ($request->boolean('preview')) {
+            return response($pdfContent, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="' . $filename . '"',
+            ]);
+        }
+
+        return response()->streamDownload(
+            fn () => print($pdfContent),
+            $filename,
+            ['Content-Type' => 'application/pdf']
+        );
+    }
+
+    /**
      * Form create GRN dari semua PO yang masih dapat diterima (filter supplier opsional).
      */
     public function create(Request $request)
@@ -160,7 +258,7 @@ class PurchaseReceiptController extends Controller
             ->whereHas('purchaseOrder', function ($q) use ($selectedSupplierId) {
                 // Flow baru: GRN boleh dari PO draft ATAU approved (closed juga valid).
                 // Cancelled dikecualikan.
-                $q->whereIn('status', ['draft', 'approved'])
+                $q->whereIn('status', ['draft', 'approved', 'closed'])
                   ->where('status', '!=', 'cancelled');
 
                 if (!empty($selectedSupplierId)) {

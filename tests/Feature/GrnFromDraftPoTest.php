@@ -135,6 +135,53 @@ class GrnFromDraftPoTest extends TestCase
             ->assertSee('Masuk stok', false)
             ->assertDontSee('Pilih sesuai lokasi fisik', false)
             ->assertDontSee('name="order_type"', false);
+
+        $indexResponse = $this->get(route('purchasing.purchase_receipts.index'));
+        $indexResponse->assertOk()
+            ->assertSee('name="supplier_id"', false)
+            ->assertDontSee('name="supplier_search"', false)
+            ->assertSee('Download PDF', false);
+    }
+
+    public function test_grn_index_can_search_by_purchase_order_code(): void
+    {
+        $po = $this->makeDraftPo(2, 1000);
+        $this->grnService->create($this->makeGrnPayload($po, 1));
+
+        $response = $this->get(route('purchasing.purchase_receipts.index', ['q' => $po->code]));
+
+        $response->assertOk()
+            ->assertSee('PO ' . $po->code, false)
+            ->assertSee('Cari GRN / PO / item / SJ...', false);
+    }
+
+    public function test_grn_export_respects_supplier_and_date_filters(): void
+    {
+        $ownPo = $this->makeDraftPo(2, 1000);
+        $otherPo = $this->makeDraftPo(2, 1000, $this->supplierOther->id);
+        $this->grnService->create($this->makeGrnPayload($ownPo, 1));
+        $this->grnService->create($this->makeGrnPayload($otherPo, 1, 0, $this->supplierOther->id));
+
+        $response = $this->get(route('purchasing.purchase_receipts.export', [
+            'supplier_id' => $this->supplier->id,
+            'from_date' => now()->toDateString(),
+            'to_date' => now()->toDateString(),
+        ]));
+
+        $response->assertOk();
+        $pdf = $response->streamedContent();
+
+        $this->assertStringStartsWith('%PDF-', $pdf);
+        $this->assertStringContainsString('application/pdf', strtolower((string) $response->headers->get('Content-Type')));
+
+        $preview = $this->get(route('purchasing.purchase_receipts.export', [
+            'supplier_id' => $this->supplier->id,
+            'from_date' => now()->toDateString(),
+            'to_date' => now()->toDateString(),
+            'preview' => 1,
+        ]));
+        $preview->assertOk();
+        $this->assertStringContainsString('inline;', strtolower((string) $preview->headers->get('Content-Disposition')));
     }
 
     public function test_purchase_order_defaults_legacy_type_when_type_is_omitted(): void

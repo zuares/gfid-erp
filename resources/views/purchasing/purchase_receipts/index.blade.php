@@ -60,6 +60,19 @@
     .filter-summary{ font-size:.74rem; color:var(--shp-muted); }
     .filter-summary strong{ color:var(--shp-accent); }
     body[data-theme="dark"] .filter-summary strong{ color:#cbd5e1; }
+    .grn-pdf-preview-frame{
+        width:100%; height:72vh; border:0; display:block;
+        background:#f8fafc;
+    }
+    @media (max-width:575.98px){
+        .grn-pdf-preview-frame{ height:calc(100vh - 132px); }
+        .filter-bar{ padding:.65rem; }
+        .grn-filter-controls{ display:grid!important; grid-template-columns:1fr; gap:.45rem!important; }
+        .grn-filter-controls .form-control,
+        .grn-filter-controls .form-select,
+        .grn-filter-controls .btn{ width:100%; max-width:none!important; }
+        .grn-filter-controls .btn{ min-height:38px; }
+    }
 
     /* Table (selaras shipment) */
     .table-responsive {
@@ -75,16 +88,20 @@
     .table-list{ margin-bottom:0; }
     .table-list thead th{
         border-bottom-width:1px; font-size:.68rem; text-transform:none; letter-spacing:0;
-        color:#64748b; background:var(--card,#fff); padding:.52rem .62rem; white-space:nowrap;
+        color:#64748b; background:var(--card,#fff); padding:.45rem .5rem; white-space:nowrap;
     }
     body[data-theme="dark"] .table-list thead th{ background:rgba(15,23,42,.98); color:#9ca3af; }
-    .table-list tbody td{ vertical-align:middle; border-top-color:rgba(148,163,184,.16); padding:.52rem .62rem; }
+    .table-list tbody td{ vertical-align:middle; border-top-color:rgba(148,163,184,.16); padding:.45rem .5rem; }
     body[data-theme="dark"] .table-list tbody td{ border-top-color:rgba(51,65,85,.85); }
 
     .grn-row{ cursor:pointer; }
     .grn-row:hover{ background:rgba(51,65,85,.035); }
     .code-link{ font-weight:700; text-decoration:none; color:inherit; font-size:.9rem; }
     .code-link:hover{ text-decoration:underline; }
+    .date-primary-ui{ color:var(--shp-accent); font-size:.86rem; font-weight:700; line-height:1.25; }
+    .po-secondary-ui{ color:var(--shp-text); font-size:.73rem; text-decoration:none; }
+    .po-secondary-ui:hover,.grn-secondary-ui:hover{ text-decoration:underline; }
+    .grn-secondary-ui{ color:#64748b; font-size:.68rem; text-decoration:none; }
     .muted{ font-size:.78rem; color:#6b7280; }
     body[data-theme="dark"] .muted{ color:#9ca3af; }
     .store-name{ font-weight:600; font-size:.86rem; }
@@ -116,13 +133,13 @@
         .kpis{ gap:.3rem; }
         .table-list thead{ display:none; }
         .table-list, .table-list tbody, .table-list tr, .table-list td{ display:block; width:100%; }
-        .table-list tbody tr{ padding:.7rem .8rem; border-top:1px solid rgba(148,163,184,.16); }
+        .table-list tbody tr{ padding:.62rem .7rem; border-top:1px solid rgba(148,163,184,.16); }
         .table-list tbody td{ border:0; padding:0; }
         .table-list tbody td.mobile-hide{ display:none; }
-        .ship-row-main{ display:flex; align-items:flex-start; justify-content:space-between; gap:.75rem; }
-        .ship-row-meta{ display:flex; align-items:center; gap:.45rem; flex-wrap:wrap; margin-top:.4rem; color:#64748b; font-size:.78rem; }
-        .ship-row-meta span+span::before{ content:'•'; margin-right:.45rem; opacity:.6; }
-        .ship-row-action{ margin-top:.6rem; }
+        .ship-row-main{ display:flex; align-items:flex-start; justify-content:space-between; gap:.5rem; }
+        .ship-row-meta{ display:flex; align-items:center; gap:.35rem; flex-wrap:wrap; margin-top:.3rem; color:#64748b; font-size:.75rem; }
+        .ship-row-meta span+span::before{ content:'•'; margin-right:.35rem; opacity:.6; }
+        .ship-row-action{ margin-top:.45rem; }
         .ship-row-action .btn{ width:100%; min-height:40px; display:flex; align-items:center; justify-content:center; }
         .code-link{ font-size:.95rem; }
         .store-name{ font-size:.9rem; margin-top:.5rem; }
@@ -174,18 +191,24 @@
 
     {{-- FILTER --}}
     <div class="filter-bar">
+        <div class="filter-summary mb-2"><strong>Filter data GRN</strong> - gunakan supplier dan periode untuk menentukan isi laporan.</div>
         <form id="grn-filter-form" method="GET" action="{{ route('purchasing.purchase_receipts.index') }}">
             <input type="hidden" name="from_date" id="grn-from-date" value="{{ request('from_date') }}">
             <input type="hidden" name="to_date"   id="grn-to-date"   value="{{ request('to_date') }}">
 
-            <div class="d-flex flex-wrap gap-2 align-items-center">
+            <div class="d-flex flex-wrap gap-2 align-items-center grn-filter-controls">
                 <input type="text" name="q" id="grn-search"
-                    value="{{ request('q') }}" placeholder="Cari GRN / Surat Jalan..."
+                    value="{{ request('q') }}" placeholder="Cari GRN / PO / item / SJ..."
                     class="form-control form-control-sm search-input" style="max-width:200px;" autocomplete="off" />
                 
-                <input type="text" name="supplier_search" id="grn-supplier-search"
-                    value="{{ request('supplier_search') }}" placeholder="Cari supplier…"
-                    class="form-control form-control-sm search-input" style="max-width:160px;" autocomplete="off" />
+                <select name="supplier_id" class="form-select form-select-sm grn-filter-auto" style="max-width:220px;">
+                    <option value="">Semua supplier</option>
+                    @foreach ($suppliers as $supplier)
+                        <option value="{{ $supplier->id }}" @selected((string) request('supplier_id') === (string) $supplier->id)>
+                            {{ $supplier->code }} — {{ $supplier->name }}
+                        </option>
+                    @endforeach
+                </select>
 
                 <select name="warehouse_id" class="form-select form-select-sm grn-filter-auto" style="max-width:160px;">
                     <option value="">Semua Gudang</option>
@@ -221,11 +244,16 @@
                     autocomplete="off" data-gf-date="off" class="form-control form-control-sm"
                     style="max-width:200px;cursor:pointer;" readonly />
 
-                @if (request()->filled('q') || request()->filled('supplier_search') || request()->filled('warehouse_id') || request()->filled('status') || request()->filled('from_date') || request()->filled('to_date'))
+                @if (request()->filled('q') || request()->filled('supplier_id') || request()->filled('warehouse_id') || request()->filled('status') || request()->filled('from_date') || request()->filled('to_date'))
                     <a href="{{ route('purchasing.purchase_receipts.index') }}" class="btn btn-sm btn-ship-outline btn-pill">
                         <i class="bi bi-x me-1"></i>Reset
                     </a>
                 @endif
+                <button type="button" id="btnPreviewGrnPdf" class="btn btn-sm btn-ship-primary btn-pill"
+                        data-preview-url="{{ route('purchasing.purchase_receipts.export', array_merge(request()->except('page'), ['preview' => 1])) }}"
+                        data-download-url="{{ route('purchasing.purchase_receipts.export', request()->except('page')) }}">
+                    <i class="bi bi-eye me-1"></i>Preview PDF
+                </button>
             </div>
         </form>
     </div>
@@ -244,13 +272,13 @@
                     <thead>
                         <tr>
                             <th style="width:46px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide">#</th>
-                            <th style="width:230px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">Dokumen & Tanggal</th>
+                            <th style="width:220px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">Tanggal / PO / GRN</th>
                             <th style="position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">Supplier / Gudang</th>
-                            <th style="width:150px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="text-end mobile-hide">Total (Qty & Rp)</th>
-                            <th style="width:140px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="text-end mobile-hide">Reject</th>
-                            <th style="width:140px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide">Status Pembayaran</th>
-                            <th style="width:100px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide">Status</th>
-                            <th style="width:100px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide"></th>
+                            <th style="width:125px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="text-end mobile-hide">Total (Qty & Rp)</th>
+                            <th style="width:95px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="text-end mobile-hide">Reject</th>
+                            <th style="width:115px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide">Status Pembayaran</th>
+                            <th style="width:80px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide">Status</th>
+                            <th style="width:86px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide"></th>
                         </tr>
                     </thead>
                     <tbody id="grn-table-body">
@@ -266,6 +294,29 @@
     </div>
 
 </div>
+
+<div class="modal fade" id="grnPdfPreviewModal" tabindex="-1" aria-labelledby="grnPdfPreviewTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-fullscreen-sm-down modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <div>
+                    <h5 class="modal-title fs-6" id="grnPdfPreviewTitle">Preview Laporan GRN</h5>
+                    <div class="small text-muted">Periksa laporan terlebih dahulu sebelum diunduh.</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body p-0">
+                <iframe id="grnPdfPreviewFrame" class="grn-pdf-preview-frame" title="Preview laporan GRN"></iframe>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-ship-outline btn-pill" data-bs-dismiss="modal">Tutup</button>
+                <a id="btnDownloadGrnPdf" href="#" class="btn btn-sm btn-ship-primary btn-pill">
+                    <i class="bi bi-download me-1"></i>Download PDF
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
@@ -273,6 +324,20 @@
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('grn-filter-form');
     if (!form) return;
+
+    const previewButton = document.getElementById('btnPreviewGrnPdf');
+    const previewFrame = document.getElementById('grnPdfPreviewFrame');
+    const downloadButton = document.getElementById('btnDownloadGrnPdf');
+    const previewModal = document.getElementById('grnPdfPreviewModal');
+    previewButton?.addEventListener('click', function () {
+        if (!previewFrame || !previewModal) return;
+        previewFrame.src = previewButton.dataset.previewUrl || '';
+        if (downloadButton) downloadButton.href = previewButton.dataset.downloadUrl || '#';
+        bootstrap.Modal.getOrCreateInstance(previewModal).show();
+    });
+    previewModal?.addEventListener('hidden.bs.modal', function () {
+        if (previewFrame) previewFrame.src = 'about:blank';
+    });
 
     form.querySelectorAll('select.grn-filter-auto').forEach(function (el) {
         el.addEventListener('change', function () { form.submit(); });
@@ -295,15 +360,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 qInput.focus();
                 const len = qInput.value.length;
                 qInput.setSelectionRange(len, len);
-            }, 100);
-        }
-    } else if (searchParams.has('supplier_search')) {
-        const supplierInput = document.getElementById('grn-supplier-search');
-        if (supplierInput) {
-            setTimeout(function () {
-                supplierInput.focus();
-                const len = supplierInput.value.length;
-                supplierInput.setSelectionRange(len, len);
             }, 100);
         }
     }

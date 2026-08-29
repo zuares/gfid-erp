@@ -30,8 +30,6 @@
             : route('purchasing.purchase_receipts.show', $receipt->id);
         $actionLabel = $canEdit ? 'Lanjutkan' : 'Detail';
         $showRoute = route('purchasing.purchase_receipts.show', $receipt->id);
-        $dateLabel = $receipt->date ? id_date($receipt->date) . ' ' . $receipt->created_at->format('H:i') : '—';
-        
         $ps = (string) ($receipt->order->payment_status ?? 'unpaid');
         $payLabel = match($ps) {
             'paid' => 'Lunas',
@@ -51,8 +49,16 @@
         <td>
             <div class="ship-row-main">
                 <div style="min-width:0;">
-                    <a class="mono text-muted d-block" style="font-size: 0.72rem; text-decoration: none;" href="{{ $showRoute }}">{{ $receipt->code ?? ('GRN#'.$receipt->id) }}</a>
-                    <div class="small mono text-nowrap mt-1" style="color:var(--shp-text); font-weight: 500;">{{ $dateLabel }}</div>
+                    <div class="date-primary-ui">{{ $receipt->date ? id_day($receipt->date) : 'Tanggal belum diatur' }}</div>
+                    <div class="muted mono mt-1">Jam {{ $receipt->created_at?->format('H:i') ?? '-' }}</div>
+                    @if ($receipt->order)
+                        <a class="po-secondary-ui mono d-block mt-1" href="{{ route('purchasing.purchase_orders.show', $receipt->order->id) }}">
+                            PO {{ $receipt->order->code }}
+                        </a>
+                    @else
+                        <span class="po-secondary-ui muted d-block mt-1">Tanpa PO</span>
+                    @endif
+                    <a class="grn-secondary-ui mono d-block mt-1" href="{{ $showRoute }}">GRN {{ $receipt->code ?? ('#'.$receipt->id) }}</a>
                     @if ($hasReturn)
                         <div class="muted mt-1">
                             <span class="ret-flag">Retur {{ $returnCount ?: 1 }}x</span>
@@ -67,8 +73,6 @@
             <div class="store-name">{{ $supplierName }}</div>
             <div class="muted mono">{{ $supplierCode ? $supplierCode.' · ' : '' }}{{ $warehouseName }}</div>
             <div class="ship-row-meta d-md-none">
-                <span class="mono">{{ $dateLabel }}</span>
-                <span>{{ $warehouseName }}</span>
                 @if ($hasReturn)<span class="ret-flag">Retur {{ $returnCount ?: 1 }}x</span>@endif
             </div>
         </td>

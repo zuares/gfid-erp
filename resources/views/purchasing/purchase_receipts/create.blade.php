@@ -411,10 +411,10 @@
         @if ($hasOrder)
             <span class="shp-meta-code">Penerimaan untuk {{ $order->code }}</span>
             <span class="shp-meta-store">{{ $order->supplier?->name ?? '-' }}</span>
-            <span class="tag tag-material">PO campuran</span>
+            <span class="tag tag-material">PO {{ $order->code }}</span>
         @else
             <span class="shp-meta-code">Pilih item dari PO (draft atau approved)</span>
-            <span class="tag tag-material">PO campuran</span>
+            <span class="tag tag-material">PO belum dipilih</span>
             @unless ($hasOrder)
                 <span class="shp-badge">1 GRN = 1 PO</span>
             @endunless
