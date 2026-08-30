@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Journal;
 use App\Models\PurchasePayment;
 use App\Models\PurchaseReceipt;
+use App\Models\StockOpname;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -1294,6 +1295,17 @@ class JournalService
 
     public function postInventoryAdjustment(\App\Models\InventoryAdjustment $adjustment): ?Journal
     {
+        // Opening SO adalah snapshot saldo awal operasional. Jangan jadikan
+        // selisih antara stok lama dan stok fisik sebagai variance 6115 karena
+        // saldo persediaannya akan dijurnal satu kali lewat Opening Balance.
+        // Adjustment periodic/manual tetap diposting seperti biasa.
+        if (
+            $adjustment->source_type === StockOpname::class
+            && $adjustment->source?->type === StockOpname::TYPE_OPENING
+        ) {
+            return null;
+        }
+
         $existing = Journal::query()
             ->where('source_type', self::SRC_INVENTORY_ADJUSTMENT)
             ->where('source_id', $adjustment->id)

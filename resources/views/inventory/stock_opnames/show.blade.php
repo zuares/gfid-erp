@@ -410,6 +410,14 @@
         </div>
     @endif
 
+    @if ($isOpening)
+        <div class="alert alert-info py-2">
+            <strong>Mode Opening:</strong> dokumen ini menetapkan stok awal dan HPP pada kartu stok.
+            Tidak membuat jurnal selisih ke akun 6115. Setelah final, catat nilai saldo awal satu kali
+            melalui <strong>Opening Balance Batch</strong>.
+        </div>
+    @endif
+
     {{-- INFO --}}
     <div class="card card-main mb-2">
         <div class="card-body">

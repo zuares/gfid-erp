@@ -508,7 +508,13 @@ class StockOpnameService
             return $adjustment;
         });
 
-        if ($adjustment?->status === InventoryAdjustment::STATUS_APPROVED) {
+        // SO opening hanya membentuk saldo operasional/kartu stok. Nilai
+        // akuntansinya akan dicatat satu kali melalui Opening Balance Batch;
+        // jangan posting lagi sebagai selisih opname ke akun 6115.
+        if (
+            $adjustment?->status === InventoryAdjustment::STATUS_APPROVED
+            && $opname->type !== StockOpname::TYPE_OPENING
+        ) {
             $this->journal->postInventoryAdjustment($adjustment);
         }
 
