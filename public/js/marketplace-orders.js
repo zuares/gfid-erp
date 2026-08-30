@@ -364,6 +364,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     }
 
     let orders           = [];
+    let availableStores  = null;
     let currentPage      = 1;
     let lastPage         = 1;
     let totalOrders      = 0;
@@ -618,8 +619,26 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     };
 
     // ── Store dropdown ────────────────────────────────────────────────────
+    async function loadAvailableStores() {
+        try {
+            const stores = await api('/api/marketplace/stores');
+            if (Array.isArray(stores)) availableStores = stores;
+        } catch (error) {
+            // Keep the order-derived fallback so a temporary store API error
+            // does not make the filter unusable.
+            console.warn('Gagal memuat daftar toko:', error);
+        }
+
+        populateStoreDropdown();
+    }
+
     function populateStoreDropdown() {
-        const names = [...new Set(orders.map(o => o.store?.name).filter(Boolean))].sort();
+        const names = [...new Set(
+            (Array.isArray(availableStores)
+                ? availableStores.map(store => store?.name)
+                : orders.map(order => order.store?.name)
+            ).filter(Boolean)
+        )].sort((a, b) => a.localeCompare(b, 'id'));
         const el = $('storeDropdownItems');
         el.innerHTML = `<div class="hdr-dropdown-item ${!activeStore?'selected':''}" onclick="selectStore('')">🏪 Semua Toko</div>` +
             names.map(n => `<div class="hdr-dropdown-item ${activeStore===n?'selected':''}" onclick="selectStore('${esc(n)}')">${esc(n)}</div>`).join('');
@@ -767,8 +786,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         $('btnStoreLabel').textContent = name || 'Semua Toko';
         $('btnStore').classList.toggle('active', !!name);
         $('ddStore').classList.remove('open');
-        populateStoreDropdown();
-        render();
+        currentPage = 1;
+        loadOrders();
     };
 
     // ── Tab switch ────────────────────────────────────────────────────────
@@ -4180,7 +4199,18 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         window.location = `/marketplace/chat?store_id=${storeId}&order_sn=${encodeURIComponent(orderSn)}`;
     };
 
-    loadOrders();
+    loadAvailableStores().finally(() => {
+        // Deep-link store_id memakai ID, sementara endpoint order memfilter
+        // memakai nama toko. Resolve dari master store sebelum load pertama.
+        if (activeStore && !isNaN(activeStore)) {
+            const matchingStore = Array.isArray(availableStores)
+                ? availableStores.find(store => Number(store.id) === Number(activeStore))
+                : null;
+            activeStore = matchingStore?.name || '';
+        }
+
+        loadOrders();
+    });
 
     // ── Silent refresh (dipakai polling & realtime push) ────────────────────
     let silentRefreshBusy = false;

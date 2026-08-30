@@ -948,7 +948,7 @@
                             ` : ''}
                             ${connectUrl ? `<li><a class="dropdown-item py-2 fw-semibold text-warning" href="${connectUrl}"><i class="bi bi-key me-2"></i>Otorisasi Ulang (Re-Auth)</a></li>` : ''}
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="disconnectStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-plug text-secondary me-2"></i>Putuskan Koneksi</button></li>
-                            <li><button class="dropdown-item py-2 fw-semibold" onclick="toggleActive(${s.id})"><i class="bi bi-power ${inactive ? 'text-success' : 'text-secondary'} me-2"></i>${inactive ? 'Aktifkan Toko' : 'Nonaktifkan Toko (sembunyikan peringatan)'}</button></li>
+                            <li><button type="button" class="dropdown-item py-2 fw-semibold" data-toggle-active="${s.id}" onclick="toggleActive(${s.id})"><i class="bi bi-power ${inactive ? 'text-success' : 'text-secondary'} me-2"></i>${inactive ? 'Aktifkan Toko' : 'Nonaktifkan Toko (sembunyikan peringatan)'}</button></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><button class="dropdown-item py-2 text-danger fw-bold" onclick="deleteStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-trash3-fill me-2"></i>Hapus Toko</button></li>
                         </ul>
@@ -958,10 +958,10 @@
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <span class="badge-status ${statusClass}">${statusLabel}</span>
                     ${inactive
-                        ? `<button class="btn btn-sm btn-outline-success" style="font-size:.7rem; padding:.15rem .5rem;" onclick="toggleActive(${s.id})"><i class="bi bi-power"></i> Aktifkan Toko</button>`
+                        ? `<button type="button" class="btn btn-sm btn-outline-success" data-toggle-active="${s.id}" style="font-size:.7rem; padding:.15rem .5rem;" onclick="toggleActive(${s.id})"><i class="bi bi-power"></i> Aktifkan Toko</button>`
                         : `<span style="display:flex; gap:.35rem; align-items:center;">
                              ${connectUrl ? `<a href="${connectUrl}" class="btn btn-sm btn-outline-primary" style="font-size:.7rem; padding:.15rem .5rem;"><i class="bi bi-plug"></i> Hubungkan Ulang</a>` : ''}
-                             <button class="btn btn-sm btn-outline-secondary" style="font-size:.7rem; padding:.15rem .5rem;" onclick="toggleActive(${s.id})" title="Sembunyikan dari peringatan koneksi"><i class="bi bi-power"></i> Nonaktifkan</button>
+                             <button type="button" class="btn btn-sm btn-outline-secondary" data-toggle-active="${s.id}" style="font-size:.7rem; padding:.15rem .5rem;" onclick="toggleActive(${s.id})" title="Sembunyikan dari peringatan koneksi"><i class="bi bi-power"></i> Nonaktifkan</button>
                            </span>`}
                 </div>
 
@@ -1540,11 +1540,48 @@
     };
 
     window.toggleActive = async function (storeId) {
+        const store = stores.find(item => String(item.id) === String(storeId));
+        if (!store) return;
+
+        const nextState = !Boolean(store.is_active);
+        const actionLabel = nextState ? 'mengaktifkan' : 'menonaktifkan';
+        const storeName = store.name || 'toko ini';
+        if (!confirm(`Yakin ingin ${actionLabel} toko "${storeName}"?`)) return;
+
+        const buttons = document.querySelectorAll(`[data-toggle-active="${storeId}"]`);
+        buttons.forEach(button => {
+            button.disabled = true;
+            button.dataset.originalHtml = button.innerHTML;
+            button.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Memproses...';
+        });
+
         try {
             const res = await api('/api/marketplace/stores/' + storeId + '/toggle-active', { method: 'POST' });
-            loadAll();
+            store.is_active = Boolean(res.is_active);
+            renderKpi();
+            renderStoreCards();
+
+            if (window.Swal) {
+                await Swal.fire({
+                    icon: 'success',
+                    title: store.is_active ? 'Toko Diaktifkan' : 'Toko Dinonaktifkan',
+                    text: res.message || 'Status toko berhasil diperbarui.',
+                    timer: 1600,
+                    showConfirmButton: false,
+                });
+            }
         } catch (e) {
-            alert(e.message || 'Gagal mengubah status aktif toko');
+            if (window.Swal) {
+                Swal.fire('Gagal', e.message || 'Gagal mengubah status aktif toko', 'error');
+            } else {
+                alert(e.message || 'Gagal mengubah status aktif toko');
+            }
+        } finally {
+            buttons.forEach(button => {
+                button.disabled = false;
+                if (button.dataset.originalHtml) button.innerHTML = button.dataset.originalHtml;
+                delete button.dataset.originalHtml;
+            });
         }
     };
 
