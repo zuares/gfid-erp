@@ -471,7 +471,7 @@
         @media (max-width: 767.98px) {
             .page-wrap {
                 padding-top: .65rem;
-                padding-bottom: 9.5rem;
+                padding-bottom: calc(11rem + env(safe-area-inset-bottom, 0px));
             }
 
             .page-head {
@@ -741,16 +741,40 @@
 
             .so-action-bottom-inner {
                 display: block;
+                padding: .55rem .65rem;
+            }
+
+            .so-action-bottom-card {
+                position: fixed;
+                left: .55rem;
+                right: .55rem;
+                bottom: calc(66px + env(safe-area-inset-bottom, 0px) + .5rem);
+                z-index: 1000;
+                margin: 0;
+                border-radius: 12px;
+                box-shadow: 0 8px 24px rgba(15, 23, 42, .18), 0 0 0 1px rgba(15, 23, 42, .06);
+            }
+
+            body[data-theme="dark"] .so-action-bottom-card {
+                box-shadow: 0 8px 24px rgba(0, 0, 0, .35), 0 0 0 1px rgba(148, 163, 184, .12);
+            }
+
+            .so-action-bottom-meta {
+                display: none;
             }
 
             .so-action-bottom-buttons {
                 display: grid;
-                grid-template-columns: 1fr;
-                margin-top: .7rem;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: .45rem;
+                margin-top: 0;
             }
 
             .so-action-bottom-buttons .btn {
-                min-height: 44px;
+                min-height: 42px;
+                padding: .45rem .4rem;
+                font-size: .75rem;
+                line-height: 1.15;
             }
         }
     </style>
