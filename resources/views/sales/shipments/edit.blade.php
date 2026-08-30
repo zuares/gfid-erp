@@ -2810,14 +2810,6 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                 return;
             }
 
-            const confirmed = window.confirm(
-                `Konfirmasi scan item?\n\nKode: ${code}\n\nItem akan ditambahkan ke shipment.`
-            );
-            if (!confirmed) {
-                focusScan();
-                return;
-            }
-
             fetch(scanForm.action, {
                 method: 'POST',
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },

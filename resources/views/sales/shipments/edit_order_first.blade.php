@@ -1420,14 +1420,6 @@
             return;
         }
 
-        const confirmed = window.confirm(
-            `Konfirmasi scan nomor order/resi?\n\n${code}\n\nNomor ini akan disimpan dan dimapping ke item shipment.`
-        );
-        if (!confirmed) {
-            scanInput?.focus();
-            return;
-        }
-
         fetch(recordOrderUrl, {
             method: 'POST',
             headers: {
@@ -1478,14 +1470,6 @@
             playTone('errorNoOrder');
             alertError('Scan nomor order dulu sebelum scan item.', 'errorNoOrder');
             setMode('order');
-            return;
-        }
-
-        const confirmed = window.confirm(
-            `Konfirmasi scan item?\n\nKode: ${code}\n\nItem akan ditambahkan ke shipment.`
-        );
-        if (!confirmed) {
-            scanInput?.focus();
             return;
         }
 
