@@ -27,7 +27,13 @@
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
             <h5 class="mb-0 fw-black">Neraca Saldo</h5>
-            <div class="text-muted" style="font-size:.8rem">Akumulasi semua jurnal s.d. tanggal terpilih</div>
+            <div class="text-muted" style="font-size:.8rem">
+                @if($cutoffDate && !$showLegacy)
+                    Jurnal sistem baru mulai {{ \Illuminate\Support\Carbon::parse($cutoffDate)->format('d-m-Y') }} s.d. tanggal terpilih
+                @else
+                    Akumulasi semua jurnal s.d. tanggal terpilih
+                @endif
+            </div>
         </div>
         @php $balanced = abs($totalBalanceDebit - $totalBalanceCredit) < 0.02; @endphp
         @if($rows->count() > 0)
@@ -46,6 +52,12 @@
                    value="{{ $asOf }}">
         </div>
         <button type="submit" class="tb-btn" style="background:#0f172a;color:#fff;border-color:#0f172a">Tampilkan</button>
+        @if($cutoffDate)
+            <label class="d-flex align-items-center gap-1 mb-2" style="font-size:.76rem;font-weight:700;color:#475569;">
+                <input type="checkbox" name="show_legacy" value="1" @checked($showLegacy)>
+                Tampilkan legacy
+            </label>
+        @endif
     </form>
 
     {{-- Table --}}

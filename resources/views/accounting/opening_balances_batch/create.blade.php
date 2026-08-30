@@ -166,7 +166,8 @@
                     <div class="field">
                         <label>Tanggal Saldo Awal</label>
                         <input type="date" name="date" class="form-control"
-                               value="{{ old('date', now()->toDateString()) }}" required>
+                               value="{{ old('date', $cutoffDate ?? now()->toDateString()) }}"
+                               max="{{ now()->toDateString() }}" required>
                     </div>
                     <div class="field">
                         <label>Keterangan</label>
@@ -198,8 +199,11 @@
         <div class="info-note">
             💡 Isi <strong>Saldo Awal</strong> masing-masing akun. Aset di kiri = Hutang + Modal di kanan.
             Kosongkan atau isi <strong>0</strong> untuk akun yang tidak punya saldo awal.
+            <br><span style="color:#1d4ed8;">✦ Nilai bertanda <strong>auto</strong> dihitung berdasarkan data sampai cut-off
+                <strong>{{ \Illuminate\Support\Carbon::parse($cutoffDate ?? now()->toDateString())->format('d-m-Y') }}</strong>.
+                Periksa dan koreksi jika saldo fisik atau rekening koran berbeda.</span>
             @if($hasPrefill)
-            <br><span style="color:#1d4ed8;">✦ Persediaan sudah terisi otomatis dari data stok sistem.</span>
+            <br><span style="color:#1d4ed8;">✦ Beberapa saldo sudah terisi otomatis dari ledger, transaksi, dan data stok sistem.</span>
             @endif
         </div>
 

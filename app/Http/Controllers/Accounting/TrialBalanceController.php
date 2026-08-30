@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Accounting;
 
 use App\Http\Controllers\Controller;
 use App\Models\Account;
+use App\Models\SystemSetting;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,8 @@ class TrialBalanceController extends Controller
         $asOf = $request->filled('as_of')
             ? Carbon::parse($request->date('as_of'))->toDateString()
             : now()->toDateString();
+        $cutoffDate = SystemSetting::cutoffDateString();
+        $showLegacy = $request->boolean('show_legacy');
 
         $accounts = Account::where('is_active', true)->orderBy('code')->get();
 
@@ -25,6 +28,7 @@ class TrialBalanceController extends Controller
             ->whereNull('j.voided_at')
             ->whereNotIn('j.source_type', self::EXCLUDED)
             ->whereDate('j.date', '<=', $asOf)
+            ->when($cutoffDate && !$showLegacy, fn ($q) => $q->whereDate('j.date', '>=', $cutoffDate))
             ->groupBy('jl.account_id')
             ->selectRaw('jl.account_id, COALESCE(SUM(jl.debit),0) as total_debit, COALESCE(SUM(jl.credit),0) as total_credit')
             ->get()
@@ -55,7 +59,14 @@ class TrialBalanceController extends Controller
         $totalBalanceCredit = $rows->sum('balance_credit');
 
         return view('accounting.trial_balance.index', compact(
-            'asOf', 'rows', 'totalDebit', 'totalCredit', 'totalBalanceDebit', 'totalBalanceCredit'
+            'asOf',
+            'cutoffDate',
+            'showLegacy',
+            'rows',
+            'totalDebit',
+            'totalCredit',
+            'totalBalanceDebit',
+            'totalBalanceCredit'
         ));
     }
 }

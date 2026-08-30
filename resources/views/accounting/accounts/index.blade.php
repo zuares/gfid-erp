@@ -14,6 +14,7 @@
 
     // Group accounts by type in COA order
     $typeOrder = ['asset', 'liability', 'equity', 'revenue', 'expense'];
+    $creditNormalTypes = ['liability', 'equity', 'revenue'];
     $filterType = request('type', '');
     $grouped = $accounts->groupBy('type');
 @endphp
@@ -134,6 +135,28 @@
         <a class="coa-add-btn" href="{{ route('accounting.accounts.create') }}">+ Akun Baru</a>
     </div>
 
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2"
+         style="padding:.65rem .85rem;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1e3a8a;font-size:.8rem;">
+        <span>
+            @if($cutoffDate && !$showLegacy)
+                Saldo akun menampilkan sistem baru mulai <strong>{{ \Illuminate\Support\Carbon::parse($cutoffDate)->format('d-m-Y') }}</strong>.
+            @else
+                Saldo akun menampilkan seluruh histori jurnal.
+            @endif
+        </span>
+        @if($cutoffDate)
+            <form method="GET" class="d-flex align-items-center gap-2 mb-0">
+                @if(request('type'))
+                    <input type="hidden" name="type" value="{{ request('type') }}">
+                @endif
+                <label class="d-flex align-items-center gap-1 mb-0" style="font-weight:800;white-space:nowrap;">
+                    <input type="checkbox" name="show_legacy" value="1" @checked($showLegacy) onchange="this.form.submit()">
+                    Tampilkan legacy
+                </label>
+            </form>
+        @endif
+    </div>
+
     {{-- KPI strip --}}
     @php
         $totalAset     = $accounts->where('type','asset')->sum(fn($a) => (float)($a->balance ?? 0));
@@ -153,18 +176,20 @@
         </div>
         <div class="coa-kpi">
             <div class="coa-kpi-label">Hutang</div>
-            <div class="coa-kpi-val {{ $totalLiab > 0 ? 'neg' : '' }}">Rp {{ $fmt($totalLiab) }}</div>
+            @php $displayTotalLiab = -$totalLiab; @endphp
+            <div class="coa-kpi-val {{ $displayTotalLiab < 0 ? 'neg' : 'pos' }}">Rp {{ $fmt($displayTotalLiab) }}</div>
         </div>
     </div>
 
     {{-- Type filter pills --}}
     <div class="coa-filter-pills">
+        @php $legacyQuery = $showLegacy ? ['show_legacy' => 1] : []; @endphp
         <a class="coa-pill {{ $filterType === '' ? 'active' : '' }}"
-           href="{{ route('accounting.accounts.index') }}">Semua</a>
+           href="{{ route('accounting.accounts.index', $legacyQuery) }}">Semua</a>
         @foreach ($typeOrder as $t)
             @if (isset($typeLabel[$t]))
                 <a class="coa-pill {{ $filterType === $t ? 'active' : '' }}"
-                   href="{{ route('accounting.accounts.index', ['type' => $t]) }}">
+                   href="{{ route('accounting.accounts.index', ['type' => $t] + $legacyQuery) }}">
                     {{ $typeLabel[$t]['label'] }}
                 </a>
             @endif
@@ -178,7 +203,8 @@
             if ($filterType && $filterType !== $groupType) continue;
             if ($groupAccounts->isEmpty()) continue;
             $meta = $typeLabel[$groupType] ?? ['label' => strtoupper($groupType), 'color' => '#475569', 'bg' => '#f1f5f9'];
-            $groupTotal = $groupAccounts->sum(fn($a) => (float)($a->balance ?? 0));
+            $groupTotalRaw = $groupAccounts->sum(fn($a) => (float)($a->balance ?? 0));
+            $groupTotal = in_array($groupType, $creditNormalTypes, true) ? -$groupTotalRaw : $groupTotalRaw;
         @endphp
         <div class="coa-group">
             <div class="coa-group-header">
@@ -200,10 +226,15 @@
             @foreach ($groupAccounts as $account)
                 @php
                     $bal      = (float)($account->balance ?? 0);
+                    $displayBal = in_array($account->type, $creditNormalTypes, true) ? -$bal : $bal;
                     $txnCount = (int)($journalLineCounts[$account->id] ?? 0);
+                    $ledgerUrl = route('accounting.accounts.ledger', $account);
+                    if ($cutoffDate && !$showLegacy) {
+                        $ledgerUrl .= '?from=' . urlencode($cutoffDate);
+                    }
                 @endphp
                 <a class="coa-row {{ !$account->is_active ? 'coa-inactive' : '' }}"
-                   href="{{ route('accounting.accounts.ledger', $account) }}">
+                   href="{{ $ledgerUrl }}">
                     <span class="coa-row-code">{{ $account->code }}</span>
                     <span>
                         <div class="coa-row-name">{{ $account->name }}</div>
@@ -220,8 +251,8 @@
                             —
                         @endif
                     </span>
-                    <span class="coa-row-balance {{ $bal < 0 ? 'neg' : ($bal > 0 ? 'pos' : '') }}">
-                        Rp {{ $fmt($bal) }}
+                    <span class="coa-row-balance {{ $displayBal < 0 ? 'neg' : ($displayBal > 0 ? 'pos' : '') }}">
+                        Rp {{ $fmt($displayBal) }}
                     </span>
                 </a>
             @endforeach

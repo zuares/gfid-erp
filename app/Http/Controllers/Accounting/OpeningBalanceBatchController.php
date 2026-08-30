@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\Journal;
 use App\Models\JournalLine;
+use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -15,6 +16,11 @@ use Illuminate\Validation\ValidationException;
 
 class OpeningBalanceBatchController extends Controller
 {
+    private const EXCLUDED_JOURNAL_SOURCES = [
+        'opening_balance_void',
+        'opening_balance_batch_void',
+    ];
+
     public function index(Request $request)
     {
         $q = Journal::query()
@@ -50,6 +56,10 @@ class OpeningBalanceBatchController extends Controller
 
     public function create()
     {
+        // Opening balance harus mengikuti tanggal cut-off resmi, bukan otomatis
+        // mengikuti tanggal saat halaman dibuka.
+        $cutoffDate = SystemSetting::cutoffDateString() ?? now()->toDateString();
+
         $accounts = Account::query()
             ->where('is_active', true)
             ->orderBy('code')
@@ -71,44 +81,14 @@ class OpeningBalanceBatchController extends Controller
 
         $nonRmCodes = array_merge($wipCodes, $fgCodes, $rejectCodes);
 
-        $inventoryByWarehouse = DB::table('inventory_stocks as s')
-            ->join('warehouses as w', 'w.id', '=', 's.warehouse_id')
-            ->join('items as i', 'i.id', '=', 's.item_id')
-            ->leftJoinSub($latestCost, 'cs', 'cs.item_id', '=', 's.item_id')
-            ->where('s.qty', '>', 0)
-            ->whereIn('w.code', $nonRmCodes)
-            ->selectRaw('w.code as wh_code, ROUND(SUM(s.qty * COALESCE(NULLIF(i.hpp, 0), cs.unit_cost, 0)), 0) as total_value')
-            ->groupBy('w.code')
-            ->pluck('total_value', 'wh_code');
-
-        // Cost source untuk RM: avg cost dari GRN (inventory_mutations direction=in),
-        // fallback ke last_purchase_price dari master item.
-        $rmAvgCost = DB::table('inventory_mutations as m')
-            ->join('warehouses as w', 'w.id', '=', 'm.warehouse_id')
-            ->where('w.code', 'RM')
-            ->where('m.direction', 'in')
-            ->where('m.unit_cost', '>', 0)
-            ->groupBy('m.item_id')
-            ->selectRaw('m.item_id, ROUND(SUM(m.total_cost) / NULLIF(SUM(m.qty_change), 0), 4) as avg_unit_cost')
-            ->pluck('avg_unit_cost', 'item_id');
-
-        $rmTotal = (float) DB::table('inventory_stocks as s')
-            ->join('warehouses as w', 'w.id', '=', 's.warehouse_id')
-            ->join('items as i', 'i.id', '=', 's.item_id')
-            ->where('w.code', 'RM')
-            ->where('s.qty', '>', 0)
-            ->get(['s.item_id', 's.qty', 'i.last_purchase_price'])
-            ->sum(function ($row) use ($rmAvgCost) {
-                $cost = (float) ($rmAvgCost[$row->item_id] ?? $row->last_purchase_price ?? 0);
-                return $row->qty * $cost;
-            });
-        $rmTotal = round($rmTotal, 0);
+        $inventoryByWarehouse = $this->inventoryValuesByWarehouseAsOf($cutoffDate, $nonRmCodes);
 
         $wipTotal    = collect($wipCodes)->sum(fn($c) => (float) ($inventoryByWarehouse[$c] ?? 0));
         $fgTotal     = collect($fgCodes)->sum(fn($c) => (float) ($inventoryByWarehouse[$c] ?? 0));
         $rejectTotal = collect($rejectCodes)->sum(fn($c) => (float) ($inventoryByWarehouse[$c] ?? 0));
 
         $customerReceivableTotal = (float) DB::table('sales_invoices')
+            ->whereDate('date', '<=', $cutoffDate)
             ->where(function ($q) {
                 $q->whereNull('status')
                     ->orWhereNotIn('status', ['cancelled', 'canceled', 'void', 'voided']);
@@ -125,6 +105,7 @@ class OpeningBalanceBatchController extends Controller
             ->sum('grand_total');
 
         $marketplaceInvoiceTotal = (float) DB::table('sales_invoices')
+            ->whereDate('date', '<=', $cutoffDate)
             ->where(function ($q) {
                 $q->whereNull('status')
                     ->orWhereNotIn('status', ['cancelled', 'canceled', 'void', 'voided']);
@@ -142,6 +123,7 @@ class OpeningBalanceBatchController extends Controller
         if ($marketplaceInvoiceTotal <= 0) {
             $marketplaceOrderTotal = (float) DB::table('marketplace_orders')
                 ->whereNull('cancelled_at')
+                ->whereDate('order_date', '<=', $cutoffDate)
                 ->where(function ($q) {
                     $q->whereNull('status')
                         ->orWhereNotIn('status', ['cancelled', 'canceled', 'void', 'voided']);
@@ -162,6 +144,7 @@ class OpeningBalanceBatchController extends Controller
         $payrollPeriodPayableTotal = (float) DB::table('piecework_payroll_periods as p')
             ->leftJoinSub($payrollLines, 'pl', 'pl.payroll_period_id', '=', 'p.id')
             ->whereNull('p.paid_at')
+            ->whereDate('p.period_end', '<=', $cutoffDate)
             ->whereIn('p.status', ['final', 'posted'])
             ->whereIn('p.module', ['cutting', 'sewing', 'finishing', 'packing'])
             ->selectRaw('SUM(COALESCE(NULLIF(p.total_amount, 0), pl.lines_total, 0)) as total')
@@ -172,6 +155,7 @@ class OpeningBalanceBatchController extends Controller
             ->join('journal_lines as jl', 'jl.journal_id', '=', 'j.id')
             ->join('accounts as a', 'a.id', '=', 'jl.account_id')
             ->whereNull('j.voided_at')
+            ->whereDate('j.date', '<=', $cutoffDate)
             ->where('a.code', '2102')
             ->whereIn('j.source_type', [
                 'cutting_job_wage',
@@ -200,6 +184,7 @@ class OpeningBalanceBatchController extends Controller
             ->join('sewing_pickups as sp', 'sp.id', '=', 'spl.sewing_pickup_id')
             ->where('spl.status', '!=', 'void')
             ->where('sp.status', '!=', 'void')
+            ->whereDate('sp.date', '<=', $cutoffDate)
             ->where('spl.wage_per_pcs', '>', 0)
             ->whereNotExists(function ($q) {
                 $q->selectRaw('1')
@@ -246,6 +231,7 @@ class OpeningBalanceBatchController extends Controller
 
         // Piutang Dagang — top 20 invoice
         $piutangDagangRows = DB::table('sales_invoices')
+            ->whereDate('date', '<=', $cutoffDate)
             ->where(function ($q) {
                 $q->whereNull('status')
                     ->orWhereNotIn('status', ['cancelled', 'canceled', 'void', 'voided']);
@@ -271,6 +257,7 @@ class OpeningBalanceBatchController extends Controller
 
         // Saldo Marketplace / Clearing — top 20 invoice/order
         $piutangMpRows = DB::table('sales_invoices')
+            ->whereDate('date', '<=', $cutoffDate)
             ->where(function ($q) {
                 $q->whereNull('status')
                     ->orWhereNotIn('status', ['cancelled', 'canceled', 'void', 'voided']);
@@ -295,6 +282,7 @@ class OpeningBalanceBatchController extends Controller
         if ($piutangMpDetail->isEmpty() && $marketplaceOrderTotal > 0) {
             $mpOrderRows = DB::table('marketplace_orders')
                 ->whereNull('cancelled_at')
+                ->whereDate('order_date', '<=', $cutoffDate)
                 ->where(function ($q) {
                     $q->whereNull('status')
                         ->orWhereNotIn('status', ['cancelled', 'canceled', 'void', 'voided']);
@@ -320,6 +308,7 @@ class OpeningBalanceBatchController extends Controller
             ->leftJoin('employees as e', 'e.id', '=', 'pl.employee_id')
             ->leftJoin('items as i', 'i.id', '=', 'pl.item_id')
             ->whereNull('p.paid_at')
+            ->whereDate('p.period_end', '<=', $cutoffDate)
             ->whereIn('p.status', ['final', 'posted'])
             ->whereIn('p.module', ['cutting', 'sewing', 'finishing', 'packing'])
             ->groupBy('p.id', 'p.module', 'p.period_start', 'p.period_end', 'e.name', 'i.code', 'i.name', 'pl.rate_per_pcs')
@@ -354,6 +343,7 @@ class OpeningBalanceBatchController extends Controller
             ->join('accounts as a', 'a.id', '=', 'jl.account_id')
             ->join('cutting_jobs as cj', 'cj.id', '=', 'j.source_id')
             ->whereNull('j.voided_at')
+            ->whereDate('j.date', '<=', $cutoffDate)
             ->where('a.code', '2102')
             ->whereIn('j.source_type', ['cutting_job_wage', 'cutting_wip'])
             ->selectRaw("
@@ -425,6 +415,7 @@ class OpeningBalanceBatchController extends Controller
             ->leftJoin('employees as e', 'e.id', '=', 'sp.operator_id')
             ->leftJoin('items as i', 'i.id', '=', 'spl.finished_item_id')
             ->whereNull('j.voided_at')
+            ->whereDate('j.date', '<=', $cutoffDate)
             ->where('a.code', '2102')
             ->where('j.source_type', 'sewing_pickup_wage')
             ->where('spl.status', '!=', 'void')
@@ -499,10 +490,9 @@ class OpeningBalanceBatchController extends Controller
             '2102' => ['title' => 'Hutang Upah Borongan Belum Dibayar', 'rows' => $hutangUpahDetail,    'note' => $hutangUpahNote],
         ];
 
-        // Prefill HANYA untuk WIP/FG/Reject — utama dari HPP master item,
-        // fallback ke snapshot cost terakhir jika HPP belum diisi.
-        // 1201 (RM) TIDAK di-prefill karena sudah otomatis terjurnal via Stock Opname
-        // (inventory_adjustment journal). Jika di-input ulang di sini akan double-count.
+        // Prefill inventory WIP/FG/Reject dari stok sistem, dengan fallback HPP
+        // master/snapshot. Nilai ini tetap editable karena hasil fisik bisa
+        // berbeda dari saldo sistem.
         $prefill = [];
         foreach ([
             ['1202', $wipTotal],
@@ -518,7 +508,137 @@ class OpeningBalanceBatchController extends Controller
             }
         }
 
-        return view('accounting.opening_balances_batch.create', compact('accounts', 'prefill', 'details'));
+        // ──────────────────────────────────────────────────────────────
+        // AUTO-PREFILL TAMBAHAN BERDASARKAN SALDO PER CUT-OFF
+        // ──────────────────────────────────────────────────────────────
+        // Semua nilai ini hanya menjadi draft di form dan tetap dapat diedit.
+        $accountByCode = $accounts->keyBy('code');
+        $ledgerBalances = $this->journalNetBalancesAsOf($cutoffDate);
+
+        // Kas / bank: ambil saldo bersih ledger sampai tanggal cut-off.
+        foreach (['1101', '1111', '1112'] as $code) {
+            $account = $accountByCode->get($code);
+            $value = max(0, (float) ($ledgerBalances[$account?->id] ?? 0));
+            if ($account && $value > 0 && !isset($prefill[$account->id])) {
+                $prefill[$account->id] = round($value, 2);
+            }
+        }
+
+        // Hutang dagang: GRN posted dikurangi pembayaran sampai cut-off.
+        $tradePayable = $this->tradePayableAsOf($cutoffDate);
+        if ($accountByCode->has('2101') && $tradePayable > 0) {
+            $prefill[$accountByCode->get('2101')->id] = round($tradePayable, 2);
+        }
+
+        // Bahan baku dan packaging: nilai mutasi persediaan bersih sampai
+        // cut-off, dikelompokkan berdasarkan item_role.
+        $inventoryByRole = $this->inventoryValuesByRoleAsOf($cutoffDate);
+        foreach ([
+            '1201' => ['raw_material', 'production_supply'],
+            '1205' => ['shipping_supply'],
+        ] as $code => $roles) {
+            $account = $accountByCode->get($code);
+            $value = collect($roles)->sum(fn ($role) => (float) ($inventoryByRole[$role] ?? 0));
+            if ($account && $value > 0 && !isset($prefill[$account->id])) {
+                $prefill[$account->id] = round($value, 2);
+            }
+        }
+
+        return view('accounting.opening_balances_batch.create', compact(
+            'accounts',
+            'prefill',
+            'details',
+            'cutoffDate'
+        ));
+    }
+
+    /**
+     * Saldo bersih per akun dari jurnal aktif sampai tanggal tertentu.
+     * Dipakai sebagai sumber auto-fill kas/bank karena saldo tersebut memang
+     * merupakan hasil transaksi accounting yang sudah diposting.
+     */
+    private function journalNetBalancesAsOf(string $asOf): array
+    {
+        return DB::table('journal_lines as jl')
+            ->join('journals as j', 'j.id', '=', 'jl.journal_id')
+            ->whereNull('j.voided_at')
+            ->whereNotIn('j.source_type', self::EXCLUDED_JOURNAL_SOURCES)
+            ->whereDate('j.date', '<=', $asOf)
+            ->groupBy('jl.account_id')
+            ->selectRaw('jl.account_id, COALESCE(SUM(jl.debit - jl.credit), 0) as net')
+            ->get()
+            ->mapWithKeys(fn ($row) => [(int) $row->account_id => (float) $row->net])
+            ->all();
+    }
+
+    /**
+     * Hutang dagang bersih berdasarkan GRN posted dikurangi pembayaran/DP apply
+     * sampai cut-off. Rumus disamakan dengan laporan Hutang Dagang.
+     */
+    private function tradePayableAsOf(string $asOf): float
+    {
+        $grn = DB::table('purchase_receipts')
+            ->where('status', 'posted')
+            ->whereDate('date', '<=', $asOf)
+            ->groupBy('purchase_order_id')
+            ->selectRaw('purchase_order_id, SUM(grand_total) as grn_total');
+
+        $paid = DB::table('purchase_payments')
+            ->whereNull('voided_at')
+            ->whereIn('type', ['payment', 'dp_apply'])
+            ->whereDate('date', '<=', $asOf)
+            ->groupBy('purchase_order_id')
+            ->selectRaw('purchase_order_id, SUM(amount) as paid_total');
+
+        return round((float) DB::table('purchase_orders as po')
+            ->joinSub($grn, 'grn', 'grn.purchase_order_id', '=', 'po.id')
+            ->leftJoinSub($paid, 'pay', 'pay.purchase_order_id', '=', 'po.id')
+            ->whereRaw('ROUND(grn.grn_total - COALESCE(pay.paid_total, 0), 2) > 0.01')
+            ->selectRaw('SUM(grn.grn_total - COALESCE(pay.paid_total, 0)) as outstanding')
+            ->value('outstanding'), 2);
+    }
+
+    /**
+     * Nilai persediaan bersih per item_role sampai cut-off.
+     * total_cost adalah nilai aktual mutasi; fallback ke qty × unit_cost untuk
+     * baris lama yang belum memiliki total_cost.
+     */
+    private function inventoryValuesByRoleAsOf(string $asOf): array
+    {
+        $cost = "COALESCE(NULLIF(ABS(im.total_cost), 0), ABS(im.qty_change) * COALESCE(im.unit_cost, 0))";
+
+        return DB::table('inventory_mutations as im')
+            ->join('items as i', 'i.id', '=', 'im.item_id')
+            ->whereDate('im.date', '<=', $asOf)
+            ->selectRaw("COALESCE(NULLIF(i.item_role, ''), 'raw_material') as item_role,
+                SUM(CASE WHEN im.direction = 'in' THEN {$cost} ELSE -{$cost} END) as amount")
+            ->groupByRaw("COALESCE(NULLIF(i.item_role, ''), 'raw_material')")
+            ->get()
+            ->mapWithKeys(fn ($row) => [(string) $row->item_role => max(0, (float) $row->amount)])
+            ->all();
+    }
+
+    /**
+     * Nilai persediaan per gudang sampai cut-off untuk WIP/FG/reject.
+     */
+    private function inventoryValuesByWarehouseAsOf(string $asOf, array $warehouseCodes): array
+    {
+        if ($warehouseCodes === []) {
+            return [];
+        }
+
+        $cost = "COALESCE(NULLIF(ABS(im.total_cost), 0), ABS(im.qty_change) * COALESCE(im.unit_cost, 0))";
+
+        return DB::table('inventory_mutations as im')
+            ->join('warehouses as w', 'w.id', '=', 'im.warehouse_id')
+            ->whereIn('w.code', $warehouseCodes)
+            ->whereDate('im.date', '<=', $asOf)
+            ->selectRaw("w.code as wh_code,
+                SUM(CASE WHEN im.direction = 'in' THEN {$cost} ELSE -{$cost} END) as amount")
+            ->groupBy('w.code')
+            ->get()
+            ->mapWithKeys(fn ($row) => [(string) $row->wh_code => max(0, (float) $row->amount)])
+            ->all();
     }
 
     public function detail(string $code)
@@ -545,7 +665,7 @@ class OpeningBalanceBatchController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'date' => ['required', 'date'],
+            'date' => ['required', 'date', 'before_or_equal:today'],
             'description' => ['nullable', 'string', 'max:255'],
 
             'account_id' => ['required', 'array'],

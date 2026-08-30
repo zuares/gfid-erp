@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Accounting;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\JournalLine;
+use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -53,15 +54,18 @@ class AccountController extends Controller
     public function index(Request $request)
     {
         $q = Account::query()->orderBy('code');
+        $cutoffDate = SystemSetting::cutoffDateString();
+        $showLegacy = $request->boolean('show_legacy');
 
         if ($request->filled('type')) {
             $q->where('type', $request->string('type')->toString());
         }
 
-        $accounts = $q->withSum(['journalLines as balance' => function ($qq) {
+        $accounts = $q->withSum(['journalLines as balance' => function ($qq) use ($cutoffDate, $showLegacy) {
             $qq->join('journals', 'journals.id', '=', 'journal_lines.journal_id')
                 ->whereNull('journals.voided_at')
-                ->whereNotIn('journals.source_type', self::EXCLUDED_BALANCE_SOURCES);
+                ->whereNotIn('journals.source_type', self::EXCLUDED_BALANCE_SOURCES)
+                ->when($cutoffDate && !$showLegacy, fn ($query) => $query->whereDate('journals.date', '>=', $cutoffDate));
         }], DB::raw('journal_lines.debit - journal_lines.credit'))
             ->get();
 
@@ -69,12 +73,18 @@ class AccountController extends Controller
             ->join('journals as j', 'j.id', '=', 'jl.journal_id')
             ->whereNull('j.voided_at')
             ->whereNotIn('j.source_type', self::EXCLUDED_BALANCE_SOURCES)
+            ->when($cutoffDate && !$showLegacy, fn ($query) => $query->whereDate('j.date', '>=', $cutoffDate))
             ->groupBy('jl.account_id')
             ->selectRaw('jl.account_id, COUNT(*) as line_count')
             ->get()
             ->pluck('line_count', 'account_id');
 
-        return view('accounting.accounts.index', compact('accounts', 'journalLineCounts'));
+        return view('accounting.accounts.index', compact(
+            'accounts',
+            'journalLineCounts',
+            'cutoffDate',
+            'showLegacy'
+        ));
     }
 
     public function create()
