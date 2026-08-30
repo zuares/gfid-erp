@@ -414,6 +414,107 @@
     body[data-theme="dark"] .summary-label { color: #cbd5e1; }
     .summary-stats { display: flex; gap: 1.5rem; }
     .summary-stat-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; }
+    .store-page-heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: .8rem;
+    }
+    .store-page-heading h1 {
+        color: var(--shp-accent);
+        font-size: 1.25rem;
+        font-weight: 800;
+        letter-spacing: -.02em;
+        margin: 0;
+    }
+    .store-page-heading p {
+        color: var(--shp-muted);
+        font-size: .78rem;
+        margin: .25rem 0 0;
+    }
+    .store-page-actions { display:flex; flex-wrap:wrap; gap:.45rem; justify-content:flex-end; }
+    .store-filter-bar {
+        display: flex;
+        align-items: center;
+        gap: .55rem;
+        flex-wrap: wrap;
+        padding: .7rem;
+        margin-bottom: .8rem;
+        background: var(--card, #fff);
+        border: 1px solid var(--shp-border);
+        border-radius: 10px;
+    }
+    .store-search {
+        position: relative;
+        flex: 1 1 250px;
+        min-width: 190px;
+    }
+    .store-search i {
+        position: absolute;
+        top: 50%;
+        left: .7rem;
+        color: #94a3b8;
+        transform: translateY(-50%);
+        pointer-events: none;
+    }
+    .store-search input {
+        width: 100%;
+        height: 34px;
+        padding: .35rem .7rem .35rem 2rem;
+        border: 1px solid var(--shp-border-strong);
+        border-radius: 8px;
+        background: transparent;
+        color: inherit;
+        font-size: .78rem;
+        outline: none;
+    }
+    .store-search input:focus { border-color: #64748b; box-shadow: 0 0 0 3px rgba(100,116,139,.12); }
+    .store-filter-select {
+        height: 34px;
+        min-width: 150px;
+        padding: .25rem 2rem .25rem .65rem;
+        border: 1px solid var(--shp-border-strong);
+        border-radius: 8px;
+        background: var(--card, #fff);
+        color: inherit;
+        font-size: .78rem;
+    }
+    body[data-theme="dark"] .store-filter-select { background: var(--card, #0f172a); }
+    .store-filter-result { color: var(--shp-muted); font-size: .72rem; white-space: nowrap; }
+    .store-status-row { display:flex; align-items:center; justify-content:space-between; gap:.6rem; margin-bottom:1.1rem; }
+    .store-status-group { display:flex; align-items:center; flex-wrap:wrap; gap:.4rem; }
+    .store-use-badge {
+        display:inline-flex;
+        align-items:center;
+        gap:.3rem;
+        padding:.25rem .55rem;
+        border-radius:6px;
+        font-size:.7rem;
+        font-weight:700;
+        border:1px solid transparent;
+    }
+    .store-use-badge.is-active { color:#166534; background:rgba(34,197,94,.10); border-color:rgba(34,197,94,.22); }
+    .store-use-badge.is-inactive { color:#64748b; background:rgba(100,116,139,.10); border-color:rgba(100,116,139,.22); }
+    body[data-theme="dark"] .store-use-badge.is-active { color:#86efac; }
+    body[data-theme="dark"] .store-use-badge.is-inactive { color:#cbd5e1; }
+    .status-toggle {
+        display:inline-flex;
+        align-items:center;
+        gap:.35rem;
+        border-radius:7px;
+        padding:.28rem .55rem;
+        font-size:.7rem;
+        font-weight:700;
+        white-space:nowrap;
+    }
+    .status-toggle.is-enable { color:#166534; background:rgba(34,197,94,.08); border:1px solid rgba(34,197,94,.28); }
+    .status-toggle.is-disable { color:#64748b; background:transparent; border:1px solid var(--shp-border-strong); }
+    .status-toggle:hover { filter:brightness(.97); }
+    .status-toggle:disabled { opacity:.65; cursor:wait; }
+    .filter-empty-state { grid-column:1 / -1; padding:2.7rem 1rem; text-align:center; color:var(--shp-muted); }
+    .filter-empty-state i { display:block; margin-bottom:.6rem; font-size:2rem; color:#cbd5e1; }
+    body[data-theme="dark"] .filter-empty-state i { color:#475569; }
     .import-modal-summary {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -447,6 +548,14 @@
         .store-actions a { min-width: 0; }
         .summary-bar { align-items: flex-start; padding: .85rem; }
         .summary-stats { flex-wrap: wrap; gap: .65rem .9rem; }
+        .store-page-heading { align-items:flex-start; flex-direction:column; gap:.65rem; }
+        .store-page-actions { width:100%; justify-content:flex-start; }
+        .store-page-actions > * { flex:1 1 auto; }
+        .store-filter-bar { align-items:stretch; }
+        .store-search, .store-filter-select { width:100%; min-width:0; }
+        .store-filter-result { width:100%; }
+        .store-status-row { align-items:flex-start; flex-direction:column; }
+        .status-toggle { width:100%; justify-content:center; }
     }
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -461,11 +570,12 @@
 
     <div class="ship-topbar">
         <div>
-            <div class="title">Toko & Channel</div>
+            <div class="title">Marketplace</div>
             <div class="kpis">
-                <span class="kpi" title="Channel aktif"><span class="lbl">Channel</span><span class="val" id="kpiChannels">—</span></span>
-                <span class="kpi" title="Toko terhubung"><span class="lbl">Toko</span><span class="val" id="kpiStores">—</span></span>
-                <span class="kpi" title="Toko dengan token valid"><span class="lbl">Token Valid</span><span class="val" id="kpiTokenExp">—</span></span>
+                <span class="kpi" title="Total toko terdaftar"><span class="lbl">Total Toko</span><span class="val" id="kpiStores">—</span></span>
+                <span class="kpi" title="Toko dengan koneksi marketplace aktif"><span class="lbl">Terhubung</span><span class="val" id="kpiConnected">—</span></span>
+                <span class="kpi" title="Toko yang membutuhkan perhatian"><span class="lbl">Perlu Perhatian</span><span class="val" id="kpiAttention">—</span></span>
+                <span class="kpi" title="Toko yang dinonaktifkan dari proses operasional"><span class="lbl">Nonaktif</span><span class="val" id="kpiInactive">—</span></span>
             </div>
         </div>
 
@@ -490,12 +600,29 @@
         </div>
     </div>
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold m-0" style="color:var(--shp-accent)"><i class="bi bi-shop me-2" style="color:#3b82f6;"></i> Daftar Toko Anda</h5>
-        <div class="d-flex gap-2">
+    <div class="store-page-heading">
+        <div>
+            <h1><i class="bi bi-shop me-2" style="color:#3b82f6;"></i>Kelola Toko & Channel</h1>
+            <p>Atur koneksi marketplace, status operasional, sinkronisasi, dan pesanan dari satu tempat.</p>
+        </div>
+        <div class="store-page-actions">
             <button type="button" class="btn btn-ship-outline btn-pill btn-sm shadow-sm" onclick="bootstrap_()"><i class="bi bi-magic me-1"></i> Setup Default</button>
             <button type="button" class="btn btn-ship-primary btn-pill btn-sm shadow-sm" onclick="loadAll()"><i class="bi bi-arrow-clockwise me-1"></i> Segarkan</button>
         </div>
+    </div>
+
+    <div class="store-filter-bar" role="search" aria-label="Filter daftar toko">
+        <div class="store-search">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <input type="search" id="storeSearch" placeholder="Cari nama atau ID toko..." autocomplete="off" oninput="setStoreSearch(this.value)">
+        </div>
+        <select id="storeStatusFilter" class="store-filter-select" aria-label="Filter status toko" onchange="setStoreStatusFilter(this.value)">
+            <option value="all">Semua status</option>
+            <option value="connected">Terhubung</option>
+            <option value="attention">Perlu perhatian</option>
+            <option value="inactive">Nonaktif</option>
+        </select>
+        <span id="storeFilterResult" class="store-filter-result">Menampilkan semua toko</span>
     </div>
 
     <div id="platformTabs" class="platform-tabs" role="tablist" aria-label="Pilih platform marketplace"></div>
@@ -740,6 +867,8 @@
     const { api, fmt, fmtDate, esc, channelPill, statusBadge } = window.mpHelpers;
     let channels = [], stores = [], warehouses = [], storeStats = {};
     let activePlatformTab = 'shopee';
+    let storeSearch = '';
+    let storeStatusFilter = 'all';
     let syncStoreId = null, syncStoreName = '';
     const canImport = @json($canImport);
     const importOrderPreviewUrl = @json(route('imports.marketplace.preview'));
@@ -829,6 +958,53 @@
         renderStoreCards();
     };
 
+    function storeMatchesFilters(store) {
+        const search = storeSearch.trim().toLowerCase();
+        if (search) {
+            const haystack = [store.name, store.code, store.external_shop_id]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+            if (!haystack.includes(search)) return false;
+        }
+
+        if (storeStatusFilter === 'inactive') return store.is_active === false;
+        if (storeStatusFilter === 'connected') return store.connection_status === 'CONNECTED';
+        if (storeStatusFilter === 'attention') {
+            return store.is_active !== false && store.connection_status !== 'CONNECTED';
+        }
+
+        return true;
+    }
+
+    function updateStoreFilterResult(count, total) {
+        const result = $('storeFilterResult');
+        if (!result) return;
+
+        const hasFilter = storeSearch.trim() !== '' || storeStatusFilter !== 'all';
+        result.textContent = hasFilter
+            ? `${count} dari ${total} toko`
+            : `${total} toko terdaftar`;
+    }
+
+    window.setStoreSearch = function (value) {
+        storeSearch = String(value || '');
+        renderStoreCards();
+    };
+
+    window.setStoreStatusFilter = function (value) {
+        storeStatusFilter = String(value || 'all');
+        renderStoreCards();
+    };
+
+    window.clearStoreFilters = function () {
+        storeSearch = '';
+        storeStatusFilter = 'all';
+        $('storeSearch').value = '';
+        $('storeStatusFilter').value = 'all';
+        renderStoreCards();
+    };
+
     function populateStoreFormOptions() {
         const channelSelect = $('storeFormChannel');
         const warehouseSelect = $('storeFormWarehouse');
@@ -846,10 +1022,16 @@
     }
 
     function renderKpi() {
-        $('kpiChannels').textContent = channels.length;
-        $('kpiStores').textContent   = stores.length;
-        const valid = stores.filter(s => s.token_expires_at && new Date(s.token_expires_at) > new Date()).length;
-        $('kpiTokenExp').textContent = valid;
+        const connected = stores.filter(store => store.connection_status === 'CONNECTED').length;
+        const inactive = stores.filter(store => store.is_active === false).length;
+        const attention = stores.filter(store =>
+            store.is_active !== false && store.connection_status !== 'CONNECTED'
+        ).length;
+
+        $('kpiStores').textContent = stores.length;
+        $('kpiConnected').textContent = connected;
+        $('kpiAttention').textContent = attention;
+        $('kpiInactive').textContent = inactive;
     }
 
     function renderStoreCards() {
@@ -862,11 +1044,18 @@
             return;
         }
 
-        const visibleStores = stores.filter(store => storePlatformKey(store) === activePlatformTab);
+        const platformStores = stores.filter(store => storePlatformKey(store) === activePlatformTab);
+        const visibleStores = platformStores.filter(storeMatchesFilters);
+        updateStoreFilterResult(visibleStores.length, stores.length);
 
         if (!visibleStores.length) {
-            const platformName = activePlatformTab === 'shopee' ? 'Shopee' : 'TikTok Shop';
-            body.innerHTML = `<div class="empty-state"><i class="bi bi-shop"></i><div>Belum ada toko ${platformName}.</div><div class="small mt-2">Tambahkan atau hubungkan toko ${platformName} dari tombol di atas.</div></div>`;
+            const hasFilter = storeSearch.trim() !== '' || storeStatusFilter !== 'all';
+            const platformName = activePlatformTab === 'shopee'
+                ? 'Shopee'
+                : (activePlatformTab === 'tiktok' ? 'TikTok Shop' : 'marketplace ini');
+            body.innerHTML = hasFilter
+                ? `<div class="filter-empty-state"><i class="bi bi-search"></i><div class="fw-semibold">Tidak ada toko yang cocok.</div><div class="small mt-2">Coba ubah kata kunci atau filter status.</div><button type="button" class="btn btn-sm btn-ship-outline btn-pill mt-3" onclick="clearStoreFilters()">Reset Filter</button></div>`
+                : `<div class="empty-state"><i class="bi bi-shop"></i><div>Belum ada toko ${platformName}.</div><div class="small mt-2">Tambahkan atau hubungkan toko ${platformName} dari tombol di atas.</div></div>`;
             summary.style.display = 'none';
             return;
         }
@@ -891,9 +1080,7 @@
             else if (s.connection_status === 'AUTH_REQUIRED') { statusClass = 'st-auth-required'; statusLabel = 'Akses Ditolak'; }
             else if (s.connection_status !== 'NOT_CONNECTED') { statusClass = 'st-warning'; statusLabel = 'Perlu Login'; }
 
-            // Toko nonaktif (sengaja tidak dipakai) → tidak diberi peringatan koneksi.
             const inactive = s.is_active === false;
-            if (inactive) { statusClass = 'st-inactive'; statusLabel = 'Nonaktif'; }
 
             const channelCode = s.channel ? (s.channel.code || '').toUpperCase() : '';
             const isShopee = ['SHP', 'SHOPEE'].includes(channelCode);
@@ -955,14 +1142,17 @@
                     </div>
                 </div>
 
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <span class="badge-status ${statusClass}">${statusLabel}</span>
-                    ${inactive
-                        ? `<button type="button" class="btn btn-sm btn-outline-success" data-toggle-active="${s.id}" style="font-size:.7rem; padding:.15rem .5rem;" onclick="toggleActive(${s.id})"><i class="bi bi-power"></i> Aktifkan Toko</button>`
-                        : `<span style="display:flex; gap:.35rem; align-items:center;">
-                             ${connectUrl ? `<a href="${connectUrl}" class="btn btn-sm btn-outline-primary" style="font-size:.7rem; padding:.15rem .5rem;"><i class="bi bi-plug"></i> Hubungkan Ulang</a>` : ''}
-                             <button type="button" class="btn btn-sm btn-outline-secondary" data-toggle-active="${s.id}" style="font-size:.7rem; padding:.15rem .5rem;" onclick="toggleActive(${s.id})" title="Sembunyikan dari peringatan koneksi"><i class="bi bi-power"></i> Nonaktifkan</button>
-                           </span>`}
+                <div class="store-status-row">
+                    <div class="store-status-group">
+                        <span class="badge-status ${statusClass}">${statusLabel}</span>
+                        <span class="store-use-badge ${inactive ? 'is-inactive' : 'is-active'}">
+                            <i class="bi ${inactive ? 'bi-pause-circle' : 'bi-check-circle'}"></i>
+                            ${inactive ? 'Nonaktif' : 'Aktif'}
+                        </span>
+                    </div>
+                    <button type="button" class="status-toggle ${inactive ? 'is-enable' : 'is-disable'}" data-toggle-active="${s.id}" onclick="toggleActive(${s.id})" title="${inactive ? 'Aktifkan toko' : 'Nonaktifkan toko'}">
+                        <i class="bi bi-power"></i> ${inactive ? 'Aktifkan' : 'Nonaktifkan'}
+                    </button>
                 </div>
 
                 <div class="store-stats">
