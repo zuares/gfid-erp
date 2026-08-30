@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Item;
 use App\Models\MarketplaceOrder;
+use App\Models\Store;
 use Illuminate\Http\JsonResponse;
 
 trait MarketplaceOrdersPaginatedTrait
@@ -18,6 +19,7 @@ trait MarketplaceOrdersPaginatedTrait
 
         $applyScope = function ($query) use ($dateFrom, $dateTo, $store, $search) {
             $this->excludeKilatOrders($query);
+            $this->scopeOperationalStores($query);
 
             if ($dateFrom || $dateTo) {
                 $query->where(function ($q) use ($dateFrom, $dateTo) {
@@ -113,6 +115,7 @@ trait MarketplaceOrdersPaginatedTrait
 
         $query = MarketplaceOrder::with($with);
         $this->excludeKilatOrders($query);
+        $this->scopeOperationalStores($query);
 
         // Date Filter
         if ($dateFrom || $dateTo) {
@@ -530,5 +533,23 @@ trait MarketplaceOrdersPaginatedTrait
                 ->orWhere('shipping_carrier', 'like', '%same day%')
                 ->orWhere('shipping_carrier', 'like', '%sameday%');
         });
+    }
+
+    /**
+     * Order marketplace reguler hanya ditampilkan untuk toko yang siap
+     * dioperasikan: aktif, status channel aktif, dan koneksi/token valid.
+     * connection_status adalah accessor model karena credentials terenkripsi,
+     * jadi daftar ID diselesaikan di aplikasi sebelum dipakai ke query order.
+     */
+    private function scopeOperationalStores($query): void
+    {
+        $storeIds = Store::query()
+            ->where('is_active', true)
+            ->where('status', 'active')
+            ->get()
+            ->filter(fn (Store $store): bool => $store->connection_status === 'CONNECTED')
+            ->modelKeys();
+
+        $query->whereIn('store_id', $storeIds);
     }
 }

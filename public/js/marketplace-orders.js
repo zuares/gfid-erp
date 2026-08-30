@@ -622,10 +622,17 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     async function loadAvailableStores() {
         try {
             const stores = await api('/api/marketplace/stores');
-            if (Array.isArray(stores)) availableStores = stores;
+            if (Array.isArray(stores)) {
+                availableStores = stores.filter(store =>
+                    store?.is_active === true
+                    && String(store.status || '').toLowerCase() === 'active'
+                    && store.connection_status === 'CONNECTED'
+                );
+            }
         } catch (error) {
-            // Keep the order-derived fallback so a temporary store API error
-            // does not make the filter unusable.
+            // Jangan menampilkan toko yang status koneksinya tidak bisa
+            // diverifikasi sebagai toko operasional.
+            availableStores = [];
             console.warn('Gagal memuat daftar toko:', error);
         }
 
