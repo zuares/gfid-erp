@@ -36,15 +36,15 @@
     $countedLines = $linesCollection->where('is_counted', true)->count();
     $notCounted = max($totalLines - $countedLines, 0);
 
-    // urutan: terlama -> terbaru (terbaru paling bawah)
+    // Urutan: terbaru -> terlama, agar item yang baru diinput selalu di atas.
     $lines = $linesCollection
-        ->sortBy(function ($line) {
+        ->sortByDesc(function ($line) {
             return $line->updated_at ?? ($line->created_at ?? $line->id);
         })
         ->values();
 
-    $lastLine = $lines->last();
-    $lastLineId = $lastLine?->id;
+    $newestLine = $lines->first();
+    $newestLineId = $newestLine?->id;
 @endphp
 
 @push('head')
@@ -396,6 +396,34 @@
             transition: border-color .15s, box-shadow .15s, opacity .15s;
             font-variant-numeric: tabular-nums;
         }
+
+        .so-inline-hpp {
+            width: 110px;
+            min-width: 86px;
+            margin-left: auto;
+            font-size: .82rem;
+            padding: .18rem .42rem;
+            text-align: right;
+            border-radius: 6px;
+            transition: border-color .15s, box-shadow .15s, opacity .15s;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .so-inline-hpp.is-saving {
+            border-color: #93c5fd !important;
+            opacity: .6;
+            pointer-events: none;
+        }
+
+        .so-inline-hpp.is-saved {
+            border-color: #22c55e !important;
+            box-shadow: 0 0 0 2px rgba(34,197,94,.2) !important;
+        }
+
+        .so-inline-hpp.is-error {
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 0 2px rgba(239,68,68,.2) !important;
+        }
         .so-inline-qty.is-saving {
             border-color: #93c5fd !important;
             opacity: .6;
@@ -413,6 +441,317 @@
             font-variant-numeric: tabular-nums;
             font-size: .82rem;
             font-weight: 800;
+        }
+
+        .so-sound-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .35rem;
+            min-height: 34px;
+            padding: .3rem .65rem;
+            border: 1px solid rgba(148, 163, 184, .3);
+            border-radius: 999px;
+            background: var(--card);
+            color: #475569;
+            font-size: .72rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .so-sound-toggle.is-off {
+            color: #94a3b8;
+            border-color: rgba(148, 163, 184, .22);
+        }
+
+        .col-physical {
+            min-width: 100px;
+        }
+
+        @media (max-width: 767.98px) {
+            .page-wrap {
+                padding-top: .65rem;
+                padding-bottom: 9.5rem;
+            }
+
+            .page-head {
+                display: block;
+            }
+
+            .page-head > .text-end {
+                margin-top: .5rem;
+                text-align: left !important;
+            }
+
+            .page-title {
+                font-size: 1rem;
+                line-height: 1.55;
+            }
+
+            .so-sound-toggle {
+                min-height: 40px;
+                padding-inline: .75rem;
+            }
+
+            .section-add .card-body,
+            .section-meta .card-body,
+            .section-table .card-body {
+                padding: .8rem;
+            }
+
+            .section-meta .card-body {
+                padding: .55rem .7rem;
+            }
+
+            .section-meta .row {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                gap: .4rem .65rem;
+                margin: 0;
+            }
+
+            .section-meta .row > [class*="col-"] {
+                width: auto;
+                padding-inline: 0;
+            }
+
+            .section-meta .so-meta-identity {
+                grid-column: 1;
+            }
+
+            .section-meta .so-meta-warehouse {
+                grid-column: 2;
+            }
+
+            .section-meta .so-meta-notes {
+                grid-column: 1 / -1;
+            }
+
+            .section-meta .so-meta-identity-content {
+                display: flex;
+                align-items: flex-start;
+                gap: .8rem;
+            }
+
+            .section-meta .so-meta-identity-content > div {
+                min-width: 0;
+                flex: 1 1 0;
+            }
+
+            .section-meta .so-meta-identity-content,
+            .section-meta .so-meta-warehouse,
+            .section-meta .so-meta-notes {
+                font-size: .74rem;
+                line-height: 1.25;
+            }
+
+            .section-meta .so-meta-identity .pill-label,
+            .section-meta .so-meta-warehouse .pill-label,
+            .section-meta .so-meta-notes .pill-label {
+                margin-top: 0 !important;
+                margin-bottom: .15rem !important;
+                font-size: .58rem;
+                letter-spacing: .045em;
+            }
+
+            .section-meta .so-meta-identity .text-mono,
+            .section-meta .so-meta-identity-content [style],
+            .section-meta .so-meta-warehouse .fw-semibold {
+                font-size: .74rem !important;
+            }
+
+            .section-meta .so-meta-warehouse .meta {
+                font-size: .68rem;
+            }
+
+            .section-meta .so-meta-identity .text-mono,
+            .section-meta .so-meta-warehouse .fw-semibold,
+            .section-meta .so-meta-warehouse .meta {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .section-meta .so-meta-notes textarea {
+                min-height: 36px;
+                height: 36px;
+                resize: vertical;
+                padding: .3rem .45rem;
+                font-size: .74rem;
+            }
+
+            .opening-add-row {
+                grid-template-columns: minmax(0, 1fr) 104px;
+                gap: .65rem;
+            }
+
+            .opening-add-row > .d-grid {
+                grid-column: 1 / -1;
+            }
+
+            .opening-add-row > .d-grid {
+                margin-top: .05rem;
+            }
+
+            .opening-add-row .form-control,
+            .opening-add-row button {
+                min-height: 44px;
+            }
+
+            .table-wrap {
+                max-height: none !important;
+                overflow: visible;
+                border: 0;
+                background: transparent;
+            }
+
+            .table-wrap table,
+            .table-wrap tbody {
+                display: block;
+                width: 100%;
+            }
+
+            .table-wrap thead {
+                display: none;
+            }
+
+            .table-wrap tbody tr {
+                display: grid;
+                grid-template-columns: 26px minmax(0, 1fr) auto;
+                gap: .25rem .55rem;
+                align-items: center;
+                margin-bottom: .55rem;
+                padding: .7rem .65rem;
+                border: 1px solid rgba(148, 163, 184, .22);
+                border-radius: 12px;
+                background: var(--card);
+                box-shadow: 0 4px 12px rgba(15, 23, 42, .04);
+            }
+
+            body[data-theme="dark"] .table-wrap tbody tr {
+                border-color: rgba(51, 65, 85, .9);
+                box-shadow: none;
+            }
+
+            .table-wrap tbody td {
+                display: none;
+                min-width: 0;
+                padding: 0;
+                border: 0;
+                white-space: normal;
+            }
+
+            .table-wrap tbody td:first-child,
+            .table-wrap tbody td:nth-child(2),
+            .table-wrap tbody td.col-physical,
+            .table-wrap tbody td.col-unit,
+            .table-wrap tbody td.so-line-action {
+                display: block;
+            }
+
+            .table-wrap tbody td:first-child {
+                grid-column: 1;
+                grid-row: 1;
+                align-self: start;
+                padding-top: .1rem;
+                color: var(--so-muted);
+                font-size: .72rem;
+                font-weight: 800;
+            }
+
+            .table-wrap tbody td:nth-child(2) {
+                grid-column: 2;
+                grid-row: 1;
+                overflow-wrap: anywhere;
+            }
+
+            .table-wrap tbody tr.so-row-with-hpp td:nth-child(2) {
+                grid-column: 2 / -1;
+            }
+
+            .table-wrap tbody td:nth-child(2) .meta {
+                display: block;
+                line-height: 1.25;
+            }
+
+            .table-wrap tbody td.col-physical {
+                grid-column: 3;
+                grid-row: 1;
+                min-width: 92px;
+            }
+
+            .table-wrap tbody td.so-line-action {
+                grid-column: 2 / -1;
+                grid-row: 3;
+                text-align: right;
+            }
+
+            .table-wrap tbody td.so-line-action .btn {
+                min-height: 36px;
+                padding-inline: .75rem;
+            }
+
+            .table-wrap tbody td.col-physical .so-inline-qty {
+                width: 100%;
+                min-width: 0;
+                min-height: 40px;
+                font-size: .9rem;
+            }
+
+            .table-wrap tbody td.col-unit {
+                display: block !important;
+                grid-column: 2 / -1;
+                grid-row: 2;
+                text-align: left !important;
+                min-width: 0;
+            }
+
+            .table-wrap tbody tr.so-row-with-hpp td.col-physical {
+                grid-column: 2;
+                grid-row: 2;
+                min-width: 0;
+                text-align: left !important;
+            }
+
+            .table-wrap tbody tr.so-row-with-hpp td.col-unit {
+                grid-column: 3;
+                grid-row: 2;
+                min-width: 104px;
+                text-align: left !important;
+            }
+
+            .table-wrap tbody td.col-unit .so-inline-hpp {
+                width: 100%;
+                min-width: 0;
+                min-height: 40px;
+                font-size: .9rem;
+            }
+
+            .so-mobile-field-label {
+                display: block;
+                margin-bottom: .2rem;
+            }
+
+            .table-wrap tbody td.col-physical > .text-mono {
+                display: inline-block;
+                padding: .45rem .5rem;
+                border-radius: 8px;
+                background: rgba(148, 163, 184, .1);
+            }
+
+            .so-action-bottom-inner {
+                display: block;
+            }
+
+            .so-action-bottom-buttons {
+                display: grid;
+                grid-template-columns: 1fr;
+                margin-top: .7rem;
+            }
+
+            .so-action-bottom-buttons .btn {
+                min-height: 44px;
+            }
         }
     </style>
 @endpush
@@ -433,7 +772,10 @@
                 </h1>
             </div>
 
-            <div class="text-end">
+            <div class="text-end d-flex align-items-center justify-content-end gap-2 flex-wrap">
+                <button type="button" class="so-sound-toggle" id="soSoundToggle" aria-pressed="true">
+                    🔊 Suara ON
+                </button>
                 <span class="chip">
                     {{ $countedLines }} / {{ $totalLines }} terisi
                     @if ($notCounted > 0)
@@ -478,21 +820,27 @@
                                             @if ($isReadonly) readonly @endif>{{ old('notes', $opname->notes) }}</textarea>
                                     </div>
                                 @else
-                                    <div class="col-md-4">
-                                        <div class="pill-label mb-1">Kode</div>
-                                        <div class="text-mono fw-semibold">{{ $opname->code }}</div>
+                                    <div class="col-md-4 so-meta-identity">
+                                        <div class="so-meta-identity-content">
+                                            <div>
+                                                <div class="pill-label mb-1">Kode</div>
+                                                <div class="text-mono fw-semibold">{{ $opname->code }}</div>
+                                            </div>
 
-                                        <div class="pill-label mt-3 mb-1">Tanggal</div>
-                                        <div style="font-size:.9rem;">{{ $opname->date?->format('d M Y') ?? '-' }}</div>
+                                            <div>
+                                                <div class="pill-label mt-3 mb-1">Tanggal</div>
+                                                <div style="font-size:.9rem;">{{ $opname->date?->format('d M Y') ?? '-' }}</div>
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    <div class="col-md-4">
+                                    <div class="col-md-4 so-meta-warehouse">
                                         <div class="pill-label mb-1">Gudang</div>
                                         <div class="fw-semibold">{{ $opname->warehouse?->code ?? '-' }}</div>
                                         <div class="meta">{{ $opname->warehouse?->name }}</div>
                                     </div>
 
-                                    <div class="col-md-4">
+                                    <div class="col-md-4 so-meta-notes">
                                         <div class="pill-label mb-1">Catatan</div>
                                         <textarea name="notes" class="form-control form-control-sm" rows="3" placeholder="Catatan…"
                                             @if ($isReadonly) readonly @endif>{{ old('notes', $opname->notes) }}</textarea>
@@ -522,10 +870,12 @@
 
                                     <div class="opening-add-row">
                                         <div id="opening-item-suggest-mobile">
-                                            <label class="pill-label mb-1">Item</label>
+                                            <label class="pill-label mb-1">Kode Item</label>
                                             <x-item-suggest idName="item_id" :idValue="old('item_id')" :displayValue="''"
-                                                placeholder="Kode / nama" :autofocus="false" :autoSelectFirst="false"
-                                                :maxResults="3" />
+                                                displayMode="code-name" mobileDisplayMode="code"
+                                                :showName="false" :showCategory="false"
+                                                placeholder="Kode item" mobilePlaceholder="Kode item"
+                                                :autofocus="false" :autoSelectFirst="false" :maxResults="3" />
                                         </div>
 
                                         <div>
@@ -640,7 +990,7 @@
 
                             <div class="table-wrap" id="opname-lines-table"
                                 data-delete-url-template="{{ route('inventory.stock_opnames.lines.destroy', ['stockOpname' => $opname, 'line' => '__LINE_ID__']) }}"
-                                data-last-line-id="{{ $lastLineId ?? '' }}">
+                                data-newest-line-id="{{ $newestLineId ?? '' }}">
                                 <table class="table table-sm mb-0 align-middle">
                                     <thead>
                                         <tr>
@@ -717,19 +1067,27 @@
                                                     $rawUnitCost = (float) $rawUnitCost;
                                                 }
 
-                                                // opening fallback base_unit_cost
+                                                // Fallback HPP master untuk baris lama yang unit_cost-nya masih NULL.
+                                                // Prioritaskan items.hpp agar sama dengan halaman detail SO.
                                                 $fallbackUnitCost = null;
-                                                if (
-                                                    !$hasUnitCostValue &&
-                                                    $line->item &&
-                                                    (float) ($line->item->base_unit_cost ?? 0) > 0
-                                                ) {
-                                                    $fallbackUnitCost = (float) $line->item->base_unit_cost;
+                                                if (!$hasUnitCostValue && $line->item) {
+                                                    $masterHpp = (float) ($line->item->hpp ?? 0);
+                                                    $baseUnitCost = (float) ($line->item->base_unit_cost ?? 0);
+
+                                                    if ($masterHpp > 0) {
+                                                        $fallbackUnitCost = $masterHpp;
+                                                    } elseif ($baseUnitCost > 0) {
+                                                        $fallbackUnitCost = $baseUnitCost;
+                                                    }
                                                 }
 
                                                 $effectiveUnitCost = $hasUnitCostValue
                                                     ? $rawUnitCost
                                                     : $fallbackUnitCost;
+
+                                                $formattedUnitCost = $effectiveUnitCost !== null
+                                                    ? rtrim(rtrim(number_format((float) $effectiveUnitCost, 4, '.', ''), '0'), '.')
+                                                    : '';
 
                                                 $rowClasses = [];
                                                 $showNotCountedBadge = false;
@@ -738,6 +1096,10 @@
                                                 if (!$hasPhysicalValue) {
                                                     $rowClasses[] = 'so-row-not-counted';
                                                     $showNotCountedBadge = true;
+                                                }
+
+                                                if ($isOpening && !$isOpOrAdmin) {
+                                                    $rowClasses[] = 'so-row-with-hpp';
                                                 }
                                             @endphp
 
@@ -766,9 +1128,10 @@
                                                 @endunless
 
                                                 {{-- ✅ Qty Fisik --}}
-                                                <td class="text-end" style="min-width:100px;">
-                                                    @if ($canModifyLines && !$isOpening)
-                                                        {{-- PERIODIC + bisa edit: inline input --}}
+                                                <td class="text-end col-physical" style="min-width:100px;">
+                                                    <span class="pill-label so-mobile-field-label d-md-none">Qty Fisik</span>
+                                                    @if ($canModifyLines)
+                                                        {{-- OPENING + PERIODIC: inline input --}}
                                                         <input type="text" inputmode="decimal" autocomplete="off"
                                                             name="{{ $inputNamePrefix }}[physical_qty]"
                                                             class="form-control form-control-sm so-inline-qty"
@@ -777,6 +1140,7 @@
                                                             data-item-id="{{ $line->item_id }}"
                                                             data-system-qty="{{ $rawSystemQty }}"
                                                             data-original="{{ $hasPhysicalValue ? (float)$rawPhysical : '' }}"
+                                                            data-unit-cost="{{ $effectiveUnitCost !== null ? $effectiveUnitCost : '' }}"
                                                             data-line-id="{{ $line->id }}">
                                                     @elseif ($isOpening)
                                                         @if ($hasPhysicalForDisplay)
@@ -809,20 +1173,31 @@
 
                                                 {{-- ✅ unit_cost: opening selalu kirim; periodic hanya kalau sudah ada physical --}}
                                                 @if ($isOpening)
-                                                    <input type="hidden" name="{{ $inputNamePrefix }}[unit_cost]"
+                                                    <input type="hidden" class="so-unit-cost-hidden" data-line-id="{{ $line->id }}"
+                                                        name="{{ $inputNamePrefix }}[unit_cost]"
                                                         value="{{ $effectiveUnitCost !== null ? $effectiveUnitCost : '' }}">
                                                 @else
                                                     @if ($hasPhysicalForDisplay)
-                                                        <input type="hidden" name="{{ $inputNamePrefix }}[unit_cost]"
+                                                        <input type="hidden" class="so-unit-cost-hidden" data-line-id="{{ $line->id }}"
+                                                            name="{{ $inputNamePrefix }}[unit_cost]"
                                                             value="{{ $effectiveUnitCost !== null ? $effectiveUnitCost : '' }}">
                                                     @endif
                                                 @endif
 
                                                 @if ($isOpening && !$isOpOrAdmin)
                                                     <td class="text-end col-unit">
-                                                        @if ($effectiveUnitCost && $effectiveUnitCost > 0)
+                                                        <span class="pill-label so-mobile-field-label d-md-none">HPP / Unit</span>
+                                                        @if ($canModifyLines)
+                                                            <input type="text" inputmode="decimal" autocomplete="off"
+                                                                class="form-control form-control-sm so-inline-hpp"
+                                                                value="{{ $formattedUnitCost }}"
+                                                                placeholder="HPP"
+                                                                data-original="{{ $effectiveUnitCost !== null ? (float) $effectiveUnitCost : '' }}"
+                                                                data-line-id="{{ $line->id }}"
+                                                                data-save-url="{{ route('inventory.stock_opnames.lines.unit_cost', ['stockOpname' => $opname, 'line' => $line]) }}">
+                                                        @elseif ($effectiveUnitCost && $effectiveUnitCost > 0)
                                                             <span class="text-mono {{ $hasUnitCostValue ? '' : 'meta' }}">
-                                                                {{ number_format($effectiveUnitCost, 2) }}
+                                                                {{ $formattedUnitCost }}
                                                             </span>
                                                         @else
                                                             <span class="meta">-</span>
@@ -843,7 +1218,7 @@
                                                 @endunless
 
                                                 @if ($isOpening && $canModifyLines)
-                                                    <td class="text-end">
+                                                    <td class="text-end so-line-action">
                                                         <button type="button"
                                                             class="btn btn-sm btn-outline-danger js-delete-line"
                                                             data-line-id="{{ $line->id }}">
@@ -943,6 +1318,9 @@
         window.SO_CAN_MODIFY     = @json($canModifyLines);
         window.SO_INLINE_SAVE_URL = @json(route('inventory.stock_opnames.lines.store', $opname));
         window.SO_CSRF           = @json(csrf_token());
+        window.SO_FLASH_SUCCESS  = @json(session('success'));
+        window.SO_FLASH_ERROR    = @json(session('error'));
+        window.SO_HAS_ERRORS     = @json($errors->any());
     </script>
 
     <script>
@@ -950,8 +1328,15 @@
         let pendingOpeningSubmit = null;
 
         document.addEventListener('DOMContentLoaded', function() {
+            initSoSound();
+            consumePendingSoFeedback();
+
+            if (window.SO_FLASH_SUCCESS) playSoSound('success');
+            if (window.SO_FLASH_ERROR || window.SO_HAS_ERRORS) playSoSound('error');
+
             initDuplicateItemModal();
             initInlineQtyEdit();
+            initInlineHppEdit();
 
             initOpeningAddBlock({
                 rootSelector: '#openingAddMobile',
@@ -974,7 +1359,7 @@
             renumberOpnameRows();
 
             setTableMaxHeight10Rows();
-            highlightLastRowIfNeeded();
+            highlightNewestRowIfNeeded();
 
             const soForm = document.getElementById('soUpdateForm');
             const markReviewedEl = document.getElementById('mark_reviewed');
@@ -1025,6 +1410,116 @@
             });
         }
 
+        /* ────────────────────────────────────────────────────
+         * INPUT FEEDBACK SOUND
+         * Uses the shared GFID sound engine so the tone is generated locally
+         * and remains available without adding an audio asset to the page.
+         * ──────────────────────────────────────────────────── */
+        const SO_SOUND_STORAGE_KEY = 'so_input_sound_enabled';
+        const SO_FEEDBACK_STORAGE_KEY = 'so_input_feedback';
+
+        function initSoSound() {
+            const button = document.getElementById('soSoundToggle');
+            if (!button) return;
+
+            let enabled = true;
+            try {
+                const saved = localStorage.getItem(SO_SOUND_STORAGE_KEY);
+                enabled = saved !== '0';
+            } catch (e) {}
+
+            if (window.GFID?.setScanSoundEnabled) {
+                window.GFID.setScanSoundEnabled(enabled);
+            }
+            window.SO_SOUND_ENABLED = enabled;
+
+            const render = () => {
+                const active = window.GFID?.isScanSoundEnabled
+                    ? window.GFID.isScanSoundEnabled()
+                    : enabled;
+                button.classList.toggle('is-off', !active);
+                button.setAttribute('aria-pressed', active ? 'true' : 'false');
+                button.textContent = active ? '🔊 Suara ON' : '🔇 Suara OFF';
+                button.title = active ? 'Matikan suara feedback input' : 'Nyalakan suara feedback input';
+            };
+
+            render();
+            button.addEventListener('click', function() {
+                const current = window.GFID?.isScanSoundEnabled
+                    ? window.GFID.isScanSoundEnabled()
+                    : enabled;
+                enabled = !current;
+                window.SO_SOUND_ENABLED = enabled;
+                if (window.GFID?.setScanSoundEnabled) window.GFID.setScanSoundEnabled(enabled);
+                try { localStorage.setItem(SO_SOUND_STORAGE_KEY, enabled ? '1' : '0'); } catch (e) {}
+                render();
+            });
+
+            // Resume AudioContext from a real user gesture (required by mobile browsers).
+            const unlock = () => {
+                try {
+                    const Ctx = window.AudioContext || window.webkitAudioContext;
+                    if (!Ctx || !window.GFID) return;
+                    const ctx = window.GFID.scanAudioContext || (window.GFID.scanAudioContext = new Ctx());
+                    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+                } catch (e) {}
+            };
+            document.addEventListener('pointerdown', unlock, { once: true, passive: true });
+            document.addEventListener('keydown', unlock, { once: true });
+        }
+
+        function playSoSound(type) {
+            const enabled = window.GFID?.isScanSoundEnabled
+                ? window.GFID.isScanSoundEnabled()
+                : window.SO_SOUND_ENABLED !== false;
+            if (!enabled) return;
+
+            if (window.GFID?.playScanSoundPreset) {
+                window.GFID.playScanSoundPreset(type === 'error' ? 'error' : 'ok');
+            }
+        }
+
+        function showSoSuccess(message) {
+            playSoSound('success');
+            if (window.GFID?.toast) {
+                window.GFID.toast(message || 'Input berhasil disimpan.', {
+                    position: 'top-end',
+                    timer: 1800,
+                });
+            } else if (message) {
+                alert(message);
+            }
+        }
+
+        function showSoError(message) {
+            playSoSound('error');
+            if (window.GFID?.errorAlert) {
+                window.GFID.errorAlert(message || 'Input gagal disimpan.');
+            } else {
+                alert(message || 'Input gagal disimpan.');
+            }
+        }
+
+        function queueSoFeedback(type, message) {
+            try {
+                sessionStorage.setItem(SO_FEEDBACK_STORAGE_KEY, JSON.stringify({ type, message }));
+            } catch (e) {}
+        }
+
+        function consumePendingSoFeedback() {
+            let pending = null;
+            try {
+                pending = JSON.parse(sessionStorage.getItem(SO_FEEDBACK_STORAGE_KEY) || 'null');
+                sessionStorage.removeItem(SO_FEEDBACK_STORAGE_KEY);
+            } catch (e) {}
+            if (!pending) return;
+
+            setTimeout(() => {
+                if (pending.type === 'error') showSoError(pending.message);
+                else showSoSuccess(pending.message);
+            }, 90);
+        }
+
         function renumberOpnameRows() {
             const tbody = document.querySelector('#opname-lines-table tbody');
             if (!tbody) return;
@@ -1037,6 +1532,13 @@
         function setTableMaxHeight10Rows() {
             const tableWrap = document.getElementById('opname-lines-table');
             if (!tableWrap) return;
+
+            if (window.innerWidth < 768) {
+                tableWrap.style.maxHeight = 'none';
+                tableWrap.style.overflowY = 'visible';
+                return;
+            }
+
             const table = tableWrap.querySelector('table');
             const thead = table ? table.querySelector('thead') : null;
             const firstRow = table ? table.querySelector('tbody tr') : null;
@@ -1062,19 +1564,19 @@
             });
         }
 
-        function highlightLastRowIfNeeded() {
+        function highlightNewestRowIfNeeded() {
             try {
-                const flag = sessionStorage.getItem('so_opening_highlight_last');
+                const flag = sessionStorage.getItem('so_opening_highlight_newest');
                 if (!flag) return;
-                sessionStorage.removeItem('so_opening_highlight_last');
+                sessionStorage.removeItem('so_opening_highlight_newest');
 
                 const tableWrap = document.getElementById('opname-lines-table');
                 if (!tableWrap) return;
 
-                const lastId = tableWrap.dataset.lastLineId;
-                if (!lastId) return;
+                const newestId = tableWrap.dataset.newestLineId;
+                if (!newestId) return;
 
-                const row = tableWrap.querySelector('tr[data-line-id="' + lastId + '"]');
+                const row = tableWrap.querySelector('tr[data-line-id="' + newestId + '"]');
                 if (!row) return;
 
                 setTableMaxHeight10Rows();
@@ -1125,6 +1627,12 @@
             }).format(n);
         }
 
+        function formatHppForInput(value) {
+            const n = Number(value);
+            if (!Number.isFinite(n)) return '';
+            return n.toFixed(4).replace(/\.?0+$/, '');
+        }
+
         function collectExistingItemIds() {
             const existingIds = new Set();
             document.querySelectorAll('tr[data-item-id]').forEach(tr => {
@@ -1144,6 +1652,7 @@
 
             const itemSuggestInput = document.querySelector(opts.itemSuggestInputSelector);
             const qtyInput = rootEl.querySelector(opts.qtySelector);
+            const itemIdInput = rootEl.querySelector('input[name="item_id"]');
             const submitBtn = document.querySelector(opts.submitBtnSelector);
 
             const updateExistingInput = rootEl.querySelector('input[name="update_existing"]');
@@ -1160,6 +1669,27 @@
                         qtyInput.focus();
                         qtyInput.select && qtyInput.select();
                     }
+                });
+            }
+
+            // Kode item mobile selalu ditulis dengan huruf kapital.
+            if (itemSuggestInput && opts.rootSelector === '#openingAddMobile') {
+                itemSuggestInput.addEventListener('input', function() {
+                    const cursor = this.selectionStart;
+                    this.value = this.value.toUpperCase();
+                    if (cursor !== null) this.setSelectionRange(cursor, cursor);
+                });
+            }
+
+            // Setelah opsi autosuggest dipilih (klik atau keyboard), lanjut ke Qty.
+            if (itemIdInput && qtyInput) {
+                itemIdInput.addEventListener('change', function() {
+                    if (!itemIdInput.value) return;
+
+                    window.setTimeout(() => {
+                        qtyInput.focus();
+                        qtyInput.select && qtyInput.select();
+                    }, 0);
                 });
             }
 
@@ -1187,12 +1717,12 @@
             const qtyField = rootEl.querySelector('input[name="physical_qty"]');
 
             if (!itemIdField || !itemIdField.value) {
-                alert('Pilih item terlebih dahulu.');
+                showSoError('Pilih item terlebih dahulu.');
                 itemSuggestInput && itemSuggestInput.focus();
                 return;
             }
             if (!qtyField || qtyField.value.trim() === '') {
-                alert('Isi Qty Fisik terlebih dahulu.');
+                showSoError('Isi Qty Fisik terlebih dahulu.');
                 qtyField && qtyField.focus();
                 qtyField && qtyField.select && qtyField.select();
                 return;
@@ -1258,7 +1788,7 @@
         function performOpeningAjaxSubmit(rootEl, opts = {}) {
             const actionUrl = opts.actionUrl || rootEl.dataset.action;
             if (!actionUrl) {
-                alert('URL penyimpanan tidak ditemukan.');
+                showSoError('URL penyimpanan tidak ditemukan.');
                 return;
             }
 
@@ -1297,7 +1827,7 @@
                                 msg = data.errors[firstKey][0] ?? msg;
                             }
                         } catch (e) {}
-                        alert(msg);
+                        showSoError(msg);
                         return null;
                     }
                     return response.json();
@@ -1307,14 +1837,15 @@
                     if (data.status === 'ok') {
                         try {
                             sessionStorage.setItem('so_opening_focus_back', '1');
-                            sessionStorage.setItem('so_opening_highlight_last', '1');
+                            sessionStorage.setItem('so_opening_highlight_newest', '1');
                         } catch (e) {}
-                        window.location.reload();
+                        queueSoFeedback('success', data.message || 'Item opname berhasil disimpan.');
+                        window.setTimeout(() => window.location.reload(), 120);
                     } else {
-                        alert(data.message || 'Gagal menyimpan item.');
+                        showSoError(data.message || 'Gagal menyimpan item.');
                     }
                 })
-                .catch(() => alert('Terjadi kesalahan saat menyimpan item.'));
+                .catch(() => showSoError('Terjadi kesalahan saat menyimpan item.'));
         }
 
         function focusBackAfterReload() {
@@ -1352,7 +1883,7 @@
          * INLINE QTY EDIT — auto-save on blur / Enter
          * ──────────────────────────────────────────────────── */
         function initInlineQtyEdit() {
-            if (!window.SO_CAN_MODIFY || window.IS_OPENING_MODE) return;
+            if (!window.SO_CAN_MODIFY) return;
 
             const tableWrap = document.getElementById('opname-lines-table');
             if (!tableWrap) return;
@@ -1453,7 +1984,7 @@
             formData.append('item_id', itemId);
             formData.append('update_existing', '1');
             formData.append('physical_qty', newVal !== null ? String(newVal) : '');
-            formData.append('unit_cost', '');
+            formData.append('unit_cost', input.dataset.unitCost || '');
             formData.append('notes', '');
 
             fetch(window.SO_INLINE_SAVE_URL, {
@@ -1473,6 +2004,7 @@
                     input.classList.add('is-error');
                     // tooltip singkat
                     input.title = msg;
+                    showSoError(msg);
                     return;
                 }
                 const d = await res.json();
@@ -1485,17 +2017,138 @@
                     }
                     input.classList.add('is-saved');
                     input.title = '';
+                    showSoSuccess('Qty berhasil disimpan.');
                     // hapus class saved setelah 2 detik
                     setTimeout(() => input.classList.remove('is-saved'), 2000);
                 } else {
                     input.classList.add('is-error');
                     input.title = d?.message || 'Gagal menyimpan.';
+                    showSoError(d?.message || 'Gagal menyimpan.');
                 }
             })
             .catch(() => {
                 input.classList.remove('is-saving');
                 input.classList.add('is-error');
                 input.title = 'Koneksi error.';
+                showSoError('Koneksi error saat menyimpan qty.');
+            });
+        }
+
+        /* ────────────────────────────────────────────────────
+         * INLINE HPP EDIT — auto-save on blur / Enter (Opening)
+         * ──────────────────────────────────────────────────── */
+        function initInlineHppEdit() {
+            if (!window.SO_CAN_MODIFY) return;
+
+            const tableWrap = document.getElementById('opname-lines-table');
+            if (!tableWrap) return;
+
+            tableWrap.querySelectorAll('.so-inline-hpp').forEach(input => {
+                input.addEventListener('input', function() {
+                    let v = this.value.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+                    const parts = v.split('.');
+                    if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
+                    this.value = v;
+                    this.classList.remove('is-saved', 'is-error');
+                });
+
+                input.addEventListener('focus', function() {
+                    this.select && this.select();
+                });
+
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.blur();
+                    }
+                    if (e.key === 'Escape') {
+                        this.value = this.dataset.original ?? '';
+                        this.blur();
+                    }
+                });
+
+                input.addEventListener('blur', function() {
+                    const raw = this.value.trim();
+                    const newVal = raw === '' ? null : parseFloat(raw);
+                    const original = this.dataset.original === '' ? null : parseFloat(this.dataset.original || '');
+
+                    if (newVal === original) {
+                        if (newVal !== null) this.value = formatHppForInput(newVal);
+                        return;
+                    }
+                    if (newVal === null || !Number.isFinite(newVal) || newVal <= 0) {
+                        this.value = this.dataset.original ?? '';
+                        this.classList.add('is-error');
+                        showSoError('HPP harus lebih besar dari 0.');
+                        return;
+                    }
+
+                    saveInlineHpp(this, newVal);
+                });
+            });
+        }
+
+        function saveInlineHpp(input, newVal) {
+            const saveUrl = input.dataset.saveUrl;
+            if (!saveUrl) return;
+
+            input.classList.remove('is-saved', 'is-error');
+            input.classList.add('is-saving');
+
+            const formData = new FormData();
+            formData.append('_token', window.SO_CSRF || getCsrfToken());
+            formData.append('unit_cost', String(newVal));
+
+            fetch(saveUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': window.SO_CSRF || getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+                body: formData,
+            })
+            .then(async (res) => {
+                input.classList.remove('is-saving');
+                if (!res.ok) {
+                    let msg = 'Gagal menyimpan HPP.';
+                    try { const d = await res.json(); msg = d?.message || msg; } catch (e) {}
+                    input.value = input.dataset.original ?? '';
+                    input.classList.add('is-error');
+                    input.title = msg;
+                    showSoError(msg);
+                    return;
+                }
+
+                const d = await res.json();
+                if (d?.status === 'ok') {
+                    const savedValue = Number(d.unit_cost ?? newVal);
+                    input.dataset.original = String(savedValue);
+                    input.value = formatHppForInput(savedValue);
+                    input.classList.add('is-saved');
+                    input.title = '';
+
+                    const hidden = document.querySelector('.so-unit-cost-hidden[data-line-id="' + input.dataset.lineId + '"]');
+                    if (hidden) hidden.value = String(savedValue);
+
+                    const qtyInput = document.querySelector('.so-inline-qty[data-line-id="' + input.dataset.lineId + '"]');
+                    if (qtyInput) qtyInput.dataset.unitCost = String(savedValue);
+
+                    showSoSuccess(d.message || 'HPP berhasil disimpan.');
+                    setTimeout(() => input.classList.remove('is-saved'), 2000);
+                } else {
+                    input.value = input.dataset.original ?? '';
+                    input.classList.add('is-error');
+                    input.title = d?.message || 'Gagal menyimpan HPP.';
+                    showSoError(d?.message || 'Gagal menyimpan HPP.');
+                }
+            })
+            .catch(() => {
+                input.classList.remove('is-saving');
+                input.value = input.dataset.original ?? '';
+                input.classList.add('is-error');
+                input.title = 'Koneksi error.';
+                showSoError('Koneksi error saat menyimpan HPP.');
             });
         }
 
@@ -1533,7 +2186,7 @@
                                     const data = await response.json();
                                     if (data?.message) msg = data.message;
                                 } catch (e) {}
-                                alert(msg);
+                                showSoError(msg);
                                 return null;
                             }
                             return response.json();
@@ -1545,11 +2198,12 @@
                                 if (tr) tr.remove();
                                 renumberOpnameRows();
                                 setTableMaxHeight10Rows();
+                                showSoSuccess(data.message || 'Item berhasil dihapus dari opname.');
                             } else {
-                                alert(data.message || 'Gagal menghapus item.');
+                                showSoError(data.message || 'Gagal menghapus item.');
                             }
                         })
-                        .catch(() => alert('Terjadi kesalahan saat menghapus item.'));
+                        .catch(() => showSoError('Terjadi kesalahan saat menghapus item.'));
                 });
             });
         }

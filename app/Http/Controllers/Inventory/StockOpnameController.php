@@ -518,18 +518,12 @@ class StockOpnameController extends Controller
                     : null;
                 }
 
-                // fallback cost untuk PERIODIC (biar konsisten dengan service kamu)
-                if (!$isOpening) {
-                    if ($line->unit_cost === null || (float) $line->unit_cost <= 0) {
-                        // ✅ rekomendasi: pakai items.hpp karena finalize/generate kamu pakai ini
-                        $fallback = (float) ($line->item->hpp ?? 0);
-
-                        // kalau kamu mau base_unit_cost, ganti jadi:
-                        // $fallback = (float) ($line->item->base_unit_cost ?? 0);
-
-                        if ($fallback > 0) {
-                            $line->unit_cost = $fallback;
-                        }
+                // Isi biaya dari master jika baris lama belum punya unit_cost.
+                // Ini berlaku juga untuk Opening, bukan hanya Periodic.
+                if ($line->unit_cost === null || (float) $line->unit_cost <= 0) {
+                    $fallback = $this->resolveMasterUnitCost($line->item);
+                    if ($fallback !== null) {
+                        $line->unit_cost = $fallback;
                     }
                 }
 
@@ -548,8 +542,8 @@ class StockOpnameController extends Controller
                             $line->is_counted = true;
 
                             if ($line->unit_cost === null || (float) $line->unit_cost <= 0) {
-                                $fallback = (float) ($line->item->hpp ?? 0);
-                                if ($fallback > 0) {
+                                $fallback = $this->resolveMasterUnitCost($line->item);
+                                if ($fallback !== null) {
                                     $line->unit_cost = $fallback;
                                 }
                             }
@@ -676,8 +670,12 @@ class StockOpnameController extends Controller
         ]);
 
         $updateExisting = $request->boolean('update_existing');
+        $item = Item::query()->find((int) $validated['item_id']);
+        $unitCost = isset($validated['unit_cost']) && (float) $validated['unit_cost'] > 0
+            ? (float) $validated['unit_cost']
+            : $this->resolveMasterUnitCost($item);
 
-        DB::transaction(function () use ($stockOpname, $validated, $updateExisting, $isOpening) {
+        DB::transaction(function () use ($stockOpname, $validated, $updateExisting, $isOpening, $unitCost) {
             $itemId = (int) $validated['item_id'];
 
             $existingLine = $stockOpname->lines()->where('item_id', $itemId)->first();
@@ -698,7 +696,6 @@ class StockOpnameController extends Controller
                 $physicalQty = (float) $rawPhysical;
             }
 
-            $unitCost = array_key_exists('unit_cost', $validated) ? $validated['unit_cost'] : null;
             $notes = $validated['notes'] ?? null;
 
             if ($existingLine) {
@@ -719,7 +716,7 @@ class StockOpnameController extends Controller
                 $existingLine->physical_qty = $physicalQty;
                 $existingLine->difference_qty = $difference;
                 $existingLine->is_counted = $isCounted;
-                // Jangan timpa HPP lama dengan NULL kalau input kosong
+                // Jangan timpa HPP lama dengan NULL; gunakan HPP master sebagai fallback.
                 $existingLine->unit_cost = $unitCost !== null ? (float) $unitCost : $existingLine->unit_cost;
                 $existingLine->notes = $notes ?? $existingLine->notes;
                 $existingLine->save();
@@ -748,7 +745,7 @@ class StockOpnameController extends Controller
                 $line->physical_qty = $physicalQty;
                 $line->difference_qty = $difference;
                 $line->is_counted = $isCounted;
-                $line->unit_cost = $unitCost !== null ? (float) $unitCost : null;
+                $line->unit_cost = $unitCost;
                 $line->notes = $notes;
                 $line->save();
             }
@@ -764,7 +761,26 @@ class StockOpnameController extends Controller
             ->with('message', 'Item opname berhasil disimpan.');
     }
 
-    public function updateLineUnitCost(Request $request, StockOpname $stockOpname, StockOpnameLine $line): RedirectResponse
+    /**
+     * Ambil HPP master untuk mengisi baris SO lama/baru yang belum memiliki unit_cost.
+     * HPP legacy tetap diprioritaskan karena itu yang tampil sebagai HPP di master item.
+     */
+    protected function resolveMasterUnitCost(?Item $item): ?float
+    {
+        if (!$item) {
+            return null;
+        }
+
+        $masterHpp = (float) ($item->hpp ?? 0);
+        if ($masterHpp > 0) {
+            return round($masterHpp, 4);
+        }
+
+        $baseUnitCost = (float) ($item->base_unit_cost ?? 0);
+        return $baseUnitCost > 0 ? round($baseUnitCost, 4) : null;
+    }
+
+    public function updateLineUnitCost(Request $request, StockOpname $stockOpname, StockOpnameLine $line): RedirectResponse|JsonResponse
     {
         if ((int) $line->stock_opname_id !== (int) $stockOpname->id) {
             abort(404);
@@ -780,10 +796,16 @@ class StockOpnameController extends Controller
             $stockOpname->isCancelled() ||
             $stockOpname->status === StockOpname::STATUS_FINALIZED
         ) {
+            $message = 'HPP tidak bisa diubah karena dokumen sudah final, dibatalkan, atau sudah punya adjustment.';
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['status' => 'error', 'message' => $message], 422);
+            }
+
             return redirect()
                 ->route('inventory.stock_opnames.show', $stockOpname)
                 ->with('status', 'error')
-                ->with('message', 'HPP tidak bisa diubah karena dokumen sudah final, dibatalkan, atau sudah punya adjustment.');
+                ->with('message', $message);
         }
 
         $validated = $request->validate([
@@ -816,12 +838,22 @@ class StockOpnameController extends Controller
             $masterUpdated = true;
         });
 
+        $message = $masterUpdated
+            ? 'HPP baris disimpan dan HPP master item berhasil diperbarui.'
+            : 'HPP baris berhasil disimpan.';
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'status' => 'ok',
+                'message' => $message,
+                'unit_cost' => $unitCost,
+            ]);
+        }
+
         return redirect()
             ->route('inventory.stock_opnames.show', $stockOpname)
             ->with('status', 'success')
-            ->with('message', $masterUpdated
-                ? 'HPP baris disimpan dan HPP master item berhasil diperbarui.'
-                : 'HPP baris berhasil disimpan.');
+            ->with('message', $message);
     }
 
     public function deleteLine(Request $request, StockOpname $stockOpname, StockOpnameLine $line)
