@@ -410,12 +410,13 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 
                         @if($orderScans->count() > 1 && $ungroupedLines->isNotEmpty())
                             <div class="sd-order sd-order-group" data-order-card data-order-search="belum dikelompokkan">
-                                <div class="sd-order-lead"><span class="sd-order-num">—</span><div><div class="sd-order-no">BELUM DIKELOMPOKKAN</div><div class="sd-muted">Item lama atau scan tanpa order</div></div><span class="sd-order-qty">x{{ number_format((int) $ungroupedLines->sum('qty_scanned'), 0, ',', '.') }}</span></div>
+                                <div class="sd-order-lead"><span class="sd-order-num">—</span><div><div class="sd-order-no">SISA BELUM TERKELOMPOK</div><div class="sd-muted">Item menunggu nomor order atau belum cocok</div></div><span class="sd-order-qty">x{{ number_format((int) $ungroupedLines->sum('qty_scanned'), 0, ',', '.') }}</span></div>
                                 <div class="sd-order-items">
                                     @foreach($ungroupedLines as $line)
                                         <div class="sd-order-item"><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div><div class="sd-order-item-name">{{ $line->item?->name ?? '' }}</div></div><div class="sd-order-item-qty">x{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div></div>
                                     @endforeach
                                 </div>
+                                <div class="sd-muted" style="padding:.55rem .75rem;border-top:1px dashed rgba(148,163,184,.25)">Masukkan nomor order di Rekonsiliasi. Item yang cocok akan otomatis dipindahkan ke kelompok order tersebut.</div>
                             </div>
                         @endif
                     </div>

@@ -2096,6 +2096,17 @@ class ShipmentController extends Controller
         return 'order_no';
     }
 
+    protected function resolveMarketplaceOrderItem(
+        \App\Models\MarketplaceOrderItem $orderItem,
+        \App\Models\OrderFulfillment $fulfillment
+    ): ?Item {
+        $fulfillmentLine = $fulfillment->lines->firstWhere('marketplace_order_item_id', $orderItem->id);
+
+        return $fulfillmentLine?->item
+            ?: $orderItem->internalItem
+            ?: ($orderItem->item_id ? Item::find($orderItem->item_id) : null);
+    }
+
     /**
      * Tautkan ulang scan lama yang masih record-only atau belum punya
      * fulfillment_id. Tidak mengubah qty maupun stok.
@@ -3744,11 +3755,12 @@ class ShipmentController extends Controller
             $service = app(\App\Services\OrderFulfillmentService::class);
             $fulfillment = $service->createDraft($marketplaceOrder);
         }
+        $fulfillment->loadMissing('lines.item');
 
         $lines = [];
         $scanLog = [];
         foreach ($marketplaceOrder->items as $item) {
-            $internalItem = $item->internalItem;
+            $internalItem = $this->resolveMarketplaceOrderItem($item, $fulfillment);
             $itemId = $internalItem ? $internalItem->id : null;
             
             $qtyNeed = (int) $item->qty;
@@ -3825,6 +3837,14 @@ class ShipmentController extends Controller
             'linked_source' => 'marketplace_order',
             'pool_full' => $poolFull,
             'match_method' => $this->reconciliationMatchMethod($no, $marketplaceOrder),
+            'allocations' => collect($lines)
+                ->filter(fn ($line) => !empty($line['item_id']) && (int) ($line['qty_alloc'] ?? 0) > 0)
+                ->map(fn ($line) => [
+                    'item_id' => (int) $line['item_id'],
+                    'qty' => (int) $line['qty_alloc'],
+                ])
+                ->values()
+                ->all(),
             'decision' => $decision,
             'subs' => [],
         ];
@@ -3849,6 +3869,7 @@ class ShipmentController extends Controller
             $rawPayload['match_method'],
             $no
         );
+        $this->syncItemFirstLineAllocations($shipment->fresh(), $currentWave);
 
         $rawPayload['scanned_at'] = now()->format('d/m/Y H:i:s');
 
@@ -4139,10 +4160,11 @@ class ShipmentController extends Controller
             $service = app(\App\Services\OrderFulfillmentService::class);
             $fulfillment = $service->createDraft($marketplaceOrder);
         }
+        $fulfillment->loadMissing('lines.item');
 
         $lines = [];
         foreach ($marketplaceOrder->items as $item) {
-            $internalItem = $item->internalItem;
+            $internalItem = $this->resolveMarketplaceOrderItem($item, $fulfillment);
             $itemId = $internalItem ? $internalItem->id : null;
             $qtyNeed = (int) $item->qty;
             $qtyAlloc = 0;
@@ -4200,6 +4222,14 @@ class ShipmentController extends Controller
             'mode' => 'auto_link',
             'linked_source' => 'marketplace_order',
             'match_method' => $this->reconciliationMatchMethod($targetNo, $marketplaceOrder),
+            'allocations' => collect($lines)
+                ->filter(fn ($line) => !empty($line['item_id']) && (int) ($line['qty_alloc'] ?? 0) > 0)
+                ->map(fn ($line) => [
+                    'item_id' => (int) $line['item_id'],
+                    'qty' => (int) $line['qty_alloc'],
+                ])
+                ->values()
+                ->all(),
             'pool_full' => $poolFull,
             'decision' => $decision,
             'subs' => [],
@@ -4222,6 +4252,7 @@ class ShipmentController extends Controller
             $rawPayload['match_method'],
             $targetNo
         );
+        $this->syncItemFirstLineAllocations($shipment->fresh());
 
         return response()->json(array_merge(['status' => 'ok'], $rawPayload));
     }

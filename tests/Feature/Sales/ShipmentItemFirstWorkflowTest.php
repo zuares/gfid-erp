@@ -351,12 +351,28 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('order.label', 'Tertaut otomatis');
 
+        $matchResponse = $this->actingAs($user)
+            ->postJson(route('sales.shipments.rekon_match', $shipment), [
+                'order_no' => 'SPXID062189160889',
+                'pool_used' => '{}',
+            ])
+            ->assertOk();
+
         $fulfillment = OrderFulfillment::where('marketplace_order_id', $order->id)->firstOrFail();
+        $matchResponse->assertJsonPath('order.lines.0.qty_alloc', 1);
         $this->assertDatabaseHas('shipment_order_scans', [
             'shipment_id' => $shipment->id,
             'order_no' => 'SPXID062189160889',
             'fulfillment_id' => $fulfillment->id,
             'match_method' => 'awb',
+        ]);
+        $this->assertDatabaseHas('shipment_lines', [
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => ShipmentOrderScan::where('shipment_id', $shipment->id)
+                ->where('order_no', 'SPXID062189160889')
+                ->value('id'),
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
         ]);
         $this->assertSame(OrderFulfillment::STATUS_PENDING_REVIEW, $fulfillment->status);
     }

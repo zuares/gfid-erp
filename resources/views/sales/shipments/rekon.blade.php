@@ -1401,7 +1401,7 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
 
             @if ($isItemFirst)
                 <div style="color:#64748b;font-size:.82rem;line-height:1.45">
-                    Order sudah tercatat dari shipment ini. Buka detail order di bawah, lalu klik <strong>Alokasikan Item ke Order</strong> untuk membagi item batch secara otomatis.
+                    Setelah nomor order dimasukkan, sistem mencari item order di batch yang sudah discan dan langsung memindahkannya ke kelompok order. Klik <strong>Alokasikan Item ke Order</strong> untuk menghitung ulang; hasilnya tetap bisa diedit.
                 </div>
             @else
                 <input type="text" id="orderInput" class="shp-scan-input"
