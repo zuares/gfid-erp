@@ -1979,6 +1979,58 @@ class ShipmentController extends Controller
         });
     }
 
+    /**
+     * Cari order aktif dari nomor order, booking SN, atau AWB.
+     *
+     * Booking Shopee bisa sudah memiliki AWB tetapi belum memiliki order_sn
+     * lokal. Dalam kondisi itu, ambil detail booking untuk melengkapi order
+     * marketplace sebelum proses rekonsiliasi dilanjutkan.
+     */
+    protected function findReconciliationMarketplaceOrder(
+        string $scanCode,
+        ?Shipment $shipment = null,
+        bool $promoteBooking = false
+    ): ?\App\Models\MarketplaceOrder {
+        $findOrder = fn () => $this->marketplaceOrderQuery($scanCode, $shipment)
+            ->whereIn('order_status', self::RECONCILIATION_MARKETPLACE_STATUSES)
+            ->with(['items.internalItem', 'store'])
+            ->first();
+
+        $marketplaceOrder = $findOrder();
+        if ($marketplaceOrder || !$promoteBooking) {
+            return $marketplaceOrder;
+        }
+
+        $booking = \App\Models\MarketplaceBooking::query()
+            ->where(function ($query) use ($scanCode) {
+                $query
+                    ->whereRaw('UPPER(TRIM(booking_sn)) = ?', [$scanCode])
+                    ->orWhereRaw('UPPER(TRIM(order_sn)) = ?', [$scanCode])
+                    ->orWhereRaw('UPPER(TRIM(tracking_number)) = ?', [$scanCode]);
+            })
+            ->when(
+                $shipment && $this->salesOperationalSetting('same_store', true) && !empty($shipment->store_id),
+                fn ($query) => $query->where('store_id', $shipment->store_id)
+            )
+            ->with('store')
+            ->first();
+
+        if (!$booking || !$booking->store) {
+            return null;
+        }
+
+        try {
+            app(\App\Services\MarketplaceSyncService::class)
+                ->promoteBookingToOrder($booking->store, $booking->booking_sn);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning(
+                "Shipment reconciliation booking lookup failed [{$booking->booking_sn}]: " . $e->getMessage()
+            );
+        }
+
+        return $findOrder();
+    }
+
     protected function salesInvoiceQuery(string $scanCode, ?Shipment $shipment = null)
     {
         $scanCode = mb_strtoupper(trim($scanCode));
@@ -3323,10 +3375,7 @@ class ShipmentController extends Controller
                 continue;
             }
 
-            $marketplaceOrder = $this->marketplaceOrderQuery($orderNo, $shipment)
-                ->whereIn('order_status', self::RECONCILIATION_MARKETPLACE_STATUSES)
-                ->with(['items.internalItem', 'store'])
-                ->first();
+            $marketplaceOrder = $this->findReconciliationMarketplaceOrder($orderNo, $shipment, true);
 
             if (!$marketplaceOrder) {
                 continue;
@@ -3411,10 +3460,7 @@ class ShipmentController extends Controller
         // Endpoint ini hanya dipanggil dari halaman rekonsiliasi, sehingga
         // lookup marketplace tetap dijalankan walaupun scan operasional utama
         // dikonfigurasi sebagai record-only.
-        $marketplaceOrder = $this->marketplaceOrderQuery($no, $shipment)
-            ->whereIn('order_status', self::RECONCILIATION_MARKETPLACE_STATUSES)
-            ->with(['items.internalItem', 'store'])
-            ->first();
+        $marketplaceOrder = $this->findReconciliationMarketplaceOrder($no, $shipment, true);
 
         if (!$marketplaceOrder) {
             $salesInvoice = $this->salesInvoiceQuery($no, $shipment)
