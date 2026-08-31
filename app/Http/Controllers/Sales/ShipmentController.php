@@ -3574,7 +3574,9 @@ class ShipmentController extends Controller
                     }
 
                     $payload = is_array($candidate->raw_payload) ? $candidate->raw_payload : [];
-                    $hasSavedAllocation = array_key_exists('allocations', $payload);
+                    $hasSavedAllocation = collect($payload['allocations'] ?? [])
+                        ->contains(fn ($allocation) => (int) data_get($allocation, 'item_id') > 0
+                            && (int) data_get($allocation, 'qty') > 0);
                     $hasMappedLine = $lines->contains(
                         fn ($line) => (int) $line->shipment_order_scan_id === (int) $candidate->id
                     );

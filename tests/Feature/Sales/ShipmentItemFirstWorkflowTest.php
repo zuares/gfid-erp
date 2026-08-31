@@ -191,6 +191,64 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $this->assertSame(1, ShipmentLine::where('shipment_id', $shipment->id)->where('shipment_order_scan_id', $scans[1]->id)->sum('qty_scanned'));
     }
 
+    public function test_confirmation_retries_a_saved_scan_with_empty_allocations(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-CONFIRM-REKON-002',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-EMPTY-ALLOCATION',
+            'channel_order_id' => 'ORDER-EMPTY-ALLOCATION',
+            'order_status' => 'SHIPPED',
+            'order_date' => now(),
+            'ordered_at' => now(),
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'item_id' => $item->id,
+            'internal_item_id' => $item->id,
+            'item_name' => $item->name,
+            'item_sku' => $item->code,
+            'model_sku' => $item->code,
+            'qty' => 1,
+        ]);
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => 'ORDER-EMPTY-ALLOCATION',
+            'status' => 'pending',
+            'source' => 'marketplace',
+            'raw_payload' => [
+                'mode' => 'auto_link',
+                'allocations' => [],
+            ],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk();
+
+        $this->assertDatabaseHas('shipment_lines', [
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => $scan->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+        ]);
+    }
+
     public function test_daily_shipment_creates_wave_and_blocks_legacy_submit(): void
     {
         [$user, $store, $item] = $this->shipmentContext();
