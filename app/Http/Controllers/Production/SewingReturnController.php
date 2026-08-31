@@ -1800,10 +1800,15 @@ class SewingReturnController extends Controller
                 throw ValidationException::withMessages(['reason' => 'Gudang WIP-SEW / WH-SEWING belum ada.']);
             }
 
-            // Tujuan Sewing Return adalah WH-PRD. Abaikan WIP-FIN dari data lama.
-            $destWarehouse = Warehouse::query()->where('code', 'WH-PRD')->first();
+            // Gunakan tujuan yang dipilih saat QC. Return lama yang masih
+            // menyimpan WIP-FIN tetap dibalik dari WH-PRD untuk kompatibilitas.
+            $destWarehouse = Warehouse::query()
+                ->whereIn('code', ['WH-RTS', 'WH-PRD'])
+                ->whereKey((int) ($return->destination_warehouse_id ?? 0))
+                ->first()
+                ?? Warehouse::query()->where('code', 'WH-PRD')->first();
             if (!$destWarehouse) {
-                throw ValidationException::withMessages(['reason' => 'Gudang tujuan SR tidak ditemukan (WH-PRD).']);
+                throw ValidationException::withMessages(['reason' => 'Gudang tujuan SR tidak ditemukan (WH-PRD / WH-RTS).']);
             }
 
             $rejectWarehouse = Warehouse::query()->where('code', 'REJ-SEW')->first();
@@ -1839,7 +1844,7 @@ class SewingReturnController extends Controller
 
             $itemIds = $pickupLines->pluck('finished_item_id')->filter()->unique()->values()->all();
 
-            // lock stok di gudang tujuan (WH-PRD; data lama mengikuti destination_warehouse_id tersimpan)
+            // lock stok di gudang tujuan yang tersimpan di return
             $stocksDest = InventoryStock::query()
                 ->where('warehouse_id', $destWarehouse->id)
                 ->whereIn('item_id', $itemIds)

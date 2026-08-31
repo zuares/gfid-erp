@@ -793,7 +793,7 @@ class QcController extends Controller
     }
 
     /**
-     * Simpan QC Jahit — gerakkan stok WIP-SEW → WIP-FIN (OK) / REJ-SEW (Reject).
+     * Simpan QC Jahit — gerakkan stok WIP-SEW → gudang tujuan (OK) / REJ-SEW (Reject).
      */
     public function updateSewing(Request $request, SewingReturn $sewingReturn)
     {

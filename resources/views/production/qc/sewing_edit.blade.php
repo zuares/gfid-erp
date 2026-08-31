@@ -602,9 +602,6 @@
                             <div class="form-control form-control-sm mono" style="background: rgba(148,163,184,.1);">
                                 {{ auth()->user()?->name ?? '-' }}
                             </div>
-                            @if ($loginOperator)
-                                <div class="text-muted small mt-1">Employee: {{ $loginOperator->name }}</div>
-                            @endif
                         </div>
                         <div class="col-12 col-lg-3">
                             <label class="form-label form-label-sm">Gudang OK setelah QC</label>
