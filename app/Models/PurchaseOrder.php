@@ -148,7 +148,13 @@ class PurchaseOrder extends Model
             return;
         }
 
-        $isComplete = $this->received_status === 'fully_received' && $this->payment_status === 'paid';
+        // DP membuat payment_status menjadi paid karena uang memang sudah
+        // dibayar ke supplier, tetapi belum mengurangi hutang AP sampai
+        // dipindahkan lewat dp_apply. PO tidak boleh auto-close sebelum AP
+        // benar-benar nol.
+        $isComplete = $this->received_status === 'fully_received'
+            && $this->payment_status === 'paid'
+            && $this->accountsPayableOutstanding() <= static::paymentRoundingTolerance();
 
         if ($isComplete && $this->status !== 'closed') {
             $this->status = 'closed';
@@ -249,6 +255,42 @@ class PurchaseOrder extends Model
     {
         return $this->hasMany(\App\Models\PurchasePayment::class, 'purchase_order_id')
             ->whereNull('voided_at');
+    }
+
+    /**
+     * Nilai hutang supplier yang benar-benar terbentuk dari GRN posted.
+     * DP tidak termasuk pengurang AP; hanya payment dan dp_apply yang boleh
+     * mengurangi saldo hutang.
+     */
+    public function accountsPayableDebt(): float
+    {
+        $grnTotal = (float) $this->purchaseReceipts()
+            ->where('status', 'posted')
+            ->where(function ($q) {
+                $q->whereNull('is_replacement')
+                    ->orWhere('is_replacement', false);
+            })
+            ->sum('grand_total');
+
+        $returnTotal = (float) $this->purchaseReturns()
+            ->where('status', 'posted')
+            ->whereNull('voided_at')
+            ->where(function ($q) {
+                $q->whereNull('resolution_type')
+                    ->orWhere('resolution_type', '!=', 'replacement');
+            })
+            ->sum('total');
+
+        return max(0, round($grnTotal - $returnTotal, 2));
+    }
+
+    public function accountsPayableOutstanding(): float
+    {
+        $settled = (float) $this->activePayments()
+            ->whereIn('type', ['payment', 'dp_apply'])
+            ->sum('amount');
+
+        return static::normalizePaymentRemainder($this->accountsPayableDebt() - $settled);
     }
 
 }

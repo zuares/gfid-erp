@@ -7,14 +7,18 @@ use App\Models\InventoryMutation;
 use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\Journal;
+use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
+use App\Models\PurchasePayment;
 use App\Models\PurchaseReceipt;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\Accounting\JournalService;
 use App\Services\Purchasing\GoodsReceiptService;
 use App\Services\Purchasing\PurchaseOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -392,6 +396,57 @@ class GrnFromDraftPoTest extends TestCase
 
         // received_status PO harus fully_received meski PO draft
         $this->assertSame('fully_received', $po->fresh()->received_status);
+    }
+
+    public function test_posting_grn_auto_applies_existing_dp_to_ap(): void
+    {
+        $bank = Account::updateOrCreate(
+            ['code' => '1112'],
+            ['name' => 'Bank Test', 'type' => 'asset', 'is_cash' => true, 'is_active' => true]
+        );
+        $bankMethod = PaymentMethod::updateOrCreate(
+            ['code' => 'BANK'],
+            ['name' => 'Transfer Bank', 'mode' => 'transfer', 'is_active' => true]
+        );
+        PaymentMethod::updateOrCreate(
+            ['code' => 'DP_APPLY'],
+            ['name' => 'Offset DP', 'mode' => 'credit', 'is_active' => true]
+        );
+
+        $po = $this->makeDraftPo(10, 1000);
+        $dp = PurchasePayment::create([
+            'purchase_order_id' => $po->id,
+            'date' => now()->toDateString(),
+            'payment_method_id' => $bankMethod->id,
+            'cash_account_id' => $bank->id,
+            'type' => 'dp',
+            'amount' => 10000,
+            'created_by' => $this->owner->id,
+        ]);
+        app(JournalService::class)->postPurchasePayment(
+            $dp->fresh(['purchaseOrder', 'cashAccount', 'paymentMethod'])
+        );
+
+        $grn = $this->grnService->create($this->makeGrnPayload($po, 10));
+        $this->grnService->post($grn);
+
+        $apply = PurchasePayment::where('purchase_order_id', $po->id)
+            ->where('type', 'dp_apply')
+            ->whereNull('voided_at')
+            ->first();
+
+        $this->assertNotNull($apply);
+        $this->assertEqualsWithDelta(10000, (float) $apply->amount, 0.01);
+        $this->assertNotNull($apply->journal_id);
+
+        $apId = (int) Account::where('code', JournalService::CODE_AP)->value('id');
+        $apBalance = (float) DB::table('journal_lines as jl')
+            ->join('journals as j', 'j.id', '=', 'jl.journal_id')
+            ->where('jl.account_id', $apId)
+            ->whereNull('j.voided_at')
+            ->sum(DB::raw('jl.debit - jl.credit'));
+
+        $this->assertEqualsWithDelta(0, $apBalance, 0.01);
     }
 
     public function test_purchase_dozen_is_converted_to_stock_pieces(): void

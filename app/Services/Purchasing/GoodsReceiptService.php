@@ -8,7 +8,9 @@ use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\ItemCostSnapshot;
 use App\Models\Lot;
+use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
+use App\Models\PurchasePayment;
 use App\Models\PurchaseOrderLine;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptLine;
@@ -780,6 +782,21 @@ class GoodsReceiptService
                 }
             }
 
+            // DP yang sudah dibayar sebelum barang diterima harus dipindahkan
+            // dari uang muka (1151) ke hutang (2101) saat GRN diposting.
+            // Tanpa offset ini, PO bisa tampil LUNAS karena DP, tetapi saldo
+            // AP tetap mengandung kredit sebesar nilai GRN.
+            if (!$grn->is_replacement && $grn->purchase_order_id) {
+                $po = PurchaseOrder::query()
+                    ->whereKey((int) $grn->purchase_order_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($po) {
+                    $this->autoApplyAvailableDp($po, $grn);
+                }
+            }
+
             if ($grn->is_replacement && $grn->purchase_return_id) {
                 $returnOrigin = \App\Models\PurchaseReturn::find($grn->purchase_return_id);
                 if ($returnOrigin) {
@@ -789,6 +806,71 @@ class GoodsReceiptService
 
             return $grn->fresh(['lines.item', 'supplier', 'warehouse']);
         }, 3);
+    }
+
+    /**
+     * Offset DP aktif ke AP setelah GRN posted.
+     * Idempotensi berasal dari payment type=dp_apply dan saldo DP/AP yang
+     * dihitung ulang di dalam transaksi yang mengunci PO.
+     */
+    protected function autoApplyAvailableDp(PurchaseOrder $po, PurchaseReceipt $grn): void
+    {
+        $dpTotal = (float) $po->activePayments()->where('type', 'dp')->sum('amount');
+        $dpApplied = (float) $po->activePayments()->where('type', 'dp_apply')->sum('amount');
+        $dpAvailable = round(max(0, $dpTotal - $dpApplied), 2);
+
+        if ($dpAvailable <= 0.0001) {
+            return;
+        }
+
+        $grnTotal = (float) $po->purchaseReceipts()
+            ->where('status', 'posted')
+            ->where(function ($q) {
+                $q->whereNull('is_replacement')->orWhere('is_replacement', false);
+            })
+            ->sum('grand_total');
+
+        $returnTotal = (float) \App\Models\PurchaseReturn::query()
+            ->where('purchase_order_id', $po->id)
+            ->where('status', 'posted')
+            ->whereNull('voided_at')
+            ->where(function ($q) {
+                $q->whereNull('resolution_type')->orWhere('resolution_type', '!=', 'replacement');
+            })
+            ->sum('total');
+
+        $paid = (float) $po->activePayments()->where('type', 'payment')->sum('amount');
+        $apOutstanding = round(max(0, $grnTotal - $returnTotal - $paid - $dpApplied), 2);
+        $amount = round(min($dpAvailable, $apOutstanding), 2);
+
+        if ($amount <= 0.0001) {
+            return;
+        }
+
+        $paymentMethodId = (int) PaymentMethod::query()
+            ->where('code', 'DP_APPLY')
+            ->value('id');
+
+        if ($paymentMethodId <= 0) {
+            throw ValidationException::withMessages([
+                'grn' => 'PaymentMethod code=DP_APPLY belum tersedia untuk offset DP otomatis.',
+            ]);
+        }
+
+        $payment = PurchasePayment::create([
+            'purchase_order_id' => (int) $po->id,
+            'date' => $grn->date->format('Y-m-d'),
+            'payment_method_id' => $paymentMethodId,
+            'cash_account_id' => null,
+            'type' => 'dp_apply',
+            'amount' => $amount,
+            'notes' => "Auto-offset DP saat posting GRN {$grn->code}",
+            'created_by' => (int) ($grn->approved_by ?: auth()->id() ?: 0) ?: null,
+        ]);
+
+        $this->journal->postPurchasePayment(
+            $payment->fresh(['purchaseOrder', 'cashAccount', 'paymentMethod'])
+        );
     }
 
     /**

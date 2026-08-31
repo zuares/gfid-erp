@@ -7,6 +7,7 @@ use App\Models\Item;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderLine;
 use App\Models\PurchasePayment;
+use App\Models\PurchaseReceipt;
 use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -71,7 +72,7 @@ class PurchaseOrderPaymentUiTest extends TestCase
             ->assertSee('Tambah DP')
             ->assertSee('DP sudah tercatat')
             ->assertSee('Rp 250.000')
-            ->assertSee('Sudah Dibayar')
+            ->assertSee('Dana Dibayar')
             ->assertSee('Rp 250.000')
             ->assertDontSee('title="Bayar DP"');
     }
@@ -129,6 +130,59 @@ class PurchaseOrderPaymentUiTest extends TestCase
             ->get(route('purchasing.purchase_orders.show', $order))
             ->assertOk()
             ->assertSee('DP sudah menutup total PO. Tambahan nominal tetap boleh dicatat, tetapi selisihnya akan menjadi piutang supplier.');
+    }
+
+    public function test_owner_sees_unapplied_dp_as_ap_warning_and_offset_primary_action(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-PO-OFFSET-UI-' . uniqid(),
+        ]);
+        $supplier = Supplier::create([
+            'code' => 'SUP-PO-OFFSET-UI-' . uniqid(),
+            'name' => 'Supplier Offset UI',
+        ]);
+        $paymentMethod = PaymentMethod::create([
+            'code' => 'UI-OFFSET-CASH-' . uniqid(),
+            'name' => 'Cash Offset UI Test',
+            'mode' => 'cash',
+            'is_active' => true,
+        ]);
+        $order = PurchaseOrder::create([
+            'code' => 'PO-OFFSET-UI-' . uniqid(),
+            'date' => '2026-08-31',
+            'supplier_id' => $supplier->id,
+            'grand_total' => 100000,
+            'status' => 'approved',
+            'received_status' => 'fully_received',
+            'payment_status' => 'paid',
+            'paid_amount' => 100000,
+        ]);
+        PurchaseReceipt::create([
+            'code' => 'GRN-OFFSET-UI-' . uniqid(),
+            'date' => '2026-08-31',
+            'purchase_order_id' => $order->id,
+            'supplier_id' => $supplier->id,
+            'grand_total' => 100000,
+            'status' => 'posted',
+            'is_replacement' => false,
+        ]);
+        PurchasePayment::create([
+            'purchase_order_id' => $order->id,
+            'date' => '2026-08-31',
+            'payment_method_id' => $paymentMethod->id,
+            'type' => 'dp',
+            'amount' => 100000,
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('purchasing.purchase_orders.show', $order))
+            ->assertOk()
+            ->assertSee('MENUNGGU OFFSET DP')
+            ->assertSee('DP Belum Dipakai')
+            ->assertSee('Hutang AP Tersisa')
+            ->assertSee('Offset DP')
+            ->assertDontSee('Bayar PO');
     }
 
     public function test_admin_can_see_payment_status_but_not_owner_only_payment_action(): void

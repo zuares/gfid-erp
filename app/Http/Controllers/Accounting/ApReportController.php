@@ -38,7 +38,6 @@ class ApReportController extends Controller
                     ->selectRaw('purchase_order_id, SUM(amount) as paid_total'),
                 'pay', 'pay.purchase_order_id', '=', 'po.id'
             )
-            ->whereIn('po.payment_status', ['unpaid', 'partial'])
             ->selectRaw("
                 s.id as supplier_id,
                 s.name as supplier_name,

@@ -130,6 +130,70 @@ class PurchasePaymentToleranceTest extends TestCase
         }
     }
 
+    public function test_dp_only_cannot_auto_close_po_before_ap_is_offset(): void
+    {
+        $supplier = Supplier::create([
+            'code' => 'AUTO-CLOSE-DP-SUP-' . uniqid(),
+            'name' => 'Auto Close DP Supplier',
+        ]);
+        $method = PaymentMethod::create([
+            'code' => 'AUTO-CLOSE-DP-CASH-' . uniqid(),
+            'name' => 'Auto Close DP Cash',
+            'mode' => 'cash',
+            'is_active' => true,
+        ]);
+        $order = PurchaseOrder::create([
+            'code' => 'AUTO-CLOSE-DP-PO-' . uniqid(),
+            'date' => '2026-08-31',
+            'supplier_id' => $supplier->id,
+            'grand_total' => 1000,
+            'status' => 'approved',
+            'received_status' => 'fully_received',
+            'payment_status' => 'paid',
+            'paid_amount' => 1000,
+        ]);
+        PurchaseReceipt::create([
+            'code' => 'AUTO-CLOSE-DP-GRN-' . uniqid(),
+            'date' => '2026-08-31',
+            'purchase_order_id' => $order->id,
+            'supplier_id' => $supplier->id,
+            'grand_total' => 1000,
+            'status' => 'posted',
+            'is_replacement' => false,
+        ]);
+        PurchasePayment::create([
+            'purchase_order_id' => $order->id,
+            'date' => '2026-08-31',
+            'payment_method_id' => $method->id,
+            'type' => 'dp',
+            'amount' => 1000,
+        ]);
+
+        $order->evaluateAutoClose();
+
+        $this->assertSame('approved', $order->fresh()->status);
+        $this->assertSame(1000.0, $order->fresh()->accountsPayableOutstanding());
+
+        PurchasePayment::create([
+            'purchase_order_id' => $order->id,
+            'date' => '2026-08-31',
+            'payment_method_id' => $method->id,
+            'type' => 'dp_apply',
+            'amount' => 1000,
+        ]);
+
+        $order = $order->fresh();
+        $order->payment_status = 'paid';
+        $order->save();
+        $order = $order->fresh();
+        $this->assertSame('fully_received', $order->received_status);
+        $this->assertSame('paid', $order->payment_status);
+        $this->assertSame(0.0, $order->accountsPayableOutstanding());
+        $order->evaluateAutoClose();
+
+        $this->assertSame('closed', $order->fresh()->status);
+    }
+
     public function test_supplier_invoice_uses_the_same_rounding_tolerance(): void
     {
         $supplier = Supplier::create([

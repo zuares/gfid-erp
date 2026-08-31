@@ -20,7 +20,7 @@
         '' => 'Semua Bayar',
         'unpaid' => 'Unpaid',
         'partial' => 'Partial',
-        'paid' => 'Paid',
+        'paid' => 'Dibayar (termasuk DP)',
         'overpaid' => 'Piutang',
     ];
 
@@ -446,7 +446,7 @@
                     </a>
                 </th>
             @endif
-            <th style="width: 150px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">Status Pembayaran</th>
+            <th style="width: 150px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">Status Keuangan</th>
             <th style="width: 90px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide"></th>
         </tr>
     </x-slot>
@@ -457,16 +457,43 @@
             $ps = (string) ($order->payment_status ?? 'unpaid');
             $rcv = $order->received_status ?? 'not_received';
 
+            // Tampilkan status berdasarkan hutang AP aktual, bukan hanya
+            // payment_status yang juga menganggap DP sebagai pembayaran.
+            $tol = \App\Models\PurchaseOrder::paymentRoundingTolerance();
+            $grnPosted = (float) ($order->purchaseReceipts ?? collect())
+                ->filter(fn ($grn) => ($grn->status ?? 'draft') === 'posted' && !$grn->is_replacement)
+                ->sum('grand_total');
+            $returnPosted = (float) ($order->purchaseReturns ?? collect())
+                ->filter(fn ($ret) => ($ret->status ?? 'draft') === 'posted' && is_null($ret->voided_at) && ($ret->resolution_type ?? null) !== 'replacement')
+                ->sum('total');
+            $payments = $order->activePayments ?? collect();
+            $dpTotal = (float) $payments->where('type', 'dp')->sum('amount');
+            $dpApplied = (float) $payments->where('type', 'dp_apply')->sum('amount');
+            $apSettled = (float) $payments->whereIn('type', ['payment', 'dp_apply'])->sum('amount');
+            $apOutstanding = \App\Models\PurchaseOrder::normalizePaymentRemainder($grnPosted - $returnPosted - $apSettled);
+            $dpAvailable = \App\Models\PurchaseOrder::normalizePaymentRemainder($dpTotal - $dpApplied);
+            $payUiState = match (true) {
+                $grnPosted > $tol && $apOutstanding > $tol && $dpAvailable > $tol => 'awaiting_offset',
+                $grnPosted > $tol && $apOutstanding > $tol => 'ap_outstanding',
+                $grnPosted > $tol => 'ap_paid',
+                $dpTotal > $tol => 'dp_recorded',
+                default => $ps,
+            };
+
             $uiStatus = $order->status;
             $rcvLabel = match($rcv) {
                 'fully_received' => 'Masuk Gudang',
                 'partial' => 'Masuk Sebagian',
                 default => 'Belum Masuk',
             };
-            $payLabel = match($ps) {
-                'paid' => 'Lunas',
+            $payLabel = match($payUiState) {
+                'awaiting_offset' => 'Menunggu offset DP',
+                'ap_outstanding' => 'Hutang belum lunas',
+                'ap_paid' => 'Hutang lunas',
+                'dp_recorded' => 'DP tercatat',
                 'partial' => 'Bayar sebagian',
                 'overpaid' => 'Piutang supplier',
+                'paid' => 'Lunas',
                 default => 'Belum bayar',
             };
 
@@ -528,7 +555,7 @@
                             {{ $rcvLabel }}
                         </span>
                         @if ($canSeeMoney)
-                            <span class="po-mobile-status {{ $ps === 'paid' ? 'is-approved' : ($ps === 'partial' ? 'is-partial' : ($ps === 'overpaid' ? 'is-overpaid' : '')) }}">
+                            <span class="po-mobile-status {{ in_array($payUiState, ['ap_paid', 'paid'], true) ? 'is-approved' : (in_array($payUiState, ['awaiting_offset', 'ap_outstanding', 'partial', 'dp_recorded'], true) ? 'is-partial' : ($payUiState === 'overpaid' ? 'is-overpaid' : '')) }}">
                                 {{ $payLabel }}
                             </span>
                         @endif
@@ -572,7 +599,7 @@
 
             <td class="mobile-hide">
                 @if ($canSeeMoney)
-                    <span class="badge {{ $payBadge($ps) }} py-1 px-2" style="font-weight: 600; font-size: .75rem; border-radius: 6px;">{{ $payLabel }}</span>
+                    <span class="badge {{ $payBadge(in_array($payUiState, ['ap_paid', 'paid'], true) ? 'paid' : (in_array($payUiState, ['awaiting_offset', 'ap_outstanding', 'partial', 'dp_recorded'], true) ? 'partial' : ($payUiState === 'overpaid' ? 'overpaid' : 'unpaid'))) }} py-1 px-2" style="font-weight: 600; font-size: .75rem; border-radius: 6px;">{{ $payLabel }}</span>
                 @else
                     <span class="text-muted" style="font-size: .8rem;">-</span>
                 @endif

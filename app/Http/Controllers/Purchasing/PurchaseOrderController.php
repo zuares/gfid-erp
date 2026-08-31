@@ -45,6 +45,8 @@ class PurchaseOrderController extends Controller
                 'approvedBy',
                 'paymentMethod',
                 'purchaseReceipts',
+                'purchaseReturns',
+                'activePayments',
                 'lines.item:id,code,name,unit,stock_unit,purchase_unit,purchase_conversion_factor',
             ]);
 
@@ -1342,6 +1344,20 @@ class PurchaseOrderController extends Controller
                 'overpaid' => 'Pembayaran melebihi nilai PO (piutang supplier)',
                 default   => 'Belum ada pembayaran',
             };
+        }
+
+        // Status paid juga mencakup DP. PO baru boleh ditutup jika hutang AP
+        // hasil GRN sudah benar-benar diselesaikan oleh payment atau dp_apply.
+        $apOutstanding = $order->accountsPayableOutstanding();
+        if ($apOutstanding > PurchaseOrder::paymentRoundingTolerance()) {
+            $dpAvailable = PurchaseOrder::normalizePaymentRemainder(
+                (float) $order->activePayments()->where('type', 'dp')->sum('amount')
+                - (float) $order->activePayments()->where('type', 'dp_apply')->sum('amount')
+            );
+
+            $blockers[] = $dpAvailable > 0
+                ? 'DP belum di-offset ke hutang (' . rupiah($dpAvailable) . ')'
+                : 'Hutang AP masih tersisa (' . rupiah($apOutstanding) . ')';
         }
 
         $outstandingInvoices = $poInvoices->whereIn('status', ['posted', 'partial_paid', 'draft']);

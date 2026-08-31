@@ -38,7 +38,7 @@ body[data-theme="dark"] .po-document-date-row strong{color:#bfdbfe}
 .pay-badge.pay-partial{color:#a16207;background:rgba(234,179,8,.1);border-color:rgba(234,179,8,.25)}
 .pay-badge.pay-overpaid{color:#6d28d9;background:rgba(124,58,237,.1);border-color:rgba(124,58,237,.25)}
 .pay-badge.pay-unpaid{color:#64748b;background:rgba(148,163,184,.08)}
-.po-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.55rem;margin-bottom:.65rem}
+.po-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.55rem;margin-bottom:.65rem}
 .po-card{background:var(--card,#fff);border:1px solid rgba(148,163,184,.18);border-radius:8px;overflow:hidden;margin-bottom:.65rem}
 .po-kpi{padding:.65rem .75rem}
 .po-label{font-size:.72rem;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.02em}
@@ -209,6 +209,35 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         // apply DP guard
         $canApplyDp = $canPay && $hasAp && $dpAvailable > 0 && $apOutstanding > 0;
         $maxApplyDp = max(0, round(min($dpAvailable, $apOutstanding), 2));
+
+        // Status UI harus menjawab pertanyaan akuntansi yang benar: apakah
+        // hutang AP sudah nol? Status paid saja tidak cukup karena DP juga
+        // membuat payment_status menjadi paid.
+        $apUiStatus = match (true) {
+            $hasAp && $apOutstanding > 0.0001 && $dpAvailable > 0.0001 => 'awaiting_offset',
+            $hasAp && $apOutstanding > 0.0001 => 'ap_outstanding',
+            $hasAp => 'ap_paid',
+            $dpTotal > 0.0001 => 'dp_recorded',
+            default => $payStatus,
+        };
+        $payBadgeClass = match ($apUiStatus) {
+            'ap_paid', 'paid' => 'pay-badge pay-paid',
+            'awaiting_offset', 'ap_outstanding', 'partial', 'dp_recorded' => 'pay-badge pay-partial',
+            'overpaid' => 'pay-badge pay-overpaid',
+            default => 'pay-badge pay-unpaid',
+        };
+        $payStatusLabel = match ($apUiStatus) {
+            'ap_paid' => 'HUTANG LUNAS',
+            'awaiting_offset' => 'MENUNGGU OFFSET DP',
+            'ap_outstanding' => 'HUTANG BELUM LUNAS',
+            'dp_recorded' => 'DP TERCATAT',
+            default => $payStatusLabel,
+        };
+        $apSettledTotal = round($paidPaymentTotal + $dpAppliedTotal, 2);
+        $paymentButtonLabel = $canApplyDp
+            ? 'Offset DP'
+            : ($canPaySettlement ? 'Bayar Hutang' : ($dpTotal > 0.0001 ? 'Tambah DP' : 'Bayar DP'));
+        $paymentModalId = $canApplyDp ? '#modalApplyDp' : '#modalAddPayment';
         $linePurchaseUnits = ($order->lines ?? collect())
             ->map(fn ($line) => $line->effectivePurchaseUnit())
             ->filter()
@@ -263,7 +292,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
 
     {{-- PRIMARY ACTIONS --}}
     @if ($canManagePayments && $canOpenPayment)
-        <button type="button" class="po-btn po-success" data-bs-toggle="modal" data-bs-target="#modalAddPayment" title="{{ $paymentButtonLabel }}">
+        <button type="button" class="po-btn po-success" data-bs-toggle="modal" data-bs-target="{{ $paymentModalId }}" title="{{ $paymentButtonLabel }}">
             <i class="bi bi-cash-coin d-inline-block d-md-none"></i>
             <span class="d-none d-md-inline">{{ $paymentButtonLabel }}</span>
         </button>
@@ -357,6 +386,18 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         <strong>{{ id_day($order->date) }}</strong>
     </div>
 
+    @if ($canSeeMoney && $hasAp && $dpAvailable > 0.0001 && $apOutstanding > 0.0001)
+        <div class="alert alert-warning d-flex align-items-start gap-2 mb-3 mt-2 py-2 px-3" style="font-size:.84rem;">
+            <i class="bi bi-exclamation-triangle-fill mt-1" aria-hidden="true"></i>
+            <div>
+                <strong>DP belum mengurangi hutang.</strong>
+                Tersedia <span class="mono">{{ rupiah($dpAvailable) }}</span> untuk di-offset ke hutang AP
+                <span class="mono">{{ $formatPaymentMoney($apOutstanding) }}</span>.
+                Gunakan tombol <b>Offset DP</b>; aksi ini tidak mengeluarkan uang baru.
+            </div>
+        </div>
+    @endif
+
     @if ($status === 'approved' && ($order->received_status ?? 'not_received') === 'partial' && ($order->payment_status ?? 'unpaid') === 'paid')
         <div class="alert alert-warning d-flex align-items-center mb-3 mt-2" style="font-size: .85rem;">
             <i class="bi bi-info-circle-fill me-2 fs-5"></i>
@@ -390,12 +431,19 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
             <div class="po-value">{{ rupiah($grnPostedTotal) }}</div>
         </div>
         <div class="po-card po-kpi">
-            <div class="po-label">Sudah Dibayar</div>
+            <div class="po-label">Dana Dibayar</div>
             <div class="po-value" style="color:#15803d;">{{ $formatPaymentMoney($paidAmount) }}</div>
+            <div class="po-muted" style="font-size:.7rem;">DP + pelunasan</div>
         </div>
         <div class="po-card po-kpi">
-            <div class="po-label">{{ $payStatus === 'overpaid' ? 'Piutang Supplier' : 'Sisa Tagihan' }}</div>
-            <div class="po-value" style="color:{{ $payStatus === 'overpaid' ? '#6d28d9' : '#b91c1c' }};">{{ $formatPaymentMoney($payStatus === 'overpaid' ? $supplierReceivable : $apOutstanding) }}</div>
+            <div class="po-label">DP Belum Dipakai</div>
+            <div class="po-value" style="color:{{ $dpAvailable > 0.0001 ? '#b45309' : '#15803d' }};">{{ $formatPaymentMoney($dpAvailable) }}</div>
+            <div class="po-muted" style="font-size:.7rem;">belum mengurangi hutang</div>
+        </div>
+        <div class="po-card po-kpi">
+            <div class="po-label">Hutang AP Tersisa</div>
+            <div class="po-value" style="color:{{ $apOutstanding > 0.0001 ? '#b91c1c' : '#15803d' }};">{{ $formatPaymentMoney($payStatus === 'overpaid' ? $supplierReceivable : $apOutstanding) }}</div>
+            <div class="po-muted" style="font-size:.7rem;">GRN − payment − offset</div>
         </div>
         @else
         <div class="po-card po-kpi">
@@ -651,7 +699,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
             <div class="po-head">
                 <div>
                     <div class="po-title">Riwayat Pembayaran</div>
-                    <div class="po-muted">Daftar mutasi uang keluar untuk PO ini.</div>
+                <div class="po-muted">Pembayaran, DP, dan pemindahan DP ke hutang AP.</div>
                 </div>
             </div>
             <div class="po-body">
@@ -673,7 +721,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                     $type = (string) ($p->type ?? '');
                                     $typeLabel = match ($type) {
                                         'dp' => 'DP',
-                                        'dp_apply' => 'Gunakan DP',
+                                        'dp_apply' => 'Offset DP ke AP',
                                         'return_apply' => 'Retur',
                                         default => 'Pelunasan',
                                     };
@@ -761,8 +809,13 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                     id="paymentForm">
                     @csrf
 
-                    <div class="modal-body">
-                        <div class="row g-2">
+                                <div class="modal-body">
+                                    <div class="alert alert-info py-2 px-3 mb-3 small">
+                                        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                                        Offset DP hanya memindahkan saldo dari <b>Uang Muka Pembelian</b> ke
+                                        <b>Hutang Dagang</b>; tidak ada uang baru yang keluar.
+                                    </div>
+                                    <div class="row g-2">
                             @if ($dpTotal > 0.0001 && $dpRemaining <= \App\Models\PurchaseOrder::paymentRoundingTolerance())
                                 <div class="col-12">
                                     <div class="alert alert-warning py-2 px-3 mb-1 small">
@@ -932,6 +985,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                         <h6 class="modal-title fw-semibold mb-0">Offset DP</h6>
                         <div class="d-flex gap-1 flex-wrap mt-2">
                             <span class="modal-kpi">DP <strong class="mono">{{ rupiah($dpAvailable) }}</strong></span>
+                            <span class="modal-kpi">AP sudah diselesaikan <strong class="mono">{{ rupiah($apSettledTotal) }}</strong></span>
                             @if ($returnPostedTotal > 0.0001)
                                 <span class="modal-kpi">Retur <strong class="mono">{{ rupiah($returnPostedTotal) }}</strong></span>
                             @endif
@@ -942,11 +996,16 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                 </div>
 
                 <div class="modal-body">
+                    <div class="alert alert-info py-2 px-3 mb-3 small">
+                        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                        Offset DP hanya memindahkan saldo dari <b>Uang Muka Pembelian</b> ke
+                        <b>Hutang Dagang</b>; tidak ada uang baru yang keluar.
+                    </div>
                     <div class="row g-2">
                         <div class="col-6">
                             <label class="form-label small fw-semibold">Tanggal</label>
                             <input type="text" name="date" class="form-control form-control-sm gf-date-input"
-                                value="{{ old('date', now()->toDateString()) }}" data-gf-date
+                                value="{{ old('date', $order->date?->toDateString() ?? now()->toDateString()) }}" data-gf-date
                                 autocomplete="off" required>
                             @error('date')
                                 <div class="text-danger small mt-1">{{ $message }}</div>
@@ -1213,6 +1272,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                 // =========================================================
                 const applyDpAmount = document.getElementById('applyDpAmount');
                 const btnFillMaxApplyDp = document.getElementById('btnFillMaxApplyDp');
+                const applyDpForm = document.getElementById('applyDpForm');
                 const maxApplyDp = {{ (float) $maxApplyDp }};
 
                 btnFillMaxApplyDp?.addEventListener('click', function() {
@@ -1227,6 +1287,32 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                     if (raw === '') return;
                     const n = Number(raw.replace(/\./g, '').replace(/,/g, '.'));
                     if (!isNaN(n)) applyDpAmount.value = fmtMoneyInput(n);
+                });
+
+                applyDpForm?.addEventListener('submit', function(event) {
+                    if (applyDpForm.dataset.confirmed === '1') return;
+
+                    const raw = (applyDpAmount?.value || '').toString().trim();
+                    const amount = Number(raw.replace(/\./g, '').replace(/,/g, '.'));
+                    if (!Number.isFinite(amount) || amount <= 0) return;
+
+                    if (amount > maxApplyDp + paymentTolerance) {
+                        event.preventDefault();
+                        window.alert(`Nominal melebihi maksimum offset ${fmtMoneyInput(maxApplyDp)}.`);
+                        return;
+                    }
+
+                    const confirmed = window.confirm(
+                        `Offset DP ${fmtMoneyInput(amount)} ke hutang AP?\n\n` +
+                        `Jurnal: Dr Hutang Dagang / Cr Uang Muka Pembelian.\n` +
+                        `Tidak ada uang baru yang keluar.`
+                    );
+                    if (!confirmed) {
+                        event.preventDefault();
+                        return;
+                    }
+
+                    applyDpForm.dataset.confirmed = '1';
                 });
 
                 // =========================================================
