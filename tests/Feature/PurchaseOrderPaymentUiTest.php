@@ -182,7 +182,7 @@ class PurchaseOrderPaymentUiTest extends TestCase
             ->assertSee('DP Belum Dipakai')
             ->assertSee('Hutang AP Tersisa')
             ->assertSee('Offset DP')
-            ->assertSee('Bayar Sekarang')
+            ->assertDontSee('data-bs-target="#modalAddPayment"')
             ->assertDontSee('Bayar PO');
     }
 

@@ -200,7 +200,13 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         $supplierReceivable = \App\Models\PurchaseOrder::normalizePaymentRemainder((float) ($order->paid_amount ?? 0) - $poGrandTotal);
         $canPaySettlement = $canPay && $hasAp && $apOutstanding > 0;
         // DP boleh melebihi nilai PO agar selisihnya tercatat sebagai piutang supplier.
-        $canPayDp = $canPay && $poGrandTotal > 0.01;
+        // Jika total pembayaran PO sudah berstatus LUNAS, jangan tawarkan
+        // pembayaran baru dari halaman ini. Saldo DP yang masih tersisa tetap
+        // ditampilkan sebagai uang muka supplier dan akan dipakai saat GRN
+        // berikutnya, bukan melalui tombol Bayar Sekarang lagi.
+        $canPayDp = $canPay
+            && $poGrandTotal > 0.01
+            && !in_array($payStatus, ['paid', 'overpaid'], true);
         $canOpenPayment = $canPaySettlement || $canPayDp;
         $paymentButtonLabel = 'Bayar Sekarang';
 
