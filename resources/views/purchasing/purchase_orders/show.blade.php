@@ -38,7 +38,7 @@ body[data-theme="dark"] .po-document-date-row strong{color:#bfdbfe}
 .pay-badge.pay-partial{color:#a16207;background:rgba(234,179,8,.1);border-color:rgba(234,179,8,.25)}
 .pay-badge.pay-overpaid{color:#6d28d9;background:rgba(124,58,237,.1);border-color:rgba(124,58,237,.25)}
 .pay-badge.pay-unpaid{color:#64748b;background:rgba(148,163,184,.08)}
-.po-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.55rem;margin-bottom:.65rem}
+.po-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.55rem;margin-bottom:.65rem}
 .po-card{background:var(--card,#fff);border:1px solid rgba(148,163,184,.18);border-radius:8px;overflow:hidden;margin-bottom:.65rem}
 .po-kpi{padding:.65rem .75rem}
 .po-label{font-size:.72rem;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.02em}
@@ -144,6 +144,9 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         $apDebt = (float) ($apDebt ?? max(0, round($grnPostedTotal - $returnPostedTotal, 2)));
         $paidPaymentTotal = (float) ($paidPaymentTotal ?? 0); // type=payment
         $dpTotal = (float) ($dpTotal ?? 0); // type=dp
+        // Total uang yang sudah dibayarkan ke supplier. dp_apply tidak
+        // dihitung lagi karena hanya memindahkan pencatatan DP ke hutang.
+        $paidAmount = round($paidPaymentTotal + $dpTotal, 2);
 
         // DP APPLY total (buat UI)
         $dpAppliedTotal =
@@ -179,6 +182,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
 
         $canPay = $status !== 'cancelled';
         $hasPayments = ($order->payments?->count() ?? 0) > 0;
+        $canManagePayments = $user?->isOwner() ?? false;
 
         // strict cash/bank list
         $cashAccountsCol = collect($cashAccounts ?? []);
@@ -198,6 +202,9 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         // DP boleh melebihi nilai PO agar selisihnya tercatat sebagai piutang supplier.
         $canPayDp = $canPay && $poGrandTotal > 0.01;
         $canOpenPayment = $canPaySettlement || $canPayDp;
+        $paymentButtonLabel = $canPaySettlement
+            ? 'Bayar PO'
+            : ($dpTotal > 0.0001 ? 'Tambah DP' : 'Bayar DP');
 
         // apply DP guard
         $canApplyDp = $canPay && $hasAp && $dpAvailable > 0 && $apOutstanding > 0;
@@ -255,8 +262,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
     <span class="po-spacer"></span>
 
     {{-- PRIMARY ACTIONS --}}
-    @if ($canSeeMoney && $canOpenPayment)
-        @php $paymentButtonLabel = $canPaySettlement ? 'Bayar PO' : 'Bayar DP'; @endphp
+    @if ($canManagePayments && $canOpenPayment)
         <button type="button" class="po-btn po-success" data-bs-toggle="modal" data-bs-target="#modalAddPayment" title="{{ $paymentButtonLabel }}">
             <i class="bi bi-cash-coin d-inline-block d-md-none"></i>
             <span class="d-none d-md-inline">{{ $paymentButtonLabel }}</span>
@@ -382,6 +388,10 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         <div class="po-card po-kpi">
             <div class="po-label">Total GRN</div>
             <div class="po-value">{{ rupiah($grnPostedTotal) }}</div>
+        </div>
+        <div class="po-card po-kpi">
+            <div class="po-label">Sudah Dibayar</div>
+            <div class="po-value" style="color:#15803d;">{{ $formatPaymentMoney($paidAmount) }}</div>
         </div>
         <div class="po-card po-kpi">
             <div class="po-label">{{ $payStatus === 'overpaid' ? 'Piutang Supplier' : 'Sisa Tagihan' }}</div>
@@ -719,7 +729,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
 </script>
 
 
-    @if ($canSeeMoney)
+    @if ($canManagePayments)
     {{-- =========================================================
     MODAL: ADD PAYMENT / DP (punya kamu, tetap, cuma sedikit touch)
 ========================================================= --}}
@@ -728,7 +738,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
             <div class="modal-content gf-modal">
                 <div class="modal-header">
                     <div>
-                        <h6 class="modal-title fw-semibold mb-0">{{ $canPaySettlement ? 'Bayar PO' : 'Bayar DP' }}</h6>
+                        <h6 class="modal-title fw-semibold mb-0">{{ $paymentButtonLabel }}</h6>
                         <div class="d-flex gap-1 flex-wrap mt-2">
                             @if ($hasAp)
                                 <span class="modal-kpi">GRN <strong class="mono">{{ rupiah($grnPostedTotal) }}</strong></span>
@@ -753,10 +763,20 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
 
                     <div class="modal-body">
                         <div class="row g-2">
-                            @if (!$hasAp)
+                            @if ($dpTotal > 0.0001 && $dpRemaining <= \App\Models\PurchaseOrder::paymentRoundingTolerance())
+                                <div class="col-12">
+                                    <div class="alert alert-warning py-2 px-3 mb-1 small">
+                                        DP sudah menutup total PO. Tambahan nominal tetap boleh dicatat, tetapi selisihnya akan menjadi piutang supplier.
+                                    </div>
+                                </div>
+                            @elseif (!$hasAp)
                                 <div class="col-12">
                                     <div class="alert alert-info py-2 px-3 mb-1 small">
-                                        Belum ada GRN POSTED. Nominal ini akan dicatat sebagai DP; pelunasan baru tersedia setelah barang diterima dan GRN diposting.
+                                        @if ($dpTotal > 0.0001)
+                                            DP sudah tercatat {{ rupiah($dpTotal) }}. Tambahan nominal akan menambah DP; pelunasan baru tersedia setelah GRN diposting.
+                                        @else
+                                            Belum ada GRN POSTED. Nominal ini akan dicatat sebagai DP; pelunasan baru tersedia setelah barang diterima dan GRN diposting.
+                                        @endif
                                     </div>
                                 </div>
                             @endif
@@ -1027,6 +1047,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
 
                 const remaining = {{ (float) $apOutstanding }};
                 const dpRemaining = {{ (float) $dpRemaining }};
+                const paymentTolerance = {{ (float) \App\Models\PurchaseOrder::paymentRoundingTolerance() }};
                 const typeSelect = document.getElementById('typeSelectModal');
                 const paymentTypeHint = document.getElementById('paymentTypeHint');
                 const supplierInvoiceWrap = document.getElementById('supplierInvoiceWrapModal');
@@ -1152,7 +1173,14 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                             ? 'Pelunasan memakai hutang dari GRN POSTED dan tidak boleh melebihi sisa tagihan.'
                             : 'DP dicatat sebagai uang muka dan bisa di-offset setelah GRN POSTED.';
                     }
-                    if (btnFill) btnFill.textContent = isPayment ? 'Isi sisa tagihan' : 'Isi sisa PO';
+                    if (btnFill) {
+                        const maxAmount = isPayment ? remaining : dpRemaining;
+                        const canFill = maxAmount > paymentTolerance;
+                        btnFill.textContent = isPayment
+                            ? (canFill ? 'Isi sisa tagihan' : 'Sisa tagihan sudah 0')
+                            : (canFill ? 'Isi sisa PO' : 'Sisa PO sudah 0');
+                        btnFill.disabled = !canFill;
+                    }
                     applyAllValidations();
                 }
 
