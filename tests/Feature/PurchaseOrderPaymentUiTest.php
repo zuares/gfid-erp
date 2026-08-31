@@ -69,7 +69,7 @@ class PurchaseOrderPaymentUiTest extends TestCase
         $this->actingAs($owner)
             ->get(route('purchasing.purchase_orders.show', $order))
             ->assertOk()
-            ->assertSee('Tambah DP')
+            ->assertSee('Bayar Sekarang')
             ->assertSee('DP sudah tercatat')
             ->assertSee('Rp 250.000')
             ->assertSee('Dana Dibayar')
@@ -182,6 +182,7 @@ class PurchaseOrderPaymentUiTest extends TestCase
             ->assertSee('DP Belum Dipakai')
             ->assertSee('Hutang AP Tersisa')
             ->assertSee('Offset DP')
+            ->assertSee('Bayar Sekarang')
             ->assertDontSee('Bayar PO');
     }
 

@@ -202,9 +202,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         // DP boleh melebihi nilai PO agar selisihnya tercatat sebagai piutang supplier.
         $canPayDp = $canPay && $poGrandTotal > 0.01;
         $canOpenPayment = $canPaySettlement || $canPayDp;
-        $paymentButtonLabel = $canPaySettlement
-            ? 'Bayar PO'
-            : ($dpTotal > 0.0001 ? 'Tambah DP' : 'Bayar DP');
+        $paymentButtonLabel = 'Bayar Sekarang';
 
         // apply DP guard
         $canApplyDp = $canPay && $hasAp && $dpAvailable > 0 && $apOutstanding > 0;
@@ -234,10 +232,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
             default => $payStatusLabel,
         };
         $apSettledTotal = round($paidPaymentTotal + $dpAppliedTotal, 2);
-        $paymentButtonLabel = $canApplyDp
-            ? 'Offset DP'
-            : ($canPaySettlement ? 'Bayar Hutang' : ($dpTotal > 0.0001 ? 'Tambah DP' : 'Bayar DP'));
-        $paymentModalId = $canApplyDp ? '#modalApplyDp' : '#modalAddPayment';
+        $paymentModalId = '#modalAddPayment';
         $linePurchaseUnits = ($order->lines ?? collect())
             ->map(fn ($line) => $line->effectivePurchaseUnit())
             ->filter()
@@ -292,7 +287,13 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
 
     {{-- PRIMARY ACTIONS --}}
     @if ($canManagePayments && $canOpenPayment)
-        <button type="button" class="po-btn po-success" data-bs-toggle="modal" data-bs-target="{{ $paymentModalId }}" title="{{ $paymentButtonLabel }}">
+        @if ($canApplyDp)
+            <button type="button" class="po-btn po-success" data-bs-toggle="modal" data-bs-target="#modalApplyDp" title="Offset DP ke Hutang AP">
+                <i class="bi bi-arrow-left-right d-inline-block d-md-none"></i>
+                <span class="d-none d-md-inline">Offset DP</span>
+            </button>
+        @endif
+        <button type="button" class="po-btn {{ $canApplyDp ? 'po-primary' : 'po-success' }}" data-bs-toggle="modal" data-bs-target="#modalAddPayment" title="Bayar sekarang">
             <i class="bi bi-cash-coin d-inline-block d-md-none"></i>
             <span class="d-none d-md-inline">{{ $paymentButtonLabel }}</span>
         </button>
