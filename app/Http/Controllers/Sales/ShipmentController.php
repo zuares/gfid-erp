@@ -3269,6 +3269,44 @@ class ShipmentController extends Controller
             'waves',
         ]);
 
+        // Shipment lama yang dibuat dalam mode record-only dapat menyimpan
+        // nomor order tanpa fulfillment_id. Resolve ulang di halaman confirm
+        // agar detail item marketplace tetap terbaca, tanpa mengubah shipment
+        // atau mengunci kemampuan edit operator.
+        foreach ($shipment->orderScans as $scan) {
+            if ($scan->status === 'skip' || $scan->source === 'sales_invoice') {
+                continue;
+            }
+
+            if ($scan->fulfillment?->marketplaceOrder) {
+                continue;
+            }
+
+            $orderNo = $this->normalizeOrderNumber($scan->order_no);
+            if ($orderNo === '') {
+                continue;
+            }
+
+            $marketplaceOrder = $this->marketplaceOrderQuery($orderNo, $shipment)
+                ->whereIn('order_status', self::RECONCILIATION_MARKETPLACE_STATUSES)
+                ->with(['items.internalItem', 'store'])
+                ->first();
+
+            if (!$marketplaceOrder) {
+                continue;
+            }
+
+            $fulfillment = $scan->fulfillment;
+            if (!$fulfillment) {
+                $fulfillment = new \App\Models\OrderFulfillment([
+                    'marketplace_order_id' => $marketplaceOrder->id,
+                ]);
+            }
+
+            $fulfillment->setRelation('marketplaceOrder', $marketplaceOrder);
+            $scan->setRelation('fulfillment', $fulfillment);
+        }
+
         $warehouse = $this->whRts();
         $stockInsufficient = $warehouse
             ? $this->checkStockSufficiency($shipment, $warehouse)
