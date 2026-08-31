@@ -1907,6 +1907,7 @@ class ShipmentController extends Controller
     protected function marketplaceOrderQuery(string $scanCode, ?Shipment $shipment = null)
     {
         $scanCode = mb_strtoupper(trim($scanCode));
+        $lookupIdentifiers = $this->salesLookupIdentifiers();
 
         $query = \App\Models\MarketplaceOrder::query();
 
@@ -1918,9 +1919,9 @@ class ShipmentController extends Controller
             $query->where('store_id', $shipment->store_id);
         }
 
-        return $query->where(function ($query) use ($scanCode) {
+        return $query->where(function ($query) use ($scanCode, $lookupIdentifiers) {
             $first = true;
-            foreach ($this->salesLookupIdentifiers() as $identifier) {
+            foreach ($lookupIdentifiers as $identifier) {
                 $column = match ($identifier) {
                     'shipping_awb_no' => 'shipping_awb_no',
                     'channel_order_id' => 'channel_order_id',
@@ -1934,6 +1935,41 @@ class ShipmentController extends Controller
                 }
 
                 $first ? $query->where($column, $scanCode) : $query->orWhere($column, $scanCode);
+                $first = false;
+            }
+
+            // Shopee menyimpan booking dan nomor resi operasional di tabel
+            // marketplace_bookings. Jangan hanya mengandalkan kolom snapshot
+            // di marketplace_orders karena data order lama bisa belum terisi.
+            if (in_array('booking_sn', $lookupIdentifiers, true)) {
+                $query->orWhereExists(function ($bookingQuery) use ($scanCode) {
+                    $bookingQuery->selectRaw('1')
+                        ->from('marketplace_bookings')
+                        ->whereColumn('marketplace_bookings.store_id', 'marketplace_orders.store_id')
+                        ->whereRaw('UPPER(TRIM(marketplace_bookings.booking_sn)) = ?', [$scanCode])
+                        ->where(function ($orderLinkQuery) {
+                            $orderLinkQuery
+                                ->whereColumn('marketplace_bookings.order_sn', 'marketplace_orders.channel_order_id')
+                                ->orWhereColumn('marketplace_bookings.order_sn', 'marketplace_orders.external_order_id')
+                                ->orWhereColumn('marketplace_bookings.booking_sn', 'marketplace_orders.booking_sn');
+                        });
+                });
+                $first = false;
+            }
+
+            if (in_array('shipping_awb_no', $lookupIdentifiers, true)) {
+                $query->orWhereExists(function ($bookingQuery) use ($scanCode) {
+                    $bookingQuery->selectRaw('1')
+                        ->from('marketplace_bookings')
+                        ->whereColumn('marketplace_bookings.store_id', 'marketplace_orders.store_id')
+                        ->whereRaw('UPPER(TRIM(marketplace_bookings.tracking_number)) = ?', [$scanCode])
+                        ->where(function ($orderLinkQuery) {
+                            $orderLinkQuery
+                                ->whereColumn('marketplace_bookings.order_sn', 'marketplace_orders.channel_order_id')
+                                ->orWhereColumn('marketplace_bookings.order_sn', 'marketplace_orders.external_order_id')
+                                ->orWhereColumn('marketplace_bookings.booking_sn', 'marketplace_orders.booking_sn');
+                        });
+                });
                 $first = false;
             }
 
