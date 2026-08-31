@@ -1882,10 +1882,56 @@ async function loadState() {
         })
         .filter(Boolean);
     rebuildPoolUsed();
+    await hydrateSavedMarketplaceOrders();
     // Item-first harus melewati aksi alokasi yang terlihat operator sebelum
     // lanjut ke halaman konfirmasi. Mode order-first tetap otomatis.
     if (!ITEM_FIRST) await recalculateAllocations();
     return orders.length ? 'ok' : 'empty';
+}
+
+// Scan lama yang dibuat saat mode operasional record-only belum punya
+// payload detail marketplace. Saat masuk ke halaman rekonsiliasi, resolve
+// ulang nomor tersebut agar item order dan qty-nya bisa dialokasikan.
+async function hydrateSavedMarketplaceOrders() {
+    if (!orders.length) return;
+
+    for (let idx = 0; idx < orders.length; idx++) {
+        const current = orders[idx];
+        if (current?.found && Array.isArray(current.order?.lines) && current.order.lines.length) continue;
+
+        const orderNo = normalizeOrderNo(current?.no || current?.order?.order_no);
+        if (!orderNo) continue;
+
+        try {
+            const fd = new FormData();
+            fd.append('_token', CSRF);
+            fd.append('order_no', orderNo);
+            fd.append('pool_used', JSON.stringify(poolUsed));
+
+            const response = await fetch(MATCH_URL, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: fd,
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.status !== 'ok') continue;
+
+            const savedNo = normalizeOrderNo(data.no || data.order?.order_no || orderNo) || orderNo;
+            const order = data.order && typeof data.order === 'object' ? { ...data.order } : {};
+            order.order_no = normalizeOrderNo(order.order_no || order.code) || savedNo;
+            orders[idx] = {
+                ...current,
+                ...data,
+                no: savedNo,
+                order,
+                decision: current.decision || data.decision || 'pending',
+                subs: current.subs || {},
+            };
+            rebuildPoolUsed();
+        } catch (error) {
+            // Order manual/unknown tetap ditampilkan sebagai record-only.
+        }
+    }
 }
 function clearState() {
     orders = [];

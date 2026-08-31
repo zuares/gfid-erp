@@ -3323,39 +3323,9 @@ class ShipmentController extends Controller
             ], 422);
         }
 
-        // Record-only tetap menerima scan order. Jangan perlakukan mode ini
-        // sebagai error lookup karena fungsi utamanya memang pencatatan.
-        if ((string) $this->salesOperationalSetting('lookup_mode', 'record_only') === 'record_only') {
-            $rawPayload = [
-                'no' => $no,
-                'found' => false,
-                'mode' => 'record_only',
-                'order' => [
-                    'order_no' => $no,
-                    'source' => 'record_only',
-                    'status' => 'pending',
-                ],
-                'pool_full' => $this->buildPoolSnapshot($shipment, $pool),
-                'decision' => 'pending',
-                'subs' => [],
-            ];
-
-            $scanModel = ShipmentOrderScan::updateOrCreate(
-                ['shipment_id' => $shipment->id, 'order_no' => $no],
-                [
-                    'shipment_wave_id' => $currentWave?->id,
-                    'fulfillment_id' => null,
-                    'status' => 'pending',
-                    'source' => 'scanner',
-                    'raw_payload' => $rawPayload,
-                ]
-            );
-
-            $rawPayload['scanned_at'] = $scanModel->created_at?->format('d/m/Y H:i:s');
-
-            return response()->json(array_merge(['status' => 'ok'], $rawPayload));
-        }
-
+        // Endpoint ini hanya dipanggil dari halaman rekonsiliasi, sehingga
+        // lookup marketplace tetap dijalankan walaupun scan operasional utama
+        // dikonfigurasi sebagai record-only.
         $marketplaceOrder = $this->marketplaceOrderQuery($no, $shipment)
             ->with(['items.internalItem', 'store'])
             ->first();
