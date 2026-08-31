@@ -26,6 +26,17 @@ use Illuminate\Support\Facades\Schema;
 
 class ShipmentController extends Controller
 {
+    /**
+     * Marketplace statuses that are eligible for shipment reconciliation.
+     * Keep cancelled, waiting, completed, and other terminal states out of
+     * the reconciliation picker.
+     */
+    private const RECONCILIATION_MARKETPLACE_STATUSES = [
+        'READY_TO_SHIP',
+        'PROCESSED',
+        'SHIPPED',
+    ];
+
     private function isShipmentNextCommand(?string $code): bool
     {
         $code = mb_strtoupper(trim((string) $code));
@@ -3327,6 +3338,7 @@ class ShipmentController extends Controller
         // lookup marketplace tetap dijalankan walaupun scan operasional utama
         // dikonfigurasi sebagai record-only.
         $marketplaceOrder = $this->marketplaceOrderQuery($no, $shipment)
+            ->whereIn('order_status', self::RECONCILIATION_MARKETPLACE_STATUSES)
             ->with(['items.internalItem', 'store'])
             ->first();
 
@@ -3401,7 +3413,7 @@ class ShipmentController extends Controller
 
         // Order dari tab Belum Packing (READY_TO_SHIP) maupun Sedang Dikemas
         // (PROCESSED) boleh masuk workflow scan dan dipromosikan setelah match.
-        if ($shipment->shipment_type !== 'manual' && !in_array($marketplaceOrder->order_status, ['READY_TO_SHIP', 'PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'DELIVERED', 'COMPLETED'])) {
+        if ($shipment->shipment_type !== 'manual' && !in_array($marketplaceOrder->order_status, self::RECONCILIATION_MARKETPLACE_STATUSES, true)) {
             $fulfillment = \App\Models\OrderFulfillment::query()
                 ->where('marketplace_order_id', $marketplaceOrder->id)
                 ->first();
