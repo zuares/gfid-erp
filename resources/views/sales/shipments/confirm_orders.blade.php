@@ -35,6 +35,21 @@
 .sd-order-item-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#111827}
 .sd-order-item-name{color:#64748b;font-size:.76rem;margin-top:.06rem}
 .sd-order-item-qty{color:#334155;font-size:.8rem;font-weight:900}
+.sd-marketplace-detail{margin:.7rem 0 0 2.05rem;padding:.7rem .75rem;border:1px solid rgba(37,99,235,.16);border-radius:8px;background:rgba(239,246,255,.55)}
+.sd-marketplace-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.6rem;flex-wrap:wrap;margin-bottom:.55rem}
+.sd-marketplace-title{font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:#1e40af}
+.sd-marketplace-meta{display:flex;gap:.4rem .75rem;flex-wrap:wrap;margin-top:.15rem;color:#64748b;font-size:.72rem}
+.sd-marketplace-actions{display:flex;gap:.35rem;flex-wrap:wrap}
+.sd-marketplace-actions a{min-height:28px;padding:.18rem .5rem;font-size:.7rem}
+.sd-marketplace-table{width:100%;border-collapse:collapse}
+.sd-marketplace-table th,.sd-marketplace-table td{padding:.38rem .4rem;border-bottom:1px solid rgba(37,99,235,.1);font-size:.73rem;vertical-align:middle}
+.sd-marketplace-table th{text-align:left;color:#64748b;font-size:.64rem;text-transform:uppercase;letter-spacing:.03em}
+.sd-marketplace-table td{color:#334155}.sd-marketplace-table tr:last-child td{border-bottom:0}
+.sd-marketplace-table .sd-marketplace-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#0f172a}
+.sd-marketplace-table .sd-marketplace-number{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sd-marketplace-short{color:#b91c1c;font-weight:900}.sd-marketplace-ok{color:#15803d;font-weight:900}
+body[data-theme="dark"] .sd-marketplace-detail{background:rgba(30,64,175,.14);border-color:rgba(96,165,250,.35)}
+body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dark"] .sd-marketplace-table td{color:#cbd5e1}body[data-theme="dark"] .sd-marketplace-table .sd-marketplace-code{color:#f1f5f9}
 .sd-badge{display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid rgba(148,163,184,.25);padding:.16rem .48rem;font-size:.69rem;font-weight:900;color:#64748b;white-space:nowrap}
 .sd-badge.pending{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:#92400e}
 .sd-empty{padding:1.6rem 1rem;text-align:center;color:#64748b;font-size:.84rem}
@@ -118,15 +133,18 @@
     $totalLines = (int) $lines->count();
     $pendingOrders = $orderScans->where('status', 'pending')->count();
     $isItemFirst = ($shipment->scan_mode ?? 'item_first') === 'item_first';
+    $isDaily = (bool) ($isDaily ?? (($shipment->dispatch_mode ?? 'single') === 'daily'));
+    $currentWave = $currentWave ?? null;
     $mappedLines = $lines->filter(fn ($line) => !empty($line->shipment_order_scan_id))->values();
     $unmappedLines = $lines->filter(fn ($line) => empty($line->shipment_order_scan_id))->values();
     $mappedQty = (int) $mappedLines->sum('qty_scanned');
     $unmappedQty = (int) $unmappedLines->sum('qty_scanned');
+    $mappingErrors = $mappingErrors ?? [];
 @endphp
 
 <div class="sd-topbar">
     <a href="{{ route('sales.shipments.edit', $shipment) }}" class="sd-btn sd-topbar-nav">
-        <i class="bi bi-box-seam" aria-hidden="true"></i> Scan Item
+        <i class="bi bi-pencil-square" aria-hidden="true"></i> Edit Shipment
     </a>
     @if (!$isItemFirst)
         <a href="{{ route('sales.shipments.scan_order', $shipment) }}" class="sd-btn sd-topbar-nav">
@@ -136,7 +154,15 @@
     <a href="{{ route('sales.shipments.index') }}" class="sd-btn sd-topbar-nav">
         <i class="bi bi-list-ul" aria-hidden="true"></i> Daftar Shipment
     </a>
+    @if($shipment->shipment_type === \App\Models\Shipment::TYPE_MARKETPLACE)
+        <a href="{{ route('sales.shipments.rekon', $shipment) }}" class="sd-btn sd-topbar-nav">
+            <i class="bi bi-diagram-3" aria-hidden="true"></i> Rekonsiliasi
+        </a>
+    @endif
     <span class="sd-code">{{ $shipment->code }}</span>
+    @if($isDaily && $currentWave)
+        <span class="sd-pill">{{ $currentWave->label ?: ('Gelombang ' . $currentWave->sequence) }}</span>
+    @endif
     <span class="sd-pill sd-status">{{ $statusLabel }}</span>
     <span class="sd-spacer"></span>
     <span class="sd-pill">Qty <b>{{ number_format($totalQty, 0, ',', '.') }}</b></span>
@@ -146,18 +172,18 @@
         <span class="sd-pill">Pesanan <b>{{ number_format($orderScans->count(), 0, ',', '.') }}</b></span>
     @endif
     @if($statusKey === 'draft')
-        <form id="shipmentSubmitForm" class="sd-inline-form" action="{{ route('sales.shipments.submit', $shipment) }}" method="POST"
+        <form id="shipmentSubmitForm" class="sd-inline-form" action="{{ $isDaily ? route('sales.shipments.wave_post', $shipment) : route('sales.shipments.submit', $shipment) }}" method="POST"
               data-gf-confirm
               data-gf-confirm-title="Submit shipment?"
               data-gf-confirm-summary='@json(["orders" => $orderScans->count(), "items" => $totalLines, "qty" => $totalQty])'
-              data-gf-confirm-text="{{ $isItemFirst ? 'Mapping item otomatis · Item/SKU: ' . $totalLines . ' · Total qty: ' . $totalQty : 'Order discan: ' . $orderScans->count() . ' · Item/SKU: ' . $totalLines . ' · Total qty: ' . $totalQty }}. Stok akan dikurangi dari WH-RTS."
-              data-gf-confirm-ok="Submit"
+              data-gf-confirm-text="{{ $isDaily ? 'Gelombang: ' . ($currentWave?->label ?: '-') . ' · Item/SKU: ' . $totalLines . ' · Total qty: ' . $totalQty : ($isItemFirst ? 'Mapping item otomatis · Item/SKU: ' . $totalLines . ' · Total qty: ' . $totalQty : 'Order discan: ' . $orderScans->count() . ' · Item/SKU: ' . $totalLines . ' · Total qty: ' . $totalQty) }}. Stok akan dikurangi dari WH-RTS."
+              data-gf-confirm-ok="{{ $isDaily ? 'Selesaikan Gelombang' : 'Submit' }}"
               data-gf-confirm-cancel="Batal">
             @csrf
             <button type="submit" class="sd-btn sd-primary sd-topbar-primary"
                     title="{{ !empty($stockInsufficient) ? 'Stok WH-RTS belum cukup' : 'Submit shipment' }}"
-                    @disabled($lines->count() === 0 || !empty($stockInsufficient))>
-                <i class="bi bi-check2-circle" aria-hidden="true"></i> Submit Shipment
+                    @disabled($lines->count() === 0 || !empty($stockInsufficient) || !empty($mappingErrors))>
+                <i class="bi bi-check2-circle" aria-hidden="true"></i> {{ $isDaily ? 'Selesaikan Gelombang' : 'Submit Shipment' }}
             </button>
         </form>
     @else
@@ -193,6 +219,19 @@
                         @endforeach
                     </tbody>
                 </table>
+            </div>
+        </div>
+    @endif
+
+    @if(!empty($mappingErrors))
+        <div class="sd-stock-warning" role="alert">
+            <div class="sd-stock-head">Shipment belum siap dikirim</div>
+            <div class="sd-body" style="padding-top:.55rem;padding-bottom:.55rem">
+                <ul style="margin:0;padding-left:1.1rem;color:#991b1b;font-size:.78rem;line-height:1.5">
+                    @foreach($mappingErrors as $mappingError)
+                        <li>{{ $mappingError }}</li>
+                    @endforeach
+                </ul>
             </div>
         </div>
     @endif
@@ -249,7 +288,10 @@
                         @foreach($orderScans as $scan)
                             @php
                                 $scanStatus = $scan->status ?: 'pending';
-                                $scanLabel = $scanStatus === 'skip' ? 'Diabaikan' : 'Ditunda';
+                                $scanIsUnlinked = empty($scan->fulfillment_id);
+                                $scanLabel = $scanStatus === 'skip'
+                                    ? 'Diabaikan'
+                                    : ($scanIsUnlinked ? 'Belum Tertaut' : 'Tertaut');
                                 $orderLines = $scan->lines->merge($singleOrderFallbackLines)->values();
                                 $orderQty = (int) $orderLines->sum('qty_scanned');
                             @endphp
@@ -258,7 +300,7 @@
                                     <span class="sd-order-num">{{ $loop->iteration }}</span>
                                     <div>
                                         <div class="sd-order-no">{{ $scan->order_no }}</div>
-                                        <div class="sd-muted">{{ $scan->source === 'manual_scan' ? 'Belum tertaut' : ($scan->source ?: 'Pencatatan manual') }}@if($scan->confirmed_at) · {{ $scan->confirmed_at->format('d M Y H:i') }}@endif</div>
+                                        <div class="sd-muted">{{ $scanIsUnlinked ? 'Belum tertaut ke marketplace/fulfillment' : ($scan->source ?: 'Tertaut') }}@if($scan->confirmed_at) · {{ $scan->confirmed_at->format('d M Y H:i') }}@endif</div>
                                     </div>
                                     <span class="sd-order-qty">x{{ number_format($orderQty, 0, ',', '.') }}</span>
                                 </div>
@@ -272,6 +314,60 @@
                                         <div class="sd-muted" style="padding:.45rem 0">Belum ada item di order ini.</div>
                                     @endforelse
                                 </div>
+                                @if($scan->fulfillment?->marketplaceOrder)
+                                    @php
+                                        $marketplaceOrder = $scan->fulfillment->marketplaceOrder;
+                                        $marketplaceLines = $marketplaceOrder->items ?? collect();
+                                        $pickedByItem = $orderLines->groupBy('item_id')->map(fn ($itemLines) => (int) $itemLines->sum('qty_scanned'));
+                                        $marketplaceStatus = strtoupper(str_replace('_', ' ', (string) ($marketplaceOrder->order_status ?: $marketplaceOrder->status ?: '')));
+                                    @endphp
+                                    <div class="sd-marketplace-detail">
+                                        <div class="sd-marketplace-head">
+                                            <div>
+                                                <div class="sd-marketplace-title"><i class="bi bi-shop me-1" aria-hidden="true"></i>Order Marketplace</div>
+                                                <div class="sd-marketplace-meta">
+                                                    <span>Status: <b>{{ $marketplaceStatus ?: '—' }}</b></span>
+                                                    @if($marketplaceOrder->buyer_username)<span>Pembeli: {{ $marketplaceOrder->buyer_username }}</span>@endif
+                                                    @if($marketplaceOrder->shipping_awb_no)<span>Resi: <b>{{ $marketplaceOrder->shipping_awb_no }}</b></span>@endif
+                                                    @if($marketplaceOrder->total_amount)<span>Total: <b>Rp{{ number_format((float) $marketplaceOrder->total_amount, 0, ',', '.') }}</b></span>@endif
+                                                </div>
+                                            </div>
+                                            <div class="sd-marketplace-actions">
+                                                @if(Route::has('marketplace.orders.show'))
+                                                    <a href="{{ route('marketplace.orders.show', $marketplaceOrder) }}" class="sd-btn" target="_blank" rel="noopener">Lihat Order</a>
+                                                @endif
+                                                <a href="{{ route('sales.shipments.edit', $shipment) }}" class="sd-btn">Edit Qty</a>
+                                            </div>
+                                        </div>
+                                        @if($marketplaceLines->isNotEmpty())
+                                            <div style="overflow:auto">
+                                                <table class="sd-marketplace-table">
+                                                    <thead><tr><th>SKU Marketplace</th><th>Item Internal</th><th class="sd-marketplace-number">Order</th><th class="sd-marketplace-number">Shipment</th><th class="sd-marketplace-number">Selisih</th></tr></thead>
+                                                    <tbody>
+                                                    @foreach($marketplaceLines as $marketplaceLine)
+                                                        @php
+                                                            $internalItem = $marketplaceLine->internalItem;
+                                                            $itemId = $marketplaceLine->internal_item_id ?: $marketplaceLine->item_id;
+                                                            $qtyOrder = (int) $marketplaceLine->qty;
+                                                            $qtyShipment = (int) ($pickedByItem[$itemId] ?? 0);
+                                                            $difference = $qtyShipment - $qtyOrder;
+                                                        @endphp
+                                                        <tr>
+                                                            <td class="sd-marketplace-code">{{ $marketplaceLine->marketplace_sku ?: $marketplaceLine->item_sku ?: $marketplaceLine->model_sku ?: '—' }}<div class="sd-muted">{{ $marketplaceLine->item_name ?: $marketplaceLine->item_name_snapshot ?: '' }}</div></td>
+                                                            <td>{{ $internalItem?->code ?: ($marketplaceLine->item_code_snapshot ?: 'Belum mapped') }}@if($internalItem)<div class="sd-muted">{{ $internalItem->name }}</div>@endif</td>
+                                                            <td class="sd-marketplace-number">{{ number_format($qtyOrder, 0, ',', '.') }}</td>
+                                                            <td class="sd-marketplace-number">{{ number_format($qtyShipment, 0, ',', '.') }}</td>
+                                                            <td class="sd-marketplace-number {{ $difference === 0 ? 'sd-marketplace-ok' : 'sd-marketplace-short' }}">{{ $difference > 0 ? '+' : '' }}{{ number_format($difference, 0, ',', '.') }}</td>
+                                                        </tr>
+                                                    @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        @else
+                                            <div class="sd-muted">Detail item marketplace belum tersedia.</div>
+                                        @endif
+                                    </div>
+                                @endif
                                 <span class="sd-badge {{ $scanStatus }}">{{ $scanLabel }}</span>
                             </div>
                         @endforeach
@@ -349,8 +445,8 @@
                         <div class="sd-rekon-message">Belum ada order yang tercatat. Scan nomor order terlebih dahulu agar item dapat dipetakan.</div>
                         <a href="{{ route('sales.shipments.scan_order', $shipment) }}" class="sd-btn sd-primary mt-3">Scan No Order</a>
                     @elseif($unmappedLines->isNotEmpty())
-                        <div class="sd-rekon-message">Sebagian item belum memiliki order. Buka rekonsiliasi untuk memeriksa mapping sebelum submit.</div>
-                        <a href="{{ route('sales.shipments.rekon', $shipment) }}" class="sd-btn sd-primary mt-3">Buka Rekonsiliasi</a>
+                        <div class="sd-rekon-message">Sebagian item belum memiliki order. Alokasikan item ke order terlebih dahulu sebelum submit shipment.</div>
+                        <a href="{{ route('sales.shipments.rekon', $shipment) }}" class="sd-btn sd-primary mt-3">Alokasikan Item ke Order</a>
                     @else
                         <div class="sd-rekon-message">Semua item sudah terhubung ke order. Mapping siap direview sebelum submit.</div>
                         <a href="{{ route('sales.shipments.rekon', $shipment) }}" class="sd-btn sd-primary mt-3">Review Rekonsiliasi</a>

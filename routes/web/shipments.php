@@ -44,6 +44,8 @@ Route::middleware(['web', 'auth', 'access:sales'])
                 Route::post('{shipment}/scan-item', 'scanItem')->name('scan_item');
 
                 Route::post('{shipment}/submit', 'submit')->name('submit');
+                Route::post('{shipment}/wave/post', 'postWave')->name('wave_post');
+                Route::post('{shipment}/daily/close', 'closeDailyShipment')->name('daily_close');
                 Route::post('{shipment}/post', 'post')->name('post');
                 Route::post('{shipment}/sync-scans', 'syncScans')->name('sync_scans');
 

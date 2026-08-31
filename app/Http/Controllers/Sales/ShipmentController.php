@@ -10,6 +10,7 @@ use App\Models\SalesInvoice;
 use App\Models\Shipment;
 use App\Models\ShipmentLine;
 use App\Models\ShipmentOrderScan;
+use App\Models\ShipmentWave;
 use App\Models\Store;
 use App\Models\SystemSetting;
 use App\Models\Warehouse;
@@ -84,6 +85,7 @@ class ShipmentController extends Controller
                 $shipment = Shipment::create([
                     'code'          => $code,
                     'shipment_type' => 'manual',
+                    'dispatch_mode' => Shipment::DISPATCH_SINGLE,
                     'date'          => now()->toDateString(),
                     'status'        => 'draft', // sedang dipacking
                     'notes'         => json_encode($receiverData),
@@ -216,6 +218,122 @@ class ShipmentController extends Controller
         return $this->whRtsCached = Warehouse::where('code', 'WH-RTS')->first();
     }
 
+    protected function usesDailyWaves(Shipment $shipment): bool
+    {
+        return ($shipment->dispatch_mode ?? Shipment::DISPATCH_SINGLE) === Shipment::DISPATCH_DAILY;
+    }
+
+    protected function normalizeOrderNumber(?string $value): string
+    {
+        $normalized = mb_strtoupper(trim((string) $value));
+
+        return in_array(mb_strtolower($normalized), ['undefined', 'null', 'nan'], true)
+            ? ''
+            : $normalized;
+    }
+
+    /**
+     * Ambil gelombang aktif untuk satu shipment harian. Shipment lama yang
+     * belum punya wave diadopsi ke gelombang pertama agar tetap kompatibel.
+     */
+    protected function ensureOpenShipmentWave(Shipment $shipment, ?string $label = null): ShipmentWave
+    {
+        $wave = ShipmentWave::query()
+            ->where('shipment_id', $shipment->id)
+            ->where('status', ShipmentWave::STATUS_OPEN)
+            ->latest('sequence')
+            ->first();
+
+        if ($wave) {
+            return $wave;
+        }
+
+        $nextSequence = ((int) ShipmentWave::where('shipment_id', $shipment->id)->max('sequence')) + 1;
+        $wave = ShipmentWave::create([
+            'shipment_id' => $shipment->id,
+            'sequence' => $nextSequence,
+            'code' => $shipment->code . '-W' . str_pad((string) $nextSequence, 2, '0', STR_PAD_LEFT),
+            'label' => $label ?: match ($nextSequence) {
+                1 => 'Siang',
+                2 => 'Sore',
+                default => 'Gelombang ' . $nextSequence,
+            },
+            'status' => ShipmentWave::STATUS_OPEN,
+            'opened_at' => now(),
+        ]);
+
+        // Data shipment lama belum memiliki wave_id. Hanya adopsi saat wave
+        // pertama dibuat; wave berikutnya tidak boleh mengambil baris lama.
+        if ($nextSequence === 1) {
+            ShipmentLine::where('shipment_id', $shipment->id)
+                ->whereNull('shipment_wave_id')
+                ->update(['shipment_wave_id' => $wave->id]);
+            ShipmentOrderScan::where('shipment_id', $shipment->id)
+                ->whereNull('shipment_wave_id')
+                ->update(['shipment_wave_id' => $wave->id]);
+        }
+
+        return $wave;
+    }
+
+    protected function currentShipmentWave(Shipment $shipment): ?ShipmentWave
+    {
+        if (!$this->usesDailyWaves($shipment)) {
+            return null;
+        }
+
+        return $this->ensureOpenShipmentWave($shipment);
+    }
+
+    protected function waveStockErrors(ShipmentWave $wave, Warehouse $warehouse): array
+    {
+        $lines = $wave->lines()->with('item:id,code,name')->get();
+        if ($lines->isEmpty()) {
+            return [];
+        }
+
+        $stocks = InventoryStock::where('warehouse_id', $warehouse->id)
+            ->whereIn('item_id', $lines->pluck('item_id')->unique())
+            ->get(['item_id', 'qty', 'allocated_qty'])
+            ->keyBy('item_id');
+
+        $requirements = $lines
+            ->groupBy('item_id')
+            ->map(fn ($itemLines) => [
+                'item_id' => (int) $itemLines->first()->item_id,
+                'needed' => (float) $itemLines->sum(fn ($line) => (float) ($line->qty_scanned ?? 0)),
+                'own_allocation' => (float) $itemLines->sum(fn ($line) => (float) ($line->allocated_qty ?? 0)),
+                'item' => $itemLines->first()->item,
+            ]);
+
+        $errors = [];
+        foreach ($requirements as $requirement) {
+            $needed = $requirement['needed'];
+            if ($needed <= 0) {
+                continue;
+            }
+
+            $itemId = $requirement['item_id'];
+            $stock = $stocks->get($itemId);
+            $physical = (float) ($stock->qty ?? 0);
+            $allocated = (float) ($stock->allocated_qty ?? 0);
+            $ownAllocation = $requirement['own_allocation'];
+            $available = $physical - $allocated + $ownAllocation;
+
+            if (($available + 0.0000001) < $needed) {
+                $errors[] = [
+                    'code' => $requirement['item']?->code ?? 'ITEM-' . $itemId,
+                    'name' => $requirement['item']?->name ?? '',
+                    'stock' => (int) $available,
+                    'needed' => (int) $needed,
+                    'short' => (int) ($needed - $available),
+                ];
+            }
+        }
+
+        return $errors;
+    }
+
     protected function salesOperationalSetting(string $key, mixed $default = null): mixed
     {
         $keys = [
@@ -276,7 +394,8 @@ class ShipmentController extends Controller
 
     protected function updateMarketplaceStatusIfAllowed(?\App\Models\MarketplaceOrder $order, string $event): void
     {
-        if (!$order || !$this->shouldUpdateMarketplaceStatus($event) || $order->order_status === 'READY_TO_HANDOVER') {
+        if (!$order || !$this->shouldUpdateMarketplaceStatus($event)
+            || in_array($order->order_status, ['READY_TO_HANDOVER', 'SHIPPED', 'DELIVERED', 'COMPLETED', 'CANCELLED'], true)) {
             return;
         }
 
@@ -375,6 +494,15 @@ class ShipmentController extends Controller
 
     protected function recordUnlinkedOrderScan(Shipment $shipment, string $orderNo, array $pool, ?string $lookupStatus = null): \Illuminate\Http\JsonResponse
     {
+        $orderNo = $this->normalizeOrderNumber($orderNo);
+        if ($orderNo === '') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Nomor order tidak valid atau belum terbaca.',
+            ], 422);
+        }
+
+        $currentWave = $this->currentShipmentWave($shipment);
         $rawPayload = [
             'no' => $orderNo,
             'found' => false,
@@ -396,6 +524,7 @@ class ShipmentController extends Controller
                 'order_no' => $orderNo,
             ],
             [
+                'shipment_wave_id' => $currentWave?->id,
                 'fulfillment_id' => null,
                 'status' => 'pending',
                 'source' => 'manual_scan',
@@ -674,6 +803,8 @@ class ShipmentController extends Controller
             'orderScans.confirmer',
             'orderScans.lines.item',
             'orderScans.fulfillment.marketplaceOrder.store',
+            'waves.lines.item',
+            'waves.orderScans',
             'creator',
             'submitter',
             'invoice',
@@ -780,6 +911,8 @@ class ShipmentController extends Controller
         }
 
         $deltaQty = $batchQty - $mpTotalQty;
+        $isDaily = $this->usesDailyWaves($shipment);
+        $waves = $shipment->waves ?? collect();
 
         return view('sales.shipments.show', compact(
             'shipment',
@@ -792,6 +925,8 @@ class ShipmentController extends Controller
             'batchQty',
             'deltaQty',
             'canSeeNominal',
+            'isDaily',
+            'waves',
             'isDummy'
         ));
     }/**
@@ -911,6 +1046,7 @@ class ShipmentController extends Controller
             'code'             => $code,
             'shipment_type'    => $data['shipment_type'],
             'scan_mode'        => $data['scan_mode'] ?? 'item_first',
+            'dispatch_mode'    => $data['dispatch_mode'] ?? ($data['shipment_type'] === Shipment::TYPE_MARKETPLACE ? Shipment::DISPATCH_DAILY : Shipment::DISPATCH_SINGLE),
             'store_id'         => $data['store_id'] ?? null,
             'sales_invoice_id' => $data['sales_invoice_id'] ?? null,
             'date'             => $data['date'],
@@ -975,7 +1111,14 @@ class ShipmentController extends Controller
                 ->with('message', 'Shipment bukan draft, tidak bisa di-edit / discan lagi.');
         }
 
-        $shipment->load(['store', 'lines.item.category']);
+        $currentWave = $this->currentShipmentWave($shipment);
+        $shipment->load(['store', 'lines.item.category', 'waves']);
+        if ($currentWave) {
+            $shipment->setRelation(
+                'lines',
+                $shipment->lines->where('shipment_wave_id', $currentWave->id)->values()
+            );
+        }
 
         // Hitung kekurangan stok secara live agar panel tetap muncul saat reload
         // dan otomatis hilang begitu stok/qty sudah beres.
@@ -987,7 +1130,16 @@ class ShipmentController extends Controller
         $importPreview = session('shipment_import_preview.' . $shipment->id . '.rows') ?? null;
         $importPreviewSummary = session('shipment_import_preview.' . $shipment->id . '.summary') ?? null;
 
-        return view('sales.shipments.edit', compact('shipment', 'importPreview', 'importPreviewSummary', 'stockInsufficient'));
+        $postedWaveCount = $shipment->waves->where('status', ShipmentWave::STATUS_POSTED)->count();
+
+        return view('sales.shipments.edit', compact(
+            'shipment',
+            'currentWave',
+            'postedWaveCount',
+            'importPreview',
+            'importPreviewSummary',
+            'stockInsufficient'
+        ));
     }
 
 
@@ -1000,8 +1152,20 @@ class ShipmentController extends Controller
                 ->with('message', 'Shipment bukan draft, tidak bisa scan nomor order lagi.');
         }
 
+        $currentWave = $this->currentShipmentWave($shipment);
+
         if (($shipment->scan_mode ?? 'item_first') === 'item_first') {
             $shipment->load(['lines.item', 'orderScans.lines.item']);
+            if ($currentWave) {
+                $shipment->setRelation(
+                    'lines',
+                    $shipment->lines->where('shipment_wave_id', $currentWave->id)->values()
+                );
+                $shipment->setRelation(
+                    'orderScans',
+                    $shipment->orderScans->where('shipment_wave_id', $currentWave->id)->values()
+                );
+            }
 
             if ($shipment->lines->isEmpty()) {
                 return redirect()
@@ -1079,11 +1243,13 @@ class ShipmentController extends Controller
             ], 422);
         }
 
+        $currentWave = $this->currentShipmentWave($shipment);
+
         $data = $request->validate([
             'order_no' => ['required', 'string', 'max:200'],
         ]);
 
-        $orderNo = mb_strtoupper(trim($data['order_no']));
+        $orderNo = $this->normalizeOrderNumber($data['order_no']);
         if ($orderNo === '') {
             return response()->json([
                 'status' => 'error',
@@ -1100,7 +1266,7 @@ class ShipmentController extends Controller
         if ($lookupMode === 'auto_link_on_scan') {
             $marketplaceOrder = $this->marketplaceOrderQuery($orderNo, $shipment)->first();
             if ($marketplaceOrder) {
-                if ($shipment->shipment_type !== 'manual' && !in_array($marketplaceOrder->order_status, ['READY_TO_SHIP', 'PROCESSED', 'READY_TO_HANDOVER'], true)) {
+                if ($shipment->shipment_type !== 'manual' && !in_array($marketplaceOrder->order_status, ['READY_TO_SHIP', 'PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'DELIVERED', 'COMPLETED'], true)) {
                     $existingFulfillment = \App\Models\OrderFulfillment::query()
                         ->where('marketplace_order_id', $marketplaceOrder->id)
                         ->first();
@@ -1139,7 +1305,7 @@ class ShipmentController extends Controller
             }
         }
 
-        $scan = DB::transaction(function () use ($shipment, $orderNo, $lookupMode, $lookupFallbackStatus, $marketplaceOrder, $salesInvoice, $fulfillment) {
+        $scan = DB::transaction(function () use ($shipment, $currentWave, $orderNo, $lookupMode, $lookupFallbackStatus, $marketplaceOrder, $salesInvoice, $fulfillment) {
             Shipment::query()
                 ->lockForUpdate()
                 ->findOrFail($shipment->id);
@@ -1153,15 +1319,22 @@ class ShipmentController extends Controller
             if (!$scan) {
                 $scan = ShipmentOrderScan::create([
                     'shipment_id' => $shipment->id,
+                    'shipment_wave_id' => $currentWave?->id,
                     'order_no' => $orderNo,
                     'fulfillment_id' => $fulfillment?->id,
                     'status' => 'pending',
                     'source' => 'scanner',
                     'raw_payload' => [
                         'mode' => $lookupMode === 'auto_link_on_scan' && $fulfillment ? 'auto_link' : 'record_only',
+                        'no' => $orderNo,
                         'label' => $fulfillment
                             ? 'Tertaut otomatis'
                             : ($lookupFallbackStatus !== null ? 'Belum tertaut' : 'Pencatatan order'),
+                        'order' => [
+                            'order_no' => $orderNo,
+                            'source' => $fulfillment ? 'marketplace' : 'record_only',
+                            'status' => 'pending',
+                        ],
                         'linked_source' => $fulfillment ? 'marketplace_order' : ($salesInvoice ? 'sales_invoice' : null),
                         'lookup_status' => $lookupFallbackStatus,
                         'sales_invoice_id' => $salesInvoice?->id,
@@ -1170,8 +1343,10 @@ class ShipmentController extends Controller
             } else {
                 $payload = is_array($scan->raw_payload) ? $scan->raw_payload : [];
                 $scan->update([
+                    'shipment_wave_id' => $currentWave?->id ?: $scan->shipment_wave_id,
                     'fulfillment_id' => $fulfillment?->id,
                     'raw_payload' => array_merge($payload, [
+                        'no' => $orderNo,
                         'mode' => $lookupMode === 'auto_link_on_scan' && $fulfillment ? 'auto_link' : ($payload['mode'] ?? 'record_only'),
                         'label' => $fulfillment
                             ? 'Tertaut otomatis'
@@ -1179,6 +1354,10 @@ class ShipmentController extends Controller
                         'linked_source' => $fulfillment ? 'marketplace_order' : ($salesInvoice ? 'sales_invoice' : ($payload['linked_source'] ?? null)),
                         'lookup_status' => $lookupFallbackStatus ?? ($payload['lookup_status'] ?? null),
                         'sales_invoice_id' => $salesInvoice?->id ?? ($payload['sales_invoice_id'] ?? null),
+                        'order' => array_merge(
+                            is_array($payload['order'] ?? null) ? $payload['order'] : [],
+                            ['order_no' => $orderNo]
+                        ),
                     ]),
                 ]);
             }
@@ -1206,6 +1385,7 @@ class ShipmentController extends Controller
                     : "Order {$orderNo} sudah tercatat."),
             'order' => [
                 'code' => $orderNo,
+                'order_no' => $orderNo,
                 'label' => $fulfillment
                     ? 'Tertaut otomatis'
                     : ($lookupFallbackStatus !== null ? 'Belum tertaut' : 'Pencatatan order'),
@@ -1361,6 +1541,8 @@ class ShipmentController extends Controller
                 ->with('status', 'error')->with('message', $message);
         }
 
+        $currentWave = $this->currentShipmentWave($shipment);
+
         $data = $request->validate([
             'scan_code' => ['required', 'string', 'max:255'],
             'qty' => ['nullable', 'integer', 'min:1'],
@@ -1467,7 +1649,7 @@ class ShipmentController extends Controller
             }
         }
 
-        $result = DB::transaction(function () use ($shipment, $item, $qty, $orderNo, $fulfillmentId, $autoOrderScanId) {
+        $result = DB::transaction(function () use ($shipment, $currentWave, $item, $qty, $orderNo, $fulfillmentId, $autoOrderScanId) {
             $warehouse = $this->whRts();
             if ($warehouse) {
                 app(\App\Services\Inventory\InventoryService::class)->reserveStock(
@@ -1489,6 +1671,7 @@ class ShipmentController extends Controller
                 if (!$orderScan) {
                     $orderScan = ShipmentOrderScan::create([
                         'shipment_id' => $shipment->id,
+                        'shipment_wave_id' => $currentWave?->id,
                         'order_no' => $orderNo,
                         'fulfillment_id' => $fulfillmentId,
                         'status' => 'pending',
@@ -1511,7 +1694,9 @@ class ShipmentController extends Controller
                 ->when(
                     $orderScanId,
                     fn ($query) => $query->where('shipment_order_scan_id', $orderScanId),
-                    fn ($query) => $query->whereNull('shipment_order_scan_id')
+                    fn ($query) => $query
+                        ->whereNull('shipment_order_scan_id')
+                        ->when($currentWave, fn ($waveQuery) => $waveQuery->where('shipment_wave_id', $currentWave->id))
                 )
                 ->lockForUpdate()
                 ->first();
@@ -1523,6 +1708,7 @@ class ShipmentController extends Controller
             } else {
                 $line = \App\Models\ShipmentLine::create([
                     'shipment_id' => $shipment->id,
+                    'shipment_wave_id' => $currentWave?->id,
                     'shipment_order_scan_id' => $orderScanId,
                     'item_id' => $item->id,
                     'qty_expected' => 0, 
@@ -1618,7 +1804,16 @@ class ShipmentController extends Controller
      */
     protected function checkStockSufficiency(Shipment $shipment, Warehouse $warehouse): array
     {
-        $lines = $shipment->lines()->with('item:id,code,name')->get();
+        $linesQuery = $shipment->lines()->with('item:id,code,name');
+        if ($this->usesDailyWaves($shipment)) {
+            // Baris yang sudah diposting pada gelombang sebelumnya tidak lagi
+            // menjadi kebutuhan/reservasi gelombang aktif.
+            $linesQuery->where(function ($query) {
+                $query->whereNull('shipment_wave_id')
+                    ->orWhereHas('wave', fn ($waveQuery) => $waveQuery->where('status', ShipmentWave::STATUS_OPEN));
+            });
+        }
+        $lines = $linesQuery->get();
         if ($lines->isEmpty()) {
             return [];
         }
@@ -1629,25 +1824,34 @@ class ShipmentController extends Controller
             ->get(['item_id', 'qty', 'allocated_qty'])
             ->keyBy('item_id');
 
+        $requirements = $lines
+            ->groupBy('item_id')
+            ->map(fn ($itemLines) => [
+                'item_id' => (int) $itemLines->first()->item_id,
+                'needed' => (float) $itemLines->sum(fn ($line) => (float) ($line->qty_scanned ?? 0)),
+                'own_allocation' => (float) $itemLines->sum(fn ($line) => (float) ($line->allocated_qty ?? 0)),
+                'item' => $itemLines->first()->item,
+            ]);
+
         $errors = [];
-        foreach ($lines as $line) {
-            $qty    = (float) ($line->qty_scanned ?? 0);
+        foreach ($requirements as $requirement) {
+            $qty = $requirement['needed'];
             if ($qty <= 0) continue;
 
-            $itemId  = (int) $line->item_id;
-            $stock   = $stocks->get($itemId);
+            $itemId = $requirement['item_id'];
+            $stock = $stocks->get($itemId);
             
             $physQty    = (float) ($stock->qty ?? 0);
             $totalAlloc = (float) ($stock->allocated_qty ?? 0);
-            $myAlloc    = (float) ($line->allocated_qty ?? 0);
+            $myAlloc    = $requirement['own_allocation'];
 
             // True available = Stok fisik - Total alokasi semua draft + Alokasi milik shipment ini sendiri
             $trueAvailable = $physQty - $totalAlloc + $myAlloc;
 
             if (($trueAvailable + 0.0000001) < $qty) {
                 $errors[] = [
-                    'code'    => $line->item->code ?? "item#{$itemId}",
-                    'name'    => $line->item->name ?? '',
+                    'code'    => $requirement['item']->code ?? "item#{$itemId}",
+                    'name'    => $requirement['item']->name ?? '',
                     'stock'   => (int) $trueAvailable,
                     'needed'  => (int) $qty,
                     'short'   => (int) ($qty - $trueAvailable),
@@ -1780,10 +1984,24 @@ class ShipmentController extends Controller
 
         $locked->load(['lines.item', 'store']);
 
+        if (($locked->scan_mode ?? 'item_first') === 'item_first') {
+            // Satu order masih bisa dimapping otomatis untuk kompatibilitas
+            // flow lama. Jika lebih dari satu order, mapping harus berasal
+            // dari rekonsiliasi yang tersimpan di server.
+            $this->autoMapItemFirstLines($locked);
+            $this->syncItemFirstLineAllocations($locked->fresh());
+            $locked->refresh()->load(['lines.item', 'store']);
+        }
+
         // ===================================================
         // VALIDASI MISMATCH QTY FULFILLMENT VS SHIPMENT
         // ===================================================
         if ($locked->shipment_type === \App\Models\Shipment::TYPE_MARKETPLACE) {
+            $mappingErrors = $this->shipmentMappingErrors($locked);
+            if (!empty($mappingErrors)) {
+                abort(422, implode(' ', $mappingErrors));
+            }
+
             $scans = \App\Models\ShipmentOrderScan::where('shipment_id', $locked->id)
                 ->whereNotIn('status', ['skip'])
                 ->get();
@@ -1979,6 +2197,12 @@ class ShipmentController extends Controller
                 ->with('status', 'error')->with('message', 'Tidak ada item di shipment ini.');
         }
 
+        if ($this->usesDailyWaves($shipment)) {
+            return redirect()->route('sales.shipments.confirm_orders', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Shipment harian harus diselesaikan per gelombang. Gunakan tombol Selesaikan Gelombang.');
+        }
+
         $warehouse = $this->whRts();
         if (!$warehouse) {
             return redirect()->route('sales.shipments.show', $shipment)
@@ -2007,6 +2231,200 @@ class ShipmentController extends Controller
         return redirect()->route('sales.shipments.index')
             ->with('status', 'success')
             ->with('message', 'Shipment berhasil disubmit & stok WH-RTS langsung berkurang.');
+    }
+
+    /**
+     * Post satu gelombang pada shipment harian. Shipment induk tetap draft
+     * sehingga operator masih bisa menambahkan gelombang berikutnya.
+     */
+    public function postWave(Request $request, Shipment $shipment)
+    {
+        if (!$this->usesDailyWaves($shipment)) {
+            return redirect()->route('sales.shipments.confirm_orders', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Shipment ini memakai mode sekali posting.');
+        }
+
+        if ($shipment->status !== 'draft' || $shipment->cancelled_at) {
+            return redirect()->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Shipment harian sudah tidak terbuka.');
+        }
+
+        $warehouse = $this->whRts();
+        if (!$warehouse) {
+            return redirect()->route('sales.shipments.edit', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Warehouse WH-RTS belum dikonfigurasi.');
+        }
+
+        try {
+            $wave = DB::transaction(function () use ($shipment, $warehouse) {
+                $locked = Shipment::query()->lockForUpdate()->findOrFail($shipment->id);
+                $wave = $this->ensureOpenShipmentWave($locked);
+
+                if (!$wave->isOpen()) {
+                    throw new \RuntimeException('Tidak ada gelombang yang masih terbuka.');
+                }
+
+                if (($locked->scan_mode ?? 'item_first') === 'item_first') {
+                    $this->syncItemFirstLineAllocations($locked, $wave);
+                }
+
+                $wave->refresh()->load(['lines.item', 'orderScans']);
+                $mappingErrors = $this->shipmentMappingErrors($locked, $wave);
+                if (!empty($mappingErrors)) {
+                    throw new \RuntimeException(implode(' ', $mappingErrors));
+                }
+
+                if ($wave->lines->isEmpty()) {
+                    throw new \RuntimeException('Gelombang ini belum memiliki item.');
+                }
+
+                $stockErrors = $this->waveStockErrors($wave, $warehouse);
+                if (!empty($stockErrors)) {
+                    $summary = collect($stockErrors)
+                        ->map(fn ($row) => ($row['code'] ?? '-') . ' kurang ' . ($row['short'] ?? 0))
+                        ->implode(', ');
+                    throw new \RuntimeException('Stok WH-RTS belum cukup: ' . $summary . '.');
+                }
+
+                $totalQty = 0;
+                foreach ($wave->lines as $line) {
+                    $qty = (int) ($line->qty_scanned ?? 0);
+                    if ($qty <= 0) {
+                        continue;
+                    }
+
+                    $totalQty += $qty;
+
+                    if ((int) ($line->allocated_qty ?? 0) > 0) {
+                        $this->inventory->releaseStock(
+                            warehouseId: $warehouse->id,
+                            itemId: (int) $line->item_id,
+                            qty: (int) $line->allocated_qty
+                        );
+                        $line->allocated_qty = 0;
+                        $line->save();
+                    }
+
+                    $this->inventory->stockOut(
+                        warehouseId: $warehouse->id,
+                        itemId: (int) $line->item_id,
+                        qty: $qty,
+                        date: $locked->date,
+                        sourceType: 'shipment',
+                        sourceId: (int) $locked->id,
+                        notes: 'Gelombang ' . $wave->code . ' — Shipment ' . $locked->code,
+                        allowNegative: false,
+                        lotId: null,
+                        unitCostOverride: null,
+                        affectLotCost: false,
+                        sourceLineId: (int) $line->id,
+                    );
+                }
+
+                $wave->update([
+                    'status' => ShipmentWave::STATUS_POSTED,
+                    'total_qty' => $totalQty,
+                    'posted_at' => now(),
+                    'posted_by' => auth()->id(),
+                ]);
+
+                $this->journalService->postShipmentWaveCogsFromMutations($wave->fresh('shipment'));
+
+                $scans = $wave->orderScans
+                    ->whereNotIn('status', ['skip'])
+                    ->whereNotNull('fulfillment_id');
+                $fulfillmentIds = $scans->pluck('fulfillment_id')->unique()->values()->all();
+
+                if (!empty($fulfillmentIds)) {
+                    \App\Models\OrderFulfillment::whereIn('id', $fulfillmentIds)
+                        ->whereNotIn('status', [
+                            \App\Models\OrderFulfillment::STATUS_CONFIRMED,
+                            \App\Models\OrderFulfillment::STATUS_CANCELLED,
+                        ])
+                        ->update([
+                            'status' => \App\Models\OrderFulfillment::STATUS_CONFIRMED,
+                            'confirmed_at' => now(),
+                            'confirmed_by' => auth()->id(),
+                        ]);
+
+                    if ($this->shouldUpdateMarketplaceStatus('post')) {
+                        \App\Models\OrderFulfillment::whereIn('id', $fulfillmentIds)
+                            ->with('marketplaceOrder')
+                            ->get()
+                            ->each(fn ($fulfillment) => $this->updateMarketplaceStatusIfAllowed($fulfillment->marketplaceOrder, 'post'));
+                    }
+                }
+
+                return $wave->fresh();
+            });
+        } catch (\Throwable $e) {
+            return redirect()->route('sales.shipments.confirm_orders', $shipment)
+                ->with('status', 'error')
+                ->with('message', 'Gelombang belum bisa diposting: ' . $e->getMessage());
+        }
+
+        return redirect()->route('sales.shipments.edit', $shipment)
+            ->with('status', 'success')
+            ->with('message', 'Gelombang ' . $wave->code . ' berhasil diposting. Shipment harian masih terbuka untuk gelombang berikutnya.');
+    }
+
+    /** Tutup shipment induk setelah seluruh gelombang selesai diposting. */
+    public function closeDailyShipment(Request $request, Shipment $shipment)
+    {
+        if (!$this->usesDailyWaves($shipment)) {
+            return redirect()->route('sales.shipments.show', $shipment)
+                ->with('status', 'error')->with('message', 'Shipment ini bukan shipment harian.');
+        }
+
+        try {
+            DB::transaction(function () use ($shipment) {
+                $locked = Shipment::query()->lockForUpdate()->findOrFail($shipment->id);
+                if ($locked->status !== 'draft' || $locked->cancelled_at) {
+                    throw new \RuntimeException('Shipment sudah tidak terbuka.');
+                }
+
+                $locked->load(['waves.lines', 'waves.orderScans']);
+                $waves = $locked->waves->where('status', '!=', ShipmentWave::STATUS_CANCELLED);
+                if ($waves->where('status', ShipmentWave::STATUS_POSTED)->isEmpty()) {
+                    throw new \RuntimeException('Belum ada gelombang yang diposting.');
+                }
+
+                foreach ($waves->where('status', ShipmentWave::STATUS_OPEN) as $wave) {
+                    if ($wave->lines->isNotEmpty()) {
+                        $errors = $this->shipmentMappingErrors($locked, $wave);
+                        throw new \RuntimeException(!empty($errors)
+                            ? implode(' ', $errors)
+                            : 'Masih ada item pada gelombang yang belum diposting.');
+                    }
+
+                    $wave->update([
+                        'status' => ShipmentWave::STATUS_POSTED,
+                        'posted_at' => now(),
+                        'posted_by' => auth()->id(),
+                    ]);
+                }
+
+                $locked->update([
+                    'status' => 'posted',
+                    'posted_at' => now(),
+                    'posted_by' => auth()->id(),
+                    'submitted_at' => $locked->submitted_at ?: now(),
+                    'submitted_by' => $locked->submitted_by ?: auth()->id(),
+                    'total_qty' => (int) $locked->lines()->sum('qty_scanned'),
+                ]);
+
+                $this->dailySales->applyShipmentPosted($locked, adsDays: 30, onlyActive: true);
+            });
+        } catch (\Throwable $e) {
+            return redirect()->route('sales.shipments.edit', $shipment)
+                ->with('status', 'error')->with('message', 'Shipment belum bisa ditutup: ' . $e->getMessage());
+        }
+
+        return redirect()->route('sales.shipments.show', $shipment)
+            ->with('status', 'success')->with('message', 'Shipment harian berhasil ditutup. Semua gelombang sudah selesai.');
     }
 
     public function post(Request $request, Shipment $shipment)
@@ -2119,9 +2537,16 @@ class ShipmentController extends Controller
                 ->with('status', 'error')->with('message', $message);
         }
 
-        DB::transaction(function () use ($shipment) {
+        $isDaily = $this->usesDailyWaves($shipment);
+
+        DB::transaction(function () use ($shipment, $isDaily) {
             $warehouse = $this->whRts();
-            $lines = ShipmentLine::where('shipment_id', $shipment->id)->get();
+            $wave = $isDaily ? $this->ensureOpenShipmentWave($shipment) : null;
+            $linesQuery = ShipmentLine::where('shipment_id', $shipment->id);
+            if ($wave) {
+                $linesQuery->where('shipment_wave_id', $wave->id);
+            }
+            $lines = $linesQuery->get();
             foreach ($lines as $line) {
                 if ($warehouse && $line->allocated_qty > 0) {
                     app(\App\Services\Inventory\InventoryService::class)->releaseStock(
@@ -2137,7 +2562,9 @@ class ShipmentController extends Controller
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'status' => 'ok',
-                'message' => 'Semua baris berhasil dibersihkan.',
+                'message' => $isDaily
+                    ? 'Baris pada gelombang aktif berhasil dibersihkan.'
+                    : 'Semua baris berhasil dibersihkan.',
                 'totals' => ['total_qty' => 0, 'total_lines' => 0],
                 'stock_insufficient' => [],
             ]);
@@ -2159,6 +2586,17 @@ class ShipmentController extends Controller
             }
 
             return redirect()->route('sales.shipments.show', $shipment?->id ?? null)
+                ->with('status', 'error')->with('message', $message);
+        }
+
+        if ($line->wave?->isPosted()) {
+            $message = 'Baris pada gelombang yang sudah diposting tidak bisa diubah.';
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => $message], 409);
+            }
+
+            return redirect()->route('sales.shipments.edit', $shipment)
                 ->with('status', 'error')->with('message', $message);
         }
 
@@ -2207,6 +2645,17 @@ class ShipmentController extends Controller
             }
 
             return redirect()->route('sales.shipments.show', $shipment?->id ?? null)
+                ->with('status', 'error')->with('message', $message);
+        }
+
+        if ($line->wave?->isPosted()) {
+            $message = 'Baris pada gelombang yang sudah diposting tidak bisa diubah.';
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => $message], 409);
+            }
+
+            return redirect()->route('sales.shipments.edit', $shipment)
                 ->with('status', 'error')->with('message', $message);
         }
 
@@ -2326,8 +2775,14 @@ class ShipmentController extends Controller
                     throw new \RuntimeException('Tidak bisa dibatalkan karena sudah dibuat invoice.');
                 }
 
-                $locked->load(['lines', 'store']);
-                $wasPosted = $locked->status === 'posted' && !empty($locked->posted_at);
+                $locked->load(['lines.wave', 'store', 'waves']);
+                $parentWasPosted = $locked->status === 'posted' && !empty($locked->posted_at);
+                $postedWaveIds = $locked->waves
+                    ->where('status', ShipmentWave::STATUS_POSTED)
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+                $hasPostedWaves = !empty($postedWaveIds);
 
                 foreach ($locked->lines as $line) {
                     $qty = (int) ($line->qty_scanned ?? 0);
@@ -2335,7 +2790,11 @@ class ShipmentController extends Controller
                         continue;
                     }
 
-                    if ($wasPosted) {
+                    $lineWasPosted = $parentWasPosted
+                        || in_array((int) ($line->shipment_wave_id ?? 0), $postedWaveIds, true)
+                        || $line->wave?->isPosted();
+
+                    if ($lineWasPosted) {
                         $unitCost = $line->unit_hpp ?? null;
 
                         $this->inventory->stockIn(
@@ -2370,11 +2829,17 @@ class ShipmentController extends Controller
 
                 $restoredOrderCount = $this->restoreMarketplaceOrdersAfterCancellation($locked);
 
-                if ($wasPosted) {
+                if ($parentWasPosted) {
                     // Void jurnal COGS jika ada
                     $this->journalService->voidBySource('shipment_cogs', (int) $locked->id);
 
                     $this->dailySales->reverseShipmentCancelled($locked, adsDays: 30, onlyActive: true);
+                }
+
+                if ($hasPostedWaves) {
+                    foreach ($postedWaveIds as $waveId) {
+                        $this->journalService->voidBySource(JournalService::SRC_SHIPMENT_WAVE_COGS, $waveId);
+                    }
                 }
 
                 return $restoredOrderCount;
@@ -2406,6 +2871,217 @@ class ShipmentController extends Controller
     protected function postShipmentCogs(Shipment $shipment): void
     {
         $this->journalService->postShipmentCogsFromMutations($shipment);
+    }
+
+    /**
+     * Simpan hasil alokasi item-first ke shipment_lines.
+     *
+     * Browser hanya dipakai untuk membantu menghitung alokasi. Server tetap
+     * menjadi sumber kebenaran dengan membangun ulang line mapped dan line
+     * yang masih tersisa di batch. Total qty per item tidak boleh berubah.
+     */
+    protected function syncItemFirstLineAllocations(Shipment $shipment, ?ShipmentWave $wave = null): void
+    {
+        if (($shipment->scan_mode ?? 'item_first') !== 'item_first') {
+            return;
+        }
+
+        $wave ??= $this->currentShipmentWave($shipment);
+        $waveId = $wave?->id;
+        $shipment->load(['lines', 'orderScans']);
+
+        $lines = $waveId
+            ? $shipment->lines->where('shipment_wave_id', $waveId)->values()
+            : $shipment->lines;
+        $orderScans = $waveId
+            ? $shipment->orderScans->where('shipment_wave_id', $waveId)->values()
+            : $shipment->orderScans;
+
+        $baseQty = $lines
+            ->groupBy('item_id')
+            ->map(fn ($lines) => (int) $lines->sum('qty_scanned'))
+            ->all();
+
+        if (empty($baseQty)) {
+            return;
+        }
+
+        $existingByScan = $lines
+            ->filter(fn ($line) => !empty($line->shipment_order_scan_id))
+            ->groupBy('shipment_order_scan_id')
+            ->map(fn ($lines) => $lines
+                ->groupBy('item_id')
+                ->map(fn ($itemLines) => (int) $itemLines->sum('qty_scanned'))
+                ->all())
+            ->all();
+
+        $allocationsByScan = [];
+        $allocatedTotals = [];
+
+        foreach ($orderScans->where('status', '!=', 'skip') as $scan) {
+            $payload = is_array($scan->raw_payload) ? $scan->raw_payload : [];
+            $hasPayloadAllocation = array_key_exists('allocations', $payload);
+            $allocations = [];
+
+            if ($hasPayloadAllocation && is_array($payload['allocations'])) {
+                foreach ($payload['allocations'] as $allocation) {
+                    $itemId = (int) data_get($allocation, 'item_id');
+                    $qty = (int) data_get($allocation, 'qty');
+
+                    if ($itemId <= 0 || $qty <= 0) {
+                        continue;
+                    }
+
+                    $allocations[$itemId] = ($allocations[$itemId] ?? 0) + $qty;
+                }
+            } elseif (isset($existingByScan[$scan->id])) {
+                // Backward-compatible untuk mapping lama yang belum menyimpan
+                // payload allocations.
+                $allocations = $existingByScan[$scan->id];
+            }
+
+            foreach ($allocations as $itemId => $qty) {
+                if (!array_key_exists($itemId, $baseQty)) {
+                    abort(422, "Item {$itemId} tidak ada di batch shipment.");
+                }
+
+                $allocatedTotals[$itemId] = ($allocatedTotals[$itemId] ?? 0) + $qty;
+                if ($allocatedTotals[$itemId] > $baseQty[$itemId]) {
+                    $itemCode = Item::find($itemId)?->code ?? $itemId;
+                    abort(422, "Alokasi SKU {$itemCode} melebihi qty item di batch.");
+                }
+            }
+
+            $allocationsByScan[$scan->id] = $allocations;
+        }
+
+        // Semua line draft dibangun ulang tanpa mengubah total reservasi.
+        // allocated_qty selalu sama dengan qty_scanned agar reserve stok tetap
+        // konsisten walaupun line berpindah dari ungrouped ke order tertentu.
+        ShipmentLine::where('shipment_id', $shipment->id)
+            ->when($waveId, fn ($query) => $query->where('shipment_wave_id', $waveId))
+            ->when(!$waveId, fn ($query) => $query->whereNull('shipment_wave_id'))
+            ->delete();
+
+        foreach ($allocationsByScan as $scanId => $allocations) {
+            foreach ($allocations as $itemId => $qty) {
+                ShipmentLine::create([
+                    'shipment_id' => $shipment->id,
+                    'shipment_wave_id' => $waveId,
+                    'shipment_order_scan_id' => $scanId,
+                    'item_id' => $itemId,
+                    'qty_expected' => 0,
+                    'qty_scanned' => $qty,
+                    'allocated_qty' => $qty,
+                    'uom' => Item::find($itemId)?->uom ?? 'pcs',
+                ]);
+            }
+        }
+
+        foreach ($baseQty as $itemId => $qty) {
+            $remaining = $qty - (int) ($allocatedTotals[$itemId] ?? 0);
+            if ($remaining <= 0) {
+                continue;
+            }
+
+            ShipmentLine::create([
+                'shipment_id' => $shipment->id,
+                'shipment_wave_id' => $waveId,
+                'shipment_order_scan_id' => null,
+                'item_id' => $itemId,
+                'qty_expected' => 0,
+                'qty_scanned' => $remaining,
+                'allocated_qty' => $remaining,
+                'uom' => Item::find($itemId)?->uom ?? 'pcs',
+            ]);
+        }
+    }
+
+    /**
+     * Validasi server sebelum stock-out. Item-first tidak boleh lolos hanya
+     * karena UI/browser menganggap mapping sudah selesai.
+     */
+    protected function shipmentMappingErrors(Shipment $shipment, ?ShipmentWave $wave = null): array
+    {
+        if ($shipment->shipment_type !== Shipment::TYPE_MARKETPLACE) {
+            return [];
+        }
+
+        if ($wave) {
+            $wave->load(['lines.item', 'orderScans']);
+            $lines = $wave->lines;
+            $activeScans = $wave->orderScans->where('status', '!=', 'skip')->values();
+        } else {
+            $shipment->load(['lines.item', 'orderScans']);
+            $lines = $shipment->lines;
+            $activeScans = $shipment->orderScans->where('status', '!=', 'skip')->values();
+        }
+        $errors = [];
+
+        if ($activeScans->isEmpty()) {
+            $errors[] = 'Shipment marketplace wajib memiliki minimal satu nomor order.';
+            return $errors;
+        }
+
+        $unmapped = $lines->filter(fn ($line) => empty($line->shipment_order_scan_id));
+        if ($unmapped->isNotEmpty()) {
+            $summary = $unmapped
+                ->groupBy('item_id')
+                ->map(function ($lines) {
+                    $line = $lines->first();
+                    return ($line->item?->code ?? 'ITEM-' . $line->item_id)
+                        . ' x' . (int) $lines->sum('qty_scanned');
+                })
+                ->values()
+                ->implode(', ');
+            $errors[] = 'Masih ada item yang belum terhubung ke order: ' . $summary . '.';
+        }
+
+        $linesByScan = $lines
+            ->filter(fn ($line) => !empty($line->shipment_order_scan_id))
+            ->groupBy('shipment_order_scan_id');
+
+        foreach ($activeScans as $scan) {
+            $scanLines = $linesByScan->get($scan->id, collect());
+            if ($scanLines->isEmpty()) {
+                $errors[] = "Order {$scan->order_no} belum memiliki item yang dialokasikan.";
+                continue;
+            }
+
+            if (!$scan->fulfillment_id) {
+                // Order external/manual boleh dikirim saat marketplace belum
+                // tersinkron, tetapi tetap wajib punya order number + mapping.
+                continue;
+            }
+
+            $expected = \App\Models\OrderFulfillmentLine::query()
+                ->where('fulfillment_id', $scan->fulfillment_id)
+                ->whereNotNull('item_id')
+                ->where('qty_fulfilled', '>', 0)
+                ->selectRaw('item_id, SUM(qty_fulfilled) as total_expected')
+                ->groupBy('item_id')
+                ->pluck('total_expected', 'item_id')
+                ->map(fn ($qty) => (int) $qty)
+                ->all();
+
+            $actual = $scanLines
+                ->groupBy('item_id')
+                ->map(fn ($lines) => (int) $lines->sum('qty_scanned'))
+                ->all();
+
+            foreach (array_unique(array_merge(array_keys($expected), array_keys($actual))) as $itemId) {
+                $expectedQty = (int) ($expected[$itemId] ?? 0);
+                $actualQty = (int) ($actual[$itemId] ?? 0);
+                if ($expectedQty === $actualQty) {
+                    continue;
+                }
+
+                $itemCode = Item::find($itemId)?->code ?? $itemId;
+                $errors[] = "Order {$scan->order_no}: SKU {$itemCode} expected {$expectedQty}, scan {$actualQty}.";
+            }
+        }
+
+        return array_values(array_unique($errors));
     }
 
     /**
@@ -2484,8 +3160,19 @@ class ShipmentController extends Controller
                 ->with('message', 'Hanya shipment draft yang bisa direkonsiliasi.');
         }
 
+        $currentWave = $this->currentShipmentWave($shipment);
         $this->autoMapItemFirstLines($shipment);
-        $shipment->load(['store', 'warehouse', 'lines.item', 'orderScans.lines.item']);
+        $shipment->load(['store', 'warehouse', 'lines.item', 'orderScans.lines.item', 'waves']);
+        if ($currentWave) {
+            $shipment->setRelation(
+                'lines',
+                $shipment->lines->where('shipment_wave_id', $currentWave->id)->values()
+            );
+            $shipment->setRelation(
+                'orderScans',
+                $shipment->orderScans->where('shipment_wave_id', $currentWave->id)->values()
+            );
+        }
 
         $warehouse = $this->whRts();
         $stockInsufficient = $warehouse
@@ -2507,16 +3194,28 @@ class ShipmentController extends Controller
             ->sortBy('id')
             ->map(function ($scan) {
                 if (!empty($scan->raw_payload)) {
-                    $payload = $scan->raw_payload;
+                    $payload = is_array($scan->raw_payload) ? $scan->raw_payload : [];
+                    $canonicalNo = $this->normalizeOrderNumber(
+                        $scan->order_no
+                            ?: data_get($payload, 'no')
+                            ?: data_get($payload, 'order.order_no')
+                            ?: data_get($payload, 'order.code')
+                    ) ?: ('SCAN-' . $scan->id);
+                    $payload['no'] = $canonicalNo;
+                    $payload['order'] = array_merge(
+                        is_array($payload['order'] ?? null) ? $payload['order'] : [],
+                        ['order_no' => $canonicalNo]
+                    );
                     $payload['decision'] = $scan->status ?: 'pending';
                     $payload['scanned_at'] = $scan->created_at?->format('d/m/Y H:i:s');
                     return $payload;
                 }
+                $canonicalNo = $this->normalizeOrderNumber($scan->order_no) ?: ('SCAN-' . $scan->id);
                 return [
-                    'no' => $scan->order_no,
+                    'no' => $canonicalNo,
                     'found' => true,
                     'order' => [
-                        'order_no' => $scan->order_no,
+                        'order_no' => $canonicalNo,
                         'source' => $scan->source ?: 'manual_scan',
                         'status' => $scan->status ?: 'pending',
                         'lines' => [],
@@ -2530,7 +3229,15 @@ class ShipmentController extends Controller
             })
             ->values();
 
-        return view('sales.shipments.rekon', compact('shipment', 'batchPool', 'savedOrderScans'));
+        $isDaily = $this->usesDailyWaves($shipment);
+
+        return view('sales.shipments.rekon', compact(
+            'shipment',
+            'currentWave',
+            'isDaily',
+            'batchPool',
+            'savedOrderScans'
+        ));
     }
 
     public function confirmOrders(Shipment $shipment)
@@ -2541,17 +3248,29 @@ class ShipmentController extends Controller
                 ->with('message', 'Hanya shipment draft yang bisa dikonfirmasi.');
         }
 
+        $currentWave = $this->currentShipmentWave($shipment);
         $this->autoMapItemFirstLines($shipment);
-        $shipment->load(['lines.item', 'orderScans.lines.item']);
+        $shipment->load([
+            'lines.item',
+            'orderScans.lines.item',
+            'orderScans.fulfillment.marketplaceOrder.items.internalItem',
+            'orderScans.fulfillment.marketplaceOrder.store',
+            'waves',
+        ]);
 
         $warehouse = $this->whRts();
         $stockInsufficient = $warehouse
             ? $this->checkStockSufficiency($shipment, $warehouse)
             : [];
+        $mappingErrors = $this->shipmentMappingErrors($shipment, $currentWave);
+        $isDaily = $this->usesDailyWaves($shipment);
 
         return view('sales.shipments.confirm_orders', compact(
             'shipment',
-            'stockInsufficient'
+            'currentWave',
+            'isDaily',
+            'stockInsufficient',
+            'mappingErrors'
         ));
     }
 
@@ -2570,7 +3289,14 @@ class ShipmentController extends Controller
             'pool_used' => ['nullable', 'string'], // JSON: {item_id: qty_used}
         ]);
 
+        $currentWave = $this->currentShipmentWave($shipment);
         $shipment->load('lines.item');
+        if ($currentWave) {
+            $shipment->setRelation(
+                'lines',
+                $shipment->lines->where('shipment_wave_id', $currentWave->id)->values()
+            );
+        }
 
         // ── Build base pool dari shipment lines ──────────────────────────
         $basePool = $shipment->lines->mapWithKeys(fn ($l) => [
@@ -2589,7 +3315,13 @@ class ShipmentController extends Controller
             }
         }
 
-        $no  = trim($request->order_no);
+        $no  = $this->normalizeOrderNumber($request->order_no);
+        if ($no === '') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Nomor order tidak valid atau belum terbaca.',
+            ], 422);
+        }
 
         // Record-only tetap menerima scan order. Jangan perlakukan mode ini
         // sebagai error lookup karena fungsi utamanya memang pencatatan.
@@ -2611,6 +3343,7 @@ class ShipmentController extends Controller
             $scanModel = ShipmentOrderScan::updateOrCreate(
                 ['shipment_id' => $shipment->id, 'order_no' => $no],
                 [
+                    'shipment_wave_id' => $currentWave?->id,
                     'fulfillment_id' => null,
                     'status' => 'pending',
                     'source' => 'scanner',
@@ -2680,6 +3413,7 @@ class ShipmentController extends Controller
                 ShipmentOrderScan::updateOrCreate(
                     ['shipment_id' => $shipment->id, 'order_no' => $no],
                     [
+                        'shipment_wave_id' => $currentWave?->id,
                         'fulfillment_id' => null,
                         'status' => $rawPayload['decision'],
                         'source' => 'sales_invoice',
@@ -2697,7 +3431,7 @@ class ShipmentController extends Controller
 
         // Order dari tab Belum Packing (READY_TO_SHIP) maupun Sedang Dikemas
         // (PROCESSED) boleh masuk workflow scan dan dipromosikan setelah match.
-        if ($shipment->shipment_type !== 'manual' && !in_array($marketplaceOrder->order_status, ['READY_TO_SHIP', 'PROCESSED', 'READY_TO_HANDOVER'])) {
+        if ($shipment->shipment_type !== 'manual' && !in_array($marketplaceOrder->order_status, ['READY_TO_SHIP', 'PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'DELIVERED', 'COMPLETED'])) {
             $fulfillment = \App\Models\OrderFulfillment::query()
                 ->where('marketplace_order_id', $marketplaceOrder->id)
                 ->first();
@@ -2804,6 +3538,7 @@ class ShipmentController extends Controller
                 'order_no' => $no,
             ],
             [
+                'shipment_wave_id' => $currentWave?->id,
                 'fulfillment_id' => $fulfillment->id,
                 'status' => $decision,
                 'source' => 'marketplace',
@@ -2971,19 +3706,35 @@ class ShipmentController extends Controller
     public function updateRekonScan(Request $request, Shipment $shipment, $orderNo)
     {
         if ($shipment->status !== 'draft') abort(403);
+
+        $request->validate([
+            'new_order_no' => ['nullable', 'string', 'max:200'],
+            'decision' => ['nullable', 'in:fulfill,pending,skip'],
+            'subs' => ['nullable', 'array'],
+            'allocations' => ['nullable', 'array'],
+            'allocations.*.item_id' => ['required', 'integer', 'exists:items,id'],
+            'allocations.*.qty' => ['required', 'integer', 'min:1'],
+        ]);
         
         $scan = \App\Models\ShipmentOrderScan::where('shipment_id', $shipment->id)
             ->where('order_no', $orderNo)
             ->firstOrFail();
 
-        $payload = $scan->raw_payload;
+        $payload = is_array($scan->raw_payload) ? $scan->raw_payload : [];
         if ($request->has('new_order_no')) {
-            $newNo = trim($request->input('new_order_no'));
+            $newNo = $this->normalizeOrderNumber($request->input('new_order_no'));
+            if ($newNo === '') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Nomor order baru tidak boleh kosong.',
+                ], 422);
+            }
             $scan->order_no = $newNo;
             $payload['no'] = $newNo;
-            if (isset($payload['order'])) {
-                $payload['order']['order_no'] = $newNo;
-            }
+            $payload['order'] = array_merge(
+                is_array($payload['order'] ?? null) ? $payload['order'] : [],
+                ['order_no' => $newNo]
+            );
         }
         
         if ($request->has('decision')) {
@@ -3003,8 +3754,29 @@ class ShipmentController extends Controller
             $payload['subs'] = $request->input('subs');
         }
 
-        $scan->raw_payload = $payload;
-        $scan->save();
+        if ($request->has('allocations')) {
+            $payload['allocations'] = collect($request->input('allocations', []))
+                ->map(fn ($allocation) => [
+                    'item_id' => (int) ($allocation['item_id'] ?? 0),
+                    'qty' => (int) ($allocation['qty'] ?? 0),
+                ])
+                ->filter(fn ($allocation) => $allocation['item_id'] > 0 && $allocation['qty'] > 0)
+                ->groupBy('item_id')
+                ->map(fn ($rows, $itemId) => [
+                    'item_id' => (int) $itemId,
+                    'qty' => (int) $rows->sum('qty'),
+                ])
+                ->values()
+                ->all();
+        }
+
+        DB::transaction(function () use ($shipment, $scan, $payload) {
+            Shipment::query()->lockForUpdate()->findOrFail($shipment->id);
+            $scan->raw_payload = $payload;
+            $scan->save();
+
+            $this->syncItemFirstLineAllocations($shipment->fresh());
+        });
 
         return response()->json(['status' => 'ok']);
     }

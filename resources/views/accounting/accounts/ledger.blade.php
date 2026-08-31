@@ -169,6 +169,14 @@
                         • Nonaktif
                     @endif
                 </div>
+                @if ($cutoffDate && !$showLegacy)
+                    <div class="lg-muted" style="margin-top:.25rem">
+                        Sistem baru mulai {{ \Carbon\Carbon::parse($cutoffDate)->format('d/m/Y') }}.
+                        Histori legacy tidak dihitung.
+                    </div>
+                @elseif ($cutoffDate)
+                    <div class="lg-muted" style="margin-top:.25rem">Menampilkan seluruh histori jurnal.</div>
+                @endif
             </div>
 
             <div class="lg-row">
@@ -191,10 +199,13 @@
                 </div>
 
                 <form class="lg-row" method="GET" action="{{ route('accounting.accounts.ledger', $account) }}">
-                    <input class="lg-in" type="date" name="from" value="{{ request('from') }}">
-                    <input class="lg-in" type="date" name="to" value="{{ request('to') }}">
+                    <input class="lg-in" type="date" name="from" value="{{ $from ?? '' }}">
+                    <input class="lg-in" type="date" name="to" value="{{ $to ?? '' }}">
+                    @if ($showLegacy)
+                        <input type="hidden" name="show_legacy" value="1">
+                    @endif
                     <button class="lg-btn" type="submit">Filter</button>
-                    @if (request()->filled('from') || request()->filled('to'))
+                    @if (request()->filled('from') || request()->filled('to') || $showLegacy)
                         <a class="lg-btn" href="{{ route('accounting.accounts.ledger', $account) }}">Reset</a>
                     @endif
                 </form>

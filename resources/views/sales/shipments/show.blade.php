@@ -77,6 +77,13 @@
 .sd-tabpane{display:none}
 .sd-tabpane.active{display:block}
 .sd-tabpane .sd-card{margin-bottom:0}
+.sd-waves{display:grid;gap:.45rem}
+.sd-wave{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:.65rem;border:1px solid rgba(148,163,184,.18);border-radius:8px;padding:.6rem .7rem}
+.sd-wave-no{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#111827}
+.sd-wave-title{font-weight:900;color:#334155}
+.sd-wave-meta{font-size:.76rem;color:#64748b;margin-top:.08rem}
+.sd-wave-status{font-size:.7rem;font-weight:900;border-radius:999px;padding:.2rem .5rem;background:rgba(245,158,11,.08);color:#92400e;border:1px solid rgba(245,158,11,.22)}
+.sd-wave-status.posted{background:rgba(22,101,52,.08);color:#166534;border-color:rgba(22,101,52,.2)}
 @media(max-width:860px){
   .sd-wrap{padding:.5rem .5rem 3.5rem}
   .sd-topbar{padding:.5rem}
@@ -89,6 +96,8 @@
   .sd-body{padding:.65rem .7rem}
   .sd-order{grid-template-columns:1fr;align-items:flex-start;gap:.4rem}
   .sd-meta{grid-template-columns:1fr}
+  .sd-wave{grid-template-columns:auto minmax(0,1fr)}
+  .sd-wave-status{grid-column:2;justify-self:start}
   .sd-table-wrap{border:none;border-radius:0;overflow:visible}
   .sd-table,.sd-table tbody,.sd-table tr,.sd-table td{display:block;width:100%}
   .sd-table thead{display:none}
@@ -116,6 +125,7 @@
     ][$statusKey] ?? ucfirst($shipment->status ?? '-');
     $shipDateTxt = $shipment->date ? \Illuminate\Support\Carbon::parse($shipment->date)->format('d M Y') : '-';
     $orderScans = $shipment->orderScans ?? collect();
+    $waves = $waves ?? collect();
     $ungroupedLines = $shipment->lines->filter(fn ($line) => !$line->shipment_order_scan_id)->values();
     $singleOrderFallbackLines = $orderScans->count() === 1 ? $ungroupedLines : collect();
     $pendingOrders = $orderScans->where('status', 'pending')->count();
@@ -160,6 +170,44 @@
         <span class="sd-step {{ $flowStage === 'done' ? 'done' : ($flowStage === 'confirm' ? 'active' : '') }}">Konfirmasi Pesanan</span><span class="sd-sep">-&gt;</span>
         <span class="sd-step {{ $flowStage === 'done' ? 'active' : '' }}">Simpan &amp; Kurangi Stok</span>
     </div>
+
+    @if($isDaily)
+        <div class="sd-card">
+            <div class="sd-head">
+                <div>
+                    <div class="sd-title">Gelombang Pengiriman</div>
+                    <div class="sd-muted">Satu shipment harian dapat diposting bertahap per gelombang.</div>
+                </div>
+                <span class="sd-pill">{{ $waves->count() }} gelombang</span>
+            </div>
+            <div class="sd-body">
+                @if($waves->isEmpty())
+                    <div class="sd-empty">Gelombang pertama akan dibuat saat mulai scan.</div>
+                @else
+                    <div class="sd-waves">
+                        @foreach($waves as $wave)
+                            @php
+                                $waveStatus = $wave->status === \App\Models\ShipmentWave::STATUS_POSTED ? 'posted' : '';
+                                $waveStatusLabel = $wave->status === \App\Models\ShipmentWave::STATUS_POSTED
+                                    ? 'Sudah diposting'
+                                    : ($wave->status === \App\Models\ShipmentWave::STATUS_CANCELLED ? 'Dibatalkan' : 'Terbuka');
+                                $waveQty = (int) $wave->lines->sum('qty_scanned');
+                                $waveOrders = (int) $wave->orderScans->where('status', '!=', 'skip')->count();
+                            @endphp
+                            <div class="sd-wave">
+                                <div class="sd-wave-no">W{{ str_pad((string) $wave->sequence, 2, '0', STR_PAD_LEFT) }}</div>
+                                <div>
+                                    <div class="sd-wave-title">{{ $wave->label ?: 'Gelombang ' . $wave->sequence }}</div>
+                                    <div class="sd-wave-meta">{{ number_format($waveQty, 0, ',', '.') }} item · {{ number_format($waveOrders, 0, ',', '.') }} pesanan</div>
+                                </div>
+                                <span class="sd-wave-status {{ $waveStatus }}">{{ $waveStatusLabel }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endif
 
     <div class="sd-grid">
         <div class="sd-card sd-kpi">

@@ -57,10 +57,14 @@ class JournalService
     public const SRC_SEWING_RETURN_REJECT = 'sewing_return_reject';
     public const SRC_SEWING_REWORK_OK = 'sewing_reject_rework_ok';
     public const SRC_SHIPMENT_COGS = 'shipment_cogs';
+    public const SRC_SHIPMENT_WAVE_COGS = 'shipment_wave_cogs';
     public const SRC_WIP_FIN_ADJUSTMENT = 'wip_fin_adjustment';
     public const SRC_INVENTORY_ADJUSTMENT = 'inventory_adjustment';
     public const SRC_WIP_NORMALIZATION = 'wip_normalization';
     public const SRC_WIP_CLEANUP = 'wip_cleanup';
+    public const SRC_MARKETPLACE_SALE = 'marketplace_sale';
+    public const SRC_MARKETPLACE_ESCROW = 'marketplace_escrow';
+    public const SRC_MARKETPLACE_SETTLEMENT = 'marketplace_settlement';
 
     // public const SRC_PO_EXPENSE_APPROVE = 'purchase_order_expense_approve';
 
@@ -1270,6 +1274,87 @@ class JournalService
             (int) $shipment->id,
             "COGS Shipment {$shipment->code}",
             $lines
+        );
+    }
+
+    /**
+     * Post HPP hanya untuk baris pada satu gelombang shipment harian.
+     * Source journal memakai wave id agar setiap gelombang idempotent dan
+     * posting gelombang berikutnya tidak tertahan journal shipment sebelumnya.
+     */
+    public function postShipmentWaveCogsFromMutations(\App\Models\ShipmentWave $wave): ?Journal
+    {
+        $existing = Journal::query()
+            ->where('source_type', self::SRC_SHIPMENT_WAVE_COGS)
+            ->where('source_id', (int) $wave->id)
+            ->whereNull('voided_at')
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $lineIds = $wave->lines()->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if (empty($lineIds)) {
+            return null;
+        }
+
+        $rows = DB::table('inventory_mutations as im')
+            ->join('items as i', 'i.id', '=', 'im.item_id')
+            ->where('im.source_type', 'shipment')
+            ->whereIn('im.source_line_id', $lineIds)
+            ->where('im.qty_change', '<', 0)
+            ->groupBy('i.item_role')
+            ->selectRaw('COALESCE(i.item_role, "finished_good") as item_role, SUM(ABS(im.total_cost)) as total_cost')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        $itemRoleToCode = [
+            'finished_good' => self::CODE_INV_FG,
+            'wip' => self::CODE_INV_WIP,
+            'raw_material' => self::CODE_INV_RAW,
+            'production_supply' => self::CODE_INV_RAW,
+            'shipping_supply' => self::CODE_INV_PACKAGING,
+        ];
+
+        $hppId = $this->accountIdByCode(self::CODE_HPP);
+        $creditLines = [];
+        $totalHpp = 0.0;
+
+        foreach ($rows as $row) {
+            $amount = round((float) ($row->total_cost ?? 0), 2);
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $accountCode = $itemRoleToCode[(string) ($row->item_role ?? '')] ?? self::CODE_INV_FG;
+            $creditLines[] = [
+                'account_id' => $this->accountIdByCode($accountCode),
+                'debit' => 0,
+                'credit' => $amount,
+            ];
+            $totalHpp = round($totalHpp + $amount, 2);
+        }
+
+        if ($totalHpp <= 0 || empty($creditLines)) {
+            return null;
+        }
+
+        return $this->post(
+            $this->dateOnly($wave->shipment?->date),
+            self::SRC_SHIPMENT_WAVE_COGS,
+            (int) $wave->id,
+            'COGS Gelombang ' . $wave->code,
+            array_merge([
+                [
+                    'account_id' => $hppId,
+                    'debit' => $totalHpp,
+                    'credit' => 0,
+                ],
+            ], $creditLines)
         );
     }
 

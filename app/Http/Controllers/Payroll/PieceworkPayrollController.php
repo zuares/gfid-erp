@@ -295,6 +295,25 @@ class PieceworkPayrollController extends Controller
             })
             ->values();
 
+        $summaryByCategory = collect();
+        if ($cfg['module'] !== 'daily') {
+            $summaryByCategory = $lines
+                ->groupBy('item_category_id')
+                ->map(function ($group) {
+                    $category = $group->first()->category;
+
+                    return [
+                        'category_id' => $category?->id,
+                        'category_code' => $category?->code,
+                        'category_name' => $category?->name,
+                        'total_qty' => (float) $group->sum('total_qty_ok'),
+                        'total_amount' => (float) $group->sum('amount'),
+                    ];
+                })
+                ->sortBy(fn (array $row) => mb_strtolower((string) ($row['category_name'] ?: $row['category_code'] ?: 'Tanpa Kategori')))
+                ->values();
+        }
+
         $grandTotalQty = (float) $lines->sum('total_qty_ok');
         $grandTotalAmount = (float) $lines->sum('amount');
         $periodDays = Carbon::parse($period->period_start)
@@ -333,6 +352,7 @@ class PieceworkPayrollController extends Controller
             'period' => $period,
             'lines' => $lines,
             'summaryByEmployee' => $summaryByEmployee,
+            'summaryByCategory' => $summaryByCategory,
             'grandTotalQty' => $grandTotalQty,
             'grandTotalAmount' => $grandTotalAmount,
             'periodDays' => $periodDays,

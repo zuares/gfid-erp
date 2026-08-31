@@ -1433,6 +1433,9 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     $totalLines        = $shipment->lines->count();
     $isItemFirst       = ($shipment->scan_mode ?? 'item_first') === 'item_first';
     $isOrderFirst      = !$isItemFirst;
+    $isDaily            = ($shipment->dispatch_mode ?? 'single') === 'daily';
+    $currentWave        = $currentWave ?? null;
+    $postedWaveCount    = (int) ($postedWaveCount ?? 0);
     $nextScanUrl       = route('sales.shipments.scan_order', $shipment);
     $nextCanProceed    = $isOrderFirst || $totalLines > 0;
     $nextScanLabel     = $isOrderFirst
@@ -1465,6 +1468,12 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         </span>
     @endif
 
+    @if ($isDaily && $currentWave)
+        <span class="shp-badge shp-badge-store">
+            {{ $currentWave->label ?: ('Gelombang ' . $currentWave->sequence) }}
+        </span>
+    @endif
+
     <span class="shp-topbar-spacer"></span>
 
     <span class="shp-pill">
@@ -1481,6 +1490,16 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     <button type="button" class="btn btn-shp-submit btn-sm shp-topbar-utility" onclick="printPickingList()" style="font-size:0.75rem;padding:0.25rem 0.75rem;">
         Cetak Picking
     </button>
+
+    @if ($isDaily && $postedWaveCount > 0)
+        <form method="POST" action="{{ route('sales.shipments.daily_close', $shipment) }}" class="d-inline"
+              onsubmit="return confirm('Tutup shipment harian ini? Setelah ditutup, shipment tidak bisa menerima gelombang baru.');">
+            @csrf
+            <button type="submit" class="btn btn-sm btn-shp-outline" style="font-size:0.75rem;padding:0.25rem 0.75rem;">
+                Tutup Shipment Harian
+            </button>
+        </form>
+    @endif
 
     @if (!$isItemFirst)
         <a href="{{ route('sales.shipments.scan_order', $shipment) }}"

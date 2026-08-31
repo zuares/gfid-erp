@@ -40,6 +40,7 @@
     .sif-order { display: flex; align-items: center; gap: .55rem; padding: .6rem .65rem; border: 1px solid rgba(148,163,184,.17); border-radius: 8px; background: #fff; }
     .sif-order-no { flex: 1; min-width: 0; overflow: hidden; color: #0f172a; font-family: ui-monospace,SFMono-Regular,Menlo,monospace; font-size: .86rem; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
     .sif-order-status { color: #166534; font-size: .7rem; font-weight: 800; }
+    .sif-order-status-unlinked { color: #b45309; }
     .sif-empty { padding: 1rem; color: #64748b; text-align: center; font-size: .78rem; }
     .sif-order-group-section { display: grid; gap: .35rem; }
     .sif-order-group-heading { display: flex; align-items: center; gap: .4rem; padding: .15rem .1rem; color: #475569; font-size: .68rem; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
@@ -152,7 +153,7 @@
                         <div id="sifCameraReader" class="sif-camera-reader"></div>
                         <div id="sifCameraStatus" class="sif-camera-status">Meminta izin kamera...</div>
                     </div>
-                    <div class="sif-hint">Satu order cukup untuk mapping otomatis item yang sudah discan.</div>
+                    <div class="sif-hint">Satu order akan dimapping otomatis. Jika shipment berisi beberapa order, lanjutkan ke rekonsiliasi untuk membagi SKU dan quantity per order.</div>
                 </div>
             </div>
         </div>
@@ -182,10 +183,18 @@
                             <div class="sif-order-group-heading"><span>{{ $group }}</span><b>{{ $groupTotal }}</b></div>
                             @foreach ($orders->filter(fn ($order) => $orderGroup($order->order_no) === $group) as $order)
                                 @php $orderNumber++; @endphp
+                                @php
+                                    $orderPayload = is_array($order->raw_payload) ? $order->raw_payload : [];
+                                    $isUnlinked = empty($order->fulfillment_id)
+                                        || ($orderPayload['mode'] ?? null) === 'record_only'
+                                        || ($orderPayload['lookup_status'] ?? null) !== null;
+                                @endphp
                                 <div class="sif-order">
                                     <span class="sif-order-index">{{ $orderNumber }}</span>
                                     <span class="sif-order-no">{{ $order->order_no }}</span>
-                                    <span class="sif-order-status">Tercatat</span>
+                                    <span class="sif-order-status {{ $isUnlinked ? 'sif-order-status-unlinked' : '' }}">
+                                        {{ $isUnlinked ? 'Belum Tertaut' : 'Tertaut' }}
+                                    </span>
                                 </div>
                             @endforeach
                         </div>
@@ -300,7 +309,7 @@
     }
 
     function getOrderGroup(orderNo) {
-        const value = String(orderNo || '').trim().toUpperCase();
+        const value = String(orderNo ?? '').trim().toUpperCase();
         if (value.startsWith('SPX')) return 'SPX';
         if (value.startsWith('JY')) return 'JY';
         return 'Lainnya';
@@ -526,7 +535,8 @@
     }
 
     async function submitOrder(orderNo) {
-        if (!orderNo || submitting) return;
+        const normalizedOrderNo = String(orderNo ?? '').trim().toUpperCase();
+        if (!normalizedOrderNo || ['UNDEFINED', 'NULL', 'NAN'].includes(normalizedOrderNo) || submitting) return;
 
         submitting = true;
         input.disabled = true;
@@ -534,12 +544,12 @@
             const response = await fetch(recordUrl, {
                 method: 'POST',
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                body: new URLSearchParams({ _token: csrf, order_no: orderNo }),
+                body: new URLSearchParams({ _token: csrf, order_no: normalizedOrderNo }),
             });
             const data = await response.json();
             if (!response.ok || data.status !== 'ok') throw new Error(data.message || 'Gagal mencatat order.');
             const isDuplicate = data.duplicate === true || data.created === false;
-            if (!orders.includes(orderNo)) orders.push(orderNo);
+            if (!orders.includes(normalizedOrderNo)) orders.push(normalizedOrderNo);
             renderOrders();
             input.value = '';
             if (isDuplicate) {

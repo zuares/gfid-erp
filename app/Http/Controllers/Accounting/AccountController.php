@@ -195,6 +195,22 @@ class AccountController extends Controller
 
     public function ledger(Request $request, Account $account)
     {
+        $cutoffDate = SystemSetting::cutoffDateString();
+        $showLegacy = $request->boolean('show_legacy');
+        $from = $request->filled('from')
+            ? $request->date('from')->toDateString()
+            : null;
+
+        // Ledger dari COA harus mengikuti mode laporan yang sama: histori
+        // legacy tidak boleh masuk ke saldo pembuka sistem baru.
+        if ($cutoffDate && !$showLegacy) {
+            $from = $from ? max($from, $cutoffDate) : $cutoffDate;
+        }
+
+        $to = $request->filled('to')
+            ? $request->date('to')->toDateString()
+            : null;
+
         // Lines (filter by date, exclude void)
         $q = JournalLine::query()
             ->join('journals', 'journals.id', '=', 'journal_lines.journal_id')
@@ -215,24 +231,25 @@ class AccountController extends Controller
             ->orderBy('journals.created_at')
             ->orderBy('journal_lines.id');
 
-        if ($request->filled('from')) {
-            $q->whereDate('journals.date', '>=', $request->date('from'));
+        if ($from) {
+            $q->whereDate('journals.date', '>=', $from);
         }
-        if ($request->filled('to')) {
-            $q->whereDate('journals.date', '<=', $request->date('to'));
+        if ($to) {
+            $q->whereDate('journals.date', '<=', $to);
         }
 
         $lines = $q->paginate(50)->withQueryString();
 
         // Opening balance sebelum "from"
         $openingBalance = 0.0;
-        if ($request->filled('from')) {
+        if ($from) {
             $openingBalance = (float) JournalLine::query()
                 ->join('journals', 'journals.id', '=', 'journal_lines.journal_id')
                 ->where('journal_lines.account_id', $account->id)
                 ->whereNull('journals.voided_at')
                 ->whereNotIn('journals.source_type', self::EXCLUDED_BALANCE_SOURCES)
-                ->whereDate('journals.date', '<', $request->date('from'))
+                ->when($cutoffDate && !$showLegacy, fn ($query) => $query->whereDate('journals.date', '>=', $cutoffDate))
+                ->whereDate('journals.date', '<', $from)
                 ->selectRaw('COALESCE(SUM(journal_lines.debit - journal_lines.credit),0) as s')
                 ->value('s');
         }
@@ -243,6 +260,7 @@ class AccountController extends Controller
             ->where('journal_lines.account_id', $account->id)
             ->whereNull('journals.voided_at')
             ->whereNotIn('journals.source_type', self::EXCLUDED_BALANCE_SOURCES)
+            ->when($cutoffDate && !$showLegacy, fn ($query) => $query->whereDate('journals.date', '>=', $cutoffDate))
             ->selectRaw('COALESCE(SUM(journal_lines.debit - journal_lines.credit),0) as s')
             ->value('s');
 
@@ -250,7 +268,11 @@ class AccountController extends Controller
             'account',
             'lines',
             'openingBalance',
-            'currentBalance'
+            'currentBalance',
+            'from',
+            'to',
+            'cutoffDate',
+            'showLegacy'
         ));
     }
 }

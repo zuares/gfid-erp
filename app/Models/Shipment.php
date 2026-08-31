@@ -12,6 +12,8 @@ class Shipment extends Model
 
     public const TYPE_MARKETPLACE = 'marketplace';
     public const TYPE_MANUAL = 'manual';
+    public const DISPATCH_SINGLE = 'single';
+    public const DISPATCH_DAILY = 'daily';
 
     protected $fillable = [
         'code',
@@ -20,6 +22,7 @@ class Shipment extends Model
         'store_id',
         'warehouse_id',
         'sales_invoice_id',
+        'dispatch_mode',
 
         'date',
         'status',
@@ -77,6 +80,11 @@ class Shipment extends Model
         return $this->hasMany(ShipmentLine::class);
     }
 
+    public function waves()
+    {
+        return $this->hasMany(ShipmentWave::class)->orderBy('sequence');
+    }
+
     public function orderScans()
     {
         return $this->hasMany(ShipmentOrderScan::class);
@@ -105,6 +113,11 @@ class Shipment extends Model
     public function invoice()
     {
         return $this->belongsTo(SalesInvoice::class, 'sales_invoice_id');
+    }
+
+    public function marketplaceFinancialTransactions(): HasMany
+    {
+        return $this->hasMany(MarketplaceFinancialTransaction::class, 'shipment_id');
     }
 
     public function marketplaceReconciliations()

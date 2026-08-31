@@ -126,6 +126,7 @@
     $hasMarketplaceFinancialStatement = $isOwner && $router->has('marketplace.reports.financial-statement');
     $hasMarketplaceFinancialClosing = $isOwner && $router->has('marketplace.reports.financial-closing');
     $hasMarketplaceFinancialQuality = $isOwner && $router->has('marketplace.reports.financial-quality');
+    $hasMarketplaceFinance = $router->has('marketplace.finance.index');
 
     // Toko Online Reconcile
     $hasMarketplaceReconcileQueue = !$isAdmin && $router->has('marketplace.reconcile.queue');
@@ -252,6 +253,7 @@
         $hasMarketplaceAnalytics = $hasMarketplaceIssues = false;
         $hasMarketplaceIndex = $hasMarketplaceCreate = $hasMarketplaceShow = false;
         $hasMarketplaceSalesReport = $hasMarketplaceSalesExport = false;
+        $hasMarketplaceFinance = false;
         $hasMarketplaceReconcileQueue = $hasMarketplaceReconcileQueueBulk = false;
         $hasMarketplaceReconcilePreview = $hasMarketplaceReconcileCommit = false;
         $hasMarketplaceReconciliationsResolve = $hasMarketplaceReconciliationsDiff = false;
@@ -333,6 +335,7 @@
         $open('marketplace.analytics') ||
         $open('marketplace.issues') ||
         $open('marketplace.reports.*') ||
+        $open('marketplace.finance.*') ||
         $open('marketplace.reconcile.*') ||
         $open('marketplace.reconciliations.*') ||
         $open('imports.marketplace.*') ||
@@ -1006,7 +1009,7 @@
             @endif
 
             {{-- Toko Online --}}
-            @if ($canShow($hasMarketplaceIndex, $hasMarketplaceSalesReport, $hasMarketplaceReconcileQueue, $hasMarketplaceReconcileItemsIndex))
+            @if ($canShow($hasMarketplaceIndex, $hasMarketplaceSalesReport, $hasMarketplaceFinance, $hasMarketplaceReconcileQueue, $hasMarketplaceReconcileItemsIndex))
                 <x-sidebar.label text="Toko Online" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openMarketplaceTools ? 'is-open' : '' }}" type="button"
@@ -1064,6 +1067,13 @@
                         <x-sidebar.simple-link href="{{ route('marketplace.reports.sales') }}" icon="bi bi-graph-up"
                             :active="request()->routeIs('marketplace.reports.sales')">
                             Laporan Penjualan
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasMarketplaceFinance)
+                        <x-sidebar.simple-link href="{{ route('marketplace.finance.index') }}" icon="bi bi-wallet2"
+                            :active="request()->routeIs('marketplace.finance.*')">
+                            Marketplace Finance
                         </x-sidebar.simple-link>
                     @endif
 

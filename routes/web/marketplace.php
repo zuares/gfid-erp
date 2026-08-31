@@ -10,6 +10,7 @@ use App\Http\Controllers\Marketplace\MarketplaceFinancialQualityController;
 use App\Http\Controllers\Marketplace\MarketplaceProfitReportController;
 use App\Http\Controllers\Marketplace\MarketplaceFinancialStatementController;
 use App\Http\Controllers\Marketplace\MarketplaceFinancialClosingController;
+use App\Http\Controllers\Marketplace\MarketplaceFinanceController;
 Route::middleware(['web', 'auth', 'access:marketplace'])
     ->prefix('marketplace')
     ->name('marketplace.')
@@ -43,6 +44,15 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
 
         Route::get('reports/sales/export', [MarketplaceOrderController::class, 'salesSummaryCsv'])
             ->name('reports.sales.export');
+
+        // Bounded Marketplace Finance read model and reconciliation views.
+        Route::prefix('finance')->name('finance.')->group(function () {
+            Route::get('/', [MarketplaceFinanceController::class, 'index'])->name('index');
+            Route::get('transactions', [MarketplaceFinanceController::class, 'transactions'])->name('transactions');
+            Route::get('settlements', [MarketplaceFinanceController::class, 'settlements'])->name('settlements');
+            Route::get('reconciliation', [MarketplaceFinanceController::class, 'reconciliation'])->name('reconciliation');
+            Route::get('fee-analysis', [MarketplaceFinanceController::class, 'feeAnalysis'])->name('fee-analysis');
+        });
 
         // Audit dan testing kualitas data finansial — owner only.
         Route::middleware('role:owner')->group(function () {

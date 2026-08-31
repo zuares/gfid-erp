@@ -114,6 +114,15 @@ class MarketplaceOrder extends Model
         return $this->hasOne(MarketplaceOrderIncomeEstimate::class, 'marketplace_order_id');
     }
 
+    /**
+     * Finance bounded submodule record. This is intentionally separate from
+     * the legacy settlement/income relationships above.
+     */
+    public function financialTransactions(): HasMany
+    {
+        return $this->hasMany(MarketplaceFinancialTransaction::class, 'marketplace_order_id');
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(MarketplaceOrderItem::class);

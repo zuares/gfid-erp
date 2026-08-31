@@ -11,6 +11,7 @@ class ShipmentOrderScan extends Model
 
     protected $fillable = [
         'shipment_id',
+        'shipment_wave_id',
         'fulfillment_id',
         'order_no',
         'status',
@@ -28,6 +29,11 @@ class ShipmentOrderScan extends Model
     public function shipment()
     {
         return $this->belongsTo(Shipment::class);
+    }
+
+    public function wave()
+    {
+        return $this->belongsTo(ShipmentWave::class, 'shipment_wave_id');
     }
 
     public function fulfillment()

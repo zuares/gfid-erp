@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Shipment;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SalesInvoice extends Model
 {
@@ -52,6 +53,11 @@ class SalesInvoice extends Model
     public function journal()
     {
         return $this->belongsTo(\App\Models\Journal::class, 'journal_id');
+    }
+
+    public function marketplaceFinancialTransactions(): HasMany
+    {
+        return $this->hasMany(MarketplaceFinancialTransaction::class, 'sales_invoice_id');
     }
 
 }

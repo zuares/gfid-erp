@@ -1238,6 +1238,21 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     background: #1d4ed8 !important;
     border-color: #1d4ed8 !important;
 }
+.shp-topbar .rk-topbar-allocate {
+    color: #fff !important;
+    background: #0f766e !important;
+    border-color: #0f766e !important;
+}
+.shp-topbar .rk-topbar-allocate:hover:not(:disabled) {
+    color: #fff !important;
+    background: #0d5f59 !important;
+    border-color: #0d5f59 !important;
+}
+.shp-topbar .rk-topbar-allocate:disabled {
+    color: #64748b !important;
+    background: #e2e8f0 !important;
+    border-color: #cbd5e1 !important;
+}
 .rk-act-btn.fulfill,
 .rk-act-btn.fulfill:hover,
 .rk-act-btn.fulfill.on {
@@ -1296,7 +1311,7 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
 
 <div class="rk-wrap">
 
-    <nav class="rk-flow {{ $isItemFirst ? 'rk-item-first-hidden' : '' }}" aria-label="Alur shipment">
+    <nav class="rk-flow" aria-label="Alur shipment">
         <span class="rk-flow-step done"><span>1</span> Scan Item</span>
         <span class="rk-flow-sep" aria-hidden="true">→</span>
         <span class="rk-flow-step active"><span>2</span> Rekonsiliasi</span>
@@ -1307,7 +1322,7 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     @if ($isItemFirst)
         <div class="rk-item-first-panel">
             <div class="rk-item-first-title">Mapping Order &amp; Item Otomatis</div>
-            <div class="rk-item-first-sub">Mode Scan Item aktif. Tidak perlu scan order lagi; item yang sudah discan dipakai sebagai detail shipment.</div>
+            <div class="rk-item-first-sub">Mode Scan Item aktif. Order yang sudah tercatat ditampilkan di bawah. Alokasikan item batch ke masing-masing order terlebih dahulu, lalu lanjutkan ke konfirmasi.</div>
             <div class="rk-item-first-map">
                 <span>Order:</span>
                 <strong>{{ $shipment->orderScans->count() === 1 ? $shipment->orderScans->first()->order_no : 'Item shipment' }}</strong>
@@ -1324,30 +1339,42 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
                     <div class="rk-batch-empty">Belum ada item yang discan.</div>
                 @endforelse
             </div>
+            <div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;margin-top:.8rem">
+                <button type="button" id="itemFirstAllocateBtn" class="btn-shp-submit" disabled>
+                    <i class="bi bi-diagram-3" aria-hidden="true"></i> Alokasikan Item ke Order
+                </button>
+                <span id="itemFirstAllocationHint" style="color:#64748b;font-size:.74rem">Menunggu order yang tercatat.</span>
+            </div>
         </div>
     @endif
 
 
     {{-- TABS --}}
-    <div class="rk-tabs {{ $isItemFirst ? 'rk-item-first-hidden' : '' }}" role="tablist">
+    <div class="rk-tabs" role="tablist">
         <button type="button" class="rk-tab active" data-tab="pesanan">Pesanan <span class="rk-tab-count" id="rkOrderCount">0</span></button>
         <button type="button" class="rk-tab" data-tab="sisa">Belum Alokasi <span class="rk-tab-count" id="rkSisaCount">0</span></button>
         <button type="button" class="rk-tab" data-tab="batch">Isi Batch <span class="rk-tab-count">{{ $batchPool->count() }}</span></button>
     </div>
 
     {{-- TAB: PESANAN --}}
-    <div class="rk-tabpane active {{ $isItemFirst ? 'rk-item-first-hidden' : '' }}" id="rk-tab-pesanan" role="tabpanel">
+    <div class="rk-tabpane active" id="rk-tab-pesanan" role="tabpanel">
         {{-- HERO SCAN CARD --}}
         <div class="shp-scan-card" style="padding: 1rem 1.25rem 0.8rem; margin-bottom: 0.75rem; border-radius: 12px; border-width: 1px;">
             <div class="shp-scan-header" style="margin-bottom: 0.35rem;">
-                <span class="shp-scan-label" style="font-size:0.75rem;">Scan Pesanan</span>
+                <span class="shp-scan-label" style="font-size:0.75rem;">{{ $isItemFirst ? 'Order untuk Alokasi' : 'Scan Pesanan' }}</span>
                 <span class="shp-scan-counter" id="scanCounter" style="font-size:0.75rem;">0 pesanan</span>
             </div>
 
-            <input type="text" id="orderInput" class="shp-scan-input"
-                   placeholder="Scan / ketik no pesanan lalu Enter"
-                   style="font-size: 1.25rem; padding: 0.5rem 0.85rem; border-width: 1.5px; border-radius: 8px;"
-                   autocomplete="off" spellcheck="false" @if (!$isItemFirst) autofocus @endif>
+            @if ($isItemFirst)
+                <div style="color:#64748b;font-size:.82rem;line-height:1.45">
+                    Order sudah tercatat dari shipment ini. Buka detail order di bawah, lalu klik <strong>Alokasikan Item ke Order</strong> untuk membagi item batch secara otomatis.
+                </div>
+            @else
+                <input type="text" id="orderInput" class="shp-scan-input"
+                       placeholder="Scan / ketik no pesanan lalu Enter"
+                       style="font-size: 1.25rem; padding: 0.5rem 0.85rem; border-width: 1.5px; border-radius: 8px;"
+                       autocomplete="off" spellcheck="false" autofocus>
+            @endif
 
         </div>
 
@@ -1375,12 +1402,12 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     </div>
 
     {{-- TAB: SISA STOK --}}
-    <div class="rk-tabpane {{ $isItemFirst ? 'rk-item-first-hidden' : '' }}" id="rk-tab-sisa" role="tabpanel">
+    <div class="rk-tabpane" id="rk-tab-sisa" role="tabpanel">
         <div id="sisaCard" style="display:none"></div>
     </div>
 
     {{-- TAB: ISI BATCH --}}
-    <div class="rk-tabpane {{ $isItemFirst ? 'rk-item-first-hidden' : '' }}" id="rk-tab-batch" role="tabpanel">
+    <div class="rk-tabpane" id="rk-tab-batch" role="tabpanel">
         <div class="rk-order-card">
             <div class="rk-batch-head">
                 <div>
@@ -1553,7 +1580,9 @@ let orderSearchQuery = '';
 
 /* ── Persistence ── */
 function normalizeOrderNo(no) {
-    return String(no || '').trim().toUpperCase();
+    const value = String(no ?? '').trim();
+    if (!value || ['undefined', 'null', 'nan'].includes(value.toLowerCase())) return '';
+    return value.toUpperCase();
 }
 
 function normalizeSearchText(value) {
@@ -1641,14 +1670,15 @@ function rebuildPoolUsed() {
     });
 }
 
-function recalculateAllocations() {
+async function recalculateAllocations() {
     if (!orders.length) return;
-    
+
     // 1. Inisialisasi pool murni dari BATCH_POOL
     const pool = {};
     BATCH_POOL.forEach(p => pool[p.item_id] = p.qty);
 
     let anyChanged = false;
+    const pendingSaves = [];
 
     // 2. Evaluasi ulang pesanan berurutan
     orders.forEach((o, idx) => {
@@ -1668,7 +1698,7 @@ function recalculateAllocations() {
             });
             if (changed) {
                 anyChanged = true;
-                saveOrderScan(idx);
+                pendingSaves.push(saveOrderScan(idx));
             }
             return;
         }
@@ -1716,7 +1746,7 @@ function recalculateAllocations() {
 
         if (changed) {
             anyChanged = true;
-            saveOrderScan(idx);
+            pendingSaves.push(saveOrderScan(idx));
         }
     });
 
@@ -1724,23 +1754,64 @@ function recalculateAllocations() {
         toast('info', 'Alokasi stok disesuaikan otomatis.');
         rebuildPoolUsed();
     }
+
+    if (pendingSaves.length) {
+        const results = await Promise.allSettled(pendingSaves);
+        if (results.some(result => result.status === 'rejected')) {
+            toast('err', 'Sebagian alokasi gagal disimpan. Silakan coba lagi.');
+        }
+    }
 }
 function saveState() {
     // No-op: DB stores the state now.
 }
-function saveOrderScan(idx) {
+
+function getActualAllocations(order) {
+    const allocations = {};
+
+    (order?.order?.lines || []).forEach(line => {
+        const substitution = order.subs?.[line.item_id];
+        if (substitution?.sub_id && Number(substitution.qty) > 0) {
+            const qty = Math.min(Number(substitution.qty), Number(line.qty_need || 0));
+            allocations[substitution.sub_id] = (allocations[substitution.sub_id] || 0) + qty;
+            return;
+        }
+
+        if (line.item_id && Number(line.qty_alloc) > 0) {
+            allocations[line.item_id] = (allocations[line.item_id] || 0) + Number(line.qty_alloc);
+        }
+    });
+
+    return Object.entries(allocations).map(([item_id, qty]) => ({
+        item_id: Number(item_id),
+        qty: Number(qty),
+    }));
+}
+
+async function saveOrderScan(idx) {
     const o = orders[idx];
-    if (!o) return;
-    const url = UPDATE_SCAN_URL.replace('__NO__', encodeURIComponent(o.no));
-    fetch(url, {
+    if (!o) return null;
+    const orderNo = normalizeOrderNo(o.no || o.order?.order_no);
+    if (!orderNo) throw new Error('Nomor order tidak tersedia. Scan ulang nomor order tersebut.');
+    const url = UPDATE_SCAN_URL.replace('__NO__', encodeURIComponent(orderNo));
+    const response = await fetch(url, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': CSRF,
             'Accept': 'application/json'
         },
-        body: JSON.stringify({ decision: o.decision, subs: o.subs })
-    }).catch(err => console.error('Failed to sync scan', err));
+        body: JSON.stringify({
+            decision: o.decision,
+            subs: o.subs,
+            allocations: getActualAllocations(o),
+        })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.status !== 'ok') {
+        throw new Error(data.message || 'Failed to sync scan');
+    }
+    return data;
 }
 
 window.editManualOrder = function(idx, oldNo) {
@@ -1791,10 +1862,29 @@ window.deleteManualOrder = function(idx, no) {
     }).catch(err => toast('err', 'Terjadi kesalahan sistem.'));
 };
 
-function loadState() {
-    orders = Array.isArray(SERVER_ORDER_SCANS) ? SERVER_ORDER_SCANS : [];
+async function loadState() {
+    orders = (Array.isArray(SERVER_ORDER_SCANS) ? SERVER_ORDER_SCANS : [])
+        .map((row) => {
+            const no = normalizeOrderNo(
+                row?.no
+                    || row?.order_no
+                    || row?.order?.order_no
+                    || row?.order?.code
+            );
+            if (!no) return null;
+
+            const order = row?.order && typeof row.order === 'object'
+                ? { ...row.order }
+                : {};
+            order.order_no = normalizeOrderNo(order.order_no || order.code) || no;
+
+            return { ...row, no, order };
+        })
+        .filter(Boolean);
     rebuildPoolUsed();
-    recalculateAllocations(); // Evaluasi ulang jika ada barang baru masuk pool
+    // Item-first harus melewati aksi alokasi yang terlihat operator sebelum
+    // lanjut ke halaman konfirmasi. Mode order-first tetap otomatis.
+    if (!ITEM_FIRST) await recalculateAllocations();
     return orders.length ? 'ok' : 'empty';
 }
 function clearState() {
@@ -1813,6 +1903,8 @@ const scanCounter   = document.getElementById('scanCounter');
 const topPillOrders = document.getElementById('topPillOrders');
 const topOrderCount = document.getElementById('topOrderCount');
 const topConfirmBtn = document.getElementById('topConfirmBtn');
+const itemFirstAllocateBtn = document.getElementById('itemFirstAllocateBtn');
+const itemFirstAllocationHint = document.getElementById('itemFirstAllocationHint');
 
 /* ── Toast ── */
 const toastEl = document.getElementById('shpToast');
@@ -2010,9 +2102,12 @@ async function processOrder(no) {
         const data = await res.json();
         if (!res.ok || data.status !== 'ok') throw new Error(data.message || 'Gagal memuat pesanan.');
 
-        data.no = no;
+        const savedNo = normalizeOrderNo(data.no || data.order?.order_no || data.order?.code || no) || no;
+        data.no = savedNo;
+        data.order = data.order && typeof data.order === 'object' ? data.order : {};
+        data.order.order_no = normalizeOrderNo(data.order.order_no || data.order.code) || savedNo;
         const defaultDecision = data.decision || (SHIPMENT_TYPE === 'manual' ? 'fulfill' : (data.order?.source === 'manual_scan' ? 'pending' : null));
-        orders.push({ no, found: data.found, order: data.order, pool_full: data.pool_full, decision: defaultDecision, subs: {} });
+        orders.push({ no: savedNo, found: data.found === true, order: data.order, pool_full: data.pool_full, decision: defaultDecision, subs: {} });
 
         if (data.found) {
             // Akumulasikan alokasi ke poolUsed
@@ -2105,7 +2200,8 @@ function renderAll() {
 }
 
 function renderCard(o, idx, displayNo) {
-    const { no, found, order, decision } = o;
+    const no = normalizeOrderNo(o?.no || o?.order?.order_no) || 'Nomor order tersimpan';
+    const { found, order, decision } = o;
     const dupeBadge = o.dupe ? '<span class="rk-dupe-badge">⚠ Duplikat</span>' : '';
     const cls = 'rk-order-card' + (decision ? ' decided-' + decision : '') + (o.dupe ? ' rk-dupe' : '');
 
@@ -2370,12 +2466,51 @@ window.promptLinkScan = async function(idx) {
     }
 };
 
+function isOrderFullyAllocated(order) {
+    if (!order?.found || !order.order?.lines?.length || order.decision === 'skip') return false;
+
+    return order.order.lines.every(line => {
+        const normalQty = Number(line.qty_alloc || 0);
+        const substitutionQty = order.subs?.[line.item_id]
+            ? Number(order.subs[line.item_id].qty || 0)
+            : 0;
+        return normalQty + substitutionQty >= Number(line.qty_need || 0);
+    });
+}
+
+function isItemFirstAllocationReady() {
+    if (!ITEM_FIRST || !orders.length) return false;
+
+    const activeOrders = orders.filter(order => order.decision !== 'skip');
+    if (!activeOrders.length || !activeOrders.every(isOrderFullyAllocated)) return false;
+
+    return buildSisaPool().every(item => Number(item.qty || 0) === 0);
+}
+
+function updateItemFirstAllocationUi() {
+    if (!ITEM_FIRST || !itemFirstAllocateBtn) return;
+
+    const hasItems = BATCH_POOL.some(item => Number(item.qty || 0) > 0);
+    const hasOrders = orders.length > 0;
+    const ready = isItemFirstAllocationReady();
+
+    itemFirstAllocateBtn.disabled = !hasItems || !hasOrders;
+    if (itemFirstAllocationHint) {
+        itemFirstAllocationHint.textContent = !hasOrders
+            ? 'Belum ada order yang tercatat.'
+            : ready
+                ? 'Semua item sudah dialokasikan. Anda bisa lanjut ke konfirmasi.'
+                : 'Klik tombol ini untuk membagi item batch ke order.';
+    }
+}
+
 function updateConfirmBtn() {
     if (ITEM_FIRST) {
-        const hasScannedItems = BATCH_POOL.some(item => Number(item.qty || 0) > 0);
+        const ready = isItemFirstAllocationReady();
+        updateItemFirstAllocationUi();
         if (topConfirmBtn) {
-            topConfirmBtn.disabled = !hasScannedItems;
-            topConfirmBtn.classList.toggle('active', hasScannedItems);
+            topConfirmBtn.disabled = !ready;
+            topConfirmBtn.classList.toggle('active', ready);
         }
         return;
     }
@@ -2669,6 +2804,25 @@ window.resetRekon = function () {
     });
 };
 
+itemFirstAllocateBtn?.addEventListener('click', async function () {
+    if (this.disabled) return;
+
+    this.disabled = true;
+    if (itemFirstAllocationHint) itemFirstAllocationHint.textContent = 'Sedang menyimpan alokasi item...';
+
+    try {
+        await recalculateAllocations();
+        renderAll();
+        toast('ok', isItemFirstAllocationReady()
+            ? 'Alokasi item berhasil disimpan.'
+            : 'Alokasi selesai, tetapi masih ada item/order yang belum lengkap.');
+    } catch (error) {
+        toast('err', error.message || 'Alokasi item gagal disimpan.');
+    } finally {
+        updateItemFirstAllocationUi();
+    }
+});
+
 topConfirmBtn?.addEventListener('click', function () {
     if (this.disabled) return;
     unlockAudio();
@@ -2699,7 +2853,7 @@ topConfirmBtn?.addEventListener('click', function () {
 
 /* ── init ── */
 window.addEventListener('load', async function () {
-    loadState();
+    await loadState();
     renderAll();
     if (!ITEM_FIRST) focusInput();
 });

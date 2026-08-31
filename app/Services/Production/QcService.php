@@ -169,12 +169,21 @@ class QcService
             // 0) WAREHOUSE SETUP
             // ===========================
             $wipSewWarehouseId = Warehouse::where('code', 'WIP-SEW')->value('id');
+            $destinationWarehouse = Warehouse::query()
+                ->whereIn('code', ['WH-RTS', 'WH-PRD'])
+                ->whereKey((int) ($payload['destination_warehouse_id'] ?? $sewingReturn->destination_warehouse_id))
+                ->first();
             $whPrdWarehouseId  = Warehouse::where('code', 'WH-PRD')->value('id');
             $rejSewWarehouseId = Warehouse::where('code', 'REJ-SEW')->value('id');
 
-            if (!$wipSewWarehouseId || !$whPrdWarehouseId || !$rejSewWarehouseId) {
-                throw new \RuntimeException('Warehouse WIP-SEW / WH-PRD / REJ-SEW belum dikonfigurasi.');
+            if (!$wipSewWarehouseId || !$destinationWarehouse || !$whPrdWarehouseId || !$rejSewWarehouseId) {
+                throw new \RuntimeException('Warehouse WIP-SEW / WH-PRD / WH-RTS / REJ-SEW belum dikonfigurasi.');
             }
+
+            // Simpan tujuan yang dipilih saat QC agar detail return dan proses
+            // berikutnya memakai gudang yang sama.
+            $sewingReturn->destination_warehouse_id = (int) $destinationWarehouse->id;
+            $sewingReturn->save();
 
             $returnLines = $sewingReturn->lines()
                 ->with('pickupLine')
@@ -354,7 +363,7 @@ class QcService
             // 2) INVENTORY MOVEMENT + COST
             // ===========================
             // - OUT: WIP-SEW (OK + Reject) pakai cost avg WIP-SEW
-            // - IN : WIP-FIN (OK) pakai cost yang sama
+            // - IN : tujuan QC (WH-PRD / WH-RTS) (OK) pakai cost yang sama
             // - IN : REJ-SEW (Reject) pakai cost yang sama
 
             // siapkan map unit_cost di WIP-SEW (atau REJ-SEW) per item
@@ -388,7 +397,7 @@ class QcService
                 }
             }
 
-            // 2.b IN ke WH-PRD (OK, per bundle)
+            // 2.b IN ke gudang tujuan QC (OK, per bundle)
             foreach ($okByBundleItem as $bundleId => $byItem) {
                 foreach ($byItem as $itemId => $qtyOkItem) {
                     if ($qtyOkItem <= 0) {
@@ -396,13 +405,13 @@ class QcService
                     }
 
                     $this->inventory->stockIn(
-                        warehouseId: $whPrdWarehouseId,
+                        warehouseId: $destinationWarehouse->id,
                         itemId: $itemId,
                         qty: $qtyOkItem,
                         date: $qcDate,
                         sourceType: 'sewing_qc_in',
                         sourceId: $sewingReturn->id,
-                        notes: "QC Sewing IN WH-PRD {$qtyOkItem} pcs untuk return {$sewingReturn->code} (bundle #{$bundleId})",
+                        notes: "QC Sewing IN {$destinationWarehouse->code} {$qtyOkItem} pcs untuk return {$sewingReturn->code} (bundle #{$bundleId})",
                         lotId: null,
                         unitCost: $unitCostWipSewPerItem[$itemId] ?? null,
                         affectLotCost: false,
@@ -470,7 +479,7 @@ class QcService
                     continue;
                 }
 
-                $bundle->wip_warehouse_id = (int) $whPrdWarehouseId;
+                $bundle->wip_warehouse_id = (int) $destinationWarehouse->id;
                 $bundle->wip_qty = (float) ($bundle->wip_qty ?? 0) + (float) $qtyOkBundle;
                 $bundle->save();
             }

@@ -326,6 +326,7 @@
     $hasMarketplaceFinancialStatement = $isOwner && $router->has('marketplace.reports.financial-statement');
     $hasMarketplaceFinancialClosing = $isOwner && $router->has('marketplace.reports.financial-closing');
     $hasMarketplaceFinancialQuality = $isOwner && $router->has('marketplace.reports.financial-quality');
+    $hasMarketplaceFinance = $router->has('marketplace.finance.index');
     $hasMarketplaceReconcileQueue = $router->has('marketplace.reconcile.queue');
     $hasMarketplaceReconcileItemsIndex = $router->has('marketplace.reconcile.items');
 
@@ -541,6 +542,7 @@
         request()->routeIs('marketplace.payout') ||
         request()->routeIs('marketplace.profit') ||
         request()->routeIs('marketplace.reports.*') ||
+        request()->routeIs('marketplace.finance.*') ||
         request()->routeIs('marketplace.ads') ||
         request()->routeIs('marketplace.analytics') ||
         request()->routeIs('marketplace.issues') ||
@@ -802,7 +804,7 @@
                         </li>
                     @endif
 
-                    @if ($isAdmin && ($hasMarketplaceIndex || $hasMarketplaceSalesReport || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex))
+                    @if ($isAdmin && ($hasMarketplaceIndex || $hasMarketplaceSalesReport || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex))
                         <div class="mobile-sidebar-section-label">Toko Online</div>
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}"
@@ -854,6 +856,13 @@
                                     <a href="{{ route('marketplace.reports.sales') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.sales') ? 'active' : '' }}">
                                         <span class="icon">📈</span><span>Ringkasan Penjualan</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasMarketplaceFinance)
+                                    <a href="{{ route('marketplace.finance.index') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.*') ? 'active' : '' }}">
+                                        <span class="icon">💳</span><span>Marketplace Finance</span>
                                     </a>
                                 @endif
 
@@ -1579,7 +1588,7 @@
                     @endif
 
                     {{-- SALES & MARKETPLACE --}}
-                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues || $hasImportMarketplaceIndex || $hasImportMarketplaceDraft || $hasImportMarketplaceIncomeIndex || $hasImportMarketplaceIncomeDraft)
+                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialQuality || $hasMarketplaceFinance || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues || $hasImportMarketplaceIndex || $hasImportMarketplaceDraft || $hasImportMarketplaceIncomeIndex || $hasImportMarketplaceIncomeDraft)
                     <div class="mobile-sidebar-section-label">Toko Online</div>
                     <li class="mb-1">
                         <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}"
@@ -1732,6 +1741,13 @@
                                 <a href="{{ route('marketplace.reports.financial-quality') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.financial-quality*') ? 'active' : '' }}">
                                     <span class="icon">✅</span><span>Audit Keuangan</span>
+                                </a>
+                            @endif
+
+                            @if ($hasMarketplaceFinance)
+                                <a href="{{ route('marketplace.finance.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.*') ? 'active' : '' }}">
+                                    <span class="icon">💳</span><span>Marketplace Finance</span>
                                 </a>
                             @endif
 

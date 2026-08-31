@@ -9,6 +9,7 @@ use App\Models\InventoryAdjustment;
 use App\Models\InventoryAdjustmentLine;
 use App\Models\QcResult;
 use App\Models\SewingReturn;
+use App\Models\Warehouse;
 use App\Services\Accounting\JournalService;
 use App\Services\Production\CuttingService;
 use App\Services\Production\QcService;
@@ -18,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class QcController extends Controller
 {
@@ -770,13 +772,23 @@ class QcController extends Controller
         $loginOperator = Auth::user()->employee ?? null;
         $hasQcSewing   = $existingQc->isNotEmpty();
         $filterItems   = collect($filterItems)->values();
+        $destinationWarehouses = Warehouse::query()
+            ->whereIn('code', ['WH-PRD', 'WH-RTS'])
+            ->orderByRaw("CASE code WHEN 'WH-PRD' THEN 1 WHEN 'WH-RTS' THEN 2 ELSE 3 END")
+            ->get(['id', 'code', 'name']);
+
+        $defaultDestinationWarehouseId = $destinationWarehouses
+            ->firstWhere('id', (int) $sewingReturn->destination_warehouse_id)?->id
+            ?? $destinationWarehouses->first()?->id;
 
         return view('production.qc.sewing_edit', compact(
             'sewingReturn',
             'rows',
             'loginOperator',
             'hasQcSewing',
-            'filterItems'
+            'filterItems',
+            'destinationWarehouses',
+            'defaultDestinationWarehouseId'
         ));
     }
 
@@ -788,6 +800,13 @@ class QcController extends Controller
         $validated = $request->validate([
             'qc_date'                 => ['required', 'date'],
             'operator_id'             => ['nullable', 'exists:employees,id'],
+            'destination_warehouse_id' => [
+                'required',
+                'integer',
+                Rule::exists('warehouses', 'id')->where(
+                    fn ($query) => $query->whereIn('code', ['WH-RTS', 'WH-PRD'])
+                ),
+            ],
             'results'                 => ['required', 'array', 'min:1'],
             'results.*.sewing_return_line_id' => ['nullable', 'exists:sewing_return_lines,id'],
             'results.*.bundle_id'     => ['required', 'exists:cutting_job_bundles,id'],
@@ -834,9 +853,11 @@ class QcController extends Controller
                 ->with('error', 'QC Jahit gagal: ' . $e->getMessage());
         }
 
+        $destinationCode = $sewingReturn->fresh('destinationWarehouse')->destinationWarehouse?->code ?? 'WH-PRD';
+
         return redirect()
             ->route('production.qc.index', ['stage' => 'sewing'])
-            ->with('success', "QC Jahit berhasil disimpan. Stok {$sewingReturn->warehouse?->code} → WH-PRD & REJ-SEW sudah diperbarui.");
+            ->with('success', "QC Jahit berhasil disimpan. Stok {$sewingReturn->warehouse?->code} → {$destinationCode} & REJ-SEW sudah diperbarui.");
     }
 
     public function overproductionCuttingBundle(Request $request, CuttingJob $cuttingJob, CuttingJobBundle $bundle)

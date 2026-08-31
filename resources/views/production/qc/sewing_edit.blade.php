@@ -533,6 +533,10 @@
     $totalIn = 0;
     $totalOk = 0;
     $totalReject = 0;
+    $destinationWarehouses = $destinationWarehouses ?? collect();
+    $defaultDestinationWarehouseId = (int) ($defaultDestinationWarehouseId ?? 0);
+    $selectedDestinationWarehouseId = (int) old('destination_warehouse_id', $defaultDestinationWarehouseId);
+    $selectedDestinationWarehouse = $destinationWarehouses->firstWhere('id', $selectedDestinationWarehouseId);
 
     foreach ($rows as $idx => $row) {
         $totalIn += (float) $row['qty_max'];
@@ -602,13 +606,31 @@
                                 <div class="text-muted small mt-1">Employee: {{ $loginOperator->name }}</div>
                             @endif
                         </div>
-                        <div class="col-lg-3 d-none d-lg-block">
+                        <div class="col-12 col-lg-3">
+                            <label class="form-label form-label-sm">Gudang OK setelah QC</label>
+                            <select name="destination_warehouse_id"
+                                    id="destination-warehouse"
+                                    class="form-select form-select-sm @error('destination_warehouse_id') is-invalid @enderror"
+                                    required>
+                                @foreach ($destinationWarehouses as $warehouse)
+                                    <option value="{{ $warehouse->id }}"
+                                            data-code="{{ $warehouse->code }}"
+                                            @selected($selectedDestinationWarehouseId === (int) $warehouse->id)>
+                                        {{ $warehouse->code }} — {{ $warehouse->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('destination_warehouse_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-lg-2 d-none d-lg-block">
                             <label class="form-label form-label-sm">Status QC</label>
                             <div class="form-control form-control-sm mono" style="background: rgba(148,163,184,.1);">
                                 {{ $statusLabel }}
                             </div>
                         </div>
-                        <div class="col-lg-4 d-none d-lg-block text-end">
+                        <div class="col-lg-2 d-none d-lg-block text-end">
                             <label class="form-label form-label-sm">Tanggal Setor</label>
                             <div class="form-control form-control-sm mono" style="background: rgba(148,163,184,.1);">
                                 {{ $sewingReturn->date?->format('d/m/Y') ?? '-' }}
@@ -738,7 +760,7 @@
                 <div class="modal-body" style="padding:1.25rem;">
                     <div style="background:rgba(59,130,246,.08); border:1px solid rgba(59,130,246,.2); border-radius:8px; padding:.75rem; margin-bottom:1rem; font-size:.8rem; color:#1e3a8a;">
                         <strong style="display:block; margin-bottom:.3rem;">Informasi Perpindahan Stok:</strong>
-                        <div style="display:flex; align-items:center; gap:.4rem;"><span style="color:#16a34a; font-weight:800; min-width:48px;">● OK</span> ➔ Masuk ke gudang <b>WH-PRD</b></div>
+                        <div style="display:flex; align-items:center; gap:.4rem;"><span style="color:#16a34a; font-weight:800; min-width:48px;">● OK</span> ➔ Masuk ke gudang <b id="confirm-destination-code">{{ $selectedDestinationWarehouse?->code ?? 'WH-PRD' }}</b></div>
                         <div style="display:flex; align-items:center; gap:.4rem; margin-top:.15rem;"><span style="color:#dc2626; font-weight:800; min-width:48px;">● Reject</span> ➔ Masuk ke gudang <b>REJ-SEW</b></div>
                     </div>
                     <p class="text-muted" style="font-size:.85rem; margin-bottom:.75rem;">Ringkasan hasil QC yang akan disimpan:</p>
@@ -848,9 +870,22 @@
     const confirmQcModal = new bootstrap.Modal(document.getElementById('confirmQcModal'));
     const confirmSummary = document.getElementById('confirmSummary');
     const form = document.getElementById('sewing-qc-form');
+    const destinationWarehouse = document.getElementById('destination-warehouse');
+
+    function syncDestinationLabel() {
+        const option = destinationWarehouse?.options[destinationWarehouse.selectedIndex];
+        const code = option?.dataset?.code || 'WH-PRD';
+        const confirmationCode = document.getElementById('confirm-destination-code');
+        if (confirmationCode) confirmationCode.textContent = code;
+        document.querySelectorAll('.summary-destination-code').forEach(el => el.textContent = code);
+    }
+
+    destinationWarehouse?.addEventListener('change', syncDestinationLabel);
+    syncDestinationLabel();
     
     if (btnShowConfirm) {
         btnShowConfirm.addEventListener('click', function() {
+            const destinationCode = destinationWarehouse?.options[destinationWarehouse.selectedIndex]?.dataset?.code || 'WH-PRD';
             const itemsMap = {};
             document.querySelectorAll('.fin-item').forEach(el => {
                 const itemName = el.querySelector('.code').textContent.trim();
@@ -874,7 +909,7 @@
                         <div style="display:flex; gap:.6rem; font-size:.8rem; font-family:monospace; flex-wrap:wrap; margin-top:.45rem;">
                             <div style="display:flex; flex-direction:column; gap:.15rem;">
                                 <span style="color:#16a34a; font-weight:700; background:rgba(22,163,74,.1); padding:.15rem .45rem; border-radius:6px; border:1px solid rgba(22,163,74,.2);">OK: ${fmt(data.ok)}</span>
-                                <span style="font-size:.65rem; color:var(--muted); text-align:center; font-family:var(--bs-body-font-family); letter-spacing:-.02em;">➔ WH-PRD</span>
+                                <span style="font-size:.65rem; color:var(--muted); text-align:center; font-family:var(--bs-body-font-family); letter-spacing:-.02em;">➔ ${destinationCode}</span>
                             </div>
                             ${data.rjJahit > 0 ? `<div style="display:flex; flex-direction:column; gap:.15rem;">
                                 <span style="color:#b91c1c; font-weight:700; background:rgba(185,28,28,.1); padding:.15rem .45rem; border-radius:6px; border:1px solid rgba(185,28,28,.2);">Rj Jahit: ${fmt(data.rjJahit)}</span>

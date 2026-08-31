@@ -248,6 +248,26 @@
             text-align: right
         }
 
+        .pw-category-summary {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(148, 163, 184, .18)
+        }
+
+        .pw-category-summary-heading {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: .75rem;
+            margin-bottom: .35rem
+        }
+
+        .pw-category-table tfoot th {
+            color: var(--text);
+            font-weight: 850;
+            border-top: 2px solid rgba(148, 163, 184, .28)
+        }
+
         .pw-daily-status-form {
             display: flex;
             align-items: center;
@@ -465,6 +485,11 @@
             .pw-summary-total {
                 align-items: flex-start
             }
+
+            .pw-category-summary-heading {
+                flex-direction: column;
+                gap: .15rem
+            }
         }
     </style>
 @endpush
@@ -632,6 +657,57 @@
                             </tbody>
                         </table>
                     </div>
+
+                    @if ($module !== 'daily' && $summaryByCategory->isNotEmpty())
+                        <div class="pw-category-summary">
+                            <div class="pw-category-summary-heading">
+                                <div style="font-weight:900">Ringkasan per Kategori</div>
+                                <div class="pw-sub">Total qty dan amount berdasarkan kategori item</div>
+                            </div>
+                            <div class="pw-table-wrap">
+                                <table class="pw-table pw-category-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Kategori</th>
+                                            <th class="pw-right">Total Qty</th>
+                                            <th class="pw-right">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($summaryByCategory as $categorySummary)
+                                            <tr>
+                                                <td>
+                                                    <div style="font-weight:750">
+                                                        {{ $categorySummary['category_name'] ?: ($categorySummary['category_code'] ?: 'Tanpa Kategori') }}
+                                                    </div>
+                                                    @if ($categorySummary['category_code'] && $categorySummary['category_name'])
+                                                        <div class="pw-sub">{{ $categorySummary['category_code'] }}</div>
+                                                    @endif
+                                                </td>
+                                                <td class="pw-right">
+                                                    {{ rtrim(rtrim(number_format((float) $categorySummary['total_qty'], 2, '.', ''), '0'), '.') }}
+                                                </td>
+                                                <td class="pw-right" style="font-weight:800">
+                                                    {{ number_format((float) $categorySummary['total_amount'], 0, ',', '.') }}
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <th>Total</th>
+                                            <th class="pw-right">
+                                                {{ rtrim(rtrim(number_format((float) $grandTotalQty, 2, '.', ''), '0'), '.') }}
+                                            </th>
+                                            <th class="pw-right">
+                                                {{ number_format((float) $grandTotalAmount, 0, ',', '.') }}
+                                            </th>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    @endif
 
                     @if (!empty($allowSlipAll))
                         <div class="pw-row" style="margin-top:.75rem">

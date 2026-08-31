@@ -793,7 +793,9 @@
     let audioCtx = null;
 
     function normalize(value) {
-        return String(value || '').trim().toUpperCase();
+        const normalized = String(value ?? '').trim();
+        if (!normalized || ['undefined', 'null', 'nan'].includes(normalized.toLowerCase())) return '';
+        return normalized.toUpperCase();
     }
 
     function isNextOrderCommand(code) {
@@ -1434,7 +1436,8 @@
             if (!response.ok) throw new Error(payload.message || 'Gagal mencatat nomor order');
             return payload;
         }).then(payload => {
-            const orderCode = normalize(payload.order?.code || code);
+            const orderCode = normalize(payload.order?.code || payload.order?.order_no || code);
+            if (!orderCode) throw new Error('Nomor order tidak tersedia. Scan ulang nomor order tersebut.');
             ensureOrder(orderCode, { label: payload.order?.label || 'Pencatatan order' });
             playTone(payload.created ? 'order' : 'orderRepeat');
             toast('ok', payload.message || `Order ${orderCode} tercatat`);
