@@ -115,6 +115,17 @@
         .cbr-row-num.neg { color: #b91c1c; }
         .cbr-empty { color: #64748b; padding: 1.8rem 1rem; text-align: center; }
         .cbr-table-wrap { overflow: auto; -webkit-overflow-scrolling: touch; }
+        .cbr-grid-2 > .cbr-table-wrap { min-width: 0; overflow-x: hidden; }
+        .cbr-grid-2 .gf-clean-table {
+            width: 100%; min-width: 0; table-layout: fixed;
+        }
+        .cbr-grid-2 .gf-clean-table th:first-child,
+        .cbr-grid-2 .gf-clean-table td:first-child { width: 64%; }
+        .cbr-grid-2 .gf-clean-table th:last-child,
+        .cbr-grid-2 .gf-clean-table td:last-child {
+            width: 36%; white-space: nowrap;
+        }
+        .cbr-grid-2 .cbr-row-title { overflow-wrap: anywhere; }
         .cbr-click-row { cursor: pointer; }
         .cbr-click-row:hover td { background: #f8fafc; }
         .cbr-status {
