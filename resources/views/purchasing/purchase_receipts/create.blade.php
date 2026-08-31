@@ -1014,16 +1014,10 @@
     function onCheckboxChange(cb) {
         const row    = cb.closest('tr');
         if (!row) return;
-        const limit  = getLimit(row);
         const inpRec = row.querySelector('.qty-received-input');
         const inpRej = row.querySelector('.qty-reject-input');
 
-        if (cb.checked) {
-            if (!inpRec.value && !inpRej.value && limit > 0) {
-                inpRec.value = limit.toFixed(2);
-                inpRej.value = '0.00';
-            }
-        } else {
+        if (!cb.checked) {
             inpRec.value = '';
             inpRej.value = '';
             inpRec.classList.remove('is-invalid');
@@ -1166,14 +1160,21 @@
 
     /* ── "Terima Semua" ── */
     function receiveAll() {
-        const unchecked = visibleRows().filter(r => {
-            const cb = r.querySelector('.line-check');
-            return cb && !cb.checked && !cb.disabled;
-        });
-        unchecked.forEach(row => {
+        visibleRows().forEach(row => {
             const cb = row.querySelector('.line-check');
-            if (cb) { cb.checked = true; onCheckboxChange(cb); }
+            if (!cb || cb.disabled) return;
+
+            const limit = getLimit(row);
+            const inpRec = row.querySelector('.qty-received-input');
+            const inpRej = row.querySelector('.qty-reject-input');
+            cb.checked = true;
+            if (inpRec) inpRec.value = limit > 0 ? limit.toFixed(2) : '';
+            // Full receipt bukan reject; biarkan field reject kosong.
+            if (inpRej) inpRej.value = '';
+            updateRowStockPreview(row);
         });
+
+        recalcTotal();
         // open confirm directly
         openConfirm();
     }
