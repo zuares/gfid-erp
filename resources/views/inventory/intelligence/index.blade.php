@@ -418,6 +418,8 @@
             const SLIP_URL = @json(route('inventory.intelligence.slip'));
             const EXPORT_URL = @json(route('inventory.intelligence.export'));
             const LEAD_TIME_URL = @json(route('inventory.intelligence.lead_time'));
+            const PR_DRAFT_URL = @json(route('inventory.intelligence.request_pr_draft'));
+            const PR_ALLOCATE_URL = @json(route('purchasing.purchase_requests.allocate_suppliers', 'DRAFT_ID'));
             const SERVER_INITIAL = @json($initialTab);
             const TAB_DESC = @json($tabDesc);
             let selectedProductionDays = Number(@json($filters['production_days'] ?? 30)) || 30;
@@ -692,6 +694,87 @@
                 if (total) total.textContent = idFmt(visibleSuggested);
                 const empty = root.querySelector('[data-ii-empty]');
                 if (empty) empty.hidden = (shown !== 0) || rows.length === 0;
+                updatePrSelectionState(root);
+            }
+
+            function selectedPrLines(root) {
+                return Array.from(root?.querySelectorAll('[data-ii-pr-checkbox]:checked') || [])
+                    .filter(input => !input.closest('[data-ii-row]')?.hidden)
+                    .map(input => ({ item_id: input.dataset.itemId, qty: input.dataset.qty }));
+            }
+
+            function updatePrSelectionState(root) {
+                const toolbar = root?.querySelector('[data-ii-pr-toolbar]');
+                if (!toolbar) return;
+
+                const checkboxes = Array.from(root.querySelectorAll('[data-ii-pr-checkbox]'));
+                const selected = selectedPrLines(root);
+                const visible = checkboxes.filter(input => !input.closest('[data-ii-row]')?.hidden);
+                const selectAll = toolbar.querySelector('[data-ii-pr-select-all]');
+                const count = toolbar.querySelector('[data-ii-pr-count]');
+                const create = toolbar.querySelector('[data-ii-pr-create-bulk]');
+
+                if (count) count.textContent = selected.length + ' item dipilih';
+                if (create) create.disabled = selected.length === 0;
+                if (selectAll) {
+                    selectAll.checked = visible.length > 0 && visible.every(input => input.checked);
+                    selectAll.indeterminate = visible.some(input => input.checked) && !selectAll.checked;
+                }
+            }
+
+            function prLink(url) {
+                return '<a href="' + url + '" target="_blank" rel="noopener" class="btn btn-sm btn-ship-outline btn-pill">Pilih supplier</a>';
+            }
+
+            async function createPurchaseRequest(root, lines, trigger, rowButtons = []) {
+                if (!lines.length || !trigger) return;
+
+                const originalText = trigger.innerHTML;
+                trigger.disabled = true;
+                trigger.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Memproses…';
+
+                try {
+                    const response = await fetch(PR_DRAFT_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        },
+                        body: JSON.stringify({ lines }),
+                    });
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok || !payload.success) {
+                        throw new Error(payload.message || 'Gagal membuat draft PR.');
+                    }
+
+                    const showUrl = PR_ALLOCATE_URL.replace('DRAFT_ID', payload.pr_draft_id);
+                    rowButtons.forEach(button => {
+                        button.outerHTML = prLink(showUrl);
+                    });
+                    root.querySelectorAll('[data-ii-pr-checkbox]:checked').forEach(input => {
+                        input.checked = false;
+                        input.disabled = true;
+                    });
+
+                    const openDraft = root.querySelector('[data-ii-pr-open]');
+                    if (openDraft) {
+                        openDraft.href = showUrl;
+                        openDraft.hidden = false;
+                    }
+                    updatePrSelectionState(root);
+                    if (typeof Toast !== 'undefined') {
+                        Toast.fire({ icon: 'success', title: payload.message || 'Draft PR berhasil dibuat.' });
+                    }
+                    window.open(showUrl, '_blank', 'noopener');
+                } catch (error) {
+                    alert(error.message || 'Gagal menghubungi server.');
+                } finally {
+                    if (document.body.contains(trigger)) {
+                        trigger.disabled = false;
+                        trigger.innerHTML = originalText;
+                    }
+                }
             }
 
             const II_SEL = '[data-ii-search],[data-ii-status],[data-ii-sort],[data-ii-action-filter],[data-ii-procurement-filter]';
@@ -700,6 +783,21 @@
                 applyTableFilter(e.target.closest('[data-tab-panel]'));
             });
             document.addEventListener('change', (e) => {
+                const prSelectAll = e.target.closest('[data-ii-pr-select-all]');
+                if (prSelectAll) {
+                    const root = prSelectAll.closest('[data-tab-panel]');
+                    root?.querySelectorAll('[data-ii-pr-checkbox]').forEach(input => {
+                        if (!input.closest('[data-ii-row]')?.hidden && !input.disabled) {
+                            input.checked = prSelectAll.checked;
+                        }
+                    });
+                    updatePrSelectionState(root);
+                    return;
+                }
+                if (e.target.closest('[data-ii-pr-checkbox]')) {
+                    updatePrSelectionState(e.target.closest('[data-tab-panel]'));
+                    return;
+                }
                 if (e.target.matches('[data-ii-production-days]')) {
                     selectedProductionDays = Number(e.target.value) === 60 ? 60 : 30;
                     applyFilters();
@@ -760,6 +858,32 @@
                 }
                 const r = e.target.closest('[data-ii-retry]');
                 if (r) loadTab(r.dataset.iiRetry, { force: true });
+
+                const rowPrButton = e.target.closest('[data-ii-pr-create]');
+                if (rowPrButton) {
+                    e.preventDefault();
+                    const root = rowPrButton.closest('[data-tab-panel]');
+                    createPurchaseRequest(root, [{
+                        item_id: rowPrButton.dataset.itemId,
+                        qty: rowPrButton.dataset.qty,
+                    }], rowPrButton, [rowPrButton]);
+                    return;
+                }
+
+                const bulkPrButton = e.target.closest('[data-ii-pr-create-bulk]');
+                if (bulkPrButton) {
+                    e.preventDefault();
+                    const root = bulkPrButton.closest('[data-tab-panel]');
+                    const selected = Array.from(root?.querySelectorAll('[data-ii-pr-checkbox]:checked') || [])
+                        .filter(input => !input.closest('[data-ii-row]')?.hidden);
+                    createPurchaseRequest(
+                        root,
+                        selected.map(input => ({ item_id: input.dataset.itemId, qty: input.dataset.qty })),
+                        bulkPrButton,
+                        selected.map(input => input.closest('[data-tab-panel] [data-ii-pr-create]'))
+                            .filter(Boolean),
+                    );
+                }
             });
 
             // ---- Tren Permintaan: grafik garis detail per SKU (Chart.js) ----

@@ -24,6 +24,7 @@
         'sehat' => 'Sehat',
         'no_demand' => 'Tanpa demand',
     ];
+    $hasSuggestions = $rows->contains(fn ($r) => (float) ($r->suggested_qty ?? 0) > 0);
 @endphp
 
 <div class="row g-2 mb-3">
@@ -102,6 +103,26 @@
     </div>
 </div>
 
+@if ($hasSuggestions)
+    <div class="card-main mb-3 p-3" data-ii-pr-toolbar>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <label class="d-flex align-items-center gap-2 mb-0 text-muted-ii small" style="cursor:pointer;">
+                <input type="checkbox" class="form-check-input" data-ii-pr-select-all>
+                <span data-ii-pr-count>0 item dipilih</span>
+            </label>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted-ii small d-none d-md-inline">Gunakan saran pengadaan sebagai qty PR.</span>
+                <button type="button" class="btn btn-sm btn-ship-primary btn-pill" data-ii-pr-create-bulk disabled>
+                    <i class="bi bi-cart-plus me-1"></i>Buat PR
+                </button>
+                <a href="#" class="btn btn-sm btn-ship-outline btn-pill" data-ii-pr-open hidden target="_blank" rel="noopener">
+                    Pilih supplier
+                </a>
+            </div>
+        </div>
+    </div>
+@endif
+
 <div class="card-main">
 
     @if ($rows->isEmpty())
@@ -111,12 +132,18 @@
             <table class="table table-hover align-middle table-list" data-ii-table id="table-procurement" data-ii-default-sort="ads" data-ii-default-dir="desc">
                 <thead style="background: rgba(241, 245, 249, 0.5);">
                     <tr>
+                        @if ($hasSuggestions)
+                            <th style="width: 42px; padding-left: 1.25rem;"><span class="visually-hidden">Pilih</span></th>
+                        @endif
                         <th data-ii-sort-key="sku" data-ii-sort-type="text" style="padding-left: 1.25rem;">SKU & Produk</th>
                         <th class="text-end">Lead Time</th>
                         <th data-ii-sort-key="stock" data-ii-sort-type="number" class="text-end">Stok Tersedia</th>
                         <th data-ii-sort-key="ads" data-ii-sort-type="number" class="text-end">Jual / Hari</th>
                         <th data-ii-sort-key="forecast" data-ii-sort-type="number" class="text-end" title="Forecast {{ $procurementDays }} hari ditambah lead time supplier">Forecast</th>
-                        <th data-ii-sort-key="suggested" data-ii-sort-type="number" class="text-end" style="padding-right: 1.25rem; width: 140px;">Saran Pengadaan</th>
+                        <th data-ii-sort-key="suggested" data-ii-sort-type="number" class="text-end" style="width: 170px;">Saran Pengadaan</th>
+                        @if ($hasSuggestions)
+                            <th class="text-end" style="padding-right: 1.25rem; width: 130px;">Tindak lanjut</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody>
@@ -133,7 +160,15 @@
                             data-forecast="{{ $r->procurement_forecast }}"
                             data-score="{{ $r->eval_score }}"
                             data-suggested="{{ $r->suggested_qty }}">
-                            
+                            @if ($hasSuggestions)
+                                <td style="padding-left: 1.25rem;">
+                                    @if ($r->suggested_qty > 0)
+                                        <input type="checkbox" class="form-check-input" data-ii-pr-checkbox
+                                            data-item-id="{{ $r->item_id }}" data-qty="{{ $r->suggested_qty }}"
+                                            aria-label="Pilih {{ $r->sku }} untuk PR">
+                                    @endif
+                                </td>
+                            @endif
                             <td style="padding-left: 1.25rem;">
                                 <span class="fw-semibold">{{ $r->sku }}</span>
                                 <div class="text-muted-ii" style="font-size: .7rem;">{{ $r->product }}</div>
@@ -178,19 +213,35 @@
                                 <div>{{ $fmt($r->procurement_forecast) }}</div>
                                 <div style="font-size:.62rem;">{{ $r->procurement_effective_days }} hari</div>
                             </td>
-                            <td class="text-end fw-bold" style="padding-right: 1.25rem; color: #059669;">
+                            <td class="text-end fw-bold" style="color: #059669;">
                                 <div>{{ $fmt($r->suggested_qty) }} pcs</div>
                                 <div class="text-muted-ii" style="font-size:.65rem;">{{ $fmtRp($r->suggested_value) }}</div>
                             </td>
+                            @if ($hasSuggestions)
+                                <td class="text-end" style="padding-right: 1.25rem;">
+                                    @if ($r->suggested_qty > 0)
+                                        <button type="button" class="btn btn-sm btn-ship-outline btn-pill"
+                                            data-ii-pr-create data-item-id="{{ $r->item_id }}"
+                                            data-qty="{{ $r->suggested_qty }}" title="Buat Purchase Request">
+                                            Buat PR
+                                        </button>
+                                    @else
+                                        <span class="text-muted-ii" style="font-size:.7rem;">Belum perlu</span>
+                                    @endif
+                                </td>
+                            @endif
                         </tr>
                     @endforeach
                 </tbody>
                 <tfoot>
                     <tr class="fw-semibold">
-                        <td colspan="5" class="text-end">Total saran pengadaan</td>
+                        <td colspan="{{ $hasSuggestions ? 6 : 5 }}" class="text-end">Total saran pengadaan</td>
                         <td class="text-end" style="padding-right: 1.25rem; color: #059669;">
                             <b data-ii-filtered-total>{{ $fmt($totalSuggested) }}</b>
                         </td>
+                        @if ($hasSuggestions)
+                            <td></td>
+                        @endif
                     </tr>
                 </tfoot>
             </table>

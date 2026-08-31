@@ -48,6 +48,10 @@ Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
         Route::post('intelligence/lead-time', [InventoryIntelligenceController::class, 'updateLeadTime'])
             ->middleware('role:owner,admin')
             ->name('intelligence.lead_time');
+        // Reuse the warehouse intelligence flow so both pages append to the
+        // user's active PR draft and continue to supplier allocation.
+        Route::post('intelligence/request-pr-draft', [WarehouseIntelligenceController::class, 'requestPrDraft'])
+            ->name('intelligence.request_pr_draft');
 
         // ================== WAREHOUSE INTELLIGENCE ==================
         Route::get('warehouse-intelligence', [WarehouseIntelligenceController::class, 'index'])

@@ -2,8 +2,10 @@
 
 use App\Models\InventoryStock;
 use App\Models\Item;
+use App\Models\PurchaseRequest;
 use App\Models\Supplier;
 use App\Models\SupplierItem;
+use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Inventory\InventoryIntelligenceService;
 use Carbon\Carbon;
@@ -148,4 +150,33 @@ it('extends procurement forecast to the manually configured supplier lead time',
         ->and($row->procurement_effective_days)->toBe(120)
         ->and($row->procurement_forecast)->toBe(240.0)
         ->and($row->procurement_suggested_qty)->toBe(230.0);
+});
+
+it('creates a purchase request draft from inventory intelligence suggestions', function () {
+    $user = User::factory()->create([
+        'employee_code' => 'OWNER-PR-TEST',
+        'role' => 'owner',
+    ]);
+    $item = Item::create([
+        'code' => 'FOB-PR-TEST',
+        'name' => 'FOB PR Test',
+        'unit' => 'pcs',
+        'type' => 'finished_good',
+        'production_source' => Item::PRODUCTION_BUY,
+        'active' => true,
+    ]);
+
+    $response = $this->actingAs($user)->postJson(
+        route('inventory.intelligence.request_pr_draft'),
+        ['lines' => [['item_id' => $item->id, 'qty' => 12]]],
+    );
+
+    $response->assertOk()
+        ->assertJsonPath('success', true);
+
+    $draft = PurchaseRequest::query()->where('requested_by', $user->id)->latest('id')->first();
+
+    expect($draft)->not->toBeNull()
+        ->and($draft->status)->toBe('draft')
+        ->and((float) $draft->lines()->where('item_id', $item->id)->value('qty'))->toBe(12.0);
 });
