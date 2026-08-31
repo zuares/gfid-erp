@@ -13,8 +13,11 @@
 .sd-btn{font-weight:800;cursor:pointer}.sd-btn:disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
 .sd-btn:hover{background:rgba(148,163,184,.09);color:#111827;text-decoration:none}
 .sd-primary{background:#334155!important;border-color:#334155!important;color:#fff!important}
+.sd-link{color:#1d4ed8;border-color:rgba(37,99,235,.35);background:rgba(239,246,255,.7)}
+.sd-link:hover{color:#1e40af;background:rgba(219,234,254,.9)}
 .sd-danger{color:#991b1b;border-color:rgba(153,27,27,.25);background:transparent}
 .sd-status{font-weight:850;color:#334155;background:rgba(148,163,184,.08)}
+.sd-flash{max-width:1040px;margin:.65rem auto 0;padding:.65rem .8rem;border:1px solid rgba(37,99,235,.2);border-radius:8px;background:#eff6ff;color:#1e40af;font-size:.78rem;font-weight:700}
 .sd-card{background:var(--card,#fff);border:1px solid rgba(148,163,184,.18);border-radius:8px;overflow:hidden;margin-bottom:.65rem}
 .sd-muted{color:#64748b;font-size:.8rem}
 .sd-head{display:flex;align-items:center;gap:.55rem;justify-content:space-between;padding:.7rem .85rem;border-bottom:1px solid rgba(148,163,184,.12)}
@@ -158,6 +161,14 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
         <a href="{{ route('sales.shipments.rekon', $shipment) }}" class="sd-btn sd-topbar-nav">
             <i class="bi bi-diagram-3" aria-hidden="true"></i> Rekonsiliasi
         </a>
+        @if($statusKey === 'draft')
+            <form class="sd-inline-form" action="{{ route('sales.shipments.rekon_auto_link', $shipment) }}" method="POST">
+                @csrf
+                <button type="submit" class="sd-btn sd-link sd-topbar-nav" title="Cari ulang AWB, nomor order, dan Booking SN lalu simpan tautannya">
+                    <i class="bi bi-link-45deg" aria-hidden="true"></i> Tautkan Otomatis
+                </button>
+            </form>
+        @endif
     @endif
     <span class="sd-code">{{ $shipment->code }}</span>
     @if($isDaily && $currentWave)
@@ -190,6 +201,10 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
         <a href="{{ route('sales.shipments.show', $shipment) }}" class="sd-btn sd-primary sd-topbar-primary">Lihat Detail</a>
     @endif
 </div>
+
+@if(session('message'))
+    <div class="sd-flash" role="status">{{ session('message') }}</div>
+@endif
 
 <div class="sd-wrap">
 
@@ -289,6 +304,24 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                             @php
                                 $scanStatus = $scan->status ?: 'pending';
                                 $scanIsUnlinked = empty($scan->fulfillment_id);
+                                $matchMethod = $scan->match_method ?: data_get($scan->raw_payload, 'match_method');
+                                $matchReason = $scan->match_reason ?: data_get($scan->raw_payload, 'match_reason') ?: data_get($scan->raw_payload, 'lookup_status');
+                                $matchMethodLabel = match ($matchMethod) {
+                                    'awb' => 'AWB order',
+                                    'awb_booking' => 'AWB booking',
+                                    'booking_sn' => 'Booking SN',
+                                    'order_no' => 'No. pesanan',
+                                    default => null,
+                                };
+                                $matchReasonLabel = match ($matchReason) {
+                                    'order_not_found' => 'Order belum ada di database marketplace',
+                                    'empty_scan_code' => 'Kode scan kosong',
+                                    'duplicate_active_shipment' => 'Order sedang ada di shipment aktif lain',
+                                    'fulfillment_cancelled' => 'Fulfillment sudah dibatalkan',
+                                    default => str_starts_with((string) $matchReason, 'status_')
+                                        ? 'Status marketplace tidak termasuk status aktif'
+                                        : null,
+                                };
                                 $scanLabel = $scanStatus === 'skip'
                                     ? 'Diabaikan'
                                     : ($scanIsUnlinked ? 'Belum Tertaut' : 'Tertaut');
@@ -300,7 +333,10 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                     <span class="sd-order-num">{{ $loop->iteration }}</span>
                                     <div>
                                         <div class="sd-order-no">{{ $scan->order_no }}</div>
-                                        <div class="sd-muted">{{ $scanIsUnlinked ? 'Belum tertaut ke marketplace/fulfillment' : ($scan->source ?: 'Tertaut') }}@if($scan->confirmed_at) · {{ $scan->confirmed_at->format('d M Y H:i') }}@endif</div>
+                                        <div class="sd-muted">{{ $scanIsUnlinked ? 'Belum tertaut ke marketplace/fulfillment' : ($matchMethodLabel ? 'Tertaut via ' . $matchMethodLabel : ($scan->source ?: 'Tertaut')) }}@if($scan->confirmed_at) · {{ $scan->confirmed_at->format('d M Y H:i') }}@endif</div>
+                                        @if($scanIsUnlinked && $matchReasonLabel)
+                                            <div class="sd-muted" title="{{ $matchReason }}">Alasan: {{ $matchReasonLabel }}</div>
+                                        @endif
                                     </div>
                                     <span class="sd-order-qty">x{{ number_format($orderQty, 0, ',', '.') }}</span>
                                 </div>

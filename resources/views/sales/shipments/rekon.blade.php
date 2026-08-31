@@ -1253,6 +1253,28 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
     background: #e2e8f0 !important;
     border-color: #cbd5e1 !important;
 }
+.rk-auto-link-form { display: inline-flex; margin: 0; }
+.rk-auto-link-btn {
+    color: #1d4ed8 !important;
+    background: #eff6ff !important;
+    border-color: #93c5fd !important;
+    font-weight: 800;
+}
+.rk-auto-link-btn:hover {
+    color: #1e40af !important;
+    background: #dbeafe !important;
+}
+.rk-auto-link-flash {
+    max-width: 1000px;
+    margin: .65rem auto 0;
+    padding: .65rem .8rem;
+    border: 1px solid rgba(37,99,235,.2);
+    border-radius: 8px;
+    background: #eff6ff;
+    color: #1e40af;
+    font-size: .78rem;
+    font-weight: 700;
+}
 .rk-act-btn.fulfill,
 .rk-act-btn.fulfill:hover,
 .rk-act-btn.fulfill.on {
@@ -1296,6 +1318,14 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
             📦 List Order
         </a>
     @endif
+    @if (($shipment->status ?? 'draft') === 'draft')
+        <form class="rk-auto-link-form" action="{{ route('sales.shipments.rekon_auto_link', $shipment) }}" method="POST">
+            @csrf
+            <button type="submit" class="btn-shp-outline btn-sm rk-auto-link-btn" title="Cari ulang AWB, nomor order, dan Booking SN lalu simpan tautannya">
+                <i class="bi bi-link-45deg" aria-hidden="true"></i> Tautkan Otomatis
+            </button>
+        </form>
+    @endif
     <span class="shp-topbar-code">{{ $shipment->code }}</span>
     <span class="shp-badge shp-badge-draft">Draft</span>
     <span class="shp-topbar-spacer"></span>
@@ -1308,6 +1338,10 @@ body[data-theme="dark"] .shp-scan-card:focus-within {
         Konfirmasi Pesanan
     </button>
 </div>
+
+@if(session('message'))
+    <div class="rk-auto-link-flash" role="status">{{ session('message') }}</div>
+@endif
 
 <div class="rk-wrap">
 

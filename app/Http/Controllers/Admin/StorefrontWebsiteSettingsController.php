@@ -176,7 +176,7 @@ class StorefrontWebsiteSettingsController extends Controller
     private function defaultSalesOperationalSettings(): array
     {
         return [
-            'lookup_mode' => 'record_only',
+            'lookup_mode' => 'auto_link_on_scan',
             'lookup_sources' => ['marketplace_order', 'sales_invoice'],
             'lookup_identifiers' => [
                 'shipping_awb_no',
@@ -188,7 +188,7 @@ class StorefrontWebsiteSettingsController extends Controller
             ],
             'same_store' => true,
             'block_duplicate' => true,
-            'allow_unlinked_submit' => true,
+            'allow_unlinked_submit' => false,
             'allow_mixed_linkage' => false,
             'status_timing' => 'on_post',
             'record_only_daily_sales' => false,
@@ -239,7 +239,7 @@ class StorefrontWebsiteSettingsController extends Controller
             'lookup_identifiers' => $identifiers ?: $defaults['lookup_identifiers'],
             'same_store' => SystemSetting::get(SystemSetting::KEY_SALES_LOOKUP_SAME_STORE, '1') !== '0',
             'block_duplicate' => SystemSetting::get(SystemSetting::KEY_SALES_LOOKUP_BLOCK_DUPLICATE, '1') !== '0',
-            'allow_unlinked_submit' => SystemSetting::get(SystemSetting::KEY_SALES_ALLOW_UNLINKED_SUBMIT, '1') !== '0',
+            'allow_unlinked_submit' => SystemSetting::get(SystemSetting::KEY_SALES_ALLOW_UNLINKED_SUBMIT, '0') !== '0',
             'allow_mixed_linkage' => SystemSetting::get(SystemSetting::KEY_SALES_ALLOW_MIXED_LINKAGE, '0') === '1',
             'status_timing' => in_array($statusTiming, ['never', 'on_link', 'on_post'], true)
                 ? $statusTiming
@@ -311,7 +311,7 @@ class StorefrontWebsiteSettingsController extends Controller
         SystemSetting::set(SystemSetting::KEY_SALES_LOOKUP_IDENTIFIERS, json_encode($defaults['lookup_identifiers'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'Prioritas identitas lookup order operasional penjualan', auth()->id());
         SystemSetting::set(SystemSetting::KEY_SALES_LOOKUP_SAME_STORE, '1', 'Batasi lookup ke store shipment', auth()->id());
         SystemSetting::set(SystemSetting::KEY_SALES_LOOKUP_BLOCK_DUPLICATE, '1', 'Blokir order aktif ganda di shipment', auth()->id());
-        SystemSetting::set(SystemSetting::KEY_SALES_ALLOW_UNLINKED_SUBMIT, '1', 'Boleh submit order tanpa tautan', auth()->id());
+        SystemSetting::set(SystemSetting::KEY_SALES_ALLOW_UNLINKED_SUBMIT, '0', 'Boleh submit order tanpa tautan', auth()->id());
         SystemSetting::set(SystemSetting::KEY_SALES_ALLOW_MIXED_LINKAGE, '0', 'Boleh campur order tertaut dan record-only', auth()->id());
         SystemSetting::set(SystemSetting::KEY_SALES_STATUS_TIMING, 'on_post', 'Waktu update status marketplace', auth()->id());
         SystemSetting::set(SystemSetting::KEY_SALES_RECORD_ONLY_DAILY_SALES, '0', 'Catat Daily Sales untuk record-only', auth()->id());

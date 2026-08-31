@@ -4,6 +4,9 @@ namespace Tests\Feature\Sales;
 
 use App\Models\Channel;
 use App\Models\Item;
+use App\Models\MarketplaceOrder;
+use App\Models\MarketplaceOrderItem;
+use App\Models\OrderFulfillment;
 use App\Models\Shipment;
 use App\Models\ShipmentLine;
 use App\Models\ShipmentOrderScan;
@@ -208,6 +211,154 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ])
             ->assertStatus(422)
             ->assertJsonPath('message', 'Nomor order belum diisi.');
+    }
+
+    public function test_auto_link_reconciles_an_existing_awb_and_persists_the_match(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-AUTO-LINK-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-AWB-001',
+            'channel_order_id' => 'ORDER-AWB-001',
+            'shipping_awb_no' => 'SPXID062189160888',
+            'order_status' => 'SHIPPED',
+            'order_date' => now(),
+            'ordered_at' => now(),
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'item_id' => $item->id,
+            'internal_item_id' => $item->id,
+            'item_name' => $item->name,
+            'item_sku' => $item->code,
+            'model_sku' => $item->code,
+            'qty' => 1,
+        ]);
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => 'SPXID062189160888',
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.rekon_auto_link', $shipment))
+            ->assertOk()
+            ->assertJsonPath('result.linked', 1)
+            ->assertJsonPath('result.unmatched', 0);
+
+        $this->assertDatabaseHas('shipment_order_scans', [
+            'id' => $scan->id,
+            'fulfillment_id' => OrderFulfillment::where('marketplace_order_id', $order->id)->value('id'),
+            'match_method' => 'awb',
+            'match_reason' => null,
+        ]);
+        $this->assertDatabaseHas('order_fulfillments', [
+            'marketplace_order_id' => $order->id,
+        ]);
+    }
+
+    public function test_auto_link_marks_an_unknown_scan_with_a_reason(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-AUTO-LINK-002',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => 'UNKNOWN-AWB-001',
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.rekon_auto_link', $shipment))
+            ->assertOk()
+            ->assertJsonPath('result.linked', 0)
+            ->assertJsonPath('result.unmatched', 1);
+
+        $this->assertDatabaseHas('shipment_order_scans', [
+            'id' => $scan->id,
+            'fulfillment_id' => null,
+            'match_reason' => 'order_not_found',
+        ]);
+    }
+
+    public function test_new_awb_scan_is_linked_immediately_without_deducting_stock(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-AUTO-LINK-003',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-AWB-002',
+            'channel_order_id' => 'ORDER-AWB-002',
+            'shipping_awb_no' => 'SPXID062189160889',
+            'order_status' => 'SHIPPED',
+            'order_date' => now(),
+            'ordered_at' => now(),
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'item_id' => $item->id,
+            'internal_item_id' => $item->id,
+            'item_name' => $item->name,
+            'item_sku' => $item->code,
+            'model_sku' => $item->code,
+            'qty' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.scan_order_store', $shipment), [
+                'order_no' => 'SPXID062189160889',
+            ])
+            ->assertOk()
+            ->assertJsonPath('order.label', 'Tertaut otomatis');
+
+        $fulfillment = OrderFulfillment::where('marketplace_order_id', $order->id)->firstOrFail();
+        $this->assertDatabaseHas('shipment_order_scans', [
+            'shipment_id' => $shipment->id,
+            'order_no' => 'SPXID062189160889',
+            'fulfillment_id' => $fulfillment->id,
+            'match_method' => 'awb',
+        ]);
+        $this->assertSame(OrderFulfillment::STATUS_PENDING_REVIEW, $fulfillment->status);
     }
 
     private function shipmentContext(): array

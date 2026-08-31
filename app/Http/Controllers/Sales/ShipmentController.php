@@ -18,6 +18,7 @@ use App\Models\Account;
 use App\Services\Accounting\JournalService;
 use App\Services\Inventory\InventoryService;
 use App\Services\Sales\DailySalesRealtimeService;
+use App\Services\Sales\ShipmentMarketplaceLinker;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -56,7 +57,8 @@ class ShipmentController extends Controller
     public function __construct(
         protected InventoryService $inventory,
         protected DailySalesRealtimeService $dailySales,
-        protected JournalService $journalService
+        protected JournalService $journalService,
+        protected ShipmentMarketplaceLinker $shipmentMarketplaceLinker,
     ) {}
 
     /**
@@ -359,6 +361,10 @@ class ShipmentController extends Controller
             'record_only_daily_sales' => SystemSetting::KEY_SALES_RECORD_ONLY_DAILY_SALES,
         ];
 
+        if ($key === 'lookup_mode' && $default === 'record_only') {
+            $default = 'auto_link_on_scan';
+        }
+
         $value = SystemSetting::get($keys[$key] ?? $key, $default);
 
         if (in_array($key, ['lookup_sources', 'lookup_identifiers'], true)) {
@@ -525,6 +531,7 @@ class ShipmentController extends Controller
                 'status' => 'pending',
             ],
             'decision' => 'pending',
+            'match_reason' => $lookupStatus ?: 'order_not_found',
             'pool_full' => $this->buildPoolSnapshot($shipment, $pool),
             'subs' => [],
         ];
@@ -539,6 +546,9 @@ class ShipmentController extends Controller
                 'fulfillment_id' => null,
                 'status' => 'pending',
                 'source' => 'manual_scan',
+                'match_method' => null,
+                'match_reason' => $lookupStatus ?: 'order_not_found',
+                'matched_at' => null,
                 'raw_payload' => $rawPayload,
             ]
         );
@@ -1268,7 +1278,7 @@ class ShipmentController extends Controller
             ], 422);
         }
 
-        $lookupMode = (string) $this->salesOperationalSetting('lookup_mode', 'record_only');
+        $lookupMode = (string) $this->salesOperationalSetting('lookup_mode', 'auto_link_on_scan');
         $marketplaceOrder = null;
         $salesInvoice = null;
         $fulfillment = null;
@@ -1277,7 +1287,7 @@ class ShipmentController extends Controller
         if ($lookupMode === 'auto_link_on_scan') {
             $marketplaceOrder = $this->marketplaceOrderQuery($orderNo, $shipment)->first();
             if ($marketplaceOrder) {
-                if ($shipment->shipment_type !== 'manual' && !in_array($marketplaceOrder->order_status, ['READY_TO_SHIP', 'PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'DELIVERED', 'COMPLETED'], true)) {
+                if ($shipment->shipment_type !== 'manual' && !in_array($marketplaceOrder->order_status, self::RECONCILIATION_MARKETPLACE_STATUSES, true)) {
                     $existingFulfillment = \App\Models\OrderFulfillment::query()
                         ->where('marketplace_order_id', $marketplaceOrder->id)
                         ->first();
@@ -1335,6 +1345,7 @@ class ShipmentController extends Controller
                     'fulfillment_id' => $fulfillment?->id,
                     'status' => 'pending',
                     'source' => 'scanner',
+                    'match_reason' => $fulfillment ? null : ($lookupFallbackStatus ?: 'order_not_found'),
                     'raw_payload' => [
                         'mode' => $lookupMode === 'auto_link_on_scan' && $fulfillment ? 'auto_link' : 'record_only',
                         'no' => $orderNo,
@@ -1348,6 +1359,7 @@ class ShipmentController extends Controller
                         ],
                         'linked_source' => $fulfillment ? 'marketplace_order' : ($salesInvoice ? 'sales_invoice' : null),
                         'lookup_status' => $lookupFallbackStatus,
+                        'match_reason' => $fulfillment ? null : ($lookupFallbackStatus ?: 'order_not_found'),
                         'sales_invoice_id' => $salesInvoice?->id,
                     ],
                 ]);
@@ -1356,6 +1368,7 @@ class ShipmentController extends Controller
                 $scan->update([
                     'shipment_wave_id' => $currentWave?->id ?: $scan->shipment_wave_id,
                     'fulfillment_id' => $fulfillment?->id,
+                    'match_reason' => $fulfillment ? null : ($lookupFallbackStatus ?? ($payload['match_reason'] ?? 'order_not_found')),
                     'raw_payload' => array_merge($payload, [
                         'no' => $orderNo,
                         'mode' => $lookupMode === 'auto_link_on_scan' && $fulfillment ? 'auto_link' : ($payload['mode'] ?? 'record_only'),
@@ -1364,6 +1377,7 @@ class ShipmentController extends Controller
                             : ($lookupFallbackStatus !== null ? 'Belum tertaut' : ($payload['label'] ?? 'Pencatatan order')),
                         'linked_source' => $fulfillment ? 'marketplace_order' : ($salesInvoice ? 'sales_invoice' : ($payload['linked_source'] ?? null)),
                         'lookup_status' => $lookupFallbackStatus ?? ($payload['lookup_status'] ?? null),
+                        'match_reason' => $fulfillment ? null : ($lookupFallbackStatus ?? ($payload['match_reason'] ?? 'order_not_found')),
                         'sales_invoice_id' => $salesInvoice?->id ?? ($payload['sales_invoice_id'] ?? null),
                         'order' => array_merge(
                             is_array($payload['order'] ?? null) ? $payload['order'] : [],
@@ -1381,6 +1395,12 @@ class ShipmentController extends Controller
         });
 
         if ($marketplaceOrder && $fulfillment) {
+            $this->shipmentMarketplaceLinker->link(
+                $scan->fresh(),
+                $marketplaceOrder,
+                $this->reconciliationMatchMethod($orderNo, $marketplaceOrder),
+                $orderNo
+            );
             $this->promoteMarketplaceOrderAfterScan($marketplaceOrder);
             $this->updateMarketplaceStatusIfAllowed($marketplaceOrder, 'link');
         }
@@ -1989,10 +2009,11 @@ class ShipmentController extends Controller
     protected function findReconciliationMarketplaceOrder(
         string $scanCode,
         ?Shipment $shipment = null,
-        bool $promoteBooking = false
+        bool $promoteBooking = false,
+        bool $eligibleOnly = true,
     ): ?\App\Models\MarketplaceOrder {
         $findOrder = fn () => $this->marketplaceOrderQuery($scanCode, $shipment)
-            ->whereIn('order_status', self::RECONCILIATION_MARKETPLACE_STATUSES)
+            ->when($eligibleOnly, fn ($query) => $query->whereIn('order_status', self::RECONCILIATION_MARKETPLACE_STATUSES))
             ->with(['items.internalItem', 'store'])
             ->first();
 
@@ -2029,6 +2050,169 @@ class ShipmentController extends Controller
         }
 
         return $findOrder();
+    }
+
+    protected function reconciliationMatchMethod(
+        string $scanCode,
+        \App\Models\MarketplaceOrder $order
+    ): string {
+        $scanCode = mb_strtoupper(trim($scanCode));
+
+        if ($scanCode !== '' && $scanCode === mb_strtoupper(trim((string) $order->shipping_awb_no))) {
+            return 'awb';
+        }
+
+        if ($scanCode !== '' && $scanCode === mb_strtoupper(trim((string) $order->channel_order_id))) {
+            return 'order_no';
+        }
+
+        if ($scanCode !== '' && $scanCode === mb_strtoupper(trim((string) $order->external_order_id))) {
+            return 'order_no';
+        }
+
+        if ($scanCode !== '' && $scanCode === mb_strtoupper(trim((string) $order->booking_sn))) {
+            return 'booking_sn';
+        }
+
+        if ($scanCode !== '') {
+            $bookingQuery = \App\Models\MarketplaceBooking::query()
+                ->where('store_id', $order->store_id)
+                ->where(function ($query) use ($scanCode) {
+                    $query
+                        ->whereRaw('UPPER(TRIM(tracking_number)) = ?', [$scanCode])
+                        ->orWhereRaw('UPPER(TRIM(booking_sn)) = ?', [$scanCode])
+                        ->orWhereRaw('UPPER(TRIM(order_sn)) = ?', [$scanCode]);
+                });
+
+            if ((clone $bookingQuery)->whereRaw('UPPER(TRIM(tracking_number)) = ?', [$scanCode])->exists()) {
+                return 'awb_booking';
+            }
+
+            if ($bookingQuery->exists()) {
+                return 'booking_sn';
+            }
+        }
+
+        return 'order_no';
+    }
+
+    /**
+     * Tautkan ulang scan lama yang masih record-only atau belum punya
+     * fulfillment_id. Tidak mengubah qty maupun stok.
+     */
+    public function autoLinkShipmentScans(Request $request, Shipment $shipment): \Illuminate\Http\JsonResponse|RedirectResponse
+    {
+        if ($shipment->status !== 'draft') {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => 'Shipment bukan draft.'], 409);
+            }
+
+            return redirect()->back()->with('status', 'error')->with('message', 'Shipment bukan draft.');
+        }
+
+        $shipment->load('orderScans');
+        $result = [
+            'checked' => 0,
+            'linked' => 0,
+            'already_linked' => 0,
+            'unmatched' => 0,
+            'skipped' => 0,
+            'errors' => [],
+            'details' => [],
+        ];
+
+        foreach ($shipment->orderScans->sortBy('id') as $scan) {
+            $result['checked']++;
+
+            if ($scan->status === 'skip' || $scan->source === 'sales_invoice') {
+                $result['skipped']++;
+                continue;
+            }
+
+            if ($scan->fulfillment_id) {
+                $result['already_linked']++;
+                continue;
+            }
+
+            $orderNo = $this->normalizeOrderNumber($scan->order_no);
+            if ($orderNo === '') {
+                $result['unmatched']++;
+                $this->shipmentMarketplaceLinker->markUnmatched($scan, 'empty_scan_code');
+                continue;
+            }
+
+            $marketplaceOrder = $this->findReconciliationMarketplaceOrder($orderNo, $shipment, true, false);
+            if (!$marketplaceOrder) {
+                $result['unmatched']++;
+                $this->shipmentMarketplaceLinker->markUnmatched($scan, 'order_not_found');
+                $result['details'][] = ['scan' => $orderNo, 'status' => 'unmatched', 'reason' => 'order_not_found'];
+                continue;
+            }
+
+            if (!in_array($marketplaceOrder->order_status, self::RECONCILIATION_MARKETPLACE_STATUSES, true)) {
+                $reason = 'status_' . strtolower((string) $marketplaceOrder->order_status);
+                $result['unmatched']++;
+                $this->shipmentMarketplaceLinker->markUnmatched($scan, $reason);
+                $result['details'][] = ['scan' => $orderNo, 'status' => 'unmatched', 'reason' => $reason];
+                continue;
+            }
+
+            $fulfillment = \App\Models\OrderFulfillment::query()
+                ->where('marketplace_order_id', $marketplaceOrder->id)
+                ->first();
+
+            if ($fulfillment?->status === \App\Models\OrderFulfillment::STATUS_CANCELLED) {
+                $result['unmatched']++;
+                $this->shipmentMarketplaceLinker->markUnmatched($scan, 'fulfillment_cancelled');
+                $result['details'][] = ['scan' => $orderNo, 'status' => 'unmatched', 'reason' => 'fulfillment_cancelled'];
+                continue;
+            }
+
+            $duplicate = $this->activeDuplicateScan($fulfillment?->id, $shipment);
+            if ($duplicate) {
+                $result['unmatched']++;
+                $this->shipmentMarketplaceLinker->markUnmatched($scan, 'duplicate_active_shipment');
+                $result['details'][] = [
+                    'scan' => $orderNo,
+                    'status' => 'unmatched',
+                    'reason' => 'duplicate_active_shipment',
+                    'shipment' => $duplicate->shipment?->code,
+                ];
+                continue;
+            }
+
+            try {
+                $this->shipmentMarketplaceLinker->link(
+                    $scan,
+                    $marketplaceOrder,
+                    $this->reconciliationMatchMethod($orderNo, $marketplaceOrder),
+                    $orderNo
+                );
+                $result['linked']++;
+                $result['details'][] = ['scan' => $orderNo, 'status' => 'linked'];
+            } catch (\Throwable $e) {
+                $result['errors'][] = ['scan' => $orderNo, 'message' => $e->getMessage()];
+            }
+        }
+
+        $message = sprintf(
+            'Auto-link selesai: %d tertaut, %d belum ditemukan, %d sudah tertaut.',
+            $result['linked'],
+            $result['unmatched'],
+            $result['already_linked']
+        );
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => empty($result['errors']) ? 'ok' : 'partial',
+                'message' => $message,
+                'result' => $result,
+            ]);
+        }
+
+        return redirect()->back()
+            ->with('status', empty($result['errors']) ? 'success' : 'warning')
+            ->with('message', $message);
     }
 
     protected function salesInvoiceQuery(string $scanCode, ?Shipment $shipment = null)
@@ -2113,7 +2297,7 @@ class ShipmentController extends Controller
             $hasLinkedScan = $scans->contains(fn ($scan) => !empty($scan->fulfillment_id));
             $recordOnlyBatch = $hasRecordOnlyScan && !$hasLinkedScan;
 
-            if ($recordOnlyBatch && !$this->salesOperationalSetting('allow_unlinked_submit', true)) {
+            if ($recordOnlyBatch && !$this->salesOperationalSetting('allow_unlinked_submit', false)) {
                 abort(422, 'Shipment record-only belum diizinkan untuk disubmit. Aktifkan Boleh submit record-only di Pengaturan Operasional Penjualan.');
             }
 
@@ -3359,8 +3543,9 @@ class ShipmentController extends Controller
 
         // Shipment lama yang dibuat dalam mode record-only dapat menyimpan
         // nomor order tanpa fulfillment_id. Resolve ulang di halaman confirm
-        // agar detail item marketplace tetap terbaca, tanpa mengubah shipment
-        // atau mengunci kemampuan edit operator.
+        // dan simpan relasinya agar status yang terlihat sama dengan data DB.
+        // Linker hanya membuat draft fulfillment; stok tetap belum dipotong
+        // sampai shipment benar-benar disubmit/post.
         foreach ($shipment->orderScans as $scan) {
             if ($scan->status === 'skip' || $scan->source === 'sales_invoice') {
                 continue;
@@ -3381,11 +3566,18 @@ class ShipmentController extends Controller
                 continue;
             }
 
-            $fulfillment = $scan->fulfillment;
-            if (!$fulfillment) {
-                $fulfillment = new \App\Models\OrderFulfillment([
-                    'marketplace_order_id' => $marketplaceOrder->id,
-                ]);
+            try {
+                $fulfillment = $this->shipmentMarketplaceLinker->link(
+                    $scan->fresh(),
+                    $marketplaceOrder,
+                    $this->reconciliationMatchMethod($orderNo, $marketplaceOrder),
+                    $orderNo
+                );
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning(
+                    "Shipment confirm auto-link failed [{$orderNo}]: " . $e->getMessage()
+                );
+                continue;
             }
 
             $fulfillment->setRelation('marketplaceOrder', $marketplaceOrder);
@@ -3460,7 +3652,7 @@ class ShipmentController extends Controller
         // Endpoint ini hanya dipanggil dari halaman rekonsiliasi, sehingga
         // lookup marketplace tetap dijalankan walaupun scan operasional utama
         // dikonfigurasi sebagai record-only.
-        $marketplaceOrder = $this->findReconciliationMarketplaceOrder($no, $shipment, true);
+        $marketplaceOrder = $this->findReconciliationMarketplaceOrder($no, $shipment, true, false);
 
         if (!$marketplaceOrder) {
             $salesInvoice = $this->salesInvoiceQuery($no, $shipment)
@@ -3629,12 +3821,15 @@ class ShipmentController extends Controller
                 'lines'        => $lines,
                 'allocated'    => [],
             ],
+            'mode' => 'auto_link',
+            'linked_source' => 'marketplace_order',
             'pool_full' => $poolFull,
+            'match_method' => $this->reconciliationMatchMethod($no, $marketplaceOrder),
             'decision' => $decision,
             'subs' => [],
         ];
 
-        \App\Models\ShipmentOrderScan::updateOrCreate(
+        $matchedScan = \App\Models\ShipmentOrderScan::updateOrCreate(
             [
                 'shipment_id' => $shipment->id,
                 'order_no' => $no,
@@ -3647,7 +3842,14 @@ class ShipmentController extends Controller
                 'raw_payload' => $rawPayload,
             ]
         );
-        
+
+        $this->shipmentMarketplaceLinker->link(
+            $matchedScan,
+            $marketplaceOrder,
+            $rawPayload['match_method'],
+            $no
+        );
+
         $rawPayload['scanned_at'] = now()->format('d/m/Y H:i:s');
 
         return response()->json(array_merge(['status' => 'ok'], $rawPayload));
@@ -3738,10 +3940,15 @@ class ShipmentController extends Controller
                         }
                     }
                 } else {
-                    $marketplaceOrder = $this->marketplaceOrderQuery($orderNo, $shipment)->first();
+                    $marketplaceOrder = $this->findReconciliationMarketplaceOrder($orderNo, $shipment, true, false);
                     
                     if (!$marketplaceOrder) {
                         abort(422, "Order/resi {$orderNo} tidak ditemukan di data marketplace.");
+                    }
+
+                    if ($shipment->shipment_type !== 'manual'
+                        && !in_array($marketplaceOrder->order_status, self::RECONCILIATION_MARKETPLACE_STATUSES, true)) {
+                        abort(422, "Order/resi {$orderNo} berstatus {$marketplaceOrder->order_status} dan belum boleh masuk shipment.");
                     }
 
                     $fulfillment = \App\Models\OrderFulfillment::where('marketplace_order_id', $marketplaceOrder->id)->first(['id', 'status']);
@@ -3771,8 +3978,9 @@ class ShipmentController extends Controller
                         'confirmed_at' => now(),
                         'confirmed_by' => auth()->id(),
                     ]);
+                    $persistedScan = $scan->fresh();
                 } else {
-                    \App\Models\ShipmentOrderScan::create([
+                    $persistedScan = \App\Models\ShipmentOrderScan::create([
                         'shipment_id'  => $shipment->id,
                         'order_no'     => $orderNo,
                         'fulfillment_id' => $fulfillmentId,
@@ -3782,6 +3990,15 @@ class ShipmentController extends Controller
                         'confirmed_at' => now(),
                         'confirmed_by' => auth()->id(),
                     ]);
+                }
+
+                if ($marketplaceOrder && $fulfillment) {
+                    $this->shipmentMarketplaceLinker->link(
+                        $persistedScan,
+                        $marketplaceOrder,
+                        $this->reconciliationMatchMethod($orderNo, $marketplaceOrder),
+                        $orderNo
+                    );
                 }
 
                 // Hanya pindahkan ke Siap Kirim jika keputusannya fulfill (Siap Kirim)
@@ -3980,6 +4197,9 @@ class ShipmentController extends Controller
                 'lines'        => $lines,
                 'allocated'    => [],
             ],
+            'mode' => 'auto_link',
+            'linked_source' => 'marketplace_order',
+            'match_method' => $this->reconciliationMatchMethod($targetNo, $marketplaceOrder),
             'pool_full' => $poolFull,
             'decision' => $decision,
             'subs' => [],
@@ -3990,8 +4210,18 @@ class ShipmentController extends Controller
             'fulfillment_id' => $fulfillment->id,
             'status' => $decision,
             'source' => 'marketplace',
+            'match_method' => $rawPayload['match_method'],
+            'match_reason' => null,
+            'matched_at' => now(),
             'raw_payload' => $rawPayload,
         ]);
+
+        $this->shipmentMarketplaceLinker->link(
+            $scan->fresh(),
+            $marketplaceOrder,
+            $rawPayload['match_method'],
+            $targetNo
+        );
 
         return response()->json(array_merge(['status' => 'ok'], $rawPayload));
     }

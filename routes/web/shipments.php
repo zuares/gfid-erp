@@ -59,6 +59,7 @@ Route::middleware(['web', 'auth', 'access:sales'])
                 Route::get('/{shipment}/rekon',        'rekon')->name('rekon');
                 Route::get('/{shipment}/confirm',      'confirmOrders')->name('confirm_orders');
                 Route::post('/{shipment}/rekon/match', 'rekonMatch')->name('rekon_match');
+                Route::post('/{shipment}/rekon/auto-link', 'autoLinkShipmentScans')->name('rekon_auto_link');
                 Route::post('/{shipment}/rekon/apply', 'rekonApply')->name('rekon_apply');
                 Route::put('/{shipment}/rekon-scan/{orderNo}', 'updateRekonScan')->name('rekon_update_scan');
                 Route::delete('/{shipment}/rekon-scan/{orderNo}', 'deleteRekonScan')->name('rekon_delete_scan');

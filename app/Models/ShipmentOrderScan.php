@@ -16,6 +16,9 @@ class ShipmentOrderScan extends Model
         'order_no',
         'status',
         'source',
+        'match_method',
+        'match_reason',
+        'matched_at',
         'raw_payload',
         'confirmed_at',
         'confirmed_by',
@@ -24,6 +27,7 @@ class ShipmentOrderScan extends Model
     protected $casts = [
         'raw_payload' => 'array',
         'confirmed_at' => 'datetime',
+        'matched_at' => 'datetime',
     ];
 
     public function shipment()
