@@ -23,7 +23,7 @@ class CashBasisReportController extends Controller
     {
         $from = $request->filled('from')
             ? Carbon::parse($request->date('from'))->toDateString()
-            : now()->startOfMonth()->toDateString();
+            : now()->toDateString();
 
         $to = $request->filled('to')
             ? Carbon::parse($request->date('to'))->toDateString()
