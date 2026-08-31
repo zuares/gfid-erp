@@ -599,6 +599,25 @@ class GrnFromDraftPoTest extends TestCase
         $this->assertFalse($active, 'Jurnal GRN harus ter-void setelah unpost.');
     }
 
+    public function test_partial_grn_keeps_remaining_qty_available_for_next_grn(): void
+    {
+        $po = $this->makeDraftPo(10, 1000);
+
+        $first = $this->grnService->create($this->makeGrnPayload($po, 7));
+        $this->grnService->post($first);
+
+        $response = $this->get(route('purchasing.purchase_receipts.create_from_order', $po));
+
+        $response->assertOk()
+            ->assertSee('Sebagian diterima', false)
+            ->assertSee('7,00 / 10,00 (70%)', false)
+            ->assertSee('3,00 ' . $po->lines()->firstOrFail()->effectivePurchaseUnit(), false);
+
+        $second = $this->grnService->create($this->makeGrnPayload($po, 3));
+        $this->assertCount(1, $second->lines);
+        $this->assertEqualsWithDelta(3, (float) $second->lines->first()->qty_received, 0.0001);
+    }
+
     // 25 + keamanan harga: helper canSeePurchasePrices konsisten.
     // Catatan: enum users.role = [sewing,cutting,operating,admin,owner,other] —
     // tidak memuat 'accounting', jadi branch itu diuji secara in-memory (tanpa insert)

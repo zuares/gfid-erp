@@ -153,6 +153,12 @@
         letter-spacing: 0;
         text-transform: none;
     }
+    .th-sub-reject { color: #b91c1c; }
+    .receipt-rule {
+        color: var(--muted);
+        font-size: .76rem;
+        line-height: 1.4;
+    }
     .table-sm td { padding-block: .35rem; vertical-align: middle; border-bottom: 1px solid rgba(148,163,184,.14); }
     .table-sm tr:last-child td { border-bottom: none; }
 
@@ -556,7 +562,7 @@
                 <span class="fw-semibold small">Detail Barang</span>
                 <div class="d-flex gap-2 align-items-center flex-wrap">
                     @if ($fullyReceivedCount > 0)
-                        <span class="tag tag-done">✓ {{ $fullyReceivedCount }} sudah lunas</span>
+                        <span class="tag tag-done">✓ {{ $fullyReceivedCount }} sudah selesai</span>
                     @endif
                     {{-- Tombol Terima Semua --}}
                     <button type="button" id="btnReceiveAll"
@@ -565,6 +571,13 @@
                     </button>
                     <input type="checkbox" id="checkAll" class="form-check-input" title="Pilih semua">
                 </div>
+            </div>
+
+            <div class="px-3 pt-2 pb-1 receipt-rule">
+                <i class="bi bi-info-circle me-1"></i>
+                <strong>Diterima</strong> masuk stok.
+                <strong class="text-danger">Reject</strong> tidak masuk stok, tetapi tetap menghabiskan sisa Qty PO.
+                Kosongkan reject jika penerimaan hanya sebagian.
             </div>
 
             <div class="table-responsive">
@@ -576,8 +589,8 @@
                             <th>Item</th>
                             <th class="text-end">Qty PO</th>
                             <th class="text-end">Sisa</th>
-                            <th class="text-end" style="width:125px;">Diterima <small class="th-sub">stok</small></th>
-                            <th class="text-end" style="width:125px;">Reject <small class="th-sub">stok</small></th>
+                            <th class="text-end" style="width:125px;">Diterima <small class="th-sub">masuk stok</small></th>
+                            <th class="text-end" style="width:125px;">Reject <small class="th-sub th-sub-reject">tidak masuk stok</small></th>
                             @if ($canSeeMoney)
                                 <th class="text-end col-harga">Harga</th>
                             @endif
@@ -753,7 +766,7 @@
                         <td colspan="{{ $colCount }}" class="text-center text-muted py-5">
                             @if ($fullyReceivedCount > 0 && $detailLines->isNotEmpty())
                                 <div style="font-size:1.5rem;margin-bottom:.5rem;">✅</div>
-                                Semua item sudah diterima penuh.
+                                Semua item sudah diproses.
                             @elseif (!$hasOrder && !$selectedSupplierId)
                                 Tidak ada item dari PO (draft/approved).
                             @elseif (!$hasOrder && $selectedSupplierId)
@@ -934,10 +947,12 @@
             const inpRej = row.querySelector('.qty-reject-input');
             updateRowStockPreview(row);
             if (!cb || !cb.checked || !inpRec || !inpRej) return;
-            const net = parseNum(inpRec.value || 0) - parseNum(inpRej.value || 0);
-            if (net > 0) {
+            // Qty diterima adalah satu-satunya qty yang masuk stok.
+            // Qty reject tidak boleh dikurangkan dari qty baik.
+            const stockIn = parseNum(inpRec.value || 0);
+            if (stockIn > 0) {
                 const unit = getStockUnit(row);
-                totals[unit] = (totals[unit] || 0) + net;
+                totals[unit] = (totals[unit] || 0) + stockIn;
             }
         });
         const fmted = formatUnitTotals(totals);
@@ -1028,11 +1043,6 @@
     function onRecInput(inp) {
         const row  = inp.closest('tr'); if (!row) return;
         ensureChecked(row);
-        const lim  = getLimit(row);
-        const inpRej = row.querySelector('.qty-reject-input');
-        const rec  = parseNum(inp.value);
-        if (rec >= 0 && rec <= lim && inpRej)
-            inpRej.value = (lim - rec).toFixed(2);
         validateRow(row);
         updateRowStockPreview(row);
         recalcTotal();
@@ -1041,11 +1051,6 @@
     function onRejInput(inp) {
         const row  = inp.closest('tr'); if (!row) return;
         ensureChecked(row);
-        const lim  = getLimit(row);
-        const inpRec = row.querySelector('.qty-received-input');
-        const rej  = parseNum(inp.value);
-        if (rej >= 0 && rej <= lim && inpRec)
-            inpRec.value = (lim - rej).toFixed(2);
         validateRow(row);
         updateRowStockPreview(row);
         recalcTotal();
@@ -1111,8 +1116,9 @@
 
         const totals = {};
         lines.forEach(l => {
-            const net = l.stockRec - l.stockRej;
-            if (net > 0) totals[l.stockUnit] = (totals[l.stockUnit] || 0) + net;
+            // Reject tidak masuk stok; ringkasan stok hanya menjumlahkan qty baik.
+            const stockIn = l.stockRec;
+            if (stockIn > 0) totals[l.stockUnit] = (totals[l.stockUnit] || 0) + stockIn;
         });
 
         let h = `<div class="confirm-kpis">
