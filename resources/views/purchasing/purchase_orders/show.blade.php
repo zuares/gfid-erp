@@ -386,7 +386,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
             <div class="po-value">{{ rupiah($poGrandTotal) }}</div>
         </div>
         <div class="po-card po-kpi">
-            <div class="po-label">Total GRN</div>
+            <div class="po-label">Nilai Barang Diterima</div>
             <div class="po-value">{{ rupiah($grnPostedTotal) }}</div>
         </div>
         <div class="po-card po-kpi">
