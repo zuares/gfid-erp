@@ -126,7 +126,69 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
             ->assertSee('Shipment belum siap dikirim')
-            ->assertSee('belum terhubung ke order');
+            ->assertSee('belum terhubung ke order')
+            ->assertSee('Rekonsiliasi dari scan sebelumnya')
+            ->assertSee('Tidak perlu scan ulang.')
+            ->assertSee('Belum Tertaut')
+            ->assertSee('sd-tab-unlinked');
+    }
+
+    public function test_confirmation_reconciles_order_numbers_scanned_in_previous_step(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-CONFIRM-REKON-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 2,
+            'allocated_qty' => 2,
+        ]);
+
+        foreach (['ORDER-PREVIOUS-A', 'ORDER-PREVIOUS-B'] as $orderNo) {
+            $order = MarketplaceOrder::create([
+                'store_id' => $store->id,
+                'external_order_id' => $orderNo,
+                'channel_order_id' => $orderNo,
+                'order_status' => 'SHIPPED',
+                'order_date' => now(),
+                'ordered_at' => now(),
+            ]);
+            MarketplaceOrderItem::create([
+                'order_id' => $order->id,
+                'marketplace_order_id' => $order->id,
+                'item_id' => $item->id,
+                'internal_item_id' => $item->id,
+                'item_name' => $item->name,
+                'item_sku' => $item->code,
+                'model_sku' => $item->code,
+                'qty' => 1,
+            ]);
+            ShipmentOrderScan::create([
+                'shipment_id' => $shipment->id,
+                'order_no' => $orderNo,
+                'status' => 'pending',
+                'source' => 'scanner',
+                'raw_payload' => ['mode' => 'record_only'],
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk();
+
+        $scans = ShipmentOrderScan::where('shipment_id', $shipment->id)->orderBy('id')->get();
+        $this->assertCount(2, $scans);
+        $this->assertTrue($scans->every(fn ($scan) => $scan->fulfillment_id !== null));
+        $this->assertSame(2, ShipmentLine::where('shipment_id', $shipment->id)->sum('qty_scanned'));
+        $this->assertSame(1, ShipmentLine::where('shipment_id', $shipment->id)->where('shipment_order_scan_id', $scans[0]->id)->sum('qty_scanned'));
+        $this->assertSame(1, ShipmentLine::where('shipment_id', $shipment->id)->where('shipment_order_scan_id', $scans[1]->id)->sum('qty_scanned'));
     }
 
     public function test_daily_shipment_creates_wave_and_blocks_legacy_submit(): void

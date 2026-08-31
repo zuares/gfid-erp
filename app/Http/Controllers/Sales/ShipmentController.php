@@ -3474,15 +3474,19 @@ class ShipmentController extends Controller
             : [];
 
         // Ringkasan batch: {item_id => {code, name, qty, qty_remaining}}
-        $batchPool = $shipment->lines->mapWithKeys(fn ($l) => [
-            $l->item_id => [
-                'item_id'       => $l->item_id,
-                'item_code'     => $l->item?->code ?? '-',
-                'item_name'     => $l->item?->name ?? '-',
-                'category_name' => $l->item?->category?->name ?? 'Tanpa Kategori',
-                'qty'           => (int) $l->qty_scanned,
-            ],
-        ]);
+        $batchPool = $shipment->lines
+            ->groupBy('item_id')
+            ->map(function ($itemLines) {
+                $line = $itemLines->first();
+
+                return [
+                    'item_id'       => $line->item_id,
+                    'item_code'     => $line->item?->code ?? '-',
+                    'item_name'     => $line->item?->name ?? '-',
+                    'category_name' => $line->item?->category?->name ?? 'Tanpa Kategori',
+                    'qty'           => (int) $itemLines->sum('qty_scanned'),
+                ];
+            });
 
         $savedOrderScans = $shipment->orderScans
             ->sortBy('id')
@@ -3532,6 +3536,84 @@ class ShipmentController extends Controller
             'batchPool',
             'savedOrderScans'
         ));
+    }
+
+    /**
+     * Rekonsiliasi otomatis order/AWB yang sudah dicatat di tahap sebelumnya.
+     * Operator tidak perlu scan ulang saat membuka halaman konfirmasi.
+     * Alokasi manual yang sudah tersimpan tetap dipertahankan.
+     */
+    protected function autoReconcileSavedOrderScans(Shipment $shipment, ?ShipmentWave $wave = null): void
+    {
+        if ($shipment->shipment_type !== Shipment::TYPE_MARKETPLACE
+            || ($shipment->scan_mode ?? 'item_first') !== 'item_first') {
+            return;
+        }
+
+        $waveId = $wave?->id;
+        $attemptedScanIds = [];
+
+        for ($attempt = 0; $attempt < 100; $attempt++) {
+            $shipment->load(['lines', 'orderScans']);
+            $lines = $waveId
+                ? $shipment->lines->where('shipment_wave_id', $waveId)->values()
+                : $shipment->lines;
+            $orderScans = $waveId
+                ? $shipment->orderScans->where('shipment_wave_id', $waveId)->values()
+                : $shipment->orderScans;
+
+            $scan = $orderScans
+                ->sortBy('id')
+                ->first(function ($candidate) use ($lines, $attemptedScanIds) {
+                    if (in_array((int) $candidate->id, $attemptedScanIds, true)) {
+                        return false;
+                    }
+
+                    if ($candidate->status === 'skip' || $candidate->source === 'sales_invoice') {
+                        return false;
+                    }
+
+                    $payload = is_array($candidate->raw_payload) ? $candidate->raw_payload : [];
+                    $hasSavedAllocation = array_key_exists('allocations', $payload);
+                    $hasMappedLine = $lines->contains(
+                        fn ($line) => (int) $line->shipment_order_scan_id === (int) $candidate->id
+                    );
+
+                    return !$hasSavedAllocation && !$hasMappedLine;
+                });
+
+            if (!$scan) {
+                return;
+            }
+            $attemptedScanIds[] = (int) $scan->id;
+
+            $poolUsed = $lines
+                ->filter(fn ($line) => !empty($line->shipment_order_scan_id))
+                ->groupBy('item_id')
+                ->map(fn ($itemLines) => (int) $itemLines->sum('qty_scanned'))
+                ->toArray();
+
+            try {
+                $matchRequest = Request::create('/', 'POST', [
+                    'order_no' => $scan->order_no,
+                    'pool_used' => json_encode($poolUsed),
+                ]);
+                $matchRequest->headers->set('Accept', 'application/json');
+
+                $response = $this->rekonMatch($matchRequest, $shipment);
+                if ($response->getStatusCode() >= 400) {
+                    \Illuminate\Support\Facades\Log::warning(
+                        "Shipment confirm auto-reconcile rejected [{$scan->order_no}]: HTTP {$response->getStatusCode()}"
+                    );
+                    return;
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning(
+                    "Shipment confirm auto-reconcile failed [{$scan->order_no}]: " . $e->getMessage()
+                );
+                return;
+            }
+        }
     }
 
     public function confirmOrders(Shipment $shipment)
@@ -3595,6 +3677,18 @@ class ShipmentController extends Controller
             $scan->setRelation('fulfillment', $fulfillment);
         }
 
+        // Order/AWB sudah discan sebelum masuk confirm. Untuk item-first,
+        // langsung cocokkan detail order dengan item batch tanpa meminta scan
+        // ulang dari operator.
+        $this->autoReconcileSavedOrderScans($shipment, $currentWave);
+        $shipment->load([
+            'lines.item',
+            'orderScans.lines.item',
+            'orderScans.fulfillment.marketplaceOrder.items.internalItem',
+            'orderScans.fulfillment.marketplaceOrder.store',
+            'waves',
+        ]);
+
         $warehouse = $this->whRts();
         $stockInsufficient = $warehouse
             ? $this->checkStockSufficiency($shipment, $warehouse)
@@ -3636,9 +3730,10 @@ class ShipmentController extends Controller
         }
 
         // ── Build base pool dari shipment lines ──────────────────────────
-        $basePool = $shipment->lines->mapWithKeys(fn ($l) => [
-            $l->item_id => (int) $l->qty_scanned,
-        ])->toArray();
+        $basePool = $shipment->lines
+            ->groupBy('item_id')
+            ->map(fn ($itemLines) => (int) $itemLines->sum('qty_scanned'))
+            ->toArray();
 
         // ── Kurangi dengan apa yang sudah dialokasikan oleh pesanan sebelumnya ──
         $poolUsed = [];

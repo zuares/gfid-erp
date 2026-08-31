@@ -102,6 +102,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-title { color:#0f172a; font-size:.9rem; }
 .sd-order-no { color:#0f172a; }
 .sd-tabs { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:.35rem; margin-bottom:.65rem; padding:.3rem; border:1px solid rgba(148,163,184,.2); border-radius:9px; background:var(--card,#fff); }
+.sd-tabs.has-unlinked { grid-template-columns:repeat(4, minmax(0, 1fr)); }
 .sd-tab-btn { display:inline-flex; align-items:center; justify-content:center; gap:.35rem; min-height:38px; border:0; border-radius:7px; color:#64748b; background:transparent; font-size:.76rem; font-weight:850; cursor:pointer; }
 .sd-tab-btn:hover { color:#1d4ed8; background:#eff6ff; }
 .sd-tab-btn.active { color:#fff; background:#2563eb; box-shadow:0 3px 9px rgba(37,99,235,.22); }
@@ -117,8 +118,17 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-rekon-stat-label { color:#64748b; font-size:.68rem; }
 .sd-rekon-stat-value { margin-top:.15rem; color:#0f172a; font-size:1.1rem; font-weight:900; }
 .sd-rekon-message { padding:.7rem; border:1px solid rgba(37,99,235,.18); border-radius:8px; color:#1e40af; background:#eff6ff; font-size:.78rem; line-height:1.45; }
+.sd-direct-rekon { margin:.7rem .85rem 0; padding:.75rem; border:1px solid rgba(37,99,235,.22); border-radius:9px; background:rgba(239,246,255,.55); }
+.sd-direct-rekon-head { display:flex; align-items:flex-start; justify-content:space-between; gap:.6rem; flex-wrap:wrap; margin-bottom:.5rem; }
+.sd-direct-rekon-title { color:#1e40af; font-size:.8rem; font-weight:900; }
+.sd-direct-rekon-sub { margin-top:.15rem; color:#64748b; font-size:.72rem; line-height:1.4; }
+.sd-direct-rekon-status { margin-top:.45rem; color:#64748b; font-size:.72rem; line-height:1.4; }
+.sd-direct-rekon-status.is-ok { color:#15803d; font-weight:800; }
+.sd-direct-rekon-status.is-error { color:#b91c1c; font-weight:800; }
+body[data-theme="dark"] .sd-direct-rekon { background:rgba(30,64,175,.14); border-color:rgba(96,165,250,.35); }
+body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
 @media(max-width:600px){
-  .sd-tabs{gap:.2rem;padding:.22rem}.sd-tab-btn{min-height:36px;font-size:.7rem}.sd-tab-btn i{display:none}
+  .sd-tabs,.sd-tabs.has-unlinked{grid-template-columns:repeat(2, minmax(0, 1fr));gap:.2rem;padding:.22rem}.sd-tab-btn{min-height:36px;font-size:.7rem}.sd-tab-btn i{display:none}
   .sd-rekon-summary{grid-template-columns:1fr 1fr}.sd-rekon-stat:last-child{grid-column:1 / -1}
 }
 </style>
@@ -142,6 +152,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     $unmappedLines = $lines->filter(fn ($line) => empty($line->shipment_order_scan_id))->values();
     $mappedQty = (int) $mappedLines->sum('qty_scanned');
     $unmappedQty = (int) $unmappedLines->sum('qty_scanned');
+    $unlinkedOrderScans = $orderScans->filter(fn ($scan) => empty($scan->fulfillment_id) && $scan->source !== 'sales_invoice')->values();
     $mappingErrors = $mappingErrors ?? [];
 @endphp
 
@@ -252,10 +263,15 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     @endif
 
     @if($isItemFirst)
-        <div class="sd-tabs" role="tablist" aria-label="Ringkasan shipment">
+        <div class="sd-tabs {{ $shipment->shipment_type === \App\Models\Shipment::TYPE_MARKETPLACE ? 'has-unlinked' : '' }}" role="tablist" aria-label="Ringkasan shipment">
             <button type="button" class="sd-tab-btn active" data-sd-tab="orders" role="tab" aria-selected="true">
                 <i class="bi bi-receipt" aria-hidden="true"></i> Order
             </button>
+            @if($shipment->shipment_type === \App\Models\Shipment::TYPE_MARKETPLACE)
+                <button type="button" class="sd-tab-btn" data-sd-tab="unlinked" role="tab" aria-selected="false">
+                    <i class="bi bi-exclamation-circle" aria-hidden="true"></i> Belum Tertaut <span class="sd-tab-count">{{ $unlinkedOrderScans->count() }}</span>
+                </button>
+            @endif
             <button type="button" class="sd-tab-btn" data-sd-tab="items" role="tab" aria-selected="false">
                 <i class="bi bi-box-seam" aria-hidden="true"></i> Items
             </button>
@@ -271,6 +287,28 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                 <div><div class="sd-title">{{ $isItemFirst ? 'Mapping Order & Item' : 'Order Tercatat' }}</div><div class="sd-muted">{{ $isItemFirst ? 'Item dipetakan otomatis dari shipment sebelum stok dikurangi.' : 'Review grouping order/no resi dan item sebelum stok dikurangi.' }}</div></div>
                 <span class="sd-pill">{{ $isItemFirst ? 'Otomatis' : number_format($pendingOrders, 0, ',', '.') . ' tunda' }}</span>
             </div>
+            @if($shipment->shipment_type === \App\Models\Shipment::TYPE_MARKETPLACE && $statusKey === 'draft')
+                <div class="sd-direct-rekon" id="sdDirectRekon">
+                    <div class="sd-direct-rekon-head">
+                        <div>
+                            <div class="sd-direct-rekon-title"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Rekonsiliasi dari scan sebelumnya</div>
+                            <div class="sd-direct-rekon-sub">{{ $orderScans->count() }} nomor order/AWB yang sudah discan dipakai otomatis untuk mencari detail marketplace dan mengelompokkan item batch. Tidak perlu scan ulang.</div>
+                        </div>
+                        <a href="{{ route('sales.shipments.rekon', $shipment) }}" class="sd-btn" style="min-height:28px;padding:.18rem .5rem;font-size:.7rem">Editor manual</a>
+                    </div>
+                    <div class="sd-direct-rekon-status {{ $unmappedQty > 0 || $unlinkedOrderScans->isNotEmpty() ? 'is-error' : 'is-ok' }}" role="status">
+                        @if($orderScans->isEmpty())
+                            Belum ada nomor order/AWB yang tersimpan dari tahap sebelumnya.
+                        @elseif($unmappedQty > 0)
+                            {{ number_format($unmappedQty, 0, ',', '.') }} qty masih belum terkelompokkan; gunakan Editor manual bila perlu mengoreksi alokasi.
+                        @elseif($unlinkedOrderScans->isNotEmpty())
+                            {{ $unlinkedOrderScans->count() }} nomor belum tertaut ke marketplace dan perlu dicek kembali.
+                        @else
+                            Semua scan order sudah tertaut dan item sudah terkelompokkan.
+                        @endif
+                    </div>
+                </div>
+            @endif
             <div class="sd-order-search">
                 <input type="search" id="orderSearchInput" placeholder="Cari nomor order atau no resi..." autocomplete="off">
             </div>
@@ -427,6 +465,50 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 
     @if($isItemFirst)
         </div>
+
+        @if($shipment->shipment_type === \App\Models\Shipment::TYPE_MARKETPLACE)
+            <div id="sd-tab-unlinked" class="sd-tab-panel" role="tabpanel" hidden>
+                <div class="sd-card">
+                    <div class="sd-head">
+                        <div>
+                            <div class="sd-title">Order Belum Tertaut</div>
+                            <div class="sd-muted">Order/AWB yang sudah discan tetapi belum terhubung ke data marketplace.</div>
+                        </div>
+                        <span class="sd-pill">{{ number_format($unlinkedOrderScans->count(), 0, ',', '.') }} order</span>
+                    </div>
+                    <div class="sd-body">
+                        @forelse($unlinkedOrderScans as $scan)
+                            @php
+                                $payload = is_array($scan->raw_payload) ? $scan->raw_payload : [];
+                                $reason = $scan->match_reason ?: data_get($payload, 'match_reason') ?: data_get($payload, 'lookup_status');
+                                $reasonLabel = match ($reason) {
+                                    'order_not_found' => 'Order/AWB belum ditemukan di database marketplace',
+                                    'empty_scan_code' => 'Kode scan kosong',
+                                    'duplicate_active_shipment' => 'Order sedang ada di shipment aktif lain',
+                                    'fulfillment_cancelled' => 'Fulfillment sudah dibatalkan',
+                                    default => str_starts_with((string) $reason, 'status_')
+                                        ? 'Status marketplace belum boleh diproses'
+                                        : 'Belum ada tautan marketplace',
+                                };
+                            @endphp
+                            <div class="sd-order sd-order-group" style="margin-bottom:.45rem">
+                                <div class="sd-order-lead">
+                                    <span class="sd-order-num">!</span>
+                                    <div>
+                                        <div class="sd-order-no">{{ $scan->order_no }}</div>
+                                        <div class="sd-muted">{{ $scan->source ?: 'scanner' }} · {{ $reasonLabel }}</div>
+                                    </div>
+                                    <span class="sd-badge pending">Belum Tertaut</span>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="sd-rekon-message">Semua order/AWB yang discan sudah tertaut ke marketplace.</div>
+                        @endforelse
+                        <a href="{{ route('sales.shipments.rekon', $shipment) }}" class="sd-btn sd-primary" style="margin-top:.35rem">Buka Editor Rekonsiliasi</a>
+                    </div>
+                </div>
+            </div>
+        @endif
 
         <div id="sd-tab-items" class="sd-tab-panel" role="tabpanel" hidden>
             <div class="sd-card">
