@@ -142,6 +142,24 @@
             font-size: .82rem
         }
 
+        .lg-click-row {
+            cursor: pointer
+        }
+
+        .lg-click-row:hover {
+            background: color-mix(in srgb, var(--accent-soft) 12%, transparent)
+        }
+
+        .lg-row-link {
+            color: inherit;
+            text-decoration: none
+        }
+
+        .lg-row-link:hover {
+            color: var(--accent);
+            text-decoration: underline
+        }
+
         @media (max-width: 720px) {
             .lg-hide-sm {
                 display: none
@@ -245,6 +263,8 @@
                                 $d = (float) ($l->debit ?? 0);
                                 $c = (float) ($l->credit ?? 0);
                                 $running += $d - $c;
+                                $relatedUrl = $l->related_url ?? route('accounting.journals.show', $l->journal_id);
+                                $relatedLabel = $l->related_label ?? 'Buka detail jurnal';
                                 $ref = $l->source_type
                                     ? strtoupper($l->source_type) . ($l->source_id ? '#' . $l->source_id : '')
                                     : '-';
@@ -252,16 +272,21 @@
                                     ? \Carbon\Carbon::parse($l->posted_at)->format('H:i')
                                     : null;
                             @endphp
-                            <tr>
+                            <tr class="lg-click-row" data-href="{{ $relatedUrl }}" tabindex="0" role="link"
+                                aria-label="{{ $relatedLabel }}">
                                 <td>
                                     <div>{{ \Carbon\Carbon::parse($l->date)->format('d/m/Y') }}</div>
                                     @if ($postedAt)
                                         <div class="lg-muted" style="font-size:.76rem">{{ $postedAt }}</div>
                                     @endif
                                 </td>
-                                <td class="lg-hide-sm lg-muted">{{ $ref }}</td>
+                                <td class="lg-hide-sm lg-muted">
+                                    <a class="lg-row-link" href="{{ $relatedUrl }}" tabindex="-1">{{ $ref }}</a>
+                                </td>
                                 <td>
-                                    <div style="font-weight:700">{{ $l->journal_description ?? '-' }}</div>
+                                    <a class="lg-row-link" href="{{ $relatedUrl }}" tabindex="-1">
+                                        <div style="font-weight:700">{{ $l->journal_description ?? '-' }}</div>
+                                    </a>
                                     <div class="lg-muted">Line #{{ $l->id }}</div>
                                 </td>
                                 <td class="lg-right">{{ $d ? number_format($d, 0, ',', '.') : '—' }}</td>
@@ -283,4 +308,19 @@
             </div>
         </div>
     </div>
+
+    <script>
+        document.querySelectorAll('.lg-click-row').forEach((row) => {
+            row.addEventListener('click', (event) => {
+                if (event.target.closest('a')) return;
+                window.location.href = row.dataset.href;
+            });
+
+            row.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                window.location.href = row.dataset.href;
+            });
+        });
+    </script>
 @endsection

@@ -448,6 +448,11 @@
                 display: none !important
             }
         }
+
+        .pickup-line-row.is-highlighted {
+            background: rgba(245, 158, 11, .16);
+            box-shadow: inset 4px 0 0 #f59e0b;
+        }
     </style>
 @endpush
 
@@ -875,7 +880,7 @@
                                     $lineVoidedAtText = optional($line->voided_at ?? null)->format('Y-m-d H:i');
                                 @endphp
 
-                                <tr class="pickup-line-row" data-line-status="{{ $lineStatusKey }}">
+                                <tr id="pickup-line-{{ $line->id }}" class="pickup-line-row" data-line-status="{{ $lineStatusKey }}">
                                     <td class="td-desktop-only">{{ $loop->iteration }}</td>
 
                                     <td class="td-desktop-only">{{ $bundle?->bundle_code ?? '-' }}</td>
@@ -1189,6 +1194,17 @@
             });
 
             applyFilter();
+
+            const hash = window.location.hash;
+            if (hash.startsWith('#pickup-line-')) {
+                const target = document.getElementById(hash.slice(1));
+                if (target) {
+                    target.classList.add('is-highlighted');
+                    window.requestAnimationFrame(() => {
+                        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    });
+                }
+            }
         });
     </script>
 @endpush

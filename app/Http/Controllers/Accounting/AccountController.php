@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Accounting;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\JournalLine;
+use App\Models\SewingPickupLine;
 use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -219,6 +220,7 @@ class AccountController extends Controller
             ->whereNotIn('journals.source_type', self::EXCLUDED_BALANCE_SOURCES)
             ->select([
                 'journal_lines.id',
+                'journals.id as journal_id',
                 'journals.date as date',
                 'journals.created_at as posted_at',
                 'journals.description as journal_description',
@@ -239,6 +241,39 @@ class AccountController extends Controller
         }
 
         $lines = $q->paginate(50)->withQueryString();
+
+        // Upah Ambil Jahit disimpan per SewingPickupLine, sehingga source_id
+        // bukan ID pickup header. Resolve ke pickup induknya agar klik dari
+        // ledger membuka dokumen Ambil Jahit yang benar.
+        $sewingWageLineIds = $lines->getCollection()
+            ->where('source_type', 'sewing_pickup_wage')
+            ->pluck('source_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        $pickupIdByLineId = $sewingWageLineIds->isEmpty()
+            ? collect()
+            : SewingPickupLine::query()
+                ->whereIn('id', $sewingWageLineIds)
+                ->pluck('sewing_pickup_id', 'id');
+
+        $lines->getCollection()->transform(function ($line) use ($pickupIdByLineId) {
+            $line->related_url = route('accounting.journals.show', $line->journal_id);
+            $line->related_label = 'Buka detail jurnal';
+
+            if ($line->source_type === 'sewing_pickup_wage' && $line->source_id) {
+                $pickupId = $pickupIdByLineId[(int) $line->source_id] ?? null;
+
+                if ($pickupId) {
+                    $line->related_url = route('production.sewing.pickups.show', $pickupId)
+                        . '#pickup-line-' . (int) $line->source_id;
+                    $line->related_label = 'Buka detail Ambil Jahit';
+                }
+            }
+
+            return $line;
+        });
 
         // Opening balance sebelum "from"
         $openingBalance = 0.0;
