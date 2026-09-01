@@ -18,8 +18,12 @@ trait MarketplaceOrdersPaginatedTrait
         $search = trim((string) request()->query('search', ''));
 
         $applyScope = function ($query) use ($dateFrom, $dateTo, $store, $search) {
-            $this->excludeKilatOrders($query);
-            $this->scopeOperationalStores($query);
+            if ($this->isDummyOrdersRequest()) {
+                $query->whereJsonContains('meta->is_dummy', true);
+            } else {
+                $this->excludeKilatOrders($query);
+                $this->scopeOperationalStores($query);
+            }
 
             if ($dateFrom || $dateTo) {
                 $query->where(function ($q) use ($dateFrom, $dateTo) {
@@ -114,8 +118,12 @@ trait MarketplaceOrdersPaginatedTrait
         ];
 
         $query = MarketplaceOrder::with($with);
-        $this->excludeKilatOrders($query);
-        $this->scopeOperationalStores($query);
+        if ($this->isDummyOrdersRequest()) {
+            $query->whereJsonContains('meta->is_dummy', true);
+        } else {
+            $this->excludeKilatOrders($query);
+            $this->scopeOperationalStores($query);
+        }
 
         // Date Filter
         if ($dateFrom || $dateTo) {
@@ -550,6 +558,19 @@ trait MarketplaceOrdersPaginatedTrait
             ->filter(fn (Store $store): bool => $store->connection_status === 'CONNECTED')
             ->modelKeys();
 
-        $query->whereIn('store_id', $storeIds);
+        $query->where(function ($scope) use ($storeIds) {
+            $scope->whereIn('store_id', $storeIds);
+
+            // Data dummy tetap bisa diuji dari halaman Orders di local/testing,
+            // meskipun store dummy tidak memiliki token marketplace.
+            if (app()->environment(['local', 'testing'])) {
+                $scope->orWhereJsonContains('meta->is_dummy', true);
+            }
+        });
+    }
+
+    private function isDummyOrdersRequest(): bool
+    {
+        return request()->boolean('dummy') && app()->environment(['local', 'testing']);
     }
 }

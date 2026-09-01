@@ -96,8 +96,12 @@ class SeedMarketplaceOrders extends Command
 
         $order = MarketplaceOrder::create([
             'store_id'         => $store->id,
+            'external_order_id'=> $channelId,
             'channel_order_id' => $channelId,
-            'booking_sn'       => $channelId,
+            // Order dummy ini reguler; booking_sn hanya untuk Pesanan Kilat.
+            'booking_sn'       => null,
+            'order_date'       => $orderedAt,
+            'status'           => 'new',
             'order_status'     => $status,
             'buyer_username'   => $this->buyers[array_rand($this->buyers)],
             'payment_method'   => rand(0, 1) ? 'ShopeePay' : 'COD',
@@ -106,6 +110,7 @@ class SeedMarketplaceOrders extends Command
             'ordered_at'       => $orderedAt,
             'synced_at'        => $now,
             'total_amount'     => 0, // di-update setelah items dibuat
+            'meta'             => ['is_dummy' => true],
         ]);
 
         // ── Buat 1–3 items per order ─────────────────────────────────────────
@@ -143,6 +148,7 @@ class SeedMarketplaceOrders extends Command
             }
 
             MarketplaceOrderItem::create([
+                'order_id'             => $order->id,
                 'marketplace_order_id' => $order->id,
                 'external_item_id'     => rand(100000, 999999),
                 'external_model_id'    => rand(1000000, 9999999),

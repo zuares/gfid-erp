@@ -127,28 +127,15 @@ class MarketplaceSystemController extends Controller
             return response()->json(['message' => 'Status tidak valid.'], 422);
         }
 
-        // Auto-create dummy channel + store jika belum ada (dev convenience)
-        $channel = \DB::table('marketplace_channels')->first();
-        if (! $channel) {
-            $channelId = \DB::table('marketplace_channels')->insertGetId([
-                'code'       => 'shopee',
-                'name'       => 'Shopee',
-                'is_active'  => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        } else {
-            $channelId = $channel->id;
-        }
+        // Pakai store lokal yang memang direferensikan marketplace_orders.
+        // MarketplaceStore adalah model legacy dan membuat order tidak muncul
+        // di endpoint Orders yang memakai relasi Store.
+        $store = Store::where('name', 'Dummy Shopee Store')->first()
+            ?? Store::where('status', 'active')->first()
+            ?? Store::first();
 
-        $store = \App\Models\MarketplaceStore::first();
         if (! $store) {
-            $store = \App\Models\MarketplaceStore::create([
-                'channel_id'  => $channelId,
-                'name'        => 'Toko Dev (Dummy)',
-                'short_code'  => 'DEV',
-                'is_active'   => true,
-            ]);
+            return response()->json(['message' => 'Belum ada store lokal untuk dummy order.'], 422);
         }
 
         // Ambil SKU mappings yang ada sebagai referensi item dummy
@@ -168,7 +155,7 @@ class MarketplaceSystemController extends Controller
                     'store_id'           => $store->id,
                     'channel_order_id'   => $channelId,
                     'external_order_id'  => $channelId,
-                    'booking_sn'         => $channelId,
+                    'booking_sn'         => null,
                     'order_date'         => now()->subMinutes(rand(5, 1440)),
                     'order_status'       => $status,
                     'status'             => $status,
@@ -179,6 +166,7 @@ class MarketplaceSystemController extends Controller
                     'ordered_at'       => now()->subMinutes(rand(5, 1440)),
                     'synced_at'        => now(),
                     'total_amount'     => 0,
+                    'meta'             => ['is_dummy' => true],
                 ]);
 
                 $itemCount   = rand(1, 3);
