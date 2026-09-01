@@ -122,10 +122,10 @@
         <span class="sif-pill">{{ $totalLines }} SKU</span>
         <span class="sif-pill">{{ number_format($totalQty, 0, ',', '.') }} Qty</span>
         <span class="sif-pill sif-pill-kpi">Order <b id="sifOrderTotal">{{ $orders->count() }}</b></span>
-        <a href="{{ route('sales.shipments.confirm_orders', $shipment) }}"
+        <a href="{{ route('sales.shipments.rekon', $shipment) }}"
            id="sifConfirmBtn"
            class="sif-btn sif-btn-primary"
-           aria-disabled="{{ $orders->isNotEmpty() ? 'false' : 'true' }}">Cek Shipment</a>
+           aria-disabled="{{ $orders->isNotEmpty() ? 'false' : 'true' }}">Rekonsiliasi</a>
     </div>
 
     <div class="sif-shell">

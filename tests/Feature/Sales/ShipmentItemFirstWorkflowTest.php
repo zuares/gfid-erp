@@ -333,6 +333,43 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertJsonPath('message', 'Nomor order belum diisi.');
     }
 
+    public function test_scanned_order_is_available_on_the_reconciliation_page(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-SCAN-REKON-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.scan_order', $shipment))
+            ->assertOk()
+            ->assertSee(route('sales.shipments.rekon', $shipment), false)
+            ->assertSee('Rekonsiliasi');
+
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.scan_order_store', $shipment), [
+                'order_no' => 'ORDER-TO-REKON-001',
+            ])
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.rekon', $shipment))
+            ->assertOk()
+            ->assertSee('ORDER-TO-REKON-001')
+            ->assertSee('ORDER-TO-REKON-001', false);
+    }
+
     public function test_auto_link_reconciles_an_existing_awb_and_persists_the_match(): void
     {
         [$user, $store, $item] = $this->shipmentContext();
