@@ -366,16 +366,18 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
                                     </div>
                                     <span class="sd-order-qty">x{{ number_format($orderQty, 0, ',', '.') }}</span>
                                 </div>
-                                <div class="sd-order-items">
-                                    @forelse($orderLines as $line)
-                                        <div class="sd-order-item">
-                                            <div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div>
-                                            <div class="sd-order-item-qty">x{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>
-                                        </div>
-                                    @empty
-                                        <div class="sd-muted" style="padding:.45rem 0">Belum ada item di order ini.</div>
-                                    @endforelse
-                                </div>
+                                @if(!$scan->fulfillment?->marketplaceOrder)
+                                    <div class="sd-order-items">
+                                        @forelse($orderLines as $line)
+                                            <div class="sd-order-item">
+                                                <div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div>
+                                                <div class="sd-order-item-qty">x{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>
+                                            </div>
+                                        @empty
+                                            <div class="sd-muted" style="padding:.45rem 0">Belum ada item.</div>
+                                        @endforelse
+                                    </div>
+                                @endif
                                 @if($scan->fulfillment?->marketplaceOrder)
                                     @php
                                         $marketplaceOrder = $scan->fulfillment->marketplaceOrder;
