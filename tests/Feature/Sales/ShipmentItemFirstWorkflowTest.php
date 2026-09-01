@@ -127,8 +127,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee('Shipment belum siap dikirim')
             ->assertSee('belum terhubung ke order')
-            ->assertSee('Rekonsiliasi dari scan sebelumnya')
-            ->assertSee('Tidak perlu scan ulang.')
+            ->assertSee('Order & Item')
+            ->assertSee('Rekon')
             ->assertSee('Belum Tertaut')
             ->assertSee('sd-tab-unlinked');
     }

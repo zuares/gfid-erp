@@ -131,6 +131,21 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
   .sd-tabs,.sd-tabs.has-unlinked{grid-template-columns:repeat(2, minmax(0, 1fr));gap:.2rem;padding:.22rem}.sd-tab-btn{min-height:36px;font-size:.7rem}.sd-tab-btn i{display:none}
   .sd-rekon-summary{grid-template-columns:1fr 1fr}.sd-rekon-stat:last-child{grid-column:1 / -1}
 }
+
+/* Confirm page: compact operator view. */
+.sd-topbar{gap:.35rem;padding:.45rem .65rem;box-shadow:0 1px 8px rgba(15,23,42,.05)}
+.sd-topbar .sd-btn,.sd-topbar .sd-pill{min-height:30px;padding:.2rem .5rem;font-size:.7rem}
+.sd-topbar .sd-code{font-size:.86rem}
+.sd-wrap{max-width:960px;padding:.6rem .7rem 1.25rem}
+.sd-card{border-radius:9px;box-shadow:0 1px 5px rgba(15,23,42,.03)}
+.sd-head{padding:.6rem .75rem}
+.sd-body{padding:.6rem .75rem}
+.sd-order-search{padding:.45rem .75rem}
+.sd-order-search input{min-height:32px;padding:.28rem .5rem}
+.sd-order{padding:.5rem .6rem}
+.sd-order-items{margin-left:1.8rem}
+.sd-marketplace-detail{margin:.55rem 0 0 1.8rem;padding:.55rem .65rem}
+.sd-marketplace-table th,.sd-marketplace-table td{padding:.32rem .35rem}
 </style>
 @endpush
 
@@ -157,26 +172,21 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
 @endphp
 
 <div class="sd-topbar">
-    <a href="{{ route('sales.shipments.edit', $shipment) }}" class="sd-btn sd-topbar-nav">
-        <i class="bi bi-pencil-square" aria-hidden="true"></i> Edit Shipment
+    <a href="{{ route('sales.shipments.index') }}" class="sd-btn sd-topbar-nav" title="Kembali ke shipment">
+        <i class="bi bi-arrow-left" aria-hidden="true"></i> Shipment
     </a>
-    @if (!$isItemFirst)
-        <a href="{{ route('sales.shipments.scan_order', $shipment) }}" class="sd-btn sd-topbar-nav">
-            <i class="bi bi-upc-scan" aria-hidden="true"></i> Scan Order
-        </a>
-    @endif
-    <a href="{{ route('sales.shipments.index') }}" class="sd-btn sd-topbar-nav">
-        <i class="bi bi-list-ul" aria-hidden="true"></i> Daftar Shipment
+    <a href="{{ route('sales.shipments.edit', $shipment) }}" class="sd-btn sd-topbar-nav">
+        <i class="bi bi-pencil-square" aria-hidden="true"></i> Edit
     </a>
     @if($shipment->shipment_type === \App\Models\Shipment::TYPE_MARKETPLACE)
         <a href="{{ route('sales.shipments.rekon', $shipment) }}" class="sd-btn sd-topbar-nav">
-            <i class="bi bi-diagram-3" aria-hidden="true"></i> Rekonsiliasi
+            <i class="bi bi-diagram-3" aria-hidden="true"></i> Rekon
         </a>
         @if($statusKey === 'draft')
             <form class="sd-inline-form" action="{{ route('sales.shipments.rekon_auto_link', $shipment) }}" method="POST">
                 @csrf
-                <button type="submit" class="sd-btn sd-link sd-topbar-nav" title="Cari ulang AWB, nomor order, dan Booking SN lalu simpan tautannya">
-                    <i class="bi bi-link-45deg" aria-hidden="true"></i> Tautkan Otomatis
+                <button type="submit" class="sd-btn sd-link sd-topbar-nav" title="Tautkan otomatis">
+                    <i class="bi bi-link-45deg" aria-hidden="true"></i>
                 </button>
             </form>
         @endif
@@ -189,9 +199,9 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
     <span class="sd-spacer"></span>
     <span class="sd-pill">Qty <b>{{ number_format($totalQty, 0, ',', '.') }}</b></span>
     @if ($isItemFirst)
-        <span class="sd-pill">Mapping <b>Otomatis</b></span>
+        <span class="sd-pill">Auto</span>
     @else
-        <span class="sd-pill">Pesanan <b>{{ number_format($orderScans->count(), 0, ',', '.') }}</b></span>
+        <span class="sd-pill">Order <b>{{ number_format($orderScans->count(), 0, ',', '.') }}</b></span>
     @endif
     @if($statusKey === 'draft')
         <form id="shipmentSubmitForm" class="sd-inline-form" action="{{ $isDaily ? route('sales.shipments.wave_post', $shipment) : route('sales.shipments.submit', $shipment) }}" method="POST"
@@ -205,7 +215,7 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
             <button type="submit" class="sd-btn sd-primary sd-topbar-primary"
                     title="{{ !empty($stockInsufficient) ? 'Stok WH-RTS belum cukup' : 'Submit shipment' }}"
                     @disabled($lines->count() === 0 || !empty($stockInsufficient) || !empty($mappingErrors))>
-                <i class="bi bi-check2-circle" aria-hidden="true"></i> {{ $isDaily ? 'Selesaikan Gelombang' : 'Submit Shipment' }}
+                <i class="bi bi-check2-circle" aria-hidden="true"></i> {{ $isDaily ? 'Selesaikan' : 'Submit' }}
             </button>
         </form>
     @else
@@ -284,33 +294,11 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
 
     <div class="sd-card">
             <div class="sd-head">
-                <div><div class="sd-title">{{ $isItemFirst ? 'Mapping Order & Item' : 'Order Tercatat' }}</div><div class="sd-muted">{{ $isItemFirst ? 'Item dipetakan otomatis dari shipment sebelum stok dikurangi.' : 'Review grouping order/no resi dan item sebelum stok dikurangi.' }}</div></div>
-                <span class="sd-pill">{{ $isItemFirst ? 'Otomatis' : number_format($pendingOrders, 0, ',', '.') . ' tunda' }}</span>
+                <div class="sd-title">{{ $isItemFirst ? 'Order & Item' : 'Order' }}</div>
+                <span class="sd-pill">{{ number_format($pendingOrders, 0, ',', '.') }} pending</span>
             </div>
-            @if($shipment->shipment_type === \App\Models\Shipment::TYPE_MARKETPLACE && $statusKey === 'draft')
-                <div class="sd-direct-rekon" id="sdDirectRekon">
-                    <div class="sd-direct-rekon-head">
-                        <div>
-                            <div class="sd-direct-rekon-title"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Rekonsiliasi dari scan sebelumnya</div>
-                            <div class="sd-direct-rekon-sub">{{ $orderScans->count() }} nomor order/AWB yang sudah discan dipakai otomatis untuk mencari detail marketplace dan mengelompokkan item batch. Tidak perlu scan ulang.</div>
-                        </div>
-                        <a href="{{ route('sales.shipments.rekon', $shipment) }}" class="sd-btn" style="min-height:28px;padding:.18rem .5rem;font-size:.7rem">Editor manual</a>
-                    </div>
-                    <div class="sd-direct-rekon-status {{ $unmappedQty > 0 || $unlinkedOrderScans->isNotEmpty() ? 'is-error' : 'is-ok' }}" role="status">
-                        @if($orderScans->isEmpty())
-                            Belum ada nomor order/AWB yang tersimpan dari tahap sebelumnya.
-                        @elseif($unmappedQty > 0)
-                            {{ number_format($unmappedQty, 0, ',', '.') }} qty masih belum terkelompokkan; gunakan Editor manual bila perlu mengoreksi alokasi.
-                        @elseif($unlinkedOrderScans->isNotEmpty())
-                            {{ $unlinkedOrderScans->count() }} nomor belum tertaut ke marketplace dan perlu dicek kembali.
-                        @else
-                            Semua scan order sudah tertaut dan item sudah terkelompokkan.
-                        @endif
-                    </div>
-                </div>
-            @endif
             <div class="sd-order-search">
-                <input type="search" id="orderSearchInput" placeholder="Cari nomor order atau no resi..." autocomplete="off">
+                <input type="search" id="orderSearchInput" placeholder="Cari order / resi" autocomplete="off">
             </div>
             <div class="sd-body">
                 @if($orderScans->isEmpty() && $isItemFirst)
@@ -335,7 +323,7 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
                         </div>
                     </div>
                 @elseif($orderScans->isEmpty())
-                    <div class="sd-empty">Belum ada nomor pesanan yang dikonfirmasi.</div>
+                    <div class="sd-empty">Belum ada order.</div>
                 @else
                     <div class="sd-list">
                         @foreach($orderScans as $scan)
@@ -371,7 +359,7 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
                                     <span class="sd-order-num">{{ $loop->iteration }}</span>
                                     <div>
                                         <div class="sd-order-no">{{ $scan->order_no }}</div>
-                                        <div class="sd-muted">{{ $scanIsUnlinked ? 'Belum tertaut ke marketplace/fulfillment' : ($matchMethodLabel ? 'Tertaut via ' . $matchMethodLabel : ($scan->source ?: 'Tertaut')) }}@if($scan->confirmed_at) · {{ $scan->confirmed_at->format('d M Y H:i') }}@endif</div>
+                                        <div class="sd-muted">{{ $scanIsUnlinked ? 'Belum tertaut' : ($matchMethodLabel ?: ($scan->source ?: 'Tertaut')) }}@if($scan->confirmed_at) · {{ $scan->confirmed_at->format('d M Y H:i') }}@endif</div>
                                         @if($scanIsUnlinked && $matchReasonLabel)
                                             <div class="sd-muted" title="{{ $matchReason }}">Alasan: {{ $matchReasonLabel }}</div>
                                         @endif
@@ -398,7 +386,7 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
                                     <div class="sd-marketplace-detail">
                                         <div class="sd-marketplace-head">
                                             <div>
-                                                <div class="sd-marketplace-title"><i class="bi bi-shop me-1" aria-hidden="true"></i>Order Marketplace</div>
+                                            <div class="sd-marketplace-title"><i class="bi bi-shop me-1" aria-hidden="true"></i>Marketplace</div>
                                                 <div class="sd-marketplace-meta">
                                                     <span>Status: <b>{{ $marketplaceStatus ?: '—' }}</b></span>
                                                     @if($marketplaceOrder->buyer_username)<span>Pembeli: {{ $marketplaceOrder->buyer_username }}</span>@endif
@@ -416,7 +404,7 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
                                         @if($marketplaceLines->isNotEmpty())
                                             <div style="overflow:auto">
                                                 <table class="sd-marketplace-table">
-                                                    <thead><tr><th>SKU Marketplace</th><th>Item Internal</th><th class="sd-marketplace-number">Order</th><th class="sd-marketplace-number">Shipment</th><th class="sd-marketplace-number">Selisih</th></tr></thead>
+                                                    <thead><tr><th>SKU</th><th>Internal</th><th class="sd-marketplace-number">Order</th><th class="sd-marketplace-number">Ship</th><th class="sd-marketplace-number">Diff</th></tr></thead>
                                                     <tbody>
                                                     @foreach($marketplaceLines as $marketplaceLine)
                                                         @php
@@ -454,7 +442,7 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
                                         <div class="sd-order-item"><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div><div class="sd-order-item-name">{{ $line->item?->name ?? '' }}</div></div><div class="sd-order-item-qty">x{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div></div>
                                     @endforeach
                                 </div>
-                                <div class="sd-muted" style="padding:.55rem .75rem;border-top:1px dashed rgba(148,163,184,.25)">Masukkan nomor order di Rekonsiliasi. Item yang cocok akan otomatis dipindahkan ke kelompok order tersebut.</div>
+                                <div class="sd-muted" style="padding:.55rem .75rem;border-top:1px dashed rgba(148,163,184,.25)">Belum ada order.</div>
                             </div>
                         @endif
                     </div>
