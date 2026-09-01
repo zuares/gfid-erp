@@ -314,7 +314,7 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
                         <div class="sd-order-items">
                             @forelse($ungroupedLines as $line)
                                 <div class="sd-order-item">
-                                    <div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div><div class="sd-order-item-name">{{ $line->item?->name ?? '' }}</div></div>
+                                    <div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div>
                                     <div class="sd-order-item-qty">x{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>
                                 </div>
                             @empty
@@ -369,7 +369,7 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
                                 <div class="sd-order-items">
                                     @forelse($orderLines as $line)
                                         <div class="sd-order-item">
-                                            <div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div><div class="sd-order-item-name">{{ $line->item?->name ?? '' }}</div></div>
+                                            <div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div>
                                             <div class="sd-order-item-qty">x{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>
                                         </div>
                                     @empty
@@ -386,7 +386,6 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
                                     <div class="sd-marketplace-detail">
                                         <div class="sd-marketplace-head">
                                             <div>
-                                            <div class="sd-marketplace-title"><i class="bi bi-shop me-1" aria-hidden="true"></i>Marketplace</div>
                                                 <div class="sd-marketplace-meta">
                                                     <span>Status: <b>{{ $marketplaceStatus ?: '—' }}</b></span>
                                                     @if($marketplaceOrder->buyer_username)<span>Pembeli: {{ $marketplaceOrder->buyer_username }}</span>@endif
@@ -415,8 +414,8 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
                                                             $difference = $qtyShipment - $qtyOrder;
                                                         @endphp
                                                         <tr>
-                                                            <td class="sd-marketplace-code">{{ $marketplaceLine->marketplace_sku ?: $marketplaceLine->item_sku ?: $marketplaceLine->model_sku ?: '—' }}<div class="sd-muted">{{ $marketplaceLine->item_name ?: $marketplaceLine->item_name_snapshot ?: '' }}</div></td>
-                                                            <td>{{ $internalItem?->code ?: ($marketplaceLine->item_code_snapshot ?: 'Belum mapped') }}@if($internalItem)<div class="sd-muted">{{ $internalItem->name }}</div>@endif</td>
+                                                            <td class="sd-marketplace-code">{{ $marketplaceLine->marketplace_sku ?: $marketplaceLine->item_sku ?: $marketplaceLine->model_sku ?: '—' }}</td>
+                                                            <td>{{ $internalItem?->code ?: ($marketplaceLine->item_code_snapshot ?: 'Belum mapped') }}</td>
                                                             <td class="sd-marketplace-number">{{ number_format($qtyOrder, 0, ',', '.') }}</td>
                                                             <td class="sd-marketplace-number">{{ number_format($qtyShipment, 0, ',', '.') }}</td>
                                                             <td class="sd-marketplace-number {{ $difference === 0 ? 'sd-marketplace-ok' : 'sd-marketplace-short' }}">{{ $difference > 0 ? '+' : '' }}{{ number_format($difference, 0, ',', '.') }}</td>
@@ -439,7 +438,7 @@ body[data-theme="dark"] .sd-direct-rekon-title { color:#bfdbfe; }
                                 <div class="sd-order-lead"><span class="sd-order-num">—</span><div><div class="sd-order-no">SISA BELUM TERKELOMPOK</div><div class="sd-muted">Item menunggu nomor order atau belum cocok</div></div><span class="sd-order-qty">x{{ number_format((int) $ungroupedLines->sum('qty_scanned'), 0, ',', '.') }}</span></div>
                                 <div class="sd-order-items">
                                     @foreach($ungroupedLines as $line)
-                                        <div class="sd-order-item"><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div><div class="sd-order-item-name">{{ $line->item?->name ?? '' }}</div></div><div class="sd-order-item-qty">x{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div></div>
+                                        <div class="sd-order-item"><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div><div class="sd-order-item-qty">x{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div></div>
                                     @endforeach
                                 </div>
                                 <div class="sd-muted" style="padding:.55rem .75rem;border-top:1px dashed rgba(148,163,184,.25)">Belum ada order.</div>
