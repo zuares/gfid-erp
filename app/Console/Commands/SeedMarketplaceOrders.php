@@ -142,9 +142,23 @@ class SeedMarketplaceOrders extends Command
                 $m        = $entry['mapping'];
                 $itemName = $m->item?->name ?? 'Produk ' . $m->marketplace_sku;
                 $sku      = $m->marketplace_sku;
+                $internalItemId = $m->item_id;
+                $hpp = (float) ($m->item?->effective_unit_cost ?? 0);
+                $mappingStatus = 'mapped';
+                $costStatus = $hpp > 0 ? 'complete' : 'missing_hpp';
+                $profitStatus = $hpp > 0 ? 'complete' : 'incomplete';
+                $dataStatus = $hpp > 0 ? 'valid' : 'incomplete';
+                $issueReason = $hpp > 0 ? null : 'missing_hpp';
             } else {
                 $itemName = 'Produk Sample ' . Str::upper(Str::random(4));
                 $sku      = 'SKU-' . Str::upper(Str::random(6));
+                $internalItemId = null;
+                $mappingStatus = 'mapping_not_found';
+                $costStatus = 'missing_hpp';
+                $profitStatus = 'incomplete';
+                $dataStatus = 'incomplete';
+                $issueReason = 'mapping_not_found';
+                $hpp = null;
             }
 
             MarketplaceOrderItem::create([
@@ -157,6 +171,14 @@ class SeedMarketplaceOrders extends Command
                 'model_sku'            => $sku,
                 'qty'                  => $qty,
                 'price'                => $price,
+                'marketplace_sku'      => $sku,
+                'mapping_status'       => $mappingStatus,
+                'cost_status'          => $costStatus,
+                'profit_status'        => $profitStatus,
+                'data_status'          => $dataStatus,
+                'issue_reason'         => $issueReason,
+                'internal_item_id'     => $internalItemId,
+                'hpp_snapshot'         => $hpp,
             ]);
 
             $totalAmount += $qty * $price;
