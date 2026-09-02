@@ -256,9 +256,13 @@
             </div>
 
             @php
-                // default operator (diset otomatis, bisa diubah dari modal)
-                $autoDefaultOperatorId = (int) old('operator_id') ?: optional($operators->first())->id;
-                $selectedOperator = $operators->firstWhere('id', $autoDefaultOperatorId);
+                // Operator berasal dari Piece Rate module Sewing dan pilihan
+                // default harus sama dengan yang tampil di modal.
+                $sewingOperators = collect($operators ?? [])
+                    ->unique('id')
+                    ->sortBy('code')
+                    ->values();
+                $autoDefaultOperatorId = (int) old('operator_id') ?: (int) optional($sewingOperators->first())->id;
             @endphp
 
             <form id="sewing-pickup-form" action="{{ route('production.sewing.pickups.store') }}" method="post"
@@ -266,7 +270,7 @@
                 @csrf
 
                 {{-- Hidden operator_id (di-set lewat modal), dan gudang --}}
-                <input type="hidden" name="operator_id" id="operator_id_hidden" value="{{ $autoDefaultOperatorId }}">
+                <input type="hidden" name="operator_id" id="operator_id_hidden" value="{{ $autoDefaultOperatorId ?: '' }}">
                 <input type="hidden" name="warehouse_id" value="{{ $defaultWarehouseId }}">
                 <input type="hidden" name="supplies_checklist" id="supplies_checklist_payload" value="">
                 <input type="hidden" name="print_after_save" id="print_after_save" value="0">
@@ -334,7 +338,8 @@
 
             {{-- Modal pilih operator --}}
             @include('production.sewing_pickups._operator_modal', [
-                'operators' => $operators,
+                'operators' => $sewingOperators,
+                'selectedOperator' => $autoDefaultOperatorId ?: null,
                 'wipSewWarehouse' => $wipSewWarehouse,
             ])
         </div>

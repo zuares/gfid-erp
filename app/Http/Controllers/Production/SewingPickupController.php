@@ -11,6 +11,7 @@ use App\Models\ItemBom;
 use App\Models\ItemBomLine;
 use App\Models\ItemRole;
 use App\Models\InventoryAdjustment;
+use App\Models\PieceRate;
 use App\Models\SewingPickup;
 use App\Models\SewingPickupLine;
 use App\Models\SewingPickupLineSupplyLine;
@@ -25,6 +26,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class SewingPickupController extends Controller
@@ -200,7 +202,14 @@ class SewingPickupController extends Controller
      */
     public function create()
     {
-        $operators = Employee::whereIn('role', ['sewing', 'operating'])
+        // Piece Rate menjadi sumber utama operator jahit. Role employee tidak
+        // cukup sebagai penentu karena tarif payroll-lah yang menentukan siapa
+        // yang siap dipakai untuk transaksi sewing.
+        $operators = Employee::query()
+            ->select('id', 'code', 'name', 'role')
+            ->whereIn('id', PieceRate::query()
+                ->where('module', 'sewing')
+                ->select('employee_id'))
             ->orderBy('code')
             ->get();
 
@@ -239,7 +248,13 @@ class SewingPickupController extends Controller
         $validated = $request->validate([
             'date' => ['required', 'date_format:Y-m-d'],
             'warehouse_id' => ['required', 'exists:warehouses,id'], // gudang sewing (WIP-SEW)
-            'operator_id' => ['required', 'exists:employees,id'],
+            'operator_id' => [
+                'required',
+                'integer',
+                'exists:employees,id',
+                Rule::exists('piece_rates', 'employee_id')
+                    ->where(fn ($query) => $query->where('module', 'sewing')),
+            ],
             'notes' => ['nullable', 'string'],
             'supplies_checklist' => ['nullable', 'string'],
 
@@ -252,6 +267,7 @@ class SewingPickupController extends Controller
             'lines.required' => 'Minimal satu baris bundle harus diisi.',
             'lines.*.bundle_id.required' => 'Bundle tidak valid.',
             'lines.*.qty_bundle.required' => 'Qty pickup wajib diisi.',
+            'operator_id.exists' => 'Operator harus memiliki tarif Piece Rate module Sewing terlebih dahulu.',
         ]);
 
         $pickup = DB::transaction(function () use ($validated, $request) {

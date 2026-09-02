@@ -4,6 +4,10 @@ $isOwner = auth()->user()?->isOwner()
     || in_array(auth()->user()?->role ?? '', ['admin', 'operating'], true);
 // Strict: hanya owner sungguhan yang boleh melihat kolom "Kebutuhan" (kebutuhan + stok RM).
 $isOwnerStrict = (bool) (auth()->user()?->isOwner());
+$sewingOperators = collect($operators ?? [])
+    ->unique('id')
+    ->sortBy('code')
+    ->values();
 @endphp
 
 @push('head')
@@ -158,9 +162,15 @@ $isOwnerStrict = (bool) (auth()->user()?->isOwner());
 
                     {{-- Operator --}}
                     <x-modal-confirm-operator title="Operator Jahit" label="Pilih Operator" :required="true"
-                        :name="null" selectId="operator_select_modal" :operators="$operators"
-                        :selected="null"
-                        description="Pilih <strong>Operator Jahit</strong> untuk semua bundle yang diambil." />
+                        :name="null" selectId="operator_select_modal" :operators="$sewingOperators"
+                        :selected="$selectedOperator ?? null"
+                        description="Pilih <strong>Operator Jahit</strong> untuk semua bundle yang diambil. Daftar operator diambil dari Payroll &gt; Piece Rate dengan module Sewing." />
+
+                    @if ($sewingOperators->isEmpty())
+                        <div class="alert alert-warning py-2 px-3 mt-2 mb-0 small">
+                            Belum ada operator dengan tarif Piece Rate <strong>Sewing</strong>. Tambahkan tarif terlebih dahulu di menu Payroll &gt; Piece Rate.
+                        </div>
+                    @endif
 
                     {{-- Bundle list (diisi JS) --}}
                     <div class="mt-3">
