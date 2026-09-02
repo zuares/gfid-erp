@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\Item;
 use App\Models\ItemRole;
 use App\Models\Lot;
+use App\Models\PieceRate;
 use App\Models\QcResult;
 use App\Models\Warehouse;
 use App\Models\CuttingJobLot;
@@ -345,10 +346,13 @@ class CuttingJobController extends Controller
             ->orderBy('code')
             ->get();
 
-        // 4️⃣ Data master operator cutting
+        // 4️⃣ Operator yang sudah memiliki konfigurasi tarif borongan cutting.
+        //    Piece Rate menjadi sumber utama daftar operator; jangan membatasi
+        //    lagi berdasarkan role employee karena module tarif sudah menentukan
+        //    bahwa employee tersebut dapat dipakai untuk proses cutting.
         $operators = Employee::query()
             ->select('id', 'code', 'name', 'role')
-            ->whereIn('role', ['cutting', 'operating'])
+            ->whereIn('id', PieceRate::cutting()->select('employee_id'))
             ->orderBy('code')
             ->get();
 

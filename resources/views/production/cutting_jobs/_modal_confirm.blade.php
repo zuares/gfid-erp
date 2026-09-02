@@ -1,6 +1,15 @@
 {{-- resources/views/production/cutting_jobs/_modal_confirm.blade.php --}}
 
 {{-- MODAL: INFO + KONFIRMASI CUTTING JOB --}}
+@php
+    // Daftar operator dikirim dari controller berdasarkan Piece Rate module cutting.
+    // unique() menjaga modal tetap bersih walaupun satu operator punya beberapa tarif.
+    $cuttingOperators = collect($operators ?? [])
+        ->unique('id')
+        ->sortBy('code')
+        ->values();
+@endphp
+
 <div class="modal fade" id="cuttingInfoModal" tabindex="-1" aria-labelledby="cuttingInfoModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
@@ -19,14 +28,25 @@
                         <div class="col-12">
                             <label class="form-label small mb-1">Pilih Operator <span
                                     class="text-danger">*</span></label>
-                            <select name="operator_id" class="form-select form-select-sm" id="modal-operator-id">
+                            <select name="operator_id" class="form-select form-select-sm" id="modal-operator-id"
+                                aria-describedby="modal-operator-help" required>
                                 <option value="">- Pilih Operator -</option>
-                                @foreach ($operators as $op)
+                                @forelse ($cuttingOperators as $op)
                                     <option value="{{ $op->id }}" @selected($selectedOperatorId == $op->id)>
                                         {{ $op->code }} - {{ $op->name }}@if ($op->role === 'operating') (operating)@endif
                                     </option>
-                                @endforeach
+                                @empty
+                                    <option value="" disabled>Belum ada operator dengan Piece Rate cutting</option>
+                                @endforelse
                             </select>
+                            <div id="modal-operator-help" class="form-text small">
+                                Daftar operator diambil dari Payroll &gt; Piece Rate dengan module Cutting.
+                            </div>
+                            @if ($cuttingOperators->isEmpty())
+                                <div class="alert alert-warning py-2 px-3 mt-2 mb-0 small">
+                                    Tambahkan tarif operator dengan module <strong>Cutting</strong> terlebih dahulu.
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>

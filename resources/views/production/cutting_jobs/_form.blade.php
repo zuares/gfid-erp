@@ -96,8 +96,14 @@
         }
 
         .bundles-table-wrap {
-            overflow-x: auto;
+            /* Dropdown item autosuggest harus bisa keluar dari area tabel. */
+            overflow: visible;
             position: relative;
+        }
+
+        .bundles-table tbody tr.bundle-row:focus-within {
+            position: relative;
+            z-index: 20;
         }
 
         .bundles-table {
