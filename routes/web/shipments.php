@@ -55,9 +55,15 @@ Route::middleware(['web', 'auth', 'access:sales'])
                 Route::get('/{shipment}/reconcile', [ShipmentController::class, 'reconcile'])
                     ->name('reconcile');
 
-                // ── Opsi C: Rekonsiliasi Pesanan ──────────────────────────
-                Route::get('/{shipment}/rekon',        'rekon')->name('rekon');
+                // Rekonsiliasi manual disembunyikan sementara. Link lama tetap
+                // aman dan dibawa ke halaman cek shipment biasa.
+                Route::get('/{shipment}/rekon', fn (\App\Models\Shipment $shipment) => redirect()
+                    ->route('sales.shipments.confirm_orders', $shipment))
+                    ->name('rekon');
                 Route::get('/{shipment}/confirm',      'confirmOrders')->name('confirm_orders');
+                // Endpoint lama dibiarkan untuk kompatibilitas data/scan yang
+                // masih dipakai halaman pembuatan shipment lama; tidak ada UI
+                // operator yang mengarah ke editor rekonsiliasi.
                 Route::post('/{shipment}/rekon/match', 'rekonMatch')->name('rekon_match');
                 Route::post('/{shipment}/rekon/auto-link', 'autoLinkShipmentScans')->name('rekon_auto_link');
                 Route::post('/{shipment}/rekon/apply', 'rekonApply')->name('rekon_apply');

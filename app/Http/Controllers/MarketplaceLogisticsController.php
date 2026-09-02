@@ -296,8 +296,40 @@ class MarketplaceLogisticsController extends Controller
     public function arrangeShipment(Request $request, Store $store, string $orderSn): JsonResponse
     {
         try {
-            $isAutoSync = $request->input('is_auto_sync', false);
-            $params = $request->input('params', []);
+            // The Orders page sends the selected method at the JSON root
+            // ({dropoff: {}} / {pickup: {...}}), while older callers used a
+            // nested {params: {...}} payload. Accept both shapes so the
+            // selected shipping method is not silently discarded.
+            $isAutoSync = $request->boolean('is_auto_sync')
+                || $request->boolean('auto_sync_only');
+            $params = $request->input('params');
+            if (! is_array($params)) {
+                $params = $request->only(['pickup', 'dropoff', 'non_integrated']);
+            }
+
+            $methodNames = ['pickup', 'dropoff', 'non_integrated'];
+            $selectedMethods = collect($methodNames)
+                ->filter(fn (string $method) => array_key_exists($method, $params))
+                ->values();
+
+            // Shopee requires exactly one shipping mode. Do this validation
+            // here so an empty/ambiguous payload cannot reach the API.
+            if (! $isAutoSync && $selectedMethods->count() !== 1) {
+                return response()->json([
+                    'error' => true,
+                    'message' => 'Pilih tepat satu metode pengiriman: pickup, dropoff, atau non_integrated.',
+                ], 422);
+            }
+
+            // Empty JSON objects are decoded by PHP as empty arrays. Convert
+            // them back to objects because Shopee expects pickup/dropoff to be
+            // an object, not an array.
+            foreach ($selectedMethods as $method) {
+                if (is_array($params[$method]) && empty($params[$method])) {
+                    $params[$method] = new \stdClass();
+                }
+            }
+
             $result = $this->logistics->arrangeShipment($store, $orderSn, $params, $isAutoSync);
             return response()->json($result);
         } catch (\Exception $e) {

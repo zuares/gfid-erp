@@ -752,13 +752,12 @@ body[data-theme="dark"] .shp-topbar {
                          style="display:none;margin-top:.55rem;padding:.5rem .85rem;border-radius:10px;
                                 background:#fef9c3;border:1px solid #fde68a;font-size:.79rem;color:#78350f">
                         No pesanan tidak ditemukan. Shipment tetap bisa dibuat.
-                        <span style="color:#94a3b8">Rekonsiliasi bisa dilakukan nanti.</span>
                     </div>
 
                     {{-- Hint: no input --}}
                     <div id="lookupHint"
                          style="margin-top:.4rem;font-size:.72rem;color:#94a3b8">
-                        Opsional, bisa rekonsiliasi nanti.
+                        Opsional, dapat dicek kembali sebelum shipment diposting.
                     </div>
                 </div>
 
@@ -824,7 +823,7 @@ body[data-theme="dark"] .shp-topbar {
             </div>
             <div style="display:flex;gap:.4rem;flex-wrap:wrap">
                 <button type="button" class="btn-shp-outline" id="newOrderBtn">Order Baru</button>
-                <a href="#" data-rekon-link class="btn-shp-outline is-disabled" aria-disabled="true" style="text-decoration:none">Cek Pesanan</a>
+                <a href="#" data-rekon-link class="btn-shp-outline is-disabled" aria-disabled="true" style="text-decoration:none">Cek Shipment</a>
             </div>
         </div>
 
@@ -908,7 +907,7 @@ body[data-theme="dark"] .shp-topbar {
                 <a href="#" data-rekon-link class="btn-shp-outline is-disabled"
                     aria-disabled="true"
                     style="display:inline-flex;align-items:center;text-decoration:none">
-                    Rekonsiliasi
+                    Cek Shipment
                 </a>
 
                 <form id="submitForm" method="POST" action=""
@@ -1555,7 +1554,7 @@ body[data-theme="dark"] .shp-topbar {
         const ea = document.getElementById('exportBtn');
         if (ea) ea.href = s.export_url;
 
-        // Rekonsiliasi links
+        // Link cek shipment (tetap memakai URL legacy agar scan inline lama kompatibel).
         document.querySelectorAll('[data-rekon-link]').forEach((el) => {
             if (!s.rekon_url) return;
             el.href = s.rekon_url;

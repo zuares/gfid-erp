@@ -256,7 +256,7 @@
                     Belum ada nomor pesanan yang dikonfirmasi.
                     @if($statusKey === 'draft')
                         <div style="margin-top:.55rem">
-                            <a href="{{ route('sales.shipments.rekon', $shipment) }}" class="sd-btn sd-primary">Scan Pesanan</a>
+                            <a href="{{ route('sales.shipments.scan_order', $shipment) }}" class="sd-btn sd-primary">Scan Pesanan</a>
                         </div>
                     @endif
                 </div>

@@ -122,10 +122,10 @@
         <span class="sif-pill">{{ $totalLines }} SKU</span>
         <span class="sif-pill">{{ number_format($totalQty, 0, ',', '.') }} Qty</span>
         <span class="sif-pill sif-pill-kpi">Order <b id="sifOrderTotal">{{ $orders->count() }}</b></span>
-        <a href="{{ route('sales.shipments.rekon', $shipment) }}"
+        <a href="{{ route('sales.shipments.confirm_orders', $shipment) }}"
            id="sifConfirmBtn"
            class="sif-btn sif-btn-primary"
-           aria-disabled="{{ $orders->isNotEmpty() ? 'false' : 'true' }}">Rekonsiliasi</a>
+           aria-disabled="{{ $orders->isNotEmpty() ? 'false' : 'true' }}">Cek Shipment</a>
     </div>
 
     <div class="sif-shell">
@@ -153,7 +153,7 @@
                         <div id="sifCameraReader" class="sif-camera-reader"></div>
                         <div id="sifCameraStatus" class="sif-camera-status">Meminta izin kamera...</div>
                     </div>
-                    <div class="sif-hint">Satu order akan dimapping otomatis. Jika shipment berisi beberapa order, lanjutkan ke rekonsiliasi untuk membagi SKU dan quantity per order.</div>
+                    <div class="sif-hint">Setelah order dicatat, pilih Cek Shipment untuk meninjau item dan melanjutkan post.</div>
                 </div>
             </div>
         </div>
@@ -162,7 +162,7 @@
             <div class="sif-card-head">
                 <div>
                     <div class="sif-title">Order Tercatat</div>
-                    <div class="sif-sub">Order yang sudah masuk akan dipetakan otomatis saat lanjut ke Cek Shipment.</div>
+                    <div class="sif-sub">Order yang sudah masuk akan digunakan saat Cek Shipment.</div>
                 </div>
             </div>
             <div class="sif-body">

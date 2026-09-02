@@ -119,8 +119,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('sales.shipments.rekon', $shipment))
-            ->assertOk()
-            ->assertSee('Alokasikan Item ke Order');
+            ->assertRedirect(route('sales.shipments.confirm_orders', $shipment));
 
         $this->actingAs($user)
             ->get(route('sales.shipments.confirm_orders', $shipment))
@@ -128,9 +127,9 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Shipment belum siap dikirim')
             ->assertSee('belum terhubung ke order')
             ->assertSee('Order & Item')
-            ->assertSee('Rekon')
-            ->assertSee('Belum Tertaut')
-            ->assertSee('sd-tab-unlinked');
+            ->assertDontSee('data-sd-tab="rekon"', false)
+            ->assertDontSee('sd-tab-rekon', false)
+            ->assertDontSee('sd-tab-unlinked', false);
     }
 
     public function test_confirmation_reconciles_order_numbers_scanned_in_previous_step(): void
@@ -333,7 +332,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertJsonPath('message', 'Nomor order belum diisi.');
     }
 
-    public function test_scanned_order_is_available_on_the_reconciliation_page(): void
+    public function test_scanned_order_is_available_on_the_shipment_check_page(): void
     {
         [$user, $store, $item] = $this->shipmentContext();
         $shipment = Shipment::create([
@@ -354,8 +353,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $this->actingAs($user)
             ->get(route('sales.shipments.scan_order', $shipment))
             ->assertOk()
-            ->assertSee(route('sales.shipments.rekon', $shipment), false)
-            ->assertSee('Rekonsiliasi');
+            ->assertSee(route('sales.shipments.confirm_orders', $shipment), false)
+            ->assertSee('Cek Shipment');
 
         $this->actingAs($user)
             ->postJson(route('sales.shipments.scan_order_store', $shipment), [
@@ -364,7 +363,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertOk();
 
         $this->actingAs($user)
-            ->get(route('sales.shipments.rekon', $shipment))
+            ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
             ->assertSee('ORDER-TO-REKON-001')
             ->assertSee('ORDER-TO-REKON-001', false);
