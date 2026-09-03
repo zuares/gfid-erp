@@ -183,7 +183,7 @@
                 <h4 class="jd-title">{{ $journal->description ?: 'Journal' }}</h4>
                 <div class="jd-sub">
                     {{ \Illuminate\Support\Carbon::parse($journal->date)->format('Y-m-d') }}
-                    • {{ $journal->source_type }}{{ $journal->source_id ? ' #' . $journal->source_id : '' }}
+                    • {{ $sourceTypeLabel ?? $journal->source_type }}{{ $journal->source_id ? ' #' . $journal->source_id : '' }}
                     • ID #{{ $journal->id }}
                 </div>
             </div>

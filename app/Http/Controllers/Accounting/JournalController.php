@@ -17,6 +17,8 @@ class JournalController extends Controller
             'cash_expense_void' => 'Pembatalan Pengeluaran',
             'cash_receipt' => 'Penerimaan Kas/Bank',
             'cash_receipt_void' => 'Pembatalan Penerimaan',
+            'cash_transfer' => 'Transfer Kas/Bank',
+            'cash_transfer_void' => 'Pembatalan Transfer Kas/Bank',
 
             'account_reclass_inventory_adjustment' => 'Reclass Adjustment Stok (6101 → 6115)',
 
@@ -150,6 +152,11 @@ class JournalController extends Controller
         if (in_array($journal->source_type, ['cash_receipt', 'cash_receipt_void'], true) && $journal->source_id) {
             $sourceUrl = $this->safeRoute('accounting.cash-receipts.show', $journal->source_id);
             $sourceLabel = $sourceUrl ? 'Buka Penerimaan' : null;
+        }
+
+        if (in_array($journal->source_type, ['cash_transfer', 'cash_transfer_void'], true) && $journal->source_id) {
+            $sourceUrl = $this->safeRoute('accounting.cash-transfers.show', $journal->source_id);
+            $sourceLabel = $sourceUrl ? 'Buka Transfer' : null;
         }
 
         if (in_array($journal->source_type, ['opening_balance', 'opening_balance_void'], true)) {

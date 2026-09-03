@@ -190,8 +190,10 @@
     $hasProdBundleAssemblies = $router->has('production.bundle_assemblies.index');
 
     // Akuntansi
+    $hasAccountingIndex = $router->has('accounting.index');
     $hasAccountsIndex = $router->has('accounting.accounts.index');
     $hasCashExpensesIndex = $router->has('accounting.cash-expenses.index');
+    $hasCashTransfersIndex = $router->has('accounting.cash-transfers.index');
     $hasCashBasisReportIndex = $router->has('accounting.cash-basis-report.index');
     $hasCashReceiptsIndex = $router->has('accounting.cash-receipts.index');
     $hasJournalsIndex = $router->has('accounting.journals.index');
@@ -289,9 +291,9 @@
     }
 
     if (!$canModule('accounting')) {
-        $hasAccountsIndex = $hasCashBasisReportIndex = false;
+        $hasAccountingIndex = $hasAccountsIndex = $hasCashBasisReportIndex = false;
         $hasCashReceiptsIndex = $hasJournalsIndex = $hasOpeningBalancesIndex = false;
-        $hasOpeningBalancesBatchIndex = false;
+        $hasOpeningBalancesBatchIndex = $hasCashTransfersIndex = false;
     }
 
     if (!$canModule('payroll')) {
@@ -378,9 +380,11 @@
         $open('production.reports.*');
 
     $openAccounting =
+        $open('accounting.index') ||
         $open('accounting.cash-basis-report.*') ||
         $open('accounting.cash-expenses.*') ||
         $open('accounting.cash-receipts.*') ||
+        $open('accounting.cash-transfers.*') ||
         $open('accounting.marketplace-payouts.*') ||
         $open('accounting.ap-report.*') ||
         $open('accounting.trial-balance.*') ||
@@ -1460,12 +1464,14 @@
             {{-- Keuangan --}}
             @if ($canShow(
                 $hasCashExpensesIndex,
+                $hasCashTransfersIndex,
                 $hasCashReceiptsIndex,
                 $hasCashBasisReportIndex,
                 $hasJournalsIndex,
                 $hasAccountsIndex,
                 $hasOpeningBalancesIndex,
-                $hasOpeningBalancesBatchIndex
+                $hasOpeningBalancesBatchIndex,
+                $hasAccountingIndex
             ))
                 <x-sidebar.label text="Keuangan" />
                 <li class="mb-1">
@@ -1479,6 +1485,12 @@
                     <div class="collapse {{ $openAccounting ? 'show' : '' }}" id="navAccountingAdmin">
                         <div class="sidebar-subhead">Akuntansi</div>
                         <div class="simple-group">
+                    @if ($hasAccountingIndex)
+                        <x-sidebar.simple-link href="{{ route('accounting.index') }}" icon="bi bi-grid-1x2"
+                            :active="request()->routeIs('accounting.index')">
+                            Ringkasan Keuangan
+                        </x-sidebar.simple-link>
+                    @endif
                     @if ($hasCashBasisReportIndex)
                         <x-sidebar.simple-link href="{{ route('accounting.cash-basis-report.index') }}" icon="bi bi-bar-chart"
                             :active="request()->routeIs('accounting.cash-basis-report.*')">
@@ -1490,6 +1502,13 @@
                         <x-sidebar.simple-link href="{{ route('accounting.cash-expenses.index') }}" icon="bi bi-cash"
                             :active="request()->routeIs('accounting.cash-expenses.*')">
                             Pengeluaran Kas
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasCashTransfersIndex)
+                        <x-sidebar.simple-link href="{{ route('accounting.cash-transfers.index') }}" icon="bi bi-arrow-left-right"
+                            :active="request()->routeIs('accounting.cash-transfers.*')">
+                            Transfer Kas/Bank
                         </x-sidebar.simple-link>
                     @endif
 
@@ -2285,7 +2304,7 @@
             @endif
 
             {{-- FINANCE --}}
-            @if ($canShow($hasOpeningBalancesIndex, $hasOpeningBalancesBatchIndex, $hasCashExpensesIndex, $hasCashReceiptsIndex, $hasCashBasisReportIndex, $hasJournalsIndex, $hasAccountsIndex))
+            @if ($canShow($hasAccountingIndex, $hasOpeningBalancesIndex, $hasOpeningBalancesBatchIndex, $hasCashExpensesIndex, $hasCashReceiptsIndex, $hasCashTransfersIndex, $hasCashBasisReportIndex, $hasJournalsIndex, $hasAccountsIndex, $hasMarketplacePayoutsIndex, $hasApReportIndex, $hasTrialBalanceIndex, $hasProfitLossIndex, $hasBukuBesarIndex))
                 <x-sidebar.label text="Keuangan" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openAccounting ? 'is-open' : '' }}" type="button"
@@ -2297,6 +2316,12 @@
                     </button>
 
                     <div class="collapse {{ $openAccounting ? 'show' : '' }}" id="navAccounting">
+                        @if ($hasAccountingIndex)
+                            <x-sidebar.sub-link href="{{ route('accounting.index') }}" icon="bi bi-grid-1x2"
+                                :active="request()->routeIs('accounting.index')">
+                                Ringkasan Keuangan
+                            </x-sidebar.sub-link>
+                        @endif
                         @if ($hasCashBasisReportIndex)
                             <x-sidebar.sub-link href="{{ route('accounting.cash-basis-report.index') }}" icon="bi bi-bar-chart"
                                 :active="request()->routeIs('accounting.cash-basis-report.*')">
@@ -2322,6 +2347,13 @@
                             <x-sidebar.sub-link href="{{ route('accounting.cash-expenses.index') }}" icon="bi bi-cash"
                                 :active="request()->routeIs('accounting.cash-expenses.*')">
                                 Pengeluaran Kas
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasCashTransfersIndex)
+                            <x-sidebar.sub-link href="{{ route('accounting.cash-transfers.index') }}" icon="bi bi-arrow-left-right"
+                                :active="request()->routeIs('accounting.cash-transfers.*')">
+                                Transfer Kas/Bank
                             </x-sidebar.sub-link>
                         @endif
 

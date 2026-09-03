@@ -5,6 +5,7 @@ use App\Http\Controllers\Accounting\ApReportController;
 use App\Http\Controllers\Accounting\CashBasisReportController;
 use App\Http\Controllers\Accounting\CashExpenseController;
 use App\Http\Controllers\Accounting\CashReceiptController;
+use App\Http\Controllers\Accounting\CashTransferController;
 use App\Http\Controllers\Accounting\JournalController;
 use App\Http\Controllers\Accounting\MarketplacePayoutController;
 use App\Http\Controllers\Accounting\OpeningBalanceBatchController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\Accounting\TrialBalanceController;
 use App\Http\Controllers\Api\AccountSuggestController;
 
 Route::middleware(['auth', 'access:accounting'])->prefix('accounting')->name('accounting.')->group(function () {
+    Route::get('/', fn () => redirect()->route('accounting.cash-basis-report.index'))->name('index');
     Route::get('cash-basis-report', [CashBasisReportController::class, 'index'])->name('cash-basis-report.index');
 
     // ✅ Laporan Keuangan
@@ -39,6 +41,11 @@ Route::middleware(['auth', 'access:accounting'])->prefix('accounting')->name('ac
     Route::resource('cash-receipts', CashReceiptController::class);
     Route::post('cash-receipts/{cashReceipt}/post', [CashReceiptController::class, 'post'])->name('cash-receipts.post');
     Route::post('cash-receipts/{cashReceipt}/void', [CashReceiptController::class, 'void'])->name('cash-receipts.void');
+
+    // ✅ Cash/Bank Transfers
+    Route::resource('cash-transfers', CashTransferController::class);
+    Route::post('cash-transfers/{cashTransfer}/post', [CashTransferController::class, 'post'])->name('cash-transfers.post');
+    Route::post('cash-transfers/{cashTransfer}/void', [CashTransferController::class, 'void'])->name('cash-transfers.void');
 
     // ✅ Journals (read-only)
     Route::get('journals', [JournalController::class, 'index'])->name('journals.index');

@@ -229,6 +229,8 @@
                 'cash_expense_void' => 'Void Pengeluaran',
                 'cash_receipt' => 'Penerimaan',
                 'cash_receipt_void' => 'Void Penerimaan',
+                'cash_transfer' => 'Transfer Kas/Bank',
+                'cash_transfer_void' => 'Void Transfer Kas/Bank',
                 'opening_balance' => 'Saldo Awal',
                 'opening_balance_void' => 'Void Saldo Awal',
                 // contoh masa depan:
@@ -248,6 +250,9 @@
             <div class="jx-actions">
                 @if (Route::has('accounting.cash-expenses.index'))
                     <a class="jx-btn" href="{{ route('accounting.cash-expenses.index') }}">💸 Pengeluaran</a>
+                @endif
+                @if (Route::has('accounting.cash-transfers.index'))
+                    <a class="jx-btn" href="{{ route('accounting.cash-transfers.index') }}">↔️ Transfer Kas/Bank</a>
                 @endif
                 @if (Route::has('accounting.opening-balances.index'))
                     <a class="jx-btn" href="{{ route('accounting.opening-balances.index') }}">🟢 Saldo Awal</a>
