@@ -295,7 +295,9 @@ class FinishingRepairController extends Controller
             ? Str::upper(Str::slug($category->code, '-'))
             : Str::upper(Str::slug($category?->name ?: 'REJECT', '-'));
 
-        $rejectCode = trim($categoryCode, '-') . '-RJCT';
+        // SKU standar reject: REJ-{KODE_KATEGORI}, misalnya REJ-LJR.
+        // Kode lama *-RJCT tetap dipertahankan sebagai histori.
+        $rejectCode = 'REJ-' . trim($categoryCode, '-');
         $rejectName = trim(($category?->name ?: $categoryCode) . ' Reject');
 
         $attributes = [
