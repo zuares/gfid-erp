@@ -56,6 +56,7 @@ class JournalService
     public const SRC_SEWING_RETURN_OK = 'sewing_return_ok';
     public const SRC_SEWING_RETURN_REJECT = 'sewing_return_reject';
     public const SRC_SEWING_REWORK_OK = 'sewing_reject_rework_ok';
+    public const SRC_DEFECT_OPENING_BALANCE_CORRECTION = 'defect_opening_balance_correction';
     public const SRC_SHIPMENT_COGS = 'shipment_cogs';
     public const SRC_SHIPMENT_WAVE_COGS = 'shipment_wave_cogs';
     public const SRC_WIP_FIN_ADJUSTMENT = 'wip_fin_adjustment';
