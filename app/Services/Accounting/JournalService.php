@@ -1126,6 +1126,26 @@ class JournalService
      */
     public function postSewingReturnOk(\App\Models\SewingReturn $return, ?string $date = null): ?Journal
     {
+        // Return OK yang sumbernya dari REJ-SEW adalah setor ulang barang
+        // cacat. Nilai dasarnya harus keluar dari akun 1204, bukan 1202.
+        // Flow lama memakai source mutation sewing_qc_out dari REJ-SEW,
+        // sehingga deteksi ini juga memperbaiki dokumen historis saat
+        // jurnalnya di-void lalu diposting ulang.
+        $fromDefectInventory = DB::table('inventory_mutations as im')
+            ->join('warehouses as w', 'w.id', '=', 'im.warehouse_id')
+            ->where('im.source_type', 'sewing_qc_out')
+            ->where('im.source_id', (int) $return->id)
+            ->where('im.qty_change', '<', 0)
+            ->where('w.code', 'REJ-SEW')
+            ->exists();
+
+        $creditAccountCode = $fromDefectInventory
+            ? self::CODE_INV_DEFECT
+            : self::CODE_INV_WIP;
+        $description = $fromDefectInventory
+            ? "Setor Ulang {$return->code} — Barang Cacat → WIP"
+            : "QC Jahit {$return->code} — WIP-SEW → WIP-FIN";
+
         if ($this->mutationAmount(self::SRC_SEWING_RETURN_OK, (int) $return->id, 'in') <= 0
             && $this->mutationAmount(self::SRC_SEWING_RETURN_OK, (int) $return->id, 'out') <= 0
         ) {
@@ -1135,9 +1155,9 @@ class JournalService
                 mutationSourceType: 'sewing_qc_in',
                 mutationSourceId: (int) $return->id,
                 date: $this->dateOnly($date ?: $return->date),
-                description: "QC Jahit {$return->code} — WIP-SEW → WIP-FIN",
+                description: $description,
                 debitAccountCode: self::CODE_INV_WIP,
-                creditAccountCode: self::CODE_INV_WIP,
+                creditAccountCode: $creditAccountCode,
                 direction: 'in'
             );
         }
@@ -1148,9 +1168,11 @@ class JournalService
             mutationSourceType: self::SRC_SEWING_RETURN_OK,
             mutationSourceId: (int) $return->id,
             date: $this->dateOnly($date ?: $return->date),
-            description: "Setoran Jahit {$return->code} — WIP-SEW → WIP-FIN + Upah",
+            description: $fromDefectInventory
+                ? "Setor Ulang {$return->code} — Barang Cacat → WIP + Upah"
+                : "Setoran Jahit {$return->code} — WIP-SEW → WIP-FIN + Upah",
             debitAccountCode: self::CODE_INV_WIP,
-            creditAccountCode: self::CODE_INV_WIP,
+            creditAccountCode: $creditAccountCode,
         );
     }
 
