@@ -134,6 +134,11 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         $grnList = $order->purchaseReceipts ?? collect();
         $grnCount = $grnList->count();
         $hasActivePayments = $order->activePayments()->exists();
+        // Payment yang sudah di-void tetap tersimpan sebagai audit trail di
+        // relasi payments, tetapi tidak boleh tampil sebagai pembayaran aktif.
+        $activePaymentRows = ($order->payments ?? collect())
+            ->filter(fn ($payment) => is_null($payment->voided_at))
+            ->values();
 
         // Payment method "preferensi" PO
         $pm = $order->paymentMethod ?? null;
@@ -465,8 +470,8 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         @if ($user && ($user->isOwner() || $isAdmin))
         <button type="button" class="po-tab" data-tab="grn">Penerimaan (GRN) <span class="po-tab-count">{{ $grnCount }}</span></button>
         @endif
-        @if ($canSeeMoney && $order->payments->count() > 0)
-        <button type="button" class="po-tab" data-tab="payments">Riwayat Bayar <span class="po-tab-count">{{ $order->payments->count() }}</span></button>
+        @if ($canSeeMoney && $activePaymentRows->count() > 0)
+        <button type="button" class="po-tab" data-tab="payments">Riwayat Bayar <span class="po-tab-count">{{ $activePaymentRows->count() }}</span></button>
         @endif
     </div>
 
@@ -700,7 +705,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
     @endif
 
     {{-- TAB PEMBAYARAN --}}
-    @if ($canSeeMoney && $order->payments->count() > 0)
+    @if ($canSeeMoney && $activePaymentRows->count() > 0)
     <div class="po-tabpane" id="po-tab-payments" role="tabpanel">
         <div class="po-card">
             <div class="po-head">
@@ -723,7 +728,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach ($order->payments as $p)
+                            @foreach ($activePaymentRows as $p)
                                 @php
                                     $type = (string) ($p->type ?? '');
                                     $typeLabel = match ($type) {
