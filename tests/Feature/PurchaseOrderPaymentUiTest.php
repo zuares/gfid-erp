@@ -230,4 +230,31 @@ class PurchaseOrderPaymentUiTest extends TestCase
             ->assertDontSee('Bayar DP')
             ->assertDontSee('Tambah DP');
     }
+
+    public function test_owner_can_cancel_approved_po_without_receipt_or_active_payment(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-PO-CANCEL-UI-' . uniqid(),
+        ]);
+        $supplier = Supplier::create([
+            'code' => 'SUP-PO-CANCEL-UI-' . uniqid(),
+            'name' => 'Supplier Cancel UI',
+        ]);
+        $order = PurchaseOrder::create([
+            'code' => 'PO-CANCEL-UI-' . uniqid(),
+            'date' => '2026-08-31',
+            'supplier_id' => $supplier->id,
+            'grand_total' => 1000000,
+            'status' => 'approved',
+            'received_status' => 'not_received',
+            'payment_status' => 'unpaid',
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('purchasing.purchase_orders.show', $order))
+            ->assertOk()
+            ->assertSee('Cancel PO')
+            ->assertDontSee('Tutup Paksa PO');
+    }
 }

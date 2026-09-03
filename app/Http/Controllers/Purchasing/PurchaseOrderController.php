@@ -788,6 +788,12 @@ class PurchaseOrderController extends Controller
                 ->with('error', 'PO yang sudah punya GRN tidak boleh dibatalkan.');
         }
 
+        if ($purchase_order->activePayments()->exists()) {
+            return redirect()
+                ->route('purchasing.purchase_orders.show', $purchase_order->id)
+                ->with('error', 'PO yang masih memiliki pembayaran aktif tidak boleh dibatalkan. Void atau selesaikan payment terlebih dahulu.');
+        }
+
         $this->service->cancel($purchase_order, (int) Auth::id());
 
         return redirect()

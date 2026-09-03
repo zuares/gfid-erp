@@ -134,6 +134,11 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         $grnList = $order->purchaseReceipts ?? collect();
         $grnCount = $grnList->count();
         $hasActivePayments = $order->activePayments()->exists();
+        $canCancelApprovedWithoutTransactions = $status === 'approved'
+            && $grnCount === 0
+            && !$hasActivePayments
+            && $user
+            && ($user->isOwner() || $user->isDeveloper());
         // Payment yang sudah di-void tetap tersimpan sebagai audit trail di
         // relasi payments, tetapi tidak boleh tampil sebagai pembayaran aktif.
         $activePaymentRows = ($order->payments ?? collect())
@@ -375,7 +380,19 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                     </form>
                 </li>
             @endif
-            @if ($status === 'approved' && $user && $user->isOwner())
+            @if ($canCancelApprovedWithoutTransactions)
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form action="{{ route('purchasing.purchase_orders.cancel', $order->id) }}" method="POST"
+                          onsubmit="return confirm('Cancel PO ini? Pastikan supplier tidak mengirim barang dan seluruh DP sudah di-void/refund.');">
+                        @csrf
+                        <button type="submit" class="dropdown-item py-2 text-danger fw-semibold">
+                            <i class="bi bi-x-circle me-2"></i> Cancel PO
+                        </button>
+                    </form>
+                </li>
+            @endif
+            @if ($status === 'approved' && $user && $user->isOwner() && $grnCount > 0)
                 <li><hr class="dropdown-divider"></li>
                 <li>
                     <form action="{{ route('purchasing.purchase_orders.close', $order->id) }}" method="POST"
