@@ -177,10 +177,10 @@ class PurchaseOrder extends Model
         return !is_null($this->locked_at);
     }
 
-    /** Status yang boleh menjadi acuan GRN (draft/approved/closed, TIDAK cancelled). */
+    /** Status yang boleh menjadi acuan GRN: hanya PO yang sudah approved. */
     public function isReceivableForGrn(): bool
     {
-        return in_array($this->status, ['draft', 'approved'], true) || $this->isClosed();
+        return $this->status === 'approved';
     }
 
     /** Label turunan untuk UI: Draft / Receiving / Partially Received / Fully Received / Locked. */

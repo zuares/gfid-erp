@@ -112,7 +112,7 @@
             default => 'status-badge status-badge-draft',
         };
         $statusLabel = match ((string) $order->status) {
-            'approved' => 'Posted',
+            'approved' => 'Approved',
             'closed' => 'Closed',
             'cancelled' => 'Cancelled',
             default => 'Draft',

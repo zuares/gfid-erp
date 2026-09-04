@@ -23,7 +23,7 @@ use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
- * UAT: Flow baru Purchase Order (draft) → GRN → PO Locked.
+ * UAT: Flow Purchase Order (draft) → approved → GRN → PO Locked.
  *
  * Menguji: penguncian PO, keamanan harga (server-side), validasi relasi
  * header/line PO, over-receipt, dan konsistensi stok/jurnal/AP saat posting.
@@ -102,6 +102,13 @@ class GrnFromDraftPoTest extends TestCase
         ]);
     }
 
+    protected function makeApprovedPo(float $qty = 10, float $price = 1000, ?int $supplierId = null): PurchaseOrder
+    {
+        $po = $this->makeDraftPo($qty, $price, $supplierId);
+
+        return $this->poService->approve($po, $this->owner->id);
+    }
+
     protected function makeGrnPayload(PurchaseOrder $po, float $qtyReceived, float $reqPrice = 0, ?int $supplierId = null): array
     {
         $poLine = $po->lines()->first();
@@ -149,7 +156,7 @@ class GrnFromDraftPoTest extends TestCase
 
     public function test_grn_index_can_search_by_purchase_order_code(): void
     {
-        $po = $this->makeDraftPo(2, 1000);
+        $po = $this->makeApprovedPo(2, 1000);
         $this->grnService->create($this->makeGrnPayload($po, 1));
 
         $response = $this->get(route('purchasing.purchase_receipts.index', ['q' => $po->code]));
@@ -161,8 +168,8 @@ class GrnFromDraftPoTest extends TestCase
 
     public function test_grn_export_respects_supplier_and_date_filters(): void
     {
-        $ownPo = $this->makeDraftPo(2, 1000);
-        $otherPo = $this->makeDraftPo(2, 1000, $this->supplierOther->id);
+        $ownPo = $this->makeApprovedPo(2, 1000);
+        $otherPo = $this->makeApprovedPo(2, 1000, $this->supplierOther->id);
         $this->grnService->create($this->makeGrnPayload($ownPo, 1));
         $this->grnService->create($this->makeGrnPayload($otherPo, 1, 0, $this->supplierOther->id));
 
@@ -217,11 +224,54 @@ class GrnFromDraftPoTest extends TestCase
         $this->assertEqualsWithDelta(20, (float) $updated->lines()->first()->qty, 0.001);
     }
 
-    // 2 + 3. GRN dari PO draft → PO terkunci (locked_at, first_grn_id).
-    public function test_grn_from_draft_po_locks_po(): void
+    // 2. PO draft tidak boleh langsung dipakai membuat GRN.
+    public function test_grn_from_draft_po_is_rejected(): void
     {
         $po = $this->makeDraftPo();
         $this->assertSame('draft', $po->status);
+
+        $this->expectException(ValidationException::class);
+        $this->grnService->create($this->makeGrnPayload($po, 5));
+    }
+
+    public function test_owner_can_approve_draft_po_from_http(): void
+    {
+        $po = $this->makeDraftPo();
+
+        $response = $this->actingAs($this->owner)
+            ->post(route('purchasing.purchase_orders.approve', $po));
+
+        $response->assertRedirect(route('purchasing.purchase_orders.show', $po));
+        $this->assertDatabaseHas('purchase_orders', [
+            'id' => $po->id,
+            'status' => 'approved',
+            'approved_by' => $this->owner->id,
+        ]);
+    }
+
+    public function test_po_ui_requires_approval_before_grn_action(): void
+    {
+        $po = $this->makeDraftPo();
+
+        $this->actingAs($this->owner)
+            ->get(route('purchasing.purchase_orders.show', $po))
+            ->assertOk()
+            ->assertSee('Approve PO', false)
+            ->assertDontSee('>Terima</span>', false);
+
+        $this->poService->approve($po, $this->owner->id);
+
+        $this->get(route('purchasing.purchase_orders.show', $po))
+            ->assertOk()
+            ->assertSee('APPROVED', false)
+            ->assertSee('>Terima</span>', false);
+    }
+
+    // 3. GRN dari PO approved → PO terkunci (locked_at, first_grn_id).
+    public function test_grn_from_approved_po_locks_po(): void
+    {
+        $po = $this->makeApprovedPo();
+        $this->assertSame('approved', $po->status);
 
         $grn = $this->grnService->create($this->makeGrnPayload($po, 5));
 
@@ -229,14 +279,13 @@ class GrnFromDraftPoTest extends TestCase
         $this->assertTrue($po->isLocked(), 'PO harus terkunci setelah GRN pertama.');
         $this->assertEquals($grn->id, $po->first_grn_id);
         $this->assertNotNull($po->receiving_started_at);
-        // Status PO tidak dipaksa approved.
-        $this->assertSame('draft', $po->status);
+        $this->assertSame('approved', $po->status);
     }
 
     // 4. PO terkunci tidak dapat dihapus (HTTP, sebagai owner).
     public function test_locked_po_cannot_be_deleted(): void
     {
-        $po = $this->makeDraftPo();
+        $po = $this->makeApprovedPo();
         $this->grnService->create($this->makeGrnPayload($po, 5));
 
         $res = $this->actingAs($this->owner)
@@ -249,7 +298,7 @@ class GrnFromDraftPoTest extends TestCase
     // 5. Supplier PO terkunci tidak dapat diubah.
     public function test_locked_po_supplier_cannot_change(): void
     {
-        $po = $this->makeDraftPo();
+        $po = $this->makeApprovedPo();
         $this->grnService->create($this->makeGrnPayload($po, 5));
         $po->refresh();
 
@@ -265,7 +314,7 @@ class GrnFromDraftPoTest extends TestCase
     // 6. Line yang sudah dirujuk GRN tidak dapat dihapus dari PO terkunci.
     public function test_referenced_line_cannot_be_removed(): void
     {
-        $po = $this->makeDraftPo();
+        $po = $this->makeApprovedPo();
         $this->grnService->create($this->makeGrnPayload($po, 5));
         $po->refresh();
 
@@ -281,7 +330,7 @@ class GrnFromDraftPoTest extends TestCase
     // 7. Qty PO tidak dapat diturunkan di bawah qty received.
     public function test_qty_cannot_go_below_received(): void
     {
-        $po = $this->makeDraftPo(10, 1000);
+        $po = $this->makeApprovedPo(10, 1000);
         $this->grnService->create($this->makeGrnPayload($po, 5)); // received 5
         $po->refresh();
 
@@ -297,7 +346,7 @@ class GrnFromDraftPoTest extends TestCase
     // Owner boleh memperbaiki HARGA pada PO terkunci (qty tetap >= received).
     public function test_owner_can_fix_price_on_locked_po(): void
     {
-        $po = $this->makeDraftPo(10, 1000);
+        $po = $this->makeApprovedPo(10, 1000);
         $this->grnService->create($this->makeGrnPayload($po, 5));
         $po->refresh();
 
@@ -324,8 +373,8 @@ class GrnFromDraftPoTest extends TestCase
     // 16. PO line dari PO lain ditolak.
     public function test_po_line_from_other_po_rejected(): void
     {
-        $poA = $this->makeDraftPo();
-        $poB = $this->makeDraftPo();
+        $poA = $this->makeApprovedPo();
+        $poB = $this->makeApprovedPo();
         $poBLine = $poB->lines()->first();
 
         $payload = $this->makeGrnPayload($poA, 5);
@@ -338,7 +387,7 @@ class GrnFromDraftPoTest extends TestCase
     // 17. Supplier mismatch ditolak.
     public function test_supplier_mismatch_rejected(): void
     {
-        $po = $this->makeDraftPo();
+        $po = $this->makeApprovedPo();
 
         $this->expectException(ValidationException::class);
         $this->grnService->create($this->makeGrnPayload($po, 5, 0, $this->supplierOther->id));
@@ -347,7 +396,7 @@ class GrnFromDraftPoTest extends TestCase
     // 18. Over receipt ditolak.
     public function test_over_receipt_rejected(): void
     {
-        $po = $this->makeDraftPo(10, 1000);
+        $po = $this->makeApprovedPo(10, 1000);
 
         $this->expectException(ValidationException::class);
         $this->grnService->create($this->makeGrnPayload($po, 15)); // > 10
@@ -356,7 +405,7 @@ class GrnFromDraftPoTest extends TestCase
     // 10 + 11. Harga dari request diabaikan; GRN memakai harga PO.
     public function test_price_from_request_is_ignored_uses_po_price(): void
     {
-        $po = $this->makeDraftPo(10, 1000);
+        $po = $this->makeApprovedPo(10, 1000);
         $grn = $this->grnService->create($this->makeGrnPayload($po, 5, 999999)); // request 999999
 
         $line = $grn->lines()->first();
@@ -366,7 +415,7 @@ class GrnFromDraftPoTest extends TestCase
     // 12. Posting GRN → stok, mutation, AP, dan jurnal terbentuk benar.
     public function test_posting_creates_stock_mutation_and_journal(): void
     {
-        $po = $this->makeDraftPo(10, 1000);
+        $po = $this->makeApprovedPo(10, 1000);
         $grn = $this->grnService->create($this->makeGrnPayload($po, 10));
         $grn = $this->grnService->post($grn);
 
@@ -394,7 +443,7 @@ class GrnFromDraftPoTest extends TestCase
         $this->assertEqualsWithDelta(10000, $apCredit, 0.01);
         $this->assertEqualsWithDelta(10000, $invDebit, 0.01);
 
-        // received_status PO harus fully_received meski PO draft
+        // received_status PO harus fully_received setelah GRN diposting.
         $this->assertSame('fully_received', $po->fresh()->received_status);
     }
 
@@ -413,7 +462,7 @@ class GrnFromDraftPoTest extends TestCase
             ['name' => 'Offset DP', 'mode' => 'credit', 'is_active' => true]
         );
 
-        $po = $this->makeDraftPo(10, 1000);
+        $po = $this->makeApprovedPo(10, 1000);
         $dp = PurchasePayment::create([
             'purchase_order_id' => $po->id,
             'date' => now()->toDateString(),
@@ -458,7 +507,7 @@ class GrnFromDraftPoTest extends TestCase
             'purchase_conversion_factor' => 12,
         ])->save();
 
-        $po = $this->makeDraftPo(2, 120000);
+        $po = $this->makeApprovedPo(2, 120000);
         $poLine = $po->lines()->first();
 
         $this->assertSame('lusin', $poLine->purchase_unit);
@@ -492,7 +541,7 @@ class GrnFromDraftPoTest extends TestCase
             'purchase_conversion_factor' => 12,
         ])->save();
 
-        $po = $this->makeDraftPo(3, 120000);
+        $po = $this->makeApprovedPo(3, 120000);
         $payload = $this->makeGrnPayload($po, 0);
         $payload['lines'][0]['qty_received'] = 35 / 12;
         $payload['lines'][0]['qty_reject'] = 1 / 12;
@@ -567,6 +616,8 @@ class GrnFromDraftPoTest extends TestCase
             ],
         ]);
 
+        $po = $this->poService->approve($po, $this->owner->id);
+
         $poLines = $po->lines()->orderBy('id')->get();
         $this->assertSame('hpp', $poLines[0]->allocation);
         $this->assertSame('expense', $poLines[1]->allocation);
@@ -638,7 +689,7 @@ class GrnFromDraftPoTest extends TestCase
     // 20. Unpost GRN membalik stok dan void jurnal.
     public function test_unpost_reverses_stock_and_voids_journal(): void
     {
-        $po = $this->makeDraftPo(10, 1000);
+        $po = $this->makeApprovedPo(10, 1000);
         $grn = $this->grnService->create($this->makeGrnPayload($po, 10));
         $grn = $this->grnService->post($grn);
         $grn = $this->grnService->unpost($grn);
@@ -656,7 +707,7 @@ class GrnFromDraftPoTest extends TestCase
 
     public function test_partial_grn_keeps_remaining_qty_available_for_next_grn(): void
     {
-        $po = $this->makeDraftPo(10, 1000);
+        $po = $this->makeApprovedPo(10, 1000);
 
         $first = $this->grnService->create($this->makeGrnPayload($po, 7));
         $this->grnService->post($first);
@@ -690,7 +741,7 @@ class GrnFromDraftPoTest extends TestCase
     // Concurrency-ish (19): dua GRN berturut tidak boleh over-receipt gabungan.
     public function test_sequential_grn_cannot_exceed_outstanding(): void
     {
-        $po = $this->makeDraftPo(10, 1000);
+        $po = $this->makeApprovedPo(10, 1000);
         $this->grnService->create($this->makeGrnPayload($po, 7)); // sisa 3
 
         $this->expectException(ValidationException::class);

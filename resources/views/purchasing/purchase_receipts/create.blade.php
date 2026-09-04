@@ -419,7 +419,7 @@
             <span class="shp-meta-store">{{ $order->supplier?->name ?? '-' }}</span>
             <span class="tag tag-material">PO {{ $order->code }}</span>
         @else
-            <span class="shp-meta-code">Pilih item dari PO (draft atau approved)</span>
+            <span class="shp-meta-code">Pilih item dari PO yang sudah Approved</span>
             <span class="tag tag-material">PO belum dipilih</span>
             @unless ($hasOrder)
                 <span class="shp-badge">1 GRN = 1 PO</span>
@@ -768,9 +768,9 @@
                                 <div style="font-size:1.5rem;margin-bottom:.5rem;">✅</div>
                                 Semua item sudah diproses.
                             @elseif (!$hasOrder && !$selectedSupplierId)
-                                Tidak ada item dari PO (draft/approved).
+                                Tidak ada item dari PO Approved.
                             @elseif (!$hasOrder && $selectedSupplierId)
-                                Tidak ada item PO (draft/approved) untuk supplier ini.
+                                Tidak ada item PO Approved untuk supplier ini.
                             @else
                                 Tidak ada detail item.
                             @endif

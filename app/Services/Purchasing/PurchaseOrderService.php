@@ -169,6 +169,46 @@ class PurchaseOrderService
     // LIFECYCLE / CANCEL
     // ======================================================================
 
+    /**
+     * Approve PO draft agar menjadi dokumen aktif yang boleh diproses GRN.
+     */
+    public function approve(PurchaseOrder $order, int $approvedBy): PurchaseOrder
+    {
+        return DB::transaction(function () use ($order, $approvedBy) {
+            $order = PurchaseOrder::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
+
+            if ($order->status === 'approved') {
+                return $order->fresh(['supplier', 'lines', 'paymentMethod']);
+            }
+
+            if ($order->status !== 'draft') {
+                throw ValidationException::withMessages([
+                    'status' => 'Hanya PO Draft yang bisa di-approve.',
+                ]);
+            }
+
+            if ($order->purchaseReceipts()->exists()) {
+                throw ValidationException::withMessages([
+                    'status' => 'PO yang sudah memiliki GRN tidak bisa di-approve dari Draft.',
+                ]);
+            }
+
+            if (!$order->lines()->exists()) {
+                throw ValidationException::withMessages([
+                    'lines' => 'PO harus memiliki minimal satu barang sebelum di-approve.',
+                ]);
+            }
+
+            $order->forceFill([
+                'status' => 'approved',
+                'approved_by' => $approvedBy,
+                'approved_at' => now(),
+            ])->save();
+
+            return $order->fresh(['supplier', 'lines', 'approvedBy', 'paymentMethod']);
+        });
+    }
+
     public function cancel(PurchaseOrder $order, int $cancelledBy): PurchaseOrder
     {
         return DB::transaction(function () use ($order, $cancelledBy) {

@@ -587,7 +587,7 @@ class PurchaseOrderController extends Controller
         if ($purchase_order->status !== 'draft' && !$canEditApproved) {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
-                ->with('error', 'PO hanya bisa diedit saat Draft, atau saat masih POSTED tetapi belum memiliki GRN dan payment aktif.');
+                ->with('error', 'PO hanya bisa diedit saat Draft, atau saat masih Approved tetapi belum memiliki GRN dan payment aktif.');
         }
 
         // ✅ RECEIVING LOCK: admin gudang (tanpa hak harga) tidak boleh mengedit PO
@@ -695,7 +695,7 @@ class PurchaseOrderController extends Controller
         if ($purchase_order->status !== 'draft' && !$canEditApproved) {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
-                ->with('error', 'PO hanya bisa diubah saat Draft, atau saat masih POSTED tetapi belum memiliki GRN dan payment aktif.');
+                ->with('error', 'PO hanya bisa diubah saat Draft, atau saat masih Approved tetapi belum memiliki GRN dan payment aktif.');
         }
 
         // ✅ RECEIVING LOCK: user tanpa hak harga tidak boleh update PO terkunci.
@@ -745,6 +745,22 @@ class PurchaseOrderController extends Controller
         return redirect()
             ->route('purchasing.purchase_orders.index')
             ->with('success', 'Purchase Order berhasil dihapus.');
+    }
+
+    /**
+     * Approve PO Draft agar dapat diproses ke GRN.
+     */
+    public function approve(Request $request, PurchaseOrder $purchase_order)
+    {
+        try {
+            $this->service->approve($purchase_order, (int) $request->user()->id);
+
+            return redirect()
+                ->route('purchasing.purchase_orders.show', $purchase_order->id)
+                ->with('success', 'Purchase Order berhasil di-approve dan siap diterima melalui GRN.');
+        } catch (ValidationException $e) {
+            return back()->with('error', collect($e->errors())->flatten()->implode(' '));
+        }
     }
 
     // ======================================================================

@@ -287,7 +287,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
            default => 'draft'
        };
        $statusLabel = match($status) {
-           'approved' => 'POSTED',
+           'approved' => 'APPROVED',
            'closed' => 'CLOSED',
            'cancelled' => 'CANCELLED',
            default => 'DRAFT'
@@ -356,6 +356,17 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                     <a class="dropdown-item py-2" href="{{ route('purchasing.purchase_orders.edit', $order->id) }}">
                         <i class="bi bi-pencil me-2 text-muted"></i> Edit PO
                     </a>
+                </li>
+            @endif
+            @if ($status === 'draft' && $user && ($user->isOwner() || $user->isDeveloper() || in_array($user->role ?? '', ['admin'], true)) && $grnCount === 0)
+                <li>
+                    <form action="{{ route('purchasing.purchase_orders.approve', $order->id) }}" method="POST"
+                          onsubmit="return confirm('Approve PO ini? Setelah approved, PO dapat diproses ke GRN.');">
+                        @csrf
+                        <button type="submit" class="dropdown-item py-2 text-success fw-semibold">
+                            <i class="bi bi-check-circle me-2"></i> Approve PO
+                        </button>
+                    </form>
                 </li>
             @endif
             @if ($canSeeMoney && $canPay && $hasAp)

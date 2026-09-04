@@ -256,10 +256,8 @@ class PurchaseReceiptController extends Controller
                 });
             }], 'qty_reject')
             ->whereHas('purchaseOrder', function ($q) use ($selectedSupplierId) {
-                // Flow baru: GRN boleh dari PO draft ATAU approved (closed juga valid).
-                // Cancelled dikecualikan.
-                $q->whereIn('status', ['draft', 'approved', 'closed'])
-                  ->where('status', '!=', 'cancelled');
+                // GRN hanya boleh dari PO yang sudah approved.
+                $q->where('status', 'approved');
 
                 if (!empty($selectedSupplierId)) {
                     $q->where('supplier_id', (int) $selectedSupplierId);
@@ -310,11 +308,11 @@ class PurchaseReceiptController extends Controller
      */
     public function createFromOrder(PurchaseOrder $purchase_order)
     {
-        // Flow baru: GRN boleh dari PO draft / approved / closed. Cancelled ditolak.
+        // GRN hanya boleh dari PO approved. Draft harus di-approve terlebih dahulu.
         if (!$purchase_order->isReceivableForGrn() || $purchase_order->status === 'cancelled') {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
-                ->with('error', 'GRN hanya bisa dibuat dari PO berstatus draft, approved, atau closed (bukan cancelled).');
+                ->with('error', 'GRN hanya bisa dibuat dari PO berstatus Approved. Approve PO terlebih dahulu.');
         }
 
         $purchase_order->load([
@@ -868,11 +866,10 @@ class PurchaseReceiptController extends Controller
             ]);
         }
 
-        // Flow baru: draft juga diizinkan (admin gudang tidak perlu approve).
-        // Cancelled tetap ditolak.
+        // GRN hanya boleh dari PO approved; draft harus di-approve terlebih dahulu.
         if ($po->status === 'cancelled' || !$po->isReceivableForGrn()) {
             throw ValidationException::withMessages([
-                'purchase_order_id' => 'GRN hanya boleh mengacu ke PO berstatus draft/approved/closed (bukan cancelled).',
+                'purchase_order_id' => 'GRN hanya boleh mengacu ke PO berstatus Approved. Approve PO terlebih dahulu.',
             ]);
         }
 

@@ -171,6 +171,10 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
         // OWNER + ADMIN — read + edit return (draft only), close PO, cancel PO
         Route::middleware('role:owner,admin')->group(function () {
 
+            // PO — Draft harus di-approve sebelum dapat dibuatkan GRN.
+            Route::post('purchase-orders/{purchase_order}/approve', [PurchaseOrderController::class, 'approve'])
+                ->name('purchase_orders.approve');
+
             // RETURN — index, show, edit draft (owner+admin)
             // AJAX Search untuk GRN saat mau bikin return
             Route::get('purchase-returns/search-grn', [PurchaseReturnController::class, 'searchGrnForReturn'])
