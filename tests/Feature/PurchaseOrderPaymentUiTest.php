@@ -257,4 +257,58 @@ class PurchaseOrderPaymentUiTest extends TestCase
             ->assertSee('Cancel PO')
             ->assertDontSee('Tutup Paksa PO');
     }
+
+    public function test_owner_can_edit_approved_po_when_only_voided_payment_and_stale_grn_lock_remain(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-PO-EDIT-UI-' . uniqid(),
+        ]);
+        $supplier = Supplier::create([
+            'code' => 'SUP-PO-EDIT-UI-' . uniqid(),
+            'name' => 'Supplier Edit UI',
+        ]);
+        $paymentMethod = PaymentMethod::create([
+            'code' => 'UI-EDIT-CASH-' . uniqid(),
+            'name' => 'Cash Edit UI Test',
+            'mode' => 'cash',
+            'is_active' => true,
+        ]);
+        $order = PurchaseOrder::create([
+            'code' => 'PO-EDIT-UI-' . uniqid(),
+            'date' => '2026-08-31',
+            'supplier_id' => $supplier->id,
+            'grand_total' => 1000000,
+            'status' => 'approved',
+            'received_status' => 'not_received',
+            'payment_status' => 'unpaid',
+            'locked_at' => now(),
+            'lock_reason' => 'Dikunci oleh GRN-GHOST-001.',
+            'first_grn_id' => 999999,
+        ]);
+        PurchasePayment::create([
+            'purchase_order_id' => $order->id,
+            'date' => '2026-08-31',
+            'payment_method_id' => $paymentMethod->id,
+            'type' => 'dp',
+            'amount' => 250000,
+            'voided_at' => now(),
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('purchasing.purchase_orders.show', $order))
+            ->assertOk()
+            ->assertSee('Edit PO')
+            ->assertDontSee('Locked');
+
+        $this->assertDatabaseHas('purchase_orders', [
+            'id' => $order->id,
+            'locked_at' => null,
+            'first_grn_id' => null,
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('purchasing.purchase_orders.edit', $order))
+            ->assertOk();
+    }
 }

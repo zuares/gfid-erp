@@ -572,10 +572,22 @@ class PurchaseOrderController extends Controller
      */
     public function edit(Request $request, PurchaseOrder $purchase_order)
     {
-        if ($purchase_order->status !== 'draft') {
+        // Self-heal lock lama apabila seluruh GRN/payment/return aktif sudah
+        // tidak ada lagi, termasuk kasus payment yang sebelumnya di-void.
+        if ($purchase_order->isLocked()) {
+            $this->service->maybeUnlock($purchase_order);
+            $purchase_order->refresh();
+        }
+
+        $canEditApproved = $purchase_order->status === 'approved'
+            && !$purchase_order->purchaseReceipts()->exists()
+            && !$purchase_order->activePayments()->exists()
+            && !$purchase_order->isLocked();
+
+        if ($purchase_order->status !== 'draft' && !$canEditApproved) {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
-                ->with('error', 'PO yang sudah diproses, ditutup, atau dibatalkan tidak bisa diedit.');
+                ->with('error', 'PO hanya bisa diedit saat Draft, atau saat masih POSTED tetapi belum memiliki GRN dan payment aktif.');
         }
 
         // ✅ RECEIVING LOCK: admin gudang (tanpa hak harga) tidak boleh mengedit PO
@@ -668,10 +680,22 @@ class PurchaseOrderController extends Controller
      */
     public function update(Request $request, PurchaseOrder $purchase_order)
     {
-        if ($purchase_order->status !== 'draft') {
+        // Samakan guard update dengan halaman edit agar request langsung ke
+        // endpoint tidak menghasilkan perilaku berbeda dari UI.
+        if ($purchase_order->isLocked()) {
+            $this->service->maybeUnlock($purchase_order);
+            $purchase_order->refresh();
+        }
+
+        $canEditApproved = $purchase_order->status === 'approved'
+            && !$purchase_order->purchaseReceipts()->exists()
+            && !$purchase_order->activePayments()->exists()
+            && !$purchase_order->isLocked();
+
+        if ($purchase_order->status !== 'draft' && !$canEditApproved) {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
-                ->with('error', 'PO yang sudah diproses, ditutup, atau dibatalkan tidak bisa diubah.');
+                ->with('error', 'PO hanya bisa diubah saat Draft, atau saat masih POSTED tetapi belum memiliki GRN dan payment aktif.');
         }
 
         // ✅ RECEIVING LOCK: user tanpa hak harga tidak boleh update PO terkunci.

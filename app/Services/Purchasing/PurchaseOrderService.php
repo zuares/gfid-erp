@@ -224,9 +224,10 @@ class PurchaseOrderService
      * KEPUTUSAN: konservatif. Lock HANYA dilepas bila TIDAK ada jejak yang
      * relevan sama sekali:
      * - tidak ada GRN tersisa (posted maupun draft),
-     * - tidak pernah/ tidak ada payment (termasuk voided sebagai jejak),
-     * - tidak ada purchase return.
-     * Jika salah satu pernah ada (stok/jurnal/payment/return/audit), lock TIDAK dibuka.
+     * - tidak ada payment aktif (payment voided tidak lagi menjadi dependency),
+     * - tidak ada purchase return aktif.
+     * Payment/return yang sudah void tetap menjadi audit trail, tetapi tidak
+     * boleh membuat lock receiving tertinggal selamanya.
      * Default flow tetap terkunci karena GRN normal tidak bisa dihapus.
      */
     public function maybeUnlock(PurchaseOrder $order): bool
@@ -238,13 +239,17 @@ class PurchaseOrderService
         $hasAnyGrn = DB::table('purchase_receipts')
             ->where('purchase_order_id', $order->id)->exists();
 
-        $hasAnyPayment = DB::table('purchase_payments')
-            ->where('purchase_order_id', $order->id)->exists();
+        $hasActivePayment = DB::table('purchase_payments')
+            ->where('purchase_order_id', $order->id)
+            ->whereNull('voided_at')
+            ->exists();
 
-        $hasAnyReturn = DB::table('purchase_returns')
-            ->where('purchase_order_id', $order->id)->exists();
+        $hasActiveReturn = DB::table('purchase_returns')
+            ->where('purchase_order_id', $order->id)
+            ->whereNull('voided_at')
+            ->exists();
 
-        if ($hasAnyGrn || $hasAnyPayment || $hasAnyReturn) {
+        if ($hasAnyGrn || $hasActivePayment || $hasActiveReturn) {
             return false; // ada jejak relevan → tetap terkunci
         }
 

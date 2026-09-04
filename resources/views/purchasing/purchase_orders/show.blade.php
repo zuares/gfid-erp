@@ -134,6 +134,12 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         $grnList = $order->purchaseReceipts ?? collect();
         $grnCount = $grnList->count();
         $hasActivePayments = $order->activePayments()->exists();
+        $canEditApprovedWithoutTransactions = $status === 'approved'
+            && $grnCount === 0
+            && !$hasActivePayments
+            && !$order->isLocked()
+            && $user
+            && ($user->canSeePurchasePrices() || $user->isDeveloper());
         $canCancelApprovedWithoutTransactions = $status === 'approved'
             && $grnCount === 0
             && !$hasActivePayments
@@ -345,7 +351,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                     </a>
                 </li>
             @endif
-            @if ($status === 'draft' && (!$order->isLocked() || ($user && $user->canSeePurchasePrices())))
+            @if (($status === 'draft' || $canEditApprovedWithoutTransactions) && (!$order->isLocked() || ($user && $user->canSeePurchasePrices())))
                 <li>
                     <a class="dropdown-item py-2" href="{{ route('purchasing.purchase_orders.edit', $order->id) }}">
                         <i class="bi bi-pencil me-2 text-muted"></i> Edit PO
