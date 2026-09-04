@@ -72,12 +72,14 @@
                     <label class="form-label">Jumlah <span class="text-danger">*</span></label>
                     <div class="input-group">
                         <span class="input-group-text" style="border-radius:8px 0 0 8px; font-size:.82rem; font-weight:700">Rp</span>
-                        <input type="number" name="amount" step="1" min="0.01"
+                        <input type="text" name="amount" inputmode="numeric" pattern="[0-9]*"
+                            data-marketplace-payout-amount
                             class="form-control @error('amount') is-invalid @enderror"
-                            value="{{ old('amount', $p->amount) }}" required
+                            value="{{ old('amount', number_format((float) $p->amount, 0, '.', '')) }}" autocomplete="off" required
                             style="border-radius:0 8px 8px 0">
                         @error('amount')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
+                    <div class="mp-hint">Masukkan angka langsung tanpa titik/koma. Contoh: 1000000</div>
                 </div>
 
                 <div>
@@ -121,3 +123,20 @@
 
 </div>
 @endsection
+
+@push('scripts')
+    <script>
+        (() => {
+            const input = document.querySelector('[data-marketplace-payout-amount]');
+            if (!input) return;
+
+            const cleanAmount = () => {
+                input.value = input.value.replace(/[^0-9]/g, '');
+            };
+
+            cleanAmount();
+            input.addEventListener('input', cleanAmount);
+            input.form?.addEventListener('submit', cleanAmount);
+        })();
+    </script>
+@endpush
