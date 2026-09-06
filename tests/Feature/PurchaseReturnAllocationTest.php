@@ -128,6 +128,41 @@ class PurchaseReturnAllocationTest extends TestCase
         $this->assertEquals(5, $line->allocated_qty);
     }
 
+    public function test_finished_good_return_allocates_from_wh_rts(): void
+    {
+        $rts = Warehouse::create(['name' => 'Gudang RTS', 'code' => 'WH-RTS']);
+        $this->item->forceFill(['type' => 'finished_good'])->save();
+
+        InventoryStock::create([
+            'warehouse_id' => $rts->id,
+            'item_id' => $this->item->id,
+            'qty' => 10,
+            'allocated_qty' => 0,
+        ]);
+
+        $this->post(route('purchasing.grn.returns.create', $this->grn->id));
+        $ret = PurchaseReturn::firstOrFail();
+        $line = $ret->lines()->where('item_id', $this->item->id)->firstOrFail();
+
+        $response = $this->put(route('purchasing.purchase_returns.update', $ret->id), [
+            'date' => now()->toDateString(),
+            'resolution_type' => 'refund',
+            'lines' => [[
+                'id' => $line->id,
+                'purchase_receipt_line_id' => $this->grnLine->id,
+                'qty' => '3',
+                'reason_code' => 'defect',
+            ]],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertSame(0.0, (float) $this->stock->fresh()->allocated_qty);
+        $this->assertSame(3.0, (float) InventoryStock::query()
+            ->where('warehouse_id', $rts->id)
+            ->where('item_id', $this->item->id)
+            ->value('allocated_qty'));
+    }
+
     public function test_return_reservation_uses_converted_stock_qty(): void
     {
         $this->item->forceFill([

@@ -877,7 +877,7 @@ class GoodsReceiptService
      * FG dari GRN langsung ditempatkan di WH-RTS.
      * Item selain FG tetap mengikuti gudang tujuan pada GRN.
      */
-    protected function resolveStockWarehouseId(PurchaseReceiptLine $line, int $defaultWarehouseId): int
+    public function resolveStockWarehouseId(PurchaseReceiptLine $line, int $defaultWarehouseId): int
     {
         if (!$line->item?->isFinishedGood()) {
             return $defaultWarehouseId;

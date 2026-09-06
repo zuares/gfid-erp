@@ -280,12 +280,18 @@ class PurchaseReturnController extends Controller
         $returnLineByGrnLine = $purchase_return->lines->keyBy('purchase_receipt_line_id');
 
         $warehouseId = (int) ($purchase_return->grn?->warehouse_id ?? 0);
-        $grnItemIds = $purchase_return->grn?->lines?->pluck('item_id')->filter()->unique() ?? collect();
-        $stockByItem = $warehouseId > 0
+        $grnLines = $purchase_return->grn?->lines ?? collect();
+        $stockWarehouseByLine = $grnLines->mapWithKeys(fn ($grnLine) => [
+            (int) $grnLine->id => $this->stockWarehouseIdForGrnLine($grnLine, $warehouseId),
+        ]);
+        $stockWarehouseIds = $stockWarehouseByLine->filter()->unique()->values();
+        $grnItemIds = $grnLines->pluck('item_id')->filter()->unique();
+        $stockByWarehouseItem = $stockWarehouseIds->isNotEmpty() && $grnItemIds->isNotEmpty()
             ? InventoryStock::query()
-                ->where('warehouse_id', $warehouseId)
+                ->whereIn('warehouse_id', $stockWarehouseIds)
                 ->whereIn('item_id', $grnItemIds)
-                ->pluck('qty', 'item_id')
+                ->get()
+                ->keyBy(fn ($stock) => $stock->warehouse_id . ':' . $stock->item_id)
             : collect();
 
         $stockByLot = DB::table('lots')
@@ -311,7 +317,8 @@ class PurchaseReturnController extends Controller
                 : $this->isHppGrnLine($purchase_return, $grnLine);
             $itemId = (int) $grnLine->item_id;
             $returnable = (float) ($remainingMap[(int) $grnLine->id] ?? 0);
-            $stock = (float) ($stockByItem[$itemId] ?? 0);
+            $stockWarehouseId = (int) ($stockWarehouseByLine[(int) $grnLine->id] ?? $warehouseId);
+            $stock = (float) ($stockByWarehouseItem[$stockWarehouseId . ':' . $itemId]?->qty ?? 0);
             $qty = (float) ($line?->qty ?? 0);
 
             if ($line) {
@@ -341,6 +348,7 @@ class PurchaseReturnController extends Controller
                 'item' => $line?->item ?? $grnLine->item,
                 'purchase_receipt_line_id' => (int) $grnLine->id,
                 'item_id' => $itemId,
+                'stock_warehouse_id' => $stockWarehouseId,
                 'lot_id' => $grnLine->lot_id ? (int) $grnLine->lot_id : null,
                 'received' => (float) ($grnLine->qty_received ?? 0),
                 'remaining' => $returnable,
@@ -367,9 +375,9 @@ class PurchaseReturnController extends Controller
 
         if ($stockReady) {
             $stockReady = $inventoryRows
-                ->groupBy('item_id')
-                ->every(fn($rows, $itemId) => (float) $rows->sum('qty')
-                    <= (float) ($stockByItem[$itemId] ?? 0) + 0.0001);
+                ->groupBy(fn ($row) => $row->stock_warehouse_id . ':' . $row->item_id)
+                ->every(fn($rows) => (float) $rows->sum('qty')
+                    <= (float) $rows->first()->stock + 0.0001);
         }
 
         if ($stockReady) {
@@ -431,7 +439,7 @@ class PurchaseReturnController extends Controller
             'delete_photos.*' => ['integer'],
         ]);
 
-        $purchase_return->loadMissing(['grn.lines']);
+        $purchase_return->loadMissing(['grn.lines.item']);
         $grnLines = $purchase_return->grn?->lines?->keyBy('id') ?? collect();
 
         $remainingMap = $this->remainingByGrnLine($purchase_return->grn, excludeReturnId: (int) $purchase_return->id);
@@ -441,8 +449,6 @@ class PurchaseReturnController extends Controller
             $purchase_return->resolution_type = $data['resolution_type'] ?? 'refund';
             $purchase_return->notes = $data['notes'] ?? null;
             $purchase_return->save();
-
-            $warehouseId = (int) $purchase_return->grn->warehouse_id;
 
             // 0) Hapus foto yang diminta (hanya foto milik return ini)
             $deleteIds = array_map('intval', $data['delete_photos'] ?? []);
@@ -493,7 +499,14 @@ class PurchaseReturnController extends Controller
                 if (!$keep) {
                     if ($line) {
                         if ($isHpp && $line->stockQty() > 0.0001) {
-                            $this->inventory->releaseStock($warehouseId, (int) $grnLine->item_id, $line->stockQty(), 'purchase_return', $purchase_return->id, $line->id);
+                            $this->inventory->releaseStock(
+                                $this->stockWarehouseIdForGrnLine($grnLine, (int) $purchase_return->grn->warehouse_id),
+                                (int) $grnLine->item_id,
+                                $line->stockQty(),
+                                'purchase_return',
+                                $purchase_return->id,
+                                $line->id,
+                            );
                         }
                         $line->allocated_qty = 0;
                         $line->save();
@@ -549,9 +562,23 @@ class PurchaseReturnController extends Controller
                 if ($isHpp && abs($diffStockQty) > 0.0001) {
                     try {
                         if ($diffStockQty > 0) {
-                            $this->inventory->reserveStock($warehouseId, (int) $grnLine->item_id, $diffStockQty, 'purchase_return', $purchase_return->id, $line->id);
+                            $this->inventory->reserveStock(
+                                $this->stockWarehouseIdForGrnLine($grnLine, (int) $purchase_return->grn->warehouse_id),
+                                (int) $grnLine->item_id,
+                                $diffStockQty,
+                                'purchase_return',
+                                $purchase_return->id,
+                                $line->id,
+                            );
                         } else {
-                            $this->inventory->releaseStock($warehouseId, (int) $grnLine->item_id, abs($diffStockQty), 'purchase_return', $purchase_return->id, $line->id);
+                            $this->inventory->releaseStock(
+                                $this->stockWarehouseIdForGrnLine($grnLine, (int) $purchase_return->grn->warehouse_id),
+                                (int) $grnLine->item_id,
+                                abs($diffStockQty),
+                                'purchase_return',
+                                $purchase_return->id,
+                                $line->id,
+                            );
                         }
                     } catch (\RuntimeException $e) {
                         $itemName = $grnLine->item?->name ?? 'Item #' . $grnLine->item_id;
@@ -598,13 +625,18 @@ class PurchaseReturnController extends Controller
         }
 
         DB::transaction(function () use ($purchase_return) {
-            $warehouseId = (int) $purchase_return->grn->warehouse_id;
-
             $purchase_return->loadMissing('lines.grnLine.item');
 
             foreach ($purchase_return->lines as $line) {
                 if ($line->allocated_qty > 0.0001 && $this->isHppGrnLine($purchase_return, $line->grnLine)) {
-                    $this->inventory->releaseStock($warehouseId, (int) $line->item_id, $line->allocated_qty, 'purchase_return', $purchase_return->id, $line->id);
+                    $this->inventory->releaseStock(
+                        $this->stockWarehouseIdForGrnLine($line->grnLine, (int) $purchase_return->grn->warehouse_id),
+                        (int) $line->item_id,
+                        $line->allocated_qty,
+                        'purchase_return',
+                        $purchase_return->id,
+                        $line->id,
+                    );
                 }
                 $line->allocated_qty = 0;
                 $line->save();
@@ -655,7 +687,7 @@ class PurchaseReturnController extends Controller
             return back()->with('error', 'Return sudah posted.');
         }
 
-        $purchase_return->loadMissing(['grn.warehouse', 'grn.lines', 'order', 'lines.grnLine', 'lines.item']);
+        $purchase_return->loadMissing(['grn.warehouse', 'grn.lines.item', 'order', 'lines.grnLine.item', 'lines.item']);
 
         if (!$purchase_return->grn || $purchase_return->grn->status !== 'posted') {
             return back()->with('error', 'GRN belum posted / tidak valid.');
@@ -704,23 +736,30 @@ class PurchaseReturnController extends Controller
             }
 
             $itemId = (int) $ln->item_id;
-            $stockRequired[$itemId] = (float) ($stockRequired[$itemId] ?? 0) + $ln->stockQty();
+            $stockWarehouseId = $this->stockWarehouseIdForGrnLine($ln->grnLine, $warehouseId);
+            $stockKey = $stockWarehouseId . ':' . $itemId;
+            $stockRequired[$stockKey] = [
+                'warehouse_id' => $stockWarehouseId,
+                'item_id' => $itemId,
+                'qty' => (float) ($stockRequired[$stockKey]['qty'] ?? 0) + $ln->stockQty(),
+            ];
         }
 
         if ($stockRequired) {
             $stocks = InventoryStock::query()
-                ->where('warehouse_id', $warehouseId)
-                ->whereIn('item_id', array_keys($stockRequired))
-                ->pluck('qty', 'item_id');
+                ->whereIn('warehouse_id', collect($stockRequired)->pluck('warehouse_id')->unique())
+                ->whereIn('item_id', collect($stockRequired)->pluck('item_id')->unique())
+                ->get()
+                ->keyBy(fn ($stock) => $stock->warehouse_id . ':' . $stock->item_id);
 
-            foreach ($stockRequired as $itemId => $requiredQty) {
-                $available = (float) ($stocks[$itemId] ?? 0);
-                if ($available + 0.0000001 < $requiredQty) {
-                    $itemCode = (string) ($purchase_return->lines->firstWhere('item_id', $itemId)?->item?->code ?? ('Item #' . $itemId));
+            foreach ($stockRequired as $stockKey => $required) {
+                $available = (float) ($stocks[$stockKey]?->qty ?? 0);
+                if ($available + 0.0000001 < $required['qty']) {
+                    $itemCode = (string) ($purchase_return->lines->firstWhere('item_id', $required['item_id'])?->item?->code ?? ('Item #' . $required['item_id']));
                     throw ValidationException::withMessages([
                         'stock' => "Stok {$itemCode} tidak cukup. Tersedia "
                             . number_format($available, 4, ',', '.')
-                            . ', akan diretur ' . number_format($requiredQty, 4, ',', '.') . '.',
+                            . ', akan diretur ' . number_format($required['qty'], 4, ',', '.') . '.',
                     ]);
                 }
             }
@@ -835,7 +874,7 @@ class PurchaseReturnController extends Controller
                 }
 
                 $this->inventory->consumeAllocationAndStockOut(
-                    warehouseId: $warehouseId,
+                    warehouseId: $this->stockWarehouseIdForGrnLine($ln->grnLine, $warehouseId),
                     itemId: (int) $ln->item_id,
                     qty: $qty,
                     date: $purchase_return->date,
@@ -1002,7 +1041,7 @@ class PurchaseReturnController extends Controller
             return back()->with('error', 'Return belum posted.');
         }
 
-        $purchase_return->loadMissing(['grn', 'lines.grnLine', 'lines.item']);
+        $purchase_return->loadMissing(['grn', 'lines.grnLine.item', 'lines.item']);
 
         DB::transaction(function () use ($purchase_return) {
             $lockedReturn = PurchaseReturn::query()
@@ -1027,8 +1066,6 @@ class PurchaseReturnController extends Controller
                 }
             }
 
-            $warehouseId = (int) $purchase_return->grn->warehouse_id;
-
             // 1) balikkan stok hanya untuk INV lines
             foreach ($purchase_return->lines as $ln) {
                 $qty = $ln->stockQty();
@@ -1041,7 +1078,7 @@ class PurchaseReturnController extends Controller
                 }
 
                 $this->inventory->stockIn(
-                    warehouseId: $warehouseId,
+                    warehouseId: $this->stockWarehouseIdForGrnLine($ln->grnLine, (int) $purchase_return->grn->warehouse_id),
                     itemId: (int) $ln->item_id,
                     qty: $qty,
                     date: $purchase_return->date,
@@ -1086,6 +1123,22 @@ class PurchaseReturnController extends Controller
     // ================================
     // Helpers
     // ================================
+
+    /**
+     * Return stock must use the same warehouse mapping as the GRN stock-in.
+     * Finished goods are posted to WH-RTS even when the GRN header points to
+     * another warehouse.
+     */
+    protected function stockWarehouseIdForGrnLine($grnLine, int $defaultWarehouseId): int
+    {
+        if (!$grnLine) {
+            return $defaultWarehouseId;
+        }
+
+        $grnLine->loadMissing('item');
+
+        return $this->goodsReceiptService->resolveStockWarehouseId($grnLine, $defaultWarehouseId);
+    }
 
     protected function isHppLine(PurchaseReturn $ret, PurchaseReturnLine $ln): bool
     {
