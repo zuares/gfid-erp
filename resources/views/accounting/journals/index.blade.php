@@ -5,7 +5,7 @@
 @push('head')
     <style>
         .jx-wrap {
-            max-width: 1100px;
+            max-width: 1240px;
             margin: 0 auto;
             padding: .7rem .7rem 2.1rem
         }
@@ -34,43 +34,150 @@
         .jx-btn {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: .4rem;
-            padding: .4rem .58rem;
+            min-height: 40px;
+            padding: .42rem .7rem;
             border-radius: 12px;
             border: 1px solid rgba(148, 163, 184, .35);
             background: color-mix(in srgb, var(--card) 88%, transparent 12%);
             text-decoration: none;
             color: var(--text);
-            font-size: .9rem
+            font-size: .84rem;
+            white-space: nowrap
         }
 
         .jx-btn:hover {
             box-shadow: inset 0 0 0 1px rgba(148, 163, 184, .35)
         }
 
-        .jx-filter {
+        .jx-filter-card {
+            margin-bottom: .8rem;
+            padding: .85rem;
+            border: 1px solid rgba(148, 163, 184, .28);
+            border-radius: 14px;
+            background: var(--card);
+            box-shadow: 0 8px 22px rgba(15, 23, 42, .045)
+        }
+
+        .jx-filter-head {
             display: flex;
-            gap: .45rem;
-            flex-wrap: wrap;
-            margin-bottom: .55rem
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: .7rem;
+            margin-bottom: .75rem
+        }
+
+        .jx-filter-title {
+            display: flex;
+            align-items: center;
+            gap: .42rem;
+            margin: 0;
+            color: var(--text);
+            font-size: .9rem;
+            font-weight: 760
+        }
+
+        .jx-filter-title i {
+            color: var(--accent, #2563eb)
+        }
+
+        .jx-filter-note {
+            margin: .16rem 0 0;
+            color: var(--muted);
+            font-size: .76rem
+        }
+
+        .jx-cutoff-note {
+            display: inline-flex;
+            align-items: center;
+            gap: .32rem;
+            flex-shrink: 0;
+            padding: .3rem .52rem;
+            border-radius: 999px;
+            color: color-mix(in srgb, var(--text) 68%, transparent 32%);
+            background: color-mix(in srgb, var(--accent-soft) 38%, transparent 62%);
+            font-size: .72rem;
+            font-weight: 700
+        }
+
+        .jx-filter {
+            display: grid;
+            grid-template-columns: minmax(280px, 2fr) minmax(180px, 1.35fr) minmax(150px, 1fr) minmax(220px, 1.65fr);
+            gap: .7rem;
+            align-items: end
+        }
+
+        .jx-date-range {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .55rem
+        }
+
+        .jx-filter-field {
+            display: grid;
+            gap: .3rem;
+            min-width: 0
+        }
+
+        .jx-filter-label {
+            color: var(--muted);
+            font-size: .7rem;
+            font-weight: 800;
+            letter-spacing: .04em;
+            text-transform: uppercase
         }
 
         .jx-in,
         .jx-sel {
+            width: 100%;
+            min-height: 42px;
+            padding: .48rem .62rem;
             border: 1px solid rgba(148, 163, 184, .35);
-            background: transparent;
             border-radius: 12px;
-            padding: .4rem .54rem;
-            font-size: .9rem;
-            color: var(--text)
+            background: var(--card);
+            color: var(--text);
+            font-size: .88rem;
+            box-shadow: none
         }
 
-        .jx-in {
-            min-width: 128px
+        .jx-in:focus,
+        .jx-sel:focus {
+            border-color: color-mix(in srgb, var(--accent, #2563eb) 62%, transparent 38%);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-soft) 62%, transparent 38%);
+            outline: 0
         }
 
-        .jx-sel {
-            min-width: 160px
+        .jx-filter-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .7rem;
+            margin-top: .7rem;
+            padding-top: .7rem;
+            border-top: 1px solid rgba(148, 163, 184, .16)
+        }
+
+        .jx-filter-option {
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+            min-height: 38px;
+            color: var(--muted);
+            font-size: .78rem;
+            cursor: pointer
+        }
+
+        .jx-filter-option input {
+            width: 1rem;
+            height: 1rem;
+            accent-color: var(--accent, #2563eb)
+        }
+
+        .jx-filter-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: .45rem
         }
 
         .jx-card {
@@ -192,17 +299,76 @@
             box-shadow: inset 0 0 0 1px rgba(148, 163, 184, .35)
         }
 
+        @media (max-width:1024px) {
+            .jx-filter {
+                grid-template-columns: repeat(2, minmax(0, 1fr))
+            }
+
+            .jx-date-range,
+            .jx-filter-field:last-child {
+                grid-column: 1 / -1
+            }
+        }
+
         @media (max-width:576px) {
+            .jx-wrap {
+                padding-right: .55rem;
+                padding-left: .55rem
+            }
+
+            .jx-top {
+                align-items: flex-start;
+                flex-direction: column
+            }
+
+            .jx-actions {
+                width: 100%
+            }
+
+            .jx-actions .jx-btn {
+                flex: 1 1 0;
+                min-width: 0
+            }
+
+            .jx-filter-card {
+                padding: .7rem
+            }
+
+            .jx-filter-head {
+                flex-direction: column;
+                gap: .45rem
+            }
+
+            .jx-cutoff-note {
+                align-self: flex-start
+            }
+
+            .jx-filter {
+                grid-template-columns: 1fr;
+                gap: .62rem
+            }
+
+            .jx-date-range,
+            .jx-filter-field:last-child {
+                grid-column: auto
+            }
+
+            .jx-filter-footer {
+                align-items: stretch;
+                flex-direction: column;
+                gap: .5rem
+            }
+
+            .jx-filter-actions {
+                width: 100%
+            }
+
+            .jx-filter-actions .jx-btn {
+                flex: 1 1 0
+            }
+
             .jx-hide-sm {
                 display: none
-            }
-
-            .jx-in {
-                min-width: 112px
-            }
-
-            .jx-sel {
-                min-width: 140px
             }
 
             .jx-desc {
@@ -260,24 +426,70 @@
             </div>
         </div>
 
-        <form method="GET" class="jx-filter">
-            <input class="jx-in" type="date" name="from" value="{{ request('from') }}">
-            <input class="jx-in" type="date" name="to" value="{{ request('to') }}">
+        <div class="jx-filter-card">
+            <div class="jx-filter-head">
+                <div>
+                    <h5 class="jx-filter-title"><i class="bi bi-funnel" aria-hidden="true"></i> Filter jurnal</h5>
+                    <p class="jx-filter-note">Pilih periode, status, sumber, atau cari berdasarkan catatan dan akun.</p>
+                </div>
 
-            <select class="jx-sel" name="source_type">
-                <option value="">Semua</option>
-                @foreach ($sourceTypes as $st)
-                    <option value="{{ $st }}" @selected(request('source_type') === $st)>
-                        {{ $typeLabel($st) }}
-                    </option>
-                @endforeach
-            </select>
+                @if (($cutoff['active'] ?? false) && !request()->filled('from'))
+                    <span class="jx-cutoff-note"><i class="bi bi-info-circle" aria-hidden="true"></i> Mulai dari cutoff {{ $cutoff['date'] }}</span>
+                @endif
+            </div>
 
-            <input class="jx-in" type="text" name="q" value="{{ request('q') }}" placeholder="Cari...">
+            <form id="jx-filter-form" method="GET" action="{{ route('accounting.journals.index') }}" class="jx-filter">
+                <div class="jx-date-range">
+                    <div class="jx-filter-field">
+                        <label class="jx-filter-label" for="jx-from">Dari tanggal</label>
+                        <input id="jx-from" class="jx-in" type="date" name="from" value="{{ request('from') }}">
+                    </div>
+                    <div class="jx-filter-field">
+                        <label class="jx-filter-label" for="jx-to">Sampai tanggal</label>
+                        <input id="jx-to" class="jx-in" type="date" name="to" value="{{ request('to') }}">
+                    </div>
+                </div>
 
-            <button class="jx-btn" type="submit">Filter</button>
-            <a class="jx-btn" href="{{ route('accounting.journals.index') }}">Reset</a>
-        </form>
+                <div class="jx-filter-field">
+                    <label class="jx-filter-label" for="jx-source-type">Sumber</label>
+                    <select id="jx-source-type" class="jx-sel" name="source_type">
+                        <option value="">Semua sumber</option>
+                        @foreach ($sourceTypes as $st)
+                            <option value="{{ $st }}" @selected(request('source_type') === $st)>
+                                {{ $sourceTypeOptions->get($st, $typeLabel($st)) }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="jx-filter-field">
+                    <label class="jx-filter-label" for="jx-status">Status</label>
+                    <select id="jx-status" class="jx-sel" name="status">
+                        <option value="">Semua status</option>
+                        <option value="final" @selected(request('status') === 'final')>Final</option>
+                        <option value="draft" @selected(request('status') === 'draft')>Draft</option>
+                        <option value="voided" @selected(request('status') === 'voided')>Void</option>
+                    </select>
+                </div>
+
+                <div class="jx-filter-field">
+                    <label class="jx-filter-label" for="jx-q">Pencarian</label>
+                    <input id="jx-q" class="jx-in" type="search" name="q" value="{{ request('q') }}" placeholder="Catatan, akun, atau ID sumber...">
+                </div>
+            </form>
+
+            <div class="jx-filter-footer">
+                <label class="jx-filter-option" for="jx-show-legacy">
+                    <input id="jx-show-legacy" type="checkbox" name="show_legacy" value="1" form="jx-filter-form" @checked(request()->boolean('show_legacy'))>
+                    Tampilkan data sebelum cutoff
+                </label>
+
+                <div class="jx-filter-actions">
+                    <button class="jx-btn" type="submit" form="jx-filter-form"><i class="bi bi-funnel" aria-hidden="true"></i> Terapkan filter</button>
+                    <a class="jx-btn" href="{{ route('accounting.journals.index') }}"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Reset</a>
+                </div>
+            </div>
+        </div>
 
         <div class="jx-card">
             <div class="table-responsive">
