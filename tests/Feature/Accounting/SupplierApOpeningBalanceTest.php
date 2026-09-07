@@ -110,6 +110,48 @@ class SupplierApOpeningBalanceTest extends TestCase
             ->assertSee('Tidak ada hutang outstanding.');
     }
 
+    public function test_bulk_mode_posts_only_suppliers_with_a_positive_amount(): void
+    {
+        $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'OB-TEST-3']);
+        $supplierA = Supplier::create([
+            'code' => 'SUP-OB-3',
+            'name' => 'Supplier Bulk A',
+            'type' => 'supplier',
+            'active' => true,
+        ]);
+        $supplierB = Supplier::create([
+            'code' => 'SUP-OB-4',
+            'name' => 'Supplier Bulk B',
+            'type' => 'supplier',
+            'active' => true,
+        ]);
+        [$ap, $offset] = $this->accounts('2101-BULK', '3101-BULK');
+
+        $this->actingAs($user)
+            ->post(route('accounting.supplier-ap-openings.store'), [
+                'bulk' => '1',
+                'date' => '2026-08-31',
+                'invoice_date' => '2026-08-31',
+                'amounts' => [
+                    $supplierA->id => '1.500.000',
+                    $supplierB->id => '0',
+                ],
+                'ap_account_id' => $ap->id,
+                'offset_account_id' => $offset->id,
+            ])
+            ->assertRedirect(route('accounting.supplier-ap-openings.index'));
+
+        $this->assertDatabaseCount('supplier_ap_opening_balances', 1);
+        $this->assertDatabaseHas('supplier_ap_opening_balances', [
+            'supplier_id' => $supplierA->id,
+            'amount' => 1500000,
+            'status' => 'posted',
+        ]);
+        $this->assertDatabaseMissing('supplier_ap_opening_balances', [
+            'supplier_id' => $supplierB->id,
+        ]);
+    }
+
     private function accounts(string $apCode = '2101-OB', string $offsetCode = '3101-OB'): array
     {
         return [

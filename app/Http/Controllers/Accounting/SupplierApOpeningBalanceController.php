@@ -68,26 +68,36 @@ class SupplierApOpeningBalanceController extends Controller
 
     public function store(Request $request)
     {
+        $bulk = $request->input('bulk') === '1';
         $data = $request->validate([
-            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
+            'bulk' => ['nullable', 'in:0,1'],
+            'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id', 'required_unless:bulk,1'],
             'date' => ['required', 'date'],
             'invoice_date' => ['nullable', 'date', 'before_or_equal:date'],
             'due_date' => ['nullable', 'date'],
             'reference_no' => ['nullable', 'string', 'max:100'],
-            'amount' => ['required', 'string'],
+            'amount' => ['nullable', 'string', 'required_unless:bulk,1'],
+            'amounts' => ['required_if:bulk,1', 'array'],
+            'amounts.*' => ['nullable', 'string'],
             'ap_account_id' => ['required', 'integer', 'exists:accounts,id'],
             'offset_account_id' => ['required', 'integer', 'exists:accounts,id', 'different:ap_account_id'],
             'notes' => ['nullable', 'string'],
         ]);
 
-        $amount = $this->toNumber($data['amount']);
-        if ($amount <= 0) {
+        $entries = $bulk
+            ? collect($data['amounts'] ?? [])
+                ->mapWithKeys(fn ($amount, $supplierId) => [(int) $supplierId => $this->toNumber($amount)])
+                ->filter(fn ($amount) => $amount > 0)
+                ->all()
+            : [(int) $data['supplier_id'] => $this->toNumber($data['amount'])];
+
+        if (empty($entries)) {
             throw ValidationException::withMessages([
-                'amount' => 'Nominal saldo awal harus lebih besar dari 0.',
+                $bulk ? 'amounts' : 'amount' => 'Isi minimal satu nominal saldo awal yang lebih besar dari 0.',
             ]);
         }
 
-        return DB::transaction(function () use ($request, $data, $amount) {
+        return DB::transaction(function () use ($request, $data, $entries, $bulk) {
             $ap = Account::query()->whereKey($data['ap_account_id'])->lockForUpdate()->firstOrFail();
             $offset = Account::query()->whereKey($data['offset_account_id'])->lockForUpdate()->firstOrFail();
 
@@ -102,54 +112,92 @@ class SupplierApOpeningBalanceController extends Controller
                 ]);
             }
 
-            $supplier = Supplier::query()->findOrFail($data['supplier_id']);
-            $balance = SupplierApOpeningBalance::create([
-                'supplier_id' => $supplier->id,
-                'date' => $data['date'],
-                'invoice_date' => $data['invoice_date'] ?? $data['date'],
-                'due_date' => $data['due_date'] ?? null,
-                'reference_no' => $data['reference_no'] ?? null,
-                'amount' => round($amount, 2),
-                'ap_account_id' => $ap->id,
-                'offset_account_id' => $offset->id,
-                'notes' => $data['notes'] ?? null,
-                'status' => 'posted',
-                'posted_at' => now(),
-                'posted_by' => $request->user()?->id,
-                'created_by' => $request->user()?->id,
-            ]);
+            $suppliers = Supplier::query()
+                ->whereIn('id', array_keys($entries))
+                ->where(function ($query) {
+                    $query->whereNull('active')->orWhere('active', true);
+                })
+                ->get()
+                ->keyBy('id');
 
-            $journal = Journal::create([
-                'date' => $data['date'],
-                'description' => 'Saldo Awal Hutang Supplier - ' . $supplier->name,
-                'source_type' => 'supplier_ap_opening_balance',
-                'source_id' => $balance->id,
-                'reference_no' => $data['reference_no'] ?? null,
-                'notes' => $data['notes'] ?? null,
-                'posted_at' => now(),
-                'created_by' => $request->user()?->id,
-            ]);
+            if ($suppliers->count() !== count($entries)) {
+                throw ValidationException::withMessages([
+                    'supplier_id' => 'Ada supplier yang tidak valid atau sudah tidak aktif.',
+                ]);
+            }
 
-            JournalLine::create([
-                'journal_id' => $journal->id,
-                'account_id' => $offset->id,
-                'debit' => $amount,
-                'credit' => 0,
-            ]);
-            JournalLine::create([
-                'journal_id' => $journal->id,
-                'account_id' => $ap->id,
-                'debit' => 0,
-                'credit' => $amount,
-            ]);
-
-            $balance->update(['journal_id' => $journal->id]);
+            foreach ($entries as $supplierId => $amount) {
+                $this->postBalance(
+                    request: $request,
+                    data: $data,
+                    supplier: $suppliers->get($supplierId),
+                    amount: $amount,
+                    ap: $ap,
+                    offset: $offset,
+                );
+            }
 
             return redirect()
                 ->route('accounting.supplier-ap-openings.index')
                 ->with('status', 'ok')
-                ->with('message', 'Saldo awal hutang supplier berhasil diposting.');
+                ->with('message', $bulk
+                    ? count($entries) . ' saldo awal hutang supplier berhasil diposting.'
+                    : 'Saldo awal hutang supplier berhasil diposting.');
         });
+    }
+
+    private function postBalance(
+        Request $request,
+        array $data,
+        Supplier $supplier,
+        float $amount,
+        Account $ap,
+        Account $offset
+    ): SupplierApOpeningBalance {
+        $amount = round($amount, 2);
+        $balance = SupplierApOpeningBalance::create([
+            'supplier_id' => $supplier->id,
+            'date' => $data['date'],
+            'invoice_date' => $data['invoice_date'] ?? $data['date'],
+            'due_date' => $data['due_date'] ?? null,
+            'reference_no' => $data['reference_no'] ?? null,
+            'amount' => $amount,
+            'ap_account_id' => $ap->id,
+            'offset_account_id' => $offset->id,
+            'notes' => $data['notes'] ?? null,
+            'status' => 'posted',
+            'posted_at' => now(),
+            'posted_by' => $request->user()?->id,
+            'created_by' => $request->user()?->id,
+        ]);
+
+        $journal = Journal::create([
+            'date' => $data['date'],
+            'description' => 'Saldo Awal Hutang Supplier - ' . $supplier->name,
+            'source_type' => 'supplier_ap_opening_balance',
+            'source_id' => $balance->id,
+            'reference_no' => $data['reference_no'] ?? null,
+            'notes' => $data['notes'] ?? null,
+            'posted_at' => now(),
+            'created_by' => $request->user()?->id,
+        ]);
+
+        JournalLine::create([
+            'journal_id' => $journal->id,
+            'account_id' => $offset->id,
+            'debit' => $amount,
+            'credit' => 0,
+        ]);
+        JournalLine::create([
+            'journal_id' => $journal->id,
+            'account_id' => $ap->id,
+            'debit' => 0,
+            'credit' => $amount,
+        ]);
+
+        $balance->update(['journal_id' => $journal->id]);
+
+        return $balance;
     }
 
     public function void(Request $request, SupplierApOpeningBalance $supplierApOpeningBalance)
