@@ -199,6 +199,7 @@
     $hasJournalsIndex = $router->has('accounting.journals.index');
     $hasOpeningBalancesIndex = $router->has('accounting.opening-balances.index');
     $hasOpeningBalancesBatchIndex = $router->has('accounting.opening-balances-batch.index');
+    $hasSupplierApOpeningsIndex = $router->has('accounting.supplier-ap-openings.index');
     $hasMarketplacePayoutsIndex = !$isAdmin && $router->has('accounting.marketplace-payouts.index');
     $hasApReportIndex           = $router->has('accounting.ap-report.index');
     $hasTrialBalanceIndex       = $router->has('accounting.trial-balance.index');
@@ -294,6 +295,7 @@
         $hasAccountingIndex = $hasAccountsIndex = $hasCashBasisReportIndex = false;
         $hasCashReceiptsIndex = $hasJournalsIndex = $hasOpeningBalancesIndex = false;
         $hasOpeningBalancesBatchIndex = $hasCashTransfersIndex = false;
+        $hasSupplierApOpeningsIndex = false;
     }
 
     if (!$canModule('payroll')) {
@@ -392,6 +394,7 @@
         $open('accounting.buku-besar.*') ||
         $open('accounting.opening-balances.*') ||
         $open('accounting.opening-balances-batch.*') ||
+        $open('accounting.supplier-ap-openings.*') ||
         $open('accounting.journals.*') ||
         $open('accounting.accounts.*');
 
@@ -1471,6 +1474,7 @@
                 $hasAccountsIndex,
                 $hasOpeningBalancesIndex,
                 $hasOpeningBalancesBatchIndex,
+                $hasSupplierApOpeningsIndex,
                 $hasAccountingIndex
             ))
                 <x-sidebar.label text="Keuangan" />
@@ -1551,6 +1555,13 @@
                         <x-sidebar.simple-link href="{{ route('accounting.opening-balances-batch.index') }}" icon="bi bi-basket"
                             :active="request()->routeIs('accounting.opening-balances-batch.*')">
                             Batch Saldo Awal
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasSupplierApOpeningsIndex)
+                        <x-sidebar.simple-link href="{{ route('accounting.supplier-ap-openings.index') }}" icon="bi bi-person-lines-fill"
+                            :active="request()->routeIs('accounting.supplier-ap-openings.*')">
+                            Saldo Awal Hutang Supplier
                         </x-sidebar.simple-link>
                     @endif
                         </div>
@@ -2304,7 +2315,7 @@
             @endif
 
             {{-- FINANCE --}}
-            @if ($canShow($hasAccountingIndex, $hasOpeningBalancesIndex, $hasOpeningBalancesBatchIndex, $hasCashExpensesIndex, $hasCashReceiptsIndex, $hasCashTransfersIndex, $hasCashBasisReportIndex, $hasJournalsIndex, $hasAccountsIndex, $hasMarketplacePayoutsIndex, $hasApReportIndex, $hasTrialBalanceIndex, $hasProfitLossIndex, $hasBukuBesarIndex))
+            @if ($canShow($hasAccountingIndex, $hasOpeningBalancesIndex, $hasOpeningBalancesBatchIndex, $hasSupplierApOpeningsIndex, $hasCashExpensesIndex, $hasCashReceiptsIndex, $hasCashTransfersIndex, $hasCashBasisReportIndex, $hasJournalsIndex, $hasAccountsIndex, $hasMarketplacePayoutsIndex, $hasApReportIndex, $hasTrialBalanceIndex, $hasProfitLossIndex, $hasBukuBesarIndex))
                 <x-sidebar.label text="Keuangan" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openAccounting ? 'is-open' : '' }}" type="button"
@@ -2340,6 +2351,13 @@
                             <x-sidebar.sub-link href="{{ route('accounting.opening-balances-batch.index') }}" icon="bi bi-basket"
                                 :active="request()->routeIs('accounting.opening-balances-batch.*')">
                                 Batch Saldo Awal
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasSupplierApOpeningsIndex)
+                            <x-sidebar.sub-link href="{{ route('accounting.supplier-ap-openings.index') }}" icon="bi bi-person-lines-fill"
+                                :active="request()->routeIs('accounting.supplier-ap-openings.*')">
+                                Saldo Awal Hutang Supplier
                             </x-sidebar.sub-link>
                         @endif
 

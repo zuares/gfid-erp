@@ -10,6 +10,7 @@ use App\Http\Controllers\Accounting\JournalController;
 use App\Http\Controllers\Accounting\MarketplacePayoutController;
 use App\Http\Controllers\Accounting\OpeningBalanceBatchController;
 use App\Http\Controllers\Accounting\OpeningBalanceController;
+use App\Http\Controllers\Accounting\SupplierApOpeningBalanceController;
 use App\Http\Controllers\Accounting\ProductionJournalAuditController;
 use App\Http\Controllers\Accounting\ProductionValueReportController;
 use App\Http\Controllers\Accounting\ProfitLossController;
@@ -65,6 +66,16 @@ Route::middleware(['auth', 'access:accounting'])->prefix('accounting')->name('ac
     Route::get('opening-balances/create', [OpeningBalanceController::class, 'create'])->name('opening-balances.create');
     Route::post('opening-balances', [OpeningBalanceController::class, 'store'])->name('opening-balances.store');
     Route::post('opening-balances/{journal}/void', [OpeningBalanceController::class, 'void'])->name('opening-balances.void');
+
+    // ✅ Opening balance subledger Hutang Supplier
+    Route::get('supplier-ap-openings', [SupplierApOpeningBalanceController::class, 'index'])
+        ->name('supplier-ap-openings.index');
+    Route::get('supplier-ap-openings/create', [SupplierApOpeningBalanceController::class, 'create'])
+        ->name('supplier-ap-openings.create');
+    Route::post('supplier-ap-openings', [SupplierApOpeningBalanceController::class, 'store'])
+        ->name('supplier-ap-openings.store');
+    Route::post('supplier-ap-openings/{supplierApOpeningBalance}/void', [SupplierApOpeningBalanceController::class, 'void'])
+        ->name('supplier-ap-openings.void');
 });
 
 // ✅ Cash Expenses — akses khusus untuk owner, admin, operating, dan user Accounting.

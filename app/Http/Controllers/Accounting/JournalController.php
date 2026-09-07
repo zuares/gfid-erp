@@ -24,6 +24,8 @@ class JournalController extends Controller
 
             'opening_balance' => 'Saldo Awal',
             'opening_balance_void' => 'Pembatalan Saldo Awal',
+            'supplier_ap_opening_balance' => 'Saldo Awal Hutang Supplier',
+            'supplier_ap_opening_balance_void' => 'Pembatalan Saldo Awal Hutang Supplier',
 
             'shipment' => 'Pengiriman',
             'shipment_void' => 'Pembatalan Pengiriman',
@@ -162,6 +164,11 @@ class JournalController extends Controller
         if (in_array($journal->source_type, ['opening_balance', 'opening_balance_void'], true)) {
             $sourceUrl = $this->safeRoute('accounting.opening-balances.index');
             $sourceLabel = $sourceUrl ? 'Buka Saldo Awal' : null;
+        }
+
+        if (in_array($journal->source_type, ['supplier_ap_opening_balance', 'supplier_ap_opening_balance_void'], true)) {
+            $sourceUrl = $this->safeRoute('accounting.supplier-ap-openings.index');
+            $sourceLabel = $sourceUrl ? 'Buka Saldo Awal Hutang Supplier' : null;
         }
 
         if ($journal->source_type === 'piecework_payroll' && $journal->source_id) {

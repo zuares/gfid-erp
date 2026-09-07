@@ -37,6 +37,7 @@
             <h5 class="mb-0 fw-black">Hutang Dagang (AP Outstanding)</h5>
             <div class="text-muted" style="font-size:.8rem">Per tanggal · aging berdasarkan tanggal GRN tertua</div>
         </div>
+        <a href="{{ route('accounting.supplier-ap-openings.index') }}" class="rpt-btn">Saldo Awal Supplier</a>
     </div>
 
     {{-- KPI --}}
@@ -91,7 +92,7 @@
                 <thead class="table-light">
                     <tr>
                         <th>Supplier / PO</th>
-                        <th>Tgl GRN</th>
+                        <th>Tgl Dasar</th>
                         <th class="rpt-num">Total GRN</th>
                         <th class="rpt-num">Sudah Bayar</th>
                         <th class="rpt-num">Outstanding</th>
@@ -107,7 +108,7 @@
                         {{-- Supplier header --}}
                         <tr class="rpt-supplier-header">
                             <td colspan="4">{{ $sup->supplier_name }}
-                                <span class="text-muted fw-normal" style="font-size:.74rem">· {{ $sup->pos->count() }} PO</span>
+                                <span class="text-muted fw-normal" style="font-size:.74rem">· {{ $sup->pos->count() }} item</span>
                             </td>
                             <td class="rpt-num text-dark">Rp {{ $fmt($sup->total) }}</td>
                             <td></td>
@@ -124,8 +125,15 @@
                             @endphp
                             <tr>
                                 <td style="padding-left:1.5rem; color:#475569">
-                                    <a href="{{ route('purchasing.purchase_orders.show', $po->po_id) }}"
-                                       style="color:#2563eb; text-decoration:none; font-weight:700">{{ $po->po_code }}</a>
+                                    @if ($po->is_opening)
+                                        <div style="font-weight:700; color:#7c3aed">Saldo Awal Hutang</div>
+                                        @if ($po->reference_no)
+                                            <div class="text-muted" style="font-size:.74rem">{{ $po->reference_no }}</div>
+                                        @endif
+                                    @else
+                                        <a href="{{ route('purchasing.purchase_orders.show', $po->po_id) }}"
+                                           style="color:#2563eb; text-decoration:none; font-weight:700">{{ $po->po_code }}</a>
+                                    @endif
                                 </td>
                                 <td style="color:#64748b">{{ \Carbon\Carbon::parse($po->oldest_grn_date)->format('d M Y') }}</td>
                                 <td class="rpt-num">Rp {{ $fmt($po->grn_total) }}</td>

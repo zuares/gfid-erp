@@ -418,6 +418,7 @@
     $hasAccountsIndex = $router->has('accounting.accounts.index');
     $hasOpeningBalancesIndex = $router->has('accounting.opening-balances.index');
     $hasOpeningBalancesBatchIndex = $router->has('accounting.opening-balances-batch.index');
+    $hasSupplierApOpeningsIndex = $router->has('accounting.supplier-ap-openings.index');
 
     // Penggajian
     $hasPayrollDashboard = $router->has('payroll.dashboard');
@@ -496,6 +497,7 @@
         $hasAccountingIndex = $hasCashBasisReportIndex = $hasCashReceiptsIndex = false;
         $hasJournalsIndex = $hasAccountsIndex = $hasOpeningBalancesIndex = false;
         $hasOpeningBalancesBatchIndex = $hasCashTransfersIndex = false;
+        $hasSupplierApOpeningsIndex = false;
     }
 
     if (!$canModule('payroll')) {
@@ -597,6 +599,7 @@
         request()->routeIs('accounting.cash-transfers.*') ||
         request()->routeIs('accounting.opening-balances.*') ||
         request()->routeIs('accounting.opening-balances-batch.*') ||
+        request()->routeIs('accounting.supplier-ap-openings.*') ||
         request()->routeIs('accounting.journals.*') ||
         request()->routeIs('accounting.accounts.*') ||
         request()->routeIs('accounting.buku-besar.*') ||
@@ -1244,7 +1247,7 @@
                     @endif
 
                     {{-- Keuangan (admin / operating) --}}
-                    @if ($hasAccountingIndex || $hasCashExpensesIndex || $hasCashTransfersIndex || $hasCashReceiptsIndex || $hasCashBasisReportIndex || $hasJournalsIndex || $hasAccountsIndex || $hasOpeningBalancesIndex || $hasOpeningBalancesBatchIndex)
+                    @if ($hasAccountingIndex || $hasCashExpensesIndex || $hasCashTransfersIndex || $hasCashReceiptsIndex || $hasCashBasisReportIndex || $hasJournalsIndex || $hasAccountsIndex || $hasOpeningBalancesIndex || $hasOpeningBalancesBatchIndex || $hasSupplierApOpeningsIndex)
                         <div class="mobile-sidebar-section-label">Keuangan</div>
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $accountingOpen ? 'is-open' : '' }}"
@@ -1271,6 +1274,11 @@
                                 @if ($hasOpeningBalancesBatchIndex)
                                     <a href="{{ route('accounting.opening-balances-batch.index') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.opening-balances-batch.*') ? 'active' : '' }}">
                                         <span class="icon">🧺</span><span>Batch Saldo Awal</span>
+                                    </a>
+                                @endif
+                                @if ($hasSupplierApOpeningsIndex)
+                                    <a href="{{ route('accounting.supplier-ap-openings.index') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.supplier-ap-openings.*') ? 'active' : '' }}">
+                                        <span class="icon">👥</span><span>Saldo Awal Hutang Supplier</span>
                                     </a>
                                 @endif
                                 @if ($hasCashExpensesIndex)
@@ -2292,6 +2300,13 @@
                                 <a href="{{ route('accounting.opening-balances-batch.index') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.opening-balances-batch.*') ? 'active' : '' }}">
                                     <span class="icon">🧺</span><span>Batch Saldo Awal</span>
+                                </a>
+                            @endif
+
+                            @if ($hasSupplierApOpeningsIndex)
+                                <a href="{{ route('accounting.supplier-ap-openings.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.supplier-ap-openings.*') ? 'active' : '' }}">
+                                    <span class="icon">👥</span><span>Saldo Awal Hutang Supplier</span>
                                 </a>
                             @endif
 
