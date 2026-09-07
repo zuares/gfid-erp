@@ -67,6 +67,74 @@ class PieceworkPayrollPostingTest extends TestCase
         $this->assertSame($journalCount, Journal::count());
     }
 
+    public function test_daily_payroll_is_accrued_to_operating_payroll_expense(): void
+    {
+        $wip = Account::firstOrCreate(['code' => '1202'], [
+            'code' => '1202',
+            'name' => 'Persediaan WIP',
+            'type' => 'asset',
+            'is_active' => true,
+        ]);
+        $payrollExpense = Account::firstOrCreate(['code' => '6103'], [
+            'code' => '6103',
+            'name' => 'Biaya Gaji Operasional',
+            'type' => 'expense',
+            'is_active' => true,
+        ]);
+        $payable = Account::firstOrCreate(['code' => '2102'], [
+            'code' => '2102',
+            'name' => 'Hutang Upah Borongan',
+            'type' => 'liability',
+            'is_active' => true,
+        ]);
+
+        $employee = Employee::create([
+            'code' => 'EMP-DAILY-POSTING-TEST',
+            'name' => 'Payroll Harian Test',
+            'role' => 'operating',
+            'payment_type' => 'variable',
+            'active' => true,
+        ]);
+        $period = PieceworkPayrollPeriod::create([
+            'module' => 'daily',
+            'period_start' => '2026-08-31',
+            'period_end' => '2026-09-06',
+            'status' => 'draft',
+            'total_amount' => 700000,
+        ]);
+        PieceworkPayrollLine::create([
+            'payroll_period_id' => $period->id,
+            'employee_id' => $employee->id,
+            'total_qty_ok' => 7,
+            'rate_per_day' => 100000,
+            'amount' => 700000,
+        ]);
+
+        app(PieceworkPayrollPostingService::class)->finalize($period);
+
+        $journal = Journal::where('source_type', 'piecework_payroll_period_accrual')
+            ->where('source_id', $period->id)
+            ->firstOrFail();
+        $this->assertDatabaseHas('journal_lines', [
+            'journal_id' => $journal->id,
+            'account_id' => $payrollExpense->id,
+            'debit' => 700000,
+            'credit' => 0,
+        ]);
+        $this->assertDatabaseHas('journal_lines', [
+            'journal_id' => $journal->id,
+            'account_id' => $payable->id,
+            'debit' => 0,
+            'credit' => 700000,
+        ]);
+        $this->assertDatabaseMissing('journal_lines', [
+            'journal_id' => $journal->id,
+            'account_id' => $wip->id,
+            'debit' => 700000,
+            'credit' => 0,
+        ]);
+    }
+
     private function makePayroll(): array
     {
         $wip = Account::firstOrCreate(['code' => '1202'], [

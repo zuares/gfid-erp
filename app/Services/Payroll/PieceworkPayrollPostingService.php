@@ -93,20 +93,21 @@ class PieceworkPayrollPostingService
             $journal = null;
 
             if (abs($difference) > 0.01) {
-                $inventoryCode = $period->module === 'finishing' ? '1203' : '1202';
-                $inventory = Account::where('code', $inventoryCode)->firstOrFail();
+                $debitAccount = $period->module === 'daily'
+                    ? Account::where('code', JournalService::CODE_EXP_DAILY_PAYROLL)->firstOrFail()
+                    : Account::where('code', $period->module === 'finishing' ? '1203' : '1202')->firstOrFail();
                 $payrollLabel = $period->module === 'daily' ? 'Payroll Harian' : 'Payroll Borongan';
                 $desc = strtoupper($period->module).' '.$payrollLabel.' (REKONSILIASI) '
                     .$period->period_start.' s/d '.$period->period_end;
 
                 $lines = $difference > 0
                     ? [
-                        ['account_id' => $inventory->id, 'debit' => $difference, 'credit' => 0],
+                        ['account_id' => $debitAccount->id, 'debit' => $difference, 'credit' => 0],
                         ['account_id' => $payable->id, 'debit' => 0, 'credit' => $difference],
                     ]
                     : [
                         ['account_id' => $payable->id, 'debit' => abs($difference), 'credit' => 0],
-                        ['account_id' => $inventory->id, 'debit' => 0, 'credit' => abs($difference)],
+                        ['account_id' => $debitAccount->id, 'debit' => 0, 'credit' => abs($difference)],
                     ];
 
                 $journal = $this->journalService->post(

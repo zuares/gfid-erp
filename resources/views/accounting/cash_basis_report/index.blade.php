@@ -224,7 +224,7 @@
                 <div class="cbr-kpi">
                     <div class="cbr-kpi-label">Kas Keluar</div>
                     <div class="cbr-kpi-value {{ $cashOutTotal < 0 ? 'neg' : '' }}">Rp {{ $fmt($cashOutTotal) }}</div>
-                    <div class="cbr-kpi-note">operasional dan pembayaran PO</div>
+                    <div class="cbr-kpi-note">operasional, gaji harian, dan pembayaran PO</div>
                 </div>
                 <div class="cbr-kpi">
                     <div class="cbr-kpi-label">Saldo Akhir Periode</div>

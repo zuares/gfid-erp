@@ -29,6 +29,7 @@ class JournalService
     public const CODE_ADV_PURCHASE = '1151'; // Uang Muka Pembelian
     public const CODE_SUPPLIER_CLAIM = '1305'; // Piutang Supplier
     public const CODE_EXP_OPEX = '6101'; // Biaya Operasional Umum
+    public const CODE_EXP_DAILY_PAYROLL = '6103'; // Biaya Gaji Operasional
     public const CODE_STOCK_VARIANCE = '6115'; // Selisih Stock Opname
     public const CODE_LEGACY_CORRECTION = '6116'; // Koreksi Persediaan Legacy (close as legacy)
     public const CODE_PRODUCTION_LOSS = '6120'; // Kerugian Produksi / Reject (scrap & write-off)
