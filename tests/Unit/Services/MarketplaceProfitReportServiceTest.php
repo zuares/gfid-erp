@@ -6,6 +6,8 @@ use App\Models\Channel;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
+use App\Models\MarketplacePayout;
+use App\Models\Account;
 use App\Models\Store;
 use App\Services\Marketplace\MarketplaceProfitReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -97,6 +99,72 @@ class MarketplaceProfitReportServiceTest extends TestCase
         $this->assertSame(0, $report['summary']['order_count']);
         $this->assertSame(0.0, $report['summary']['operating_profit']);
         $this->assertSame('settlement_missing', $report['quality']['issues'][0]['reason']);
+    }
+
+    public function test_settlement_basis_uses_posted_payout_date_and_allocated_amount(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'PROFIT-PAYOUT-001',
+            'channel_order_id' => 'PROFIT-PAYOUT-001',
+            'order_date' => '2026-08-01 10:00:00',
+            'ordered_at' => '2026-08-01 10:00:00',
+            'order_status' => 'COMPLETED',
+            'financial_data_status' => 'ready',
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'line_no' => 1,
+            'item_name' => 'Produk Payout',
+            'model_sku' => 'SKU-PAYOUT',
+            'qty' => 1,
+            'price' => 300,
+            'hpp_snapshot' => 100,
+            'data_status' => 'valid',
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => 'PROFIT-PAYOUT-001',
+            'buyer_payment_amount' => 300,
+            'final_income' => 255,
+            'settlement_time' => '2026-08-02 10:00:00',
+            'data_status' => 'complete',
+            'raw_json' => [],
+        ]);
+        $bank = Account::create([
+            'code' => '1101-PAYOUT-' . uniqid(),
+            'name' => 'Bank Payout Test',
+            'type' => 'asset',
+            'is_cash' => true,
+            'is_active' => true,
+        ]);
+        MarketplacePayout::create([
+            'date' => '2026-08-10',
+            'marketplace_name' => 'Shopee',
+            'store_id' => $store->id,
+            'source' => 'shopee_wallet',
+            'amount' => 240,
+            'bank_account_id' => $bank->id,
+            'transaction_created_at' => '2026-08-10 12:00:00',
+            'source_payload' => [
+                'allocations' => [['order_sn' => 'PROFIT-PAYOUT-001', 'amount' => 240]],
+            ],
+            'status' => 'posted',
+        ]);
+
+        $report = app(MarketplaceProfitReportService::class)->report([
+            'store_id' => $store->id,
+            'date_basis' => 'settlement_time',
+            'date_from' => '2026-08-10',
+            'date_to' => '2026-08-10',
+        ]);
+
+        $this->assertSame(1, $report['summary']['order_count']);
+        $this->assertSame(240.0, $report['summary']['payout']);
+        $this->assertSame('2026-08-10', $report['orders'][0]['settlement_time']);
     }
 
     public function test_non_completed_orders_are_excluded_from_financial_quality_counts(): void

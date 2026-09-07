@@ -6,6 +6,9 @@ use Carbon\Carbon;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
+use App\Models\MarketplaceFinanceSettlement;
+use App\Models\MarketplacePayout;
+use App\Domain\Marketplace\Finance\Enums\SettlementStatus;
 use Illuminate\Database\Eloquent\Builder;
 
 class MarketplaceProfitReportService
@@ -30,15 +33,16 @@ class MarketplaceProfitReportService
     public function report(array $filters): array
     {
         $filters = $this->normalizeFilters($filters);
+        $settlementSource = $this->settlementSource($filters);
 
-        $qualityCounts = $this->filteredOrders($filters)
+        $qualityCounts = $this->filteredOrders($filters, $settlementSource)
             ->whereIn('order_status', MarketplaceFinancialDataQualityService::FINANCIAL_ELIGIBLE_ORDER_STATUSES)
             ->selectRaw('COALESCE(financial_data_status, ?) AS status, COUNT(*) AS total', ['unknown'])
             ->groupBy('financial_data_status')
             ->pluck('total', 'status')
             ->map(fn ($value) => (int) $value);
 
-        $issueBreakdown = $this->filteredOrders($filters)
+        $issueBreakdown = $this->filteredOrders($filters, $settlementSource)
             ->whereIn('order_status', MarketplaceFinancialDataQualityService::FINANCIAL_ELIGIBLE_ORDER_STATUSES)
             ->where(function (Builder $query) {
                 $query->where('financial_data_status', MarketplaceFinancialDataQualityService::ORDER_INCOMPLETE)
@@ -55,7 +59,7 @@ class MarketplaceProfitReportService
             ->values()
             ->all();
 
-        $ordersQuery = $this->filteredOrders($filters)
+        $ordersQuery = $this->filteredOrders($filters, $settlementSource)
             ->where(function (Builder $query) use ($filters) {
                 $query->where(function (Builder $completed) {
                     $completed
@@ -88,7 +92,7 @@ class MarketplaceProfitReportService
         $dailyRows = [];
         $itemRows = [];
 
-        $ordersQuery->chunkById(200, function ($orders) use (&$orderRows, &$storeRows, &$dailyRows, &$itemRows, $filters) {
+        $ordersQuery->chunkById(200, function ($orders) use (&$orderRows, &$storeRows, &$dailyRows, &$itemRows, $filters, $settlementSource) {
             foreach ($orders as $order) {
                 $settlement = $order->settlement;
                 if (! $settlement) {
@@ -104,7 +108,8 @@ class MarketplaceProfitReportService
                     continue;
                 }
 
-                $row = $this->buildOrderRow($order, $settlement, $items);
+                $payout = $settlementSource['orders'][(string) $order->id] ?? null;
+                $row = $this->buildOrderRow($order, $settlement, $items, $payout);
                 $orderRows[] = $row;
 
                 $storeKey = (string) $order->store_id;
@@ -117,7 +122,7 @@ class MarketplaceProfitReportService
                     $row,
                 );
 
-                $date = $this->dateKey($order, $settlement, $filters['date_basis']);
+                $date = $this->dateKey($order, $settlement, $filters['date_basis'], $payout);
                 $dailyKey = $date ?: 'undated';
                 $dailyRows[$dailyKey] = $this->mergeAggregate(
                     $dailyRows[$dailyKey] ?? $this->emptyAggregate(['date' => $date]),
@@ -168,10 +173,10 @@ class MarketplaceProfitReportService
                 'unknown' => (int) ($qualityCounts['unknown'] ?? 0),
                 'issues' => $issueBreakdown,
                 'provisional_total' => $filters['report_scope'] === 'include_shipped'
-                    ? $this->filteredOrders($filters)->where('order_status', 'SHIPPED')->count()
+                    ? $this->filteredOrders($filters, $settlementSource)->where('order_status', 'SHIPPED')->count()
                     : 0,
                 'provisional_ready' => $filters['report_scope'] === 'include_shipped'
-                    ? $this->filteredOrders($filters)
+                    ? $this->filteredOrders($filters, $settlementSource)
                         ->where('order_status', 'SHIPPED')
                         ->whereHas('settlement', fn (Builder $query) => $query->where('data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE))
                         ->whereHas('items', fn (Builder $query) => $query->where('data_status', 'valid')->where('hpp_snapshot', '>', 0))
@@ -200,15 +205,23 @@ class MarketplaceProfitReportService
         ];
     }
 
-    private function filteredOrders(array $filters): Builder
+    private function filteredOrders(array $filters, array $settlementSource = ['active' => false, 'orders' => []]): Builder
     {
         $query = MarketplaceOrder::query()
             ->when($filters['store_id'], fn (Builder $builder, $storeId) => $builder->where('store_id', $storeId));
 
         if ($filters['date_basis'] === 'settlement_time') {
-            $query->whereHas('settlement', function (Builder $settlement) use ($filters) {
-                $this->applyDateRange($settlement, 'settlement_time', $filters['date_from'], $filters['date_to']);
-            });
+            if ($settlementSource['active']) {
+                // A payout can settle several orders at once. Use its
+                // allocation date as the settlement basis, rather than the
+                // per-order release timestamp which may be absent or differ
+                // from the actual cash disbursement.
+                $query->whereKey(array_keys($settlementSource['orders']));
+            } else {
+                $query->whereHas('settlement', function (Builder $settlement) use ($filters) {
+                    $this->applyDateRange($settlement, 'settlement_time', $filters['date_from'], $filters['date_to']);
+                });
+            }
         } else {
             $this->applyDateRange($query, 'ordered_at', $filters['date_from'], $filters['date_to']);
         }
@@ -226,18 +239,20 @@ class MarketplaceProfitReportService
         }
     }
 
-    private function buildOrderRow(MarketplaceOrder $order, MarketplaceOrderSettlement $settlement, $items): array
+    private function buildOrderRow(MarketplaceOrder $order, MarketplaceOrderSettlement $settlement, $items, ?array $payout = null): array
     {
         $grossSales = $settlement->buyer_payment_amount !== null
             ? (float) $settlement->buyer_payment_amount
             : (float) ($order->total_amount ?? $order->total_paid_customer ?? $order->subtotal_items ?? 0);
-        $payout = (float) ($settlement->final_income ?? 0);
+        $payoutAmount = $payout !== null && array_key_exists('amount', $payout)
+            ? (float) $payout['amount']
+            : (float) ($settlement->final_income ?? 0);
         $hpp = (float) $items->sum(fn (MarketplaceOrderItem $item) => (float) $item->hpp_snapshot * max((int) $item->qty, 0));
         $fees = (float) collect(self::FEE_FIELDS)->sum(fn (string $field) => (float) ($settlement->{$field} ?? 0));
         $sellerDiscount = (float) ($settlement->seller_voucher ?? 0) + (float) ($settlement->seller_coin_cash_back ?? 0);
         $refund = (float) ($settlement->drc_adjustable_refund ?? 0);
         $adCost = (float) ($settlement->ad_cost ?? 0);
-        $grossProfit = $payout - $hpp;
+        $grossProfit = $payoutAmount - $hpp;
         $operatingProfit = $grossProfit - $adCost;
 
         return [
@@ -250,12 +265,12 @@ class MarketplaceProfitReportService
                 ? 'final'
                 : 'provisional',
             'ordered_at' => optional($order->ordered_at)->toDateString(),
-            'settlement_time' => optional($settlement->settlement_time)->toDateString(),
+            'settlement_time' => $payout['date'] ?? optional($settlement->settlement_time)->toDateString(),
             'gross_sales' => $grossSales,
             'seller_discount' => $sellerDiscount,
             'marketplace_fees' => $fees,
             'refund' => $refund,
-            'payout' => $payout,
+            'payout' => $payoutAmount,
             'hpp' => $hpp,
             'ad_cost' => $adCost,
             'gross_profit' => $grossProfit,
@@ -302,11 +317,132 @@ class MarketplaceProfitReportService
         }
     }
 
-    private function dateKey(MarketplaceOrder $order, MarketplaceOrderSettlement $settlement, string $basis): ?string
+    private function dateKey(MarketplaceOrder $order, MarketplaceOrderSettlement $settlement, string $basis, ?array $payout = null): ?string
     {
         return $basis === 'settlement_time'
-            ? optional($settlement->settlement_time)->toDateString()
+            ? ($payout['date'] ?? optional($settlement->settlement_time)->toDateString())
             : optional($order->ordered_at)->toDateString();
+    }
+
+    /**
+     * Resolve the actual cash disbursement used for settlement-basis reports.
+     *
+     * The new finance settlement tables are authoritative. Legacy payout
+     * rows are used only for orders that do not have a finance allocation yet.
+     * If any mapped payout exists, an order without an allocation is excluded
+     * from the settlement-basis period instead of silently falling back to its
+     * order-level release timestamp.
+     *
+     * @return array{active:bool,orders:array<string,array{amount:float,date:string}>}
+     */
+    private function settlementSource(array $filters): array
+    {
+        if ($filters['date_basis'] !== 'settlement_time') {
+            return ['active' => false, 'orders' => []];
+        }
+
+        $orders = [];
+        $hasMappedSource = MarketplaceFinanceSettlement::query()
+            ->where('status', SettlementStatus::RECEIVED->value)
+            ->whereHas('allocations')
+            ->when($filters['store_id'], fn (Builder $query, $storeId) => $query->where('store_id', $storeId))
+            ->exists();
+
+        $financeSettlements = MarketplaceFinanceSettlement::query()
+            ->where('status', SettlementStatus::RECEIVED->value)
+            ->when($filters['store_id'], fn (Builder $query, $storeId) => $query->where('store_id', $storeId))
+            ->when($filters['date_from'], fn (Builder $query, $date) => $query->whereDate('settlement_date', '>=', $date))
+            ->when($filters['date_to'], fn (Builder $query, $date) => $query->whereDate('settlement_date', '<=', $date))
+            ->whereNotNull('settlement_date')
+            ->with('allocations.financialTransaction:id,marketplace_order_id')
+            ->get();
+
+        foreach ($financeSettlements as $settlement) {
+            foreach ($settlement->allocations as $allocation) {
+                $orderId = $allocation->financialTransaction?->marketplace_order_id;
+                if (! $orderId) {
+                    continue;
+                }
+
+                $key = (string) $orderId;
+                $orders[$key] ??= ['amount' => 0.0, 'date' => $settlement->settlement_date->toDateString()];
+                $orders[$key]['amount'] += (float) $allocation->allocated_amount;
+                $orders[$key]['date'] = max($orders[$key]['date'], $settlement->settlement_date->toDateString());
+            }
+        }
+
+        $hasLegacyMappedSource = MarketplacePayout::query()
+            ->where('status', 'posted')
+            ->whereNotNull('source_payload')
+            ->when($filters['store_id'], fn (Builder $query, $storeId) => $query->where('store_id', $storeId))
+            ->get(['id', 'store_id', 'source_payload'])
+            ->contains(fn (MarketplacePayout $payout) => $this->allocationRows($payout->source_payload) !== []);
+        $hasMappedSource = $hasMappedSource || $hasLegacyMappedSource;
+
+        $legacyPayouts = MarketplacePayout::query()
+            ->where('status', 'posted')
+            ->when($filters['store_id'], fn (Builder $query, $storeId) => $query->where('store_id', $storeId))
+            ->when($filters['date_from'], fn (Builder $query, $date) => $query->where(function (Builder $nested) use ($date) {
+                $nested->whereDate('transaction_created_at', '>=', $date)
+                    ->orWhere(function (Builder $fallback) use ($date) {
+                        $fallback->whereNull('transaction_created_at')->whereDate('date', '>=', $date);
+                    });
+            }))
+            ->when($filters['date_to'], fn (Builder $query, $date) => $query->where(function (Builder $nested) use ($date) {
+                $nested->whereDate('transaction_created_at', '<=', $date)
+                    ->orWhere(function (Builder $fallback) use ($date) {
+                        $fallback->whereNull('transaction_created_at')->whereDate('date', '<=', $date);
+                    });
+            }))
+            ->get();
+
+        foreach ($legacyPayouts as $payout) {
+            $date = ($payout->transaction_created_at ?? $payout->date)?->toDateString();
+            if (! $date) {
+                continue;
+            }
+
+            foreach ($this->allocationRows($payout->source_payload) as $allocation) {
+                $orderNumber = trim((string) ($allocation['order_sn'] ?? $allocation['order_id'] ?? $allocation['ordersn'] ?? ''));
+                $amount = $allocation['amount'] ?? $allocation['allocated_amount'] ?? $allocation['payout_amount'] ?? $allocation['settlement_amount'] ?? null;
+                if ($orderNumber === '' || $amount === null) {
+                    continue;
+                }
+
+                $order = MarketplaceOrder::query()
+                    ->where('store_id', $payout->store_id)
+                    ->where(fn (Builder $query) => $query
+                        ->where('channel_order_id', $orderNumber)
+                        ->orWhere('external_order_id', $orderNumber))
+                    ->first(['id']);
+                if (! $order || isset($orders[(string) $order->id])) {
+                    continue;
+                }
+
+                $orders[(string) $order->id] = [
+                    'amount' => (float) $amount,
+                    'date' => $date,
+                ];
+            }
+        }
+
+        return ['active' => $hasMappedSource, 'orders' => $orders];
+    }
+
+    /** @return array<int,array<string,mixed>> */
+    private function allocationRows(mixed $payload): array
+    {
+        if (! is_array($payload)) {
+            return [];
+        }
+        foreach (['allocations', 'orders', 'order_list', 'pay_order_list', 'escrow_list', 'details'] as $key) {
+            $rows = data_get($payload, $key);
+            if (is_array($rows)) {
+                return array_is_list($rows) ? $rows : [$rows];
+            }
+        }
+
+        return array_is_list($payload) ? $payload : [];
     }
 
     private function mergeItemRows(array &$itemRows, MarketplaceOrder $order, MarketplaceOrderSettlement $settlement, $items, array $orderRow): void
