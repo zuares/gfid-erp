@@ -146,7 +146,7 @@ class OpeningBalanceBatchController extends Controller
             ->whereNull('p.paid_at')
             ->whereDate('p.period_end', '<=', $cutoffDate)
             ->whereIn('p.status', ['final', 'posted'])
-            ->whereIn('p.module', ['cutting', 'sewing', 'finishing', 'packing'])
+            ->whereIn('p.module', ['cutting', 'sewing', 'daily', 'finishing', 'packing'])
             ->selectRaw('SUM(COALESCE(NULLIF(p.total_amount, 0), pl.lines_total, 0)) as total')
             ->value('total');
         $payrollPeriodPayableTotal = round($payrollPeriodPayableTotal, 0);

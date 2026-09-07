@@ -94,7 +94,10 @@ class PieceworkPayrollPostingService
 
             if (abs($difference) > 0.01) {
                 $debitAccount = $period->module === 'daily'
-                    ? Account::where('code', JournalService::CODE_EXP_DAILY_PAYROLL)->firstOrFail()
+                    ? Account::where('code', JournalService::CODE_EXP_DAILY_PAYROLL)
+                        ->where('type', 'expense')
+                        ->where('is_active', true)
+                        ->firstOrFail()
                     : Account::where('code', $period->module === 'finishing' ? '1203' : '1202')->firstOrFail();
                 $payrollLabel = $period->module === 'daily' ? 'Payroll Harian' : 'Payroll Borongan';
                 $desc = strtoupper($period->module).' '.$payrollLabel.' (REKONSILIASI) '

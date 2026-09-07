@@ -571,7 +571,7 @@ class PieceworkPayrollController extends Controller
     }
 
     /**
-     * FINALIZE: Dr HPP, Cr Hutang Upah Borongan
+     * FINALIZE: Dr HPP (borongan) atau Beban Operasional (harian), Cr Hutang.
      */
     public function finalize(string $module, PieceworkPayrollPeriod $period, PieceworkPayrollPostingService $svc): RedirectResponse
     {
@@ -586,10 +586,13 @@ class PieceworkPayrollController extends Controller
 
         try {
             $svc->finalize($period);
+            $finalizeMessage = $cfg['module'] === 'daily'
+                ? 'Biaya Operasional + Hutang dicatat'
+                : 'HPP + Hutang dicatat';
 
             return redirect()
                 ->to($this->moduleRoute($cfg['module'], 'show', ['period' => $period]))
-                ->with('status', "Periode payroll {$cfg['label']} berhasil difinalkan (HPP + Hutang dicatat).");
+                ->with('status', "Periode payroll {$cfg['label']} berhasil difinalkan ({$finalizeMessage}).");
         } catch (\Throwable $e) {
             return redirect()
                 ->to($this->moduleRoute($cfg['module'], 'show', ['period' => $period]))

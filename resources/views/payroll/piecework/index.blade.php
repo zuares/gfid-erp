@@ -172,7 +172,13 @@
         <div class="pw-top">
             <div>
                 <h1 class="pw-title">Payroll • {{ $moduleLabel ?? ucfirst($module) }}</h1>
-                <div class="pw-sub">Periode borongan (PCS) — Basis: {{ $module === 'sewing' ? 'Ambil Jahit' : 'Qty PCS jika belum QC / QC OK jika sudah QC' }} · Final = HPP + Hutang, Bayar = lunasi hutang.</div>
+                <div class="pw-sub">
+                    @if ($module === 'daily')
+                        Periode payroll harian — Basis: tarif harian &amp; kehadiran · Final = Beban Operasional + Hutang, Bayar = lunasi hutang.
+                    @else
+                        Periode borongan (PCS) — Basis: {{ $module === 'sewing' ? 'Ambil Jahit' : 'Qty PCS jika belum QC / QC OK jika sudah QC' }} · Final = HPP + Hutang, Bayar = lunasi hutang.
+                    @endif
+                </div>
             </div>
 
             <div class="pw-actions">
