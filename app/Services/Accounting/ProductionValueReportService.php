@@ -99,9 +99,12 @@ class ProductionValueReportService
                 'label' => 'Nilai Setoran Jahit',
                 'source_type' => JournalService::SRC_SEWING_RETURN_OK,
                 'journal_source_type' => JournalService::SRC_SEWING_RETURN_OK,
-                'amount' => $this->mutationAmount(JournalService::SRC_SEWING_RETURN_OK, $from, $to, 'in'),
+                'amount' => $this->mutationAmountForSources([
+                    JournalService::SRC_SEWING_RETURN_OK,
+                    'sewing_qc_in',
+                ], $from, $to, 'in'),
                 'journal_amount' => $this->journalOneSideAmount(JournalService::SRC_SEWING_RETURN_OK, $from, $to),
-                'hint' => 'WIP-SEW berpindah ke WIP-FIN. Nilai kartu memakai cost keluar WIP-SEW.',
+                'hint' => 'QC jahit lolos menjadi barang jadi di WH-PRD/WH-RTS. Nilai kartu memakai cost keluar WIP-SEW.',
             ],
             [
                 'key' => 'sewing_return_reject',
@@ -238,8 +241,13 @@ class ProductionValueReportService
 
     protected function mutationAmount(string $sourceType, string $from, string $to, string $direction): float
     {
+        return $this->mutationAmountForSources([$sourceType], $from, $to, $direction);
+    }
+
+    protected function mutationAmountForSources(array $sourceTypes, string $from, string $to, string $direction): float
+    {
         $query = DB::table('inventory_mutations')
-            ->where('source_type', $sourceType)
+            ->whereIn('source_type', array_values(array_unique($sourceTypes)))
             ->whereDate('date', '>=', $from)
             ->whereDate('date', '<=', $to);
 

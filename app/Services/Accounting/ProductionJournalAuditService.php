@@ -109,7 +109,7 @@ class ProductionJournalAuditService
                 'model' => SewingReturn::class,
                 'method' => 'postSewingReturnOk',
                 'direction' => 'in',
-                'effect' => 'Dr 1202 / Cr 1202 + Cr 2102',
+                'effect' => 'Dr 1203 / Cr 1202/1204 + Cr 2102',
             ],
             'sewing_return_reject' => [
                 'label' => 'Reject Jahit',

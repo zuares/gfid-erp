@@ -1122,8 +1122,11 @@ class JournalService
     }
 
     /**
-     * Setoran jahit OK: WIP-SEW → WIP-FIN.
+     * Setoran jahit OK setelah QC: WIP-SEW → Barang Jadi.
      * Upah jahit sudah diakui saat Ambil Jahit.
+     *
+     * Mutasi fisiknya dapat berakhir di WH-PRD atau WH-RTS, tergantung
+     * gudang tujuan QC. Secara akuntansi keduanya masuk akun barang jadi.
      */
     public function postSewingReturnOk(\App\Models\SewingReturn $return, ?string $date = null): ?Journal
     {
@@ -1144,8 +1147,8 @@ class JournalService
             ? self::CODE_INV_DEFECT
             : self::CODE_INV_WIP;
         $description = $fromDefectInventory
-            ? "Setor Ulang {$return->code} — Barang Cacat → WIP"
-            : "QC Jahit {$return->code} — WIP-SEW → WIP-FIN";
+            ? "Setor Ulang {$return->code} — Barang Cacat → Barang Jadi"
+            : "QC Jahit {$return->code} — WIP-SEW → Barang Jadi";
 
         if ($this->mutationAmount(self::SRC_SEWING_RETURN_OK, (int) $return->id, 'in') <= 0
             && $this->mutationAmount(self::SRC_SEWING_RETURN_OK, (int) $return->id, 'out') <= 0
@@ -1157,7 +1160,7 @@ class JournalService
                 mutationSourceId: (int) $return->id,
                 date: $this->dateOnly($date ?: $return->date),
                 description: $description,
-                debitAccountCode: self::CODE_INV_WIP,
+                debitAccountCode: self::CODE_INV_FG,
                 creditAccountCode: $creditAccountCode,
                 direction: 'in'
             );
@@ -1170,9 +1173,9 @@ class JournalService
             mutationSourceId: (int) $return->id,
             date: $this->dateOnly($date ?: $return->date),
             description: $fromDefectInventory
-                ? "Setor Ulang {$return->code} — Barang Cacat → WIP + Upah"
-                : "Setoran Jahit {$return->code} — WIP-SEW → WIP-FIN + Upah",
-            debitAccountCode: self::CODE_INV_WIP,
+                ? "Setor Ulang {$return->code} — Barang Cacat → Barang Jadi + Upah"
+                : "Setoran Jahit {$return->code} — WIP-SEW → Barang Jadi + Upah",
+            debitAccountCode: self::CODE_INV_FG,
             creditAccountCode: $creditAccountCode,
         );
     }
@@ -1215,8 +1218,8 @@ class JournalService
             mutationSourceType: self::SRC_SEWING_REWORK_OK,
             mutationSourceId: (int) $return->id,
             date: $this->dateOnly($return->date),
-            description: "Setor Ulang {$return->code} — Barang Cacat → WIP + Upah",
-            debitAccountCode: self::CODE_INV_WIP,
+            description: "Setor Ulang {$return->code} — Barang Cacat → Barang Jadi + Upah",
+            debitAccountCode: self::CODE_INV_FG,
             creditAccountCode: self::CODE_INV_DEFECT,
         );
     }
