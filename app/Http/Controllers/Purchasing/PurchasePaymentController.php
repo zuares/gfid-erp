@@ -132,6 +132,19 @@ class PurchasePaymentController extends Controller
     ) {}
 
     /**
+     * GET shortcut for the payment tab on a purchase order.
+     *
+     * Payment creation remains handled by the POST endpoint below; this
+     * route only makes the direct /payments URL safe to open in a browser.
+     */
+    public function showPayments(PurchaseOrder $purchase_order)
+    {
+        return redirect()
+            ->route('purchasing.purchase_orders.show', $purchase_order)
+            ->withFragment('payments');
+    }
+
+    /**
      * Store DP / Payment (pelunasan) dari modal show PO.
      *
      * Rules:

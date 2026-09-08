@@ -86,6 +86,9 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
                 ->name('purchase_payments.index');
 
             // PAYMENTS — sub-routes per PO (tetap ada)
+            Route::get('purchase-orders/{purchase_order}/payments', [PurchasePaymentController::class, 'showPayments'])
+                ->name('purchase_orders.payments.index');
+
             Route::post('purchase-orders/{purchase_order}/payments', [PurchasePaymentController::class, 'store'])
                 ->name('purchase_orders.payments.store');
 

@@ -17,6 +17,29 @@ class PurchaseOrderPaymentUiTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_owner_can_open_the_direct_payment_url(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-PO-PAY-REDIRECT-' . uniqid(),
+        ]);
+        $supplier = Supplier::create([
+            'code' => 'SUP-PO-PAY-REDIRECT-' . uniqid(),
+            'name' => 'Supplier Payment Redirect',
+        ]);
+        $order = PurchaseOrder::create([
+            'code' => 'PO-PAY-REDIRECT-' . uniqid(),
+            'date' => '2026-08-31',
+            'supplier_id' => $supplier->id,
+            'grand_total' => 1000000,
+            'status' => 'approved',
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('purchasing.purchase_orders.payments.index', $order))
+            ->assertRedirect(route('purchasing.purchase_orders.show', $order) . '#payments');
+    }
+
     public function test_owner_sees_tambah_dp_after_a_dp_has_been_recorded(): void
     {
         $owner = User::factory()->create([
