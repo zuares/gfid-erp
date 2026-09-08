@@ -166,6 +166,18 @@ class GrnFromDraftPoTest extends TestCase
             ->assertSee('Cari GRN / PO / item / SJ...', false);
     }
 
+    public function test_grn_show_has_a_button_back_to_related_purchase_order(): void
+    {
+        $po = $this->makeApprovedPo(2, 1000);
+        $grn = $this->grnService->create($this->makeGrnPayload($po, 1));
+
+        $response = $this->get(route('purchasing.purchase_receipts.show', $grn->id));
+
+        $response->assertOk()
+            ->assertSee('Kembali ke PO', false)
+            ->assertSee(route('purchasing.purchase_orders.show', $po->id), false);
+    }
+
     public function test_grn_export_respects_supplier_and_date_filters(): void
     {
         $ownPo = $this->makeApprovedPo(2, 1000);

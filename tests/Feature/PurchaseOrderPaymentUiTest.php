@@ -311,4 +311,50 @@ class PurchaseOrderPaymentUiTest extends TestCase
             ->get(route('purchasing.purchase_orders.edit', $order))
             ->assertOk();
     }
+
+    public function test_owner_can_pay_again_after_the_last_payment_is_voided(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-PO-REPAY-UI-' . uniqid(),
+        ]);
+        $supplier = Supplier::create([
+            'code' => 'SUP-PO-REPAY-UI-' . uniqid(),
+            'name' => 'Supplier Repay UI',
+        ]);
+        $paymentMethod = PaymentMethod::create([
+            'code' => 'UI-REPAY-CASH-' . uniqid(),
+            'name' => 'Cash Repay UI Test',
+            'mode' => 'cash',
+            'is_active' => true,
+        ]);
+        $order = PurchaseOrder::create([
+            'code' => 'PO-REPAY-UI-' . uniqid(),
+            'date' => '2026-08-31',
+            'supplier_id' => $supplier->id,
+            'grand_total' => 1000000,
+            'status' => 'approved',
+            'payment_status' => 'paid',
+            'paid_amount' => 1000000,
+        ]);
+        PurchasePayment::create([
+            'purchase_order_id' => $order->id,
+            'date' => '2026-08-31',
+            'payment_method_id' => $paymentMethod->id,
+            'type' => 'dp',
+            'amount' => 1000000,
+            'voided_at' => now(),
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('purchasing.purchase_orders.show', $order))
+            ->assertOk()
+            ->assertSee('Bayar Sekarang', false);
+
+        $this->assertDatabaseHas('purchase_orders', [
+            'id' => $order->id,
+            'payment_status' => 'unpaid',
+            'paid_amount' => 0,
+        ]);
+    }
 }

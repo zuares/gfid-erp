@@ -537,10 +537,12 @@ class CuttingJobController extends Controller
             ->orderBy('code')
             ->get();
 
-        // 4) operators
+        // 4) Operator yang sudah memiliki konfigurasi tarif borongan cutting.
+        //    Harus sama dengan form create agar employee lintas role (misalnya
+        //    OWN) tetap bisa dipilih saat memperbaiki job lama.
         $operators = Employee::query()
             ->select('id', 'code', 'name', 'role')
-            ->whereIn('role', ['cutting', 'operating'])
+            ->whereIn('id', PieceRate::cutting()->select('employee_id'))
             ->orderBy('code')
             ->get();
 

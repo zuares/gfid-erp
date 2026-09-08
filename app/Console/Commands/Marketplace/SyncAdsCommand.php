@@ -48,7 +48,14 @@ class SyncAdsCommand extends Command
 
         $query = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
             ->where('status', 'active')
-            ->where('is_active', true); // toko nonaktif dilewati
+            ->where('is_active', true)
+            // Token yang dicabut/expired tidak boleh memicu penarikan otomatis.
+            // OAuth resmi dapat diulang dari panel integrasi untuk membuat token
+            // baru dengan masa berlaku baru.
+            ->where(function ($q) {
+                $q->whereNull('token_expires_at')
+                    ->orWhere('token_expires_at', '>', now());
+            }); // toko nonaktif atau token tidak valid dilewati
 
         if ($storeId) {
             $query->where('id', $storeId);

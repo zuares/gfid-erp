@@ -145,25 +145,19 @@
         padding-block: .4rem;
         white-space: nowrap;
     }
-    .th-sub {
-        display: block;
-        color: #2563eb;
-        font-size: .62rem;
-        font-weight: 700;
-        letter-spacing: 0;
-        text-transform: none;
-    }
-    .th-sub-reject { color: #b91c1c; }
     .receipt-rule {
         color: var(--muted);
         font-size: .76rem;
-        line-height: 1.4;
+        line-height: 1.3;
+        padding-top: .1rem;
+        padding-bottom: .55rem;
     }
-    .table-sm td { padding-block: .35rem; vertical-align: middle; border-bottom: 1px solid rgba(148,163,184,.14); }
+    .receipt-rule strong { color: #334155; }
+    .table-sm td { padding: .3rem .45rem; vertical-align: middle; border-bottom: 1px solid rgba(148,163,184,.14); }
     .table-sm tr:last-child td { border-bottom: none; }
 
-    .item-code { font-weight: 700; font-size: .9rem; color: #334155; }
-    .item-name { font-size: .82rem; color: #64748b; margin-top: .15rem; line-height: 1.35; }
+    .item-name { font-size: .88rem; font-weight: 700; color: var(--text, #172033); line-height: 1.3; }
+    .item-code { font-size: .72rem; color: var(--muted); margin-top: .12rem; }
 
     /* Selected row highlight (selaras shipment: state jelas) */
     #grnLinesBody tr:has(.line-check:checked) {
@@ -171,22 +165,8 @@
         box-shadow: inset 3px 0 0 #334155;
     }
 
-    .progress-mini {
-        height: 3px;
-        border-radius: 999px;
-        background: rgba(148,163,184,.2);
-        overflow: hidden;
-        margin-top: .3rem;
-        width: 80px;
-    }
-    .progress-mini-bar {
-        height: 100%;
-        border-radius: 999px;
-        background: rgba(234,179,8,.8);
-    }
-
     .qty-input {
-        width: 88px;
+        width: 84px;
         text-align: right;
         font-variant-numeric: tabular-nums;
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono";
@@ -194,7 +174,7 @@
     }
 
     .qty-cell {
-        min-width: 112px;
+        min-width: 104px;
     }
     .qty-unit {
         display: block;
@@ -317,7 +297,7 @@
         .item-code { font-size: 1rem; }
         .item-name { font-size: .88rem; }
 
-        /* Sembunyikan kolom bernilai rendah di HP (data tetap ada utk JS) */
+        /* Sembunyikan kolom yang tidak diperlukan saat input di HP. */
         .col-harga,
         #grnLinesBody td[data-label="#"],
         #grnLinesBody td[data-label="Unit"],
@@ -392,7 +372,7 @@
     // supaya name="selected[{{ $idx }}]" cocok dengan index po_line_id[]/item_id[] di controller
     $activeLines        = $detailLines->filter(fn($l) => !($l->fully_received ?? false))->values();
     $fullyReceivedCount = $detailLines->count() - $activeLines->count();
-    $colCount           = $canSeeMoney ? 9 : 8;
+    $colCount           = $canSeeMoney ? 8 : 7;
 @endphp
 
 <div class="shp-topbar">
@@ -562,7 +542,7 @@
                 <span class="fw-semibold small">Detail Barang</span>
                 <div class="d-flex gap-2 align-items-center flex-wrap">
                     @if ($fullyReceivedCount > 0)
-                        <span class="tag tag-done">✓ {{ $fullyReceivedCount }} sudah selesai</span>
+                        <span class="tag tag-done">✓ Ada item selesai</span>
                     @endif
                     {{-- Tombol Terima Semua --}}
                     <button type="button" id="btnReceiveAll"
@@ -573,28 +553,24 @@
                 </div>
             </div>
 
-            <div class="px-3 pt-2 pb-1 receipt-rule">
-                <i class="bi bi-info-circle me-1"></i>
-                <strong>Diterima</strong> masuk stok.
-                <strong class="text-danger">Reject</strong> tidak masuk stok, tetapi tetap menghabiskan sisa Qty PO.
-                Kosongkan reject jika penerimaan hanya sebagian.
+            <div class="px-3 pt-2 receipt-rule">
+                <strong>Diterima</strong> masuk stok · <strong class="text-danger">Reject</strong> tidak masuk stok
             </div>
 
             <div class="table-responsive">
-                <table class="table table-sm table-hover align-middle mb-0">
+                <table class="table table-sm table-hover align-middle mb-0 grn-lines-table">
                     <thead>
                         <tr>
                             <th style="width:36px;" class="text-center"></th>
                             <th style="width:32px;" class="text-center">#</th>
                             <th>Item</th>
-                            <th class="text-end">Qty PO</th>
-                            <th class="text-end">Sisa</th>
-                            <th class="text-end" style="width:125px;">Diterima <small class="th-sub">masuk stok</small></th>
-                            <th class="text-end" style="width:125px;">Reject <small class="th-sub th-sub-reject">tidak masuk stok</small></th>
+                            <th class="text-end" style="width:110px;">Sisa</th>
+                            <th class="text-end" style="width:120px;">Diterima</th>
+                            <th class="text-end" style="width:120px;">Reject</th>
                             @if ($canSeeMoney)
                                 <th class="text-end col-harga">Harga</th>
                             @endif
-                            <th class="text-center" style="width:90px;">Satuan</th>
+                            <th class="text-center" style="width:86px;">Satuan</th>
                         </tr>
                     </thead>
                     <tbody id="grnLinesBody">
@@ -606,10 +582,6 @@
                         $isPartial       = (bool)($line->partially_received ?? false);
                         $qtyPo           = (float) $line->qty;
                         $qtyRemaining    = (float)($line->qty_remaining ?? $qtyPo);
-                        $qtyReceivedSoFar= (float)($line->qty_received_posted ?? 0);
-                        $qtyRejectedSoFar= (float)($line->qty_rejected_posted ?? 0);
-                        $qtyAccountedSoFar = $qtyReceivedSoFar + $qtyRejectedSoFar;
-                        $pctDone         = $qtyPo > 0 ? min(100, round(($qtyAccountedSoFar / $qtyPo) * 100)) : 0;
                         $lineAllocation  = ($line->allocation ?? ($line->item?->default_allocation ?? 'hpp')) === 'expense' ? 'expense' : 'hpp';
                         $lineExpenseAcc  = $line->expenseAccount ?? null;
 
@@ -658,7 +630,6 @@
 
                         {{-- Item --}}
                         <td class="td-item" data-label="Item">
-                            <div class="item-code mono">{{ $line->item?->code ?? '-' }}</div>
                             <div class="item-name">
                                 {{ $line->item?->name ?? '-' }}
                                 @if (!$hasOrder && $po)
@@ -671,6 +642,7 @@
                                     &nbsp;<span class="tag tag-partial">Sebagian diterima</span>
                                 @endif
                             </div>
+                            <div class="item-code mono">{{ $line->item?->code ?? '-' }}</div>
                             <div class="mt-1">
                                 @if ($lineAllocation === 'expense')
                                     <span class="tag" style="font-size:.65rem;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;">Biaya{{ $lineExpenseAcc ? ' · '.$lineExpenseAcc->code : '' }}</span>
@@ -678,20 +650,6 @@
                                     <span class="tag" style="font-size:.65rem;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;">Persediaan / HPP</span>
                                 @endif
                             </div>
-                            @if ($isPartial)
-                                <div class="d-flex align-items-center gap-2 mt-1">
-                                    <div class="progress-mini">
-                                        <div class="progress-mini-bar" style="width:{{ $pctDone }}%;"></div>
-                                    </div>
-                                    <span style="font-size:.7rem;color:var(--muted);">
-                                        {{ number_format($qtyAccountedSoFar,2,',','.') }} / {{ number_format($qtyPo,2,',','.') }} ({{ $pctDone }}%)
-                                        @if ($qtyRejectedSoFar > 0)
-                                            <span class="text-warning">· {{ number_format($qtyRejectedSoFar,2,',','.') }} reject</span>
-                                        @endif
-                                    </span>
-                                </div>
-                            @endif
-
                             <input type="hidden" name="po_line_id[]" value="{{ $line->id }}">
                             <input type="hidden" name="item_id[]"    value="{{ $line->item_id }}">
                             @if ($canSeeMoney)
@@ -702,21 +660,15 @@
                             <input type="hidden" name="unit[]" value="{{ $line->effectivePurchaseUnit() }}">
                         </td>
 
-                        {{-- Qty PO --}}
-                        <td class="text-end mono text-muted" style="font-size:.82rem;" data-label="Qty PO">
-                            <div class="qty-stack">
-                                <span>{{ number_format($qtyPo, 2, ',', '.') }} {{ $line->effectivePurchaseUnit() }}</span>
-                                <small>{{ decimal_id((float) $qtyPo * $line->effectiveConversionFactor(), 2) }} {{ $line->effectiveStockUnit() }} stok</small>
-                            </div>
-                        </td>
-
                         {{-- Sisa --}}
                         <td class="text-end mono" data-label="Sisa"
                             style="font-weight:{{ $isPartial ? '700' : '400' }};
                                    color:{{ $isPartial ? 'rgba(234,179,8,1)' : 'inherit' }};">
                             <div class="qty-stack">
-                                <span>{{ number_format($qtyRemaining, 2, ',', '.') }} {{ $line->effectivePurchaseUnit() }}</span>
-                                <small>{{ decimal_id((float) $qtyRemaining * $line->effectiveConversionFactor(), 2) }} {{ $line->effectiveStockUnit() }} stok</small>
+                                <span>{{ decimal_id((float) $qtyRemaining * $line->effectiveConversionFactor(), 2) }} {{ $line->effectiveStockUnit() }}</span>
+                                @if ($line->effectivePurchaseUnit() !== $line->effectiveStockUnit())
+                                    <small>{{ number_format($qtyRemaining, 2, ',', '.') }} {{ $line->effectivePurchaseUnit() }}</small>
+                                @endif
                             </div>
                         </td>
 
@@ -729,7 +681,9 @@
                                        placeholder="0,00" autocomplete="off"
                                        @if ($hasDraftGrn) disabled @endif>
                                 <span class="qty-unit">{{ $line->effectiveStockUnit() }}</span>
-                                <span class="qty-stock-preview" data-stock-preview="received">Beli: 0 {{ $line->effectivePurchaseUnit() }}</span>
+                                @if ($line->effectivePurchaseUnit() !== $line->effectiveStockUnit())
+                                    <span class="qty-stock-preview" data-stock-preview="received">Setara: 0 {{ $line->effectivePurchaseUnit() }}</span>
+                                @endif
                             </div>
                         </td>
 
@@ -742,7 +696,9 @@
                                        placeholder="0,00" autocomplete="off"
                                        @if ($hasDraftGrn) disabled @endif>
                                 <span class="qty-unit">{{ $line->effectiveStockUnit() }}</span>
-                                <span class="qty-stock-preview" data-stock-preview="reject">Beli: 0 {{ $line->effectivePurchaseUnit() }}</span>
+                                @if ($line->effectivePurchaseUnit() !== $line->effectiveStockUnit())
+                                    <span class="qty-stock-preview" data-stock-preview="reject">Setara: 0 {{ $line->effectivePurchaseUnit() }}</span>
+                                @endif
                             </div>
                         </td>
 
@@ -913,8 +869,8 @@
         const rejPreview = row.querySelector('[data-stock-preview="reject"]');
 
         const purchaseUnit = getPurchaseUnit(row);
-        if (recPreview) recPreview.textContent = `Beli: ${fmtId(rec / factor)} ${purchaseUnit}`;
-        if (rejPreview) rejPreview.textContent = `Beli: ${fmtId(rej / factor)} ${purchaseUnit}`;
+        if (recPreview) recPreview.textContent = `Setara: ${fmtId(rec / factor)} ${purchaseUnit}`;
+        if (rejPreview) rejPreview.textContent = `Setara: ${fmtId(rej / factor)} ${purchaseUnit}`;
         updateHiddenPurchaseQty(row);
     }
 

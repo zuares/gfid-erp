@@ -53,6 +53,69 @@ class Store extends Model
         return data_get($this->credentials ?? [], $key, $default);
     }
 
+    /**
+     * True only for credentials obtained through the official OAuth flow for
+     * the Ads Dashboard read-only integration. Raw token input is deliberately
+     * not supported by this integration.
+     */
+    public function hasReadOnlyAdsIntegration(): bool
+    {
+        try {
+            return data_get($this->meta ?? [], 'api_access_mode') === 'read_only'
+                && ! $this->readOnlyAdsIntegrationRevoked()
+                && filled($this->credential('access_token'));
+        } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+            return false;
+        }
+    }
+
+    public function readOnlyAdsIntegrationRevoked(): bool
+    {
+        try {
+            return filled(data_get($this->meta ?? [], 'api_revoked_at'));
+        } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+            return true;
+        }
+    }
+
+    public function readOnlyAdsIntegrationStatus(): string
+    {
+        try {
+            if ($this->readOnlyAdsIntegrationRevoked()) {
+                return 'revoked';
+            }
+
+            if (data_get($this->meta ?? [], 'api_access_mode') !== 'read_only') {
+                return 'not_connected';
+            }
+
+            if (! filled($this->credential('access_token'))) {
+                return 'not_connected';
+            }
+
+            if ($this->token_expires_at && $this->token_expires_at->isPast()) {
+                return 'expired';
+            }
+
+            return 'connected';
+        } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+            return 'revoked';
+        }
+    }
+
+    public function readOnlyAdsIntegrationScopes(): array
+    {
+        try {
+            return array_values(array_filter((array) data_get(
+                $this->meta ?? [],
+                'api_scopes',
+                config('marketplace.read_only_api_scopes', ['ads.read', 'shop.read'])
+            )));
+        } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+            return [];
+        }
+    }
+
     public function getConnectionStatusAttribute(): string
     {
         try {

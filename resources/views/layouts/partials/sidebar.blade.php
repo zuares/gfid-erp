@@ -196,6 +196,7 @@
     $hasCashTransfersIndex = $router->has('accounting.cash-transfers.index');
     $hasCashBasisReportIndex = $router->has('accounting.cash-basis-report.index');
     $hasCashReceiptsIndex = $router->has('accounting.cash-receipts.index');
+    $hasLoansIndex = $router->has('accounting.loans.index');
     $hasJournalsIndex = $router->has('accounting.journals.index');
     $hasOpeningBalancesIndex = $router->has('accounting.opening-balances.index');
     $hasOpeningBalancesBatchIndex = $router->has('accounting.opening-balances-batch.index');
@@ -294,6 +295,7 @@
     if (!$canModule('accounting')) {
         $hasAccountingIndex = $hasAccountsIndex = $hasCashBasisReportIndex = false;
         $hasCashReceiptsIndex = $hasJournalsIndex = $hasOpeningBalancesIndex = false;
+        $hasLoansIndex = false;
         $hasOpeningBalancesBatchIndex = $hasCashTransfersIndex = false;
         $hasSupplierApOpeningsIndex = false;
     }
@@ -386,6 +388,7 @@
         $open('accounting.cash-basis-report.*') ||
         $open('accounting.cash-expenses.*') ||
         $open('accounting.cash-receipts.*') ||
+        $open('accounting.loans.*') ||
         $open('accounting.cash-transfers.*') ||
         $open('accounting.marketplace-payouts.*') ||
         $open('accounting.ap-report.*') ||
@@ -1469,6 +1472,7 @@
                 $hasCashExpensesIndex,
                 $hasCashTransfersIndex,
                 $hasCashReceiptsIndex,
+                $hasLoansIndex,
                 $hasCashBasisReportIndex,
                 $hasJournalsIndex,
                 $hasAccountsIndex,
@@ -1520,6 +1524,13 @@
                         <x-sidebar.simple-link href="{{ route('accounting.cash-receipts.index') }}" icon="bi bi-coin"
                             :active="request()->routeIs('accounting.cash-receipts.*')">
                             Penerimaan Kas
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasLoansIndex)
+                        <x-sidebar.simple-link href="{{ route('accounting.loans.index') }}" icon="bi bi-bank"
+                            :active="request()->routeIs('accounting.loans.*') || request()->routeIs('accounting.loans.repayments.*')">
+                            Pinjaman
                         </x-sidebar.simple-link>
                     @endif
 
@@ -2315,7 +2326,7 @@
             @endif
 
             {{-- FINANCE --}}
-            @if ($canShow($hasAccountingIndex, $hasOpeningBalancesIndex, $hasOpeningBalancesBatchIndex, $hasSupplierApOpeningsIndex, $hasCashExpensesIndex, $hasCashReceiptsIndex, $hasCashTransfersIndex, $hasCashBasisReportIndex, $hasJournalsIndex, $hasAccountsIndex, $hasMarketplacePayoutsIndex, $hasApReportIndex, $hasTrialBalanceIndex, $hasProfitLossIndex, $hasBukuBesarIndex))
+            @if ($canShow($hasAccountingIndex, $hasOpeningBalancesIndex, $hasOpeningBalancesBatchIndex, $hasSupplierApOpeningsIndex, $hasCashExpensesIndex, $hasCashReceiptsIndex, $hasLoansIndex, $hasCashTransfersIndex, $hasCashBasisReportIndex, $hasJournalsIndex, $hasAccountsIndex, $hasMarketplacePayoutsIndex, $hasApReportIndex, $hasTrialBalanceIndex, $hasProfitLossIndex, $hasBukuBesarIndex))
                 <x-sidebar.label text="Keuangan" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openAccounting ? 'is-open' : '' }}" type="button"
@@ -2379,6 +2390,13 @@
                             <x-sidebar.sub-link href="{{ route('accounting.cash-receipts.index') }}" icon="bi bi-coin"
                                 :active="request()->routeIs('accounting.cash-receipts.*')">
                                 Penerimaan Kas
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasLoansIndex)
+                            <x-sidebar.sub-link href="{{ route('accounting.loans.index') }}" icon="bi bi-bank"
+                                :active="request()->routeIs('accounting.loans.*') || request()->routeIs('accounting.loans.repayments.*')">
+                                Pinjaman
                             </x-sidebar.sub-link>
                         @endif
 

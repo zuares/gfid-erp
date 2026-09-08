@@ -17,6 +17,7 @@
     $insightTraffic = $insightTraffic ?? collect();
     $campaigns = $campaigns ?? collect();
     $campaignSchedules = collect($campaignSchedules ?? []);
+    $integrationStores = collect($integrationStores ?? []);
     $adsSetting = $adsSetting ?? (object)[];
     $metrics = $metrics ?? [];
     $heatmapInternalItems = collect($campaigns)->filter(function ($campaign) {
@@ -2212,6 +2213,76 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     @endif
 
+    {{-- ==============================================
+         OFFICIAL READ-ONLY API INTEGRATION
+    ============================================== --}}
+    <section class="dpanel" style="padding:1rem 1.1rem; margin:.75rem 0 1rem; border:1px solid rgba(37,99,235,.2); background:linear-gradient(135deg, rgba(239,246,255,.92), rgba(248,250,252,.9));">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
+            <div>
+                <div style="display:flex; align-items:center; gap:.45rem; font-size:.9rem; font-weight:800; color:#1e3a8a;">
+                    <i class="bi bi-shield-lock-fill"></i> Integrasi API Ads · Read-only
+                    <span style="font-size:.58rem; padding:.18rem .42rem; border-radius:999px; background:#dcfce7; color:#166534; letter-spacing:.05em;">AMAN</span>
+                </div>
+                <div style="font-size:.72rem; color:#475569; margin-top:.28rem; max-width:720px;">
+                    Token hanya diperoleh melalui OAuth resmi provider, disimpan terenkripsi, memiliki masa berlaku, dan tidak pernah diterima sebagai input manual.
+                    Profil izin minimum: <b>ads.read</b> · <b>shop.read</b>.
+                    Endpoint perubahan kampanye/produk diblokir untuk koneksi ini.
+                </div>
+            </div>
+            <div style="font-size:.65rem; color:#64748b; display:flex; gap:.35rem; align-items:center;">
+                <i class="bi bi-arrow-repeat"></i> Penarikan otomatis mengikuti scheduler
+            </div>
+        </div>
+
+        @if($integrationStores->isEmpty())
+            <div style="margin-top:.75rem; padding:.65rem .75rem; border-radius:10px; background:rgba(255,255,255,.72); color:#64748b; font-size:.75rem;">
+                Belum ada toko yang dapat dihubungkan. Tambahkan toko dari menu Marketplace terlebih dahulu.
+            </div>
+        @else
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:.55rem; margin-top:.75rem;">
+                @foreach($integrationStores as $integrationStore)
+                    @php
+                        $integrationStatus = $integrationStore->readOnlyAdsIntegrationStatus();
+                        $providerCode = strtolower((string) ($integrationStore->channel?->code ?? ''));
+                        $connectRoute = in_array($providerCode, ['tiktok'], true)
+                            ? route('marketplace.tiktok.connect', ['store_id' => $integrationStore->id, 'integration' => 'ads_read_only'])
+                            : route('marketplace.shopee.connect', ['store_id' => $integrationStore->id, 'integration' => 'ads_read_only']);
+                    @endphp
+                    <div id="adsIntegrationCard{{ $integrationStore->id }}" style="display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.65rem .75rem; border-radius:11px; background:rgba(255,255,255,.78); border:1px solid rgba(148,163,184,.22);">
+                        <div style="min-width:0;">
+                            <div style="font-size:.77rem; font-weight:800; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                {{ $integrationStore->name }}
+                                <span style="font-weight:600; color:#64748b;">· {{ $integrationStore->channel?->name ?? 'Marketplace' }}</span>
+                            </div>
+                            <div style="font-size:.66rem; margin-top:.18rem; color:{{ $integrationStatus === 'connected' ? '#15803d' : ($integrationStatus === 'expired' ? '#b45309' : '#64748b') }};">
+                                @if($integrationStatus === 'connected')
+                                    <i class="bi bi-check-circle-fill"></i> Terhubung · berlaku sampai {{ optional($integrationStore->token_expires_at)->timezone(config('app.timezone'))->format('d M Y H:i') }}
+                                @elseif($integrationStatus === 'expired')
+                                    <i class="bi bi-clock-history"></i> Token kedaluwarsa · hubungkan ulang
+                                @elseif($integrationStatus === 'revoked')
+                                    <i class="bi bi-slash-circle"></i> Akses dicabut
+                                @else
+                                    <i class="bi bi-dash-circle"></i> Belum terhubung
+                                @endif
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:.35rem; flex-shrink:0;">
+                            @if($integrationStatus !== 'connected')
+                                <a href="{{ $connectRoute }}" class="btn btn-sm btn-primary" style="font-size:.66rem; font-weight:800; border-radius:8px;">
+                                    <i class="bi bi-box-arrow-up-right"></i> Hubungkan resmi
+                                </a>
+                            @else
+                                <button type="button" class="btn btn-sm btn-outline-danger" style="font-size:.66rem; font-weight:800; border-radius:8px;" onclick="revokeAdsIntegration({{ $integrationStore->id }}, @js($integrationStore->name))">
+                                    <i class="bi bi-shield-x"></i> Cabut
+                                </button>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </section>
+
     @php
         // ================= Target Profit & ROAS (per toko) =================
         // net & COGS ratio dari KPI agregat (data yang sudah dihitung service).
@@ -4147,10 +4218,40 @@ window.AdsDashboardRoutes = {
     clear: @json(route('marketplace.ads.clear')),
     sync: @json(route('marketplace.ads.sync')),
     syncCancel: @json(route('marketplace.ads.sync.cancel')),
+    integrationStatus: @json(route('marketplace.ads.integration.status')),
+    integrationRevoke: @json(route('marketplace.ads.integration.revoke', ['store' => '__STORE_ID__'])),
     feeSetting: @json(route('marketplace.ads.fee.setting')),
     experimentsIndex: @json(route('marketplace.ads.experiments.index')),
     experimentsShow: @json(route('marketplace.ads.experiments.show', ['experiment' => '__EXPERIMENT_ID__'])),
     experimentsSimulate: @json(route('marketplace.ads.experiments.simulate')),
+};
+
+window.revokeAdsIntegration = async function (storeId, storeName) {
+    if (!window.confirm('Cabut token API resmi untuk ' + storeName + '? Penarikan data otomatis akan berhenti sampai toko dihubungkan ulang.')) {
+        return;
+    }
+
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const endpoint = window.AdsDashboardRoutes.integrationRevoke.replace('__STORE_ID__', encodeURIComponent(storeId));
+
+    try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': csrf,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+            throw new Error(payload.message || 'Pencabutan token gagal.');
+        }
+        window.showToast(payload.message || 'Token berhasil dicabut.');
+        window.setTimeout(() => window.location.reload(), 500);
+    } catch (error) {
+        window.showToast(error.message || 'Pencabutan token gagal.');
+    }
 };
 </script>
 <script>

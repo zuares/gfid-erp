@@ -1,6 +1,11 @@
 <?php
 
 return [
+    // Profil scope yang dipakai oleh integrasi Ads Dashboard. Scope aktual
+    // tetap harus diaktifkan pada console resmi provider; token tidak pernah
+    // dimasukkan secara manual melalui UI aplikasi.
+    'read_only_api_scopes' => ['ads.read', 'shop.read'],
+
     // Must exceed the normal scheduler batch runtime so manual, finance, and
     // settlement syncs for one store cannot overlap while a batch is finishing.
     'settlement_lock_ttl' => (int) env('MARKETPLACE_SETTLEMENT_LOCK_TTL', 3600),

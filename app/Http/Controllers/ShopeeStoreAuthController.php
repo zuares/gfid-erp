@@ -6,6 +6,7 @@ use App\Models\Channel;
 use App\Models\Store;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class ShopeeStoreAuthController extends Controller
 {
@@ -23,6 +24,15 @@ class ShopeeStoreAuthController extends Controller
             session(['shopee_connect_store_id' => request('store_id')]);
         }
 
+        if (request()->query('integration') === 'ads_read_only') {
+            session(['marketplace_integration' => 'ads_read_only']);
+        } else {
+            session()->forget('marketplace_integration');
+        }
+
+        $state = Str::random(64);
+        session(['shopee_oauth_state' => $state]);
+
         $redirectUrl = rtrim(env('APP_URL', request()->getSchemeAndHttpHost()), '/') . '/marketplace/shopee/callback';
 
         $path = '/api/v2/shop/auth_partner';
@@ -34,6 +44,7 @@ class ShopeeStoreAuthController extends Controller
             'timestamp' => $timestamp,
             'sign' => $sign,
             'redirect' => $redirectUrl,
+            'state' => $state,
         ]);
 
         return redirect()->away($url);
@@ -41,6 +52,15 @@ class ShopeeStoreAuthController extends Controller
 
     public function callback(Request $request)
     {
+        $expectedState = session()->pull('shopee_oauth_state');
+        // Shopee v2 historically only documented code + shop_id on callback.
+        // Validate state when the provider returns it, while keeping
+        // compatibility with provider responses that omit the optional field.
+        if ($expectedState && $request->query('state') !== null
+            && ! hash_equals($expectedState, (string) $request->query('state'))) {
+            return redirect('/marketplace/toko')->with('error', 'Shopee callback ditolak karena state OAuth tidak valid.');
+        }
+
         $code = $request->query('code');
         $shopId = $request->query('shop_id');
 
@@ -79,6 +99,7 @@ class ShopeeStoreAuthController extends Controller
             ['name' => 'Shopee', 'status' => 'active']
         );
 
+        $readOnlyIntegration = session()->pull('marketplace_integration') === 'ads_read_only';
         $credentials = [
             'partner_id' => $partnerId,
             'partner_key' => $partnerKey,
@@ -95,6 +116,22 @@ class ShopeeStoreAuthController extends Controller
         }
 
         try {
+            $meta = is_array($storeModel?->meta) ? $storeModel->meta : [];
+        } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+            $meta = [];
+        }
+        if ($readOnlyIntegration) {
+            $meta = array_merge($meta, [
+                'api_access_mode' => 'read_only',
+                'api_scopes' => config('marketplace.read_only_api_scopes', ['ads.read', 'shop.read']),
+                'api_auth_source' => 'official_oauth',
+                'api_connected_at' => now()->toISOString(),
+                'api_revoked_at' => null,
+                'api_revoked_by' => null,
+            ]);
+        }
+
+        try {
             if ($storeModel) {
                 $storeModel->update([
                     'channel_id' => $channel->id,
@@ -103,6 +140,7 @@ class ShopeeStoreAuthController extends Controller
                     'status' => 'active',
                     'is_active' => true,
                     'token_expires_at' => now()->addSeconds(max(0, ($token['expire_in'] ?? 86400) - 300)),
+                    'meta' => $meta,
                 ]);
             } else {
                 $storeModel = Store::updateOrCreate(
@@ -115,6 +153,7 @@ class ShopeeStoreAuthController extends Controller
                         'status' => 'active',
                         'is_active' => true,
                         'token_expires_at' => now()->addSeconds(max(0, ($token['expire_in'] ?? 86400) - 300)),
+                        'meta' => $meta,
                     ]
                 );
             }
@@ -128,6 +167,7 @@ class ShopeeStoreAuthController extends Controller
                 'status' => 'active',
                 'is_active' => true,
                 'token_expires_at' => now()->addSeconds(max(0, ($token['expire_in'] ?? 86400) - 300)),
+                'meta' => $meta,
                 'updated_at' => now(),
             ];
 

@@ -80,10 +80,14 @@ class ShopeeStoreAuthControllerTest extends TestCase
             ->andReturn(null, null, $queuedAdsSync);
 
         $response = $this->actingAs($user)
-            ->withSession(['shopee_connect_store_id' => $store->id])
+            ->withSession([
+                'shopee_connect_store_id' => $store->id,
+                'shopee_oauth_state' => 'test-state',
+            ])
             ->get(route('marketplace.shopee.callback', [
                 'code' => 'dummy-code',
                 'shop_id' => '987654321',
+                'state' => 'test-state',
             ]));
 
         $response->assertRedirect('/marketplace/toko?connected=1');

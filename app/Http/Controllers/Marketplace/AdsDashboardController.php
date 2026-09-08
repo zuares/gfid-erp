@@ -21,6 +21,17 @@ class AdsDashboardController extends Controller
 {
     public function index(Request $request, AdsAnalyticsService $analytics, AdsDashboardService $dashboardService)
     {
+        // Daftar ini sengaja tidak memuat credentials. Dipakai panel koneksi
+        // agar toko yang tokennya kedaluwarsa/dicabut tetap bisa dihubungkan
+        // ulang melalui OAuth resmi.
+        $integrationStores = Store::query()
+            ->select('id', 'name', 'channel_id', 'status', 'is_active', 'token_expires_at', 'meta')
+            ->with('channel:id,code,name')
+            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
         $stores = Store::select('id', 'name')
             ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
             ->where('status', 'active')
@@ -36,7 +47,7 @@ class AdsDashboardController extends Controller
                 ? $request->input('compare_mode')
                 : 'prev_period';
 
-            return view('marketplace.ads_dashboard', compact('stores', 'storeId', 'dateFrom', 'dateTo', 'compareMode'))
+            return view('marketplace.ads_dashboard', compact('stores', 'integrationStores', 'storeId', 'dateFrom', 'dateTo', 'compareMode'))
                 ->with('lastSyncTime', '')
                 ->with('error', 'Tidak ada toko Shopee aktif dengan token valid.');
         }
@@ -130,8 +141,61 @@ class AdsDashboardController extends Controller
         $finishedAt = $lastSync?->finished_at;
         $dashboard['lastSyncAt'] = $finishedAt ? $finishedAt->copy()->timezone(config('app.timezone'))->diffForHumans() : 'Belum pernah';
         $dashboard['lastSyncTime'] = $finishedAt ? $finishedAt->copy()->timezone(config('app.timezone'))->format('d M Y H:i') : '';
+        $dashboard['integrationStores'] = $integrationStores;
 
         return view('marketplace.ads_dashboard', $dashboard);
+    }
+
+    /** Status aman untuk UI: tidak pernah mengembalikan token atau credential. */
+    public function integrationStatus(): JsonResponse
+    {
+        $stores = Store::query()
+            ->with('channel:id,code,name')
+            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'data' => $stores->map(fn (Store $store) => [
+                'id' => $store->id,
+                'name' => $store->name,
+                'provider' => $store->channel?->name,
+                'status' => $store->readOnlyAdsIntegrationStatus(),
+                'expires_at' => $store->token_expires_at?->toIso8601String(),
+                'scopes' => $store->readOnlyAdsIntegrationScopes(),
+            ])->values(),
+        ]);
+    }
+
+    /** Cabut token OAuth untuk toko dan hentikan akses Ads Dashboard. */
+    public function revokeIntegration(Request $request, Store $store): JsonResponse
+    {
+        abort_unless($store->channel && in_array(strtolower((string) $store->channel->code), ['shopee', 'shp', 'tiktok'], true), 404);
+
+        try {
+            $credentials = is_array($store->credentials) ? $store->credentials : [];
+        } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+            $credentials = [];
+        }
+        unset($credentials['access_token'], $credentials['refresh_token']);
+
+        $meta = is_array($store->meta) ? $store->meta : [];
+        $meta['api_access_mode'] = 'read_only';
+        $meta['api_revoked_at'] = now()->toISOString();
+        $meta['api_revoked_by'] = $request->user()?->getAuthIdentifier();
+
+        $store->forceFill([
+            'credentials' => $credentials,
+            'token_expires_at' => null,
+            'status' => 'revoked',
+            'meta' => $meta,
+        ])->save();
+
+        return response()->json([
+            'status' => 'revoked',
+            'message' => 'Token integrasi resmi telah dicabut. Hubungkan ulang melalui OAuth resmi untuk mengaktifkan penarikan data.',
+        ]);
     }
 
     /** Simpan pengaturan admin fee (otomatis dari settlement / manual %). */

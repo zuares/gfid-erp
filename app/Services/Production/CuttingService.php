@@ -423,6 +423,65 @@ class CuttingService
     }
 
     /**
+     * Validate all piece rates used by the QC-to-WIP flow before QC is saved.
+     *
+     * Quantities mirror QcService::saveCuttingQc() normalization so a missing
+     * rate cannot leave an orphan qc_results row behind.
+     */
+    public function validatePieceRatesForQc(
+        CuttingJob $job,
+        array $results,
+        string $qcDate,
+    ): void {
+        $job->loadMissing(['bundles']);
+
+        $resultMap = collect($results)
+            ->filter(fn ($row) => is_array($row))
+            ->keyBy(fn (array $row) => (int) ($row['cutting_job_bundle_id'] ?? $row['bundle_id'] ?? 0));
+
+        foreach ($job->bundles as $bundle) {
+            $row = $resultMap->get((int) $bundle->id);
+
+            if ($row !== null) {
+                $bundleQty = $this->num($bundle->qty_pcs);
+                $qtyOk = max(0, $this->num($row['qty_ok'] ?? 0));
+                $qtyReject = max(0, $this->num($row['qty_reject'] ?? 0));
+
+                if ($qtyOk + $qtyReject > $bundleQty) {
+                    $diff = ($qtyOk + $qtyReject) - $bundleQty;
+                    if ($qtyReject >= $diff) {
+                        $qtyReject -= $diff;
+                    } else {
+                        $qtyOk = max(0, $bundleQty - $qtyReject);
+                    }
+                }
+            } else {
+                $qtyOk = $this->num($bundle->qty_qc_ok ?? 0);
+                $qtyReject = $this->num($bundle->qty_qc_reject ?? 0);
+            }
+
+            if (($qtyOk + $qtyReject) <= 0) {
+                continue;
+            }
+
+            $employeeId = (int) ($bundle->operator_id ?: $job->operator_id ?: 0);
+            $itemId = (int) ($bundle->finished_item_id ?? 0);
+
+            // Preserve the existing behavior for incomplete legacy records.
+            if ($employeeId <= 0 || $itemId <= 0) {
+                continue;
+            }
+
+            $this->pieceRate->requireRatePerPcs(
+                module: 'cutting',
+                employeeId: $employeeId,
+                itemId: $itemId,
+                date: $qcDate,
+            );
+        }
+    }
+
+    /**
      * POST QC Cutting -> Create WIP-CUT + REJ-CUT
      * ✅ Updated: unit cost includes cutting piece rate otomatis
      */
@@ -582,8 +641,5 @@ class CuttingService
             $bundle->save();
         }
 
-        if ($job->status !== 'qc_done') {
-            $job->update(['status' => 'qc_done']);
-        }
     }
 }

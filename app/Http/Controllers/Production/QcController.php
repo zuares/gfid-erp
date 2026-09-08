@@ -194,36 +194,12 @@ class QcController extends Controller
         $validated['qc_by_user_id'] = Auth::id();
 
         try {
-            // 1️⃣ SIMPAN QC (tanpa mutasi stok)
-            $this->qc->saveCuttingQc($cuttingJob, $validated);
-
-            // 2️⃣ BUAT WIP-CUT dari hasil QC
-            //    (method ini ada di CuttingService versi yang tadi kita bikin)
-            $this->cutting->createWipFromCuttingQc(
-                job: $cuttingJob->fresh('bundles'),
-                qcDate: $validated['qc_date'],
-            );
-
-            try {
-                $this->journal->postCuttingWip($cuttingJob->fresh(), $validated['qc_date']);
-            } catch (\Throwable $journalError) {
-                Log::error('Gagal membuat jurnal cutting_wip', [
-                    'cutting_job_id' => $cuttingJob->id,
-                    'message' => $journalError->getMessage(),
-                ]);
-            }
-
+            $this->processCuttingQc($cuttingJob, $validated);
         } catch (\Throwable $e) {
             return back()
                 ->withInput()
                 ->with('error', 'QC gagal: ' . $e->getMessage());
         }
-
-        // 3️⃣ Update status job → sudah QC
-        $cuttingJob->update([
-            'status' => 'qc_done',
-            'updated_by' => \Illuminate\Support\Facades\Auth::id(),
-        ]);
 
         $shortageCount = $this->materialShortages->rows()->where('has_shortage', true)->count();
 
@@ -272,30 +248,11 @@ class QcController extends Controller
         ];
 
         try {
-            $this->qc->saveCuttingQc($cuttingJob, $payload);
-
-            $this->cutting->createWipFromCuttingQc(
-                job: $cuttingJob->fresh('bundles'),
-                qcDate: $qcDate,
-            );
-
-            try {
-                $this->journal->postCuttingWip($cuttingJob->fresh(), $qcDate);
-            } catch (\Throwable $journalError) {
-                Log::error('Gagal membuat jurnal cutting_wip', [
-                    'cutting_job_id' => $cuttingJob->id,
-                    'message' => $journalError->getMessage(),
-                ]);
-            }
+            $this->processCuttingQc($cuttingJob, $payload);
         } catch (\Throwable $e) {
             return back()
                 ->with('error', 'Selesai Cutting gagal: ' . $e->getMessage());
         }
-
-        $cuttingJob->update([
-            'status' => 'qc_done',
-            'updated_by' => Auth::id(),
-        ]);
 
         $shortageCount = $this->materialShortages->rows()->where('has_shortage', true)->count();
 
@@ -353,39 +310,10 @@ class QcController extends Controller
         ];
 
         try {
-            $this->qc->saveCuttingQc($cuttingJob, $payload);
-
-            $this->cutting->createWipFromCuttingQc(
-                job: $cuttingJob->fresh('bundles'),
-                qcDate: $qcDate,
-            );
-
-            try {
-                $this->journal->postCuttingWip($cuttingJob->fresh(), $qcDate);
-            } catch (\Throwable $journalError) {
-                Log::error('Gagal membuat jurnal cutting_wip (quickOkBundle)', [
-                    'cutting_job_id' => $cuttingJob->id,
-                    'bundle_id'      => $bundle->id,
-                    'message'        => $journalError->getMessage(),
-                ]);
-            }
+            $this->processCuttingQc($cuttingJob, $payload);
         } catch (\Throwable $e) {
             return back()->with('error', 'Quick OK bundle gagal: ' . $e->getMessage());
         }
-
-        // Cek apakah SEMUA bundle sudah QC sekarang
-        $totalBundles = $cuttingJob->bundles()->count();
-        $doneCount    = QcResult::where('stage', QcResult::STAGE_CUTTING)
-            ->where('cutting_job_id', $cuttingJob->id)
-            ->distinct('cutting_job_bundle_id')
-            ->count('cutting_job_bundle_id');
-
-        $newStatus = $doneCount >= $totalBundles ? 'qc_done' : $cuttingJob->status;
-
-        $cuttingJob->update([
-            'status'     => $newStatus,
-            'updated_by' => Auth::id(),
-        ]);
 
         return redirect()
             ->route('production.cutting_jobs.show', $cuttingJob)
@@ -422,38 +350,62 @@ class QcController extends Controller
         ];
 
         try {
-            $this->qc->saveCuttingQc($cuttingJob, $payload);
-
-            $this->cutting->createWipFromCuttingQc(
-                job: $cuttingJob->fresh('bundles'),
-                qcDate: $qcDate,
-            );
-
-            try {
-                $this->journal->postCuttingWip($cuttingJob->fresh(), $qcDate);
-            } catch (\Throwable $journalError) {
-                Log::error('Gagal membuat jurnal cutting_wip (saveBundleEdit)', [
-                    'cutting_job_id' => $cuttingJob->id,
-                    'bundle_id'      => $bundle->id,
-                    'message'        => $journalError->getMessage(),
-                ]);
-            }
+            $this->processCuttingQc($cuttingJob, $payload);
         } catch (\Throwable $e) {
             return back()->with('error', 'Simpan bundle gagal: ' . $e->getMessage());
         }
 
-        // Update status job — qc_done hanya kalau semua bundle sudah QC
-        $totalBundles = $cuttingJob->bundles()->count();
-        $doneCount    = QcResult::where('stage', QcResult::STAGE_CUTTING)
-            ->where('cutting_job_id', $cuttingJob->id)
-            ->distinct('cutting_job_bundle_id')
-            ->count('cutting_job_bundle_id');
-        $newStatus = $doneCount >= $totalBundles ? 'qc_done' : $cuttingJob->status;
-        $cuttingJob->update(['status' => $newStatus, 'updated_by' => Auth::id()]);
-
         return redirect()
             ->route('production.qc.cutting.edit', $cuttingJob)
             ->with('success', 'Bundle ' . $bundle->bundle_code . ' berhasil disimpan.');
+    }
+
+    /**
+     * Complete the QC Cutting workflow atomically.
+     *
+     * QC results, WIP/reject inventory, journal, and job status must either
+     * all succeed or all roll back together. This prevents an orphan QC
+     * result when WIP posting fails (for example because PieceRate is missing).
+     */
+    private function processCuttingQc(CuttingJob $cuttingJob, array $payload): void
+    {
+        DB::transaction(function () use ($cuttingJob, $payload) {
+            $job = CuttingJob::query()
+                ->whereKey($cuttingJob->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->cutting->validatePieceRatesForQc(
+                job: $job->fresh('bundles'),
+                results: $payload['results'] ?? [],
+                qcDate: $payload['qc_date'],
+            );
+
+            $this->qc->saveCuttingQc($job, $payload);
+
+            $job = $job->fresh('bundles');
+            $this->cutting->createWipFromCuttingQc(
+                job: $job,
+                qcDate: $payload['qc_date'],
+            );
+
+            $journal = $this->journal->postCuttingWip($job->fresh(), $payload['qc_date']);
+            if (!$journal) {
+                throw new \RuntimeException('Jurnal hasil QC Cutting tidak terbentuk. QC dibatalkan.');
+            }
+
+            $totalBundles = $job->bundles()->count();
+            $doneCount = QcResult::query()
+                ->where('stage', QcResult::STAGE_CUTTING)
+                ->where('cutting_job_id', $job->id)
+                ->distinct('cutting_job_bundle_id')
+                ->count('cutting_job_bundle_id');
+
+            $job->update([
+                'status' => $doneCount >= $totalBundles ? 'qc_done' : $job->status,
+                'updated_by' => Auth::id(),
+            ]);
+        });
     }
 
     public function cancelCutting(CuttingJob $cuttingJob): RedirectResponse

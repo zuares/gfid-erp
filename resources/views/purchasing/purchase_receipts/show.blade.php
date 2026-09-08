@@ -264,6 +264,13 @@
           <i class="bi bi-arrow-left me-1"></i>Kembali
         </a>
 
+        @if ($receipt->order)
+          <a href="{{ route('purchasing.purchase_orders.show', $receipt->order->id) }}"
+             class="btn btn-ship-primary btn-pill btn-sm">
+            <i class="bi bi-file-earmark-text me-1"></i>Kembali ke PO
+          </a>
+        @endif
+
         <a href="{{ route('purchasing.purchase_receipts.barcode', $receipt->id) }}"
            class="btn btn-ship-outline btn-pill btn-sm" target="_blank">
           <i class="bi bi-upc-scan me-1"></i>Cetak Barcode

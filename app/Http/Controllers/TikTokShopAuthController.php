@@ -7,6 +7,7 @@ use App\Models\Store;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class TikTokShopAuthController extends Controller
 {
@@ -25,12 +26,22 @@ class TikTokShopAuthController extends Controller
             session(['tiktok_connect_store_id' => (int) request('store_id')]);
         }
 
+        if (request()->query('integration') === 'ads_read_only') {
+            session(['marketplace_integration' => 'ads_read_only']);
+        } else {
+            session()->forget('marketplace_integration');
+        }
+
+        $state = Str::random(64);
+        session(['tiktok_oauth_state' => $state]);
+
         $callbackUrl = rtrim(env('APP_URL', request()->getSchemeAndHttpHost()), '/')
             . '/marketplace/tiktok/callback';
 
         $url = $authUrl . '/oauth/authorize?' . http_build_query([
             'app_key'      => $appKey,
             'redirect_uri' => $callbackUrl,
+            'state'        => $state,
         ]);
 
         return redirect()->away($url);
@@ -40,6 +51,12 @@ class TikTokShopAuthController extends Controller
 
     public function callback(Request $request)
     {
+        $expectedState = session()->pull('tiktok_oauth_state');
+        if ($expectedState && $request->query('state') !== null
+            && ! hash_equals($expectedState, (string) $request->query('state'))) {
+            return redirect('/marketplace/toko')->with('error', 'TikTok callback ditolak karena state OAuth tidak valid.');
+        }
+
         $authCode = $request->query('code') ?? $request->query('auth_code');
         $state    = $request->query('state');
 
@@ -102,6 +119,7 @@ class TikTokShopAuthController extends Controller
 
         $targetStoreId = session()->pull('tiktok_connect_store_id');
         $targetStore = $targetStoreId ? Store::find((int) $targetStoreId) : null;
+        $readOnlyIntegration = session()->pull('marketplace_integration') === 'ads_read_only';
 
         // ─── Simpan satu Store per shop ───────────────────────────────────────
         foreach ($shops as $shop) {
@@ -139,9 +157,19 @@ class TikTokShopAuthController extends Controller
                 'meta' => [
                     'auth_source'        => 'tiktok_oauth',
                     'shop_cipher'        => $shopCipher,
-                    'raw_token_response' => $tokenData,
                 ],
             ];
+
+            if ($readOnlyIntegration) {
+                $storePayload['meta'] = array_merge($targetStore?->meta ?? [], $storePayload['meta'], [
+                    'api_access_mode' => 'read_only',
+                    'api_scopes' => config('marketplace.read_only_api_scopes', ['ads.read', 'shop.read']),
+                    'api_auth_source' => 'official_oauth',
+                    'api_connected_at' => now()->toISOString(),
+                    'api_revoked_at' => null,
+                    'api_revoked_by' => null,
+                ]);
+            }
 
             if ($targetStore) {
                 $targetStore->update($storePayload);

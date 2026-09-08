@@ -360,10 +360,10 @@ class PurchaseOrderController extends Controller
         // snapshot qty, harga, dan konversi pada baris PO.
         $purchase_order = $this->service->recalculate($purchase_order);
 
-        // Repair status pembayaran lama yang menyisakan nominal pembulatan kecil.
-        if ($purchase_order->activePayments()->exists()) {
-            $this->recalcPaymentStatus($purchase_order);
-        }
+        // Selalu sinkronkan ulang dari payment aktif. Ini penting setelah
+        // payment terakhir di-void: payment_status lama bisa masih `paid`,
+        // sehingga tombol bayar ikut menghilang walaupun saldo aktif sudah 0.
+        $this->recalcPaymentStatus($purchase_order);
 
         $purchase_order->load([
             'supplier',

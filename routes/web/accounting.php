@@ -7,6 +7,7 @@ use App\Http\Controllers\Accounting\CashExpenseController;
 use App\Http\Controllers\Accounting\CashReceiptController;
 use App\Http\Controllers\Accounting\CashTransferController;
 use App\Http\Controllers\Accounting\JournalController;
+use App\Http\Controllers\Accounting\LoanController;
 use App\Http\Controllers\Accounting\MarketplacePayoutController;
 use App\Http\Controllers\Accounting\OpeningBalanceBatchController;
 use App\Http\Controllers\Accounting\OpeningBalanceController;
@@ -42,6 +43,17 @@ Route::middleware(['auth', 'access:accounting'])->prefix('accounting')->name('ac
     Route::resource('cash-receipts', CashReceiptController::class);
     Route::post('cash-receipts/{cashReceipt}/post', [CashReceiptController::class, 'post'])->name('cash-receipts.post');
     Route::post('cash-receipts/{cashReceipt}/void', [CashReceiptController::class, 'void'])->name('cash-receipts.void');
+
+    // ✅ Pinjaman: penerimaan pokok dan pembayaran pokok/bunga
+    Route::get('loans', [LoanController::class, 'index'])->name('loans.index');
+    Route::get('loans/create', [LoanController::class, 'create'])->name('loans.create');
+    Route::post('loans', [LoanController::class, 'store'])->name('loans.store');
+    Route::get('loans/{loan}', [LoanController::class, 'show'])->name('loans.show');
+    Route::post('loans/{loan}/post', [LoanController::class, 'post'])->name('loans.post');
+    Route::post('loans/{loan}/void', [LoanController::class, 'void'])->name('loans.void');
+    Route::post('loans/{loan}/repayments', [LoanController::class, 'storeRepayment'])->name('loans.repayments.store');
+    Route::post('loan-repayments/{repayment}/post', [LoanController::class, 'postRepayment'])->name('loans.repayments.post');
+    Route::post('loan-repayments/{repayment}/void', [LoanController::class, 'voidRepayment'])->name('loans.repayments.void');
 
     // ✅ Cash/Bank Transfers
     Route::resource('cash-transfers', CashTransferController::class);

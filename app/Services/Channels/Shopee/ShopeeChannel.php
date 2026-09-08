@@ -60,10 +60,30 @@ class ShopeeChannel implements MarketplaceChannel
 
     protected function post(Store $store, string $path, array $body = []): array
     {
+        if ($store->hasReadOnlyAdsIntegration() && $this->isMutationEndpoint($path)) {
+            return [
+                'error' => 'read_only_integration',
+                'message' => 'Integrasi API toko ini bersifat read-only; endpoint perubahan data dinonaktifkan.',
+                '_meta' => ['http_status' => 403],
+            ];
+        }
+
         // POST TIDAK di-retry untuk 5xx/timeout — request bisa saja sudah diproses
         // server (mis. kirim chat, atur pengiriman) dan retry akan menduplikasi aksi.
         // Hanya 429 yang aman di-retry (request pasti ditolak sebelum diproses).
         return $this->resilientRequest($store, fn () => $this->doPost($store, $path, $body), false);
+    }
+
+    /**
+     * Endpoint POST yang mengubah state provider. Endpoint POST untuk membaca
+     * data (sebagian Ads API Shopee memang POST) tetap diizinkan.
+     */
+    protected function isMutationEndpoint(string $path): bool
+    {
+        return (bool) preg_match(
+            '#/(?:returns/confirm|ads/edit_|logistics/(?:ship_|create_)|sellerchat/(?:send_|read_)|product/(?:update_|unlist_item|boost_item)|discount/(?:add_|update_|end_|delete_|set_))#',
+            $path
+        );
     }
 
     /**
