@@ -8,6 +8,7 @@ use App\Models\CashExpense;
 use App\Models\CashReceipt;
 use App\Models\MarketplacePayout;
 use App\Models\PurchasePayment;
+use App\Models\SystemSetting;
 use App\Services\Accounting\JournalService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -30,10 +31,11 @@ class CashBasisReportController extends Controller
         $to = $request->filled('to')
             ? Carbon::parse($request->date('to'))->toDateString()
             : now()->toDateString();
+        $cutoffDate = SystemSetting::cutoffDateString();
+        $showLegacy = $request->boolean('show_legacy');
 
         $cashAccounts = Account::query()
             ->where('is_cash', true)
-            ->where('is_active', true)
             ->orderBy('code')
             ->get();
 
@@ -45,6 +47,7 @@ class CashBasisReportController extends Controller
                 ->whereIn('jl.account_id', $cashAccountIds)
                 ->whereNull('j.voided_at')
                 ->whereNotIn('j.source_type', self::EXCLUDED_BALANCE_SOURCES)
+                ->when($cutoffDate && !$showLegacy, fn ($query) => $query->whereDate('j.date', '>=', $cutoffDate))
                 ->whereDate('j.date', '<', $from)
                 ->groupBy('jl.account_id')
                 ->selectRaw('jl.account_id, COALESCE(SUM(jl.debit - jl.credit), 0) as balance')
@@ -57,6 +60,7 @@ class CashBasisReportController extends Controller
                 ->whereIn('jl.account_id', $cashAccountIds)
                 ->whereNull('j.voided_at')
                 ->whereNotIn('j.source_type', self::EXCLUDED_BALANCE_SOURCES)
+                ->when($cutoffDate && !$showLegacy, fn ($query) => $query->whereDate('j.date', '>=', $cutoffDate))
                 ->whereDate('j.date', '<=', $to)
                 ->groupBy('jl.account_id')
                 ->selectRaw('jl.account_id, COALESCE(SUM(jl.debit - jl.credit), 0) as balance')
@@ -290,6 +294,13 @@ class CashBasisReportController extends Controller
             ->sort(fn ($left, $right) => $this->compareAccountCodes($left->code, $right->code))
             ->values();
 
+        $cashOutExpenseRows = $cashOutRows
+            ->filter(fn ($row) => preg_match('/^\d/', (string) $row->code) === 1)
+            ->values();
+        $cashOutOtherRows = $cashOutRows
+            ->reject(fn ($row) => preg_match('/^\d/', (string) $row->code) === 1)
+            ->values();
+
         $dailyPayrollCashAccounts = $postedDailyPayrolls->pluck('paid_from_account_id')->filter()->unique();
         $dailyPayrollCashAccountNames = $dailyPayrollCashAccounts->isEmpty()
             ? collect()
@@ -348,6 +359,8 @@ class CashBasisReportController extends Controller
         return view('accounting.cash_basis_report.index', [
             'from'                => $from,
             'to'                  => $to,
+            'cutoffDate'          => $cutoffDate,
+            'showLegacy'          => $showLegacy,
             'cashAccounts'        => $cashAccounts,
             'openingCashTotal' => (float) $cashAccounts->sum('opening_balance'),
             'cashTotal' => (float) $cashAccounts->sum('balance'),
@@ -356,6 +369,10 @@ class CashBasisReportController extends Controller
             'cashNetFlow' => $cashInTotal - $cashOutTotal,
             'cashInRows' => $cashInRows,
             'cashOutRows' => $cashOutRows,
+            'cashOutExpenseRows' => $cashOutExpenseRows,
+            'cashOutOtherRows' => $cashOutOtherRows,
+            'cashOutExpenseTotal' => (float) $cashOutExpenseRows->sum('total_amount'),
+            'cashOutOtherTotal' => (float) $cashOutOtherRows->sum('total_amount'),
             'recentCashTransactions' => $recentCashTransactions,
         ]);
     }

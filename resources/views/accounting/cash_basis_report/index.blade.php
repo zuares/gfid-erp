@@ -115,6 +115,12 @@
         .cbr-row-num.neg { color: #b91c1c; }
         .cbr-empty { color: #64748b; padding: 1.8rem 1rem; text-align: center; }
         .cbr-table-wrap { overflow: auto; -webkit-overflow-scrolling: touch; }
+        .cbr-summary-table-wrap { min-width: 0; }
+        .cbr-summary-heading {
+            margin: 1rem 0 .5rem; color: #0f172a; font-size: .78rem; font-weight: 900;
+            text-transform: uppercase; letter-spacing: .06em;
+        }
+        body[data-theme="dark"] .cbr-summary-heading { color: #f1f5f9; }
         .cbr-grid-2 > .cbr-table-wrap { min-width: 0; overflow-x: hidden; }
         .cbr-grid-2 .gf-clean-table {
             width: 100%; min-width: 0; table-layout: fixed;
@@ -153,6 +159,7 @@
             .cbr-kpi-value { font-size: 1.02rem; }
             .cbr-grid-2 { grid-template-columns: 1fr; }
             .cbr-table-wrap { display: none; }
+            .cbr-summary-table-wrap { display: block; overflow-x: auto; }
             .cbr-mobile-list { display: grid; gap: .62rem; }
             .cbr-mobile-card {
                 display: grid; gap: .5rem; padding: .8rem;
@@ -204,6 +211,12 @@
                 <div class="cbr-filter-summary">
                     Periode aktif: <strong>{{ $from }}</strong> sampai <strong>{{ $to }}</strong>
                     · hanya transaksi posted yang masuk laporan.
+                    @if ($cutoffDate)
+                        <label class="ms-2" style="font-weight:700;cursor:pointer;">
+                            <input type="checkbox" name="show_legacy" value="1" @checked($showLegacy) onchange="this.form.submit()">
+                            Tampilkan legacy
+                        </label>
+                    @endif
                 </div>
             </div>
         </form>
@@ -235,7 +248,7 @@
 
             <x-gf.panel title="Ringkasan Arus Kas" subtitle="Kas masuk dan kas keluar selama periode yang dipilih.">
                 <div class="cbr-grid-2">
-                    <div class="cbr-table-wrap">
+                    <div class="cbr-table-wrap cbr-summary-table-wrap">
                         <table class="table align-middle mb-0 gf-clean-table">
                             <thead>
                                 <tr>
@@ -263,16 +276,16 @@
                             </tfoot>
                         </table>
                     </div>
-                    <div class="cbr-table-wrap">
+                    <div class="cbr-table-wrap cbr-summary-table-wrap">
                         <table class="table align-middle mb-0 gf-clean-table">
                             <thead>
                                 <tr>
-                                    <th>Kas Keluar</th>
+                                    <th>Biaya</th>
                                     <th class="text-end">Nominal</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse ($cashOutRows as $row)
+                                @forelse ($cashOutExpenseRows as $row)
                                     <tr>
                                         <td>
                                             <div class="cbr-row-title">{{ $row->name }}</div>
@@ -287,10 +300,39 @@
                                 @endforelse
                             </tbody>
                             <tfoot>
-                                <tr><th>Total Kas Keluar</th><th class="text-end">Rp {{ $fmt($cashOutTotal) }}</th></tr>
+                                <tr><th>Total Biaya</th><th class="text-end">Rp {{ $fmt($cashOutExpenseTotal) }}</th></tr>
                             </tfoot>
                         </table>
                     </div>
+                </div>
+                <div class="cbr-summary-heading">Lain-lain</div>
+                <div class="cbr-table-wrap cbr-summary-table-wrap">
+                    <table class="table align-middle mb-0 gf-clean-table">
+                        <thead>
+                            <tr>
+                                <th>Lain-lain</th>
+                                <th class="text-end">Nominal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($cashOutOtherRows as $row)
+                                <tr>
+                                    <td>
+                                        <div class="cbr-row-title">{{ $row->name }}</div>
+                                        <div class="cbr-row-meta">
+                                            @if ($row->code !== $row->name){{ $row->code }} · @endif{{ $fmt($row->total_docs) }} transaksi
+                                        </div>
+                                    </td>
+                                    <td class="text-end fw-bold">Rp {{ $fmt($row->total_amount) }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="2" class="cbr-empty">Belum ada transaksi lain-lain.</td></tr>
+                            @endforelse
+                        </tbody>
+                        <tfoot>
+                            <tr><th>Total Lain-lain</th><th class="text-end">Rp {{ $fmt($cashOutOtherTotal) }}</th></tr>
+                        </tfoot>
+                    </table>
                 </div>
                 <div class="cbr-row" style="margin-top:1rem">
                     <div>
@@ -301,13 +343,16 @@
                 </div>
             </x-gf.panel>
 
-            <x-gf.panel title="Saldo Kas / Bank" subtitle="Saldo akhir per akun kas dan bank pada tanggal {{ $to }}.">
+            <x-gf.panel title="Saldo Kas / Bank" subtitle="Saldo akhir per akun kas dan bank pada tanggal {{ $to }}, mengikuti jurnal aktif COA.">
                 <div class="cbr-list">
                     @forelse ($cashAccounts as $account)
                         <div class="cbr-row">
                             <div>
                                 <div class="cbr-row-title">{{ $account->name }}</div>
-                                <div class="cbr-row-meta">{{ $account->code }}</div>
+                                <div class="cbr-row-meta">
+                                    {{ $account->code }}
+                                    @if (!$account->is_active) · Nonaktif @endif
+                                </div>
                             </div>
                             <div class="cbr-row-num {{ (float) $account->balance < 0 ? 'neg' : '' }}">Rp {{ $fmt($account->balance) }}</div>
                         </div>
