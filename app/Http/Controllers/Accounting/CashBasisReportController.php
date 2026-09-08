@@ -361,20 +361,28 @@ class CashBasisReportController extends Controller
     }
 
     /**
-     * Split pembayaran PO menjadi akun biaya untuk line expense dan baris
-     * Pembelian untuk porsi persediaan/non-expense. PO campuran dibagi
-     * proporsional berdasarkan nilai line, sehingga total tetap sama dengan
-     * nominal kas yang benar-benar dibayar.
+     * Split pembayaran PO menjadi akun biaya untuk line expense, Pembelian
+     * Persediaan untuk line hpp, dan Uang Muka Pembelian untuk DP. PO
+     * campuran dibagi proporsional berdasarkan nilai line, sehingga total
+     * tetap sama dengan nominal kas yang benar-benar dibayar.
      */
     private function buildPurchaseCashOutRows(Collection $payments): Collection
     {
         $expenseRows = [];
-        $purchaseAmount = 0.0;
-        $purchasePaymentIds = [];
+        $inventoryAmount = 0.0;
+        $inventoryPaymentIds = [];
+        $advanceAmount = 0.0;
+        $advancePaymentIds = [];
 
         foreach ($payments as $payment) {
             $amount = round((float) $payment->amount, 2);
             if ($amount <= 0) {
+                continue;
+            }
+
+            if ($payment->type === 'dp') {
+                $advanceAmount += $amount;
+                $advancePaymentIds[$payment->id] = true;
                 continue;
             }
 
@@ -385,8 +393,8 @@ class CashBasisReportController extends Controller
                 ->values() ?? collect();
 
             if ($expenseLines->isEmpty()) {
-                $purchaseAmount += $amount;
-                $purchasePaymentIds[$payment->id] = true;
+                $inventoryAmount += $amount;
+                $inventoryPaymentIds[$payment->id] = true;
                 continue;
             }
 
@@ -395,8 +403,8 @@ class CashBasisReportController extends Controller
             $allocationBase = $allLineTotal > 0 ? $allLineTotal : $expenseTotal;
 
             if ($expenseTotal <= 0 || $allocationBase <= 0) {
-                $purchaseAmount += $amount;
-                $purchasePaymentIds[$payment->id] = true;
+                $inventoryAmount += $amount;
+                $inventoryPaymentIds[$payment->id] = true;
                 continue;
             }
 
@@ -426,10 +434,10 @@ class CashBasisReportController extends Controller
                 $expenseRows[$key]['total_amount'] += $groupAmount;
             }
 
-            $purchaseRemainder = round($amount - $expensePaymentAmount, 2);
-            if ($purchaseRemainder > 0) {
-                $purchaseAmount += $purchaseRemainder;
-                $purchasePaymentIds[$payment->id] = true;
+            $inventoryRemainder = round($amount - $expensePaymentAmount, 2);
+            if ($inventoryRemainder > 0) {
+                $inventoryAmount += $inventoryRemainder;
+                $inventoryPaymentIds[$payment->id] = true;
             }
         }
 
@@ -440,12 +448,21 @@ class CashBasisReportController extends Controller
             'total_amount' => round($row['total_amount'], 2),
         ]);
 
-        if ($purchaseAmount > 0) {
+        if ($inventoryAmount > 0) {
             $rows->push((object) [
-                'name' => 'Pembelian',
-                'code' => 'Pembelian',
-                'total_docs' => count($purchasePaymentIds),
-                'total_amount' => round($purchaseAmount, 2),
+                'name' => 'Pembelian Persediaan',
+                'code' => 'Pembelian Persediaan',
+                'total_docs' => count($inventoryPaymentIds),
+                'total_amount' => round($inventoryAmount, 2),
+            ]);
+        }
+
+        if ($advanceAmount > 0) {
+            $rows->push((object) [
+                'name' => 'Uang Muka Pembelian',
+                'code' => 'Uang Muka Pembelian',
+                'total_docs' => count($advancePaymentIds),
+                'total_amount' => round($advanceAmount, 2),
             ]);
         }
 
