@@ -21,6 +21,9 @@
         .loan-filter { display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:.55rem; align-items:end; }
         .loan-filter .form-control,.loan-filter .form-select { min-height:40px; border-radius:999px; box-shadow:none; }
         .loan-table td,.loan-table th { vertical-align:middle; }
+        .loan-row { cursor:pointer; }
+        .loan-row:hover td { background:#f8fafc; }
+        .loan-row:focus-visible td { outline:2px solid #94a3b8; outline-offset:-2px; }
         .loan-link { color:#0f172a; font-weight:900; text-decoration:none; }
         .loan-muted { color:#64748b; font-size:.78rem; }
         .loan-status { display:inline-flex; border-radius:999px; padding:.22rem .6rem; font-size:.74rem; font-weight:850; }
@@ -52,7 +55,7 @@
                         <tbody>
                         @forelse ($loans as $loan)
                             @php $paid = (float) ($loan->posted_principal_paid ?? 0); $remaining = max(0, (float) $loan->principal_amount - $paid); @endphp
-                            <tr>
+                            <tr class="loan-row" data-href="{{ route('accounting.loans.show', $loan) }}" role="link" tabindex="0" aria-label="Buka detail pinjaman dari {{ $loan->lender }}">
                                 <td>{{ optional($loan->date)->format('d/m/Y') }}</td>
                                 <td><a class="loan-link" href="{{ route('accounting.loans.show', $loan) }}">{{ $loan->lender }}</a><div class="loan-muted">{{ $loan->description ?: 'Penerimaan pinjaman' }}{{ $loan->reference ? ' · '.$loan->reference : '' }}</div></td>
                                 <td>{{ $loan->liabilityAccount?->name }}<div class="loan-muted">{{ $loan->liabilityAccount?->code }}</div></td>
@@ -70,3 +73,27 @@
         </div>
     </x-gf.page>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.loan-row[data-href]').forEach(function (row) {
+                function openDetail() {
+                    window.location.href = row.dataset.href;
+                }
+
+                row.addEventListener('click', function (event) {
+                    if (event.target.closest('a, button, form, input, select, textarea')) return;
+                    openDetail();
+                });
+
+                row.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openDetail();
+                    }
+                });
+            });
+        });
+    </script>
+@endpush
