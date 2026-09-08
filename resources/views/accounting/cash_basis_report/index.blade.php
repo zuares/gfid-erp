@@ -391,6 +391,13 @@
                 </div>
                 <div class="cbr-row" style="margin-top:1rem">
                     <div>
+                        <div class="cbr-row-title">Total Uang Masuk</div>
+                        <div class="cbr-row-meta">Total penerimaan dan marketplace selama periode</div>
+                    </div>
+                    <div class="cbr-row-num">Rp {{ $fmt($cashInTotal) }}</div>
+                </div>
+                <div class="cbr-row" style="margin-top:.55rem">
+                    <div>
                         <div class="cbr-row-title">Total Pengeluaran</div>
                         <div class="cbr-row-meta">Total biaya dan lain-lain selama periode</div>
                     </div>
