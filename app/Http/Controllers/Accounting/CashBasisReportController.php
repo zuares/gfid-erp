@@ -11,6 +11,7 @@ use App\Models\PurchasePayment;
 use App\Services\Accounting\JournalService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class CashBasisReportController extends Controller
@@ -76,7 +77,7 @@ class CashBasisReportController extends Controller
         $postedExpenseCount = (int) (clone $postedExpenseBase)->count();
 
         $postedPurchasePaymentBase = PurchasePayment::query()
-            ->with(['purchaseOrder.supplier', 'cashAccount', 'paymentMethod'])
+            ->with(['purchaseOrder.supplier', 'purchaseOrder.lines.expenseAccount', 'cashAccount', 'paymentMethod'])
             ->whereNull('purchase_payments.voided_at')
             ->whereIn('purchase_payments.type', ['dp', 'payment'])
             ->whereNotNull('purchase_payments.cash_account_id')
@@ -86,8 +87,9 @@ class CashBasisReportController extends Controller
                 ->whereNull('voided_at')
                 ->where('source_type', 'purchase_payment'));
 
-        $postedPurchasePaymentTotal = (float) (clone $postedPurchasePaymentBase)->sum('amount');
-        $postedPurchasePaymentCount = (int) (clone $postedPurchasePaymentBase)->count();
+        $postedPurchasePayments = (clone $postedPurchasePaymentBase)->get();
+        $postedPurchasePaymentTotal = (float) $postedPurchasePayments->sum(fn ($payment) => (float) $payment->amount);
+        $purchaseCashOutRows = $this->buildPurchaseCashOutRows($postedPurchasePayments);
 
         // Payroll harian dibayar melalui jurnal payroll, bukan cash_expenses.
         // Ambil tanggal jurnal payment agar laporan tetap murni basis kas: yang
@@ -133,7 +135,7 @@ class CashBasisReportController extends Controller
             ->withoutEagerLoads()
             ->join('accounts as a', 'a.id', '=', 'cash_expenses.expense_account_id')
             ->groupBy('a.id', 'a.code', 'a.name')
-            ->orderByDesc(DB::raw('SUM(cash_expenses.amount)'))
+            ->orderBy('a.code')
             ->selectRaw('a.id, a.code, a.name, COUNT(*) as total_docs, COALESCE(SUM(cash_expenses.amount), 0) as total_amount')
             ->get();
 
@@ -141,7 +143,7 @@ class CashBasisReportController extends Controller
             ->withoutEagerLoads()
             ->join('accounts as a', 'a.id', '=', 'cash_receipts.source_account_id')
             ->groupBy('a.id', 'a.code', 'a.name')
-            ->orderByDesc(DB::raw('SUM(cash_receipts.amount)'))
+            ->orderBy('a.code')
             ->selectRaw('a.id, a.code, a.name, COUNT(*) as total_docs, COALESCE(SUM(cash_receipts.amount), 0) as total_amount')
             ->get();
 
@@ -173,11 +175,10 @@ class CashBasisReportController extends Controller
             ->limit(8)
             ->get();
 
-        $recentPurchasePayments = (clone $postedPurchasePaymentBase)
-            ->orderByDesc('date')
-            ->orderByDesc('id')
-            ->limit(8)
-            ->get();
+        $recentPurchasePayments = $postedPurchasePayments
+            ->sortByDesc(fn ($payment) => $payment->date?->format('Y-m-d') . str_pad($payment->id, 8, '0', STR_PAD_LEFT))
+            ->take(8)
+            ->values();
 
         // Merge CashReceipts + MarketplacePayouts, sorted by date desc, limit 10
         $recentCashReceipts = CashReceipt::query()
@@ -243,6 +244,7 @@ class CashBasisReportController extends Controller
                 'total_docs' => $row->total_docs,
                 'total_amount' => $row->total_amount,
             ]))
+            ->sort(fn ($left, $right) => $this->compareAccountCodes($left->code, $right->code))
             ->values();
 
         $cashOutRows = $expenseByCategory
@@ -252,12 +254,7 @@ class CashBasisReportController extends Controller
                 'total_docs' => $row->total_docs,
                 'total_amount' => $row->total_amount,
             ])
-            ->when($postedPurchasePaymentTotal > 0, fn ($rows) => $rows->push((object) [
-                'name' => 'Pembayaran Pembelian / PO',
-                'code' => 'Purchasing',
-                'total_docs' => $postedPurchasePaymentCount,
-                'total_amount' => $postedPurchasePaymentTotal,
-            ]))
+            ->concat($purchaseCashOutRows)
             ->values();
 
         if ($postedDailyPayrollTotal > 0) {
@@ -277,6 +274,21 @@ class CashBasisReportController extends Controller
                 ]);
             }
         }
+
+        $cashOutRows = $cashOutRows
+            ->groupBy('code')
+            ->map(function (Collection $rows) {
+                $first = $rows->first();
+
+                return (object) [
+                    'name' => $first->name,
+                    'code' => $first->code,
+                    'total_docs' => (int) $rows->sum('total_docs'),
+                    'total_amount' => (float) $rows->sum('total_amount'),
+                ];
+            })
+            ->sort(fn ($left, $right) => $this->compareAccountCodes($left->code, $right->code))
+            ->values();
 
         $dailyPayrollCashAccounts = $postedDailyPayrolls->pluck('paid_from_account_id')->filter()->unique();
         $dailyPayrollCashAccountNames = $dailyPayrollCashAccounts->isEmpty()
@@ -346,5 +358,109 @@ class CashBasisReportController extends Controller
             'cashOutRows' => $cashOutRows,
             'recentCashTransactions' => $recentCashTransactions,
         ]);
+    }
+
+    /**
+     * Split pembayaran PO menjadi akun biaya untuk line expense dan baris
+     * Pembelian untuk porsi persediaan/non-expense. PO campuran dibagi
+     * proporsional berdasarkan nilai line, sehingga total tetap sama dengan
+     * nominal kas yang benar-benar dibayar.
+     */
+    private function buildPurchaseCashOutRows(Collection $payments): Collection
+    {
+        $expenseRows = [];
+        $purchaseAmount = 0.0;
+        $purchasePaymentIds = [];
+
+        foreach ($payments as $payment) {
+            $amount = round((float) $payment->amount, 2);
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $expenseLines = $payment->purchaseOrder?->lines
+                ?->filter(fn ($line) => $line->allocation === 'expense'
+                    && (int) $line->expense_account_id > 0
+                    && $line->expenseAccount)
+                ->values() ?? collect();
+
+            if ($expenseLines->isEmpty()) {
+                $purchaseAmount += $amount;
+                $purchasePaymentIds[$payment->id] = true;
+                continue;
+            }
+
+            $expenseTotal = (float) $expenseLines->sum(fn ($line) => max(0, (float) $line->line_total));
+            $allLineTotal = (float) ($payment->purchaseOrder?->lines?->sum(fn ($line) => max(0, (float) $line->line_total)) ?? 0);
+            $allocationBase = $allLineTotal > 0 ? $allLineTotal : $expenseTotal;
+
+            if ($expenseTotal <= 0 || $allocationBase <= 0) {
+                $purchaseAmount += $amount;
+                $purchasePaymentIds[$payment->id] = true;
+                continue;
+            }
+
+            $expensePaymentAmount = round($amount * min(1, $expenseTotal / $allocationBase), 2);
+            $remainingExpenseAmount = $expensePaymentAmount;
+            $expenseLinesByAccount = $expenseLines->groupBy('expense_account_id');
+            $accountGroups = $expenseLinesByAccount->values();
+
+            foreach ($accountGroups as $index => $lines) {
+                $lineTotal = (float) $lines->sum(fn ($line) => max(0, (float) $line->line_total));
+                $isLast = $index === $accountGroups->count() - 1;
+                $groupAmount = $isLast
+                    ? $remainingExpenseAmount
+                    : round($expensePaymentAmount * ($lineTotal / $expenseTotal), 2);
+                $remainingExpenseAmount = round($remainingExpenseAmount - $groupAmount, 2);
+
+                $line = $lines->first();
+                $accountId = (int) $line->expense_account_id;
+                $key = (string) $accountId;
+                $expenseRows[$key] ??= [
+                    'name' => $line->expenseAccount->name,
+                    'code' => $line->expenseAccount->code,
+                    'total_docs' => [],
+                    'total_amount' => 0.0,
+                ];
+                $expenseRows[$key]['total_docs'][$payment->id] = true;
+                $expenseRows[$key]['total_amount'] += $groupAmount;
+            }
+
+            $purchaseRemainder = round($amount - $expensePaymentAmount, 2);
+            if ($purchaseRemainder > 0) {
+                $purchaseAmount += $purchaseRemainder;
+                $purchasePaymentIds[$payment->id] = true;
+            }
+        }
+
+        $rows = collect($expenseRows)->map(fn ($row) => (object) [
+            'name' => $row['name'],
+            'code' => $row['code'],
+            'total_docs' => count($row['total_docs']),
+            'total_amount' => round($row['total_amount'], 2),
+        ]);
+
+        if ($purchaseAmount > 0) {
+            $rows->push((object) [
+                'name' => 'Pembelian',
+                'code' => 'Pembelian',
+                'total_docs' => count($purchasePaymentIds),
+                'total_amount' => round($purchaseAmount, 2),
+            ]);
+        }
+
+        return $rows->sort(fn ($left, $right) => $this->compareAccountCodes($left->code, $right->code))->values();
+    }
+
+    private function compareAccountCodes(string $left, string $right): int
+    {
+        $leftIsNumeric = preg_match('/^\d/', $left) === 1;
+        $rightIsNumeric = preg_match('/^\d/', $right) === 1;
+
+        if ($leftIsNumeric !== $rightIsNumeric) {
+            return $leftIsNumeric ? -1 : 1;
+        }
+
+        return strnatcasecmp($left, $right);
     }
 }

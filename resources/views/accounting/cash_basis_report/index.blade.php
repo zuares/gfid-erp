@@ -224,7 +224,7 @@
                 <div class="cbr-kpi">
                     <div class="cbr-kpi-label">Kas Keluar</div>
                     <div class="cbr-kpi-value {{ $cashOutTotal < 0 ? 'neg' : '' }}">Rp {{ $fmt($cashOutTotal) }}</div>
-                    <div class="cbr-kpi-note">operasional, gaji harian, dan pembayaran PO</div>
+                    <div class="cbr-kpi-note">operasional, pembelian, dan gaji harian</div>
                 </div>
                 <div class="cbr-kpi">
                     <div class="cbr-kpi-label">Saldo Akhir Periode</div>
@@ -248,7 +248,9 @@
                                     <tr>
                                         <td>
                                             <div class="cbr-row-title">{{ $row->name }}</div>
-                                            <div class="cbr-row-meta">{{ $row->code }} · {{ $fmt($row->total_docs) }} transaksi</div>
+                                            <div class="cbr-row-meta">
+                                                @if ($row->code !== $row->name){{ $row->code }} · @endif{{ $fmt($row->total_docs) }} transaksi
+                                            </div>
                                         </td>
                                         <td class="text-end fw-bold">Rp {{ $fmt($row->total_amount) }}</td>
                                     </tr>
@@ -274,7 +276,9 @@
                                     <tr>
                                         <td>
                                             <div class="cbr-row-title">{{ $row->name }}</div>
-                                            <div class="cbr-row-meta">{{ $row->code }} · {{ $fmt($row->total_docs) }} transaksi</div>
+                                            <div class="cbr-row-meta">
+                                                @if ($row->code !== $row->name){{ $row->code }} · @endif{{ $fmt($row->total_docs) }} transaksi
+                                            </div>
                                         </td>
                                         <td class="text-end fw-bold">Rp {{ $fmt($row->total_amount) }}</td>
                                     </tr>
