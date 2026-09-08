@@ -391,6 +391,13 @@
                 </div>
                 <div class="cbr-row" style="margin-top:1rem">
                     <div>
+                        <div class="cbr-row-title">Total Pengeluaran</div>
+                        <div class="cbr-row-meta">Total biaya dan lain-lain selama periode</div>
+                    </div>
+                    <div class="cbr-row-num neg">Rp {{ $fmt($cashOutTotal) }}</div>
+                </div>
+                <div class="cbr-row" style="margin-top:1rem">
+                    <div>
                         <div class="cbr-row-title">Arus Kas Bersih</div>
                         <div class="cbr-row-meta">Kas masuk dikurangi kas keluar</div>
                     </div>
