@@ -8,6 +8,7 @@ use Carbon\Carbon;
 
 class MarketplaceFinancialStatementService
 {
+    private const AD_COST_SOURCE = 'wallet_actual';
     private const WALLET_AD_CHARGE_TYPES = ['450', 'paid_ads_charge', 'paid-ads-charge'];
     private const WALLET_AD_REFUND_TYPES = ['451', 'paid_ads_refund', 'paid-ads-refund'];
     private const WALLET_AD_TOPUP_TYPES = ['SPM_DEDUCT', 'spm_deduct', 'spm-deduct'];
@@ -187,47 +188,18 @@ class MarketplaceFinancialStatementService
             ->groupBy('store_id')
             ->pluck('total', 'store_id');
 
-        $storeIds = collect([
-            ...array_keys($chargeRows->all()),
-            ...array_keys($refundRows->all()),
-            ...array_keys($topupRows->all()),
-            ...array_keys($walletCountByStore->all()),
-            ...array_keys($adsDailyByStore->all()),
-        ])->unique()->values();
         $charge = round((float) $chargeRows->sum(), 2);
         $refund = round((float) $refundRows->sum(), 2);
         $topup = round((float) $topupRows->sum(), 2);
         $walletNet = round($charge - $refund, 2);
         $walletCount = (int) $walletCountByStore->sum();
         $adsDailySpend = round((float) $adsDailyByStore->sum(), 2);
-        $adCostForGl = 0.0;
+        // Wallet actual is the sole GL source by policy. Ads Daily remains a
+        // comparison metric only and must never silently become a fallback.
+        $adCostForGl = $walletNet;
+        $walletStoreCount = (int) $walletCountByStore->count();
         $adsDailyFallbackSpend = 0.0;
-        $walletStoreCount = 0;
         $fallbackStoreCount = 0;
-
-        foreach ($storeIds as $storeId) {
-            $storeKey = (string) $storeId;
-            $storeHasWalletTransactions = (int) ($walletCountByStore->get($storeId) ?? $walletCountByStore->get($storeKey) ?? 0) > 0;
-            $storeWalletCost = (float) ($chargeRows->get($storeId) ?? $chargeRows->get($storeKey) ?? 0)
-                - (float) ($refundRows->get($storeId) ?? $refundRows->get($storeKey) ?? 0);
-            $storeAdsDailySpend = (float) ($adsDailyByStore->get($storeId) ?? $adsDailyByStore->get($storeKey) ?? 0);
-
-            if ($storeHasWalletTransactions) {
-                $adCostForGl += $storeWalletCost;
-                $walletStoreCount++;
-            } elseif ($storeAdsDailySpend !== 0.0) {
-                $adCostForGl += $storeAdsDailySpend;
-                $adsDailyFallbackSpend += $storeAdsDailySpend;
-                $fallbackStoreCount++;
-            }
-        }
-
-        $source = match (true) {
-            $walletStoreCount > 0 && $fallbackStoreCount > 0 => 'mixed_wallet_actual_and_ads_daily_fallback',
-            $walletStoreCount > 0 => 'wallet_actual',
-            $fallbackStoreCount > 0 => 'ads_daily_fallback',
-            default => 'none',
-        };
 
         return [
             'wallet_ad_charge' => $charge,
@@ -238,11 +210,12 @@ class MarketplaceFinancialStatementService
             'ads_daily_spend' => $adsDailySpend,
             'ad_cost_variance' => round($walletNet - $adsDailySpend, 2),
             'ad_cost_for_gl' => round($adCostForGl, 2),
-            'ad_cost_for_gl_source' => $source,
+            'ad_cost_for_gl_source' => self::AD_COST_SOURCE,
+            'wallet_actual_available' => $walletCount > 0,
             'ads_daily_fallback_spend' => round($adsDailyFallbackSpend, 2),
             'wallet_store_count' => $walletStoreCount,
             'ads_daily_fallback_store_count' => $fallbackStoreCount,
-            'ad_cost_date_basis' => 'wallet_transaction_created_at; fallback ads_daily.date',
+            'ad_cost_date_basis' => 'wallet_transaction_created_at; Ads Daily comparison uses ads_daily.date',
         ];
     }
 }

@@ -304,8 +304,8 @@
                 <div class="col-6 col-md-3"><div class="text-muted small">Selisih wallet vs Ads Daily</div><div class="fw-bold {{ abs((float) ($summary['ad_cost_variance'] ?? 0)) > 0.01 ? 'text-warning-emphasis' : 'text-success' }}">Rp {{ $fmt($summary['ad_cost_variance'] ?? 0) }}</div></div>
             </div>
             <div class="small text-muted mt-3">SPM top up dipindahkan dari 1302 ke 1304 sebagai saldo iklan prepaid. Ads Daily/wallet actual mengakui pemakaian ke akun 6206 dengan lawan 1304, sedangkan penarikan bank tetap menggunakan 1302. Angka ini bersifat period-level dan tidak dialokasikan ulang ke laba per order.</div>
-            @if (($summary['ad_cost_for_gl_source'] ?? 'none') !== 'wallet_actual' && ($summary['ad_cost_for_gl'] ?? 0) > 0)
-                <div class="alert alert-warning small mt-3 mb-0"><i class="bi bi-info-circle me-1"></i> Sumber posting saat ini: <strong>{{ $adCostSource }}</strong>. Klik <strong>Sync biaya iklan</strong> sebelum posting final agar angka wallet Shopee menjadi sumber utama bila tersedia.</div>
+            @if (!($summary['wallet_actual_available'] ?? false))
+                <div class="alert alert-warning small mt-3 mb-0"><i class="bi bi-info-circle me-1"></i> Wallet aktual belum memiliki transaksi charge Paid Ads. Biaya iklan yang masuk GL tetap Rp0; Ads Daily hanya digunakan sebagai pembanding.</div>
             @endif
         </div>
     </div>

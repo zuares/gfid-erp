@@ -119,5 +119,8 @@ class MarketplaceFinancialStatementServiceTest extends TestCase
         $this->assertSame(75.0, $statement['summary']['wallet_ad_topup']);
         $this->assertSame(100.0, $statement['summary']['ads_daily_spend']);
         $this->assertSame(30.0, $statement['summary']['ad_cost_variance']);
+        $this->assertSame('wallet_actual', $statement['summary']['ad_cost_for_gl_source']);
+        $this->assertTrue($statement['summary']['wallet_actual_available']);
+        $this->assertSame(0.0, $statement['summary']['ads_daily_fallback_spend']);
     }
 }
