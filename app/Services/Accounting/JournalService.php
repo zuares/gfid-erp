@@ -395,6 +395,7 @@ class JournalService
             }
 
             $advId = $this->accountIdByCode(self::CODE_ADV_PURCHASE);
+            $apId = $this->accountIdByCode(self::CODE_AP);
 
             $po = $payment->purchaseOrder;
             $poCode = $po?->code ?? '-';
@@ -412,7 +413,6 @@ class JournalService
 
             // dp_apply (tanpa kas/bank)
             if ($payment->type === 'dp_apply') {
-                $apId = $this->accountIdByCode(self::CODE_AP);
                 $journal = $this->post(
                     $date,
                     $sourceType,

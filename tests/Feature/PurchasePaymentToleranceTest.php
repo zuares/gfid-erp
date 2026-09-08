@@ -4,12 +4,14 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\Purchasing\PurchaseOrderController;
 use App\Http\Controllers\Purchasing\PurchasePaymentController;
+use App\Models\Account;
 use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
 use App\Models\PurchaseReceipt;
 use App\Models\Supplier;
 use App\Models\SupplierInvoice;
+use App\Services\Accounting\JournalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use ReflectionMethod;
 use Tests\TestCase;
@@ -23,6 +25,64 @@ class PurchasePaymentToleranceTest extends TestCase
         $this->assertSame(0.0, PurchaseOrder::normalizePaymentRemainder(1.00));
         $this->assertSame(0.0, PurchaseOrder::normalizePaymentRemainder(0.98));
         $this->assertSame(1.01, PurchaseOrder::normalizePaymentRemainder(1.01));
+    }
+
+    public function test_purchase_payment_journal_debits_accounts_payable(): void
+    {
+        $ap = Account::create([
+            'code' => JournalService::CODE_AP,
+            'name' => 'Hutang Dagang',
+            'type' => 'liability',
+            'is_active' => true,
+        ]);
+        $advance = Account::create([
+            'code' => JournalService::CODE_ADV_PURCHASE,
+            'name' => 'Uang Muka Pembelian',
+            'type' => 'asset',
+            'is_active' => true,
+        ]);
+        $cash = Account::create([
+            'code' => '1101',
+            'name' => 'Kas',
+            'type' => 'asset',
+            'is_cash' => true,
+            'is_active' => true,
+        ]);
+        $method = PaymentMethod::create([
+            'code' => 'PAY-CASH-' . uniqid(),
+            'name' => 'Cash Payment',
+            'mode' => 'cash',
+            'is_active' => true,
+        ]);
+        $supplier = Supplier::create([
+            'code' => 'PAY-SUP-' . uniqid(),
+            'name' => 'Payment Supplier',
+        ]);
+        $order = PurchaseOrder::create([
+            'code' => 'PAY-PO-' . uniqid(),
+            'date' => '2026-08-27',
+            'supplier_id' => $supplier->id,
+            'grand_total' => 1000,
+            'status' => 'approved',
+        ]);
+        $payment = PurchasePayment::create([
+            'purchase_order_id' => $order->id,
+            'date' => '2026-08-27',
+            'payment_method_id' => $method->id,
+            'cash_account_id' => $cash->id,
+            'type' => 'payment',
+            'amount' => 1000,
+        ]);
+
+        $journal = app(JournalService::class)->postPurchasePayment(
+            $payment->fresh(['purchaseOrder', 'cashAccount', 'paymentMethod'])
+        );
+
+        $this->assertNotNull($journal->id);
+        $this->assertSame($journal->id, $payment->fresh()->journal_id);
+        $this->assertSame(1000.0, (float) $journal->lines()->where('account_id', $ap->id)->sum('debit'));
+        $this->assertSame(1000.0, (float) $journal->lines()->where('account_id', $cash->id)->sum('credit'));
+        $this->assertSame(0, $journal->lines()->where('account_id', $advance->id)->count());
     }
 
     public function test_ap_outstanding_treats_one_rupiah_rounding_remainder_as_paid(): void
