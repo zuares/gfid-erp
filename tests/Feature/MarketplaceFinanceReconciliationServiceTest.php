@@ -49,6 +49,24 @@ class MarketplaceFinanceReconciliationServiceTest extends TestCase
         $this->assertSame('RECON-MATCHED-001', $transaction->order_sn);
     }
 
+    public function test_finance_chain_can_match_without_invoice_or_shipment_links(): void
+    {
+        [$store, $transaction] = $this->completeChain();
+        $transaction->forceFill([
+            'sales_invoice_id' => null,
+            'shipment_id' => null,
+        ])->save();
+
+        $result = app(MarketplaceFinanceReconciliationService::class)->reconcile([
+            'store_id' => $store->id,
+        ]);
+        $item = $result['transactions'][0];
+
+        $this->assertSame('matched', $item['status']);
+        $this->assertSame([], $item['reasons']);
+        $this->assertNull($item['gross_sales_invoice']);
+    }
+
     public function test_invoice_or_fee_amount_difference_is_reported_as_mismatch(): void
     {
         [$store, $transaction] = $this->transaction('RECON-MISMATCH-001', 100000);
@@ -63,6 +81,7 @@ class MarketplaceFinanceReconciliationServiceTest extends TestCase
         $transaction->forceFill([
             'sales_invoice_id' => $invoice->id,
             'escrow_status' => EscrowStatus::FINALIZED,
+            'income_status' => IncomeStatus::RELEASED,
             'net_amount' => 90000,
             'source_hash' => str_repeat('e', 64),
             'raw_payload' => ['income' => ['buyer_total_amount' => 100000]],
@@ -82,7 +101,8 @@ class MarketplaceFinanceReconciliationServiceTest extends TestCase
         $this->assertSame('mismatch', $item['status']);
         $this->assertContains('amount_mismatch', $item['reasons']);
         $this->assertContains('fee_mismatch', $item['reasons']);
-        $this->assertContains('missing_shipment', $item['reasons']);
+        $this->assertNotContains('missing_sales_invoice', $item['reasons']);
+        $this->assertNotContains('missing_shipment', $item['reasons']);
         $this->assertSame(0, DB::table('journals')->count());
     }
 
@@ -98,8 +118,8 @@ class MarketplaceFinanceReconciliationServiceTest extends TestCase
 
         $this->assertSame($transaction->id, $item['transaction_id']);
         $this->assertSame('pending', $item['status']);
-        $this->assertContains('missing_sales_invoice', $item['reasons']);
-        $this->assertContains('missing_shipment', $item['reasons']);
+        $this->assertNotContains('missing_sales_invoice', $item['reasons']);
+        $this->assertNotContains('missing_shipment', $item['reasons']);
         $this->assertContains('missing_escrow', $item['reasons']);
         $this->assertContains('missing_settlement', $item['reasons']);
         $this->assertSame(1, $result['summary']['pending']);

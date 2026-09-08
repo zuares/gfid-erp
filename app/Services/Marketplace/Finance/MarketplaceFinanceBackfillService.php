@@ -199,7 +199,10 @@ class MarketplaceFinanceBackfillService
         }
         $this->duplicateSource($stats, 'order_settlements', $context['key']);
 
-        $gross = $this->nullableAmount($row->buyer_payment_amount);
+        // buyer_payment_amount is the amount paid by the buyer after platform
+        // discounts. For settlement accounting, prefer the seller-side gross
+        // from the raw response when it is available.
+        $gross = $this->settlementGross($row);
         $net = $this->nullableAmount($row->final_income);
         $transaction = $this->transaction($context, [
             'gross_amount' => $gross,
@@ -230,6 +233,12 @@ class MarketplaceFinanceBackfillService
                 $this->component($transaction, $code, $name, $row->{$field}, 'marketplace_order_settlements', $row->id, $field, $row->raw_json, $stats);
             }
         }
+
+        // Legacy exports do not expose every adjustment as a dedicated column.
+        // Keep the residual explicit and auditable instead of leaving a false
+        // fee mismatch in reconciliation. Do this only for released income;
+        // pending rows must remain pending until a real payout is received.
+        $this->settlementResidual($transaction, $row, $gross, $net, $stats);
     }
 
     private function backfillIncomeEstimate(MarketplaceOrderIncomeEstimate $row, array &$stats, array &$result): void
@@ -300,6 +309,13 @@ class MarketplaceFinanceBackfillService
             return;
         }
         $this->duplicateSource($stats, 'payouts', $store->id.'|'.$channel.'|'.$externalId);
+        $items = $this->allocationRows($row->source_payload);
+        if ($items === []) {
+            $this->unmatched($stats, $result, 'payouts', $row->id, 'settlement_without_order_mapping');
+
+            return;
+        }
+
         $settlement = $this->settlement($store, $channel, $externalId, [
             'amount' => $this->nullableAmount($row->amount) ?? '0.00',
             'currency' => 'IDR',
@@ -308,13 +324,6 @@ class MarketplaceFinanceBackfillService
             'status' => $this->settlementStatus($row->status),
             'raw_payload' => $this->legacyPayload('marketplace_payouts', $row->id, $row->source_payload),
         ], $stats);
-
-        $items = $this->allocationRows($row->source_payload);
-        if ($items === []) {
-            $this->unmatched($stats, $result, 'payouts', $row->id, 'settlement_without_order_mapping');
-
-            return;
-        }
 
         foreach ($items as $index => $item) {
             $orderSn = trim((string) ($item['order_sn'] ?? $item['order_id'] ?? $item['ordersn'] ?? ''));
@@ -415,6 +424,18 @@ class MarketplaceFinanceBackfillService
         if ($transaction && (float) $transaction->gross_amount === 0.0 && ($values['gross_amount'] ?? null) !== null) {
             $changes['gross_amount'] = $values['gross_amount'];
         }
+        if ($transaction
+            && ($values['gross_amount'] ?? null) !== null
+            && ($values['source_hash'] ?? null) !== null
+            && $transaction->source_hash === $values['source_hash']
+            && abs((float) $transaction->gross_amount - (float) $values['gross_amount']) > 0.01
+            && ! $transaction->sale_journal_id) {
+            // The canonical gross can change when a legacy import is upgraded
+            // from buyer-paid amount to seller-side raw settlement amount.
+            // Allow that correction only for the same source response and
+            // before a sale journal has been posted.
+            $changes['gross_amount'] = $values['gross_amount'];
+        }
         if ($transaction && (float) $transaction->net_amount === 0.0 && ($values['net_amount'] ?? null) !== null) {
             $changes['net_amount'] = $values['net_amount'];
         }
@@ -452,10 +473,14 @@ class MarketplaceFinanceBackfillService
                         unset($createValues[$field]);
                     }
                 }
-                foreach (['marketplace_order_id', 'sales_invoice_id', 'shipment_id'] as $field) {
-                    if (isset($context[$field])) {
-                        $createValues[$field] = $context[$field];
-                    }
+                if ($context['order']) {
+                    $createValues['marketplace_order_id'] = $context['order']->id;
+                }
+                if ($context['invoice']) {
+                    $createValues['sales_invoice_id'] = $context['invoice']->id;
+                }
+                if ($context['shipment']) {
+                    $createValues['shipment_id'] = $context['shipment']->id;
                 }
 
                 return MarketplaceFinancialTransaction::create($createValues);
@@ -677,13 +702,84 @@ class MarketplaceFinanceBackfillService
         if (! is_array($payload)) {
             return [];
         }
-        foreach (['allocations', 'orders', 'order_list', 'escrow_list', 'details'] as $key) {
+        foreach (['allocations', 'orders', 'order_list', 'escrow_list', 'details', 'pay_order_list'] as $key) {
             $rows = data_get($payload, $key);
             if (is_array($rows)) {
                 return array_is_list($rows) ? $rows : [$rows];
             }
         }
 
+        // Some payout APIs put a single order directly at the payload root.
+        // Withdrawal records normally have no order_sn and must remain
+        // unallocated rather than being assigned to an arbitrary order.
+        $orderSn = trim((string) ($payload['order_sn'] ?? $payload['order_id'] ?? $payload['ordersn'] ?? ''));
+        $amount = $payload['allocated_amount']
+            ?? $payload['payout_amount']
+            ?? $payload['settlement_amount']
+            ?? $payload['amount']
+            ?? null;
+        if ($orderSn !== '' && $amount !== null && $amount !== '') {
+            return [['order_sn' => $orderSn, 'amount' => $amount]];
+        }
+
         return array_is_list($payload) ? $payload : [];
+    }
+
+    private function settlementGross(MarketplaceOrderSettlement $row): ?string
+    {
+        $raw = is_array($row->raw_json) ? $row->raw_json : [];
+        foreach (['order_discounted_price', 'order_selling_price', 'order_original_price'] as $field) {
+            $value = $raw[$field] ?? null;
+            if ($value !== null && abs((float) $value) > 0.0) {
+                return $this->nullableAmount($value);
+            }
+        }
+
+        return $this->nullableAmount($row->buyer_payment_amount);
+    }
+
+    private function settlementResidual(array $transaction, MarketplaceOrderSettlement $row, ?string $gross, ?string $net, array &$stats): void
+    {
+        if ($this->dryRun
+            || ! $transaction['id']
+            || $gross === null
+            || $net === null
+            || ! $row->settlement_time) {
+            return;
+        }
+
+        $componentsTotal = 0.0;
+        foreach ([
+            'commission_fee',
+            'service_fee',
+            'transaction_fee',
+            'affiliate_fee',
+            'shipping_insurance_fee',
+            'seller_voucher',
+            'seller_coin_cash_back',
+            'reverse_shipping_fee',
+            'activity_fee',
+            'drc_adjustable_refund',
+            'escrow_tax',
+            'ad_cost',
+        ] as $field) {
+            $componentsTotal += (float) ($row->{$field} ?? 0);
+        }
+        $residual = round((float) $gross - (float) $net - $componentsTotal, 2);
+        if (abs($residual) <= 0.01) {
+            return;
+        }
+
+        $this->component(
+            $transaction,
+            'unmapped_adjustment',
+            'Unmapped Settlement Adjustment',
+            $residual,
+            'marketplace_order_settlements',
+            $row->id,
+            'unmapped_adjustment',
+            $row->raw_json,
+            $stats,
+        );
     }
 }

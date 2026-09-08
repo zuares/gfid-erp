@@ -14,6 +14,8 @@ use App\Models\MarketplaceOrderIncomeEstimate;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\MarketplacePayout;
 use App\Models\MpIncome;
+use App\Models\SalesInvoice;
+use App\Models\Shipment;
 use App\Models\Store;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -83,6 +85,98 @@ class MarketplaceFinanceBackfillTest extends TestCase
         $this->assertSame('order_unmatched:NOT-IN-ORDERS', $result['unmatched_rows'][0]['reason']);
         $this->assertSame(0, MarketplaceFinanceSettlement::count());
         $this->assertSame(0, MarketplaceFinancialTransaction::count());
+    }
+
+    public function test_settlement_backfill_maps_existing_order_invoice_and_shipment_on_first_insert(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'BF-LINK-001',
+            'channel_order_id' => 'BF-LINK-001',
+            'order_date' => '2026-08-28',
+            'ordered_at' => '2026-08-28 09:00:00',
+            'order_status' => 'COMPLETED',
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+        $warehouseId = $this->warehouse('BF-LINK-WH');
+        $invoice = SalesInvoice::create([
+            'code' => 'INV-BF-LINK-001',
+            'date' => '2026-08-28',
+            'warehouse_id' => $warehouseId,
+            'status' => 'posted',
+            'grand_total' => 100000,
+        ]);
+        $invoice->forceFill([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'channel_order_no' => 'BF-LINK-001',
+        ])->save();
+        $shipment = Shipment::create([
+            'code' => 'SHP-BF-LINK-001',
+            'store_id' => $store->id,
+            'sales_invoice_id' => $invoice->id,
+            'date' => '2026-08-28',
+            'status' => 'posted',
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => 'BF-LINK-001',
+            'buyer_payment_amount' => 90000,
+            'commission_fee' => 5000,
+            'final_income' => 95000,
+            'settlement_time' => '2026-08-28 12:00:00',
+            'raw_json' => ['order_discounted_price' => 100000],
+        ]);
+
+        $this->artisan('marketplace:finance-backfill', [
+            '--apply' => true,
+            '--source' => ['order_settlements'],
+        ])->assertExitCode(0);
+
+        $transaction = MarketplaceFinancialTransaction::firstOrFail();
+        $this->assertSame($order->id, $transaction->marketplace_order_id);
+        $this->assertSame($invoice->id, $transaction->sales_invoice_id);
+        $this->assertSame($shipment->id, $transaction->shipment_id);
+        $this->assertSame('100000.00', (string) $transaction->gross_amount);
+        $this->assertSame(1, MarketplaceFinancialComponent::count());
+    }
+
+    public function test_payout_with_root_order_sn_creates_settlement_allocation(): void
+    {
+        [$store, $order] = $this->legacyRows();
+        $bank = Account::create([
+            'code' => 'BF-ROOT-1101',
+            'name' => 'Bank Root Payout',
+            'type' => 'asset',
+            'is_cash' => true,
+            'is_active' => true,
+        ]);
+        MarketplacePayout::create([
+            'date' => '2026-08-28',
+            'marketplace_name' => 'Shopee',
+            'store_id' => $store->id,
+            'source' => 'shopee',
+            'amount' => 94500,
+            'bank_account_id' => $bank->id,
+            'external_transaction_id' => 'BF-ROOT-PAYOUT-001',
+            'transaction_created_at' => '2026-08-28 13:00:00',
+            'status' => 'posted',
+            'source_payload' => [
+                'order_sn' => $order->channel_order_id,
+                'amount' => 94500,
+            ],
+        ]);
+
+        $this->artisan('marketplace:finance-backfill', [
+            '--apply' => true,
+            '--source' => ['order_settlements', 'income_estimates', 'mp_incomes', 'payouts'],
+        ])->assertExitCode(0);
+
+        $this->assertSame(2, MarketplaceFinanceSettlement::count());
+        $this->assertSame(2, DB::table('marketplace_finance_settlement_allocations')->count());
     }
 
     /** @return array{0:Store,1:MarketplaceOrder} */
@@ -160,6 +254,18 @@ class MarketplaceFinanceBackfillTest extends TestCase
             'name' => 'Backfill Store',
             'status' => 'active',
             'is_active' => true,
+        ]);
+    }
+
+    private function warehouse(string $code): int
+    {
+        return DB::table('warehouses')->insertGetId([
+            'code' => $code,
+            'name' => $code,
+            'type' => 'internal',
+            'active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 }

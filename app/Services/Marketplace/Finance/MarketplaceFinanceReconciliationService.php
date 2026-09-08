@@ -118,12 +118,6 @@ class MarketplaceFinanceReconciliationService
         if (! $transaction->marketplace_order_id) {
             $reasons[] = 'order_unmatched';
         }
-        if (! $transaction->sales_invoice_id || ! $transaction->salesInvoice) {
-            $reasons[] = 'missing_sales_invoice';
-        }
-        if (! $transaction->shipment_id || ! $transaction->shipment) {
-            $reasons[] = 'missing_shipment';
-        }
 
         $escrowGross = $this->escrowGross($transaction);
         if ($transaction->escrow_status !== EscrowStatus::SYNCED && $transaction->escrow_status !== EscrowStatus::FINALIZED) {
@@ -152,7 +146,9 @@ class MarketplaceFinanceReconciliationService
         if ($escrowGross !== null && $this->different($escrowGross, (float) $transaction->gross_amount)) {
             $reasons[] = 'amount_mismatch';
         }
-        if ($expectedNet !== null && $this->different($expectedNet, (float) $transaction->net_amount)) {
+        if ($expectedNet !== null
+            && $transaction->income_status === IncomeStatus::RELEASED
+            && $this->different($expectedNet, (float) $transaction->net_amount)) {
             $reasons[] = 'fee_mismatch';
         }
 

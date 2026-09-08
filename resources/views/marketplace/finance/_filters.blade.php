@@ -1,5 +1,14 @@
-<form method="GET" class="finance-card card shadow-sm mb-4">
+<form method="GET" class="finance-card finance-filter-card card mb-4">
     <div class="card-body">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div>
+                <div class="finance-section-title">Filter data</div>
+                <div class="finance-section-meta">Persempit transaksi yang ingin kamu audit.</div>
+            </div>
+            @if (request()->query())
+                <a class="btn btn-sm btn-light border" href="{{ url()->current() }}"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</a>
+            @endif
+        </div>
         <div class="row g-3 align-items-end">
             <div class="col-12 col-md-3">
                 <label class="form-label" for="finance-store">Toko</label>
@@ -34,7 +43,7 @@
                 </div>
             @endif
             <div class="col-12 col-md-1 d-grid">
-                <button class="btn btn-primary" type="submit">Filter</button>
+                <button class="btn btn-primary" type="submit"><i class="bi bi-funnel me-1"></i>Filter</button>
             </div>
         </div>
     </div>

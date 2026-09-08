@@ -168,7 +168,9 @@ class MarketplaceAccountingPostingTest extends TestCase
             ->sum($side);
 
         $this->assertSame(50.0, $accountLine('1304', 'debit'));
-        $this->assertSame(80.0, $accountLine('1304', 'credit'));
+        // Top-up debits the prepaid wallet; usage credits it back. The
+        // top-up is not itself a second credit to the wallet.
+        $this->assertSame(30.0, $accountLine('1304', 'credit'));
         $this->assertSame(50.0, $accountLine('1302', 'credit'));
         $this->assertSame(30.0, $accountLine('6206', 'debit'));
         $this->assertSame(50.0, (float) $preview['included_in_gl']['wallet_ad_topup']);
@@ -243,7 +245,10 @@ class MarketplaceAccountingPostingTest extends TestCase
             ['6201', 'Biaya Marketplace', 'expense'],
             ['6206', 'Biaya Iklan Marketplace', 'expense'],
         ] as [$code, $name, $type]) {
-            Account::create(['code' => $code, 'name' => $name, 'type' => $type, 'is_active' => true]);
+            Account::updateOrCreate(
+                ['code' => $code],
+                ['name' => $name, 'type' => $type, 'is_active' => true],
+            );
         }
 
         $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
