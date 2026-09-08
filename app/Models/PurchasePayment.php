@@ -9,11 +9,12 @@ class PurchasePayment extends Model
 {
     protected $fillable = [
         'purchase_order_id',
+        'supplier_loan_id',
         'supplier_invoice_id',  // nullable — link ke faktur supplier (Tahap 4)
         'date',
         'payment_method_id',
         'cash_account_id',
-        'type',
+        'type', // dp|payment|dp_apply|loan_apply
         'amount',
         'ref_no',
         'notes',
@@ -41,6 +42,11 @@ class PurchasePayment extends Model
     public function supplierInvoice(): BelongsTo
     {
         return $this->belongsTo(SupplierInvoice::class, 'supplier_invoice_id');
+    }
+
+    public function supplierLoan(): BelongsTo
+    {
+        return $this->belongsTo(SupplierLoan::class, 'supplier_loan_id');
     }
 
     public function paymentMethod(): BelongsTo
@@ -71,7 +77,7 @@ class PurchasePayment extends Model
 
     public function getIsVoidedAttribute(): bool
     {
-        return !is_null($this->voided_at);
+        return ! is_null($this->voided_at);
     }
 
     public function payments()
@@ -96,5 +102,4 @@ class PurchasePayment extends Model
     {
         return $this->payment_status === 'paid';
     }
-
 }

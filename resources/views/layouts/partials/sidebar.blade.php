@@ -197,6 +197,7 @@
     $hasCashBasisReportIndex = $router->has('accounting.cash-basis-report.index');
     $hasCashReceiptsIndex = $router->has('accounting.cash-receipts.index');
     $hasLoansIndex = $router->has('accounting.loans.index');
+    $hasSupplierLoansIndex = $router->has('accounting.supplier-loans.index');
     $hasJournalsIndex = $router->has('accounting.journals.index');
     $hasOpeningBalancesIndex = $router->has('accounting.opening-balances.index');
     $hasOpeningBalancesBatchIndex = $router->has('accounting.opening-balances-batch.index');
@@ -295,7 +296,7 @@
     if (!$canModule('accounting')) {
         $hasAccountingIndex = $hasAccountsIndex = $hasCashBasisReportIndex = false;
         $hasCashReceiptsIndex = $hasJournalsIndex = $hasOpeningBalancesIndex = false;
-        $hasLoansIndex = false;
+        $hasLoansIndex = $hasSupplierLoansIndex = false;
         $hasOpeningBalancesBatchIndex = $hasCashTransfersIndex = false;
         $hasSupplierApOpeningsIndex = false;
     }
@@ -389,6 +390,7 @@
         $open('accounting.cash-expenses.*') ||
         $open('accounting.cash-receipts.*') ||
         $open('accounting.loans.*') ||
+        $open('accounting.supplier-loans.*') ||
         $open('accounting.cash-transfers.*') ||
         $open('accounting.marketplace-payouts.*') ||
         $open('accounting.ap-report.*') ||
@@ -1473,6 +1475,7 @@
                 $hasCashTransfersIndex,
                 $hasCashReceiptsIndex,
                 $hasLoansIndex,
+                $hasSupplierLoansIndex,
                 $hasCashBasisReportIndex,
                 $hasJournalsIndex,
                 $hasAccountsIndex,
@@ -1531,6 +1534,13 @@
                         <x-sidebar.simple-link href="{{ route('accounting.loans.index') }}" icon="bi bi-bank"
                             :active="request()->routeIs('accounting.loans.*') || request()->routeIs('accounting.loans.repayments.*')">
                             Pinjaman
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasSupplierLoansIndex)
+                        <x-sidebar.simple-link href="{{ route('accounting.supplier-loans.index') }}" icon="bi bi-person-check"
+                            :active="request()->routeIs('accounting.supplier-loans.*')">
+                            Dana Supplier
                         </x-sidebar.simple-link>
                     @endif
 
@@ -2326,7 +2336,7 @@
             @endif
 
             {{-- FINANCE --}}
-            @if ($canShow($hasAccountingIndex, $hasOpeningBalancesIndex, $hasOpeningBalancesBatchIndex, $hasSupplierApOpeningsIndex, $hasCashExpensesIndex, $hasCashReceiptsIndex, $hasLoansIndex, $hasCashTransfersIndex, $hasCashBasisReportIndex, $hasJournalsIndex, $hasAccountsIndex, $hasMarketplacePayoutsIndex, $hasApReportIndex, $hasTrialBalanceIndex, $hasProfitLossIndex, $hasBukuBesarIndex))
+            @if ($canShow($hasAccountingIndex, $hasOpeningBalancesIndex, $hasOpeningBalancesBatchIndex, $hasSupplierApOpeningsIndex, $hasCashExpensesIndex, $hasCashReceiptsIndex, $hasLoansIndex, $hasSupplierLoansIndex, $hasCashTransfersIndex, $hasCashBasisReportIndex, $hasJournalsIndex, $hasAccountsIndex, $hasMarketplacePayoutsIndex, $hasApReportIndex, $hasTrialBalanceIndex, $hasProfitLossIndex, $hasBukuBesarIndex))
                 <x-sidebar.label text="Keuangan" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openAccounting ? 'is-open' : '' }}" type="button"
@@ -2397,6 +2407,13 @@
                             <x-sidebar.sub-link href="{{ route('accounting.loans.index') }}" icon="bi bi-bank"
                                 :active="request()->routeIs('accounting.loans.*') || request()->routeIs('accounting.loans.repayments.*')">
                                 Pinjaman
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasSupplierLoansIndex)
+                            <x-sidebar.sub-link href="{{ route('accounting.supplier-loans.index') }}" icon="bi bi-person-check"
+                                :active="request()->routeIs('accounting.supplier-loans.*')">
+                                Dana Supplier
                             </x-sidebar.sub-link>
                         @endif
 

@@ -467,7 +467,7 @@
                 ->filter(fn ($ret) => ($ret->status ?? 'draft') === 'posted' && is_null($ret->voided_at) && ($ret->resolution_type ?? null) !== 'replacement')
                 ->sum('total');
             $payments = $order->activePayments ?? collect();
-            $dpTotal = (float) $payments->where('type', 'dp')->sum('amount');
+            $dpTotal = (float) $payments->whereIn('type', ['dp', 'loan_apply'])->sum('amount');
             $dpApplied = (float) $payments->where('type', 'dp_apply')->sum('amount');
             $apSettled = (float) $payments->whereIn('type', ['payment', 'dp_apply'])->sum('amount');
             $apOutstanding = \App\Models\PurchaseOrder::normalizePaymentRemainder($grnPosted - $returnPosted - $apSettled);

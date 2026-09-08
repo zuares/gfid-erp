@@ -10,6 +10,7 @@ use App\Models\PurchasePayment;
 use App\Models\PurchaseReturn;
 use App\Models\Supplier;
 use App\Models\SupplierInvoice;
+use App\Models\SupplierLoan;
 use App\Services\Accounting\JournalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +35,7 @@ class PurchasePaymentController extends Controller
             ->orderByDesc('id');
 
         if ($request->filled('supplier_id')) {
-            $q->whereHas('purchaseOrder', fn($s) => $s->where('supplier_id', $request->integer('supplier_id')));
+            $q->whereHas('purchaseOrder', fn ($s) => $s->where('supplier_id', $request->integer('supplier_id')));
         }
 
         if ($request->filled('from')) {
@@ -64,14 +65,14 @@ class PurchasePaymentController extends Controller
 
         $summary = [
             'total_payment' => (float) ($summaryRows->get('payment')?->total ?? 0),
-            'total_dp'      => (float) ($summaryRows->get('dp')?->total ?? 0),
-            'count'         => (int)   $summaryRows->sum('cnt'),
+            'total_dp' => (float) ($summaryRows->get('dp')?->total ?? 0),
+            'count' => (int) $summaryRows->sum('cnt'),
         ];
 
-        $payments  = $q->paginate(30)->withQueryString();
+        $payments = $q->paginate(30)->withQueryString();
         $suppliers = Supplier::orderBy('name')->get(['id', 'name']);
         $paymentMethods = PaymentMethod::where('is_active', true)->orderBy('sort_order')->get();
-        $cashAccounts   = Account::where('is_cash', true)->where('is_active', true)->orderBy('code')->get();
+        $cashAccounts = Account::where('is_cash', true)->where('is_active', true)->orderBy('code')->get();
 
         // POs with outstanding debt for create form
         $openPos = PurchaseOrder::query()
@@ -115,6 +116,7 @@ class PurchasePaymentController extends Controller
                 $settled = (float) ($po->posted_payment_total ?? 0)
                     + (float) ($po->posted_dp_apply_total ?? 0);
                 $po->payment_outstanding = PurchaseOrder::normalizePaymentRemainder($debt - $settled);
+
                 return $po;
             })
             ->filter(fn (PurchaseOrder $po) => (float) $po->payment_outstanding > 0)
@@ -244,7 +246,7 @@ class PurchasePaymentController extends Controller
         // DP tetap berada di akun Uang Muka Pembelian. DP tidak boleh
         // otomatis mengurangi invoice supplier; offset dilakukan eksplisit
         // melalui flow applyDp().
-        if (($data['type'] ?? '') === 'dp' && !empty($data['supplier_invoice_id'])) {
+        if (($data['type'] ?? '') === 'dp' && ! empty($data['supplier_invoice_id'])) {
             throw ValidationException::withMessages([
                 'supplier_invoice_id' => 'DP tidak boleh dikaitkan langsung ke invoice. Gunakan Offset DP setelah GRN POSTED.',
             ]);
@@ -252,7 +254,7 @@ class PurchasePaymentController extends Controller
 
         $supplierInvoiceId = null;
         if (($data['type'] ?? '') === 'payment') {
-            $supplierInvoiceId = !empty($data['supplier_invoice_id'])
+            $supplierInvoiceId = ! empty($data['supplier_invoice_id'])
                 ? (int) $data['supplier_invoice_id']
                 : SupplierInvoice::where('purchase_order_id', $purchase_order->id)
                     ->where('supplier_id', $purchase_order->supplier_id)
@@ -268,7 +270,7 @@ class PurchasePaymentController extends Controller
                     ->whereIn('status', ['posted', 'partial_paid'])
                     ->exists();
 
-                if (!$invoiceMatchesOrder) {
+                if (! $invoiceMatchesOrder) {
                     throw ValidationException::withMessages([
                         'supplier_invoice_id' => 'Invoice supplier harus milik PO dan supplier yang sama, serta belum lunas/void.',
                     ]);
@@ -318,7 +320,7 @@ class PurchasePaymentController extends Controller
             );
 
             // ✅ SAFETY: kalau JournalService return Journal, set journal_id di sini juga
-            if ($journal && empty($payment->journal_id) && !empty($journal->id)) {
+            if ($journal && empty($payment->journal_id) && ! empty($journal->id)) {
                 $payment->journal_id = (int) $journal->id;
                 $payment->save();
             }
@@ -354,7 +356,7 @@ class PurchasePaymentController extends Controller
             $payment->save();
 
             // ✅ Paling aman: void via journal_id jika ada
-            if (!empty($payment->journal_id)) {
+            if (! empty($payment->journal_id)) {
                 $this->journalService->voidById((int) $payment->journal_id);
             } else {
                 // fallback: void by source (pastikan JournalService memang set source_type/source_id)
@@ -454,7 +456,7 @@ class PurchasePaymentController extends Controller
                 ->where('code', 'DP_APPLY')
                 ->value('id');
 
-            if (!$pmId) {
+            if (! $pmId) {
                 throw ValidationException::withMessages([
                     'amount' => 'PaymentMethod code=DP_APPLY belum ada. Buat dulu payment method "Offset DP".',
                 ]);
@@ -477,7 +479,7 @@ class PurchasePaymentController extends Controller
             );
 
             // SAFETY: set journal_id jika JournalService return Journal
-            if ($journal && empty($payment->journal_id) && !empty($journal->id)) {
+            if ($journal && empty($payment->journal_id) && ! empty($journal->id)) {
                 $payment->journal_id = (int) $journal->id;
                 $payment->save();
             }
@@ -486,6 +488,124 @@ class PurchasePaymentController extends Controller
         });
 
         return back()->with('success', 'DP berhasil di-offset ke hutang.');
+    }
+
+    /**
+     * Alokasikan sebagian saldo pinjaman supplier menjadi uang muka PO.
+     * Tidak ada kas baru yang keluar:
+     *   Dr Uang Muka Pembelian
+     *   Cr Piutang Pinjaman Supplier
+     */
+    public function applySupplierLoan(Request $request, PurchaseOrder $purchase_order)
+    {
+        $this->ensureOwner($request);
+
+        if (($purchase_order->status ?? '') === 'cancelled') {
+            return back()->with('error', 'PO cancelled tidak bisa diproses.');
+        }
+
+        $data = $request->validate([
+            'date' => ['required', 'date'],
+            'supplier_loan_id' => ['required', 'integer', 'exists:supplier_loans,id'],
+            'amount' => ['required', 'string'],
+            'notes' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $amountReq = $this->toNumber($data['amount'] ?? 0);
+        if ($amountReq <= 0) {
+            throw ValidationException::withMessages(['amount' => 'Nominal alokasi harus > 0.']);
+        }
+
+        DB::transaction(function () use ($request, $purchase_order, $data, $amountReq) {
+            $lockedOrder = PurchaseOrder::query()
+                ->whereKey($purchase_order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $loan = SupplierLoan::query()
+                ->whereKey((int) $data['supplier_loan_id'])
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ((int) $loan->supplier_id !== (int) $lockedOrder->supplier_id) {
+                throw ValidationException::withMessages([
+                    'supplier_loan_id' => 'Pinjaman harus berasal dari supplier yang sama dengan PO.',
+                ]);
+            }
+            if (! in_array($loan->status, ['posted', 'settled'], true)) {
+                throw ValidationException::withMessages([
+                    'supplier_loan_id' => 'Pinjaman supplier harus POSTED terlebih dahulu.',
+                ]);
+            }
+
+            $repaid = (float) $loan->repayments()
+                ->where('status', 'posted')
+                ->sum('amount');
+            $allocated = (float) PurchasePayment::query()
+                ->where('supplier_loan_id', $loan->id)
+                ->where('type', 'loan_apply')
+                ->whereNull('voided_at')
+                ->sum('amount');
+            $loanAvailable = max(0, (float) $loan->principal_amount - $repaid - $allocated);
+
+            $poPaidOrAdvanced = (float) $lockedOrder->activePayments()
+                ->whereIn('type', ['dp', 'loan_apply', 'payment'])
+                ->sum('amount');
+            $poAvailable = max(0, round((float) $lockedOrder->grand_total - $poPaidOrAdvanced, 2));
+            $amount = round(min($amountReq, $loanAvailable, $poAvailable), 2);
+
+            if ($loanAvailable <= 0.0001) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Saldo pinjaman supplier sudah habis.',
+                ]);
+            }
+            if ($poAvailable <= 0.0001) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Nilai PO sudah seluruhnya dialokasikan atau dibayar.',
+                ]);
+            }
+            if ($amount <= 0) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Nominal alokasi tidak valid.',
+                ]);
+            }
+
+            $paymentMethodId = (int) PaymentMethod::query()
+                ->where('code', 'LOAN_APPLY')
+                ->value('id');
+
+            if ($paymentMethodId <= 0) {
+                throw ValidationException::withMessages([
+                    'amount' => 'PaymentMethod code=LOAN_APPLY belum tersedia.',
+                ]);
+            }
+
+            $payment = PurchasePayment::create([
+                'purchase_order_id' => (int) $lockedOrder->id,
+                'supplier_loan_id' => (int) $loan->id,
+                'date' => $data['date'],
+                'payment_method_id' => $paymentMethodId,
+                'cash_account_id' => null,
+                'type' => 'loan_apply',
+                'amount' => $amount,
+                'ref_no' => null,
+                'notes' => $data['notes'] ?? 'Alokasi saldo pinjaman supplier ke PO',
+                'created_by' => (int) $request->user()->id,
+            ]);
+
+            $journal = $this->journalService->postPurchasePayment(
+                $payment->fresh(['purchaseOrder', 'cashAccount', 'paymentMethod', 'supplierLoan'])
+            );
+
+            if ($journal && empty($payment->journal_id) && ! empty($journal->id)) {
+                $payment->journal_id = (int) $journal->id;
+                $payment->save();
+            }
+
+            $this->recalcPaymentStatus($lockedOrder);
+        });
+
+        return back()->with('success', 'Saldo pinjaman supplier berhasil dialokasikan ke PO.');
     }
 
     // ======================================================================
@@ -510,7 +630,7 @@ class PurchasePaymentController extends Controller
 
         $agg = $order->activePayments()
             ->selectRaw("
-                COALESCE(SUM(CASE WHEN type IN ('dp', 'payment') THEN amount ELSE 0 END), 0) as paid
+                COALESCE(SUM(CASE WHEN type IN ('dp', 'loan_apply', 'payment') THEN amount ELSE 0 END), 0) as paid
             ")
             ->first();
 
@@ -521,6 +641,7 @@ class PurchasePaymentController extends Controller
             $order->payment_status = 'unpaid';
             $order->save();
             $order->evaluateAutoClose();
+
             return;
         }
 
@@ -545,7 +666,7 @@ class PurchasePaymentController extends Controller
         $order->paid_amount = $paid;
         $order->payment_status = $status;
         $order->save();
-        
+
         $order->evaluateAutoClose();
     }
 
@@ -613,7 +734,7 @@ class PurchasePaymentController extends Controller
 
     protected function validateCashAccount(?int $cashAccountId, string $mode): void
     {
-        if (!$cashAccountId) {
+        if (! $cashAccountId) {
             throw ValidationException::withMessages([
                 'cash_account_id' => $mode === 'cash'
                 ? 'Untuk CASH, wajib pilih akun 1101 (Kas).'
@@ -622,7 +743,7 @@ class PurchasePaymentController extends Controller
         }
 
         $acc = Account::query()->find($cashAccountId);
-        if (!$acc || (int) ($acc->is_cash ?? 0) !== 1) {
+        if (! $acc || (int) ($acc->is_cash ?? 0) !== 1) {
             throw ValidationException::withMessages([
                 'cash_account_id' => 'Akun yang dipilih bukan akun kas/bank.',
             ]);
@@ -636,7 +757,7 @@ class PurchasePaymentController extends Controller
             ]);
         }
 
-        if ($mode === 'transfer' && !in_array($code, self::TRANSFER_BANK_CODES, true)) {
+        if ($mode === 'transfer' && ! in_array($code, self::TRANSFER_BANK_CODES, true)) {
             throw ValidationException::withMessages([
                 'cash_account_id' => 'Untuk TRANSFER, pilih akun bank/ewallet: 1111/1112/1113/1114.',
             ]);
@@ -694,7 +815,7 @@ class PurchasePaymentController extends Controller
             return $selectedAccountId;
         }
 
-        if (!empty($pm->default_cash_account_id)) {
+        if (! empty($pm->default_cash_account_id)) {
             return (int) $pm->default_cash_account_id;
         }
 
@@ -722,12 +843,12 @@ class PurchasePaymentController extends Controller
     protected function syncInvoicePaymentStatus(int $invoiceId): void
     {
         // Guard: tabel supplier_invoices harus ada
-        if (!\Illuminate\Support\Facades\Schema::hasTable('supplier_invoices')) {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('supplier_invoices')) {
             return;
         }
 
         $invoice = SupplierInvoice::find($invoiceId);
-        if (!$invoice) {
+        if (! $invoice) {
             return;
         }
 
@@ -777,11 +898,13 @@ class PurchasePaymentController extends Controller
         if (strpos($value, ',') !== false) {
             $value = str_replace('.', '', $value);
             $value = str_replace(',', '.', $value);
+
             return (float) $value;
         }
 
         if (preg_match('/^\d{1,3}(\.\d{3})+$/', $value)) {
             $value = str_replace('.', '', $value);
+
             return (float) $value;
         }
 

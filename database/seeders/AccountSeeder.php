@@ -275,5 +275,12 @@ class AccountSeeder extends Seeder
                 'is_cash' => 0,
                 'is_active' => 1,
             ]);
+            DB::table('accounts')->updateOrInsert(['code' => '1306'], [
+                'code' => '1306',
+                'name' => 'Piutang Pinjaman Supplier',
+                'type' => 'asset',
+                'is_cash' => 0,
+                'is_active' => 1,
+            ]);
     }
 }

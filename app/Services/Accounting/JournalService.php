@@ -7,6 +7,7 @@ use App\Models\Journal;
 use App\Models\PurchasePayment;
 use App\Models\PurchaseReceipt;
 use App\Models\StockOpname;
+use App\Models\SupplierLoan;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -17,56 +18,111 @@ class JournalService
 {
     // ====== COA CODES ======
     public const CODE_AP = '2101'; // Hutang Dagang
+
     public const CODE_INV_RAW = '1201'; // Persediaan Bahan Baku
+
     public const CODE_INV_RM = self::CODE_INV_RAW;
+
     public const CODE_INV_WIP = '1202'; // Persediaan WIP
-    public const CODE_INV_FG  = '1203'; // Persediaan Barang Jadi
+
+    public const CODE_INV_FG = '1203'; // Persediaan Barang Jadi
+
     public const CODE_INV_DEFECT = '1204'; // Persediaan Barang Cacat
+
     public const CODE_INV_PACKAGING = '1205'; // Persediaan Packaging
+
     public const CODE_PAYABLE = self::CODE_AP;
+
     public const CODE_PAYROLL_PAYABLE = '2102';
+
     public const CODE_HPP = '5101'; // Harga Pokok Penjualan
+
     public const CODE_ADV_PURCHASE = '1151'; // Uang Muka Pembelian
+
     public const CODE_SUPPLIER_CLAIM = '1305'; // Piutang Supplier
+
+    public const CODE_SUPPLIER_LOAN = '1306'; // Piutang Pinjaman Supplier
+
     public const CODE_EXP_OPEX = '6101'; // Biaya Operasional Umum
+
     public const CODE_EXP_DAILY_PAYROLL = '6103'; // Biaya Gaji Operasional
+
     public const CODE_STOCK_VARIANCE = '6115'; // Selisih Stock Opname
+
     public const CODE_LEGACY_CORRECTION = '6116'; // Koreksi Persediaan Legacy (close as legacy)
+
     public const CODE_PRODUCTION_LOSS = '6120'; // Kerugian Produksi / Reject (scrap & write-off)
 
     // ====== SOURCE TYPES ======
     public const SRC_PURCHASE_PAYMENT = 'purchase_payment';
+
     public const SRC_GRN_ACCRUAL = 'purchase_receipt_post';
+
     public const SRC_GRN_ACCRUAL_INV = 'grn_inv';
+
     public const SRC_GRN_ACCRUAL_EXP = 'grn_exp';
+
     public const SRC_PURCHASE_RECEIPT = 'purchase_receipt';
+
     public const SRC_GRN_APPLY_DP = 'purchase_dp_apply';
+
     public const SRC_PURCHASE_RETURN = 'purchase_return_post';
+
     public const SRC_PURCHASE_RETURN_INV = 'purchase_return_inv';
+
     public const SRC_PURCHASE_RETURN_EXP = 'purchase_return_exp';
+
     public const SRC_FINISHING_JOB = 'finishing_job';
+
     public const SRC_FINISHING_BOM = 'finishing_bom';
+
     public const SRC_CUTTING_JOB = 'cutting_job';
+
     public const SRC_CUTTING_JOB_WAGE = 'cutting_job_wage';
+
     public const SRC_CUTTING_WIP = 'cutting_wip';
+
     public const SRC_SEWING_PICKUP = 'App\\Models\\SewingPickup';
+
     public const SRC_SEWING_PICKUP_WAGE = 'sewing_pickup_wage';
+
     public const SRC_SEWING_PICKUP_SUPPLY = 'sewing_pickup_supply';
+
     public const SRC_SEWING_PICKUP_SUPPLY_FOLLOWUP = 'sewing_pickup_supply_followup';
+
     public const SRC_SEWING_PICKUP_SUPPLY_VOID_LINE = 'sewing_pickup_supply_void_line';
+
     public const SRC_SEWING_RETURN_OK = 'sewing_return_ok';
+
     public const SRC_SEWING_RETURN_REJECT = 'sewing_return_reject';
+
     public const SRC_SEWING_REWORK_OK = 'sewing_reject_rework_ok';
+
     public const SRC_DEFECT_OPENING_BALANCE_CORRECTION = 'defect_opening_balance_correction';
+
     public const SRC_SHIPMENT_COGS = 'shipment_cogs';
+
     public const SRC_SHIPMENT_WAVE_COGS = 'shipment_wave_cogs';
+
     public const SRC_WIP_FIN_ADJUSTMENT = 'wip_fin_adjustment';
+
     public const SRC_INVENTORY_ADJUSTMENT = 'inventory_adjustment';
+
     public const SRC_WIP_NORMALIZATION = 'wip_normalization';
+
     public const SRC_WIP_CLEANUP = 'wip_cleanup';
+
     public const SRC_MARKETPLACE_SALE = 'marketplace_sale';
+
     public const SRC_MARKETPLACE_ESCROW = 'marketplace_escrow';
+
     public const SRC_MARKETPLACE_SETTLEMENT = 'marketplace_settlement';
+
+    public const SRC_SUPPLIER_LOAN = 'supplier_loan';
+
+    public const SRC_SUPPLIER_LOAN_REPAYMENT = 'supplier_loan_repayment';
+
+    public const SRC_SUPPLIER_LOAN_APPLY = 'supplier_loan_apply';
 
     // public const SRC_PO_EXPENSE_APPROVE = 'purchase_order_expense_approve';
 
@@ -102,7 +158,7 @@ class JournalService
             $totalCredit = 0.0;
 
             foreach ($lines as $i => $line) {
-                if (!isset($line['account_id'])) {
+                if (! isset($line['account_id'])) {
                     throw ValidationException::withMessages([
                         'journal' => "Line #{$i}: account_id wajib.",
                     ]);
@@ -215,7 +271,7 @@ class JournalService
 
             // 2) Deskripsi reversal
             $revDesc = trim(
-                'Reversal: ' . ($journal->description ?? '-') .
+                'Reversal: '.($journal->description ?? '-').
                 ($reason ? " | {$reason}" : '')
             );
 
@@ -257,7 +313,7 @@ class JournalService
                 ->lockForUpdate()
                 ->first();
 
-            if (!$j) {
+            if (! $j) {
                 return null;
             }
 
@@ -315,7 +371,7 @@ class JournalService
             }
 
             // anti double click: kalau sudah punya journal_id dan journal masih ada
-            if (!empty($payment->journal_id)) {
+            if (! empty($payment->journal_id)) {
                 $existing = Journal::query()->find((int) $payment->journal_id);
                 if ($existing) {
                     return $existing;
@@ -330,7 +386,7 @@ class JournalService
                 ->lockForUpdate()
                 ->first();
 
-            if ($locked && !empty($locked->journal_id)) {
+            if ($locked && ! empty($locked->journal_id)) {
                 $existing = Journal::query()->find((int) $locked->journal_id);
                 if ($existing) {
                     return $existing;
@@ -339,7 +395,6 @@ class JournalService
             }
 
             $advId = $this->accountIdByCode(self::CODE_ADV_PURCHASE);
-            $apId = $this->accountIdByCode(self::CODE_AP);
 
             $po = $payment->purchaseOrder;
             $poCode = $po?->code ?? '-';
@@ -357,6 +412,7 @@ class JournalService
 
             // dp_apply (tanpa kas/bank)
             if ($payment->type === 'dp_apply') {
+                $apId = $this->accountIdByCode(self::CODE_AP);
                 $journal = $this->post(
                     $date,
                     $sourceType,
@@ -369,6 +425,64 @@ class JournalService
                 );
 
                 $payment->forceFill(['journal_id' => $journal->id])->save();
+
+                return $journal;
+            }
+
+            // loan_apply: pindahkan sebagian saldo Piutang Pinjaman Supplier
+            // menjadi Uang Muka Pembelian pada PO, tanpa uang keluar lagi.
+            if ($payment->type === 'loan_apply') {
+                $loan = SupplierLoan::query()
+                    ->whereKey($payment->supplier_loan_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $loan) {
+                    throw ValidationException::withMessages([
+                        'supplier_loan_id' => 'Saldo pinjaman supplier tidak ditemukan.',
+                    ]);
+                }
+                if (! in_array($loan->status, ['posted', 'settled'], true)) {
+                    throw ValidationException::withMessages([
+                        'supplier_loan_id' => 'Pinjaman supplier harus POSTED sebelum dialokasikan ke PO.',
+                    ]);
+                }
+                if ((int) $loan->supplier_id !== (int) $po?->supplier_id) {
+                    throw ValidationException::withMessages([
+                        'supplier_loan_id' => 'Pinjaman supplier harus berasal dari supplier PO yang sama.',
+                    ]);
+                }
+
+                $repaid = (float) $loan->repayments()
+                    ->where('status', 'posted')
+                    ->sum('amount');
+                $allocated = (float) PurchasePayment::query()
+                    ->where('supplier_loan_id', $loan->id)
+                    ->where('type', 'loan_apply')
+                    ->whereNull('voided_at')
+                    ->sum('amount');
+                $available = max(0, (float) $loan->principal_amount - $repaid - $allocated);
+
+                if ($amount <= 0 || $amount > $available + 0.01) {
+                    throw ValidationException::withMessages([
+                        'payment' => 'Nominal alokasi melebihi saldo pinjaman supplier yang tersedia.',
+                    ]);
+                }
+
+                $journal = $this->post(
+                    $date,
+                    self::SRC_SUPPLIER_LOAN_APPLY,
+                    $sourceId,
+                    trim("Alokasi Pinjaman Supplier ke PO {$poCode}"),
+                    [
+                        ['account_id' => $advId, 'debit' => $amount, 'credit' => 0],
+                        ['account_id' => (int) $loan->receivable_account_id, 'debit' => 0, 'credit' => $amount],
+                    ],
+                    ['reference_no' => $payment->ref_no, 'notes' => $payment->notes, 'created_by' => $payment->created_by ?? auth()->id()],
+                );
+
+                $payment->forceFill(['journal_id' => $journal->id])->save();
+
                 return $journal;
             }
 
@@ -387,7 +501,7 @@ class JournalService
                 ]);
             }
 
-            if (!$payment->cash_account_id) {
+            if (! $payment->cash_account_id) {
                 throw ValidationException::withMessages([
                     'payment' => 'cash_account_id wajib untuk jurnal pembayaran (kas/bank).',
                 ]);
@@ -410,6 +524,7 @@ class JournalService
                 );
 
                 $payment->forceFill(['journal_id' => $journal->id])->save();
+
                 return $journal;
             }
 
@@ -426,16 +541,18 @@ class JournalService
             );
 
             $payment->forceFill(['journal_id' => $journal->id])->save();
+
             return $journal;
         });
     }
+
     public function postGrnSplit(PurchaseReceipt $grn): void
     {
         DB::transaction(function () use ($grn) {
 
             $grn->loadMissing(['order', 'lines']);
 
-            if (!$grn->order) {
+            if (! $grn->order) {
                 throw ValidationException::withMessages([
                     'grn' => 'GRN tidak punya PO.',
                 ]);
@@ -444,7 +561,7 @@ class JournalService
             $hasAlloc = Schema::hasColumn('purchase_receipt_lines', 'allocation');
             $hasExpAcc = Schema::hasColumn('purchase_receipt_lines', 'expense_account_id');
 
-            if (!$hasAlloc) {
+            if (! $hasAlloc) {
                 throw ValidationException::withMessages([
                     'grn' => 'purchase_receipt_lines.allocation belum ada. Tambahkan kolom allocation agar bisa split jurnal.',
                 ]);
@@ -478,7 +595,7 @@ class JournalService
 
             if ($expLines->count() > 0) {
 
-                if (!$hasExpAcc) {
+                if (! $hasExpAcc) {
                     throw ValidationException::withMessages([
                         'grn' => 'purchase_receipt_lines.expense_account_id belum ada. Tambahkan agar expense bisa dijurnal.',
                     ]);
@@ -547,7 +664,7 @@ class JournalService
             $grn->loadMissing(['order.paymentMethod']);
 
             $po = $grn->order ?? null;
-            if (!$po) {
+            if (! $po) {
                 throw ValidationException::withMessages([
                     'grn' => 'GRN tidak punya PO.',
                 ]);
@@ -556,7 +673,7 @@ class JournalService
             $mode = $this->detectPaymentModeFromMethod($po->paymentMethod);
 
             // sementara: accrual hutang hanya relevan kalau tempo/credit
-            if (!in_array($mode, ['credit', 'tempo'], true)) {
+            if (! in_array($mode, ['credit', 'tempo'], true)) {
                 return;
             }
 
@@ -586,12 +703,12 @@ class JournalService
             );
 
             // 2) Apply DP dari PO (hanya DP aktif)
-            if (!method_exists($po, 'activePayments')) {
+            if (! method_exists($po, 'activePayments')) {
                 return;
             }
 
             $dpTotal = (float) $po->activePayments()
-                ->where('type', 'dp')
+                ->whereIn('type', ['dp', 'loan_apply'])
                 ->sum('amount');
 
             if ($dpTotal <= 0.0001) {
@@ -648,8 +765,8 @@ class JournalService
             return null;
         }
 
-        $wipId    = $this->accountIdByCode(self::CODE_INV_WIP);
-        $fgId     = $this->accountIdByCode(self::CODE_INV_FG);
+        $wipId = $this->accountIdByCode(self::CODE_INV_WIP);
+        $fgId = $this->accountIdByCode(self::CODE_INV_FG);
         $defectId = $this->accountIdByCode(self::CODE_INV_DEFECT);
 
         $wipWarehouseId = (int) \App\Models\Warehouse::where('code', 'WIP-FIN')->value('id');
@@ -657,14 +774,14 @@ class JournalService
         // Aggregate lines per item_id (satu job bisa punya banyak lines item yang sama)
         $byItem = [];
         foreach ($job->lines as $line) {
-            $itemId    = (int) $line->item_id;
-            $qtyOk     = (int) round((float) ($line->qty_ok     ?? 0));
+            $itemId = (int) $line->item_id;
+            $qtyOk = (int) round((float) ($line->qty_ok ?? 0));
             $qtyReject = (int) round((float) ($line->qty_reject ?? 0));
 
-            if (!isset($byItem[$itemId])) {
+            if (! isset($byItem[$itemId])) {
                 $byItem[$itemId] = ['qty_ok' => 0, 'qty_reject' => 0];
             }
-            $byItem[$itemId]['qty_ok']     += $qtyOk;
+            $byItem[$itemId]['qty_ok'] += $qtyOk;
             $byItem[$itemId]['qty_reject'] += $qtyReject;
         }
 
@@ -681,19 +798,19 @@ class JournalService
             ->keyBy('item_id');
 
         $journalLines = [];
-        $totalWip     = 0.0;
+        $totalWip = 0.0;
 
         foreach ($byItem as $itemId => $agg) {
-            $qtyOk     = $agg['qty_ok'];
+            $qtyOk = $agg['qty_ok'];
             $qtyReject = $agg['qty_reject'];
-            $qtyUsed   = $qtyOk + $qtyReject;
+            $qtyUsed = $qtyOk + $qtyReject;
 
             if ($qtyUsed <= 0) {
                 continue;
             }
 
             $mut = $mutCosts->get($itemId);
-            if (!$mut || (float) $mut->total_cost <= 0) {
+            if (! $mut || (float) $mut->total_cost <= 0) {
                 continue; // tidak ada nilai → skip
             }
 
@@ -706,7 +823,7 @@ class JournalService
                 continue;
             }
 
-            $amountOk     = round($totalCost * ($qtyOk     / $mutQty), 2);
+            $amountOk = round($totalCost * ($qtyOk / $mutQty), 2);
             $amountReject = round($totalCost * ($qtyReject / $mutQty), 2);
 
             if ($amountOk > 0) {
@@ -879,7 +996,9 @@ class JournalService
             ->where('source_id', (int) $job->id)
             ->whereNull('voided_at')
             ->first();
-        if ($existing) return $existing;
+        if ($existing) {
+            return $existing;
+        }
 
         $job->loadMissing('bundles');
         $totalWage = 0.0;
@@ -933,7 +1052,9 @@ class JournalService
             ->where('source_id', $job->id)
             ->whereNull('voided_at')
             ->first();
-        if ($existing) return $existing;
+        if ($existing) {
+            return $existing;
+        }
 
         $rawCost = $this->mutationAmount(self::SRC_CUTTING_JOB, (int) $job->id, 'out');
         $okCost = $this->mutationAmount(self::SRC_CUTTING_WIP, (int) $job->id, 'in');
@@ -941,15 +1062,21 @@ class JournalService
         $outputCost = round($okCost + $rejectCost, 2);
         $laborCost = round($outputCost - $rawCost, 2);
 
-        if ($outputCost <= 0 || $rawCost <= 0 || $laborCost < -0.01) return null;
+        if ($outputCost <= 0 || $rawCost <= 0 || $laborCost < -0.01) {
+            return null;
+        }
         if (abs($laborCost) <= 0.01) {
             $rawCost = $outputCost;
             $laborCost = 0.0;
         }
 
         $lines = [];
-        if ($okCost > 0) $lines[] = ['account_id' => $this->accountIdByCode(self::CODE_INV_WIP), 'debit' => $okCost, 'credit' => 0];
-        if ($rejectCost > 0) $lines[] = ['account_id' => $this->accountIdByCode(self::CODE_INV_DEFECT), 'debit' => $rejectCost, 'credit' => 0];
+        if ($okCost > 0) {
+            $lines[] = ['account_id' => $this->accountIdByCode(self::CODE_INV_WIP), 'debit' => $okCost, 'credit' => 0];
+        }
+        if ($rejectCost > 0) {
+            $lines[] = ['account_id' => $this->accountIdByCode(self::CODE_INV_DEFECT), 'debit' => $rejectCost, 'credit' => 0];
+        }
         $lines[] = ['account_id' => $this->accountIdByCode(self::CODE_INV_WIP), 'debit' => 0, 'credit' => $rawCost];
         if ($laborCost > 0.01) {
             $lines[] = ['account_id' => $this->accountIdByCode(self::CODE_PAYROLL_PAYABLE), 'debit' => 0, 'credit' => $laborCost];
@@ -993,7 +1120,9 @@ class JournalService
             ->where('source_id', (int) $line->id)
             ->whereNull('voided_at')
             ->first();
-        if ($existing) return $existing;
+        if ($existing) {
+            return $existing;
+        }
 
         $line->loadMissing('sewingPickup');
 
@@ -1006,7 +1135,7 @@ class JournalService
 
         $pickup = $line->sewingPickup;
         $date = $pickup ? $this->dateOnly($pickup->date) : $this->dateOnly(now());
-        $code = $pickup?->code ?? ('Line #' . $line->id);
+        $code = $pickup?->code ?? ('Line #'.$line->id);
 
         return $this->post(
             $date,
@@ -1058,10 +1187,11 @@ class JournalService
     public function postSewingPickupSupplyFollowupByAdjustment(int $adjustmentId): ?Journal
     {
         $adjustment = \App\Models\InventoryAdjustment::query()->find($adjustmentId);
-        if (!$adjustment || $adjustment->reference_type !== \App\Models\SewingPickup::class) {
+        if (! $adjustment || $adjustment->reference_type !== \App\Models\SewingPickup::class) {
             return null;
         }
         $pickup = \App\Models\SewingPickup::query()->find($adjustment->reference_id);
+
         return $pickup ? $this->postSewingPickupSupplyFollowup($adjustment, $pickup) : null;
     }
 
@@ -1087,20 +1217,25 @@ class JournalService
             ->where('source_id', (int) $line->id)
             ->whereNull('voided_at')
             ->first();
-        if ($existing) return $existing;
+        if ($existing) {
+            return $existing;
+        }
 
         $materialUnitCost = max((float) $line->unit_cost - (float) ($line->wage_per_pcs ?? 0), 0);
         if ($materialUnitCost <= 0) {
             $materialUnitCost = (float) $line->unit_cost;
         }
         $materialCost = round($materialUnitCost * (float) $line->qty_bundle, 2);
-        if ($materialCost <= 0) return null;
+        if ($materialCost <= 0) {
+            return null;
+        }
 
         $pickup = \App\Models\SewingPickup::find($line->sewing_pickup_id);
-        $date   = $pickup ? $this->dateOnly($pickup->date) : $this->dateOnly(now());
-        $desc   = "VOID Line Ambil Jahit" . ($pickup ? " {$pickup->code}" : '') . " — Line #{$line->id}";
+        $date = $pickup ? $this->dateOnly($pickup->date) : $this->dateOnly(now());
+        $desc = 'VOID Line Ambil Jahit'.($pickup ? " {$pickup->code}" : '')." — Line #{$line->id}";
 
         $wipId = $this->accountIdByCode(self::CODE_INV_WIP);
+
         return $this->post($date, 'sewing_pickup_line_void', (int) $line->id, $desc, [
             ['account_id' => $wipId, 'debit' => $materialCost, 'credit' => 0],
             ['account_id' => $wipId, 'debit' => 0, 'credit' => $materialCost],
@@ -1374,7 +1509,7 @@ class JournalService
             $this->dateOnly($wave->shipment?->date),
             self::SRC_SHIPMENT_WAVE_COGS,
             (int) $wave->id,
-            'COGS Gelombang ' . $wave->code,
+            'COGS Gelombang '.$wave->code,
             array_merge([
                 [
                     'account_id' => $hppId,
@@ -1423,7 +1558,9 @@ class JournalService
             ->where('source_id', $adjustment->id)
             ->whereNull('voided_at')
             ->first();
-        if ($existing) return $existing;
+        if ($existing) {
+            return $existing;
+        }
 
         $rows = DB::table('inventory_mutations as im')
             ->join('items as i', 'i.id', '=', 'im.item_id')
@@ -1438,14 +1575,18 @@ class JournalService
             ->groupBy('i.item_role', 'im.direction')
             ->selectRaw('COALESCE(i.item_role,"raw_material") item_role, im.direction, SUM(ABS(im.total_cost)) amount')
             ->get();
-        if ($rows->isEmpty()) return null;
+        if ($rows->isEmpty()) {
+            return null;
+        }
 
         $lines = [];
         $totalIn = 0.0;
         $totalOut = 0.0;
         foreach ($rows as $row) {
             $amount = round((float) $row->amount, 2);
-            if ($amount <= 0) continue;
+            if ($amount <= 0) {
+                continue;
+            }
             $accountId = $this->accountIdByCode($this->inventoryAccountCodeForRole((string) $row->item_role));
             if ($row->direction === 'in') {
                 $lines[] = ['account_id' => $accountId, 'debit' => $amount, 'credit' => 0];
@@ -1457,9 +1598,15 @@ class JournalService
         }
 
         $varianceId = $this->accountIdByCode(self::CODE_STOCK_VARIANCE);
-        if ($totalOut > 0) $lines[] = ['account_id' => $varianceId, 'debit' => round($totalOut, 2), 'credit' => 0];
-        if ($totalIn > 0) $lines[] = ['account_id' => $varianceId, 'debit' => 0, 'credit' => round($totalIn, 2)];
-        if (count($lines) < 2) return null;
+        if ($totalOut > 0) {
+            $lines[] = ['account_id' => $varianceId, 'debit' => round($totalOut, 2), 'credit' => 0];
+        }
+        if ($totalIn > 0) {
+            $lines[] = ['account_id' => $varianceId, 'debit' => 0, 'credit' => round($totalIn, 2)];
+        }
+        if (count($lines) < 2) {
+            return null;
+        }
 
         return $this->post(
             $this->dateOnly($adjustment->date),
@@ -1502,7 +1649,7 @@ class JournalService
             return $existing;
         }
 
-        $wipId  = $this->accountIdByCode(self::CODE_INV_WIP);
+        $wipId = $this->accountIdByCode(self::CODE_INV_WIP);
         $opexId = $this->accountIdByCode(self::CODE_EXP_OPEX);
 
         // Ambil total nilai dari inventory_mutations
@@ -1516,8 +1663,8 @@ class JournalService
         }
 
         $amount = round($amount, 2);
-        $type   = strtolower($adj->type ?? 'out');
-        $desc   = "Adj WIP {$adj->code} ({$type})";
+        $type = strtolower($adj->type ?? 'out');
+        $desc = "Adj WIP {$adj->code} ({$type})";
 
         if ($type === 'in') {
             // WIP bertambah: Dr WIP / Cr Opex
@@ -1587,14 +1734,14 @@ class JournalService
             return $existing;
         }
 
-        $totalIn  = $this->mutationAmount(self::SRC_WIP_NORMALIZATION, (int) $adjustment->id, 'in');
+        $totalIn = $this->mutationAmount(self::SRC_WIP_NORMALIZATION, (int) $adjustment->id, 'in');
         $totalOut = $this->mutationAmount(self::SRC_WIP_NORMALIZATION, (int) $adjustment->id, 'out');
 
         if ($totalIn <= 0 && $totalOut <= 0) {
             return null; // tidak ada nilai → tidak ada jurnal (mis. item tanpa cost)
         }
 
-        $wipId      = $this->accountIdByCode(self::CODE_INV_WIP);
+        $wipId = $this->accountIdByCode(self::CODE_INV_WIP);
         $varianceId = $this->accountIdByCode(self::CODE_STOCK_VARIANCE);
 
         $lines = [];
@@ -1654,10 +1801,10 @@ class JournalService
         }
 
         $debitCode = match ($adjustment->action) {
-            \App\Models\InventoryAdjustment::ACTION_WRITE_OFF    => self::CODE_PRODUCTION_LOSS,   // 6120
+            \App\Models\InventoryAdjustment::ACTION_WRITE_OFF => self::CODE_PRODUCTION_LOSS,   // 6120
             \App\Models\InventoryAdjustment::ACTION_CLOSE_LEGACY => self::CODE_LEGACY_CORRECTION, // 6116
-            \App\Models\InventoryAdjustment::ACTION_REJECT       => self::CODE_INV_DEFECT,        // 1204
-            \App\Models\InventoryAdjustment::ACTION_FINISH       => self::CODE_INV_FG,            // 1203
+            \App\Models\InventoryAdjustment::ACTION_REJECT => self::CODE_INV_DEFECT,        // 1204
+            \App\Models\InventoryAdjustment::ACTION_FINISH => self::CODE_INV_FG,            // 1203
             default => null, // move / keep_open → nilai tetap di WIP, tanpa jurnal
         };
         if ($debitCode === null) {
@@ -1760,11 +1907,15 @@ class JournalService
             ->where('source_id', $journalSourceId)
             ->whereNull('voided_at')
             ->first();
-        if ($existing) return $existing;
+        if ($existing) {
+            return $existing;
+        }
 
         $outCost = $this->mutationAmount($mutationSourceType, $mutationSourceId, 'out');
         $inCost = $this->mutationAmount($mutationSourceType, $mutationSourceId, 'in');
-        if ($outCost <= 0 && $inCost <= 0) return null;
+        if ($outCost <= 0 && $inCost <= 0) {
+            return null;
+        }
 
         $baseCost = $outCost > 0 ? $outCost : $inCost;
         $laborCost = round(max($inCost - $outCost, 0), 2);
@@ -1970,7 +2121,7 @@ class JournalService
             ->where('is_active', 1)
             ->first();
 
-        if (!$acc) {
+        if (! $acc) {
             throw ValidationException::withMessages([
                 'account' => "Account code {$code} tidak ditemukan / tidak aktif.",
             ]);
@@ -1981,7 +2132,7 @@ class JournalService
 
     protected function detectPaymentModeFromMethod($pm): string
     {
-        if (!$pm) {
+        if (! $pm) {
             return 'unknown';
         }
 
@@ -2011,7 +2162,7 @@ class JournalService
     protected function ensureAccountIsCash(int $accountId): void
     {
         $acc = Account::query()->whereKey($accountId)->first();
-        if (!$acc) {
+        if (! $acc) {
             throw ValidationException::withMessages([
                 'account' => "Account id {$accountId} tidak ditemukan.",
             ]);

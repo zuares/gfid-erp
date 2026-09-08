@@ -162,12 +162,15 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         $dpTotal = (float) ($dpTotal ?? 0); // type=dp
         // Total uang yang sudah dibayarkan ke supplier. dp_apply tidak
         // dihitung lagi karena hanya memindahkan pencatatan DP ke hutang.
-        $paidAmount = round($paidPaymentTotal + $dpTotal, 2);
+        $loanAppliedTotal = (float) ($loanAppliedTotal ?? 0);
+        $paidAmount = round($paidPaymentTotal + $dpTotal + $loanAppliedTotal, 2);
 
         // DP APPLY total (buat UI)
         $dpAppliedTotal =
             (float) ($dpAppliedTotal ?? ($order->activePayments()?->where('type', 'dp_apply')->sum('amount') ?? 0));
         $dpAvailable = \App\Models\PurchaseOrder::normalizePaymentRemainder($dpTotal - $dpAppliedTotal);
+        $advanceTotal = round($dpTotal + $loanAppliedTotal, 2);
+        $advanceAvailable = \App\Models\PurchaseOrder::normalizePaymentRemainder($advanceTotal - $dpAppliedTotal);
 
         // outstanding hutang (should include dp_apply)
         $apOutstanding = \App\Models\PurchaseOrder::normalizePaymentRemainder(
@@ -234,10 +237,10 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         // hutang AP sudah nol? Status paid saja tidak cukup karena DP juga
         // membuat payment_status menjadi paid.
         $apUiStatus = match (true) {
-            $hasAp && $apOutstanding > 0.0001 && $dpAvailable > 0.0001 => 'awaiting_offset',
+            $hasAp && $apOutstanding > 0.0001 && $advanceAvailable > 0.0001 => 'awaiting_offset',
             $hasAp && $apOutstanding > 0.0001 => 'ap_outstanding',
             $hasAp => 'ap_paid',
-            $dpTotal > 0.0001 => 'dp_recorded',
+            $advanceTotal > 0.0001 => 'dp_recorded',
             default => $payStatus,
         };
         $payBadgeClass = match ($apUiStatus) {
@@ -299,6 +302,12 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
     <span class="po-pill po-status {{ $statusBadgeClass }}">{{ $statusLabel }}</span>
     @if ($canSeeMoney)
         <span class="po-pill {{ $payBadgeClass }}">{{ $payStatusLabel }}</span>
+    @endif
+    @if ($canManagePayments && ($canApplySupplierLoan ?? false))
+        <button type="button" class="po-btn po-info" data-bs-toggle="modal" data-bs-target="#modalApplySupplierLoan" title="Alokasikan saldo pinjaman supplier ke PO">
+            <i class="bi bi-person-check d-inline-block d-md-none"></i>
+            <span class="d-none d-md-inline">Alokasi Pinjaman</span>
+        </button>
     @endif
     
     @if ($order->isLocked())
@@ -768,6 +777,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                     $typeLabel = match ($type) {
                                         'dp' => 'DP',
                                         'dp_apply' => 'Offset DP ke AP',
+                                        'loan_apply' => 'Alokasi Pinjaman Supplier',
                                         'return_apply' => 'Retur',
                                         default => 'Pelunasan',
                                     };
@@ -780,7 +790,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                         <div class="po-muted" style="font-size:.7rem;">{{ $p->paymentMethod?->name ?? '-' }}</div>
                                     </td>
                                     <td class="po-r" style="font-weight:700;">
-                                        @if(in_array($type, ['dp_apply','return_apply']))
+                                        @if(in_array($type, ['dp_apply','loan_apply','return_apply']))
                                             <span style="color:#d97706;">{{ rupiah($p->amount) }}</span>
                                         @else
                                             <span style="color:#15803d;">{{ rupiah($p->amount) }}</span>
@@ -1093,6 +1103,78 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
     </div>
 
     {{-- =========================================================
+    MODAL: ALOKASI PINJAMAN SUPPLIER
+========================================================= --}}
+    @if ($canApplySupplierLoan ?? false)
+    <div class="modal fade" id="modalApplySupplierLoan" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form method="POST" action="{{ route('purchasing.purchase_orders.payments.apply_supplier_loan', $order->id) }}"
+                class="modal-content gf-modal" id="applySupplierLoanForm">
+                @csrf
+                <div class="modal-header">
+                    <div>
+                        <h6 class="modal-title fw-semibold mb-0">Alokasi Pinjaman Supplier</h6>
+                        <div class="d-flex gap-1 flex-wrap mt-2">
+                            <span class="modal-kpi">Sisa PO <strong class="mono">{{ rupiah($poAllocationRemaining) }}</strong></span>
+                            <span class="modal-kpi">Maks. alokasi <strong class="mono">{{ rupiah($maxSupplierLoanApply) }}</strong></span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info py-2 px-3 mb-3 small">
+                        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                        Alokasi ini tidak mengeluarkan uang baru. Jurnalnya memindahkan
+                        <b>Piutang Pinjaman Supplier</b> menjadi <b>Uang Muka Pembelian</b>.
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small fw-semibold">Tanggal</label>
+                            <input type="text" name="date" class="form-control form-control-sm gf-date-input"
+                                value="{{ old('date', $order->date?->toDateString() ?? now()->toDateString()) }}" data-gf-date
+                                autocomplete="off" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-semibold">Nominal Alokasi</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">Rp</span>
+                                <input type="text" name="amount" class="form-control mono" id="applySupplierLoanAmount"
+                                    placeholder="0" value="{{ old('amount') }}" required>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnFillMaxSupplierLoan">Max</button>
+                            </div>
+                            <div class="form-text small" id="supplierLoanMaxHint">Pilih pinjaman terlebih dahulu.</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Saldo Pinjaman</label>
+                            <select name="supplier_loan_id" id="supplierLoanSelect" class="form-select form-select-sm" required>
+                                <option value="">— Pilih pinjaman supplier —</option>
+                                @foreach ($supplierLoanOptions as $loanOption)
+                                    <option value="{{ $loanOption->id }}" data-available="{{ (float) $loanOption->allocation_available }}"
+                                        @selected(old('supplier_loan_id') == $loanOption->id)>
+                                        {{ optional($loanOption->date)->format('d/m/Y') }}
+                                        @if($loanOption->reference) · {{ $loanOption->reference }} @endif
+                                        — tersedia {{ rupiah($loanOption->allocation_available) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Catatan <span class="text-muted fw-normal">(opsional)</span></label>
+                            <input type="text" name="notes" class="form-control form-control-sm" maxlength="255"
+                                value="{{ old('notes') }}" placeholder="Contoh: Alokasi sebagian pinjaman ke PO ini">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-sm btn-info text-white">Alokasikan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    @endif
+
+    {{-- =========================================================
     MODAL: VOID PAYMENT + REASON
 ========================================================= --}}
     <div class="modal fade" id="modalVoidPayment" tabindex="-1" aria-hidden="true">
@@ -1359,6 +1441,66 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                     }
 
                     applyDpForm.dataset.confirmed = '1';
+                });
+
+                // =========================================================
+                // APPLY SUPPLIER LOAN modal helpers
+                // =========================================================
+                const supplierLoanSelect = document.getElementById('supplierLoanSelect');
+                const applySupplierLoanAmount = document.getElementById('applySupplierLoanAmount');
+                const btnFillMaxSupplierLoan = document.getElementById('btnFillMaxSupplierLoan');
+                const supplierLoanMaxHint = document.getElementById('supplierLoanMaxHint');
+                const applySupplierLoanForm = document.getElementById('applySupplierLoanForm');
+                const poAllocationRemaining = {{ (float) ($poAllocationRemaining ?? 0) }};
+
+                function selectedSupplierLoanMax() {
+                    const opt = supplierLoanSelect?.selectedOptions?.[0];
+                    const available = Number(opt?.dataset?.available || 0);
+                    return Math.min(available, poAllocationRemaining);
+                }
+
+                function syncSupplierLoanMax() {
+                    const max = selectedSupplierLoanMax();
+                    if (supplierLoanMaxHint) {
+                        supplierLoanMaxHint.textContent = max > paymentTolerance
+                            ? 'Maksimal alokasi: Rp ' + fmtMoneyInput(max)
+                            : 'Saldo pinjaman atau sisa PO sudah 0.';
+                    }
+                    if (btnFillMaxSupplierLoan) btnFillMaxSupplierLoan.disabled = max <= paymentTolerance;
+                }
+
+                supplierLoanSelect?.addEventListener('change', syncSupplierLoanMax);
+                syncSupplierLoanMax();
+
+                btnFillMaxSupplierLoan?.addEventListener('click', function() {
+                    if (!applySupplierLoanAmount) return;
+                    applySupplierLoanAmount.value = fmtMoneyInput(selectedSupplierLoanMax());
+                    applySupplierLoanAmount.focus();
+                    applySupplierLoanAmount.select?.();
+                });
+
+                applySupplierLoanAmount?.addEventListener('focusout', function() {
+                    const raw = (applySupplierLoanAmount.value || '').toString().trim();
+                    if (raw === '') return;
+                    const n = Number(raw.replace(/\./g, '').replace(/,/g, '.'));
+                    if (!isNaN(n)) applySupplierLoanAmount.value = fmtMoneyInput(n);
+                });
+
+                applySupplierLoanForm?.addEventListener('submit', function(event) {
+                    const raw = (applySupplierLoanAmount?.value || '').toString().trim();
+                    const amount = Number(raw.replace(/\./g, '').replace(/,/g, '.'));
+                    const max = selectedSupplierLoanMax();
+                    if (!Number.isFinite(amount) || amount <= 0 || amount > max + paymentTolerance) {
+                        event.preventDefault();
+                        window.alert('Nominal melebihi maksimum alokasi Rp ' + fmtMoneyInput(max) + '.');
+                        return;
+                    }
+                    if (!window.confirm(
+                        'Alokasikan Rp ' + fmtMoneyInput(amount) + ' dari saldo pinjaman supplier ke PO ini?\n\n' +
+                        'Tidak ada uang baru yang keluar.'
+                    )) {
+                        event.preventDefault();
+                    }
                 });
 
                 // =========================================================

@@ -43,5 +43,14 @@ class PaymentMethodSeeder extends Seeder
                 'is_active' => 1,
                 'default_cash_account_id' => null,
             ]);
+            DB::table('payment_methods')->updateOrInsert(['code' => 'LOAN_APPLY'], [
+                'code' => 'LOAN_APPLY',
+                'name' => 'Alokasi Pinjaman Supplier',
+                'mode' => 'credit',
+                'description' => 'Alokasi saldo pinjaman supplier menjadi uang muka PO',
+                'sort_order' => 91,
+                'is_active' => 1,
+                'default_cash_account_id' => null,
+            ]);
     }
 }

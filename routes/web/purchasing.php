@@ -94,6 +94,8 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
 
             Route::post('purchase-orders/{purchase_order}/apply-dp', [PurchasePaymentController::class, 'applyDp'])
                 ->name('purchase_orders.payments.apply_dp');
+            Route::post('purchase-orders/{purchase_order}/apply-supplier-loan', [PurchasePaymentController::class, 'applySupplierLoan'])
+                ->name('purchase_orders.payments.apply_supplier_loan');
 
             // GRN
             // Draft GRN boleh dibuat oleh user purchasing; perubahan, hapus,

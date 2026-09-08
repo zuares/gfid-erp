@@ -12,6 +12,7 @@ use App\Http\Controllers\Accounting\MarketplacePayoutController;
 use App\Http\Controllers\Accounting\OpeningBalanceBatchController;
 use App\Http\Controllers\Accounting\OpeningBalanceController;
 use App\Http\Controllers\Accounting\SupplierApOpeningBalanceController;
+use App\Http\Controllers\Accounting\SupplierLoanController;
 use App\Http\Controllers\Accounting\ProductionJournalAuditController;
 use App\Http\Controllers\Accounting\ProductionValueReportController;
 use App\Http\Controllers\Accounting\ProfitLossController;
@@ -54,6 +55,16 @@ Route::middleware(['auth', 'access:accounting'])->prefix('accounting')->name('ac
     Route::post('loans/{loan}/repayments', [LoanController::class, 'storeRepayment'])->name('loans.repayments.store');
     Route::post('loan-repayments/{repayment}/post', [LoanController::class, 'postRepayment'])->name('loans.repayments.post');
     Route::post('loan-repayments/{repayment}/void', [LoanController::class, 'voidRepayment'])->name('loans.repayments.void');
+
+    // Dana yang dipinjamkan ke supplier: Dr Piutang Supplier / Cr Kas-Bank.
+    Route::resource('supplier-loans', SupplierLoanController::class)->only([
+        'index', 'create', 'store', 'show', 'edit', 'update', 'destroy',
+    ]);
+    Route::post('supplier-loans/{supplierLoan}/post', [SupplierLoanController::class, 'post'])->name('supplier-loans.post');
+    Route::post('supplier-loans/{supplierLoan}/void', [SupplierLoanController::class, 'void'])->name('supplier-loans.void');
+    Route::post('supplier-loans/{supplierLoan}/repayments', [SupplierLoanController::class, 'storeRepayment'])->name('supplier-loans.repayments.store');
+    Route::post('supplier-loan-repayments/{repayment}/post', [SupplierLoanController::class, 'postRepayment'])->name('supplier-loans.repayments.post');
+    Route::post('supplier-loan-repayments/{repayment}/void', [SupplierLoanController::class, 'voidRepayment'])->name('supplier-loans.repayments.void');
 
     // ✅ Cash/Bank Transfers
     Route::resource('cash-transfers', CashTransferController::class);

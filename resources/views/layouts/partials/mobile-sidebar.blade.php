@@ -408,6 +408,7 @@
     $hasCashExpensesIndex = $router->has('accounting.cash-expenses.index');
     $hasCashBasisReportIndex = $router->has('accounting.cash-basis-report.index');
     $hasCashReceiptsIndex = $router->has('accounting.cash-receipts.index');
+    $hasSupplierLoansIndex = $router->has('accounting.supplier-loans.index');
     $hasCashTransfersIndex = $router->has('accounting.cash-transfers.index');
     $hasMarketplacePayoutsIndex = !$isAdmin && $router->has('accounting.marketplace-payouts.index');
     $hasApReportIndex           = $router->has('accounting.ap-report.index');
@@ -497,7 +498,7 @@
         $hasAccountingIndex = $hasCashBasisReportIndex = $hasCashReceiptsIndex = false;
         $hasJournalsIndex = $hasAccountsIndex = $hasOpeningBalancesIndex = false;
         $hasOpeningBalancesBatchIndex = $hasCashTransfersIndex = false;
-        $hasSupplierApOpeningsIndex = false;
+        $hasSupplierApOpeningsIndex = $hasSupplierLoansIndex = false;
     }
 
     if (!$canModule('payroll')) {
@@ -597,6 +598,7 @@
         request()->routeIs('accounting.cash-receipts.*') ||
         request()->routeIs('accounting.marketplace-payouts.*') ||
         request()->routeIs('accounting.cash-transfers.*') ||
+        request()->routeIs('accounting.supplier-loans.*') ||
         request()->routeIs('accounting.opening-balances.*') ||
         request()->routeIs('accounting.opening-balances-batch.*') ||
         request()->routeIs('accounting.supplier-ap-openings.*') ||
@@ -1247,7 +1249,7 @@
                     @endif
 
                     {{-- Keuangan (admin / operating) --}}
-                    @if ($hasAccountingIndex || $hasCashExpensesIndex || $hasCashTransfersIndex || $hasCashReceiptsIndex || $hasCashBasisReportIndex || $hasJournalsIndex || $hasAccountsIndex || $hasOpeningBalancesIndex || $hasOpeningBalancesBatchIndex || $hasSupplierApOpeningsIndex)
+                    @if ($hasAccountingIndex || $hasCashExpensesIndex || $hasCashTransfersIndex || $hasCashReceiptsIndex || $hasSupplierLoansIndex || $hasCashBasisReportIndex || $hasJournalsIndex || $hasAccountsIndex || $hasOpeningBalancesIndex || $hasOpeningBalancesBatchIndex || $hasSupplierApOpeningsIndex)
                         <div class="mobile-sidebar-section-label">Keuangan</div>
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $accountingOpen ? 'is-open' : '' }}"
@@ -1294,6 +1296,11 @@
                                 @if ($hasCashReceiptsIndex)
                                     <a href="{{ route('accounting.cash-receipts.index') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.cash-receipts.*') ? 'active' : '' }}">
                                         <span class="icon">💰</span><span>Penerimaan Kas</span>
+                                    </a>
+                                @endif
+                                @if ($hasSupplierLoansIndex)
+                                    <a href="{{ route('accounting.supplier-loans.index') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.supplier-loans.*') ? 'active' : '' }}">
+                                        <span class="icon">🤝</span><span>Dana Supplier</span>
                                     </a>
                                 @endif
                                 @if ($hasJournalsIndex)
@@ -2328,6 +2335,13 @@
                                 <a href="{{ route('accounting.cash-receipts.index') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.cash-receipts.*') ? 'active' : '' }}">
                                     <span class="icon">💰</span><span>Penerimaan Kas</span>
+                                </a>
+                            @endif
+
+                            @if ($hasSupplierLoansIndex)
+                                <a href="{{ route('accounting.supplier-loans.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.supplier-loans.*') ? 'active' : '' }}">
+                                    <span class="icon">🤝</span><span>Dana Supplier</span>
                                 </a>
                             @endif
 

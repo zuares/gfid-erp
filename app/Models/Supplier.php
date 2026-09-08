@@ -38,6 +38,11 @@ class Supplier extends Model
         return $this->hasMany(PurchaseOrder::class);
     }
 
+    public function supplierLoans()
+    {
+        return $this->hasMany(SupplierLoan::class);
+    }
+
     /**
      * Harga historis per item di supplier ini.
      */

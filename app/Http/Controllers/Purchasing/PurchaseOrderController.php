@@ -11,11 +11,12 @@ use App\Models\PurchasePayment;
 use App\Models\PurchaseReceiptLine;
 use App\Models\PurchaseReturn;
 use App\Models\Supplier;
+use App\Models\SupplierLoan;
 use App\Models\WhatsAppMessage;
 use App\Services\Accounting\JournalService;
 use App\Services\Purchasing\PurchaseOrderService;
-use App\Services\WhatsApp\WhatsAppMessageService;
 use App\Services\WhatsApp\PurchaseOrderWhatsAppMessageBuilder;
+use App\Services\WhatsApp\WhatsAppMessageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -52,11 +53,13 @@ class PurchaseOrderController extends Controller
 
         if ($sortCol === 'supplier_id') {
             $q->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_orders.supplier_id')
-              ->orderBy('suppliers.name', $sortDir)
-              ->select('purchase_orders.*');
+                ->orderBy('suppliers.name', $sortDir)
+                ->select('purchase_orders.*');
         } else {
             $q->orderBy($sortCol, $sortDir);
-            if ($sortCol !== 'id') $q->orderByDesc('purchase_orders.id');
+            if ($sortCol !== 'id') {
+                $q->orderByDesc('purchase_orders.id');
+            }
         }
 
         if ($request->filled('supplier_id')) {
@@ -66,8 +69,8 @@ class PurchaseOrderController extends Controller
         if ($request->filled('supplier_search')) {
             $term = (string) $request->supplier_search;
             $q->whereHas('supplier', function ($s) use ($term) {
-                $s->where('name', 'like', '%' . $term . '%')
-                    ->orWhere('code', 'like', '%' . $term . '%');
+                $s->where('name', 'like', '%'.$term.'%')
+                    ->orWhere('code', 'like', '%'.$term.'%');
             });
         }
 
@@ -94,12 +97,12 @@ class PurchaseOrderController extends Controller
         if ($request->filled('q')) {
             $term = (string) $request->q;
             $q->where(function ($sub) use ($term) {
-                $sub->where('code', 'like', '%' . $term . '%');
+                $sub->where('code', 'like', '%'.$term.'%');
             });
         }
 
         $summaryQuery = clone $q;
-        
+
         $grandTotalQuery = clone $summaryQuery;
         if ($request->status !== 'cancelled') {
             $grandTotalQuery->where('status', '!=', 'cancelled');
@@ -117,8 +120,6 @@ class PurchaseOrderController extends Controller
 
         $orders = $q->paginate(15)->withQueryString();
 
-
-
         $suppliers = Supplier::orderBy('name')->get();
 
         return view('purchasing.purchase_orders.index', compact('orders', 'suppliers', 'summary', 'sortCol', 'sortDir'));
@@ -130,7 +131,7 @@ class PurchaseOrderController extends Controller
      */
     public function create(Request $request)
     {
-        $order = new PurchaseOrder();
+        $order = new PurchaseOrder;
         $order->date = now()->toDateString();
         $order->tax_percent = 11;
         $order->discount = 0;
@@ -182,7 +183,7 @@ class PurchaseOrderController extends Controller
             ->orderBy('code')
             ->get();
 
-        $lines  = collect();
+        $lines = collect();
         $fromPr = null; // PR-D: null by default
 
         // PR-D: Pre-fill dari Purchase Request jika from_pr dikirim
@@ -193,31 +194,32 @@ class PurchaseOrderController extends Controller
                 $fromPr = $pr;
 
                 // Pre-fill supplier
-                if ($pr->supplier_id && !$request->filled('supplier_id')) {
+                if ($pr->supplier_id && ! $request->filled('supplier_id')) {
                     $order->supplier_id = $pr->supplier_id;
                 }
 
                 // Build lines dari PR (format compatible dengan _form.blade.php)
                 $prLinesMapped = $pr->lines->map(function ($prLine) {
                     $item = $prLine->item;
+
                     return [
-                        'item_id'             => $prLine->item_id,
-                        'item'                => $item ? [
-                            'id'                         => $item->id,
-                            'code'                       => $item->code,
-                            'name'                       => $item->name,
-                            'unit'                       => $item->unit,
-                            'stock_unit'                 => $item->stockUnit(),
-                            'purchase_unit'              => $item->purchaseUnit(),
-                            'purchase_conversion_factor'=> $item->purchaseConversionFactor(),
-                            'default_allocation'         => $item->default_allocation ?? 'hpp',
+                        'item_id' => $prLine->item_id,
+                        'item' => $item ? [
+                            'id' => $item->id,
+                            'code' => $item->code,
+                            'name' => $item->name,
+                            'unit' => $item->unit,
+                            'stock_unit' => $item->stockUnit(),
+                            'purchase_unit' => $item->purchaseUnit(),
+                            'purchase_conversion_factor' => $item->purchaseConversionFactor(),
+                            'default_allocation' => $item->default_allocation ?? 'hpp',
                             'default_expense_account_id' => $item->default_expense_account_id ?? null,
                         ] : null,
-                        'qty'                 => $prLine->qty,
-                        'unit_price'          => $prLine->unit_price ?? 0,
-                        'discount'            => 0,
-                        'allocation'          => $item->default_allocation ?? 'hpp',
-                        'expense_account_id'  => $item->default_expense_account_id ?? '',
+                        'qty' => $prLine->qty,
+                        'unit_price' => $prLine->unit_price ?? 0,
+                        'discount' => 0,
+                        'allocation' => $item->default_allocation ?? 'hpp',
+                        'expense_account_id' => $item->default_expense_account_id ?? '',
                     ];
                 });
 
@@ -226,24 +228,24 @@ class PurchaseOrderController extends Controller
                 }
 
                 // PR notes sebagai referensi di PO notes
-                if (!empty($pr->notes)) {
-                    $order->notes = '[PR: ' . $pr->code . '] ' . $pr->notes;
+                if (! empty($pr->notes)) {
+                    $order->notes = '[PR: '.$pr->code.'] '.$pr->notes;
                 } else {
-                    $order->notes = '[PR: ' . $pr->code . ']';
+                    $order->notes = '[PR: '.$pr->code.']';
                 }
             }
         }
 
         return view('purchasing.purchase_orders.create', [
-            'order'          => $order,
-            'suppliers'      => $suppliers,
+            'order' => $order,
+            'suppliers' => $suppliers,
             'paymentMethods' => $paymentMethods,
-            'items'          => $items,
-            'lines'          => $lines,
-            'cashAccounts'   => $cashAccounts,
-            'expenseAccounts'=> $expenseAccounts,
-            'orderType'      => $orderType,
-            'fromPr'         => $fromPr, // PR-D: null atau PurchaseRequest model
+            'items' => $items,
+            'lines' => $lines,
+            'cashAccounts' => $cashAccounts,
+            'expenseAccounts' => $expenseAccounts,
+            'orderType' => $orderType,
+            'fromPr' => $fromPr, // PR-D: null atau PurchaseRequest model
         ]);
     }
 
@@ -257,8 +259,8 @@ class PurchaseOrderController extends Controller
         // ==========================================
         // IDEMPOTENCY CHECK
         // ==========================================
-        if (!$request->input('ignore_duplicate')) {
-            $inputLines = collect($data['lines'] ?? [])->map(fn($l) => [
+        if (! $request->input('ignore_duplicate')) {
+            $inputLines = collect($data['lines'] ?? [])->map(fn ($l) => [
                 'item_id' => (int) ($l['item_id'] ?? 0),
                 'qty' => (float) ($l['qty'] ?? 0),
                 'unit_price' => (float) ($l['unit_price'] ?? 0),
@@ -266,16 +268,16 @@ class PurchaseOrderController extends Controller
 
             $idempotencyHash = md5(json_encode([
                 'supplier_id' => $data['supplier_id'],
-                'discount' => (float)($data['discount'] ?? 0),
-                'tax_percent' => (float)($data['tax_percent'] ?? 0),
-                'shipping_cost' => (float)($data['shipping_cost'] ?? 0),
+                'discount' => (float) ($data['discount'] ?? 0),
+                'tax_percent' => (float) ($data['tax_percent'] ?? 0),
+                'shipping_cost' => (float) ($data['shipping_cost'] ?? 0),
                 'lines' => $inputLines,
             ]));
 
-            $lockKey = 'po_store_' . $request->user()->id . '_' . $idempotencyHash;
+            $lockKey = 'po_store_'.$request->user()->id.'_'.$idempotencyHash;
             $lock = \Illuminate\Support\Facades\Cache::lock($lockKey, 10);
 
-            if (!$lock->get()) {
+            if (! $lock->get()) {
                 return back()->with('error', 'Sistem sedang memproses data PO yang sama. Harap tunggu sebentar lalu coba lagi (double-click terdeteksi).');
             }
 
@@ -284,19 +286,25 @@ class PurchaseOrderController extends Controller
                 ->where('supplier_id', $data['supplier_id'])
                 ->where('created_at', '>=', now()->subMinutes(15))
                 ->get();
-            
-            $inputLines = collect($data['lines'] ?? [])->map(fn($l) => [
+
+            $inputLines = collect($data['lines'] ?? [])->map(fn ($l) => [
                 'item_id' => (int) ($l['item_id'] ?? 0),
                 'qty' => (float) ($l['qty'] ?? 0),
                 'unit_price' => (float) ($l['unit_price'] ?? 0),
             ])->sortBy('item_id')->values()->toArray();
 
             $isDuplicate = $recentPOs->contains(function ($po) use ($inputLines, $data) {
-                if ((float)$po->discount !== (float)($data['discount'] ?? 0)) return false;
-                if ((float)$po->tax_percent !== (float)($data['tax_percent'] ?? 0)) return false;
-                if ((float)$po->shipping_cost !== (float)($data['shipping_cost'] ?? 0)) return false;
+                if ((float) $po->discount !== (float) ($data['discount'] ?? 0)) {
+                    return false;
+                }
+                if ((float) $po->tax_percent !== (float) ($data['tax_percent'] ?? 0)) {
+                    return false;
+                }
+                if ((float) $po->shipping_cost !== (float) ($data['shipping_cost'] ?? 0)) {
+                    return false;
+                }
 
-                $poLines = $po->lines->map(fn($l) => [
+                $poLines = $po->lines->map(fn ($l) => [
                     'item_id' => (int) $l->item_id,
                     'qty' => (float) $l->qty,
                     'unit_price' => (float) $l->unit_price,
@@ -337,9 +345,9 @@ class PurchaseOrderController extends Controller
 
                 // Update status PR → converted
                 $pr->update([
-                    'status'           => 'converted',
+                    'status' => 'converted',
                     'converted_to_po_id' => $order->id,
-                    'converted_at'     => now(),
+                    'converted_at' => now(),
                 ]);
 
                 $successMsg = "PO {$order->code} berhasil dibuat dari PR {$pr->code}.";
@@ -423,7 +431,7 @@ class PurchaseOrderController extends Controller
         // =========================================================
         $grnPostedTotal = (float) $purchase_order->purchaseReceipts
             ->where('status', 'posted')
-            ->filter(fn ($grn) => !$grn->is_replacement)
+            ->filter(fn ($grn) => ! $grn->is_replacement)
             ->sum('grand_total');
 
         $returnPostedTotal = (float) PurchaseReturn::query()
@@ -451,11 +459,55 @@ class PurchaseOrderController extends Controller
             ->where('type', 'dp_apply')
             ->sum('amount');
 
+        $loanAppliedTotal = (float) $purchase_order->payments
+            ->whereNull('voided_at')
+            ->where('type', 'loan_apply')
+            ->sum('amount');
+
         $dpAvailable = PurchaseOrder::normalizePaymentRemainder($dpTotal - $dpAppliedTotal);
+        $advanceTotal = round($dpTotal + $loanAppliedTotal, 2);
+        $advanceAvailable = PurchaseOrder::normalizePaymentRemainder($advanceTotal - $dpAppliedTotal);
 
         $settled = $paidPaymentTotal + $dpAppliedTotal;
         $apDebt = max(0, round($grnPostedTotal - $returnPostedTotal, 2));
         $apOutstanding = PurchaseOrder::normalizePaymentRemainder($apDebt - $settled);
+
+        $supplierLoanOptions = SupplierLoan::query()
+            ->where('supplier_id', $purchase_order->supplier_id)
+            ->whereIn('status', ['posted', 'settled'])
+            ->withSum(['repayments as posted_repayment_amount' => function ($q) {
+                $q->where('status', 'posted');
+            }], 'amount')
+            ->withSum(['purchasePayments as allocated_amount' => function ($q) {
+                $q->where('type', 'loan_apply')->whereNull('voided_at');
+            }], 'amount')
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get()
+            ->map(function (SupplierLoan $loan) {
+                $loan->allocation_available = max(
+                    0,
+                    (float) $loan->principal_amount
+                    - (float) ($loan->posted_repayment_amount ?? 0)
+                    - (float) ($loan->allocated_amount ?? 0)
+                );
+
+                return $loan;
+            })
+            ->filter(fn (SupplierLoan $loan) => $loan->allocation_available > 0.0001)
+            ->values();
+
+        $poAllocationRemaining = max(
+            0,
+            round((float) $purchase_order->grand_total - $paidPaymentTotal - $advanceTotal, 2)
+        );
+        $maxSupplierLoanApply = min(
+            (float) $supplierLoanOptions->sum('allocation_available'),
+            $poAllocationRemaining
+        );
+        $canApplySupplierLoan = $purchase_order->status !== 'cancelled'
+            && $supplierLoanOptions->isNotEmpty()
+            && $maxSupplierLoanApply > 0.0001;
 
         // Cek apakah semua PO line sudah fully received (dari GRN posted)
         // → dipakai untuk disable tombol "+ GRN baru"
@@ -523,12 +575,12 @@ class PurchaseOrderController extends Controller
 
         // Ringkasan invoice untuk UI
         $invoiceTotalAmount = (float) $poInvoices->whereNotIn('status', ['void'])->sum('total_amount');
-        $invoiceTotalPaid   = (float) $poInvoices->whereNotIn('status', ['void'])->sum('paid_amount');
+        $invoiceTotalPaid = (float) $poInvoices->whereNotIn('status', ['void'])->sum('paid_amount');
         $invoiceOutstanding = max(0, round($invoiceTotalAmount - $invoiceTotalPaid, 2));
 
         // Cek syarat Close PO
         $closeBlockers = $this->calcCloseBlockers($purchase_order, $poInvoices);
-        $canClose = empty($closeBlockers) && !$purchase_order->isClosed();
+        $canClose = empty($closeBlockers) && ! $purchase_order->isClosed();
 
         $lastWhatsappMessage = WhatsAppMessage::query()
             ->where('module', 'purchasing')
@@ -549,8 +601,15 @@ class PurchaseOrderController extends Controller
             'paidPaymentTotal' => $paidPaymentTotal,
             'dpTotal' => $dpTotal,
             'dpAppliedTotal' => $dpAppliedTotal,
+            'loanAppliedTotal' => $loanAppliedTotal,
+            'advanceTotal' => $advanceTotal,
+            'advanceAvailable' => $advanceAvailable,
             'dpAvailable' => $dpAvailable,
             'apOutstanding' => $apOutstanding,
+            'supplierLoanOptions' => $supplierLoanOptions,
+            'poAllocationRemaining' => $poAllocationRemaining,
+            'maxSupplierLoanApply' => $maxSupplierLoanApply,
+            'canApplySupplierLoan' => $canApplySupplierLoan,
             'canCreateGrn' => $canCreateGrn,
             'receivedByLine' => $receivedByLine,
             'rejectedByLine' => $rejectedByLine ?? collect(),
@@ -580,11 +639,11 @@ class PurchaseOrderController extends Controller
         }
 
         $canEditApproved = $purchase_order->status === 'approved'
-            && !$purchase_order->purchaseReceipts()->exists()
-            && !$purchase_order->activePayments()->exists()
-            && !$purchase_order->isLocked();
+            && ! $purchase_order->purchaseReceipts()->exists()
+            && ! $purchase_order->activePayments()->exists()
+            && ! $purchase_order->isLocked();
 
-        if ($purchase_order->status !== 'draft' && !$canEditApproved) {
+        if ($purchase_order->status !== 'draft' && ! $canEditApproved) {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
                 ->with('error', 'PO hanya bisa diedit saat Draft, atau saat masih Approved tetapi belum memiliki GRN dan payment aktif.');
@@ -592,7 +651,7 @@ class PurchaseOrderController extends Controller
 
         // ✅ RECEIVING LOCK: admin gudang (tanpa hak harga) tidak boleh mengedit PO
         // yang sudah dirujuk GRN. Owner masih boleh (proteksi granular di Service).
-        if ($purchase_order->isLocked() && !($request->user()?->canSeePurchasePrices())) {
+        if ($purchase_order->isLocked() && ! ($request->user()?->canSeePurchasePrices())) {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
                 ->with('error', 'PO terkunci karena sudah ada GRN. Tidak dapat diedit.');
@@ -649,7 +708,7 @@ class PurchaseOrderController extends Controller
             ->all();
 
         $itemsLine = collect();
-        if (!empty($lineItemIds)) {
+        if (! empty($lineItemIds)) {
             $itemsLine = Item::query()
                 ->whereIn('id', $lineItemIds)
                 ->with('category')
@@ -688,11 +747,11 @@ class PurchaseOrderController extends Controller
         }
 
         $canEditApproved = $purchase_order->status === 'approved'
-            && !$purchase_order->purchaseReceipts()->exists()
-            && !$purchase_order->activePayments()->exists()
-            && !$purchase_order->isLocked();
+            && ! $purchase_order->purchaseReceipts()->exists()
+            && ! $purchase_order->activePayments()->exists()
+            && ! $purchase_order->isLocked();
 
-        if ($purchase_order->status !== 'draft' && !$canEditApproved) {
+        if ($purchase_order->status !== 'draft' && ! $canEditApproved) {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
                 ->with('error', 'PO hanya bisa diubah saat Draft, atau saat masih Approved tetapi belum memiliki GRN dan payment aktif.');
@@ -700,7 +759,7 @@ class PurchaseOrderController extends Controller
 
         // ✅ RECEIVING LOCK: user tanpa hak harga tidak boleh update PO terkunci.
         // Owner boleh — Service memproteksi line yang sudah dirujuk GRN.
-        if ($purchase_order->isLocked() && !($request->user()?->canSeePurchasePrices())) {
+        if ($purchase_order->isLocked() && ! ($request->user()?->canSeePurchasePrices())) {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
                 ->with('error', 'PO terkunci karena sudah ada GRN. Perubahan ditolak.');
@@ -774,8 +833,7 @@ class PurchaseOrderController extends Controller
         PurchaseOrder $purchase_order,
         WhatsAppMessageService $whatsapp,
         PurchaseOrderWhatsAppMessageBuilder $builder,
-    )
-    {
+    ) {
         abort_unless(
             in_array(auth()->user()?->role, ['owner', 'admin'], true) || auth()->user()?->isDeveloper(),
             403,
@@ -816,7 +874,7 @@ class PurchaseOrderController extends Controller
 
     public function cancel(PurchaseOrder $purchase_order)
     {
-        if (!in_array($purchase_order->status, ['draft', 'approved'], true)) {
+        if (! in_array($purchase_order->status, ['draft', 'approved'], true)) {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
                 ->with('error', 'PO ini sudah tidak bisa dibatalkan.');
@@ -840,13 +898,14 @@ class PurchaseOrderController extends Controller
             ->route('purchasing.purchase_orders.show', $purchase_order->id)
             ->with('success', 'PO berhasil dibatalkan.');
     }
+
     public function printDotMatrix(PurchaseOrder $purchase_order)
     {
         // Dokumen PO memuat harga → hanya untuk role berhak harga.
         abort_unless($this->canSeeMoney(request()), 403, 'Anda tidak memiliki akses harga untuk mencetak PO.');
 
         return view('purchasing.purchase_orders.print_dot_matrix', [
-            'order' => $purchase_order
+            'order' => $purchase_order,
         ]);
     }
 
@@ -860,23 +919,23 @@ class PurchaseOrderController extends Controller
         $lines = [];
 
         // Header
-        $companyName = "G R E A T F I T . I D";
-        $lines[] = str_pad($companyName, $width, " ", STR_PAD_BOTH);
-        $lines[] = str_pad("PURCHASE ORDER", $width, " ", STR_PAD_BOTH);
-        $lines[] = str_repeat("=", $width);
-        
+        $companyName = 'G R E A T F I T . I D';
+        $lines[] = str_pad($companyName, $width, ' ', STR_PAD_BOTH);
+        $lines[] = str_pad('PURCHASE ORDER', $width, ' ', STR_PAD_BOTH);
+        $lines[] = str_repeat('=', $width);
+
         // Info PO (kiri-kanan)
-        $noPoStr = "No : " . $purchase_order->code;
-        $tglStr = "Tgl: " . date('d/m/Y', strtotime($purchase_order->date));
-        $lines[] = $noPoStr . str_repeat(" ", max(0, $width - strlen($noPoStr) - strlen($tglStr))) . $tglStr;
-        
-        $lines[] = "Kpd: " . substr(optional($purchase_order->supplier)->name ?? '-', 0, $width - 5);
-        $lines[] = str_repeat("-", $width);
+        $noPoStr = 'No : '.$purchase_order->code;
+        $tglStr = 'Tgl: '.date('d/m/Y', strtotime($purchase_order->date));
+        $lines[] = $noPoStr.str_repeat(' ', max(0, $width - strlen($noPoStr) - strlen($tglStr))).$tglStr;
+
+        $lines[] = 'Kpd: '.substr(optional($purchase_order->supplier)->name ?? '-', 0, $width - 5);
+        $lines[] = str_repeat('-', $width);
 
         // Header Tabel
         // Barang (19) | Qty (5) | Harga (8) | Tot (9)
-        $lines[] = str_pad("Deskripsi Barang", 19) . " " . str_pad("Qty", 5, " ", STR_PAD_LEFT) . " " . str_pad("Harga", 8, " ", STR_PAD_LEFT) . " " . str_pad("Total", 9, " ", STR_PAD_LEFT);
-        $lines[] = str_repeat("-", $width);
+        $lines[] = str_pad('Deskripsi Barang', 19).' '.str_pad('Qty', 5, ' ', STR_PAD_LEFT).' '.str_pad('Harga', 8, ' ', STR_PAD_LEFT).' '.str_pad('Total', 9, ' ', STR_PAD_LEFT);
+        $lines[] = str_repeat('-', $width);
 
         $totalQty = 0;
         $canSeeMoney = $this->canSeeMoney(request());
@@ -884,38 +943,42 @@ class PurchaseOrderController extends Controller
         foreach ($purchase_order->lines as $line) {
             $itemName = substr($line->item->name ?? 'Item', 0, 19);
             $qty = rtrim(rtrim(number_format($line->qty, 2, ',', '.'), '0'), ',');
-            if ($qty === '') $qty = '0';
-            
+            if ($qty === '') {
+                $qty = '0';
+            }
+
             $priceStr = $canSeeMoney ? number_format($line->unit_price, 0, ',', '.') : '***';
             $subtotalStr = $canSeeMoney
                 ? number_format($line->calculatedLineTotal(), 0, ',', '.')
                 : '***';
-            
+
             $strItem = str_pad($itemName, 19);
-            $strQty = str_pad($qty, 5, " ", STR_PAD_LEFT);
-            $strPrice = str_pad(substr($priceStr, -8), 8, " ", STR_PAD_LEFT);
-            $strSub = str_pad(substr($subtotalStr, -9), 9, " ", STR_PAD_LEFT);
-            
+            $strQty = str_pad($qty, 5, ' ', STR_PAD_LEFT);
+            $strPrice = str_pad(substr($priceStr, -8), 8, ' ', STR_PAD_LEFT);
+            $strSub = str_pad(substr($subtotalStr, -9), 9, ' ', STR_PAD_LEFT);
+
             $lines[] = "$strItem $strQty $strPrice $strSub";
             $totalQty += $line->qty;
         }
-        
-        $lines[] = str_repeat("-", $width);
-        
+
+        $lines[] = str_repeat('-', $width);
+
         $totalQtyStr = rtrim(rtrim(number_format($totalQty, 2, ',', '.'), '0'), ',');
-        if ($totalQtyStr === '') $totalQtyStr = '0';
+        if ($totalQtyStr === '') {
+            $totalQtyStr = '0';
+        }
         $grandTotalStr = $canSeeMoney ? number_format($purchase_order->grand_total, 0, ',', '.') : '***';
-        
-        $lines[] = str_pad("Total Item", 19) . " " . str_pad($totalQtyStr, 5, " ", STR_PAD_LEFT);
-        $lines[] = str_pad("GRAND TOTAL", 34) . " " . str_pad(substr($grandTotalStr, -9), 9, " ", STR_PAD_LEFT);
-        $lines[] = str_repeat("=", $width);
-        $lines[] = "";
-        
+
+        $lines[] = str_pad('Total Item', 19).' '.str_pad($totalQtyStr, 5, ' ', STR_PAD_LEFT);
+        $lines[] = str_pad('GRAND TOTAL', 34).' '.str_pad(substr($grandTotalStr, -9), 9, ' ', STR_PAD_LEFT);
+        $lines[] = str_repeat('=', $width);
+        $lines[] = '';
+
         // Tanda Tangan (kiri-kanan rapi)
-        $lines[] = str_pad("Disetujui Oleh,", 22) . str_pad("Diterima Oleh,", 23, " ", STR_PAD_LEFT);
-        $lines[] = "";
-        $lines[] = "";
-        $lines[] = str_pad("(_______________)", 22) . str_pad("(_______________)", 23, " ", STR_PAD_LEFT);
+        $lines[] = str_pad('Disetujui Oleh,', 22).str_pad('Diterima Oleh,', 23, ' ', STR_PAD_LEFT);
+        $lines[] = '';
+        $lines[] = '';
+        $lines[] = str_pad('(_______________)', 22).str_pad('(_______________)', 23, ' ', STR_PAD_LEFT);
 
         // Pad to exactly 33 lines (14cm at 6 lpi = ~33 lines)
         $totalLines = count($lines);
@@ -923,15 +986,15 @@ class PurchaseOrderController extends Controller
         $padLines = $maxLines - $totalLines;
         if ($padLines > 0) {
             for ($i = 0; $i < $padLines; $i++) {
-                $lines[] = "";
+                $lines[] = '';
             }
         }
-        
+
         // Return raw string with CRLF
-        $rawText = implode("\r\n", $lines) . "\r\n";
-        
+        $rawText = implode("\r\n", $lines)."\r\n";
+
         return response()->json([
-            'raw_text' => $rawText
+            'raw_text' => $rawText,
         ]);
     }
 
@@ -941,7 +1004,7 @@ class PurchaseOrderController extends Controller
 
     public function getSupplierLastPrice(Request $request)
     {
-        if (!$this->canSeeMoney($request)) {
+        if (! $this->canSeeMoney($request)) {
             return response()->json(['last_price' => null]);
         }
 
@@ -992,6 +1055,7 @@ class PurchaseOrderController extends Controller
                 $n = (float) $fallback->hpp;
             }
         }
+
         return response()->json(['last_price' => $n > 0 ? $n : null]);
     }
 
@@ -1055,7 +1119,7 @@ class PurchaseOrderController extends Controller
         // service, dan barang jadi. Accounting tetap ditentukan per baris
         // melalui default_allocation + akun biaya master item.
 
-        if (!$this->canSeeMoney($request)) {
+        if (! $this->canSeeMoney($request)) {
             $this->stripMoneyFromNonOwnerPayload($data, $existingOrder);
         }
 
@@ -1070,7 +1134,7 @@ class PurchaseOrderController extends Controller
 
     protected function maybeCreatePayNowPayment(Request $request, PurchaseOrder $order, bool $allowIfHasExistingPayments = true): void
     {
-        if (!$this->canSeeMoney($request)) {
+        if (! $this->canSeeMoney($request)) {
             return;
         }
 
@@ -1079,7 +1143,7 @@ class PurchaseOrderController extends Controller
             return;
         }
 
-        if (!$allowIfHasExistingPayments && method_exists($order, 'activePayments')) {
+        if (! $allowIfHasExistingPayments && method_exists($order, 'activePayments')) {
             if ($order->activePayments()->exists()) {
                 return;
             }
@@ -1159,7 +1223,7 @@ class PurchaseOrderController extends Controller
         $paid = 0.0;
         if (method_exists($order, 'activePayments')) {
             $paid = (float) $order->activePayments()
-                ->whereIn('type', ['dp', 'payment'])
+                ->whereIn('type', ['dp', 'loan_apply', 'payment'])
                 ->sum('amount');
         }
 
@@ -1191,7 +1255,7 @@ class PurchaseOrderController extends Controller
 
     protected function detectPaymentMode(?PaymentMethod $pm): string
     {
-        if (!$pm) {
+        if (! $pm) {
             return 'unknown';
         }
 
@@ -1218,6 +1282,7 @@ class PurchaseOrderController extends Controller
     {
         $v = strtolower(trim((string) $value));
         $allowed = ['material', 'finished_good', 'packing', 'asset', 'service', 'jasa', 'lainnya'];
+
         return in_array($v, $allowed, true) ? $v : 'material';
     }
 
@@ -1231,15 +1296,16 @@ class PurchaseOrderController extends Controller
     protected function canSeeMoney(?Request $request = null): bool
     {
         $user = $request?->user() ?: auth()->user();
+
         return $user && method_exists($user, 'canSeePurchasePrices') && $user->canSeePurchasePrices();
     }
 
     protected function stripMoneyFromNonOwnerPayload(array &$data, ?PurchaseOrder $existingOrder = null): void
     {
-        $data['discount']      = $existingOrder ? (float) ($existingOrder->discount ?? 0) : 0.0;
-        $data['tax_percent']   = $existingOrder ? (float) ($existingOrder->tax_percent ?? 0) : 0.0;
+        $data['discount'] = $existingOrder ? (float) ($existingOrder->discount ?? 0) : 0.0;
+        $data['tax_percent'] = $existingOrder ? (float) ($existingOrder->tax_percent ?? 0) : 0.0;
         $data['shipping_cost'] = $existingOrder ? (float) ($existingOrder->shipping_cost ?? 0) : 0.0;
-        $data['pay_now']       = 0.0;
+        $data['pay_now'] = 0.0;
 
         // Harga existing PO (untuk edit — pertahankan harga yang sudah diisi owner)
         $moneyByItem = [];
@@ -1247,21 +1313,23 @@ class PurchaseOrderController extends Controller
             $existingOrder->loadMissing('lines');
             foreach ($existingOrder->lines as $line) {
                 $itemId = (int) ($line->item_id ?? 0);
-                if ($itemId <= 0) continue;
+                if ($itemId <= 0) {
+                    continue;
+                }
                 $moneyByItem[$itemId] ??= [];
                 $moneyByItem[$itemId][] = [
                     'unit_price' => (float) ($line->unit_price ?? 0),
-                    'discount'   => (float) ($line->discount ?? 0),
+                    'discount' => (float) ($line->discount ?? 0),
                 ];
             }
         }
 
         // Preload supplier_prices untuk supplier ini (dipakai sebagai fallback harga)
         $supplierId = (int) ($data['supplier_id'] ?? 0);
-        $itemIds    = array_filter(array_map(fn($l) => (int) ($l['item_id'] ?? 0), $data['lines']));
+        $itemIds = array_filter(array_map(fn ($l) => (int) ($l['item_id'] ?? 0), $data['lines']));
         $supplierPriceMap = [];
         $itemLastPriceMap = [];
-        if ($supplierId > 0 && !empty($itemIds)) {
+        if ($supplierId > 0 && ! empty($itemIds)) {
             $supplierPriceMap = DB::table('supplier_prices')
                 ->where('supplier_id', $supplierId)
                 ->whereIn('item_id', $itemIds)
@@ -1276,8 +1344,8 @@ class PurchaseOrderController extends Controller
 
         foreach ($data['lines'] as &$line) {
             $itemId = (int) ($line['item_id'] ?? 0);
-            $money  = null;
-            if ($itemId > 0 && !empty($moneyByItem[$itemId])) {
+            $money = null;
+            if ($itemId > 0 && ! empty($moneyByItem[$itemId])) {
                 $money = array_shift($moneyByItem[$itemId]);
             }
 
@@ -1286,7 +1354,7 @@ class PurchaseOrderController extends Controller
             if ($existingPrice > 0) {
                 // Edit PO: pertahankan harga owner
                 $line['unit_price'] = $existingPrice;
-                $line['discount']   = (float) ($money['discount'] ?? 0);
+                $line['discount'] = (float) ($money['discount'] ?? 0);
             } else {
                 // PO baru atau harga belum diisi: ambil dari supplier_prices / item
                 $fallback = (float) ($supplierPriceMap[$itemId] ?? 0);
@@ -1294,7 +1362,7 @@ class PurchaseOrderController extends Controller
                     $fallback = (float) ($itemLastPriceMap[$itemId] ?? 0);
                 }
                 $line['unit_price'] = $fallback;
-                $line['discount']   = 0.0;
+                $line['discount'] = 0.0;
             }
         }
         unset($line);
@@ -1317,12 +1385,14 @@ class PurchaseOrderController extends Controller
         if (strpos($value, ',') !== false) {
             $value = str_replace('.', '', $value);
             $value = str_replace(',', '.', $value);
+
             return (float) $value;
         }
 
         // ribuan: 1.234.567
         if (preg_match('/^\d{1,3}(\.\d{3})+$/', $value)) {
             $value = str_replace('.', '', $value);
+
             return (float) $value;
         }
 
@@ -1352,8 +1422,8 @@ class PurchaseOrderController extends Controller
 
         $blockers = $this->calcCloseBlockers($purchase_order, $poInvoices);
 
-        if (!empty($blockers)) {
-            return back()->with('error', 'PO belum bisa di-close: ' . implode('; ', $blockers));
+        if (! empty($blockers)) {
+            return back()->with('error', 'PO belum bisa di-close: '.implode('; ', $blockers));
         }
 
         $purchase_order->status = 'closed';
@@ -1368,14 +1438,14 @@ class PurchaseOrderController extends Controller
      * Hitung daftar alasan PO belum bisa di-close.
      * Return array kosong = bisa close.
      *
-     * @param \Illuminate\Support\Collection $poInvoices
+     * @param  \Illuminate\Support\Collection  $poInvoices
      */
     protected function calcCloseBlockers(PurchaseOrder $order, $poInvoices): array
     {
         $blockers = [];
 
         if ($order->status !== 'approved') {
-            $blockers[] = 'PO ' . strtoupper($order->status ?? 'draft') . ', belum approved';
+            $blockers[] = 'PO '.strtoupper($order->status ?? 'draft').', belum approved';
         }
 
         $rcvStatus = $order->received_status ?? 'not_received';
@@ -1388,7 +1458,7 @@ class PurchaseOrderController extends Controller
             $blockers[] = match ($payStatus) {
                 'partial' => 'Pembayaran baru sebagian',
                 'overpaid' => 'Pembayaran melebihi nilai PO (piutang supplier)',
-                default   => 'Belum ada pembayaran',
+                default => 'Belum ada pembayaran',
             };
         }
 
@@ -1397,18 +1467,18 @@ class PurchaseOrderController extends Controller
         $apOutstanding = $order->accountsPayableOutstanding();
         if ($apOutstanding > PurchaseOrder::paymentRoundingTolerance()) {
             $dpAvailable = PurchaseOrder::normalizePaymentRemainder(
-                (float) $order->activePayments()->where('type', 'dp')->sum('amount')
+                (float) $order->activePayments()->whereIn('type', ['dp', 'loan_apply'])->sum('amount')
                 - (float) $order->activePayments()->where('type', 'dp_apply')->sum('amount')
             );
 
             $blockers[] = $dpAvailable > 0
-                ? 'DP belum di-offset ke hutang (' . rupiah($dpAvailable) . ')'
-                : 'Hutang AP masih tersisa (' . rupiah($apOutstanding) . ')';
+                ? 'DP belum di-offset ke hutang ('.rupiah($dpAvailable).')'
+                : 'Hutang AP masih tersisa ('.rupiah($apOutstanding).')';
         }
 
         $outstandingInvoices = $poInvoices->whereIn('status', ['posted', 'partial_paid', 'draft']);
         if ($outstandingInvoices->isNotEmpty()) {
-            $blockers[] = $outstandingInvoices->count() . ' faktur belum lunas';
+            $blockers[] = $outstandingInvoices->count().' faktur belum lunas';
         }
 
         return $blockers;

@@ -4,7 +4,7 @@
 
 @php
   $fmt       = fn($n) => number_format((float) $n, 0, ',', '.');
-  $typeLabel = ['dp' => 'DP', 'payment' => 'Pelunasan', 'dp_apply' => 'Offset DP'];
+  $typeLabel = ['dp' => 'DP', 'payment' => 'Pelunasan', 'dp_apply' => 'Offset DP', 'loan_apply' => 'Alokasi Pinjaman Supplier'];
 @endphp
 
 @push('head')
@@ -48,6 +48,7 @@
   .badge-dp       { background:rgba(59,130,246,.1);  color:#1d4ed8; border-color:rgba(59,130,246,.4); }
   .badge-payment  { background:rgba(22,163,74,.1);   color:#15803d; border-color:rgba(22,163,74,.4); }
   .badge-dp_apply { background:rgba(139,92,246,.1);  color:#7c3aed; border-color:rgba(139,92,246,.4); }
+  .badge-loan_apply { background:rgba(14,165,233,.1); color:#0369a1; border-color:rgba(14,165,233,.4); }
   .badge-voided   { background:rgba(220,38,38,.08);  color:#b91c1c; border-color:rgba(220,38,38,.4); }
 
   /* PO cards in modal */
@@ -147,6 +148,7 @@
           <option value="payment"  @selected(request('type') === 'payment')>Pelunasan</option>
           <option value="dp"       @selected(request('type') === 'dp')>DP</option>
           <option value="dp_apply" @selected(request('type') === 'dp_apply')>Offset DP</option>
+          <option value="loan_apply" @selected(request('type') === 'loan_apply')>Alokasi Pinjaman Supplier</option>
         </select>
 
         <select name="voided" class="form-select form-select-sm pay-filter-auto" style="max-width:120px;">
