@@ -111,6 +111,7 @@
     $hasMarketplaceAds         = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics   = $router->has('marketplace.analytics');
     $hasMarketplaceIssues      = $router->has('marketplace.issues');
+    $hasMarketplaceShopeeApiLogs = $router->has('marketplace.shopee-api-logs');
 
     // Toko Online (UPDATED sesuai routes terbaru yang kamu kasih)
     // =========================================================
@@ -255,7 +256,7 @@
         $hasMarketplaceToko = $hasMarketplaceOrders = $hasMarketplacePemenuhan = false;
         $hasMarketplacePickingBarang = $hasMarketplaceSkuMapping = $hasMarketplaceSync = false;
         $hasMarketplacePencairanDana = $hasMarketplaceProfit = $hasMarketplaceAds = false;
-        $hasMarketplaceAnalytics = $hasMarketplaceIssues = false;
+        $hasMarketplaceAnalytics = $hasMarketplaceIssues = $hasMarketplaceShopeeApiLogs = false;
         $hasMarketplaceIndex = $hasMarketplaceCreate = $hasMarketplaceShow = false;
         $hasMarketplaceSalesReport = $hasMarketplaceSalesExport = false;
         $hasMarketplaceFinance = false;
@@ -319,6 +320,45 @@
     $openPembelian = $open('purchasing.*');
     $openMarketplaceOrders = $open('marketplace.orders.*');
 
+    $openMarketplaceOrderGroup =
+        $open('marketplace.orders') ||
+        $open('marketplace.orders.*') ||
+        $open('marketplace.returns') ||
+        $open('marketplace.kilat') ||
+        $open('marketplace.settings') ||
+        $open('marketplace.fulfillment') ||
+        $open('marketplace.fulfillment.*') ||
+        $open('marketplace.picking') ||
+        $open('marketplace.chat');
+
+    $openMarketplaceCatalogGroup =
+        $open('marketplace.toko') ||
+        $open('marketplace.products') ||
+        $open('marketplace.sku-mapping') ||
+        $open('marketplace.promotions') ||
+        $open('marketplace.promotions.*') ||
+        $open('marketplace.boost');
+
+    $openMarketplaceFinanceGroup =
+        $open('marketplace.settlement') ||
+        $open('marketplace.income-detail') ||
+        $open('marketplace.escrow') ||
+        $open('marketplace.payout') ||
+        $open('marketplace.profit') ||
+        $open('marketplace.reports.*') ||
+        $open('marketplace.finance.*') ||
+        $open('marketplace.analytics') ||
+        $open('marketplace.ads.dashboard');
+
+    $openMarketplaceDataGroup =
+        $open('marketplace.sync') ||
+        $open('marketplace.issues') ||
+        $open('marketplace.shopee-api-logs');
+
+    $openMarketplaceImportGroup =
+        $open('imports.marketplace.*') ||
+        $open('imports.marketplace_income.*');
+
     $openMarketplaceTools =
         $open('marketplace.toko') ||
         $open('marketplace.returns') ||
@@ -339,6 +379,7 @@
         $open('marketplace.escrow') ||
         $open('marketplace.profit') ||
         $open('marketplace.ads') ||
+        $open('marketplace.ads.dashboard') ||
         $open('marketplace.analytics') ||
         $open('marketplace.issues') ||
         $open('marketplace.reports.*') ||
@@ -346,7 +387,8 @@
         $open('marketplace.reconcile.*') ||
         $open('marketplace.reconciliations.*') ||
         $open('imports.marketplace.*') ||
-        $open('imports.marketplace_income.*');
+        $open('imports.marketplace_income.*') ||
+        $open('marketplace.shopee-api-logs');
 
     $openSales =
         $open('sales.invoices.*') ||
@@ -479,13 +521,13 @@
         --sidebar-active-blue: #60a5fa;
     }
 
-    /* Tablet (768px–991px): sidebar 180px — sempit tapi full navigasi */
+    /* Tablet (768px–991px): sidebar tetap usable, tidak terlalu sempit */
     @media (min-width: 768px) {
         .sidebar-modern {
             position: fixed;
             top: 0;
             left: 0;
-            width: 180px;
+            width: 220px;
             height: 100vh;
             padding: .8rem .65rem 1.4rem;
             display: flex;
@@ -503,9 +545,9 @@
             scrollbar-color: rgba(148, 163, 184, .35) transparent;
         }
 
-        .app-main { margin-left: 180px; }
+        .app-main { margin-left: 220px; }
 
-        /* Kecilkan font dan padding sedikit agar muat di 180px */
+        /* Kecilkan font dan padding sedikit agar tetap proporsional */
         .sidebar-modern .sidebar-brand {
             font-size: 1rem;
             padding: .55rem .2rem .75rem;
@@ -716,6 +758,31 @@
 
     .sidebar-modern .collapsing {
         transition: height .15s ease-out !important;
+    }
+
+    .sidebar-nested-toggle {
+        margin-top: .15rem;
+        padding-left: 1.05rem !important;
+        font-size: .78rem !important;
+        color: var(--muted);
+        border-radius: 9px;
+    }
+
+    .sidebar-nested-toggle .icon {
+        width: 18px !important;
+        font-size: .9rem !important;
+    }
+
+    .sidebar-nested-toggle.is-open,
+    .sidebar-nested-toggle:hover {
+        color: var(--accent);
+        background: color-mix(in srgb, var(--accent-soft) 12%, var(--card) 88%);
+    }
+
+    .sidebar-nested-collapse {
+        margin-left: .2rem;
+        padding-left: .15rem;
+        border-left: 1px solid color-mix(in srgb, var(--line) 75%, transparent 25%);
     }
 </style>
 
@@ -1021,7 +1088,7 @@
             @endif
 
             {{-- Toko Online --}}
-            @if ($canShow($hasMarketplaceIndex, $hasMarketplaceSalesReport, $hasMarketplaceFinance, $hasMarketplaceReconcileQueue, $hasMarketplaceReconcileItemsIndex))
+            @if ($canShow($hasMarketplaceIndex, $router->has('marketplace.products'), $hasMarketplacePromotions, $hasMarketplacePromotionsSummary, $hasMarketplaceSalesReport, $hasMarketplaceFinance, $hasMarketplaceReconcileQueue, $hasMarketplaceReconcileItemsIndex))
                 <x-sidebar.label text="Toko Online" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openMarketplaceTools ? 'is-open' : '' }}" type="button"
@@ -1032,84 +1099,101 @@
                         <span class="chevron">▸</span>
                     </button>
                     <div class="collapse {{ $openMarketplaceTools ? 'show' : '' }}" id="navMarketplaceAdmin">
-                        <div class="sidebar-subhead">Operasional</div>
-                        <div class="simple-group">
-                    @if ($hasMarketplaceIndex)
-                        <x-sidebar.simple-link href="{{ route('marketplace.orders') }}" icon="bi bi-cart3"
-                            :active="request()->routeIs('marketplace.orders') || request()->routeIs('marketplace.orders.*')">
-                            Pesanan
-                        </x-sidebar.simple-link>
-                    @endif
+                        @if ($hasMarketplaceIndex || ($router->has('marketplace.chat') && $canModule('marketplace')))
+                            <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceOrderGroup ? 'is-open' : '' }}" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminOrders"
+                                aria-expanded="{{ $openMarketplaceOrderGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminOrders">
+                                <span class="icon"><i class="bi bi-box-seam"></i></span>
+                                <span>Pesanan & Komunikasi</span>
+                                <span class="chevron">▸</span>
+                            </button>
+                            <div class="collapse sidebar-nested-collapse {{ $openMarketplaceOrderGroup ? 'show' : '' }}" id="navMarketplaceAdminOrders">
+                                @if ($hasMarketplaceIndex)
+                                    <x-sidebar.sub-link href="{{ route('marketplace.orders') }}" icon="bi bi-cart3"
+                                        :active="request()->routeIs('marketplace.orders') || request()->routeIs('marketplace.orders.*')">
+                                        Pesanan
+                                    </x-sidebar.sub-link>
+                                @endif
+                                @if ($router->has('marketplace.chat') && $canModule('marketplace'))
+                                    <x-sidebar.sub-link href="{{ route('marketplace.chat') }}" icon="bi bi-chat-dots"
+                                        :active="request()->routeIs('marketplace.chat')">
+                                        Chat <span class="sidebarChatBadge badge bg-danger rounded-pill ms-2" style="display:none;"></span>
+                                    </x-sidebar.sub-link>
+                                @endif
+                            </div>
+                        @endif
 
-                    @if ($router->has('marketplace.products'))
-                        <x-sidebar.simple-link href="{{ route('marketplace.products') }}" icon="bi bi-tags"
-                            :active="request()->routeIs('marketplace.products')">
-                            Produk
-                        </x-sidebar.simple-link>
-                    @endif
+                        @if ($router->has('marketplace.products') || $router->has('marketplace.boost') || $hasMarketplacePromotions || $hasMarketplacePromotionsSummary)
+                            <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceCatalogGroup ? 'is-open' : '' }}" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminCatalog"
+                                aria-expanded="{{ $openMarketplaceCatalogGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminCatalog">
+                                <span class="icon"><i class="bi bi-tags"></i></span>
+                                <span>Produk & Promosi</span>
+                                <span class="chevron">▸</span>
+                            </button>
+                            <div class="collapse sidebar-nested-collapse {{ $openMarketplaceCatalogGroup ? 'show' : '' }}" id="navMarketplaceAdminCatalog">
+                                @if ($router->has('marketplace.products'))
+                                    <x-sidebar.sub-link href="{{ route('marketplace.products') }}" icon="bi bi-tags"
+                                        :active="request()->routeIs('marketplace.products')">
+                                        Produk
+                                    </x-sidebar.sub-link>
+                                @endif
+                                @if (!$isAdmin && $router->has('marketplace.boost'))
+                                    <x-sidebar.sub-link href="{{ route('marketplace.boost') }}" icon="bi bi-rocket-takeoff"
+                                        :active="request()->routeIs('marketplace.boost')">
+                                        Naikkan Produk
+                                    </x-sidebar.sub-link>
+                                @endif
+                                @if ($hasMarketplacePromotions)
+                                    <x-sidebar.sub-link href="{{ route('marketplace.promotions') }}" icon="bi bi-percent"
+                                        :active="request()->routeIs('marketplace.promotions')">
+                                        Promosi
+                                    </x-sidebar.sub-link>
+                                @endif
+                                @if ($hasMarketplacePromotionsSummary)
+                                    <x-sidebar.sub-link href="{{ route('marketplace.promotions.summary') }}" icon="bi bi-grid-3x3-gap"
+                                        :active="request()->routeIs('marketplace.promotions.summary')">
+                                        Summary Promosi
+                                    </x-sidebar.sub-link>
+                                @endif
+                            </div>
+                        @endif
 
-                    @if (!$isAdmin && $router->has('marketplace.boost'))
-                        <x-sidebar.simple-link href="{{ route('marketplace.boost') }}" icon="bi bi-rocket-takeoff"
-                            :active="request()->routeIs('marketplace.boost')">
-                            Naikkan Produk
-                        </x-sidebar.simple-link>
-                    @endif
-
-                    @if ($router->has('marketplace.promotions'))
-                        <x-sidebar.simple-link href="{{ route('marketplace.promotions') }}" icon="bi bi-percent"
-                            :active="request()->routeIs('marketplace.promotions')">
-                            Promosi
-                        </x-sidebar.simple-link>
-                    @endif
-                    @if ($hasMarketplacePromotionsSummary)
-                        <x-sidebar.simple-link href="{{ route('marketplace.promotions.summary') }}" icon="bi bi-grid-3x3-gap"
-                            :active="request()->routeIs('marketplace.promotions.summary')">
-                            Summary Promosi
-                        </x-sidebar.simple-link>
-                    @endif
-
-                    @if ($router->has('marketplace.chat') && $canModule('marketplace'))
-                        <x-sidebar.simple-link href="{{ route('marketplace.chat') }}" icon="bi bi-chat-dots"
-                            :active="request()->routeIs('marketplace.chat')">
-                            Chat <span class="sidebarChatBadge badge bg-danger rounded-pill ms-2" style="display:none;"></span>
-                        </x-sidebar.simple-link>
-                    @endif
-
-                    @if ($hasMarketplaceSalesReport)
-                        <x-sidebar.simple-link href="{{ route('marketplace.reports.sales') }}" icon="bi bi-graph-up"
-                            :active="request()->routeIs('marketplace.reports.sales')">
-                            Laporan Penjualan
-                        </x-sidebar.simple-link>
-                    @endif
-
-                    @if ($hasMarketplaceFinance)
-                        <x-sidebar.simple-link href="{{ route('marketplace.finance.index') }}" icon="bi bi-wallet2"
-                            :active="request()->routeIs('marketplace.finance.*')">
-                            Marketplace Finance
-                        </x-sidebar.simple-link>
-                    @endif
-
-                    @if ($hasMarketplaceFinancialQuality)
-                        <x-sidebar.simple-link href="{{ route('marketplace.reports.financial-quality') }}" icon="bi bi-clipboard2-data"
-                            :active="request()->routeIs('marketplace.reports.financial-quality*')">
-                            Audit Keuangan (Owner)
-                        </x-sidebar.simple-link>
-                    @endif
-
-                    @if ($hasMarketplaceReconcileQueue)
-                        <x-sidebar.simple-link href="{{ route('marketplace.reconcile.queue') }}" icon="bi bi-puzzle"
-                            :active="request()->routeIs('marketplace.reconcile.*') || request()->routeIs('marketplace.reconciliations.*')">
-                            Antrean Rekonsiliasi
-                        </x-sidebar.simple-link>
-                    @endif
-
-                    @if ($hasMarketplaceReconcileItemsIndex)
-                        <x-sidebar.simple-link href="{{ route('marketplace.reconcile.items') }}" icon="bi bi-receipt"
-                            :active="request()->routeIs('marketplace.reconcile.items*')">
-                            Rekonsiliasi Barang
-                        </x-sidebar.simple-link>
-                    @endif
-                        </div>
+                        @if ($hasMarketplaceSalesReport || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
+                            <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceFinanceGroup ? 'is-open' : '' }}" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminFinance"
+                                aria-expanded="{{ $openMarketplaceFinanceGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminFinance">
+                                <span class="icon"><i class="bi bi-bar-chart-line"></i></span>
+                                <span>Keuangan & Laporan</span>
+                                <span class="chevron">▸</span>
+                            </button>
+                            <div class="collapse sidebar-nested-collapse {{ $openMarketplaceFinanceGroup ? 'show' : '' }}" id="navMarketplaceAdminFinance">
+                                @if ($hasMarketplaceSalesReport)
+                                    <x-sidebar.sub-link href="{{ route('marketplace.reports.sales') }}" icon="bi bi-graph-up"
+                                        :active="request()->routeIs('marketplace.reports.sales')">
+                                        Laporan Penjualan
+                                    </x-sidebar.sub-link>
+                                @endif
+                                @if ($hasMarketplaceFinance)
+                                    <x-sidebar.sub-link href="{{ route('marketplace.finance.index') }}" icon="bi bi-wallet2"
+                                        :active="request()->routeIs('marketplace.finance.*')">
+                                        Marketplace Finance
+                                    </x-sidebar.sub-link>
+                                @endif
+                                @if ($hasMarketplaceReconcileQueue)
+                                    <x-sidebar.sub-link href="{{ route('marketplace.reconcile.queue') }}" icon="bi bi-puzzle"
+                                        :active="request()->routeIs('marketplace.reconcile.*') || request()->routeIs('marketplace.reconciliations.*')">
+                                        Antrean Rekonsiliasi
+                                    </x-sidebar.sub-link>
+                                @endif
+                                @if ($hasMarketplaceReconcileItemsIndex)
+                                    <x-sidebar.sub-link href="{{ route('marketplace.reconcile.items') }}" icon="bi bi-receipt"
+                                        :active="request()->routeIs('marketplace.reconcile.items*')">
+                                        Rekonsiliasi Barang
+                                    </x-sidebar.sub-link>
+                                @endif
+                            </div>
+                        @endif
                     </div>
                 </li>
             @endif
@@ -1599,13 +1683,19 @@
             @if ($canShow(
                 $hasMarketplaceToko,
                 $hasMarketplaceOrders,
+                $hasMarketplaceCreate,
+                $hasMarketplacePromotions,
+                $hasMarketplacePromotionsSummary,
                 $hasMarketplacePemenuhan,
                 $hasMarketplacePickingBarang,
                 $hasMarketplaceSkuMapping,
                 $hasMarketplaceSync,
                 $hasMarketplacePencairanDana,
                 $hasMarketplaceIncomeDetail,
+                $hasMarketplaceEscrow,
+                $hasMarketplacePayout,
                 $hasMarketplaceProfit,
+                $hasMarketplaceFinance,
                 $hasMarketplaceSalesReport,
                 $hasMarketplaceProfitReport,
                 $hasMarketplaceFinancialStatement,
@@ -1613,6 +1703,7 @@
                 $hasMarketplaceAds,
                 $hasMarketplaceAnalytics,
                 $hasMarketplaceIssues,
+                $hasMarketplaceShopeeApiLogs,
                 $hasImportMarketplaceIndex,
                 $hasImportMarketplaceDraft,
                 $hasImportMarketplaceIncomeIndex,
@@ -1629,7 +1720,16 @@
                     </button>
 
                     <div class="collapse {{ $openMarketplaceTools ? 'show' : '' }}" id="navMarketplaceOwner">
-                        @php $subhead('Operasional'); @endphp
+                        @if ($canShow($hasMarketplaceToko, $hasMarketplaceOrders, $hasMarketplaceCreate, $hasMarketplacePemenuhan, $hasMarketplacePickingBarang, $router->has('marketplace.products'), $router->has('marketplace.boost'), $hasMarketplacePromotions, $hasMarketplacePromotionsSummary))
+                            <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ ($openMarketplaceOrderGroup || $openMarketplaceCatalogGroup) ? 'is-open' : '' }}" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerOperational"
+                                aria-expanded="{{ ($openMarketplaceOrderGroup || $openMarketplaceCatalogGroup) ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerOperational">
+                                <span class="icon"><i class="bi bi-box-seam"></i></span>
+                                <span>Operasional & Produk</span>
+                                <span class="chevron">▸</span>
+                            </button>
+                            <div class="collapse sidebar-nested-collapse {{ ($openMarketplaceOrderGroup || $openMarketplaceCatalogGroup) ? 'show' : '' }}" id="navMarketplaceOwnerOperational">
+                                @php $subhead('Operasional'); @endphp
                         @if ($hasMarketplaceToko)
                             <x-sidebar.sub-link href="{{ route('marketplace.toko') }}" icon="bi bi-shop"
                                 :active="request()->routeIs('marketplace.toko')">
@@ -1655,6 +1755,12 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.orders') }}" icon="bi bi-list-ul"
                                 :active="request()->routeIs('marketplace.orders') || request()->routeIs('marketplace.orders.*')">
                                 Pesanan Lokal
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceCreate)
+                            <x-sidebar.sub-link href="{{ route('marketplace.orders.create') }}" icon="bi bi-plus-circle"
+                                :active="request()->routeIs('marketplace.orders.create')">
+                                Order Manual
                             </x-sidebar.sub-link>
                         @endif
                         @if ($router->has('marketplace.products'))
@@ -1699,8 +1805,19 @@
                                 Pengambilan
                             </x-sidebar.sub-link>
                         @endif
+                            </div>
+                        @endif
 
-                        @php $subhead('Data & Sinkronisasi'); @endphp
+                        @if ($hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplaceIssues || $hasMarketplaceShopeeApiLogs)
+                            <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceDataGroup ? 'is-open' : '' }}" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerData"
+                                aria-expanded="{{ $openMarketplaceDataGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerData">
+                                <span class="icon"><i class="bi bi-arrow-repeat"></i></span>
+                                <span>Data & Sinkronisasi</span>
+                                <span class="chevron">▸</span>
+                            </button>
+                            <div class="collapse sidebar-nested-collapse {{ $openMarketplaceDataGroup ? 'show' : '' }}" id="navMarketplaceOwnerData">
+                                @php $subhead('Data & Sinkronisasi'); @endphp
                         @if ($hasMarketplaceSkuMapping)
                             <x-sidebar.sub-link href="{{ route('marketplace.sku-mapping') }}" icon="bi bi-link-45deg"
                                 :active="request()->routeIs('marketplace.sku-mapping')">
@@ -1719,8 +1836,25 @@
                                 Perbaikan Data
                             </x-sidebar.sub-link>
                         @endif
+                        @if ($hasMarketplaceShopeeApiLogs)
+                            <x-sidebar.sub-link href="{{ route('marketplace.shopee-api-logs') }}" icon="bi bi-hdd-network"
+                                :active="request()->routeIs('marketplace.shopee-api-logs')">
+                                Log API Shopee
+                            </x-sidebar.sub-link>
+                        @endif
+                            </div>
+                        @endif
 
-                        @php $subhead('Analisa'); @endphp
+                        @if ($hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialClosing || $hasMarketplaceSalesReport || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceFinance)
+                            <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceFinanceGroup ? 'is-open' : '' }}" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerFinance"
+                                aria-expanded="{{ $openMarketplaceFinanceGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerFinance">
+                                <span class="icon"><i class="bi bi-bar-chart-line"></i></span>
+                                <span>Keuangan & Analitik</span>
+                                <span class="chevron">▸</span>
+                            </button>
+                            <div class="collapse sidebar-nested-collapse {{ $openMarketplaceFinanceGroup ? 'show' : '' }}" id="navMarketplaceOwnerFinance">
+                                @php $subhead('Analisa'); @endphp
                         @if ($hasMarketplacePencairanDana)
                             <x-sidebar.sub-link href="{{ route('marketplace.settlement') }}" icon="bi bi-coin"
                                 :active="request()->routeIs('marketplace.settlement')">
@@ -1796,8 +1930,18 @@
                                 Analisa Penjualan
                             </x-sidebar.sub-link>
                         @endif
+                            </div>
+                        @endif
 
                         @if ($hasImportMarketplaceIndex || $hasImportMarketplaceDraft || $hasImportMarketplaceIncomeIndex || $hasImportMarketplaceIncomeDraft)
+                            <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceImportGroup ? 'is-open' : '' }}" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerImport"
+                                aria-expanded="{{ $openMarketplaceImportGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerImport">
+                                <span class="icon"><i class="bi bi-upload"></i></span>
+                                <span>Impor</span>
+                                <span class="chevron">▸</span>
+                            </button>
+                            <div class="collapse sidebar-nested-collapse {{ $openMarketplaceImportGroup ? 'show' : '' }}" id="navMarketplaceOwnerImport">
                             @php $subhead('Impor'); @endphp
                             @if ($hasImportMarketplaceIndex)
                                 <x-sidebar.sub-link href="{{ route('imports.marketplace.index') }}" icon="bi bi-upload"
@@ -1823,11 +1967,8 @@
                                     Draft Income
                                 </x-sidebar.sub-link>
                             @endif
+                            </div>
                         @endif
-                            <x-sidebar.sub-link href="{{ route('marketplace.shopee-api-logs') }}" icon="bi bi-hdd-network"
-                                :active="request()->routeIs('marketplace.shopee-api-logs')">
-                                Log API Shopee
-                            </x-sidebar.sub-link>
                     </div>
                 </li>
             @endif

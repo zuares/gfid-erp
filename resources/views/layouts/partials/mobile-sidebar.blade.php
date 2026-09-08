@@ -192,6 +192,32 @@
         color: var(--accent);
     }
 
+    .mobile-sidebar-nested-toggle {
+        margin-top: .15rem;
+        padding-left: .8rem;
+        font-size: .82rem;
+        color: var(--muted);
+        border: 0;
+        background: transparent;
+    }
+
+    .mobile-sidebar-nested-toggle .icon {
+        width: 20px;
+        font-size: 1rem;
+    }
+
+    .mobile-sidebar-nested-toggle.is-open,
+    .mobile-sidebar-nested-toggle:hover {
+        color: var(--accent);
+        background: color-mix(in srgb, var(--accent-soft) 12%, var(--card) 88%);
+    }
+
+    .mobile-sidebar-nested-collapse {
+        margin-left: .2rem;
+        padding-left: .15rem;
+        border-left: 1px solid color-mix(in srgb, var(--line) 75%, transparent 25%);
+    }
+
     .mobile-sidebar-link-sub {
         position: relative;
         font-size: .86rem;
@@ -320,6 +346,7 @@
     $hasMarketplaceAds = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics = $router->has('marketplace.analytics');
     $hasMarketplaceIssues = $router->has('marketplace.issues');
+    $hasMarketplaceShopeeApiLogs = $router->has('marketplace.shopee-api-logs');
     $hasMarketplaceIndex = $router->has('marketplace.orders');
     $hasMarketplaceSalesReport = $router->has('marketplace.reports.sales');
     $hasMarketplaceProfitReport = $isOwner && $router->has('marketplace.reports.profit');
@@ -453,7 +480,7 @@
         $hasMarketplaceToko = $hasMarketplaceOrders = $hasMarketplacePemenuhan = false;
         $hasMarketplacePickingBarang = $hasMarketplaceSkuMapping = $hasMarketplaceSync = false;
         $hasMarketplacePencairanDana = $hasMarketplaceProfit = $hasMarketplaceAds = false;
-        $hasMarketplaceAnalytics = $hasMarketplaceIssues = false;
+        $hasMarketplaceAnalytics = $hasMarketplaceIssues = $hasMarketplaceShopeeApiLogs = false;
         $hasMarketplaceIndex = $hasMarketplaceSalesReport = false;
         $hasMarketplaceReconcileQueue = $hasMarketplaceReconcileItemsIndex = false;
     }
@@ -551,8 +578,49 @@
         request()->routeIs('marketplace.reports.*') ||
         request()->routeIs('marketplace.finance.*') ||
         request()->routeIs('marketplace.ads') ||
+        request()->routeIs('marketplace.ads.dashboard') ||
         request()->routeIs('marketplace.analytics') ||
         request()->routeIs('marketplace.issues') ||
+        request()->routeIs('marketplace.shopee-api-logs') ||
+        request()->routeIs('imports.marketplace.*') ||
+        request()->routeIs('imports.marketplace_income.*');
+
+    $marketplaceOrderGroupOpen =
+        request()->routeIs('marketplace.orders') ||
+        request()->routeIs('marketplace.orders.*') ||
+        request()->routeIs('marketplace.returns') ||
+        request()->routeIs('marketplace.kilat') ||
+        request()->routeIs('marketplace.settings') ||
+        request()->routeIs('marketplace.fulfillment') ||
+        request()->routeIs('marketplace.fulfillment.*') ||
+        request()->routeIs('marketplace.picking') ||
+        request()->routeIs('marketplace.chat');
+
+    $marketplaceCatalogGroupOpen =
+        request()->routeIs('marketplace.toko') ||
+        request()->routeIs('marketplace.products') ||
+        request()->routeIs('marketplace.sku-mapping') ||
+        request()->routeIs('marketplace.promotions') ||
+        request()->routeIs('marketplace.promotions.*') ||
+        request()->routeIs('marketplace.boost');
+
+    $marketplaceFinanceGroupOpen =
+        request()->routeIs('marketplace.settlement') ||
+        request()->routeIs('marketplace.income-detail') ||
+        request()->routeIs('marketplace.escrow') ||
+        request()->routeIs('marketplace.payout') ||
+        request()->routeIs('marketplace.profit') ||
+        request()->routeIs('marketplace.reports.*') ||
+        request()->routeIs('marketplace.finance.*') ||
+        request()->routeIs('marketplace.ads.dashboard') ||
+        request()->routeIs('marketplace.analytics');
+
+    $marketplaceDataGroupOpen =
+        request()->routeIs('marketplace.sync') ||
+        request()->routeIs('marketplace.issues') ||
+        request()->routeIs('marketplace.shopee-api-logs');
+
+    $marketplaceImportGroupOpen =
         request()->routeIs('imports.marketplace.*') ||
         request()->routeIs('imports.marketplace_income.*');
 
@@ -833,67 +901,79 @@
                             </button>
 
                             <div class="collapse {{ $marketplaceOpen ? 'show' : '' }}" id="navMarketplaceAdminMobile">
-                                @if ($hasMarketplaceIndex)
-                                    <a href="{{ route('marketplace.orders') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.orders') || request()->routeIs('marketplace.orders.*') ? 'active' : '' }}">
-                                        <span class="icon">📋</span><span>Pesanan</span>
-                                    </a>
+                                @if ($hasMarketplaceIndex || ($router->has('marketplace.chat') && $canModule('marketplace')))
+                                    <button class="mobile-sidebar-link mobile-sidebar-toggle mobile-sidebar-nested-toggle {{ $marketplaceOrderGroupOpen ? 'is-open' : '' }}"
+                                            type="button" data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminOrdersMobile"
+                                            aria-expanded="{{ $marketplaceOrderGroupOpen ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminOrdersMobile">
+                                        <span class="icon"><i class="bi bi-box-seam"></i></span><span>Pesanan & Komunikasi</span><span class="chevron">▸</span>
+                                    </button>
+                                    <div class="collapse mobile-sidebar-nested-collapse {{ $marketplaceOrderGroupOpen ? 'show' : '' }}" id="navMarketplaceAdminOrdersMobile">
+                                        @if ($hasMarketplaceIndex)
+                                            <a href="{{ route('marketplace.orders') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.orders') || request()->routeIs('marketplace.orders.*') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-cart3"></i></span><span>Pesanan</span>
+                                            </a>
+                                        @endif
+                                        @if ($router->has('marketplace.chat') && $canModule('marketplace'))
+                                            <a href="{{ route('marketplace.chat') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.chat') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-chat-dots"></i></span><span>Chat <span class="sidebarChatBadge badge bg-danger rounded-pill ms-2" style="display:none; font-size:.65rem; padding:.2rem .4rem;"></span></span>
+                                            </a>
+                                        @endif
+                                    </div>
                                 @endif
 
-                                @if ($router->has('marketplace.products'))
-                                    <a href="{{ route('marketplace.products') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.products') ? 'active' : '' }}">
-                                        <span class="icon">🏷</span><span>Produk</span>
-                                    </a>
+                                @if ($router->has('marketplace.products') || $hasMarketplacePromotions || $hasMarketplacePromotionsSummary)
+                                    <button class="mobile-sidebar-link mobile-sidebar-toggle mobile-sidebar-nested-toggle {{ $marketplaceCatalogGroupOpen ? 'is-open' : '' }}"
+                                            type="button" data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminCatalogMobile"
+                                            aria-expanded="{{ $marketplaceCatalogGroupOpen ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminCatalogMobile">
+                                        <span class="icon"><i class="bi bi-tags"></i></span><span>Produk & Promosi</span><span class="chevron">▸</span>
+                                    </button>
+                                    <div class="collapse mobile-sidebar-nested-collapse {{ $marketplaceCatalogGroupOpen ? 'show' : '' }}" id="navMarketplaceAdminCatalogMobile">
+                                        @if ($router->has('marketplace.products'))
+                                            <a href="{{ route('marketplace.products') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.products') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-tags"></i></span><span>Produk</span>
+                                            </a>
+                                        @endif
+                                        @if ($hasMarketplacePromotions)
+                                            <a href="{{ route('marketplace.promotions') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.promotions') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-percent"></i></span><span>Promosi</span>
+                                            </a>
+                                        @endif
+                                        @if ($hasMarketplacePromotionsSummary)
+                                            <a href="{{ route('marketplace.promotions.summary') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.promotions.summary') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-grid-3x3-gap"></i></span><span>Summary Promosi</span>
+                                            </a>
+                                        @endif
+                                    </div>
                                 @endif
 
-                                @if ($hasMarketplacePromotions)
-                                    <a href="{{ route('marketplace.promotions') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.promotions') ? 'active' : '' }}">
-                                        <span class="icon">🏷️</span><span>Promosi</span>
-                                    </a>
-                                @endif
-
-                                @if ($hasMarketplacePromotionsSummary)
-                                    <a href="{{ route('marketplace.promotions.summary') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.promotions.summary') ? 'active' : '' }}">
-                                        <span class="icon">📊</span><span>Summary Promosi</span>
-                                    </a>
-                                @endif
-
-                                @if ($router->has('marketplace.chat') && $canModule('marketplace'))
-                                    <a href="{{ route('marketplace.chat') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.chat') ? 'active' : '' }}">
-                                        <span class="icon">💬</span><span>Chat <span class="sidebarChatBadge badge bg-danger rounded-pill ms-2" style="display:none; font-size:.65rem; padding:.2rem .4rem;"></span></span>
-                                    </a>
-                                @endif
-
-                                @if ($hasMarketplaceSalesReport)
-                                    <a href="{{ route('marketplace.reports.sales') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.sales') ? 'active' : '' }}">
-                                        <span class="icon">📈</span><span>Ringkasan Penjualan</span>
-                                    </a>
-                                @endif
-
-                                @if ($hasMarketplaceFinance)
-                                    <a href="{{ route('marketplace.finance.index') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.*') ? 'active' : '' }}">
-                                        <span class="icon">💳</span><span>Marketplace Finance</span>
-                                    </a>
-                                @endif
-
-                                @if ($hasMarketplaceReconcileQueue)
-                                    <a href="{{ route('marketplace.reconcile.queue') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reconcile.*') || request()->routeIs('marketplace.reconciliations.*') ? 'active' : '' }}">
-                                        <span class="icon">🧩</span><span>Antrean Rekonsiliasi</span>
-                                    </a>
-                                @endif
-
-                                @if ($hasMarketplaceReconcileItemsIndex)
-                                    <a href="{{ route('marketplace.reconcile.items') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reconcile.items*') ? 'active' : '' }}">
-                                        <span class="icon">🧾</span><span>Pencocokan Barang</span>
-                                    </a>
+                                @if ($hasMarketplaceSalesReport || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
+                                    <button class="mobile-sidebar-link mobile-sidebar-toggle mobile-sidebar-nested-toggle {{ $marketplaceFinanceGroupOpen ? 'is-open' : '' }}"
+                                            type="button" data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminFinanceMobile"
+                                            aria-expanded="{{ $marketplaceFinanceGroupOpen ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminFinanceMobile">
+                                        <span class="icon"><i class="bi bi-bar-chart-line"></i></span><span>Keuangan & Laporan</span><span class="chevron">▸</span>
+                                    </button>
+                                    <div class="collapse mobile-sidebar-nested-collapse {{ $marketplaceFinanceGroupOpen ? 'show' : '' }}" id="navMarketplaceAdminFinanceMobile">
+                                        @if ($hasMarketplaceSalesReport)
+                                            <a href="{{ route('marketplace.reports.sales') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.sales') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-graph-up"></i></span><span>Ringkasan Penjualan</span>
+                                            </a>
+                                        @endif
+                                        @if ($hasMarketplaceFinance)
+                                            <a href="{{ route('marketplace.finance.index') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.*') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-wallet2"></i></span><span>Marketplace Finance</span>
+                                            </a>
+                                        @endif
+                                        @if ($hasMarketplaceReconcileQueue)
+                                            <a href="{{ route('marketplace.reconcile.queue') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reconcile.*') || request()->routeIs('marketplace.reconciliations.*') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-puzzle"></i></span><span>Antrean Rekonsiliasi</span>
+                                            </a>
+                                        @endif
+                                        @if ($hasMarketplaceReconcileItemsIndex)
+                                            <a href="{{ route('marketplace.reconcile.items') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reconcile.items*') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-receipt"></i></span><span>Pencocokan Barang</span>
+                                            </a>
+                                        @endif
+                                    </div>
                                 @endif
                             </div>
                         </li>
@@ -1673,7 +1753,7 @@
                     @endif
 
                     {{-- SALES & MARKETPLACE --}}
-                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialQuality || $hasMarketplaceFinance || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues || $hasImportMarketplaceIndex || $hasImportMarketplaceDraft || $hasImportMarketplaceIncomeIndex || $hasImportMarketplaceIncomeDraft)
+                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceProfit || $hasMarketplaceSalesReport || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialQuality || $hasMarketplaceFinance || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues || $hasMarketplaceShopeeApiLogs || $hasImportMarketplaceIndex || $hasImportMarketplaceDraft || $hasImportMarketplaceIncomeIndex || $hasImportMarketplaceIncomeDraft)
                     <div class="mobile-sidebar-section-label">Toko Online</div>
                     <li class="mb-1">
                         <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}"
@@ -1686,6 +1766,12 @@
                         </button>
 
                         <div class="collapse {{ $marketplaceOpen ? 'show' : '' }}" id="navMarketplaceMobile">
+                            <button class="mobile-sidebar-link mobile-sidebar-toggle mobile-sidebar-nested-toggle {{ ($marketplaceOrderGroupOpen || $marketplaceCatalogGroupOpen) ? 'is-open' : '' }}"
+                                    type="button" data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerOperationalMobile"
+                                    aria-expanded="{{ ($marketplaceOrderGroupOpen || $marketplaceCatalogGroupOpen) ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerOperationalMobile">
+                                <span class="icon"><i class="bi bi-box-seam"></i></span><span>Operasional & Produk</span><span class="chevron">▸</span>
+                            </button>
+                            <div class="collapse mobile-sidebar-nested-collapse {{ ($marketplaceOrderGroupOpen || $marketplaceCatalogGroupOpen) ? 'show' : '' }}" id="navMarketplaceOwnerOperationalMobile">
                             <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Operasional</div>
 
                             @if ($hasMarketplaceToko)
@@ -1693,6 +1779,18 @@
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.toko') ? 'active' : '' }}">
                                     <span class="icon">🏪</span><span>Toko & Kanal</span>
                                 </a>
+                                @if ($router->has('marketplace.returns'))
+                                    <a href="{{ route('marketplace.returns') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.returns') ? 'active' : '' }}">
+                                        <span class="icon"><i class="bi bi-arrow-return-left"></i></span><span>Retur</span>
+                                    </a>
+                                @endif
+                                @if ($router->has('marketplace.kilat'))
+                                    <a href="{{ route('marketplace.kilat') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.kilat') ? 'active' : '' }}">
+                                        <span class="icon"><i class="bi bi-lightning-charge"></i></span><span>Pesanan Kilat</span>
+                                    </a>
+                                @endif
                                 <a href="{{ route('marketplace.settings') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.settings') ? 'active' : '' }}">
                                     <span class="icon">⚙️</span><span>Pengaturan Umum</span>
@@ -1740,7 +1838,14 @@
                                     <span class="icon">🧺</span><span>Pengambilan</span>
                                 </a>
                             @endif
+                            </div>
 
+                            <button class="mobile-sidebar-link mobile-sidebar-toggle mobile-sidebar-nested-toggle {{ $marketplaceDataGroupOpen ? 'is-open' : '' }}"
+                                    type="button" data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerDataMobile"
+                                    aria-expanded="{{ $marketplaceDataGroupOpen ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerDataMobile">
+                                <span class="icon"><i class="bi bi-arrow-repeat"></i></span><span>Data & Sinkronisasi</span><span class="chevron">▸</span>
+                            </button>
+                            <div class="collapse mobile-sidebar-nested-collapse {{ $marketplaceDataGroupOpen ? 'show' : '' }}" id="navMarketplaceOwnerDataMobile">
                             <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Data & Sinkronisasi</div>
 
                             @if ($hasMarketplaceSkuMapping)
@@ -1763,7 +1868,20 @@
                                     <span class="icon">⚠️</span><span>Perbaikan Data</span>
                                 </a>
                             @endif
+                            @if ($hasMarketplaceShopeeApiLogs)
+                                <a href="{{ route('marketplace.shopee-api-logs') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.shopee-api-logs') ? 'active' : '' }}">
+                                    <span class="icon"><i class="bi bi-hdd-network"></i></span><span>Log API Shopee</span>
+                                </a>
+                            @endif
+                            </div>
 
+                            <button class="mobile-sidebar-link mobile-sidebar-toggle mobile-sidebar-nested-toggle {{ $marketplaceFinanceGroupOpen ? 'is-open' : '' }}"
+                                    type="button" data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerFinanceMobile"
+                                    aria-expanded="{{ $marketplaceFinanceGroupOpen ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerFinanceMobile">
+                                <span class="icon"><i class="bi bi-bar-chart-line"></i></span><span>Keuangan & Analitik</span><span class="chevron">▸</span>
+                            </button>
+                            <div class="collapse mobile-sidebar-nested-collapse {{ $marketplaceFinanceGroupOpen ? 'show' : '' }}" id="navMarketplaceOwnerFinanceMobile">
                             <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Analisa</div>
 
                             @if ($hasMarketplacePencairanDana)
@@ -1849,9 +1967,22 @@
                                     <span class="icon">📊</span><span>Analisa Penjualan</span>
                                 </a>
                             @endif
+                            @if ($hasMarketplaceSalesReport)
+                                <a href="{{ route('marketplace.reports.sales') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.sales') ? 'active' : '' }}">
+                                    <span class="icon"><i class="bi bi-graph-up"></i></span><span>Laporan Penjualan</span>
+                                </a>
+                            @endif
+                            </div>
 
                             @if ($hasImportMarketplaceIndex || $hasImportMarketplaceDraft || $hasImportMarketplaceIncomeIndex || $hasImportMarketplaceIncomeDraft)
-                                <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Impor</div>
+                                <button class="mobile-sidebar-link mobile-sidebar-toggle mobile-sidebar-nested-toggle {{ $marketplaceImportGroupOpen ? 'is-open' : '' }}"
+                                        type="button" data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerImportMobile"
+                                        aria-expanded="{{ $marketplaceImportGroupOpen ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerImportMobile">
+                                    <span class="icon"><i class="bi bi-upload"></i></span><span>Impor</span><span class="chevron">▸</span>
+                                </button>
+                                <div class="collapse mobile-sidebar-nested-collapse {{ $marketplaceImportGroupOpen ? 'show' : '' }}" id="navMarketplaceOwnerImportMobile">
+                            <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Impor</div>
                                 @if ($hasImportMarketplaceIndex)
                                     <a href="{{ route('imports.marketplace.index') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('imports.marketplace.*') ? 'active' : '' }}">
@@ -1876,6 +2007,7 @@
                                         <span class="icon">🕘</span><span>Draft Income</span>
                                     </a>
                                 @endif
+                                </div>
                             @endif
                         </div>
                     </li>
