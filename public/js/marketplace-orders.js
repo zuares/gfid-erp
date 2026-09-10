@@ -1905,7 +1905,9 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         const badgeSubReadyAll = $('badge-sub-ready-all');
         if (badgeSubReadyAll) badgeSubReadyAll.textContent = Number(orderCounts?.ready ?? readyRows.length);
         const badgeSubReadyUnpaid = $('badge-sub-ready-unpaid');
-        if (badgeSubReadyUnpaid) badgeSubReadyUnpaid.textContent = unpaidCount;
+        // Daftar `orders` hanya berisi subtab aktif. Gunakan total server agar
+        // angka Belum Bayar tetap benar saat user sedang melihat subtab lain.
+        if (badgeSubReadyUnpaid) badgeSubReadyUnpaid.textContent = Number(orderCounts?.unpaid ?? unpaidCount);
         const badgeSubReadyProcess = $('badge-sub-ready-process');
         if (badgeSubReadyProcess) badgeSubReadyProcess.textContent = Number(orderCounts?.ready_process ?? processCount);
         const badgeSubReadyKilat = $('badge-sub-ready-kilat');
