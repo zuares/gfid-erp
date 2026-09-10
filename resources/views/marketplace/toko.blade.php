@@ -800,6 +800,8 @@
                         <option value="PROCESSED">PROCESSED (Sudah Diproses)</option>
                         <option value="SHIPPED">SHIPPED (Dikirim)</option>
                         <option value="COMPLETED">COMPLETED (Selesai)</option>
+                        <option value="INVOICE_PENDING">INVOICE_PENDING (Tertunda)</option>
+                        <option value="IN_CANCEL">IN_CANCEL (Proses Batal)</option>
                         <option value="CANCELLED">CANCELLED (Dibatalkan)</option>
                     </select>
                     <button class="btn btn-ship-primary px-3" type="button" id="btnFetchOrderList">Tarik Data</button>
@@ -1126,6 +1128,7 @@
                             ${isShopee ? `
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="simulateWebhook(${s.id}, '${esc(s.name)}', 'shopee', '${s.external_shop_id}', 'order_status_update')"><i class="bi bi-broadcast text-primary me-2"></i>Simulasi: Tes Order Baru</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="simulateWebhook(${s.id}, '${esc(s.name)}', 'shopee', '${s.external_shop_id}', 'auth_expiry_push')"><i class="bi bi-broadcast text-warning me-2"></i>Simulasi: Token Expired (Push 12)</button></li>
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="checkOrderList(${s.id}, '${esc(s.name)}')"><i class="bi bi-list-ul text-primary me-2"></i>Tes API: get_order_list</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testOrderDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-bug text-info me-2"></i>Tes API: get_order_detail</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testPackageDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-box text-success me-2"></i>Tes API: get_package_detail</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testReturnList(${s.id}, '${esc(s.name)}')"><i class="bi bi-arrow-return-left text-danger me-2"></i>Tes API: get_return_list</button></li>

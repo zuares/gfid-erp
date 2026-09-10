@@ -246,11 +246,27 @@ class MarketplaceLogisticsController extends Controller
         try {
             $driver = $this->manager->driver($store);
             if (method_exists($driver, 'getOrders')) {
-                $timeFrom = $request->input('time_from', time() - (86400 * 3)); // default last 3 days
-                $timeTo = $request->input('time_to', time());
-                $status = $request->input('order_status', '');
-                
-                $result = $this->ensureSuccess($driver->getOrders($store, (int)$timeFrom, (int)$timeTo, 20, '', $status));
+                // Selaraskan parameter dengan Shopee v2.order.get_order_list:
+                // time_range_field, cursor, page_size, dan order_status.
+                $timeFrom = (int) $request->input('time_from', time() - (86400 * 3));
+                $timeTo = (int) $request->input('time_to', time());
+                $pageSize = min(100, max(1, (int) $request->input('page_size', 20)));
+                $cursor = trim((string) $request->input('cursor', ''));
+                $status = trim((string) $request->input('order_status', ''));
+                $timeRangeField = (string) $request->input('time_range_field', 'update_time');
+                if (! in_array($timeRangeField, ['create_time', 'update_time'], true)) {
+                    $timeRangeField = 'update_time';
+                }
+
+                $result = $this->ensureSuccess($driver->getOrders(
+                    $store,
+                    $timeFrom,
+                    $timeTo,
+                    $pageSize,
+                    $cursor,
+                    $status,
+                    $timeRangeField,
+                ));
                 return response()->json($result);
             }
             return response()->json(['error' => 'Not supported on this channel'], 400);
