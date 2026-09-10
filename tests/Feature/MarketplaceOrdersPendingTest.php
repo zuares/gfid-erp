@@ -182,4 +182,32 @@ class MarketplaceOrdersPendingTest extends TestCase
         $this->getJson('/api/marketplace/local-orders-paginated?tab=ready&sub_tab=unpaid')
             ->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.platform_pending', false);
     }
+
+    public function test_raw_unpaid_status_is_shown_in_unpaid_subtab(): void
+    {
+        $order = $this->createOrder('RAW-UNPAID', 'READY_TO_SHIP', 'buyer');
+        $order->update([
+            'raw_json' => [
+                'order_status' => 'UNPAID',
+                'package_list' => [[
+                    'logistics_status' => 'LOGISTICS_READY',
+                ]],
+            ],
+        ]);
+
+        $this->getJson('/api/marketplace/local-orders-paginated?tab=ready&sub_tab=unpaid')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.channel_order_id', 'RAW-UNPAID');
+
+        $this->getJson('/api/marketplace/local-orders-paginated?tab=ready&sub_tab=process')
+            ->assertOk()
+            ->assertJsonPath('total', 0);
+
+        $this->getJson('/api/marketplace/local-order-counts')
+            ->assertOk()
+            ->assertJsonPath('unpaid', 1)
+            ->assertJsonPath('ready_process', 0)
+            ->assertJsonPath('ready_pending', 0);
+    }
 }

@@ -2057,7 +2057,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     // order_status dinormalisasi menjadi READY_TO_SHIP karena belum ada bukti
     // pengaturan pengiriman.
     function platformOrderStatus(o) {
-        return String(o.api_order_status || o.platform_status || o.order_status || '').toUpperCase();
+        const rawStatus = o.raw_json && typeof o.raw_json === 'object' ? o.raw_json.order_status : '';
+        return String(o.api_order_status || o.platform_status || rawStatus || o.order_status || '').toUpperCase();
     }
 
     function isPendingOrder(o) {

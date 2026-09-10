@@ -58,7 +58,9 @@ trait MarketplaceOrdersPaginatedTrait
         $baseQuery = MarketplaceOrder::query();
         $applyScope($baseQuery);
 
-        $readyQuery = (clone $baseQuery)->whereIn('order_status', ['PENDING', 'INVOICE_PENDING', 'READY_TO_SHIP', 'MATCHED']);
+        $readyQuery = (clone $baseQuery)
+            ->whereIn('order_status', ['PENDING', 'INVOICE_PENDING', 'READY_TO_SHIP', 'MATCHED'])
+            ->whereJsonDoesntContain('raw_json->order_status', 'UNPAID');
         $pendingCount = (clone $readyQuery)->shippingPending()->count();
         $processCount = (clone $readyQuery)->shippingPending(false)->count();
 
@@ -70,6 +72,15 @@ trait MarketplaceOrdersPaginatedTrait
             ->groupBy('order_status')
             ->pluck('total', 'order_status')
             ->all();
+
+        // Payload Shopee dapat membawa status terbaru di raw_json sebelum
+        // kolom kanonik selesai diperbarui oleh proses sinkronisasi.
+        $unpaidCount = (clone $baseQuery)
+            ->where(function ($q) {
+                $q->where('order_status', 'UNPAID')
+                    ->orWhereJsonContains('raw_json->order_status', 'UNPAID');
+            })
+            ->count();
 
         // Calculate issues count (simplified)
         $issuesQuery = MarketplaceOrder::whereHas('items', function ($q) {
@@ -86,7 +97,7 @@ trait MarketplaceOrdersPaginatedTrait
             'shipped' => ($counts['SHIPPED'] ?? 0) + ($counts['TO_CONFIRM_RECEIVE'] ?? 0),
             'completed' => $counts['COMPLETED'] ?? 0,
             'failed_delivery' => $failedDeliveryQuery->count(),
-            'unpaid' => $counts['UNPAID'] ?? 0,
+            'unpaid' => $unpaidCount,
             'cancel' => ($counts['CANCELLED'] ?? 0) + ($counts['IN_CANCEL'] ?? 0) + ($counts['CANCELLED_BEFORE_SHIPPING'] ?? 0),
             'rrc' => ($counts['TO_RETURN'] ?? 0) + ($counts['RETURNED'] ?? 0),
             'issues' => $issuesCount
@@ -173,12 +184,18 @@ trait MarketplaceOrdersPaginatedTrait
             });
         } elseif ($tab === 'ready') {
             if ($subTab === 'unpaid') {
-                $query->where('order_status', 'UNPAID');
+                $query->where(function ($q) {
+                    $q->where('order_status', 'UNPAID')
+                        ->orWhereJsonContains('raw_json->order_status', 'UNPAID');
+                });
             } elseif ($subTab === 'cancel') {
                 $query->whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING']);
             } else {
                 // Approximate logic for kilat/instant handling
                 $query->whereIn('order_status', ['PENDING', 'INVOICE_PENDING', 'READY_TO_SHIP', 'MATCHED']);
+                // Order dengan status platform UNPAID hanya boleh muncul di
+                // subtab Belum Bayar, walau kolom lokalnya masih READY_TO_SHIP.
+                $query->whereJsonDoesntContain('raw_json->order_status', 'UNPAID');
                 if ($subTab === 'pending') {
                     $query->shippingPending();
                 } elseif ($subTab === 'process') {
