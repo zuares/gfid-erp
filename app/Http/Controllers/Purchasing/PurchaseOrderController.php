@@ -464,8 +464,10 @@ class PurchaseOrderController extends Controller
             ->where('type', 'loan_apply')
             ->sum('amount');
 
-        $dpAvailable = PurchaseOrder::normalizePaymentRemainder($dpTotal - $dpAppliedTotal);
         $advanceTotal = round($dpTotal + $loanAppliedTotal, 2);
+        // Uang muka dari DP kas dan alokasi pinjaman sama-sama bisa di-offset
+        // ke Hutang Dagang setelah GRN posted.
+        $dpAvailable = PurchaseOrder::normalizePaymentRemainder($advanceTotal - $dpAppliedTotal);
         $advanceAvailable = PurchaseOrder::normalizePaymentRemainder($advanceTotal - $dpAppliedTotal);
 
         $settled = $paidPaymentTotal + $dpAppliedTotal;

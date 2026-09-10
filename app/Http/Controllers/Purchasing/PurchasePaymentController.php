@@ -413,8 +413,10 @@ class PurchasePaymentController extends Controller
             ]);
         }
 
-        // hitung DP tersedia
-        $dpTotal = (float) $purchase_order->activePayments()->where('type', 'dp')->sum('amount');
+        // Hitung uang muka tersedia, termasuk alokasi pinjaman supplier.
+        $dpTotal = (float) $purchase_order->activePayments()
+            ->whereIn('type', ['dp', 'loan_apply'])
+            ->sum('amount');
         $dpApplied = (float) $purchase_order->activePayments()->where('type', 'dp_apply')->sum('amount');
         $dpAvailable = PurchaseOrder::normalizePaymentRemainder($dpTotal - $dpApplied);
 
@@ -451,7 +453,9 @@ class PurchasePaymentController extends Controller
 
             // Recalculate both balances while the PO is locked. Ini mencegah
             // dua request Offset DP memakai saldo DP/AP yang sama.
-            $dpTotal = (float) $lockedOrder->activePayments()->where('type', 'dp')->sum('amount');
+            $dpTotal = (float) $lockedOrder->activePayments()
+                ->whereIn('type', ['dp', 'loan_apply'])
+                ->sum('amount');
             $dpApplied = (float) $lockedOrder->activePayments()->where('type', 'dp_apply')->sum('amount');
             $dpAvailable = PurchaseOrder::normalizePaymentRemainder($dpTotal - $dpApplied);
             $apOutstanding = $this->calcApOutstandingByGrn($lockedOrder);

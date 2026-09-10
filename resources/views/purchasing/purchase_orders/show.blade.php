@@ -168,8 +168,8 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         // DP APPLY total (buat UI)
         $dpAppliedTotal =
             (float) ($dpAppliedTotal ?? ($order->activePayments()?->where('type', 'dp_apply')->sum('amount') ?? 0));
-        $dpAvailable = \App\Models\PurchaseOrder::normalizePaymentRemainder($dpTotal - $dpAppliedTotal);
         $advanceTotal = round($dpTotal + $loanAppliedTotal, 2);
+        $dpAvailable = \App\Models\PurchaseOrder::normalizePaymentRemainder($advanceTotal - $dpAppliedTotal);
         $advanceAvailable = \App\Models\PurchaseOrder::normalizePaymentRemainder($advanceTotal - $dpAppliedTotal);
 
         // outstanding hutang (should include dp_apply)
@@ -215,7 +215,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         // guard: payment hanya boleh kalau hutang real sudah ada
         $hasAp = $grnPostedTotal > 0.0001;
         $poGrandTotal = (float) ($order->grand_total ?? 0);
-        $dpRemaining = max(0, round($poGrandTotal - $dpTotal, 2));
+        $dpRemaining = max(0, round($poGrandTotal - $advanceTotal, 2));
         $supplierReceivable = \App\Models\PurchaseOrder::normalizePaymentRemainder((float) ($order->paid_amount ?? 0) - $poGrandTotal);
         $canPaySettlement = $canPay && $hasAp && $apOutstanding > 0;
         // DP boleh melebihi nilai PO agar selisihnya tercatat sebagai piutang supplier.
@@ -850,10 +850,9 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                     <span class="modal-kpi">Retur <strong class="mono">{{ rupiah($returnPostedTotal) }}</strong></span>
                                 @endif
                                 <span class="modal-kpi">Sisa <strong class="mono">{{ $formatPaymentMoney($apOutstanding) }}</strong></span>
-                                <span class="modal-kpi">DP tersedia <strong class="mono">{{ rupiah($dpAvailable) }}</strong></span>
                             @else
                                 <span class="modal-kpi">Total PO <strong class="mono">{{ rupiah($poGrandTotal) }}</strong></span>
-                                <span class="modal-kpi">DP tercatat <strong class="mono">{{ rupiah($dpTotal) }}</strong></span>
+                                <span class="modal-kpi">Uang muka tercatat <strong class="mono">{{ rupiah($advanceTotal) }}</strong></span>
                                 <span class="modal-kpi">Sisa nilai PO <strong class="mono">{{ rupiah($dpRemaining) }}</strong></span>
                             @endif
                         </div>
@@ -872,7 +871,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                         <b>Hutang Dagang</b>; tidak ada uang baru yang keluar.
                                     </div>
                                     <div class="row g-2">
-                            @if ($dpTotal > 0.0001 && $dpRemaining <= \App\Models\PurchaseOrder::paymentRoundingTolerance())
+                            @if ($advanceTotal > 0.0001 && $dpRemaining <= \App\Models\PurchaseOrder::paymentRoundingTolerance())
                                 <div class="col-12">
                                     <div class="alert alert-warning py-2 px-3 mb-1 small">
                                         DP sudah menutup total PO. Tambahan nominal tetap boleh dicatat, tetapi selisihnya akan menjadi piutang supplier.
@@ -881,8 +880,8 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                             @elseif (!$hasAp)
                                 <div class="col-12">
                                     <div class="alert alert-info py-2 px-3 mb-1 small">
-                                        @if ($dpTotal > 0.0001)
-                                            DP sudah tercatat {{ rupiah($dpTotal) }}. Tambahan nominal akan menambah DP; pelunasan baru tersedia setelah GRN diposting.
+                                        @if ($advanceTotal > 0.0001)
+                                            DP sudah tercatat {{ rupiah($advanceTotal) }} (termasuk alokasi pinjaman). Tambahan nominal akan menambah uang muka; pelunasan baru tersedia setelah GRN diposting.
                                         @else
                                             Belum ada GRN POSTED. Nominal ini akan dicatat sebagai DP; pelunasan baru tersedia setelah barang diterima dan GRN diposting.
                                         @endif
@@ -1040,7 +1039,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                     <div>
                         <h6 class="modal-title fw-semibold mb-0">Offset DP</h6>
                         <div class="d-flex gap-1 flex-wrap mt-2">
-                            <span class="modal-kpi">DP <strong class="mono">{{ rupiah($dpAvailable) }}</strong></span>
+                            <span class="modal-kpi">Uang muka <strong class="mono">{{ rupiah($dpAvailable) }}</strong></span>
                             <span class="modal-kpi">AP sudah diselesaikan <strong class="mono">{{ rupiah($apSettledTotal) }}</strong></span>
                             @if ($returnPostedTotal > 0.0001)
                                 <span class="modal-kpi">Retur <strong class="mono">{{ rupiah($returnPostedTotal) }}</strong></span>

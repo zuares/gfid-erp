@@ -4,8 +4,10 @@ namespace Tests\Feature\Purchasing;
 
 use App\Models\Account;
 use App\Models\Journal;
+use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
+use App\Models\PurchaseReceipt;
 use App\Models\Supplier;
 use App\Models\SupplierLoan;
 use App\Services\Accounting\SupplierLoanService;
@@ -45,6 +47,16 @@ class SupplierLoanAllocationTest extends TestCase
         Account::firstOrCreate(
             ['code' => '2101'],
             ['name' => 'Hutang Dagang', 'type' => 'liability', 'is_cash' => false, 'is_active' => true],
+        );
+        PaymentMethod::firstOrCreate(
+            ['code' => 'DP_APPLY'],
+            [
+                'name' => 'Offset DP',
+                'mode' => 'credit',
+                'description' => 'Offset uang muka ke hutang supplier',
+                'sort_order' => 90,
+                'is_active' => true,
+            ],
         );
         $loan = SupplierLoan::create([
             'supplier_id' => $supplier->id,
@@ -105,6 +117,40 @@ class SupplierLoanAllocationTest extends TestCase
         $this->assertSame('partial', $order->fresh()->payment_status);
         $this->assertSame(400000.0, (float) $order->fresh()->paid_amount);
         $this->assertSame(600000.0, $loan->fresh()->allocation_available_amount);
+
+        // Setelah GRN posted, alokasi pinjaman harus bisa di-offset ke AP.
+        PurchaseReceipt::create([
+            'code' => 'GRN-ALLOC-001',
+            'date' => '2026-09-08',
+            'purchase_order_id' => $order->id,
+            'supplier_id' => $supplier->id,
+            'subtotal' => 400000,
+            'grand_total' => 400000,
+            'status' => 'posted',
+        ]);
+
+        $offsetResponse = $this->actingAs($user)->post(
+            route('purchasing.purchase_orders.payments.apply_dp', $order),
+            [
+                'date' => '2026-09-08',
+                'amount' => '400000',
+                'notes' => 'Offset alokasi pinjaman ke AP',
+            ],
+        );
+
+        $offsetResponse->assertRedirect();
+        $offsetResponse->assertSessionDoesntHaveErrors();
+        $this->assertDatabaseHas('purchase_payments', [
+            'purchase_order_id' => $order->id,
+            'type' => 'dp_apply',
+            'amount' => 400000,
+        ]);
+        $apAccount = Account::where('code', '2101')->firstOrFail();
+        $this->assertDatabaseHas('journal_lines', [
+            'account_id' => $apAccount->id,
+            'debit' => 400000,
+            'credit' => 0,
+        ]);
 
         // Alokasi kedua menghabiskan sisa nilai PO. Record payment yang sedang
         // diposting tidak boleh dihitung dua kali oleh JournalService.
