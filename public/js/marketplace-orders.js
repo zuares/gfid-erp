@@ -1500,8 +1500,10 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             toolbar.classList.toggle('visible', true);
             $('toolbarInfo').style.display = 'none';
         } else if (activeTab === 'ready') {
-            const rows = getProcessRows();
-            toolbar.classList.toggle('visible', rows.length > 0);
+            // Toolbar ini juga memuat seluruh subtab Perlu Dikirim. Jangan
+            // menyembunyikannya saat Tertunda dipilih karena halaman sedang
+            // memuat subset order yang memang tidak bisa diproses.
+            toolbar.classList.toggle('visible', true);
             $('toolbarInfo').style.display = 'none';
         } else {
             toolbar.classList.toggle('visible', true);
