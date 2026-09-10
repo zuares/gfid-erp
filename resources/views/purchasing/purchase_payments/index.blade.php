@@ -58,6 +58,8 @@
   }
   .po-card:hover    { border-color:#94a3b8; background:rgba(59,130,246,.03); }
   .po-card.selected { border-color:#2563eb; background:rgba(59,130,246,.05); }
+  .po-card-check { width:1rem; height:1rem; pointer-events:none; }
+  .allocation-row { border-top:1px solid var(--line); padding-top:.45rem; margin-top:.45rem; }
 
   /* Tbl link */
   .tbl-link { color:inherit; text-decoration:none; font-weight:600; }
@@ -80,8 +82,8 @@
       <h2 class="mb-0">Pembayaran Supplier</h2>
       <div class="text-muted small">Jurnal: Dr 2101 Hutang Dagang / Cr Bank</div>
     </div>
-    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalBayar">
-      <i class="bi bi-plus me-1"></i>Bayar Supplier
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalBayar" onclick="resetPaymentPicker()">
+      <i class="bi bi-plus me-1"></i>Bayar Supplier / Gabungkan PO
     </button>
   </div>
 
@@ -268,27 +270,35 @@
 
         {{-- Step 1: Pilih PO --}}
         <div class="mb-3">
-          <label class="form-label small fw-semibold">Pilih PO yang akan dibayar</label>
+          <label class="form-label small fw-semibold">Pilih PO yang akan dibayar <span class="text-muted fw-normal">(bisa beberapa, supplier wajib sama)</span></label>
           <input type="search" id="poSearch" class="form-control form-control-sm mb-2"
                  placeholder="Cari kode PO atau nama supplier…" autocomplete="off">
           <div id="poList" style="display:grid;gap:.45rem;max-height:220px;overflow-y:auto;">
             @forelse ($openPos as $po)
             @php $outstanding = (float) ($po->payment_outstanding ?? 0); @endphp
             <div class="po-card" data-po-id="{{ $po->id }}" data-po-code="{{ $po->code }}"
-                 data-supplier="{{ $po->supplier?->name }}" data-outstanding="{{ $outstanding }}"
-                 onclick="selectPo(this)">
-              <div class="d-flex justify-content-between align-items-start">
+                 data-supplier-id="{{ $po->supplier_id }}" data-supplier="{{ $po->supplier?->name }}"
+                 data-po-date="{{ \Carbon\Carbon::parse($po->date)->format('d/m/Y') }}"
+                 data-items="{{ $po->lines->pluck('item.name')->filter()->join(', ') }}"
+                 data-outstanding="{{ $outstanding }}" onclick="togglePo(this)">
+              <div class="d-flex align-items-start gap-2">
+                <input type="checkbox" class="po-card-check mt-1" tabindex="-1" aria-hidden="true">
+                <div class="d-flex justify-content-between align-items-start flex-grow-1">
                 <div>
                   <div class="fw-semibold mono" style="font-size:.88rem;">{{ $po->code }}</div>
                   <div class="text-muted" style="font-size:.76rem;">
                     {{ $po->supplier?->name }} · {{ \Carbon\Carbon::parse($po->date)->format('d/m/Y') }}
                   </div>
+                  @if ($po->lines->pluck('item.name')->filter()->isNotEmpty())
+                    <div class="text-muted" style="font-size:.7rem;">Item: {{ $po->lines->pluck('item.name')->filter()->join(', ') }}</div>
+                  @endif
                 </div>
                 <div class="text-end">
                   <div class="mono fw-bold text-danger" style="font-size:.88rem;">
                     Rp {{ number_format($outstanding, 0, ',', '.') }}
                   </div>
                   <div class="text-muted" style="font-size:.7rem;">outstanding</div>
+                </div>
                 </div>
               </div>
             </div>
@@ -302,6 +312,7 @@
         <form id="payForm" method="POST" action="" style="display:none;">
           @csrf
           <input type="hidden" name="type" value="payment">
+          <div id="combinedFields"></div>
 
           <div id="selectedPoInfo" class="mb-3 p-2 rounded"
                style="background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.2);font-size:.85rem;"></div>
@@ -313,7 +324,7 @@
                      value="{{ date('Y-m-d') }}" required>
             </div>
             <div class="col-sm-6">
-              <label class="form-label small fw-semibold">Jumlah <span class="text-danger">*</span></label>
+              <label class="form-label small fw-semibold"><span id="amountLabel">Jumlah</span> <span class="text-danger">*</span></label>
               <div class="input-group input-group-sm">
                 <span class="input-group-text">Rp</span>
                 <input type="text" name="amount" id="payAmount" class="form-control"
@@ -356,7 +367,7 @@
 
           <div class="d-flex justify-content-end gap-2 mt-3 pt-3" style="border-top:1px solid var(--line);">
             <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-            <button type="submit" class="btn btn-sm btn-primary">Simpan Pembayaran</button>
+            <button type="submit" class="btn btn-sm btn-primary" id="submitPaymentButton">Simpan Pembayaran</button>
           </div>
         </form>
 
@@ -371,19 +382,105 @@
 const fmt = n => Math.round(n).toLocaleString('id-ID');
 
 function selectPo(el) {
-    document.querySelectorAll('.po-card').forEach(c => c.classList.remove('selected'));
-    el.classList.add('selected');
+    togglePo(el);
+}
 
-    const route = '{{ url("/purchasing/purchase-orders") }}/' + el.dataset.poId + '/payments';
-    document.getElementById('payForm').action = route;
+function selectedPoCards() {
+    return [...document.querySelectorAll('.po-card.selected')];
+}
 
-    const out = parseFloat(el.dataset.outstanding);
-    document.getElementById('payAmount').value = Math.round(out);
-    document.getElementById('selectedPoInfo').innerHTML =
-        '<strong>' + el.dataset.poCode + '</strong> — ' + el.dataset.supplier +
-        ' &nbsp;·&nbsp; Outstanding: <strong class="text-danger">Rp ' + fmt(out) + '</strong>';
+function togglePo(el) {
+    const selected = selectedPoCards();
+    const willSelect = !el.classList.contains('selected');
+    const supplierId = el.dataset.supplierId;
+    const currentSupplierId = selected[0]?.dataset.supplierId;
 
-    document.getElementById('payForm').style.display = 'block';
+    if (willSelect && currentSupplierId && currentSupplierId !== supplierId) {
+        alert('PO yang digabung harus berasal dari supplier yang sama.');
+        return;
+    }
+
+    el.classList.toggle('selected', willSelect);
+    el.querySelector('.po-card-check').checked = willSelect;
+    syncPaymentSelection();
+}
+
+function syncPaymentSelection() {
+    const cards = selectedPoCards();
+    const form = document.getElementById('payForm');
+    const info = document.getElementById('selectedPoInfo');
+    const fields = document.getElementById('combinedFields');
+    const amount = document.getElementById('payAmount');
+    const label = document.getElementById('amountLabel');
+    const submit = document.getElementById('submitPaymentButton');
+
+    fields.innerHTML = '';
+    if (!cards.length) {
+        form.style.display = 'none';
+        return;
+    }
+
+    const total = cards.reduce((sum, card) => sum + parseFloat(card.dataset.outstanding || 0), 0);
+    const isCombined = cards.length > 1;
+    form.action = isCombined
+        ? '{{ route('purchasing.purchase_payments.combine') }}'
+        : '{{ url("/purchasing/purchase-orders") }}/' + cards[0].dataset.poId + '/payments';
+    amount.value = Math.round(total);
+    amount.readOnly = isCombined;
+    label.textContent = isCombined ? 'Total gabungan' : 'Jumlah';
+    submit.textContent = isCombined ? 'Simpan Pembayaran Gabungan' : 'Simpan Pembayaran';
+
+    let html = isCombined
+        ? '<div class="fw-semibold mb-1">' + cards.length + ' PO supplier ' + cards[0].dataset.supplier + '</div>'
+        : '';
+
+    cards.forEach(card => {
+        const out = parseFloat(card.dataset.outstanding || 0);
+        if (isCombined) {
+            const inputName = 'amounts[' + card.dataset.poId + ']';
+            fields.insertAdjacentHTML('beforeend', '<input type="hidden" name="purchase_order_ids[]" value="' + card.dataset.poId + '">');
+            html += '<div class="allocation-row d-flex justify-content-between align-items-center gap-2">'
+                + '<div><strong>' + card.dataset.poCode + '</strong><div class="text-muted" style="font-size:.72rem;">Tanggal ' + card.dataset.poDate
+                + (card.dataset.items ? ' · ' + card.dataset.items : '') + '</div></div>'
+                + '<div class="input-group input-group-sm" style="max-width:180px;"><span class="input-group-text">Rp</span>'
+                + '<input type="text" class="form-control combined-allocation" name="' + inputName + '" value="' + Math.round(out)
+                + '" data-outstanding="' + out + '" inputmode="decimal"></div></div>';
+        } else {
+            html += '<strong>' + card.dataset.poCode + '</strong> — ' + card.dataset.supplier
+                + ' &nbsp;·&nbsp; Outstanding: <strong class="text-danger">Rp ' + fmt(out) + '</strong>';
+        }
+    });
+    info.innerHTML = html;
+    form.style.display = 'block';
+
+    document.querySelectorAll('.combined-allocation').forEach(input => {
+        input.addEventListener('input', updateCombinedTotal);
+    });
+    updateCombinedTotal();
+}
+
+function updateCombinedTotal() {
+    const inputs = [...document.querySelectorAll('.combined-allocation')];
+    if (!inputs.length) return;
+    const total = inputs.reduce((sum, input) => sum + parseAmount(input.value), 0);
+    document.getElementById('payAmount').value = Math.round(total);
+}
+
+function parseAmount(value) {
+    const raw = String(value || '').replace(/\s/g, '');
+    if (raw.includes(',')) return parseFloat(raw.replace(/\./g, '').replace(',', '.')) || 0;
+    if (/^\d{1,3}(\.\d{3})+$/.test(raw)) return parseFloat(raw.replace(/\./g, '')) || 0;
+    return parseFloat(raw) || 0;
+}
+
+function resetPaymentPicker() {
+    document.querySelectorAll('.po-card.selected').forEach(card => {
+        card.classList.remove('selected');
+        card.querySelector('.po-card-check').checked = false;
+    });
+    document.getElementById('payForm').reset();
+    document.getElementById('payForm').style.display = 'none';
+    document.getElementById('combinedFields').innerHTML = '';
 }
 
 function updateCashAccount(sel) {

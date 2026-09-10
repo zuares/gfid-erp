@@ -118,6 +118,158 @@ class PurchaseOrderPaymentUiTest extends TestCase
             ->assertSee('GRN-PAY-001');
     }
 
+    public function test_owner_can_combine_payments_for_multiple_pos_of_the_same_supplier(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-COMBINED-PAY-' . uniqid(),
+        ]);
+        Account::create([
+            'code' => JournalService::CODE_AP,
+            'name' => 'Hutang Dagang',
+            'type' => 'liability',
+            'is_active' => true,
+        ]);
+        Account::create([
+            'code' => JournalService::CODE_ADV_PURCHASE,
+            'name' => 'Uang Muka Pembelian',
+            'type' => 'asset',
+            'is_active' => true,
+        ]);
+        $cash = Account::create([
+            'code' => '1101',
+            'name' => 'Kas',
+            'type' => 'asset',
+            'is_cash' => true,
+            'is_active' => true,
+        ]);
+        $method = PaymentMethod::create([
+            'code' => 'COMBINED-CASH-' . uniqid(),
+            'name' => 'Cash Combined Test',
+            'mode' => 'cash',
+            'is_active' => true,
+        ]);
+        $supplier = Supplier::create([
+            'code' => 'SUP-COMBINED-' . uniqid(),
+            'name' => 'Supplier Combined Payment',
+        ]);
+
+        $orders = collect([400000, 600000])->map(function (int $total, int $index) use ($supplier) {
+            $order = PurchaseOrder::create([
+                'code' => 'PO-COMBINED-'.$index.'-'.uniqid(),
+                'date' => '2026-09-11',
+                'supplier_id' => $supplier->id,
+                'grand_total' => $total,
+                'status' => 'approved',
+            ]);
+
+            PurchaseReceipt::create([
+                'code' => 'GRN-COMBINED-'.$index.'-'.uniqid(),
+                'date' => '2026-09-11',
+                'purchase_order_id' => $order->id,
+                'supplier_id' => $supplier->id,
+                'grand_total' => $total,
+                'status' => 'posted',
+                'is_replacement' => false,
+            ]);
+
+            return $order;
+        });
+
+        $this->actingAs($owner)
+            ->post(route('purchasing.purchase_payments.combine'), [
+                'purchase_order_ids' => $orders->pluck('id')->all(),
+                'amounts' => [
+                    $orders[0]->id => '400.000',
+                    $orders[1]->id => '600.000',
+                ],
+                'date' => '2026-09-11',
+                'payment_method_id' => $method->id,
+                'cash_account_id' => $cash->id,
+                'ref_no' => 'COMBINED-001',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $payments = PurchasePayment::query()
+            ->whereIn('purchase_order_id', $orders->pluck('id'))
+            ->where('ref_no', 'COMBINED-001')
+            ->get();
+
+        $this->assertCount(2, $payments);
+        $this->assertSame(1000000.0, (float) $payments->sum('amount'));
+        $this->assertTrue($payments->every(fn (PurchasePayment $payment) => ! empty($payment->journal_id)));
+        $this->assertTrue($payments->every(fn (PurchasePayment $payment) => ! empty($payment->purchase_receipt_id)));
+
+        $this->actingAs($owner)
+            ->get(route('purchasing.purchase_payments.index'))
+            ->assertOk()
+            ->assertSee('Bayar Supplier / Gabungkan PO')
+            ->assertSee('Riwayat Pembayaran');
+    }
+
+    public function test_combined_payment_rejects_pos_from_different_suppliers(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-COMBINED-MIXED-' . uniqid(),
+        ]);
+        $supplierA = Supplier::create([
+            'code' => 'SUP-COMBINED-A-' . uniqid(),
+            'name' => 'Supplier Combined A',
+        ]);
+        $supplierB = Supplier::create([
+            'code' => 'SUP-COMBINED-B-' . uniqid(),
+            'name' => 'Supplier Combined B',
+        ]);
+        $orders = collect([$supplierA, $supplierB])->map(function (Supplier $supplier, int $index) {
+            $order = PurchaseOrder::create([
+                'code' => 'PO-COMBINED-MIXED-'.$index.'-'.uniqid(),
+                'date' => '2026-09-11',
+                'supplier_id' => $supplier->id,
+                'grand_total' => 100000,
+                'status' => 'approved',
+            ]);
+
+            PurchaseReceipt::create([
+                'code' => 'GRN-COMBINED-MIXED-'.$index.'-'.uniqid(),
+                'date' => '2026-09-11',
+                'purchase_order_id' => $order->id,
+                'supplier_id' => $supplier->id,
+                'grand_total' => 100000,
+                'status' => 'posted',
+                'is_replacement' => false,
+            ]);
+
+            return $order;
+        });
+        $method = PaymentMethod::create([
+            'code' => 'MIXED-CASH-' . uniqid(),
+            'name' => 'Cash Mixed Supplier Test',
+            'mode' => 'cash',
+            'is_active' => true,
+        ]);
+        $cash = Account::create([
+            'code' => '1101',
+            'name' => 'Kas',
+            'type' => 'asset',
+            'is_cash' => true,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($owner)
+            ->post(route('purchasing.purchase_payments.combine'), [
+                'purchase_order_ids' => $orders->pluck('id')->all(),
+                'amounts' => $orders->mapWithKeys(fn (PurchaseOrder $order) => [$order->id => '100.000'])->all(),
+                'date' => '2026-09-11',
+                'payment_method_id' => $method->id,
+                'cash_account_id' => $cash->id,
+            ])
+            ->assertSessionHasErrors('purchase_order_ids');
+
+        $this->assertSame(0, PurchasePayment::count());
+    }
+
     public function test_owner_sees_tambah_dp_after_a_dp_has_been_recorded(): void
     {
         $owner = User::factory()->create([

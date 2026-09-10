@@ -77,7 +77,7 @@ class PurchasePaymentController extends Controller
 
         // POs with outstanding debt for create form
         $openPos = PurchaseOrder::query()
-            ->with('supplier')
+            ->with(['supplier', 'lines.item'])
             ->whereHas('purchaseReceipts', function ($s) {
                 $s->where('status', 'posted')
                     ->where(function ($q) {
@@ -518,6 +518,163 @@ class PurchasePaymentController extends Controller
         return back()->with('success', 'Pembayaran tersimpan.');
     }
 
+    /**
+     * Store one supplier payment allocated across multiple POs.
+     *
+     * A combined payment is persisted as one payment row per PO so the
+     * existing AP, journal, PO status, and detail history remain traceable.
+     * All POs must belong to the same supplier.
+     */
+    public function storeCombined(Request $request)
+    {
+        $this->ensureOwner($request);
+
+        $data = $request->validate([
+            'purchase_order_ids' => ['required', 'array', 'min:2'],
+            'purchase_order_ids.*' => ['required', 'integer', 'distinct', 'exists:purchase_orders,id'],
+            'amounts' => ['required', 'array'],
+            'amounts.*' => ['required', 'string'],
+            'date' => ['required', 'date'],
+            'payment_method_id' => ['required', 'integer', 'exists:payment_methods,id'],
+            'cash_account_id' => ['nullable', 'integer', 'exists:accounts,id'],
+            'ref_no' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $poIds = collect($data['purchase_order_ids'])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($poIds->count() < 2) {
+            throw ValidationException::withMessages([
+                'purchase_order_ids' => 'Pilih minimal dua PO untuk pembayaran gabungan.',
+            ]);
+        }
+
+        /** @var PaymentMethod $pm */
+        $pm = PaymentMethod::query()->findOrFail((int) $data['payment_method_id']);
+        $mode = $this->detectPaymentMode($pm);
+        if (! in_array($mode, ['cash', 'transfer'], true)) {
+            throw ValidationException::withMessages([
+                'payment_method_id' => 'Pembayaran gabungan hanya boleh menggunakan CASH atau TRANSFER.',
+            ]);
+        }
+
+        $cashAccountId = $this->resolveCashAccountId($pm, $data['cash_account_id'] ?? null);
+        $this->validateCashAccount($cashAccountId, $mode);
+
+        DB::transaction(function () use ($request, $data, $poIds, $cashAccountId) {
+            // Lock in a stable order to avoid two combined payments racing on
+            // the same set of PO balances.
+            $orders = PurchaseOrder::query()
+                ->whereIn('id', $poIds->all())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            if ($orders->count() !== $poIds->count()) {
+                throw ValidationException::withMessages([
+                    'purchase_order_ids' => 'Salah satu PO tidak ditemukan.',
+                ]);
+            }
+
+            $supplierIds = $orders->pluck('supplier_id')->unique()->values();
+            if ($supplierIds->count() !== 1) {
+                throw ValidationException::withMessages([
+                    'purchase_order_ids' => 'Pembayaran gabungan hanya boleh untuk PO dari supplier yang sama.',
+                ]);
+            }
+
+            $allocations = [];
+            foreach ($orders as $order) {
+                if (($order->status ?? '') === 'cancelled') {
+                    throw ValidationException::withMessages([
+                        'purchase_order_ids' => "PO {$order->code} sudah cancelled dan tidak bisa dibayar.",
+                    ]);
+                }
+
+                $amount = $this->toNumber(data_get($data, "amounts.{$order->id}"));
+                $outstanding = $this->rawApOutstandingByGrn($order);
+                $receipts = $this->receiptsWithOutstanding($order);
+                $receiptCapacity = min(
+                    $outstanding,
+                    (float) $receipts->sum('receipt_outstanding')
+                );
+
+                if ($amount <= 0) {
+                    throw ValidationException::withMessages([
+                        "amounts.{$order->id}" => "Alokasi untuk PO {$order->code} harus lebih dari 0.",
+                    ]);
+                }
+
+                if ($receiptCapacity <= 0.0001) {
+                    throw ValidationException::withMessages([
+                        "amounts.{$order->id}" => "PO {$order->code} sudah tidak memiliki GRN dengan hutang outstanding.",
+                    ]);
+                }
+
+                if ($amount > $receiptCapacity + PurchaseOrder::paymentRoundingTolerance()) {
+                    throw ValidationException::withMessages([
+                        "amounts.{$order->id}" => "Alokasi PO {$order->code} melebihi sisa hutangnya.",
+                    ]);
+                }
+
+                $allocations[(int) $order->id] = [
+                    'order' => $order,
+                    'amount' => min(round($amount, 2), $receiptCapacity),
+                    'receipts' => $receipts,
+                ];
+            }
+
+            foreach ($allocations as $allocation) {
+                /** @var PurchaseOrder $order */
+                $order = $allocation['order'];
+                $remaining = $allocation['amount'];
+
+                // Allocate oldest GRN first. A single combined action may
+                // therefore create several GRN-linked payment rows for one PO.
+                foreach ($allocation['receipts'] as $receipt) {
+                    if ($remaining <= 0.0001) {
+                        break;
+                    }
+
+                    $receiptAmount = min($remaining, (float) $receipt->receipt_outstanding);
+                    if ($receiptAmount <= 0.0001) {
+                        continue;
+                    }
+
+                    $payment = PurchasePayment::create([
+                        'purchase_order_id' => (int) $order->id,
+                        'purchase_receipt_id' => (int) $receipt->id,
+                        'date' => $data['date'],
+                        'payment_method_id' => (int) $data['payment_method_id'],
+                        'cash_account_id' => (int) $cashAccountId,
+                        'type' => 'payment',
+                        'amount' => round($receiptAmount, 2),
+                        'ref_no' => $data['ref_no'] ?? null,
+                        'notes' => $data['notes'] ?? null,
+                        'created_by' => (int) $request->user()->id,
+                    ]);
+
+                    $journal = $this->journalService->postPurchasePayment(
+                        $payment->fresh(['purchaseOrder', 'cashAccount', 'paymentMethod'])
+                    );
+
+                    if ($journal && empty($payment->journal_id) && ! empty($journal->id)) {
+                        $payment->forceFill(['journal_id' => (int) $journal->id])->save();
+                    }
+
+                    $remaining -= $receiptAmount;
+                }
+
+                $this->recalcPaymentStatus($order);
+            }
+        });
+
+        return back()->with('success', 'Pembayaran gabungan supplier berhasil disimpan untuk '.$poIds->count().' PO.');
+    }
+
     public function void(Request $request, PurchaseOrder $purchase_order, PurchasePayment $payment)
     {
         $this->ensureOwner($request);
@@ -912,6 +1069,47 @@ class PurchasePaymentController extends Controller
                     ->orWhere('resolution_type', '!=', 'replacement');
             })
             ->sum('total');
+    }
+
+    /**
+     * Posted, non-replacement GRNs with their currently available AP balance.
+     * Used by combined payments to retain the GRN-level payment trail.
+     */
+    protected function receiptsWithOutstanding(PurchaseOrder $order)
+    {
+        return $order->purchaseReceipts()
+            ->where('status', 'posted')
+            ->where(function ($q) {
+                $q->whereNull('is_replacement')
+                    ->orWhere('is_replacement', false);
+            })
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get()
+            ->map(function (PurchaseReceipt $receipt) {
+                $returnTotal = (float) PurchaseReturn::query()
+                    ->where('purchase_receipt_id', $receipt->id)
+                    ->where('status', 'posted')
+                    ->whereNull('voided_at')
+                    ->where(function ($q) {
+                        $q->whereNull('resolution_type')
+                            ->orWhere('resolution_type', '!=', 'replacement');
+                    })
+                    ->sum('total');
+                $paidTotal = (float) PurchasePayment::query()
+                    ->where('purchase_receipt_id', $receipt->id)
+                    ->whereNull('voided_at')
+                    ->where('type', 'payment')
+                    ->sum('amount');
+
+                $receipt->receipt_outstanding = PurchaseOrder::normalizePaymentRemainder(
+                    (float) $receipt->grand_total - $returnTotal - $paidTotal
+                );
+
+                return $receipt;
+            })
+            ->filter(fn (PurchaseReceipt $receipt) => $receipt->receipt_outstanding > 0.0001)
+            ->values();
     }
 
     // ======================================================================
