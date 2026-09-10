@@ -105,6 +105,24 @@ class SupplierLoanAllocationTest extends TestCase
         $this->assertSame('partial', $order->fresh()->payment_status);
         $this->assertSame(400000.0, (float) $order->fresh()->paid_amount);
         $this->assertSame(600000.0, $loan->fresh()->allocation_available_amount);
+
+        // Alokasi kedua menghabiskan sisa nilai PO. Record payment yang sedang
+        // diposting tidak boleh dihitung dua kali oleh JournalService.
+        $secondResponse = $this->actingAs($user)->post(
+            route('purchasing.purchase_orders.payments.apply_supplier_loan', $order),
+            [
+                'date' => '2026-09-08',
+                'supplier_loan_id' => $loan->id,
+                'amount' => '400000',
+                'notes' => 'Alokasi kedua',
+            ],
+        );
+
+        $secondResponse->assertRedirect();
+        $secondResponse->assertSessionDoesntHaveErrors();
+        $this->assertSame('paid', $order->fresh()->payment_status);
+        $this->assertSame(800000.0, (float) $order->fresh()->paid_amount);
+        $this->assertSame(200000.0, $loan->fresh()->allocation_available_amount);
     }
 
     public function test_supplier_loan_allocation_rejects_a_different_supplier(): void

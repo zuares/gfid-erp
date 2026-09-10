@@ -460,6 +460,9 @@ class JournalService
                     ->where('supplier_loan_id', $loan->id)
                     ->where('type', 'loan_apply')
                     ->whereNull('voided_at')
+                    // Payment ini sudah dibuat sebelum jurnal diposting.
+                    // Jangan hitung ulang sebagai alokasi sebelumnya.
+                    ->where('id', '!=', $payment->id)
                     ->sum('amount');
                 $available = max(0, (float) $loan->principal_amount - $repaid - $allocated);
 
