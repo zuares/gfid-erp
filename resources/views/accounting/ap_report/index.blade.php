@@ -35,7 +35,7 @@
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
             <h5 class="mb-0 fw-black">Hutang Dagang (AP Outstanding)</h5>
-            <div class="text-muted" style="font-size:.8rem">Per tanggal · aging berdasarkan tanggal GRN tertua</div>
+            <div class="text-muted" style="font-size:.8rem">Per tanggal · aging berdasarkan tanggal GRN tertua atau invoice saldo awal</div>
         </div>
         <a href="{{ route('accounting.supplier-ap-openings.index') }}" class="rpt-btn">Saldo Awal Supplier</a>
     </div>
@@ -93,7 +93,7 @@
                     <tr>
                         <th>Supplier / PO</th>
                         <th>Tgl Dasar</th>
-                        <th class="rpt-num">Total GRN</th>
+                        <th class="rpt-num">GRN / Saldo Awal</th>
                         <th class="rpt-num">Sudah Bayar</th>
                         <th class="rpt-num">Outstanding</th>
                         <th class="text-center">Umur</th>

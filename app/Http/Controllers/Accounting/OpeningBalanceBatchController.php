@@ -577,25 +577,8 @@ class OpeningBalanceBatchController extends Controller
      */
     private function tradePayableAsOf(string $asOf): float
     {
-        $grn = DB::table('purchase_receipts')
-            ->where('status', 'posted')
-            ->whereDate('date', '<=', $asOf)
-            ->groupBy('purchase_order_id')
-            ->selectRaw('purchase_order_id, SUM(grand_total) as grn_total');
-
-        $paid = DB::table('purchase_payments')
-            ->whereNull('voided_at')
-            ->whereIn('type', ['payment', 'dp_apply'])
-            ->whereDate('date', '<=', $asOf)
-            ->groupBy('purchase_order_id')
-            ->selectRaw('purchase_order_id, SUM(amount) as paid_total');
-
-        return round((float) DB::table('purchase_orders as po')
-            ->joinSub($grn, 'grn', 'grn.purchase_order_id', '=', 'po.id')
-            ->leftJoinSub($paid, 'pay', 'pay.purchase_order_id', '=', 'po.id')
-            ->whereRaw('ROUND(grn.grn_total - COALESCE(pay.paid_total, 0), 2) > 0.01')
-            ->selectRaw('SUM(grn.grn_total - COALESCE(pay.paid_total, 0)) as outstanding')
-            ->value('outstanding'), 2);
+        return round(app(\App\Services\Accounting\ApOutstandingService::class)
+            ->rowsAsOf($asOf)->sum('outstanding'), 2);
     }
 
     /**
