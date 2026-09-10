@@ -3,11 +3,15 @@
 namespace App\Http\Controllers\Purchasing;
 
 use App\Http\Controllers\Controller;
+use App\Models\Account;
 use App\Models\Item;
+use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderLine;
+use App\Models\PurchasePayment;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptLine;
+use App\Models\PurchaseReturn;
 use App\Models\Supplier;
 use App\Models\Warehouse;
 use App\Services\Purchasing\GoodsReceiptService;
@@ -474,13 +478,88 @@ class PurchaseReceiptController extends Controller
             'warehouse',
             'lines.item',
             'order',
+            'payments.paymentMethod',
+            'payments.cashAccount',
+            'returns',
             'qc.checkedBy',
             'qc.purchaseReturn',
             'returnOrigin',
         ]);
 
+        $receiptPaymentTotal = (float) $purchase_receipt->payments
+            ->whereNull('voided_at')
+            ->where('type', 'payment')
+            ->sum('amount');
+
+        $receiptReturnTotal = (float) $purchase_receipt->returns
+            ->where('status', 'posted')
+            ->whereNull('voided_at')
+            ->filter(fn ($return) => ($return->resolution_type ?? null) !== 'replacement')
+            ->sum('total');
+
+        $receiptOutstanding = PurchaseOrder::normalizePaymentRemainder(
+            (float) $purchase_receipt->grand_total - $receiptReturnTotal - $receiptPaymentTotal
+        );
+
+        // Legacy PO-level payments are still part of the same AP balance.
+        // Cap the GRN balance with the PO balance to prevent overpayment while
+        // the application transitions to GRN-level payment allocation.
+        $poOutstanding = 0.0;
+        if ($purchase_receipt->order) {
+            $po = $purchase_receipt->order;
+            $postedGrnTotal = (float) $po->purchaseReceipts()
+                ->where('status', 'posted')
+                ->where(function ($q) {
+                    $q->whereNull('is_replacement')
+                        ->orWhere('is_replacement', false);
+                })
+                ->sum('grand_total');
+            $postedReturnTotal = (float) PurchaseReturn::query()
+                ->where('purchase_order_id', $po->id)
+                ->where('status', 'posted')
+                ->whereNull('voided_at')
+                ->where(function ($q) {
+                    $q->whereNull('resolution_type')
+                        ->orWhere('resolution_type', '!=', 'replacement');
+                })
+                ->sum('total');
+            $paidTotal = (float) PurchasePayment::query()
+                ->where('purchase_order_id', $po->id)
+                ->whereNull('voided_at')
+                ->where('type', 'payment')
+                ->sum('amount');
+            $dpAppliedTotal = (float) PurchasePayment::query()
+                ->where('purchase_order_id', $po->id)
+                ->whereNull('voided_at')
+                ->where('type', 'dp_apply')
+                ->sum('amount');
+
+            $poOutstanding = PurchaseOrder::normalizePaymentRemainder(
+                $postedGrnTotal - $postedReturnTotal - $paidTotal - $dpAppliedTotal
+            );
+        }
+
+        $receiptPaymentOutstanding = min($receiptOutstanding, $poOutstanding);
+        $paymentMethods = PaymentMethod::query()
+            ->where('is_active', true)
+            ->whereIn('mode', ['cash', 'transfer'])
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+        $cashAccounts = Account::query()
+            ->where('is_active', true)
+            ->where('is_cash', true)
+            ->whereIn('code', ['1101', '1111', '1112', '1113', '1114'])
+            ->orderBy('code')
+            ->get();
+
         return view('purchasing.purchase_receipts.show', [
             'receipt' => $purchase_receipt,
+            'paymentMethods' => $paymentMethods,
+            'cashAccounts' => $cashAccounts,
+            'receiptPaymentTotal' => $receiptPaymentTotal,
+            'receiptReturnTotal' => $receiptReturnTotal,
+            'receiptPaymentOutstanding' => $receiptPaymentOutstanding,
         ]);
     }
 

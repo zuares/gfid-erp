@@ -55,6 +55,19 @@ class PurchaseReceipt extends Model
         return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id');
     }
 
+    public function payments()
+    {
+        return $this->hasMany(PurchasePayment::class, 'purchase_receipt_id')
+            ->orderByDesc('date')
+            ->orderByDesc('id');
+    }
+
+    public function activePayments()
+    {
+        return $this->hasMany(PurchasePayment::class, 'purchase_receipt_id')
+            ->whereNull('voided_at');
+    }
+
     public function lines()
     {
         return $this->hasMany(PurchaseReceiptLine::class);

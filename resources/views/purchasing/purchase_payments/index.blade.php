@@ -183,6 +183,7 @@
             <th>Tanggal</th>
             <th>Supplier</th>
             <th>No PO</th>
+            <th>No GRN</th>
             <th>Tipe</th>
             <th>Metode</th>
             <th>Akun</th>
@@ -203,6 +204,15 @@
                   {{ $pay->purchaseOrder->code }}
                 </a>
               @else —
+              @endif
+            </td>
+            <td>
+              @if ($pay->purchaseReceipt)
+                <a href="{{ route('purchasing.purchase_receipts.show', $pay->purchaseReceipt) }}" class="tbl-link mono">
+                  {{ $pay->purchaseReceipt->code }}
+                </a>
+              @else
+                <span class="text-muted">—</span>
               @endif
             </td>
             <td>
@@ -229,7 +239,7 @@
           </tr>
           @empty
           <tr>
-            <td colspan="8" class="text-center text-muted py-4">Belum ada pembayaran.</td>
+            <td colspan="9" class="text-center text-muted py-4">Belum ada pembayaran.</td>
           </tr>
           @endforelse
         </tbody>

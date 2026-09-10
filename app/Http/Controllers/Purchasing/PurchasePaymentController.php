@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
+use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReturn;
 use App\Models\Supplier;
 use App\Models\SupplierInvoice;
@@ -30,7 +31,7 @@ class PurchasePaymentController extends Controller
         $this->ensureOwner($request);
 
         $q = PurchasePayment::query()
-            ->with(['purchaseOrder.supplier', 'paymentMethod', 'cashAccount'])
+            ->with(['purchaseOrder.supplier', 'purchaseReceipt', 'paymentMethod', 'cashAccount'])
             ->orderByDesc('date')
             ->orderByDesc('id');
 
@@ -142,6 +143,174 @@ class PurchasePaymentController extends Controller
         return redirect()
             ->route('purchasing.purchase_orders.show', $purchase_order)
             ->withFragment('payments');
+    }
+
+    /**
+     * Store a settlement payment allocated to one posted GRN.
+     *
+     * The PO link is retained for backward-compatible AP aggregation, while
+     * purchase_receipt_id makes the payment traceable to a specific receipt.
+     */
+    public function storeForReceipt(Request $request, PurchaseReceipt $purchase_receipt)
+    {
+        $this->ensureOwner($request);
+
+        $data = $request->validate([
+            'date' => ['required', 'date'],
+            'payment_method_id' => ['required', 'integer', 'exists:payment_methods,id'],
+            'cash_account_id' => ['nullable', 'integer', 'exists:accounts,id'],
+            'amount' => ['required', 'string'],
+            'ref_no' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string', 'max:255'],
+            'supplier_invoice_id' => ['nullable', 'integer', 'exists:supplier_invoices,id'],
+        ]);
+
+        if ($purchase_receipt->status !== 'posted') {
+            throw ValidationException::withMessages([
+                'amount' => 'Pembayaran hanya bisa dibuat untuk GRN yang sudah POSTED.',
+            ]);
+        }
+
+        if ($purchase_receipt->is_replacement) {
+            throw ValidationException::withMessages([
+                'amount' => 'GRN replacement tidak dapat dibayar langsung.',
+            ]);
+        }
+
+        $amount = $this->toNumber($data['amount']);
+        if ($amount <= 0) {
+            throw ValidationException::withMessages([
+                'amount' => 'Nominal pembayaran harus > 0.',
+            ]);
+        }
+
+        $pm = PaymentMethod::query()->findOrFail((int) $data['payment_method_id']);
+        $mode = $this->detectPaymentMode($pm);
+        if (! in_array($mode, ['cash', 'transfer'], true)) {
+            throw ValidationException::withMessages([
+                'payment_method_id' => 'Pembayaran GRN hanya boleh menggunakan CASH atau TRANSFER.',
+            ]);
+        }
+
+        $cashAccountId = $this->resolveCashAccountId($pm, $data['cash_account_id'] ?? null);
+        $this->validateCashAccount($cashAccountId, $mode);
+
+        DB::transaction(function () use ($request, $data, &$amount, $cashAccountId, $purchase_receipt) {
+            $lockedReceipt = PurchaseReceipt::query()
+                ->whereKey($purchase_receipt->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedReceipt->status !== 'posted' || $lockedReceipt->is_replacement) {
+                throw ValidationException::withMessages([
+                    'amount' => 'GRN sudah tidak dapat menerima pembayaran.',
+                ]);
+            }
+
+            $lockedOrder = PurchaseOrder::query()
+                ->whereKey($lockedReceipt->purchase_order_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedOrder->status === 'cancelled') {
+                throw ValidationException::withMessages([
+                    'amount' => 'PO cancelled tidak bisa menerima pembayaran.',
+                ]);
+            }
+
+            $receiptReturnTotal = (float) PurchaseReturn::query()
+                ->where('purchase_receipt_id', $lockedReceipt->id)
+                ->where('status', 'posted')
+                ->whereNull('voided_at')
+                ->where(function ($q) {
+                    $q->whereNull('resolution_type')
+                        ->orWhere('resolution_type', '!=', 'replacement');
+                })
+                ->sum('total');
+
+            $receiptPaid = (float) PurchasePayment::query()
+                ->where('purchase_receipt_id', $lockedReceipt->id)
+                ->whereNull('voided_at')
+                ->where('type', 'payment')
+                ->sum('amount');
+
+            $receiptOutstanding = PurchaseOrder::normalizePaymentRemainder(
+                (float) $lockedReceipt->grand_total - $receiptReturnTotal - $receiptPaid
+            );
+
+            // Also cap against the PO-wide AP balance so legacy PO payments
+            // and GRN payments cannot collectively overpay the supplier.
+            $poOutstanding = $this->rawApOutstandingByGrn($lockedOrder);
+            $available = min($receiptOutstanding, $poOutstanding);
+
+            if ($available <= 0.0001) {
+                throw ValidationException::withMessages([
+                    'amount' => 'GRN ini sudah lunas atau saldo AP PO sudah habis.',
+                ]);
+            }
+
+            if ($amount > $available + PurchaseOrder::paymentRoundingTolerance()) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Nominal melebihi sisa hutang GRN.',
+                ]);
+            }
+
+            $amount = min(round($amount, 2), $available);
+
+            $supplierInvoiceId = ! empty($data['supplier_invoice_id'])
+                ? (int) $data['supplier_invoice_id']
+                : SupplierInvoice::query()
+                    ->where('purchase_order_id', $lockedOrder->id)
+                    ->where('supplier_id', $lockedOrder->supplier_id)
+                    ->whereIn('status', ['posted', 'partial_paid'])
+                    ->orderBy('invoice_date')
+                    ->value('id');
+
+            if ($supplierInvoiceId) {
+                $invoiceMatchesOrder = SupplierInvoice::query()
+                    ->whereKey($supplierInvoiceId)
+                    ->where('purchase_order_id', $lockedOrder->id)
+                    ->where('supplier_id', $lockedOrder->supplier_id)
+                    ->whereIn('status', ['posted', 'partial_paid'])
+                    ->exists();
+
+                if (! $invoiceMatchesOrder) {
+                    throw ValidationException::withMessages([
+                        'supplier_invoice_id' => 'Invoice supplier harus milik PO dan supplier yang sama, serta belum lunas/void.',
+                    ]);
+                }
+            }
+
+            $payment = PurchasePayment::create([
+                'purchase_order_id' => (int) $lockedOrder->id,
+                'purchase_receipt_id' => (int) $lockedReceipt->id,
+                'supplier_invoice_id' => $supplierInvoiceId,
+                'date' => $data['date'],
+                'payment_method_id' => (int) $data['payment_method_id'],
+                'cash_account_id' => (int) $cashAccountId,
+                'type' => 'payment',
+                'amount' => $amount,
+                'ref_no' => $data['ref_no'] ?? null,
+                'notes' => $data['notes'] ?? null,
+                'created_by' => (int) $request->user()->id,
+            ]);
+
+            $journal = $this->journalService->postPurchasePayment(
+                $payment->fresh(['purchaseOrder', 'cashAccount', 'paymentMethod'])
+            );
+
+            if ($journal && empty($payment->journal_id) && ! empty($journal->id)) {
+                $payment->forceFill(['journal_id' => (int) $journal->id])->save();
+            }
+
+            $this->recalcPaymentStatus($lockedOrder);
+
+            if ($supplierInvoiceId) {
+                $this->syncInvoicePaymentStatus($supplierInvoiceId);
+            }
+        });
+
+        return back()->with('success', 'Pembayaran GRN berhasil disimpan.');
     }
 
     /**

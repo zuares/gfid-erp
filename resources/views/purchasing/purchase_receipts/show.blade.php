@@ -187,6 +187,10 @@
 
   $isDraft = $receipt->status === 'draft';
   $isPosted = $receipt->status === 'posted';
+  $canPayReceipt = $isPosted
+      && $canSeeMoney
+      && !$receipt->is_replacement
+      && (float) ($receiptPaymentOutstanding ?? 0) > \App\Models\PurchaseOrder::paymentRoundingTolerance();
 
   // ===== ROUTE SAFE CHECK =====
   $router = app('router');
@@ -263,6 +267,12 @@
         <a href="{{ route('purchasing.purchase_receipts.index') }}" class="btn btn-ship-outline btn-pill btn-sm">
           <i class="bi bi-arrow-left me-1"></i>Kembali
         </a>
+
+        @if ($canPayReceipt)
+          <button type="button" class="btn btn-success btn-pill btn-sm" data-bs-toggle="modal" data-bs-target="#modalGrnPayment">
+            <i class="bi bi-cash-coin me-1"></i>Bayar GRN
+          </button>
+        @endif
 
         @if ($receipt->order)
           <a href="{{ route('purchasing.purchase_orders.show', $receipt->order->id) }}"
@@ -421,6 +431,70 @@
         </div>
       </div>
     </div>
+
+    @if ($canSeeMoney)
+      <div class="card-info mb-3">
+        <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
+          <div>
+            <div class="info-label mb-1">Pembayaran GRN</div>
+            <div class="text-muted" style="font-size:.78rem;">
+              Pembayaran ini dialokasikan khusus ke GRN {{ $receipt->code }}.
+            </div>
+          </div>
+          <div class="text-end">
+            <div class="text-muted" style="font-size:.72rem;">Sudah dibayar</div>
+            <div class="mono fw-semibold">{{ rupiah($receiptPaymentTotal ?? 0) }}</div>
+          </div>
+          <div class="text-end">
+            <div class="text-muted" style="font-size:.72rem;">Sisa GRN</div>
+            <div class="mono fw-bold {{ ($receiptPaymentOutstanding ?? 0) > 0.0001 ? 'text-danger' : 'text-success' }}">
+              {{ rupiah($receiptPaymentOutstanding ?? 0) }}
+            </div>
+          </div>
+          @if ($canPayReceipt)
+            <button type="button" class="btn btn-sm btn-success btn-pill" data-bs-toggle="modal" data-bs-target="#modalGrnPayment">
+              Bayar Sisa
+            </button>
+          @endif
+        </div>
+
+        @if ($receipt->payments->whereNull('voided_at')->where('type', 'payment')->isNotEmpty())
+          <div class="table-responsive mt-3">
+            <table class="table table-sm align-middle mb-0" style="font-size:.8rem;">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Metode</th>
+                  <th>Referensi</th>
+                  <th class="text-end">Nominal</th>
+                  <th class="text-end">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                @foreach ($receipt->payments->whereNull('voided_at')->where('type', 'payment') as $grnPayment)
+                  <tr>
+                    <td class="mono">{{ $grnPayment->date?->format('d/m/Y') ?? '-' }}</td>
+                    <td>{{ $grnPayment->paymentMethod?->name ?? '-' }}</td>
+                    <td class="mono">{{ $grnPayment->ref_no ?: '-' }}</td>
+                    <td class="text-end mono">{{ rupiah($grnPayment->amount) }}</td>
+                    <td class="text-end">
+                      @if ($isOwner && $receipt->purchase_order_id)
+                        <form method="POST" class="d-inline"
+                              action="{{ route('purchasing.purchase_orders.payments.void', [$receipt->purchase_order_id, $grnPayment->id]) }}"
+                              onsubmit="return confirm('VOID pembayaran GRN ini? Jurnal pembayaran akan direversal.');">
+                          @csrf
+                          <button type="submit" class="btn btn-sm btn-outline-danger">Void</button>
+                        </form>
+                      @endif
+                    </td>
+                  </tr>
+                @endforeach
+              </tbody>
+            </table>
+          </div>
+        @endif
+      </div>
+    @endif
 
     <div class="row g-3 mb-3">
 
@@ -992,5 +1066,95 @@
       @endif
     @endif
 
+    @if ($canPayReceipt)
+      <div class="modal fade" id="modalGrnPayment" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <form method="POST" action="{{ route('purchasing.purchase_receipts.payments.store', $receipt->id) }}" class="modal-content">
+            @csrf
+            <div class="modal-header">
+              <div>
+                <h6 class="modal-title fw-semibold mb-1">Bayar GRN {{ $receipt->code }}</h6>
+                <div class="text-muted small">Sisa yang dapat dibayar: <strong>{{ rupiah($receiptPaymentOutstanding) }}</strong></div>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+              <div class="alert alert-info py-2 px-3 small">
+                Pembayaran ini akan dicatat ke GRN ini dan mengurangi Hutang Dagang supplier.
+              </div>
+
+              <div class="row g-3">
+                <div class="col-6">
+                  <label class="form-label small fw-semibold">Tanggal</label>
+                  <input type="date" name="date" class="form-control form-control-sm"
+                         value="{{ old('date', now()->toDateString()) }}" required>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small fw-semibold">Nominal</label>
+                  <input type="text" name="amount" class="form-control form-control-sm mono"
+                         value="{{ number_format($receiptPaymentOutstanding, 0, ',', '.') }}" required>
+                </div>
+                <div class="col-12">
+                  <label class="form-label small fw-semibold">Metode Pembayaran</label>
+                  <select name="payment_method_id" id="grnPaymentMethod" class="form-select form-select-sm" required>
+                    @foreach ($paymentMethods as $pmOpt)
+                      <option value="{{ $pmOpt->id }}" data-mode="{{ strtolower($pmOpt->mode ?? '') }}">
+                        {{ $pmOpt->name }}{{ $pmOpt->mode ? ' — ' . strtoupper($pmOpt->mode) : '' }}
+                      </option>
+                    @endforeach
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label small fw-semibold">Kas/Bank</label>
+                  <select name="cash_account_id" id="grnCashAccount" class="form-select form-select-sm" required>
+                    <option value="">— Pilih akun kas/bank —</option>
+                    @foreach ($cashAccounts as $cashAccount)
+                      <option value="{{ $cashAccount->id }}" data-code="{{ $cashAccount->code }}">
+                        {{ $cashAccount->code }} — {{ $cashAccount->name }}
+                      </option>
+                    @endforeach
+                  </select>
+                  <div class="form-text">CASH harus memakai 1101; TRANSFER memakai akun 1111–1114.</div>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small fw-semibold">No. Referensi</label>
+                  <input type="text" name="ref_no" class="form-control form-control-sm mono" maxlength="100">
+                </div>
+                <div class="col-6">
+                  <label class="form-label small fw-semibold">Catatan</label>
+                  <input type="text" name="notes" class="form-control form-control-sm" maxlength="255">
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+              <button type="submit" class="btn btn-sm btn-success">Simpan Pembayaran</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    @endif
+
 </div>{{-- /page-wrap --}}
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const method = document.getElementById('grnPaymentMethod');
+    const account = document.getElementById('grnCashAccount');
+    if (!method || !account) return;
+
+    function selectDefaultAccount() {
+        const mode = method.selectedOptions[0]?.dataset.mode || '';
+        const code = mode === 'cash' ? '1101' : account.querySelector('option[data-code^="111"]')?.dataset.code;
+        if (!code) return;
+        const option = account.querySelector(`option[data-code="${code}"]`);
+        if (option) account.value = option.value;
+    }
+
+    method.addEventListener('change', selectDefaultAccount);
+    selectDefaultAccount();
+});
+</script>
+@endpush

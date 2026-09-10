@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Account;
 use App\Models\PaymentMethod;
 use App\Models\Item;
 use App\Models\PurchaseOrder;
@@ -10,6 +11,7 @@ use App\Models\PurchasePayment;
 use App\Models\PurchaseReceipt;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Services\Accounting\JournalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -38,6 +40,82 @@ class PurchaseOrderPaymentUiTest extends TestCase
         $this->actingAs($owner)
             ->get(route('purchasing.purchase_orders.payments.index', $order))
             ->assertRedirect(route('purchasing.purchase_orders.show', $order) . '#payments');
+    }
+
+    public function test_owner_can_pay_a_posted_grn_and_payment_is_allocated_to_it(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-GRN-PAY-' . uniqid(),
+        ]);
+        $ap = Account::create([
+            'code' => JournalService::CODE_AP,
+            'name' => 'Hutang Dagang',
+            'type' => 'liability',
+            'is_active' => true,
+        ]);
+        Account::create([
+            'code' => JournalService::CODE_ADV_PURCHASE,
+            'name' => 'Uang Muka Pembelian',
+            'type' => 'asset',
+            'is_active' => true,
+        ]);
+        $cash = Account::create([
+            'code' => '1101',
+            'name' => 'Kas',
+            'type' => 'asset',
+            'is_cash' => true,
+            'is_active' => true,
+        ]);
+        $method = PaymentMethod::create([
+            'code' => 'GRN-CASH-' . uniqid(),
+            'name' => 'Cash GRN Test',
+            'mode' => 'cash',
+            'is_active' => true,
+        ]);
+        $supplier = Supplier::create([
+            'code' => 'SUP-GRN-PAY-' . uniqid(),
+            'name' => 'Supplier GRN Payment',
+        ]);
+        $order = PurchaseOrder::create([
+            'code' => 'PO-GRN-PAY-' . uniqid(),
+            'date' => '2026-09-11',
+            'supplier_id' => $supplier->id,
+            'grand_total' => 1000000,
+            'status' => 'approved',
+        ]);
+        $receipt = PurchaseReceipt::create([
+            'code' => 'GRN-GRN-PAY-' . uniqid(),
+            'date' => '2026-09-11',
+            'purchase_order_id' => $order->id,
+            'supplier_id' => $supplier->id,
+            'grand_total' => 1000000,
+            'status' => 'posted',
+            'is_replacement' => false,
+        ]);
+
+        $this->actingAs($owner)
+            ->post(route('purchasing.purchase_receipts.payments.store', $receipt), [
+                'date' => '2026-09-11',
+                'payment_method_id' => $method->id,
+                'cash_account_id' => $cash->id,
+                'amount' => '250.000',
+                'ref_no' => 'GRN-PAY-001',
+            ])
+            ->assertRedirect();
+
+        $payment = PurchasePayment::query()->where('purchase_receipt_id', $receipt->id)->firstOrFail();
+        $this->assertSame('payment', $payment->type);
+        $this->assertSame(250000.0, (float) $payment->amount);
+        $this->assertNotNull($payment->journal_id);
+        $this->assertSame(250000.0, (float) $payment->journal->lines()->where('account_id', $ap->id)->sum('debit'));
+
+        $this->actingAs($owner)
+            ->get(route('purchasing.purchase_receipts.show', $receipt))
+            ->assertOk()
+            ->assertSee('Pembayaran GRN')
+            ->assertSee('Bayar GRN')
+            ->assertSee('GRN-PAY-001');
     }
 
     public function test_owner_sees_tambah_dp_after_a_dp_has_been_recorded(): void

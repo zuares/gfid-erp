@@ -9,6 +9,7 @@ class PurchasePayment extends Model
 {
     protected $fillable = [
         'purchase_order_id',
+        'purchase_receipt_id',
         'supplier_loan_id',
         'supplier_invoice_id',  // nullable — link ke faktur supplier (Tahap 4)
         'date',
@@ -32,6 +33,11 @@ class PurchasePayment extends Model
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id');
+    }
+
+    public function purchaseReceipt(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseReceipt::class, 'purchase_receipt_id');
     }
 
     public function journal(): BelongsTo

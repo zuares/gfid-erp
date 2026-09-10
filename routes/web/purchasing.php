@@ -110,6 +110,9 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
                 ->names('purchase_receipts')
                 ->except(['edit', 'update', 'destroy']);
 
+            Route::post('purchase-receipts/{purchase_receipt}/payments', [PurchasePaymentController::class, 'storeForReceipt'])
+                ->name('purchase_receipts.payments.store');
+
             Route::middleware('role:owner,admin')->group(function () {
                 Route::get('purchase-receipts/{purchase_receipt}/edit', [PurchaseReceiptController::class, 'edit'])
                     ->name('purchase_receipts.edit');
