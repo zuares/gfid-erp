@@ -159,8 +159,7 @@ class MarketplaceOrder extends Model
         }
 
         return $this->order_status === 'PENDING'
-            || strtoupper((string) data_get($this->raw_json, 'order_status')) === 'PENDING'
-            || $this->shipping_logistics_status === 'LOGISTICS_NOT_START';
+            || strtoupper((string) data_get($this->raw_json, 'order_status')) === 'PENDING';
     }
 
     /** Filter sebelum pagination; COALESCE menjaga order tanpa payload tetap bisa diproses. */
@@ -177,8 +176,7 @@ class MarketplaceOrder extends Model
                 ->whereRaw("{$logistics} != ?", ['LOGISTICS_READY'])
                 ->where(function (Builder $q) use ($logistics, $rawOrderStatus) {
                     $q->where('order_status', 'PENDING')
-                        ->orWhereRaw("UPPER(COALESCE({$rawOrderStatus}, '')) = ?", ['PENDING'])
-                        ->orWhereRaw("{$logistics} = ?", ['LOGISTICS_NOT_START']);
+                        ->orWhereRaw("UPPER(COALESCE({$rawOrderStatus}, '')) = ?", ['PENDING']);
                 });
         };
 

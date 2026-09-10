@@ -2058,7 +2058,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     }
 
     function isPendingOrder(o) {
-        const logisticsStatus = String(o.api_logistics_status || o.logistics_status || '').toUpperCase();
+        const logisticsStatus = String(o.api_logistics_status || '').toUpperCase();
 
         // LOGISTICS_READY berarti platform sudah mengizinkan proses pengiriman.
         // Prioritaskan status terbaru ini bila flag pending dari payload lama

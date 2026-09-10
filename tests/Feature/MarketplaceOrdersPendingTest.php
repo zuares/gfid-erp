@@ -69,8 +69,11 @@ class MarketplaceOrdersPendingTest extends TestCase
     public function test_pending_orders_are_filtered_before_pagination_and_counted_across_pages(): void
     {
         for ($i = 0; $i < 3; $i++) {
-            $this->createOrder("READY-{$i}", 'READY_TO_SHIP', 'buyer');
-            $order = $this->createOrder("PENDING-{$i}", 'READY_TO_SHIP', 'buyer');
+            $ready = $this->createOrder("READY-{$i}", 'READY_TO_SHIP', 'buyer');
+            if ($i === 0) {
+                $ready->update(['raw_json' => ['package_list' => [['logistics_status' => 'LOGISTICS_NOT_START']]]]);
+            }
+            $order = $this->createOrder("PENDING-{$i}", 'PENDING', 'buyer');
             $order->update(['raw_json' => ['package_list' => [['logistics_status' => 'LOGISTICS_NOT_START']]]]);
         }
 
@@ -94,7 +97,7 @@ class MarketplaceOrdersPendingTest extends TestCase
     {
         $this->createOrder('STATUS-PENDING', 'PENDING', 'buyer');
         $root = $this->createOrder('ROOT-PENDING', 'READY_TO_SHIP', 'buyer');
-        $root->update(['raw_json' => ['logistics_status' => 'LOGISTICS_NOT_START']]);
+        $root->update(['raw_json' => ['order_status' => 'PENDING', 'logistics_status' => 'LOGISTICS_NOT_START']]);
         $raw = $this->createOrder('RAW-PENDING', 'MATCHED', 'buyer');
         $raw->update(['raw_json' => ['order_status' => 'PENDING']]);
 
@@ -109,7 +112,7 @@ class MarketplaceOrdersPendingTest extends TestCase
 
     public function test_order_returns_to_process_when_logistics_becomes_ready(): void
     {
-        $order = $this->createOrder('BECOMES-READY', 'READY_TO_SHIP', 'buyer');
+        $order = $this->createOrder('BECOMES-READY', 'PENDING', 'buyer');
         $order->update(['raw_json' => ['order_status' => 'PENDING', 'package_list' => [['logistics_status' => 'LOGISTICS_NOT_START']]]]);
         $this->getJson('/api/marketplace/local-orders-paginated?tab=ready&sub_tab=pending')
             ->assertOk()->assertJsonPath('total', 1);
