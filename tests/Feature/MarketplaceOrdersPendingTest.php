@@ -127,6 +127,25 @@ class MarketplaceOrdersPendingTest extends TestCase
             ->assertOk()->assertJsonPath('ready_pending', 0)->assertJsonPath('ready_process', 1);
     }
 
+    public function test_invoice_pending_masuk_tertunda_dan_bukan_bisa_proses(): void
+    {
+        $pending = $this->createOrder('INVOICE-PENDING', 'INVOICE_PENDING', 'buyer');
+        $pending->update(['raw_json' => ['package_list' => [['logistics_status' => 'LOGISTICS_READY']]]]);
+        $ready = $this->createOrder('READY-FOR-PROCESS', 'READY_TO_SHIP', 'buyer');
+
+        $this->getJson('/api/marketplace/local-orders-paginated?tab=ready&sub_tab=pending')
+            ->assertOk()->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.channel_order_id', 'INVOICE-PENDING')
+            ->assertJsonPath('data.0.platform_pending', true);
+        $this->getJson('/api/marketplace/local-orders-paginated?tab=ready&sub_tab=process')
+            ->assertOk()->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.channel_order_id', 'READY-FOR-PROCESS');
+        $this->getJson('/api/marketplace/local-order-counts')
+            ->assertOk()->assertJsonPath('ready', 2)
+            ->assertJsonPath('ready_pending', 1)
+            ->assertJsonPath('ready_process', 1);
+    }
+
     public function test_stale_pending_payload_does_not_move_unpaid_cancelled_or_processed_orders(): void
     {
         foreach (['UNPAID', 'CANCELLED', 'PROCESSED', 'SHIPPED'] as $status) {

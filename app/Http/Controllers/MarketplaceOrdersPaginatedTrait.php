@@ -58,7 +58,7 @@ trait MarketplaceOrdersPaginatedTrait
         $baseQuery = MarketplaceOrder::query();
         $applyScope($baseQuery);
 
-        $readyQuery = (clone $baseQuery)->whereIn('order_status', ['PENDING', 'READY_TO_SHIP', 'MATCHED']);
+        $readyQuery = (clone $baseQuery)->whereIn('order_status', ['PENDING', 'INVOICE_PENDING', 'READY_TO_SHIP', 'MATCHED']);
         $pendingCount = (clone $readyQuery)->shippingPending()->count();
         $processCount = (clone $readyQuery)->shippingPending(false)->count();
 
@@ -79,7 +79,7 @@ trait MarketplaceOrdersPaginatedTrait
         $issuesCount = $issuesQuery->count();
 
         return response()->json([
-            'ready' => ($counts['PENDING'] ?? 0) + ($counts['READY_TO_SHIP'] ?? 0) + ($counts['MATCHED'] ?? 0),
+            'ready' => ($counts['PENDING'] ?? 0) + ($counts['INVOICE_PENDING'] ?? 0) + ($counts['READY_TO_SHIP'] ?? 0) + ($counts['MATCHED'] ?? 0),
             'ready_pending' => $pendingCount,
             'ready_process' => $processCount,
             'processed' => ($counts['PROCESSED'] ?? 0) + ($counts['READY_TO_HANDOVER'] ?? 0),
@@ -178,7 +178,7 @@ trait MarketplaceOrdersPaginatedTrait
                 $query->whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING']);
             } else {
                 // Approximate logic for kilat/instant handling
-                $query->whereIn('order_status', ['PENDING', 'READY_TO_SHIP', 'MATCHED']);
+                $query->whereIn('order_status', ['PENDING', 'INVOICE_PENDING', 'READY_TO_SHIP', 'MATCHED']);
                 if ($subTab === 'pending') {
                     $query->shippingPending();
                 } elseif ($subTab === 'process') {

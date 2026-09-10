@@ -19,7 +19,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     
     function orderStatusBadge(s) {
         if (!s) return `<span class="badge-status st-draft">—</span>`;
-        if (['UNPAID'].includes(s)) return `<span class="badge-status st-draft">${esc(s)}</span>`;
+        if (['UNPAID', 'INVOICE_PENDING'].includes(s)) return `<span class="badge-status st-draft">${esc(s)}</span>`;
         if (['READY_TO_SHIP', 'PROCESSED', 'READY_TO_HANDOVER'].includes(s)) return `<span class="badge-status st-submitted">${esc(s)}</span>`;
         if (['SHIPPED', 'TO_CONFIRM_RECEIVE', 'COMPLETED'].includes(s)) return `<span class="badge-status st-posted">${esc(s)}</span>`;
         if (['CANCELLED', 'IN_CANCEL', 'TO_RETURN'].includes(s)) return `<span class="badge-status st-cancelled">${esc(s)}</span>`;
@@ -43,6 +43,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     function shippingStatusFallback(status) {
         const labels = {
             UNPAID: 'Belum dibayar',
+            INVOICE_PENDING: 'Invoice tertunda',
             READY_TO_SHIP: 'Siap dikirim',
             PROCESSED: 'Sedang diproses',
             READY_TO_HANDOVER: 'Siap diserahkan',
@@ -500,7 +501,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     const TAB_STATUSES = {
         all:        null,
         unpaid:     ['UNPAID'],
-        ready:      ['READY_TO_SHIP', 'MATCHED'],
+        ready:      ['READY_TO_SHIP', 'MATCHED', 'INVOICE_PENDING'],
         processed:  ['PROCESSED'],
         shipped:    ['SHIPPED', 'TO_CONFIRM_RECEIVE'],
         completed:  ['COMPLETED'],
@@ -2067,7 +2068,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
 
         if (typeof o.platform_pending === 'boolean') return o.platform_pending;
 
-        return platformOrderStatus(o) === 'PENDING'
+        return ['PENDING', 'INVOICE_PENDING'].includes(platformOrderStatus(o))
             || o.api_platform_pending === true
             || logisticsStatus === 'LOGISTICS_NOT_START';
     }
