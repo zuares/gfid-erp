@@ -2070,7 +2070,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
 
         return ['PENDING', 'INVOICE_PENDING'].includes(platformOrderStatus(o))
             || o.api_platform_pending === true
-            || logisticsStatus === 'LOGISTICS_NOT_START';
+            || ['LOGISTICS_NOT_START', 'LOGISTICS_NOT_READY'].includes(logisticsStatus);
     }
 
     function isUnpaidOrder(o) {

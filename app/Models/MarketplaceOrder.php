@@ -161,13 +161,20 @@ class MarketplaceOrder extends Model
             return true;
         }
 
+        $logisticsStatus = $this->shipping_logistics_status;
+
         if (! in_array($this->order_status, ['PENDING', 'READY_TO_SHIP', 'MATCHED'], true)
-            || $this->shipping_logistics_status === 'LOGISTICS_READY') {
+            || $logisticsStatus === 'LOGISTICS_READY') {
             return false;
         }
 
-        return $this->order_status === 'PENDING'
-            || $rawOrderStatus === 'PENDING';
+        // Hanya package dengan LOGISTICS_READY yang boleh masuk Bisa Proses.
+        // READY_TO_SHIP/MATCHED yang belum siap di platform tetap Tertunda.
+        if ($this->order_status === 'PENDING' || $rawOrderStatus === 'PENDING') {
+            return true;
+        }
+
+        return in_array($logisticsStatus, ['LOGISTICS_NOT_START', 'LOGISTICS_NOT_READY'], true);
     }
 
     /** Filter sebelum pagination; COALESCE menjaga order tanpa payload tetap bisa diproses. */
@@ -184,13 +191,15 @@ class MarketplaceOrder extends Model
                 ->where(function (Builder $q) use ($logistics, $rawOrderStatus) {
                     $q->where('order_status', 'INVOICE_PENDING')
                         ->orWhereRaw("UPPER(COALESCE({$rawOrderStatus}, '')) = ?", ['INVOICE_PENDING'])
+                        ->orWhere(function (Builder $q) use ($logistics) {
+                            $q->whereIn('order_status', ['READY_TO_SHIP', 'MATCHED'])
+                                ->whereRaw("{$logistics} IN (?, ?)", ['LOGISTICS_NOT_START', 'LOGISTICS_NOT_READY']);
+                        })
                         ->orWhere(function (Builder $q) use ($logistics, $rawOrderStatus) {
-                            $q->whereIn('order_status', ['PENDING', 'READY_TO_SHIP', 'MATCHED'])
-                                ->whereRaw("{$logistics} != ?", ['LOGISTICS_READY'])
-                                ->where(function (Builder $q) use ($rawOrderStatus) {
-                                    $q->where('order_status', 'PENDING')
-                                        ->orWhereRaw("UPPER(COALESCE({$rawOrderStatus}, '')) = ?", ['PENDING']);
-                                });
+                            $q->where(function (Builder $q) use ($rawOrderStatus) {
+                                $q->where('order_status', 'PENDING')
+                                    ->orWhereRaw("UPPER(COALESCE({$rawOrderStatus}, '')) = ?", ['PENDING']);
+                            })->whereRaw("{$logistics} != ?", ['LOGISTICS_READY']);
                         });
                 });
         };

@@ -77,18 +77,18 @@ class MarketplaceOrdersPendingTest extends TestCase
             $order->update(['raw_json' => ['package_list' => [['logistics_status' => 'LOGISTICS_NOT_START']]]]);
         }
 
-        foreach ([1, 2, 3] as $page) {
+        foreach ([1, 2, 3, 4] as $page) {
             $this->getJson("/api/marketplace/local-orders-paginated?tab=ready&sub_tab=pending&limit=1&page={$page}")
-                ->assertOk()->assertJsonPath('total', 3)->assertJsonCount(1, 'data')
+                ->assertOk()->assertJsonPath('total', 4)->assertJsonCount(1, 'data')
                 ->assertJsonPath('data.0.platform_pending', true)
                 ->assertJsonPath('data.0.logistics_status', 'LOGISTICS_NOT_START');
         }
 
         $this->getJson('/api/marketplace/local-orders-paginated?tab=ready&sub_tab=process&limit=1')
-            ->assertOk()->assertJsonPath('total', 3)->assertJsonPath('data.0.platform_pending', false);
+            ->assertOk()->assertJsonPath('total', 2)->assertJsonPath('data.0.platform_pending', false);
         $this->getJson('/api/marketplace/local-order-counts')
             ->assertOk()->assertJsonPath('ready', 6)
-            ->assertJsonPath('ready_pending', 3)->assertJsonPath('ready_process', 3);
+            ->assertJsonPath('ready_pending', 4)->assertJsonPath('ready_process', 2);
         $this->getJson('/api/marketplace/local-order-counts?search=PENDING-')
             ->assertOk()->assertJsonPath('ready_pending', 3)->assertJsonPath('ready_process', 0);
     }
@@ -144,6 +144,29 @@ class MarketplaceOrdersPendingTest extends TestCase
             ->assertOk()->assertJsonPath('ready', 2)
             ->assertJsonPath('ready_pending', 1)
             ->assertJsonPath('ready_process', 1);
+    }
+
+    public function test_ready_to_ship_with_logistics_not_ready_moves_to_pending(): void
+    {
+        $order = $this->createOrder('LOGISTICS-NOT-READY', 'READY_TO_SHIP', 'buyer');
+        $order->update([
+            'raw_json' => [
+                'package_list' => [[
+                    'logistics_status' => 'LOGISTICS_NOT_READY',
+                ]],
+            ],
+        ]);
+
+        $this->getJson('/api/marketplace/local-orders-paginated?tab=ready&sub_tab=pending')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.channel_order_id', 'LOGISTICS-NOT-READY')
+            ->assertJsonPath('data.0.platform_pending', true)
+            ->assertJsonPath('data.0.logistics_status', 'LOGISTICS_NOT_READY');
+
+        $this->getJson('/api/marketplace/local-orders-paginated?tab=ready&sub_tab=process')
+            ->assertOk()
+            ->assertJsonPath('total', 0);
     }
 
     public function test_stale_pending_payload_does_not_move_unpaid_cancelled_or_processed_orders(): void
