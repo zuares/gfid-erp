@@ -1409,7 +1409,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         if (window.autoArrangeAfterSync) {
             window.autoArrangeAfterSync = false;
             setTimeout(() => {
-                pendingShipOrders = orders.filter(o => o.order_status === 'READY_TO_SHIP');
+                pendingShipOrders = getProcessRows();
                 if (pendingShipOrders.length > 0) {
                     const modal = new bootstrap.Modal($('bulkArrangeShipmentModal'));
                     modal.show();
@@ -1439,7 +1439,9 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
 
     // ── Process Toolbar ───────────────────────────────────────────────────
     function getProcessRows() {
-        return filterByTab(applyFilters(orders.filter(inRange)), 'ready');
+        return filterByTab(applyFilters(orders.filter(inRange)), 'ready')
+            .filter(o => ['READY_TO_SHIP', 'MATCHED'].includes(o.order_status)
+                && !isPendingOrder(o) && !isKilatPlatformBlocked(o));
     }
 
     function getPackingRows() {
@@ -1898,15 +1900,15 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             else processCount++;
         });
         const badgeSubReadyAll = $('badge-sub-ready-all');
-        if (badgeSubReadyAll) badgeSubReadyAll.textContent = readyRows.length;
+        if (badgeSubReadyAll) badgeSubReadyAll.textContent = Number(orderCounts?.ready ?? readyRows.length);
         const badgeSubReadyUnpaid = $('badge-sub-ready-unpaid');
         if (badgeSubReadyUnpaid) badgeSubReadyUnpaid.textContent = unpaidCount;
         const badgeSubReadyProcess = $('badge-sub-ready-process');
-        if (badgeSubReadyProcess) badgeSubReadyProcess.textContent = processCount;
+        if (badgeSubReadyProcess) badgeSubReadyProcess.textContent = Number(orderCounts?.ready_process ?? processCount);
         const badgeSubReadyKilat = $('badge-sub-ready-kilat');
         if (badgeSubReadyKilat) badgeSubReadyKilat.textContent = kilatCount;
         const badgeSubReadyPending = $('badge-sub-ready-pending');
-        if (badgeSubReadyPending) badgeSubReadyPending.textContent = pendingCount;
+        if (badgeSubReadyPending) badgeSubReadyPending.textContent = Number(orderCounts?.ready_pending ?? pendingCount);
         const badgeSubReadyBlocked = $('badge-sub-ready-blocked');
         if (badgeSubReadyBlocked) badgeSubReadyBlocked.textContent = blockedCount;
         const badgeSubReadyCancel = $('badge-sub-ready-cancel');
@@ -2056,12 +2058,14 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     }
 
     function isPendingOrder(o) {
-        const logisticsStatus = String(o.api_logistics_status || '').toUpperCase();
+        const logisticsStatus = String(o.api_logistics_status || o.logistics_status || '').toUpperCase();
 
         // LOGISTICS_READY berarti platform sudah mengizinkan proses pengiriman.
         // Prioritaskan status terbaru ini bila flag pending dari payload lama
         // masih terbawa.
         if (logisticsStatus === 'LOGISTICS_READY') return false;
+
+        if (typeof o.platform_pending === 'boolean') return o.platform_pending;
 
         return platformOrderStatus(o) === 'PENDING'
             || o.api_platform_pending === true
@@ -2140,7 +2144,9 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             let actionBtn = '';
             
             if (activeTab === 'ready') {
-                if (o.order_status === 'UNPAID') {
+                if (isPendingOrder(o)) {
+                    actionBtn = '<span class="badge-status st-draft">⏳ Menunggu izin pengiriman</span>';
+                } else if (o.order_status === 'UNPAID') {
                     actionBtn = `<button class="btn-fulfillment" style="width:100%; justify-content:center; padding:0.55rem; font-size:0.85rem; border-radius:8px; border-color:#22c55e; color:#16a34a; background:#f0fdf4; font-weight:700" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
                 } else if (o.is_kilat && !kilatNeedsArrange(o)) {
                     // Kilat yang sudah diatur/terkirim: jangan tampilkan "Atur Pengiriman" (akan error).
@@ -2800,7 +2806,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             }
 
             let perluKirimBadge = '';
-            if (o.needs_shipping_arrangement) {
+            if (o.needs_shipping_arrangement && !isPendingOrder(o)) {
                 perluKirimBadge = `<span style="font-size:.65rem;background:#fee2e2;color:#991b1b;border-radius:99px;padding:2px 8px;font-weight:800;border:none;">🚚 Perlu Kirim</span>`;
                 if (isInstant) {
                     perluKirimBadge += `<span style="font-size:.65rem;color:#b91c1c;margin-left:4px;font-weight:600;">Pengiriman Kilat belum diatur</span>`;
@@ -2814,7 +2820,9 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             if (activeTab === 'processed') {
                 logisticsBtn = '';
             } else if (activeTab === 'ready') {
-                if (o.order_status === 'UNPAID') {
+                if (isPendingOrder(o)) {
+                    logisticsBtn = '<span class="badge-status st-draft">⏳ Menunggu izin pengiriman</span>';
+                } else if (o.order_status === 'UNPAID') {
                     // Belum bayar → tidak bisa diproses; tawarkan chat ke pembeli
                     logisticsBtn = `<button class="btn-ship-outline" style="color:#16a34a!important;border-color:#bbf7d0!important;background:#f0fdf4!important;font-size:0.7rem;padding:0.35rem 0.5rem;width:100%;justify-content:center;box-shadow:none" onclick="event.stopPropagation(); openChatForOrder(${o.store_id}, '${o.channel_order_id}')">💬 Chat Pembeli</button>`;
                 } else {
@@ -3532,6 +3540,12 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     // bookingSn diisi hanya untuk Pesanan Kilat murni (booking belum MATCHED ke
     // order lokal) — pengiriman diatur lewat endpoint booking, bukan order.
     window.openArrangeShipment = async function (storeId, orderSn, bookingSn = null) {
+        const pendingOrder = orders.find(o => o.store_id === storeId
+            && (o.channel_order_id === orderSn || o.booking_sn === orderSn));
+        if (pendingOrder && isPendingOrder(pendingOrder)) {
+            alert('Pesanan masih tertunda. Tunggu sampai marketplace mengizinkan pengiriman.');
+            return;
+        }
         // Beberapa tombol (tab Instan/Bermasalah/daftar lain) tidak meneruskan
         // bookingSn — derive dari data baris supaya Pesanan Kilat SELALU lewat
         // endpoint booking (endpoint order akan error "order_sn is not exist").

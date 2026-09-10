@@ -58,6 +58,10 @@ trait MarketplaceOrdersPaginatedTrait
         $baseQuery = MarketplaceOrder::query();
         $applyScope($baseQuery);
 
+        $readyQuery = (clone $baseQuery)->whereIn('order_status', ['PENDING', 'READY_TO_SHIP', 'MATCHED']);
+        $pendingCount = (clone $readyQuery)->shippingPending()->count();
+        $processCount = (clone $readyQuery)->shippingPending(false)->count();
+
         $failedDeliveryQuery = MarketplaceOrder::query();
         $applyScope($failedDeliveryQuery);
         $this->applyFailedDeliveryScope($failedDeliveryQuery);
@@ -75,7 +79,9 @@ trait MarketplaceOrdersPaginatedTrait
         $issuesCount = $issuesQuery->count();
 
         return response()->json([
-            'ready' => ($counts['READY_TO_SHIP'] ?? 0) + ($counts['MATCHED'] ?? 0),
+            'ready' => ($counts['PENDING'] ?? 0) + ($counts['READY_TO_SHIP'] ?? 0) + ($counts['MATCHED'] ?? 0),
+            'ready_pending' => $pendingCount,
+            'ready_process' => $processCount,
             'processed' => ($counts['PROCESSED'] ?? 0) + ($counts['READY_TO_HANDOVER'] ?? 0),
             'shipped' => ($counts['SHIPPED'] ?? 0) + ($counts['TO_CONFIRM_RECEIVE'] ?? 0),
             'completed' => $counts['COMPLETED'] ?? 0,
@@ -172,7 +178,12 @@ trait MarketplaceOrdersPaginatedTrait
                 $query->whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING']);
             } else {
                 // Approximate logic for kilat/instant handling
-                $query->whereIn('order_status', ['READY_TO_SHIP', 'MATCHED']);
+                $query->whereIn('order_status', ['PENDING', 'READY_TO_SHIP', 'MATCHED']);
+                if ($subTab === 'pending') {
+                    $query->shippingPending();
+                } elseif ($subTab === 'process') {
+                    $query->shippingPending(false);
+                }
                 if ($subTab === 'kilat') {
                     $query->where(function($q) {
                         $q->whereNotNull('booking_sn')->where('shipping_carrier', 'not like', '%instant%')->where('shipping_carrier', 'not like', '%same day%');
@@ -296,6 +307,7 @@ trait MarketplaceOrdersPaginatedTrait
             $arr['api_order_status']       = null;
             $arr['api_logistics_status']   = null;
             $arr['api_platform_pending']   = null;
+            $arr['platform_pending']       = $o->shipping_pending;
             $arr['status_source']          = 'database';
             $arr['fulfillment_id']         = $o->fulfillment?->id;
             $arr['fulfillment_status']     = $o->fulfillment?->status;
@@ -308,7 +320,7 @@ trait MarketplaceOrdersPaginatedTrait
             $arr['has_data_issues'] = $o->items->contains(
                 fn ($item) => ($item->data_status ?? 'incomplete') !== 'valid'
             );
-            $arr['logistics_status'] = $o->raw_json['package_list'][0]['logistics_status'] ?? null;
+            $arr['logistics_status'] = $o->shipping_logistics_status ?: null;
             $arr['fulfillment_scan_log'] = null;
 
             if ($o->fulfillment && $hasScanLog && $o->fulfillment->scan_log) {

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -142,5 +143,45 @@ class MarketplaceOrder extends Model
             && is_null($this->shipping_arranged_at)
             && empty($this->shipping_awb_no)
             && !$isArrangedViaApp;
+    }
+
+    public function getShippingLogisticsStatusAttribute(): string
+    {
+        return strtoupper((string) (data_get($this->raw_json, 'package_list.0.logistics_status')
+            ?? data_get($this->raw_json, 'logistics_status', '')));
+    }
+
+    public function getShippingPendingAttribute(): bool
+    {
+        if (! in_array($this->order_status, ['PENDING', 'READY_TO_SHIP', 'MATCHED'], true)
+            || $this->shipping_logistics_status === 'LOGISTICS_READY') {
+            return false;
+        }
+
+        return $this->order_status === 'PENDING'
+            || strtoupper((string) data_get($this->raw_json, 'order_status')) === 'PENDING'
+            || $this->shipping_logistics_status === 'LOGISTICS_NOT_START';
+    }
+
+    /** Filter sebelum pagination; COALESCE menjaga order tanpa payload tetap bisa diproses. */
+    public function scopeShippingPending(Builder $query, bool $pending = true): Builder
+    {
+        $grammar = $query->getQuery()->getGrammar();
+        $packageStatus = $grammar->wrap('raw_json->package_list[0]->logistics_status');
+        $rootStatus = $grammar->wrap('raw_json->logistics_status');
+        $rawOrderStatus = $grammar->wrap('raw_json->order_status');
+        $logistics = "UPPER(COALESCE({$packageStatus}, {$rootStatus}, ''))";
+
+        $condition = function (Builder $q) use ($logistics, $rawOrderStatus) {
+            $q->whereIn('order_status', ['PENDING', 'READY_TO_SHIP', 'MATCHED'])
+                ->whereRaw("{$logistics} != ?", ['LOGISTICS_READY'])
+                ->where(function (Builder $q) use ($logistics, $rawOrderStatus) {
+                    $q->where('order_status', 'PENDING')
+                        ->orWhereRaw("UPPER(COALESCE({$rawOrderStatus}, '')) = ?", ['PENDING'])
+                        ->orWhereRaw("{$logistics} = ?", ['LOGISTICS_NOT_START']);
+                });
+        };
+
+        return $pending ? $query->where($condition) : $query->whereNot($condition);
     }
 }
