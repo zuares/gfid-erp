@@ -9,47 +9,27 @@
 
 @push('head')
 <style>
-  .page-wrap { max-width:1080px; margin-inline:auto; padding-bottom:3rem; }
   .mono { font-variant-numeric:tabular-nums; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono"; }
 
-  /* Summary row */
-  .card-info    { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:1rem 1.15rem; }
-  .summary-col  { padding:.8rem 1rem; border-right:1px solid var(--line); }
-  .summary-col:last-child { border-right:none; }
-  .summary-col-label { font-size:.68rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); font-weight:600; margin-bottom:.25rem; }
-  .summary-col-value { font-size:.9rem; font-weight:700; }
-
-  /* Filter */
-  .card-filter { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:.75rem .95rem; }
-
-  /* Table */
-  .card-section { background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
-  .card-section-header {
-    padding:.6rem 1rem; border-bottom:1px solid var(--line);
-    font-size:.72rem; text-transform:uppercase; letter-spacing:.07em;
-    color:var(--muted); font-weight:600;
-    display:flex; align-items:center; justify-content:space-between;
-  }
-  .table thead th {
-    border-bottom:1px solid var(--line);
-    font-size:.72rem; text-transform:uppercase; letter-spacing:.07em;
-    color:var(--muted); padding:.5rem .75rem; white-space:nowrap; font-weight:600;
-  }
-  .table tbody td { vertical-align:middle; font-size:.83rem; padding:.48rem .75rem; border-bottom:1px solid var(--line); }
-  .table tbody tr:last-child td { border-bottom:none; }
+  .payment-table tbody td { vertical-align:middle; }
+  .payment-table .payment-date { color:#334155; font-size:.82rem; font-weight:700; }
+  .payment-table .payment-ref { color:#94a3b8; font-size:.68rem; }
+  .payment-link { color:#334155; text-decoration:none; font-weight:650; font-size:.74rem; }
+  .payment-link:hover { color:#0f172a; text-decoration:underline; }
+  .payment-secondary { color:#64748b; font-size:.72rem; }
+  .payment-total { color:#0f172a; font-size:.8rem; font-weight:750; }
   .pay-row:hover td { background:rgba(59,130,246,.035); }
   .pay-row.voided td { opacity:.55; }
 
-  /* Badges */
-  .badge-status {
-    border-radius:999px; font-size:.7rem; padding:.1rem .55rem;
+  .payment-type-badge {
+    border-radius:7px; font-size:.68rem; padding:.16rem .48rem;
     border:1px solid transparent; white-space:nowrap; display:inline-block;
   }
-  .badge-dp       { background:rgba(59,130,246,.1);  color:#1d4ed8; border-color:rgba(59,130,246,.4); }
-  .badge-payment  { background:rgba(22,163,74,.1);   color:#15803d; border-color:rgba(22,163,74,.4); }
-  .badge-dp_apply { background:rgba(139,92,246,.1);  color:#7c3aed; border-color:rgba(139,92,246,.4); }
-  .badge-loan_apply { background:rgba(14,165,233,.1); color:#0369a1; border-color:rgba(14,165,233,.4); }
-  .badge-voided   { background:rgba(220,38,38,.08);  color:#b91c1c; border-color:rgba(220,38,38,.4); }
+  .payment-type-dp { background:rgba(59,130,246,.1); color:#1d4ed8; border-color:rgba(59,130,246,.4); }
+  .payment-type-payment { background:rgba(22,163,74,.1); color:#15803d; border-color:rgba(22,163,74,.4); }
+  .payment-type-dp_apply { background:rgba(139,92,246,.1); color:#7c3aed; border-color:rgba(139,92,246,.4); }
+  .payment-type-loan_apply { background:rgba(14,165,233,.1); color:#0369a1; border-color:rgba(14,165,233,.4); }
+  .payment-type-voided { background:rgba(220,38,38,.08); color:#b91c1c; border-color:rgba(220,38,38,.4); }
 
   /* PO cards in modal */
   .po-card {
@@ -65,211 +45,188 @@
   .tbl-link { color:inherit; text-decoration:none; font-weight:600; }
   .tbl-link:hover { text-decoration:underline; color:#2563eb; }
 
+  .payment-filter-controls { gap:.45rem!important; }
+  .payment-filter-controls .form-control, .payment-filter-controls .form-select { min-height:34px; }
+  .payment-modal { border:1px solid rgba(148,163,184,.2); border-radius:8px; background:var(--card,#fff); overflow:hidden; }
+  .payment-modal .modal-header { padding:.85rem 1rem; border-bottom:1px solid rgba(148,163,184,.18); }
+  .payment-modal .modal-body { padding:1rem; }
+  .payment-modal .modal-title { color:#0f172a; }
+  .payment-modal .modal-caption { color:#64748b; font-size:.74rem; }
+  .payment-modal .modal-kpi { display:inline-flex; gap:.3rem; align-items:baseline; padding:.2rem .45rem; border-radius:7px; border:1px solid rgba(148,163,184,.25); color:#64748b; font-size:.68rem; }
+  .payment-modal .modal-kpi strong { color:#334155; }
+  .payment-step-label { color:#64748b; font-size:.67rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
+
   @media(max-width:767.98px){
-    .page-wrap { padding-inline:.75rem; }
-    .summary-col { border-right:none; border-bottom:1px solid var(--line); }
-    .summary-col:last-child { border-bottom:none; }
+    .payment-filter-controls { display:grid!important; grid-template-columns:1fr; }
+    .payment-filter-controls > * { width:100%!important; max-width:none!important; }
+    .payment-table tbody tr { padding:.68rem .7rem; }
+    .payment-table tbody td { padding:0; border:0; }
+    .payment-table tbody td + td { margin-top:.3rem; }
+    .payment-table .payment-total { font-size:.9rem; }
   }
 </style>
 @endpush
 
 @section('content')
-<div class="page-wrap py-3">
+@php
+  $idMonths = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  $rangeDisplay = '';
+  if (request('from') && request('to')) {
+      try {
+          $f = \Carbon\Carbon::parse(request('from'));
+          $t = \Carbon\Carbon::parse(request('to'));
+          $rangeDisplay = $f->day.' '.$idMonths[$f->month - 1].' – '.$t->day.' '.$idMonths[$t->month - 1].' '.$t->year;
+      } catch (\Exception $e) { $rangeDisplay = request('from').' – '.request('to'); }
+  } elseif (request('from')) {
+      try {
+          $f = \Carbon\Carbon::parse(request('from'));
+          $rangeDisplay = $f->day.' '.$idMonths[$f->month - 1].' '.$f->year;
+      } catch (\Exception $e) { $rangeDisplay = request('from'); }
+  }
+  $hasPayFilters = request()->filled('supplier_id') || request()->filled('type')
+      || request()->filled('from') || request()->filled('to') || request()->filled('voided');
+@endphp
 
-  {{-- HEADER --}}
-  <div class="d-flex align-items-center justify-content-between gap-3 mb-3 flex-wrap">
-    <div>
-      <h2 class="mb-0">Pembayaran Supplier</h2>
-      <div class="text-muted small">Jurnal: Dr 2101 Hutang Dagang / Cr Bank</div>
-    </div>
-    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalBayar" onclick="resetPaymentPicker()">
-      <i class="bi bi-plus me-1"></i>Bayar Supplier / Gabungkan PO
+<x-index-layout title="Pembayaran Supplier" subtitle="Pelunasan hutang supplier berdasarkan PO dan GRN.">
+  <x-slot name="kpis">
+    <span class="kpi"><span class="lbl">Transaksi</span><span class="val mono">{{ $summary['count'] }}</span></span>
+    <span class="kpi"><span class="lbl">Pelunasan</span><span class="val mono">Rp {{ $fmt($summary['total_payment']) }}</span></span>
+    <span class="kpi"><span class="lbl">DP</span><span class="val mono">Rp {{ $fmt($summary['total_dp']) }}</span></span>
+  </x-slot>
+
+  <x-slot name="actions">
+    <button class="btn btn-sm btn-ship-primary btn-pill" data-bs-toggle="modal" data-bs-target="#modalBayar" onclick="resetPaymentPicker()">
+      <i class="bi bi-plus-lg me-1"></i>Bayar Supplier / Gabungkan PO
     </button>
-  </div>
+  </x-slot>
 
-  {{-- FLASH --}}
-  @if (session('success'))
-    <div class="alert alert-success py-2 small mb-3">{{ session('success') }}</div>
+  <x-slot name="filters">
+    <div class="filter-bar">
+      <div class="filter-summary mb-2"><strong>Filter pembayaran</strong> — cari berdasarkan supplier, tipe, status, atau periode.</div>
+      <form method="GET" action="{{ route('purchasing.purchase_payments.index') }}" id="pay-filter-form">
+        <input type="hidden" name="from" id="pay-from" value="{{ request('from') }}" data-gf-date="off">
+        <input type="hidden" name="to" id="pay-to" value="{{ request('to') }}" data-gf-date="off">
+        <div class="d-flex flex-wrap align-items-center payment-filter-controls">
+          <select name="supplier_id" class="form-select form-select-sm pay-filter-auto" style="max-width:210px;">
+            <option value="">Semua supplier</option>
+            @foreach ($suppliers as $s)
+              <option value="{{ $s->id }}" @selected(request('supplier_id') == $s->id)>{{ $s->name }}</option>
+            @endforeach
+          </select>
+          <select name="type" class="form-select form-select-sm pay-filter-auto" style="max-width:170px;">
+            <option value="">Semua tipe</option>
+            <option value="payment" @selected(request('type') === 'payment')>Pelunasan</option>
+            <option value="dp" @selected(request('type') === 'dp')>DP</option>
+            <option value="dp_apply" @selected(request('type') === 'dp_apply')>Offset DP</option>
+            <option value="loan_apply" @selected(request('type') === 'loan_apply')>Alokasi Pinjaman</option>
+          </select>
+          <select name="voided" class="form-select form-select-sm pay-filter-auto" style="max-width:130px;">
+            <option value="no" @selected(request('voided', 'no') === 'no')>Aktif</option>
+            <option value="yes" @selected(request('voided') === 'yes')>Void</option>
+            <option value="" @selected(request('voided') === '')>Semua</option>
+          </select>
+          <input type="text" id="pay-date-range" value="{{ $rangeDisplay }}" placeholder="Pilih periode…"
+                 autocomplete="off" readonly class="form-control form-control-sm" style="max-width:210px;cursor:pointer;" data-gf-date="off">
+          @if ($hasPayFilters)
+            <a href="{{ route('purchasing.purchase_payments.index') }}" class="btn btn-sm btn-ship-outline btn-pill">
+              <i class="bi bi-x-lg me-1"></i>Reset Filter
+            </a>
+          @endif
+        </div>
+      </form>
+    </div>
+  </x-slot>
+
+  <x-slot name="summary">
+    <strong>Riwayat Pembayaran</strong> — menampilkan <strong>{{ $payments->total() }}</strong> transaksi dalam filter aktif.
+  </x-slot>
+
+  @if ($payments->count() === 0)
+    <x-slot name="emptyState">
+      <div class="empty">Belum ada pembayaran sesuai filter.</div>
+    </x-slot>
   @endif
-  @if (session('error'))
-    <div class="alert alert-danger py-2 small mb-3">{{ session('error') }}</div>
-  @endif
 
-  {{-- SUMMARY ROW --}}
-  <div class="card-info mb-3">
-    <div class="row g-0">
-      <div class="col-6 col-md-4 summary-col">
-        <div class="summary-col-label">Total Transaksi</div>
-        <div class="summary-col-value">{{ $summary['count'] }}</div>
-      </div>
-      <div class="col-6 col-md-4 summary-col">
-        <div class="summary-col-label">Total Pelunasan</div>
-        <div class="summary-col-value mono">Rp {{ $fmt($summary['total_payment']) }}</div>
-      </div>
-      <div class="col-6 col-md-4 summary-col">
-        <div class="summary-col-label">Total DP</div>
-        <div class="summary-col-value mono">Rp {{ $fmt($summary['total_dp']) }}</div>
-      </div>
-    </div>
-  </div>
+  <x-slot name="thead">
+    <tr>
+      <th>Tanggal / Referensi</th>
+      <th>Supplier</th>
+      <th>PO</th>
+      <th>GRN</th>
+      <th>Status</th>
+      <th>Metode</th>
+      <th class="mobile-hide">Akun</th>
+      <th class="text-end">Jumlah</th>
+      <th class="text-end">Aksi</th>
+    </tr>
+  </x-slot>
 
-  {{-- FILTER --}}
-  @php
-    $idMonths = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-    $rangeDisplay = '';
-    if (request('from') && request('to')) {
-        try {
-            $f = \Carbon\Carbon::parse(request('from'));
-            $t = \Carbon\Carbon::parse(request('to'));
-            $rangeDisplay = $f->day . ' ' . $idMonths[$f->month-1]
-                . ' – ' . $t->day . ' ' . $idMonths[$t->month-1] . ' ' . $t->year;
-        } catch (\Exception $e) { $rangeDisplay = request('from') . ' – ' . request('to'); }
-    } elseif (request('from')) {
-        try {
-            $f = \Carbon\Carbon::parse(request('from'));
-            $rangeDisplay = $f->day . ' ' . $idMonths[$f->month-1] . ' ' . $f->year;
-        } catch (\Exception $e) { $rangeDisplay = request('from'); }
-    }
-  @endphp
-  <div class="card-filter mb-3">
-    <form method="GET" action="{{ route('purchasing.purchase_payments.index') }}" id="pay-filter-form">
-      <input type="hidden" name="from" id="pay-from" value="{{ request('from') }}" data-gf-date="off">
-      <input type="hidden" name="to"   id="pay-to"   value="{{ request('to') }}"   data-gf-date="off">
+  @foreach ($payments as $pay)
+    <tr class="pay-row {{ $pay->voided_at ? 'voided' : '' }}">
+      <td>
+        <div class="payment-date">{{ \Carbon\Carbon::parse($pay->date)->format('d/m/Y') }}</div>
+        @if ($pay->ref_no)
+          <div class="payment-ref mono">Ref: {{ $pay->ref_no }}</div>
+        @endif
+      </td>
+      <td><span class="supplier-name">{{ $pay->purchaseOrder?->supplier?->name ?? '—' }}</span></td>
+      <td>
+        @if ($pay->purchaseOrder)
+          <a href="{{ route('purchasing.purchase_orders.show', $pay->purchaseOrder) }}" class="payment-link mono">{{ $pay->purchaseOrder->code }}</a>
+        @else <span class="payment-secondary">—</span>
+        @endif
+      </td>
+      <td>
+        @if ($pay->purchaseReceipt)
+          <a href="{{ route('purchasing.purchase_receipts.show', $pay->purchaseReceipt) }}" class="payment-link mono">{{ $pay->purchaseReceipt->code }}</a>
+        @else <span class="payment-secondary">PO-level</span>
+        @endif
+      </td>
+      <td>
+        <span class="payment-type-badge {{ $pay->voided_at ? 'payment-type-voided' : 'payment-type-' . $pay->type }}">
+          {{ $pay->voided_at ? 'Void' : ($typeLabel[$pay->type] ?? $pay->type) }}
+        </span>
+      </td>
+      <td><span class="payment-secondary">{{ $pay->paymentMethod?->name ?? '—' }}</span></td>
+      <td class="mobile-hide"><span class="payment-secondary">{{ $pay->cashAccount?->name ?? '—' }}</span></td>
+      <td class="text-end"><span class="payment-total mono">Rp {{ $fmt($pay->amount) }}</span></td>
+      <td class="text-end">
+        @if (!$pay->voided_at && $pay->purchaseOrder)
+          <form method="POST" action="{{ route('purchasing.purchase_orders.payments.void', [$pay->purchaseOrder, $pay]) }}"
+                onsubmit="return confirm('VOID pembayaran ini?\nTindakan ini tidak bisa dibatalkan.')">
+            @csrf
+            <button type="submit" class="btn btn-sm btn-ship-outline" style="font-size:.7rem;padding:.16rem .55rem;">Void</button>
+          </form>
+        @endif
+      </td>
+    </tr>
+  @endforeach
 
-      <div class="d-flex flex-wrap gap-2 align-items-center">
-
-        <select name="supplier_id" class="form-select form-select-sm pay-filter-auto" style="max-width:195px;">
-          <option value="">Semua supplier</option>
-          @foreach ($suppliers as $s)
-            <option value="{{ $s->id }}" @selected(request('supplier_id') == $s->id)>{{ $s->name }}</option>
-          @endforeach
-        </select>
-
-        <select name="type" class="form-select form-select-sm pay-filter-auto" style="max-width:140px;">
-          <option value="">Semua tipe</option>
-          <option value="payment"  @selected(request('type') === 'payment')>Pelunasan</option>
-          <option value="dp"       @selected(request('type') === 'dp')>DP</option>
-          <option value="dp_apply" @selected(request('type') === 'dp_apply')>Offset DP</option>
-          <option value="loan_apply" @selected(request('type') === 'loan_apply')>Alokasi Pinjaman Supplier</option>
-        </select>
-
-        <select name="voided" class="form-select form-select-sm pay-filter-auto" style="max-width:120px;">
-          <option value="no"  @selected(request('voided', 'no') === 'no')>Aktif</option>
-          <option value="yes" @selected(request('voided') === 'yes')>Void</option>
-          <option value=""    @selected(request('voided') === '')>Semua</option>
-        </select>
-
-        <input type="text" id="pay-date-range" value="{{ $rangeDisplay }}"
-               placeholder="Pilih tanggal…" autocomplete="off" readonly
-               class="form-control form-control-sm" style="max-width:195px;cursor:pointer;"
-               data-gf-date="off">
-
-        <a href="{{ route('purchasing.purchase_payments.index') }}"
-           class="btn btn-sm btn-outline-secondary" style="font-size:.78rem;padding:.25rem .65rem;">
-          <i class="bi bi-x me-1"></i>Reset
-        </a>
-      </div>
-    </form>
-  </div>
-
-  {{-- TABLE --}}
-  <div class="card-section">
-    <div class="card-section-header">
-      <span>Riwayat Pembayaran</span>
-      <span style="font-weight:700;color:var(--body);font-size:.78rem;">{{ $payments->total() }} transaksi</span>
-    </div>
-    <div class="table-responsive">
-      <table class="table table-sm mb-0">
-        <thead>
-          <tr>
-            <th>Tanggal</th>
-            <th>Supplier</th>
-            <th>No PO</th>
-            <th>No GRN</th>
-            <th>Tipe</th>
-            <th>Metode</th>
-            <th>Akun</th>
-            <th class="text-end">Jumlah</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          @forelse ($payments as $pay)
-          <tr class="pay-row {{ $pay->voided_at ? 'voided' : '' }}">
-            <td class="mono text-muted" style="white-space:nowrap;">
-              {{ \Carbon\Carbon::parse($pay->date)->format('d/m/Y') }}
-            </td>
-            <td>{{ $pay->purchaseOrder?->supplier?->name ?? '—' }}</td>
-            <td>
-              @if ($pay->purchaseOrder)
-                <a href="{{ route('purchasing.purchase_orders.show', $pay->purchaseOrder) }}" class="tbl-link mono">
-                  {{ $pay->purchaseOrder->code }}
-                </a>
-              @else —
-              @endif
-            </td>
-            <td>
-              @if ($pay->purchaseReceipt)
-                <a href="{{ route('purchasing.purchase_receipts.show', $pay->purchaseReceipt) }}" class="tbl-link mono">
-                  {{ $pay->purchaseReceipt->code }}
-                </a>
-              @else
-                <span class="text-muted">—</span>
-              @endif
-            </td>
-            <td>
-              <span class="badge-status {{ $pay->voided_at ? 'badge-voided' : 'badge-' . $pay->type }}">
-                {{ $pay->voided_at ? 'Void' : ($typeLabel[$pay->type] ?? $pay->type) }}
-              </span>
-            </td>
-            <td class="text-muted">{{ $pay->paymentMethod?->name ?? '—' }}</td>
-            <td class="text-muted">{{ $pay->cashAccount?->name ?? '—' }}</td>
-            <td class="text-end mono fw-semibold">Rp {{ $fmt($pay->amount) }}</td>
-            <td>
-              @if (!$pay->voided_at)
-                <form method="POST"
-                      action="{{ route('purchasing.purchase_orders.payments.void', [$pay->purchaseOrder, $pay]) }}"
-                      onsubmit="return confirm('VOID pembayaran ini?\nTindakan ini tidak bisa dibatalkan.')">
-                  @csrf
-                  <button type="submit" class="btn btn-sm btn-outline-danger"
-                          style="font-size:.7rem;padding:.15rem .55rem;">
-                    Void
-                  </button>
-                </form>
-              @endif
-            </td>
-          </tr>
-          @empty
-          <tr>
-            <td colspan="9" class="text-center text-muted py-4">Belum ada pembayaran.</td>
-          </tr>
-          @endforelse
-        </tbody>
-      </table>
-    </div>
-
-    {{-- Pagination --}}
-    @if ($payments->hasPages())
-    <div class="px-3 py-2 border-top" style="font-size:.8rem;">
-      {{ $payments->withQueryString()->links() }}
-    </div>
-    @endif
-  </div>
-
-</div>
+  <x-slot name="pagination">
+    {{ $payments->withQueryString()->links() }}
+  </x-slot>
+</x-index-layout>
 
 {{-- ── MODAL BAYAR SUPPLIER ──────────────────────────────────────── --}}
 <div class="modal fade" id="modalBayar" tabindex="-1">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header" style="border-bottom:1px solid var(--line);padding:.85rem 1.15rem;">
-        <h6 class="modal-title fw-semibold mb-0">Bayar Supplier</h6>
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content payment-modal">
+      <div class="modal-header">
+        <div>
+          <h6 class="modal-title fw-semibold mb-1">Bayar Supplier</h6>
+          <div class="modal-caption">Gabungkan beberapa PO dari supplier yang sama tanpa menghilangkan detail GRN.</div>
+          <div class="d-flex gap-1 flex-wrap mt-2">
+            <span class="modal-kpi">PO terbuka <strong class="mono">{{ $openPos->count() }}</strong></span>
+            <span class="modal-kpi">Aturan <strong>1 supplier</strong></span>
+          </div>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body" style="padding:1.1rem 1.15rem;">
+      <div class="modal-body">
 
         {{-- Step 1: Pilih PO --}}
         <div class="mb-3">
+          <div class="payment-step-label mb-1">Langkah 1 · Pilih dokumen</div>
           <label class="form-label small fw-semibold">Pilih PO yang akan dibayar <span class="text-muted fw-normal">(bisa beberapa, supplier wajib sama)</span></label>
           <input type="search" id="poSearch" class="form-control form-control-sm mb-2"
                  placeholder="Cari kode PO atau nama supplier…" autocomplete="off">
@@ -314,6 +271,7 @@
           <input type="hidden" name="type" value="payment">
           <div id="combinedFields"></div>
 
+          <div class="payment-step-label mb-1">Langkah 2 · Atur pembayaran</div>
           <div id="selectedPoInfo" class="mb-3 p-2 rounded"
                style="background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.2);font-size:.85rem;"></div>
 
