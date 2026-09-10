@@ -6,6 +6,7 @@ use App\Http\Controllers\MarketplaceLogisticsController;
 use App\Models\Store;
 use App\Services\Channels\ChannelManager;
 use App\Services\Channels\Contracts\MarketplaceChannel;
+use App\Services\Channels\Shopee\ShopeeChannel;
 use App\Services\Marketplace\MarketplaceLogisticsService;
 use Illuminate\Http\Request;
 use Mockery\MockInterface;
@@ -27,7 +28,43 @@ class MarketplaceLogisticsControllerTest extends TestCase
                     && $timeTo === 1700003600
                     && $pageSize === 100
                     && $cursor === 'CURSOR-2'
-                    && $status === 'INVOICE_PENDING'
+                    && $status === 'UNPAID'
+                    && $timeRangeField === 'create_time';
+            })
+            ->andReturn(['response' => ['order_list' => []]]);
+
+        $this->mock(ChannelManager::class, function (MockInterface $mock) use ($store, $driver): void {
+            $mock->shouldReceive('driver')->once()->with($store)->andReturn($driver);
+        });
+
+        $request = Request::create('/order-list', 'GET', [
+            'time_from' => 1700000000,
+            'time_to' => 1700003600,
+            'page_size' => 200,
+            'cursor' => 'CURSOR-2',
+            'order_status' => 'UNPAID',
+            'time_range_field' => 'create_time',
+        ]);
+        $response = app(MarketplaceLogisticsController::class)->getOrderList($store, $request);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame([], $response->getData(true)['response']['order_list']);
+    }
+
+    public function test_pending_invoice_order_list_uses_dedicated_endpoint_without_status_filter(): void
+    {
+        $store = new Store();
+        $store->id = 7;
+
+        $driver = \Mockery::mock(ShopeeChannel::class);
+        $driver->shouldReceive('getPendingBuyerInvoiceOrderList')
+            ->once()
+            ->withArgs(function (Store $receivedStore, int $timeFrom, int $timeTo, int $pageSize, string $cursor, string $timeRangeField): bool {
+                return $receivedStore->id === 7
+                    && $timeFrom === 1700000000
+                    && $timeTo === 1700003600
+                    && $pageSize === 100
+                    && $cursor === 'CURSOR-2'
                     && $timeRangeField === 'create_time';
             })
             ->andReturn(['response' => ['order_list' => []]]);
@@ -44,7 +81,7 @@ class MarketplaceLogisticsControllerTest extends TestCase
             'order_status' => 'INVOICE_PENDING',
             'time_range_field' => 'create_time',
         ]);
-        $response = app(MarketplaceLogisticsController::class)->getOrderList($store, $request);
+        $response = app(MarketplaceLogisticsController::class)->getPendingBuyerInvoiceOrderList($store, $request);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame([], $response->getData(true)['response']['order_list']);

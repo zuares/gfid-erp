@@ -276,6 +276,44 @@ class MarketplaceLogisticsController extends Controller
     }
 
     /**
+     * Get Shopee's pending buyer invoice order list.
+     *
+     * This endpoint must be called without order_status; Shopee rejects that
+     * parameter with "order_status is invalid".
+     */
+    public function getPendingBuyerInvoiceOrderList(Store $store, Request $request): JsonResponse
+    {
+        try {
+            $driver = $this->manager->driver($store);
+            if (! method_exists($driver, 'getPendingBuyerInvoiceOrderList')) {
+                return response()->json(['error' => 'Not supported on this channel'], 400);
+            }
+
+            $timeFrom = (int) $request->input('time_from', time() - (86400 * 3));
+            $timeTo = (int) $request->input('time_to', time());
+            $pageSize = min(100, max(1, (int) $request->input('page_size', 20)));
+            $cursor = trim((string) $request->input('cursor', ''));
+            $timeRangeField = (string) $request->input('time_range_field', 'update_time');
+            if (! in_array($timeRangeField, ['create_time', 'update_time'], true)) {
+                $timeRangeField = 'update_time';
+            }
+
+            $result = $this->ensureSuccess($driver->getPendingBuyerInvoiceOrderList(
+                $store,
+                $timeFrom,
+                $timeTo,
+                $pageSize,
+                $cursor,
+                $timeRangeField,
+            ));
+
+            return response()->json($result);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e);
+        }
+    }
+
+    /**
      * Sync bookings from marketplace and update local database
      */
     public function syncBookings(Store $store, Request $request): JsonResponse

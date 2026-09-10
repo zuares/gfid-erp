@@ -164,6 +164,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/return-list/raw-detail', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getReturnListRaw']);
     Route::get('/stores/{store}/booking-list', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getBookingList']);
     Route::get('/stores/{store}/order-list', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getOrderList']);
+    Route::get('/stores/{store}/pending-buyer-invoice-order-list', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'getPendingBuyerInvoiceOrderList']);
     Route::post('/stores/{store}/sync-bookings', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'syncBookings'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/stores/{store}/orders/{orderSn}/ship', [\App\Http\Controllers\MarketplaceLogisticsController::class, 'arrangeShipment'])

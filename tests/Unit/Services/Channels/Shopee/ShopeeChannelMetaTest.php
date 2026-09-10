@@ -44,6 +44,40 @@ class ShopeeChannelMetaTest extends TestCase
         ], $overrides));
     }
 
+    public function test_get_orders_invoice_pending_uses_dedicated_endpoint_without_order_status(): void
+    {
+        $store = $this->createStore();
+
+        Http::fake([
+            '*/api/v2/order/get_pending_buyer_invoice_order_list*' => Http::response([
+                'response' => ['order_list' => [], 'more' => false],
+            ], 200),
+        ]);
+
+        app(ShopeeChannel::class)->getOrders(
+            $store,
+            1700000000,
+            1700003600,
+            200,
+            'CURSOR-2',
+            'INVOICE_PENDING',
+            'create_time',
+        );
+
+        Http::assertSent(function ($request): bool {
+            parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+            return $request->method() === 'GET'
+                && str_contains($request->url(), '/api/v2/order/get_pending_buyer_invoice_order_list')
+                && ($query['time_range_field'] ?? null) === 'create_time'
+                && ($query['time_from'] ?? null) === '1700000000'
+                && ($query['time_to'] ?? null) === '1700003600'
+                && ($query['page_size'] ?? null) === '100'
+                && ($query['cursor'] ?? null) === 'CURSOR-2'
+                && ! array_key_exists('order_status', $query);
+        });
+    }
+
     public function test_meta_tetap_ada_untuk_response_200_json_valid()
     {
         $store = $this->createStore();

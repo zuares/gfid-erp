@@ -1514,8 +1514,15 @@
         
         let url = '';
         if (type === 'order') {
-            url = '/api/marketplace/stores/' + id + '/order-list' + (status ? '?order_status=' + status : '');
-            $('infoOutput').textContent = 'Memuat Order List (' + (status || 'Semua Status') + ')...';
+            if (status === 'INVOICE_PENDING') {
+                // Shopee memakai endpoint khusus untuk status ini dan menolak
+                // query order_status pada endpoint get_order_list.
+                url = '/api/marketplace/stores/' + id + '/pending-buyer-invoice-order-list';
+                $('infoOutput').textContent = 'Memuat Pending Buyer Invoice Order List...';
+            } else {
+                url = '/api/marketplace/stores/' + id + '/order-list' + (status ? '?order_status=' + status : '');
+                $('infoOutput').textContent = 'Memuat Order List (' + (status || 'Semua Status') + ')...';
+            }
         } else {
             url = '/api/marketplace/stores/' + id + '/booking-list' + (status ? '?booking_status=' + status : '');
             $('infoOutput').textContent = 'Memuat Booking List (' + (status || 'Semua Status') + ')...';

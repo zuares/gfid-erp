@@ -312,6 +312,19 @@ class ShopeeChannel implements MarketplaceChannel
 
     public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = '', string $orderStatus = '', string $timeRangeField = 'update_time'): array
     {
+        // INVOICE_PENDING bukan filter yang valid untuk get_order_list.
+        // Shopee menyediakan endpoint khusus yang tidak menerima order_status.
+        if (strtoupper(trim($orderStatus)) === 'INVOICE_PENDING') {
+            return $this->getPendingBuyerInvoiceOrderList(
+                $store,
+                $timeFrom,
+                $timeTo,
+                $pageSize,
+                $cursor,
+                $timeRangeField,
+            );
+        }
+
         // Shopee get_order_list hanya menerima 'create_time' atau 'update_time'
         // (rentang maksimal 15 hari per panggilan — dipecah di MarketplaceSyncService).
         $params = [
@@ -330,6 +343,37 @@ class ShopeeChannel implements MarketplaceChannel
             $params['order_status'] = $orderStatus;
         }
         return $this->get($store, '/api/v2/order/get_order_list', $params);
+    }
+
+    /**
+     * Ambil pesanan yang menunggu invoice pembeli.
+     *
+     * Endpoint khusus ini tidak menerima parameter order_status. Jangan
+     * menambahkan filter status ke request karena Shopee akan mengembalikan
+     * "order_status is invalid".
+     */
+    public function getPendingBuyerInvoiceOrderList(
+        Store $store,
+        int $timeFrom,
+        int $timeTo,
+        int $pageSize = 20,
+        string $cursor = '',
+        string $timeRangeField = 'update_time'
+    ): array {
+        $params = [
+            'time_range_field' => in_array($timeRangeField, ['create_time', 'update_time'], true)
+                ? $timeRangeField
+                : 'update_time',
+            'time_from' => $timeFrom,
+            'time_to' => $timeTo,
+            'page_size' => min(100, max(1, $pageSize)),
+        ];
+
+        if ($cursor) {
+            $params['cursor'] = $cursor;
+        }
+
+        return $this->get($store, '/api/v2/order/get_pending_buyer_invoice_order_list', $params);
     }
 
     public function getOrderDetail(Store $store, array $orderSnList): array

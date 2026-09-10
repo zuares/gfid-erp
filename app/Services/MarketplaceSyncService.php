@@ -141,10 +141,11 @@ class MarketplaceSyncService
 
         $orderSnList = [];
         
-        // Untuk Shopee, kita tarik spesifik per status agar tidak ada order (termasuk kilat) yang terlewat
-        // Catatan: TO_CONFIRM_RECEIVE bukan parameter valid untuk filter di get_order_list (akan memicu error API)
+        // Untuk Shopee, kita tarik spesifik per status agar tidak ada order (termasuk kilat) yang terlewat.
+        // INVOICE_PENDING diteruskan ke endpoint get_pending_buyer_invoice_order_list oleh driver;
+        // status ini tidak dikirim sebagai order_status ke get_order_list.
         $statuses = $store->channel?->code === 'shopee'
-            ? ['UNPAID', 'READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'COMPLETED', 'IN_CANCEL', 'CANCELLED']
+            ? ['UNPAID', 'READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'COMPLETED', 'IN_CANCEL', 'CANCELLED', 'INVOICE_PENDING']
             : ['']; // Channel lain panggil tanpa filter status
 
         // Rentang panjang (mis. 30/60 hari) dipecah menjadi jendela <=14 hari
