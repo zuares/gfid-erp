@@ -71,9 +71,6 @@
         .sub{ color:var(--ii-muted); font-size:.78rem; }
         body[data-theme="dark"] .sub{ color:#9ca3af; }
         .controls{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
-        .filter-label{ font-size:.8rem; color:#6b7280; font-weight: 600; }
-        body[data-theme="dark"] .filter-label{ color:#9ca3af; }
-        
         .gf-header-select {
             min-height: 36px; border-radius: 10px; font-size: .82rem; font-weight: 600;
             border: 1px solid rgba(148,163,184,.35); box-shadow: none; background-color: transparent;
@@ -129,18 +126,46 @@
 
         /* Filter bar */
         .filter-bar{
-            background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);
-            border:1px solid rgba(148,163,184,.15);
-            border-radius:14px;
-            padding:.85rem .95rem;
+            background:var(--card, #fff);
+            border:1px solid rgba(148,163,184,.18);
+            border-radius:10px;
+            padding:.65rem .75rem;
             margin-bottom:1rem;
-            box-shadow:0 1px 2px rgba(15,23,42,.04);
+            box-shadow:none;
         }
         body[data-theme="dark"] .filter-bar{ background:rgba(15,23,42,.92); border-color:rgba(51,65,85,.75); box-shadow:none; }
-        .filter-bar .form-control, .filter-bar .form-select, .item-suggest-input{ border-radius:8px; font-size:.84rem; border-color: rgba(148,163,184,.3); min-height: 34px; }
-        .filter-bar .form-control:focus, .filter-bar .form-select:focus, .item-suggest-input:focus { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); border-color: #3b82f6; }
+        .filter-bar .form-control, .filter-bar .form-select{ border-radius:7px; font-size:.82rem; border-color: rgba(148,163,184,.3); min-height: 36px; }
+        .filter-bar .form-control:focus, .filter-bar .form-select:focus { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); border-color: #3b82f6; }
+        .filter-bar > .d-flex { align-items: flex-start !important; }
+        .filter-bar > .d-flex > .filter-placeholder { flex: 1 1 100%; width: 100%; padding-bottom: .55rem; margin-bottom: .1rem; border-bottom: 1px solid rgba(148,163,184,.14); }
+        #iiFilterForm { width: 100%; }
+        #iiFilterForm > div:first-child { order: 2; }
+        #iiFilterForm .ii-item-filter { flex: 1 1 360px; order: 1; }
+        #iiFilterForm > [data-ii-reset] { order: 3; }
         
         .ii-count { margin-left: auto; font-size: .78rem; font-weight: 700; color: #475569; white-space: nowrap; }
+        .ii-item-filter { align-items: flex-start !important; }
+        .ii-item-filter-control { min-width: 240px; max-width: none; flex: 1 1 280px; }
+        .ii-item-search-wrap { position: relative; }
+        .ii-item-search-wrap > .bi { position: absolute; left: .7rem; top: 50%; transform: translateY(-50%); color: #94a3b8; pointer-events: none; }
+        .ii-item-search-wrap > input { padding-left: 2rem; padding-right: 2.25rem; min-height: 38px; }
+        .ii-search-clear { position: absolute; top: 50%; right: .45rem; transform: translateY(-50%); width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #94a3b8; display: inline-flex; align-items: center; justify-content: center; }
+        .ii-search-clear[hidden] { display: none; }
+        .ii-search-clear:hover { background: rgba(148,163,184,.14); color: #475569; }
+        .ii-action-bar { display:flex; justify-content:flex-end; gap:.5rem; margin:-.45rem 0 1rem; }
+        .ii-action-bar .btn { min-height:36px; }
+        @media (max-width: 576px) {
+            .filter-bar > .d-flex > .filter-placeholder { padding-bottom: .55rem; }
+            .filter-bar > .d-flex > .text-muted-ii { width: 100%; }
+            .filter-bar > .d-flex > .form-select,
+            .filter-bar > .d-flex > .ii-search { width: 100%; max-width: none !important; min-height: 40px; }
+            .filter-bar > .d-flex > .vr { display: none !important; }
+            #iiFilterForm > [data-ii-reset] { width: 100%; justify-content: center; min-height: 40px; }
+            #iiFilterForm .ii-item-filter { flex-direction: column; width: 100%; }
+            .ii-item-filter-control { min-width: 0; max-width: none; width: 100%; }
+            .ii-action-bar { justify-content:stretch; margin:-.35rem 0 1rem; }
+            .ii-action-bar .btn { flex:1 1 0; min-height:40px; }
+        }
 
         /* Table */
         .table-list { margin-bottom: 0; font-size: .82rem; }
@@ -370,7 +395,6 @@
 
         <form id="iiFilterForm" method="GET" action="{{ route('inventory.intelligence') }}" class="d-flex flex-wrap gap-2 align-items-center m-0" style="display: none !important;" data-ii-filter>
             <div class="d-flex align-items-center gap-1">
-                <span class="filter-label d-none d-lg-inline">Kategori</span>
                 <select name="category_id" class="form-select form-select-sm gf-header-select bg-white" data-ii-filterctl aria-label="Kategori" style="min-width: 130px;">
                     <option value="">Semua Kategori</option>
                     @foreach ($categoryOptions as $cat)
@@ -380,16 +404,20 @@
                 </select>
             </div>
 
-            <div class="d-flex align-items-center gap-1">
-                <span class="filter-label d-none d-lg-inline">SKU</span>
-                <div style="min-width: 220px; max-width: 300px; flex: 1;">
-                    <x-item-suggest-input 
-                        idName="item_id" 
-                        type="finished_good"
-                        placeholder="Cari SKU..."
-                        :idValue="$filters['item_id'] ?? ''"
-                        :displayValue="$selectedItemLabel ?? ''"
-                    />
+            <div class="d-flex gap-2 ii-item-filter">
+                <div class="ii-item-filter-control">
+                    <div class="ii-item-search-wrap">
+                        <i class="bi bi-search" aria-hidden="true"></i>
+                        <input type="text" name="item_search" class="form-control form-control-sm"
+                            value="{{ $filters['item_search'] ?? '' }}"
+                            placeholder="Cari kode atau nama item..."
+                            autocomplete="off"
+                            aria-label="Cari kode atau nama item">
+                        <button type="button" class="ii-search-clear" data-ii-clear-search hidden
+                            aria-label="Hapus pencarian item" title="Hapus pencarian">
+                            <i class="bi bi-x-lg" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -424,6 +452,8 @@
             const TAB_DESC = @json($tabDesc);
             let selectedProductionDays = Number(@json($filters['production_days'] ?? 30)) || 30;
             let selectedProcurementDays = Number(@json($filters['procurement_days'] ?? 60)) || 60;
+            let itemFilterTimer = null;
+            let latestFilterRun = 0;
             const descEl = document.querySelector('.gf-master-desc');
             const setDesc = (name) => { if (descEl && TAB_DESC[name]) descEl.textContent = TAB_DESC[name]; };
 
@@ -478,7 +508,7 @@
                 history.replaceState(null, '', location.pathname + '?' + params.toString());
             }
 
-            async function loadTab(name, { force = false } = {}) {
+            async function loadTab(name, { force = false, isCurrent = () => true } = {}) {
                 const pane = paneByName(name);
                 if (!pane) return;
                 if (pane.dataset.loaded === '1' && !force) return;
@@ -496,6 +526,7 @@
                     });
                     if (!res.ok) throw new Error('HTTP ' + res.status);
                     const json = await res.json();
+                    if (!isCurrent()) return;
                     pane.innerHTML = json.html;
                     pane.dataset.loaded = '1';
                     
@@ -509,12 +540,17 @@
                     applyTableFilter(pane);
                     if (name === 'trend') initTrend(pane);
                 } catch (e) {
-                    pane.innerHTML = errorHTML(name);
+                    if (isCurrent()) pane.innerHTML = errorHTML(name);
                 }
             }
 
             async function applyFilters() {
+                const filterRun = ++latestFilterRun;
                 const filterWrapper = document.getElementById('iiFilterForm');
+                const itemInput = form.querySelector('input[name="item_search"]');
+                const keepItemFocus = itemInput && document.activeElement === itemInput;
+                const selectionStart = keepItemFocus ? itemInput.selectionStart : null;
+                const selectionEnd = keepItemFocus ? itemInput.selectionEnd : null;
                 panes.forEach(p => {
                     if (p.dataset.tabPanel !== activeName()) {
                         if (filterWrapper && p.contains(filterWrapper)) document.body.appendChild(filterWrapper);
@@ -524,8 +560,25 @@
                 });
                 form.classList.add('ii-filter-busy');
                 syncUrl();
-                await loadTab(activeName(), { force: true });
-                form.classList.remove('ii-filter-busy');
+                try {
+                    await loadTab(activeName(), {
+                        force: true,
+                        isCurrent: () => filterRun === latestFilterRun,
+                    });
+                } finally {
+                    if (filterRun === latestFilterRun) {
+                        form.classList.remove('ii-filter-busy');
+                        if (keepItemFocus) {
+                            const currentItemInput = form.querySelector('input[name="item_search"]');
+                            if (currentItemInput) {
+                                currentItemInput.focus({ preventScroll: true });
+                                if (selectionStart !== null && selectionEnd !== null) {
+                                    currentItemInput.setSelectionRange(selectionStart, selectionEnd);
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             function setSummarySubtab(pane, tab) {
@@ -972,15 +1025,71 @@
                 }
             });
 
-            // ---- Server-side filter (kategori / SKU) ----
+            // ---- Server-side filter (kategori / item) ----
             form.addEventListener('submit', (e) => { e.preventDefault(); applyFilters(); });
-            form.querySelectorAll('select[data-ii-filterctl], input[name="item_id"]').forEach(el =>
+            const itemSearchInput = form.querySelector('input[name="item_search"]');
+            const clearSearchButton = form.querySelector('[data-ii-clear-search]');
+            const ITEM_SEARCH_DEBOUNCE = 700;
+            const ITEM_SEARCH_MIN_CHARS = 2;
+            let lastAppliedItemSearch = (itemSearchInput?.value || '').trim();
+            const syncSearchClearButton = () => {
+                if (clearSearchButton) clearSearchButton.hidden = !(itemSearchInput?.value || '').trim();
+            };
+            const scheduleItemFilter = () => {
+                if (!itemSearchInput) return;
+                if (itemFilterTimer) clearTimeout(itemFilterTimer);
+
+                const value = itemSearchInput.value.trim();
+                syncSearchClearButton();
+
+                if (value && value.length < ITEM_SEARCH_MIN_CHARS) {
+                    return;
+                }
+
+                itemFilterTimer = setTimeout(() => {
+                    const latestValue = itemSearchInput.value.trim();
+                    if (latestValue === lastAppliedItemSearch) {
+                        return;
+                    }
+
+                    lastAppliedItemSearch = latestValue;
+                    applyFilters();
+                }, ITEM_SEARCH_DEBOUNCE);
+            };
+            if (itemSearchInput) {
+                syncSearchClearButton();
+                itemSearchInput.addEventListener('input', scheduleItemFilter);
+                itemSearchInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && itemSearchInput.value) {
+                        e.preventDefault();
+                        itemSearchInput.value = '';
+                        itemSearchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        return;
+                    }
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    if (itemFilterTimer) clearTimeout(itemFilterTimer);
+                    lastAppliedItemSearch = itemSearchInput.value.trim();
+                    applyFilters();
+                });
+            }
+            if (clearSearchButton) {
+                clearSearchButton.addEventListener('click', () => {
+                    if (!itemSearchInput) return;
+                    itemSearchInput.value = '';
+                    itemSearchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    itemSearchInput.focus();
+                });
+            }
+            form.querySelectorAll('select[data-ii-filterctl]').forEach(el =>
                 el.addEventListener('change', applyFilters));
             const resetLink = form.querySelector('[data-ii-reset]');
             if (resetLink) resetLink.addEventListener('click', (e) => {
                 e.preventDefault();
-                form.querySelectorAll('select[data-ii-filterctl], input[name="item_id"]').forEach(s => s.value = '');
-                form.querySelectorAll('.item-suggest-input').forEach(s => s.value = '');
+                if (itemFilterTimer) clearTimeout(itemFilterTimer);
+                form.querySelectorAll('select[data-ii-filterctl], input[name="item_search"]').forEach(s => s.value = '');
+                syncSearchClearButton();
+                lastAppliedItemSearch = '';
                 applyFilters();
             });
 

@@ -26,9 +26,8 @@
 <div class="filter-bar mb-3">
     <div class="d-flex flex-wrap gap-2 align-items-center">
         <div class="filter-placeholder d-flex flex-wrap align-items-center gap-2"></div>
-        <div class="vr mx-1 d-none d-md-block" style="opacity: .15;"></div>
         <input type="search" class="form-control form-control-sm ii-search" data-ii-search
-            placeholder="Cari SKU / produk / kategori…" autocomplete="off" style="max-width:200px;">
+            placeholder="Cari di hasil…" autocomplete="off" style="max-width:200px;">
 
         <select class="form-select form-select-sm" data-ii-status aria-label="Status" style="max-width:140px;">
             <option value="">Semua Status</option>

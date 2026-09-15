@@ -221,7 +221,29 @@
 
     .search input {
         padding-left: 2.2rem;
+        padding-right: 2.5rem;
+        min-height: 40px;
     }
+
+    .search-clear {
+        position: absolute;
+        top: 50%;
+        right: .45rem;
+        transform: translateY(-50%);
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--muted);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .search-clear[hidden] { display: none; }
+    .search-clear:hover { background: var(--soft); color: inherit; }
 
     .form-control-sm,
     .form-select-sm {

@@ -90,6 +90,57 @@ it('uses a 60-day FOB forecast and counts process WIP once', function () {
         ->and($rowProduction60->production_forecast)->toBe(120.0);
 });
 
+it('supports OR terms in the inventory intelligence item search', function () {
+    $warehouse = Warehouse::create([
+        'code' => 'WH-RTS',
+        'name' => 'WH-RTS',
+        'type' => 'fg',
+        'active' => true,
+    ]);
+
+    $matchingItems = collect([
+        ['code' => 'MULTI-ITEM-A', 'name' => 'Item A'],
+        ['code' => 'MULTI-ITEM-B', 'name' => 'Item B'],
+    ])->map(function (array $attributes) use ($warehouse) {
+        $item = Item::create([
+            ...$attributes,
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+
+        InventoryStock::create([
+            'warehouse_id' => $warehouse->id,
+            'item_id' => $item->id,
+            'qty' => 10,
+        ]);
+
+        return $item;
+    });
+
+    $nonMatchingItem = Item::create([
+        'code' => 'MULTI-ITEM-C',
+        'name' => 'Item C',
+        'unit' => 'pcs',
+        'type' => 'finished_good',
+        'active' => true,
+    ]);
+
+    InventoryStock::create([
+        'warehouse_id' => $warehouse->id,
+        'item_id' => $nonMatchingItem->id,
+        'qty' => 10,
+    ]);
+
+    $rows = app(InventoryIntelligenceService::class)->rows([
+        'item_search' => 'MULTI-ITEM-A MULTI-ITEM-B',
+    ]);
+
+    expect($rows->pluck('item_id')->all())
+        ->toEqualCanonicalizing($matchingItems->pluck('id')->all())
+        ->not->toContain($nonMatchingItem->id);
+});
+
 it('extends procurement forecast to the manually configured supplier lead time', function () {
     $item = Item::create([
         'code' => 'FOB-LEAD-TEST',

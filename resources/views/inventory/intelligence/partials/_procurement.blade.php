@@ -63,10 +63,8 @@
 <div class="filter-bar mb-3">
     <div class="d-flex flex-wrap gap-2 align-items-center">
         <div class="filter-placeholder d-flex flex-wrap align-items-center gap-2"></div>
-        <span class="text-muted-ii" style="font-size:.72rem;">Forecast {{ $procurementDays }} hari + lead time supplier</span>
-        <div class="vr mx-1 d-none d-md-block" style="opacity: .15;"></div>
         <input type="search" class="form-control form-control-sm ii-search" data-ii-search
-            placeholder="Cari SKU / produk / kategori…" autocomplete="off" style="max-width:200px;">
+            placeholder="Cari di hasil…" autocomplete="off" style="max-width:200px;">
 
         <select class="form-select form-select-sm" data-ii-procurement-days aria-label="Periode forecast pengadaan" style="max-width:150px;">
             <option value="30" @selected($procurementDays === 30)>Forecast 30 hari</option>
@@ -96,11 +94,16 @@
             <option value="cover-desc">Cover Stok Tertebal &darr;</option>
         </select>
 
-        <span class="ii-actions d-flex gap-2 ms-auto">
-            <button type="button" class="btn btn-ship-primary btn-sm btn-pill" data-ii-slip>Cetak Slip</button>
-            <button type="button" class="btn btn-ship-outline btn-sm btn-pill" data-ii-export>Export CSV</button>
-        </span>
     </div>
+</div>
+
+<div class="ii-action-bar" aria-label="Aksi pengadaan">
+    <button type="button" class="btn btn-ship-primary btn-sm btn-pill" data-ii-slip>
+        <i class="bi bi-printer me-1"></i>Cetak Slip
+    </button>
+    <button type="button" class="btn btn-ship-outline btn-sm btn-pill" data-ii-export>
+        <i class="bi bi-download me-1"></i>Export CSV
+    </button>
 </div>
 
 @if ($hasSuggestions)

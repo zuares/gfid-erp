@@ -46,15 +46,12 @@ class InventoryIntelligenceController extends Controller
 
         $filters = $this->resolveFilters($request);
 
-        $selectedItem = $filters['item_id'] ? Item::find($filters['item_id']) : null;
-
         return view('inventory.intelligence.index', array_merge(
             [
                 'filters' => $filters,
                 'initialTab' => $initialTab,
                 'initialPartial' => $this->partialFor($initialTab),
                 'categoryOptions' => ItemCategory::where('active', 1)->orderBy('name')->get(),
-                'selectedItemLabel' => $selectedItem ? $selectedItem->code . ' — ' . $selectedItem->name : '',
                 'canEditLeadTime' => $this->canEditLeadTime($request),
             ],
             $this->tabData($initialTab, $filters),
@@ -71,14 +68,11 @@ class InventoryIntelligenceController extends Controller
 
         $filters = $this->resolveFilters($request);
         
-        $selectedItem = $filters['item_id'] ? Item::find($filters['item_id']) : null;
-        
         $data = array_merge(
             $this->tabData($tab, $filters),
             [
                 'categoryOptions' => ItemCategory::where('active', 1)->orderBy('name')->get(),
                 'filters' => $filters,
-                'selectedItemLabel' => $selectedItem ? $selectedItem->code . ' — ' . $selectedItem->name : '',
                 'canEditLeadTime' => $this->canEditLeadTime($request),
             ]
         );
@@ -89,7 +83,7 @@ class InventoryIntelligenceController extends Controller
             'tab' => $tab,
             'html' => $html,
             'meta' => [
-                'item_id' => $filters['item_id'],
+                'item_search' => $filters['item_search'],
                 'category_id' => $filters['category_id'],
             ],
         ]);
@@ -110,14 +104,12 @@ class InventoryIntelligenceController extends Controller
             : $this->service->productionDraft($filters, $itemIds);
 
         $category = $filters['category_id'] ? ItemCategory::find($filters['category_id']) : null;
-        $item = $filters['item_id'] ? Item::find($filters['item_id']) : null;
-
         return view('inventory.intelligence.slip', [
             'rows' => $rows,
             'printedAt' => now(),
             'fileName' => ($isProcurement ? 'saran-pengadaan-fob-' : 'saran-produksi-') . now()->format('Ymd-Hi'),
             'categoryLabel' => $category?->name,
-            'itemLabel' => $item ? $item->code . ' — ' . $item->name : null,
+            'itemLabel' => $filters['item_search'] ?: null,
             'skuCount' => $rows->count(),
             'totalSuggested' => (float) $rows->sum('suggested_qty'),
             'totalSuggestedValue' => (float) $rows->sum('suggested_value'),
@@ -205,7 +197,7 @@ class InventoryIntelligenceController extends Controller
         ]);
     }
 
-    /** Parse filter (item_id, category_id). Tidak ada rentang tanggal (window snapshot tetap). */
+    /** Parse filter (free-text item search, category_id). Tidak ada rentang tanggal. */
     private function resolveFilters(Request $request): array
     {
         $procurementDays = (int) $request->input('procurement_days', 60);
@@ -218,7 +210,7 @@ class InventoryIntelligenceController extends Controller
         }
 
         return [
-            'item_id' => $request->input('item_id') ?: null,
+            'item_search' => trim((string) $request->input('item_search', '')) ?: null,
             'category_id' => $request->input('category_id') ?: null,
             'production_days' => $productionDays,
             'procurement_days' => $procurementDays,

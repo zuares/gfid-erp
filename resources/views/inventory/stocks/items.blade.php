@@ -142,9 +142,9 @@
                             <span class="pill"><i class="bi bi-house"></i>{{ $activeWarehouse->name }}</span>
                         @endif
 
-                        @if ($activeSearch)
-                            <span class="pill"><i class="bi bi-search"></i>{{ $activeSearch }}</span>
-                        @endif
+                        <span class="pill" id="activeSearchPill" @if (!$activeSearch) hidden @endif>
+                            <i class="bi bi-search"></i><span id="activeSearchLabel">{{ $activeSearch }}</span>
+                        </span>
                     </div>
                 </div>
 
@@ -249,7 +249,12 @@
                                 <i class="bi bi-search"></i>
                                 <input type="text" name="search" id="searchInput"
                                     value="{{ $filters['search'] ?? '' }}" class="form-control form-control-sm"
-                                    placeholder="Item code / name" autocomplete="off" inputmode="search">
+                                    placeholder="Cari kode atau nama item..." autocomplete="off" inputmode="search"
+                                    aria-label="Cari kode atau nama item">
+                                <button type="button" class="search-clear" id="searchClear" hidden
+                                    aria-label="Hapus pencarian" title="Hapus pencarian">
+                                    <i class="bi bi-x-lg" aria-hidden="true"></i>
+                                </button>
                             </div>
                         </div>
 

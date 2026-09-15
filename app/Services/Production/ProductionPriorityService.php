@@ -240,6 +240,13 @@ class ProductionPriorityService
         if (!empty($f['item_id'])) {
             $q->where('s.item_id', $f['item_id']);
         }
+        if (array_key_exists('item_ids', $f)) {
+            if (empty($f['item_ids'])) {
+                $q->whereRaw('1 = 0');
+            } else {
+                $q->whereIn('s.item_id', $f['item_ids']);
+            }
+        }
         if (!empty($f['category_id'])) {
             $q->join('items as i', 'i.id', '=', 's.item_id')->where('i.item_category_id', $f['category_id']);
         }
@@ -271,6 +278,13 @@ class ProductionPriorityService
 
         if (!empty($f['item_id'])) {
             $q->where('d.item_id', $f['item_id']);
+        }
+        if (array_key_exists('item_ids', $f)) {
+            if (empty($f['item_ids'])) {
+                $q->whereRaw('1 = 0');
+            } else {
+                $q->whereIn('d.item_id', $f['item_ids']);
+            }
         }
         if (!empty($f['category_id'])) {
             $q->join('items as i', 'i.id', '=', 'd.item_id')->where('i.item_category_id', $f['category_id']);

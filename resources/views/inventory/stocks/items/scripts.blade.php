@@ -67,6 +67,9 @@
 
             const form = $('#stockFilterForm');
             const searchInput = $('#searchInput');
+            const searchClear = $('#searchClear');
+            const activeSearchPill = $('#activeSearchPill');
+            const activeSearchLabel = $('#activeSearchLabel');
             const warehouseSelect = $('#warehouseSelect');
             const sortSelect = $('#sortSelect');
             const dirSelect = $('#dirSelect');
@@ -97,11 +100,12 @@
                 loadingOverlay.classList.toggle('show', !!on);
             };
 
-            const fetchJson = async (url) => {
+            const fetchJson = async (url, options = {}) => {
                 const res = await fetch(url, {
                     method: 'GET',
                     credentials: 'include',
                     cache: 'no-store',
+                    signal: options.signal,
                     headers: {
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
@@ -109,6 +113,22 @@
                 });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 return res.json();
+            };
+
+            let stocksAbortController = null;
+            let searchTimer = null;
+            let lastAppliedSearch = (searchInput?.value || '').trim();
+            const SEARCH_DEBOUNCE = 700;
+            const SEARCH_MIN_CHARS = 2;
+
+            const syncSearchClear = () => {
+                if (searchClear) searchClear.hidden = !(searchInput?.value || '').trim();
+            };
+
+            const syncActiveSearchPill = (value) => {
+                const query = String(value || '').trim();
+                if (activeSearchLabel) activeSearchLabel.textContent = query;
+                if (activeSearchPill) activeSearchPill.hidden = !query;
             };
 
             const buildDesktopRow = (row, index, from) => {
@@ -381,6 +401,10 @@
             const fetchStocks = async (extraParams = {}) => {
                 if (!form) return;
 
+                if (stocksAbortController) stocksAbortController.abort();
+                const requestController = new AbortController();
+                stocksAbortController = requestController;
+
                 const formData = new FormData(form);
                 const params = new URLSearchParams(formData);
                 Object.entries(extraParams).forEach(([k, v]) => {
@@ -390,30 +414,74 @@
 
                 const url = `${form.action}?${params.toString()}`;
 
+                if (window.history?.replaceState) {
+                    window.history.replaceState({}, '', url);
+                }
+
                 setLoading(true);
                 try {
-                    const data = await fetchJson(url);
+                    const data = await fetchJson(url, { signal: requestController.signal });
                     applyStocksData(data);
                 } catch (e) {
-                    console.error('Fetch JSON failed:', e);
+                    if (e?.name !== 'AbortError') console.error('Fetch JSON failed:', e);
                 } finally {
-                    setLoading(false);
+                    if (stocksAbortController === requestController) {
+                        stocksAbortController = null;
+                        setLoading(false);
+                    }
                 }
             };
 
-            const debounce = (fn, delay = 320) => {
-                let t;
-                return (...args) => {
-                    clearTimeout(t);
-                    t = setTimeout(() => fn(...args), delay);
-                };
+            const runSearch = () => {
+                if (!searchInput) return;
+                if (searchTimer) clearTimeout(searchTimer);
+
+                const value = searchInput.value.trim();
+                syncSearchClear();
+                if (value && value.length < SEARCH_MIN_CHARS) return;
+                if (value === lastAppliedSearch) return;
+
+                lastAppliedSearch = value;
+                syncActiveSearchPill(value);
+                fetchStocks({ page: 1 });
             };
 
-            const fetchDebounced = debounce(() => fetchStocks({
-                page: 1
-            }), 320);
+            const scheduleSearch = () => {
+                if (!searchInput) return;
+                if (searchTimer) clearTimeout(searchTimer);
+                syncSearchClear();
 
-            searchInput?.addEventListener('input', fetchDebounced);
+                const value = searchInput.value.trim();
+                if (value && value.length < SEARCH_MIN_CHARS) return;
+
+                searchTimer = setTimeout(runSearch, SEARCH_DEBOUNCE);
+            };
+
+            syncSearchClear();
+            searchInput?.addEventListener('input', scheduleSearch);
+            searchInput?.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && searchInput.value) {
+                    e.preventDefault();
+                    searchInput.value = '';
+                    scheduleSearch();
+                    return;
+                }
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                runSearch();
+            });
+
+            searchClear?.addEventListener('click', () => {
+                if (!searchInput) return;
+                searchInput.value = '';
+                scheduleSearch();
+                searchInput.focus();
+            });
+
+            form?.addEventListener('submit', (e) => {
+                e.preventDefault();
+                runSearch();
+            });
 
             warehouseSelect?.addEventListener('change', () => {
                 pageWrap.dataset.selectedWarehouseId = String(getSelectedWarehouseId());

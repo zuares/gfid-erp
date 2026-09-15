@@ -43,6 +43,7 @@ class InventoryIntelligenceService
      */
     public function rows(array $filters): Collection
     {
+        $filters = $this->resolveItemSearchFilter($filters);
         $snapshot = $this->priority->inventorySnapshot($filters);
         if ($snapshot->isEmpty()) {
             return collect();
@@ -326,6 +327,7 @@ class InventoryIntelligenceService
      */
     public function demandSeries(array $filters, int $days = 30): Collection
     {
+        $filters = $this->resolveItemSearchFilter($filters);
         $today = Carbon::today();
         $start = $today->copy()->subDays($days - 1)->toDateString();
 
@@ -334,6 +336,13 @@ class InventoryIntelligenceService
 
         if (!empty($filters['item_id'])) {
             $q->where('d.item_id', $filters['item_id']);
+        }
+        if (array_key_exists('item_ids', $filters)) {
+            if (empty($filters['item_ids'])) {
+                return collect();
+            }
+
+            $q->whereIn('d.item_id', $filters['item_ids']);
         }
         if (!empty($filters['category_id'])) {
             $q->join('items as i', 'i.id', '=', 'd.item_id')
@@ -352,6 +361,55 @@ class InventoryIntelligenceService
             $byDate = $rowsForItem->keyBy('date');
             return $axis->map(fn ($d) => (float) ($byDate->get($d)->qty ?? 0))->all();
         });
+    }
+
+    /**
+     * Resolve the free-text item filter to finished-good IDs.
+     * Terms separated by spaces (or OR, pipe, comma) are alternatives.
+     */
+    private function resolveItemSearchFilter(array $filters): array
+    {
+        if (array_key_exists('item_ids', $filters)) {
+            return $filters;
+        }
+
+        $search = trim((string) ($filters['item_search'] ?? ''));
+        if ($search === '') {
+            return $filters;
+        }
+
+        $normalizedSearch = preg_replace('/\s*(?:\bOR\b|\||,)\s*/i', ' ', $search);
+        $terms = preg_split('/\s+/', $normalizedSearch, -1, PREG_SPLIT_NO_EMPTY);
+        $terms = collect($terms)
+            ->map(fn ($term) => trim($term))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($terms->isEmpty()) {
+            $filters['item_ids'] = [];
+            return $filters;
+        }
+
+        $itemQuery = Item::query()
+            ->where('type', 'finished_good')
+            ->when(!empty($filters['category_id']), fn ($query) =>
+                $query->where('item_category_id', $filters['category_id']))
+            ->where(function ($query) use ($terms) {
+                foreach ($terms as $index => $term) {
+                    $like = '%' . addcslashes($term, '%_\\') . '%';
+                    $method = $index === 0 ? 'where' : 'orWhere';
+
+                    $query->{$method}(function ($termQuery) use ($like) {
+                        $termQuery->where('code', 'like', $like)
+                            ->orWhere('name', 'like', $like);
+                    });
+                }
+            });
+
+        $filters['item_ids'] = $itemQuery->pluck('id')->all();
+
+        return $filters;
     }
 
     /**
