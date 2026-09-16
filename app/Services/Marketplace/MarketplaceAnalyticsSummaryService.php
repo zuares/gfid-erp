@@ -165,12 +165,13 @@ class MarketplaceAnalyticsSummaryService
         $filters = $this->normalizeFilters($filters);
         $page = max(1, $page);
         $perPage = max(10, min(100, $perPage));
-        $settlement = in_array($settlement, ['all', 'unsettled', 'shipped', 'cancelled'], true) ? $settlement : 'settled';
+        $settlement = in_array($settlement, ['all', 'unsettled', 'shipped', 'cancelled', 'return_refund'], true) ? $settlement : 'settled';
         $base = match ($settlement) {
             'all' => $this->allCashBase($filters),
             'unsettled' => $this->unsettledBase($filters),
             'shipped' => $this->cashStatusBase($filters, 'shipped'),
             'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
+            'return_refund' => $this->cashStatusBase($filters, 'return_refund'),
             default => $this->cashBase($filters),
         };
 
@@ -203,6 +204,7 @@ class MarketplaceAnalyticsSummaryService
                 'ms.activity_fee',
                 'ms.shipping_insurance_fee',
                 'ms.escrow_tax',
+                DB::raw($this->returnRefundExistsSql() . ' AS has_return_refund'),
             ])
             ->orderByDesc('ms.settlement_time')
             ->orderByDesc('mo.ordered_at')
@@ -336,6 +338,11 @@ class MarketplaceAnalyticsSummaryService
     {
         $status = strtoupper(trim((string) ($row->order_status ?: $row->status ?: '')));
 
+        if ((int) ($row->has_return_refund ?? 0) === 1
+            || in_array($status, ['TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED'], true)) {
+            return ['key' => 'return_refund', 'label' => 'Return / Refund'];
+        }
+
         if (in_array($status, ['CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL'], true)) {
             return ['key' => 'cancelled', 'label' => 'Dibatalkan'];
         }
@@ -357,8 +364,16 @@ class MarketplaceAnalyticsSummaryService
         $base = $this->allCashBase($filters);
 
         return match ($group) {
-            'shipped' => $base->whereRaw("{$status} IN ('READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE', 'TO_RETURN')"),
-            'cancelled' => $base->whereRaw("{$status} IN ('CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL')"),
+            'shipped' => $base
+                ->whereRaw("{$status} IN ('READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE')")
+                ->whereRaw('NOT ' . $this->returnRefundExistsSql()),
+            'cancelled' => $base
+                ->whereRaw("{$status} IN ('CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL')")
+                ->whereRaw('NOT ' . $this->returnRefundExistsSql()),
+            'return_refund' => $base->where(function ($query) use ($status) {
+                $query->whereRaw($this->returnRefundExistsSql())
+                    ->orWhereRaw("{$status} IN ('TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED')");
+            }),
             default => $base,
         };
     }
@@ -370,6 +385,7 @@ class MarketplaceAnalyticsSummaryService
             'unsettled' => $this->unsettledBase($filters),
             'shipped' => $this->cashStatusBase($filters, 'shipped'),
             'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
+            'return_refund' => $this->cashStatusBase($filters, 'return_refund'),
             default => $this->cashBase($filters),
         };
         if (in_array($settlement, ['all', 'cancelled'], true)) {
@@ -971,6 +987,7 @@ class MarketplaceAnalyticsSummaryService
             'unsettled' => $this->unsettledBase($filters),
             'shipped' => $this->cashStatusBase($filters, 'shipped'),
             'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
+            'return_refund' => $this->cashStatusBase($filters, 'return_refund'),
             default => $this->cashBase($filters),
         };
         if (in_array($settlement, ['all', 'cancelled'], true)) {
@@ -1465,7 +1482,7 @@ class MarketplaceAnalyticsSummaryService
             'SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN 1 ELSE 0 END) AS order_total',
             "SUM(CASE WHEN {$status} IN ('SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE', 'COMPLETED') THEN 1 ELSE 0 END) AS shipped_count",
             "SUM(CASE WHEN {$status} = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_count",
-            "SUM(CASE WHEN {$status} IN ('CANCELLED', 'CANCELED', 'BATAL') THEN 1 ELSE 0 END) AS cancelled_count",
+            "SUM(CASE WHEN {$status} IN ('CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL') THEN 1 ELSE 0 END) AS cancelled_count",
             'SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $this->orderValueExpression() . ' ELSE 0 END) AS gmv',
         ]);
     }
@@ -1478,7 +1495,15 @@ class MarketplaceAnalyticsSummaryService
     private function isRevenueStatus(): string
     {
         $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
-        return "{$status} NOT IN ('CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL')";
+        return "{$status} NOT IN ('CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL', 'TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED')"
+            . ' AND NOT ' . $this->returnRefundExistsSql();
+    }
+
+    private function returnRefundExistsSql(): string
+    {
+        return "EXISTS (SELECT 1 FROM marketplace_returns AS mr_status"
+            . " WHERE mr_status.store_id = mo.store_id"
+            . " AND (mr_status.order_sn = mo.channel_order_id OR mr_status.order_sn = mo.external_order_id))";
     }
 
     private function normalizeAggregate($row): array

@@ -503,6 +503,7 @@
                     <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="settled">Sudah cair</button>
                     <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="shipped">Masih dikirim</button>
                     <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="cancelled">Dibatalkan</button>
+                    <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="return_refund">Return / Refund</button>
                     <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="unsettled">Belum cair</button>
                 </div>
                 <div class="an-modal-summary" id="cashOrdersSummary"><div class="an-empty">Memuat ringkasan…</div></div>
@@ -911,7 +912,7 @@
         const feePercent = value => aggregate.cash_order_revenue > 0 ? `${(n(value) / n(aggregate.cash_order_revenue) * 100).toFixed(1)}% omzet order` : '0.0% omzet order';
         const settlementLabel = row => String(row.settlement_status || '').toLowerCase() === 'complete' ? 'Sudah cair' : 'Belum cair';
         const statusLabel = row => row.status_group_label || cashStatus(row.status);
-        const modeLabel = { all: 'semua status', settled: 'settlement complete', shipped: 'shipped · masih dikirim', cancelled: 'dibatalkan', unsettled: 'belum settlement complete' }[cashSettlement] || 'semua status';
+        const modeLabel = { all: 'semua status', settled: 'settlement complete', shipped: 'shipped · masih dikirim', cancelled: 'dibatalkan', return_refund: 'return / refund', unsettled: 'belum settlement complete' }[cashSettlement] || 'semua status';
         $('cashOrdersTitle').textContent = isFeeFocus ? 'Rincian fee marketplace actual' : 'Status order & pencairan';
         $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · ${modeLabel} · ${totalOrders} order`;
         $('cashOrdersSummary').innerHTML = isFeeFocus ? [
@@ -933,7 +934,7 @@
         }).join('');
         const renderTable = (groupRows, groupLabel = '') => groupRows.length ? `${groupLabel ? `<div class="an-cash-group-head"><strong>${esc(groupLabel)}</strong><span>${groupRows.length.toLocaleString('id-ID')} order</span></div>` : ''}<div class="an-table-wrap"><table class="an-table an-cash-table"><thead><tr><th>Order</th><th>Toko &amp; status</th><th>${isAll ? 'Nilai order' : 'Omzet order'}</th><th>Pembayaran pembeli</th><th>${isSettled ? 'Omzet cair' : 'Payout tercatat'}</th><th>Fee marketplace</th><th>Affiliate / AMS</th></tr></thead><tbody>${renderRows(groupRows)}</tbody></table></div>` : '';
         const groups = isAll
-            ? ['completed', 'shipped', 'cancelled', 'other'].map(key => ({ key, label: rows.find(row => row.status_group === key)?.status_group_label || key, rows: rows.filter(row => row.status_group === key) })).filter(group => group.rows.length)
+            ? ['completed', 'shipped', 'return_refund', 'cancelled', 'other'].map(key => ({ key, label: rows.find(row => row.status_group === key)?.status_group_label || key, rows: rows.filter(row => row.status_group === key) })).filter(group => group.rows.length)
             : [{ key: 'flat', label: '', rows }];
         const table = groups.length ? groups.map(group => `<section class="an-cash-group">${renderTable(group.rows, isAll ? group.label : '')}</section>`).join('') : `<div class="an-empty">Tidak ada order pada periode ini.</div>`;
         const body = isFeeFocus
@@ -952,7 +953,7 @@
         document.body.classList.remove('an-modal-open');
     }
     function setCashSettlementTab(value) {
-        cashSettlement = ['all', 'settled', 'shipped', 'cancelled', 'unsettled'].includes(value) ? value : 'settled';
+        cashSettlement = ['all', 'settled', 'shipped', 'cancelled', 'return_refund', 'unsettled'].includes(value) ? value : 'settled';
         document.querySelectorAll('[data-cash-settlement]').forEach(button => {
             const active = button.dataset.cashSettlement === cashSettlement;
             button.classList.toggle('active', active);

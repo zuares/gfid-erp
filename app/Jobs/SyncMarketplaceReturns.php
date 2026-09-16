@@ -10,6 +10,7 @@ use Illuminate\Queue\SerializesModels;
 use App\Models\Store;
 use App\Models\MarketplaceReturn;
 use App\Models\MarketplaceReturnItem;
+use App\Models\MarketplaceOrder;
 use App\Models\Item;
 use App\Services\Channels\ChannelManager;
 use Illuminate\Support\Facades\Log;
@@ -172,6 +173,8 @@ class SyncMarketplaceReturns implements ShouldQueue
             ]
         );
 
+        $this->syncLinkedOrderStatus($returnObj);
+
         if ($syncItems && isset($data['item']) && is_array($data['item'])) {
             // Kita bisa sinkronisasi ulang item-itemnya
             $existingItemIds = [];
@@ -214,5 +217,44 @@ class SyncMarketplaceReturns implements ShouldQueue
         }
 
         return $returnObj;
+    }
+
+    private function syncLinkedOrderStatus(MarketplaceReturn $return): void
+    {
+        $order = MarketplaceOrder::where('store_id', $this->store->id)
+            ->where(function ($query) use ($return) {
+                $query->where('channel_order_id', $return->order_sn)
+                    ->orWhere('external_order_id', $return->order_sn);
+            })
+            ->first();
+
+        if (! $order) {
+            return;
+        }
+
+        $current = strtoupper(trim((string) ($order->order_status ?: $order->status ?: '')));
+        if (in_array($current, ['CANCELLED', 'CANCELED', 'RETURNED', 'REFUNDED'], true)) {
+            return;
+        }
+
+        $returnStatus = strtoupper(trim((string) ($return->status ?? '')));
+        $next = in_array($returnStatus, ['COMPLETED', 'CLOSED', 'REFUND_PAID'], true)
+            ? ((int) $return->return_solution === 1 ? 'REFUNDED' : 'RETURNED')
+            : 'TO_RETURN';
+
+        $meta = is_array($order->meta) ? $order->meta : [];
+        $meta['return_sn'] = $return->return_sn;
+        $meta['return_status'] = $return->status;
+
+        if ($current !== $next) {
+            $order->update(['order_status' => $next, 'meta' => $meta]);
+            try {
+                event(new \App\Events\OrderUpdated($this->store->id, $return->order_sn, $next));
+            } catch (\Throwable $e) {
+                Log::warning("Failed to broadcast return status for {$return->order_sn}: " . $e->getMessage());
+            }
+        } elseif ($order->meta !== $meta) {
+            $order->update(['meta' => $meta]);
+        }
     }
 }
