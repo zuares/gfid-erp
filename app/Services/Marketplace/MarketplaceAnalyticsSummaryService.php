@@ -354,7 +354,7 @@ class MarketplaceAnalyticsSummaryService
         }
 
         if ($status === 'COMPLETED') {
-            return ['key' => 'completed', 'label' => 'Completed · Sudah cair'];
+            return ['key' => 'completed', 'label' => 'Completed · ' . (! empty($row->settlement_time) ? 'Sudah cair' : 'Belum cair')];
         }
 
         if (in_array($status, ['READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE', 'TO_RETURN'], true)) {
@@ -1108,7 +1108,7 @@ class MarketplaceAnalyticsSummaryService
         return $this->applyDateAndStoreFilters(
             DB::table('marketplace_orders as mo')
                 ->join('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
-                ->where('ms.data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
+                ->whereNotNull('ms.settlement_time')
                 ->whereRaw($this->isRevenueStatus()),
             $filters,
             'mo'
@@ -1133,9 +1133,7 @@ class MarketplaceAnalyticsSummaryService
                 ->leftJoin('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
                 ->whereRaw($this->isRevenueStatus())
                 ->where(function ($query) {
-                    $query->whereNull('ms.id')
-                        ->orWhereNull('ms.data_status')
-                        ->orWhere('ms.data_status', '<>', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE);
+                    $query->whereNull('ms.settlement_time');
                 }),
             $filters,
             'mo'
