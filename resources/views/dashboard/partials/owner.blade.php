@@ -43,19 +43,19 @@
 @php
     $marketplaceKpi = $d['marketplace_kpi'] ?? [];
     $marketplaceAnalyticsUrl = $r('marketplace.analytics', [
-        'date_from' => now()->subDays(6)->toDateString(),
+        'date_from' => now()->toDateString(),
         'date_to' => now()->toDateString(),
         'compare_mode' => 'prev_period',
     ]);
     $marketplaceExceptions = (int) ($marketplaceKpi['cancelled_count'] ?? 0) + (int) ($marketplaceKpi['return_refund_order_count'] ?? 0);
     $marketplaceRoas = $marketplaceKpi['roas_net'] ?? null;
 @endphp
-<div class="dash-sec"><i class="bi bi-speedometer2"></i> KPI Marketplace (7 hari)</div>
+<div class="dash-sec"><i class="bi bi-speedometer2"></i> KPI Marketplace (hari ini)</div>
 <div class="dash-grid">
     @include('dashboard.partials._kpi', [
         'label' => 'Omzet net marketplace', 'icon' => 'bi-graph-up-arrow', 'color' => 'blue',
         'value' => rupiah($marketplaceKpi['net_order_revenue'] ?? 0),
-        'sub' => number_format((int) ($marketplaceKpi['order_total'] ?? 0), 0, ',', '.') . ' order eligible · setelah batal/refund',
+        'sub' => number_format((int) ($marketplaceKpi['order_total'] ?? 0), 0, ',', '.') . ' order eligible hari ini · setelah batal/refund',
         'url' => $marketplaceAnalyticsUrl, 'cta' => 'Buka analytics',
     ])
     @include('dashboard.partials._kpi', [
@@ -73,6 +73,11 @@
         'label' => 'ROAS net', 'icon' => 'bi-megaphone', 'color' => $marketplaceRoas !== null && $marketplaceRoas >= 3 ? 'green' : 'amber',
         'value' => $marketplaceRoas === null ? '—' : number_format((float) $marketplaceRoas, 2, ',', '.') . 'x', 'small' => true,
         'sub' => 'Omzet net ÷ biaya iklan incl. PPN',
+    ])
+    @include('dashboard.partials._kpi', [
+        'label' => 'Biaya iklan incl. PPN', 'icon' => 'bi-cash-stack', 'color' => 'amber',
+        'value' => rupiah($marketplaceKpi['ad_cost'] ?? 0),
+        'sub' => 'Spend iklan marketplace hari ini',
     ])
     @include('dashboard.partials._kpi', [
         'label' => 'Affiliate / AMS', 'icon' => 'bi-person-check', 'color' => 'violet',

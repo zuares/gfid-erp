@@ -95,7 +95,7 @@ class DashboardController extends Controller
         $marketplaceSummary = $this->safe(
             fn () => $this->marketplaceAnalytics->summary([
                 'store_id' => null,
-                'date_from' => $today->copy()->subDays(6)->toDateString(),
+                'date_from' => $today->toDateString(),
                 'date_to' => $today->toDateString(),
                 'compare_mode' => 'prev_period',
             ]),
