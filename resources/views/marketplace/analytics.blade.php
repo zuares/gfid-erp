@@ -1366,7 +1366,7 @@
         const feeRate = settledRevenue > 0
             ? actualCashFee / settledRevenue * 100
             : Number(current.marketplace_fee_estimate_rate || 0);
-        const previousFeeRate = previousSettledRevenue > 0
+        const previousDecisionFeeRate = previousSettledRevenue > 0
             ? Number(previous.cash_marketplace_fees || 0) / previousSettledRevenue * 100
             : Number(previous.marketplace_fee_estimate_rate || 0);
         const roas = adCost > 0 ? netOrderRevenue / adCost : 0;
@@ -1401,7 +1401,7 @@
         const multipleText = value => `${Number(value || 0).toFixed(2)}x`;
         const payoutRealizationChange = pulseChange(payoutRealization, previousPayoutRealization, percentText);
         const pendingPayoutChange = pulseChange(pendingPayout, previousPendingPayout, moneyText);
-        const feeRateChange = pulseChange(feeRate, previousFeeRate, percentText);
+        const feeRateChange = pulseChange(feeRate, previousDecisionFeeRate, percentText);
         const roasChange = pulseChange(roas, previousRoas, multipleText);
         const poasChange = pulseChange(poas, previousPoas, multipleText);
         const returnRefundRate = placedOrders > 0 ? returnRefundOrders / placedOrders * 100 : 0;
