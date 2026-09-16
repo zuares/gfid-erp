@@ -120,6 +120,58 @@ class MarketplaceAnalyticsSummaryService
         ];
     }
 
+    /**
+     * Lightweight payload for the first paint of the analytics page.
+     * Deliberately excludes daily, store, product, and cohort detail rows.
+     */
+    public function kpis(array $filters): array
+    {
+        $filters = $this->normalizeFilters($filters);
+        $previous = $this->previousRange($filters);
+        $previousFilters = array_merge($filters, $previous);
+        $current = $this->kpiSnapshot($filters);
+        $previousSnapshot = $this->kpiSnapshot($previousFilters);
+
+        return [
+            'filters' => $filters,
+            'current' => $current,
+            'previous' => $previousSnapshot,
+            'changes' => $this->changes($current, $previousSnapshot),
+            'quality' => $this->qualitySummary($filters),
+        ];
+    }
+
+    private function kpiSnapshot(array $filters): array
+    {
+        $financial = $this->financialAggregate($filters);
+        $cash = $this->cashAggregate($filters);
+        $unsettledCash = $this->cashAggregate($filters, 'unsettled');
+        $unsettledEstimate = $this->estimatedUnsettledPayout($filters, $cash);
+        $hpp = $this->hppAggregate($filters);
+        $returns = $this->returnRefundAggregate($filters);
+        $productQty = $this->productQuantityAggregate($filters);
+        $operational = $this->operationalAggregate($filters);
+        $ads = $this->adsAggregate($filters);
+
+        return $this->withRates($this->applyAdCost(array_merge($financial, $cash, [
+            'cash_unsettled_order_count' => $unsettledCash['cash_order_count'],
+            'cash_unsettled_gross_sales' => $unsettledCash['cash_gross_sales'],
+            'cash_unsettled_order_revenue' => $unsettledCash['cash_order_revenue'],
+            'estimated_unsettled_payout' => $unsettledEstimate['payout'],
+            'estimated_unsettled_order_count' => $unsettledEstimate['order_count'],
+            'hpp_total' => $hpp['hpp_total'],
+            'hpp_settled' => $hpp['hpp_settled'],
+            'hpp_unsettled' => $hpp['hpp_unsettled'],
+            'return_refund_count' => $returns['return_refund_count'],
+            'return_refund_order_count' => $returns['return_refund_order_count'],
+            'return_refund_amount' => $returns['return_refund_amount'],
+            'product_qty' => $productQty['total'],
+            'product_qty_settled' => $productQty['settled'],
+            'product_qty_unsettled' => $productQty['unsettled'],
+            'product_qty_return_refund' => $productQty['return_refund'],
+        ], $operational), $ads));
+    }
+
     public function products(array $filters, int $limit = 100): array
     {
         $filters = $this->normalizeFilters($filters);
@@ -926,23 +978,19 @@ class MarketplaceAnalyticsSummaryService
     private function financialBase(array $filters)
     {
         $itemCosts = DB::table('marketplace_order_items as oi')
+            ->join('marketplace_orders as fmo', 'fmo.id', '=', 'oi.marketplace_order_id')
             ->select('oi.marketplace_order_id')
             ->selectRaw('SUM(oi.hpp_snapshot * CASE WHEN oi.qty > 0 THEN oi.qty ELSE 0 END) AS hpp')
             ->selectRaw('SUM(CASE WHEN oi.qty > 0 THEN oi.qty ELSE 0 END) AS qty')
             ->where('oi.data_status', 'valid')
             ->where('oi.hpp_snapshot', '>', 0)
-            ->whereExists(function ($query) use ($filters) {
-                $query->selectRaw('1')
-                    ->from('marketplace_orders as fmo')
-                    ->whereColumn('fmo.id', 'oi.marketplace_order_id')
-                    ->where('fmo.financial_data_status', MarketplaceFinancialDataQualityService::ORDER_READY)
-                    ->whereNotNull('fmo.ordered_at')
-                    ->whereBetween('fmo.ordered_at', [
-                        $filters['date_from'] . ' 00:00:00',
-                        $filters['date_to'] . ' 23:59:59',
-                    ])
-                    ->when($filters['store_id'], fn ($q, $storeId) => $q->where('fmo.store_id', $storeId));
-            })
+            ->where('fmo.financial_data_status', MarketplaceFinancialDataQualityService::ORDER_READY)
+            ->whereNotNull('fmo.ordered_at')
+            ->whereBetween('fmo.ordered_at', [
+                $filters['date_from'] . ' 00:00:00',
+                $filters['date_to'] . ' 23:59:59',
+            ])
+            ->when($filters['store_id'], fn ($query, $storeId) => $query->where('fmo.store_id', $storeId))
             ->groupBy('oi.marketplace_order_id');
 
         $query = DB::table('marketplace_orders as mo')

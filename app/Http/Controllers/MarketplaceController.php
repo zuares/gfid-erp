@@ -131,9 +131,39 @@ class MarketplaceController extends Controller
             'compare_mode' => ['nullable', 'in:prev_period,prev_month,prev_quarter,prev_year'],
         ]);
 
+        $cacheKey = $this->analyticsCacheKey('summary', $filters);
+        $payload = Cache::remember($cacheKey, now()->addSeconds(45), fn (): array => $summaryService->summary($filters));
+
         return response()
-            ->json($summaryService->summary($filters))
+            ->json($payload)
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+
+    public function analyticsKpis(Request $request, MarketplaceAnalyticsSummaryService $summaryService): JsonResponse
+    {
+        $filters = $request->validate([
+            'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'date_from' => ['required', 'date'],
+            'date_to' => ['required', 'date', 'after_or_equal:date_from'],
+            'compare_mode' => ['nullable', 'in:prev_period,prev_month,prev_quarter,prev_year'],
+        ]);
+
+        $cacheKey = $this->analyticsCacheKey('kpis', $filters);
+        $payload = Cache::remember($cacheKey, now()->addSeconds(45), fn (): array => $summaryService->kpis($filters));
+
+        return response()
+            ->json($payload)
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+
+    private function analyticsCacheKey(string $scope, array $filters): string
+    {
+        return 'marketplace:analytics:'.$scope.':'.sha1(implode('|', [
+            (string) ($filters['store_id'] ?? 'all'),
+            Carbon::parse($filters['date_from'])->toDateString(),
+            Carbon::parse($filters['date_to'])->toDateString(),
+            (string) ($filters['compare_mode'] ?? 'prev_period'),
+        ]));
     }
 
     public function analyticsProducts(Request $request, MarketplaceAnalyticsSummaryService $summaryService): JsonResponse

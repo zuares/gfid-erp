@@ -1805,7 +1805,7 @@
         cashPayload = null;
         returnPage = 1;
         returnPayload = null;
-        setLoading('Mengambil ringkasan settlement…');
+        setLoading('Menyiapkan KPI utama…');
         $('anRefresh').disabled = true;
         $('anRefresh').textContent = 'Memuat…';
         document.querySelector('.an-shell')?.setAttribute('aria-busy', 'true');
@@ -1815,10 +1815,19 @@
         try {
             const params = new URLSearchParams({ date_from: from(), date_to: to(), compare_mode: $('anCompare').value, _ts: Date.now().toString() });
             if (selectedStore()) params.set('store_id', selectedStore());
-            const [storeRows, summaryPayload] = await Promise.all([
+            try {
+                const kpiPayload = await api('/api/marketplace/analytics-kpis?' + params.toString(), { cache: 'no-store' });
+                summary = kpiPayload;
+                renderEnterprise();
+                setLoading('KPI utama siap · memuat detail analytics…');
+            } catch (kpiError) {
+                console.warn('Analytics KPI fast load failed', kpiError);
+            }
+            const detailsPromise = Promise.all([
                 loadStores(),
                 api('/api/marketplace/analytics-summary?' + params.toString(), { cache: 'no-store' }),
             ]);
+            const [storeRows, summaryPayload] = await detailsPromise;
             stores = storeRows;
             summary = summaryPayload;
             fillStores();
