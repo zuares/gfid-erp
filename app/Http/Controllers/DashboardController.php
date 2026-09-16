@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Inventory\InventoryIntelligenceService;
+use App\Services\Marketplace\MarketplaceAnalyticsSummaryService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +31,10 @@ class DashboardController extends Controller
         'RTS'      => 'WH-RTS',
     ];
 
-    public function __construct(private InventoryIntelligenceService $inventoryIntelligence)
+    public function __construct(
+        private InventoryIntelligenceService $inventoryIntelligence,
+        private MarketplaceAnalyticsSummaryService $marketplaceAnalytics,
+    )
     {
     }
 
@@ -88,6 +92,22 @@ class DashboardController extends Controller
             $today->copy()->subMonthNoOverflow(),
         );
 
+        $marketplaceSummary = $this->safe(
+            fn () => $this->marketplaceAnalytics->summary([
+                'store_id' => null,
+                'date_from' => $today->copy()->subDays(6)->toDateString(),
+                'date_to' => $today->toDateString(),
+                'compare_mode' => 'prev_period',
+            ]),
+            ['current' => []],
+        );
+        $marketplaceKpi = $marketplaceSummary['current'] ?? [];
+        $marketplaceAdCost = (float) ($marketplaceKpi['ad_cost'] ?? 0);
+        $marketplaceNetRevenue = (float) ($marketplaceKpi['net_order_revenue'] ?? 0);
+        $marketplaceKpi['roas_net'] = $marketplaceAdCost > 0
+            ? $marketplaceNetRevenue / $marketplaceAdCost
+            : null;
+
         // Read-only forecast dari Inventory Intelligence. Jika data stok belum
         // lengkap, dashboard tetap tampil dan hanya menunjukkan saran 0.
         $intelligenceRows = $this->safe(
@@ -137,6 +157,7 @@ class DashboardController extends Controller
             'sales_7_amount'      => $sales7['amount'],
             'sales_7_compare_period' => $this->salesComparison($sales7, $sales7PreviousPeriod),
             'sales_7_compare_month'  => $this->salesComparison($sales7, $sales7PreviousMonth),
+            'marketplace_kpi'      => $marketplaceKpi,
             'orders_todo'         => $this->mpUnshippedCount(),
             'orders_ready'        => $this->mpStatusCount(['READY_TO_SHIP']),
             'orders_shipped_7'    => $this->mpStatusCount(['SHIPPED'], 6),

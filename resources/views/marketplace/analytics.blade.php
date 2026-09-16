@@ -1354,6 +1354,8 @@
         const previousEstimatedProfit = Number(previous.estimated_profit ?? previousEstimatedProfitFallback);
         const estimatedMargin = Number(current.estimated_profit_margin ?? (netOrderRevenue > 0 ? estimatedProfit / netOrderRevenue * 100 : 0));
         const previousEstimatedMargin = Number(previous.estimated_profit_margin ?? (previousNetOrderRevenue > 0 ? previousEstimatedProfit / previousNetOrderRevenue * 100 : 0));
+        const previousActualCashFee = Number(previous.cash_marketplace_fees ?? previous.marketplace_fees_actual ?? 0);
+        const previousActualAffiliateFee = Number(previous.cash_affiliate_fees ?? previous.affiliate_fees_actual ?? 0);
         const estimatedPayout = Number(current.estimated_payout ?? cashPayout);
         const previousCashPayout = Number(previous.cash_payout ?? previous.payout ?? 0);
         const previousEstimatedPayout = Number(previous.estimated_payout ?? previousCashPayout);
@@ -1390,6 +1392,8 @@
         const totalProductsChange = pulseChange(totalProducts, previous.product_qty ?? previous.qty, countText);
         const netRevenueChange = pulseChange(netOrderRevenue, previousNetOrderRevenue, moneyText);
         const adCostChange = pulseChange(adCost, previousAdCost, moneyText);
+        const marketplaceFeeChange = pulseChange(actualCashFee, previousActualCashFee, moneyText);
+        const affiliateFeeChange = pulseChange(actualAffiliateFee, previousActualAffiliateFee, moneyText);
         const aovChange = pulseChange(aovNet, previousAovNet, moneyText);
         const apcChange = pulseChange(apc, previousApc, moneyText);
         const cancelledAmountChange = pulseChange(cancelledAmount, previousCancelledAmount, moneyText);
@@ -1415,6 +1419,8 @@
             ['Produk terjual', totalProducts.toLocaleString('id-ID'), { text: `unit · ${totalProductsChange.text}`, className: totalProductsChange.className }, 'products'],
             ['Omzet net', money(netOrderRevenue), netRevenueChange, 'revenue'],
             ['Biaya iklan incl. PPN', money(adCost), adCostChange, 'ads'],
+            ['Fee marketplace', money(actualCashFee), { text: `actual · ${marketplaceFeeChange.text}`, className: exceptionChange(marketplaceFeeChange).className }, 'marketplace-fee'],
+            ['Affiliate / AMS', money(actualAffiliateFee), { text: `actual · ${affiliateFeeChange.text}`, className: exceptionChange(affiliateFeeChange).className }, 'affiliate'],
             ['AOV net', money(aovNet), aovChange, 'aov'],
             ['APC pembeli', money(apc), { text: `cair + pending · ${apcChange.text}`, className: apcChange.className }, 'apc'],
             ['Estimasi profit', money(estimatedProfit), estimatedProfitChange, 'estimated-profit'],
