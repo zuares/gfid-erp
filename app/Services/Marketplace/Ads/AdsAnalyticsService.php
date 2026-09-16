@@ -258,13 +258,25 @@ class AdsAnalyticsService
             $ratios[$storeKey . '|*'] = (float) $ratio;
         }
 
+        $qty = "CASE WHEN COALESCE(moi.qty, 0) > 0 THEN moi.qty ELSE 0 END";
+        $itemRevenueExpression = "CASE WHEN COALESCE(moi.line_net_amount, 0) > 0 THEN moi.line_net_amount WHEN COALESCE(moi.line_gross_amount, 0) > 0 THEN moi.line_gross_amount WHEN COALESCE(moi.price_after_discount, 0) > 0 THEN moi.price_after_discount * ({$qty}) ELSE COALESCE(moi.price, 0) * ({$qty}) END";
+        $orderItemTotals = DB::table('marketplace_order_items as moi')
+            ->selectRaw("moi.order_id, SUM({$itemRevenueExpression}) as order_item_value")
+            ->whereNotNull('moi.order_id')
+            ->groupBy('moi.order_id');
+
         $dateExpression = 'DATE(COALESCE(mo.ordered_at, mo.order_date, mos.settlement_time, mos.created_at))';
         $settlementRows = MarketplaceOrderSettlement::query()
             ->from('marketplace_order_settlements as mos')
             ->leftJoin('marketplace_orders as mo', 'mo.id', '=', 'mos.order_id')
+            ->joinSub($orderItemTotals, 'ot', function ($join) {
+                $join->on('ot.order_id', '=', 'mos.order_id');
+            })
             ->whereIn('mos.store_id', $storeIds)
+            ->where('mos.final_income', '>', 0)
+            ->whereRaw('ot.order_item_value > 0')
             ->whereBetween(DB::raw($dateExpression), [$dateFrom, $dateTo])
-            ->selectRaw("mos.store_id, {$dateExpression} as settlement_date, SUM(mos.final_income) as final_income, SUM(mos.buyer_payment_amount) as buyer_payment")
+            ->selectRaw("mos.store_id, {$dateExpression} as settlement_date, SUM(mos.final_income) as final_income, SUM(ot.order_item_value) as buyer_payment")
             ->groupBy('mos.store_id', DB::raw($dateExpression))
             ->get();
 

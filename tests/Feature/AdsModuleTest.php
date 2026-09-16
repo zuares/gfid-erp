@@ -1339,6 +1339,52 @@ class AdsModuleTest extends TestCase
         $this->assertSame(20000.0, (float) $day['admin_fee']);
     }
 
+    public function test_net_revenue_ratio_uses_line_net_amount_and_allocates_order_payout()
+    {
+        $store = $this->createStore('LINENETRATIO');
+        $order = \App\Models\MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-LINENET-RATIO',
+            'channel_order_id' => 'ORDER-LINENET-RATIO',
+            'order_date' => '2026-07-30 10:00:00',
+            'ordered_at' => '2026-07-30 10:00:00',
+            'order_status' => 'COMPLETED',
+            'total_amount' => 120000,
+            'total_paid_customer' => 120000,
+        ]);
+
+        foreach ([
+            ['external_item_id' => 'ITEM-LINENET-A', 'line_net_amount' => 60000],
+            ['external_item_id' => 'ITEM-LINENET-B', 'line_net_amount' => 40000],
+        ] as $index => $item) {
+            \App\Models\MarketplaceOrderItem::create([
+                'order_id' => $order->id,
+                'marketplace_order_id' => $order->id,
+                'line_no' => $index + 1,
+                'external_item_id' => $item['external_item_id'],
+                'qty' => 1,
+                'price' => $item['line_net_amount'],
+                'price_after_discount' => $item['line_net_amount'],
+                'line_gross_amount' => $item['line_net_amount'],
+                'line_net_amount' => $item['line_net_amount'],
+            ]);
+        }
+
+        \App\Models\MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => 'ORDER-LINENET-RATIO',
+            'buyer_payment_amount' => 120000,
+            'final_income' => 78000,
+        ]);
+
+        [$ratio, $source] = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->resolveConfiguredNetRevenueRatio('ITEM-LINENET-A', $store->id);
+
+        $this->assertSame(0.78, $ratio);
+        $this->assertSame('item', $source);
+    }
+
     public function test_summary_prefers_seller_center_without_double_counting_gms()
     {
         $store = $this->createStore('SUMMARYSOURCE');

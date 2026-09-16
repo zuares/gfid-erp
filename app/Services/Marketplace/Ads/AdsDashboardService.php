@@ -64,34 +64,62 @@ class AdsDashboardService
 
     /**
      * Hitung rasio cair dari data settlement riil per item.
-     * Menggunakan buyer_payment_amount (harga jual item) sebagai penyebut,
-     * bukan subtotal_items (harga coret) agar rasio tidak terlalu rendah.
+     * Menggunakan line_net_amount sebagai penyebut item-level. Settlement
+     * tersimpan satu baris per order, sehingga final_income dialokasikan
+     * proporsional ke nilai item agar order multi-item tidak terhitung penuh
+     * pada setiap item.
      *
      * @return array{0: float, 1: string}
      */
     private function computeNetRevenueRatio(string $channelItemId, ?int $storeId = null): array
     {
-        $settlements = \App\Models\MarketplaceOrderSettlement::whereIn(
-                'order_id',
-                \App\Models\MarketplaceOrderItem::query()
-                    ->join('marketplace_orders as mo', 'mo.id', '=', 'marketplace_order_items.order_id')
-                    ->when($storeId !== null, fn ($q) => $q->where('mo.store_id', $storeId))
-                    ->where('external_item_id', $channelItemId)
-                    ->whereNotNull('order_id')
-                    ->select('order_id')
-            )
-            ->when($storeId !== null, fn ($q) => $q->where('store_id', $storeId))
-            ->where('final_income', '>', 0)
-            ->get(['final_income', 'buyer_payment_amount']);
+        $itemValueExpression = $this->itemRevenueExpression('moi');
+        $matchedItems = MarketplaceOrderItem::query()
+            ->from('marketplace_order_items as moi')
+            ->join('marketplace_orders as mo', 'mo.id', '=', 'moi.order_id')
+            ->when($storeId !== null, fn ($q) => $q->where('mo.store_id', $storeId))
+            ->where('moi.external_item_id', $channelItemId)
+            ->whereNotNull('moi.order_id')
+            ->selectRaw("moi.order_id, SUM({$itemValueExpression}) as item_value")
+            ->groupBy('moi.order_id');
 
-        $totalFinalIncome = (float) $settlements->sum('final_income');
-        $totalItemValue   = (float) $settlements->sum('buyer_payment_amount');
+        $orderItemTotals = MarketplaceOrderItem::query()
+            ->from('marketplace_order_items as moi')
+            ->selectRaw("moi.order_id, SUM({$itemValueExpression}) as order_item_value")
+            ->whereNotNull('moi.order_id')
+            ->groupBy('moi.order_id');
+
+        $ratio = MarketplaceOrderSettlement::query()
+            ->from('marketplace_order_settlements as mos')
+            ->joinSub($matchedItems, 'oi', fn ($join) => $join->on('oi.order_id', '=', 'mos.order_id'))
+            ->joinSub($orderItemTotals, 'ot', fn ($join) => $join->on('ot.order_id', '=', 'mos.order_id'))
+            ->when($storeId !== null, fn ($q) => $q->where('mos.store_id', $storeId))
+            ->where('mos.final_income', '>', 0)
+            ->whereRaw('ot.order_item_value > 0')
+            ->selectRaw('COALESCE(SUM((mos.final_income * oi.item_value) / NULLIF(ot.order_item_value, 0)), 0) as allocated_final_income')
+            ->selectRaw('COALESCE(SUM(oi.item_value), 0) as total_item_value')
+            ->first();
+
+        $totalFinalIncome = (float) ($ratio->allocated_final_income ?? 0);
+        $totalItemValue   = (float) ($ratio->total_item_value ?? 0);
 
         if ($totalItemValue > 0) {
             return [round(min(1, $totalFinalIncome / $totalItemValue), 4), 'item'];
         }
 
         return [self::DEFAULT_NET_REVENUE_RATIO, 'default'];
+    }
+
+    /**
+     * Nilai penjualan item yang selaras dengan basis GMV campaign.
+     * line_net_amount sudah setelah diskon; fallback menjaga data legacy tetap
+     * dapat dipakai ketika kolom item-level belum terisi.
+     */
+    private function itemRevenueExpression(string $alias = 'moi'): string
+    {
+        $qty = "CASE WHEN COALESCE({$alias}.qty, 0) > 0 THEN {$alias}.qty ELSE 0 END";
+
+        return "CASE WHEN COALESCE({$alias}.line_net_amount, 0) > 0 THEN {$alias}.line_net_amount WHEN COALESCE({$alias}.line_gross_amount, 0) > 0 THEN {$alias}.line_gross_amount WHEN COALESCE({$alias}.price_after_discount, 0) > 0 THEN {$alias}.price_after_discount * ({$qty}) ELSE COALESCE({$alias}.price, 0) * ({$qty}) END";
     }
 
     public function buildDashboardData(
@@ -1123,21 +1151,37 @@ class AdsDashboardService
             }
         }
 
+        $itemValueExpression = $this->itemRevenueExpression('moi');
         $orderItemsSub = MarketplaceOrderItem::query()
-            ->join('marketplace_orders as mo', 'mo.id', '=', 'marketplace_order_items.order_id')
-            ->select('mo.store_id', 'marketplace_order_items.external_item_id', 'marketplace_order_items.order_id')
-            ->distinct()
-            ->whereIn('marketplace_order_items.external_item_id', $itemIds)
+            ->from('marketplace_order_items as moi')
+            ->join('marketplace_orders as mo', 'mo.id', '=', 'moi.order_id')
+            ->selectRaw("mo.store_id, moi.external_item_id, moi.order_id, SUM({$itemValueExpression}) as item_value")
+            ->whereIn('moi.external_item_id', $itemIds)
             ->whereIn('mo.store_id', $storeIds)
-            ->whereNotNull('marketplace_order_items.order_id');
+            ->whereNotNull('moi.order_id')
+            ->groupBy('mo.store_id', 'moi.external_item_id', 'moi.order_id');
+
+        // Settlement hanya satu baris per order. Hitung total seluruh item
+        // order agar final_income dapat dialokasikan ke item yang diiklankan
+        // berdasarkan porsi line_net_amount-nya.
+        $orderItemTotals = MarketplaceOrderItem::query()
+            ->from('marketplace_order_items as moi')
+            ->selectRaw("moi.order_id, SUM({$itemValueExpression}) as order_item_value")
+            ->whereNotNull('moi.order_id')
+            ->groupBy('moi.order_id');
 
         $ratioRows = MarketplaceOrderSettlement::query()
+            ->from('marketplace_order_settlements as mos')
             ->joinSub($orderItemsSub, 'oi', function ($join) {
-                $join->on('oi.order_id', '=', 'marketplace_order_settlements.order_id');
+                $join->on('oi.order_id', '=', 'mos.order_id');
             })
-            ->where('final_income', '>', 0)
+            ->joinSub($orderItemTotals, 'ot', function ($join) {
+                $join->on('ot.order_id', '=', 'mos.order_id');
+            })
+            ->where('mos.final_income', '>', 0)
+            ->whereRaw('ot.order_item_value > 0')
             ->groupBy('oi.store_id', 'oi.external_item_id')
-            ->selectRaw('oi.store_id, oi.external_item_id, SUM(marketplace_order_settlements.final_income) as total_final_income, SUM(marketplace_order_settlements.buyer_payment_amount) as total_item_value')
+            ->selectRaw('oi.store_id, oi.external_item_id, SUM((mos.final_income * oi.item_value) / NULLIF(ot.order_item_value, 0)) as total_final_income, SUM(oi.item_value) as total_item_value')
             ->get();
 
         foreach ($ratioRows as $row) {
