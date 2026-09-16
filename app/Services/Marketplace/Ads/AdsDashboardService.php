@@ -305,6 +305,7 @@ class AdsDashboardService
                 'internalItem.category:id,name',
                 'store:id,name,channel_id',
                 'store.channel:id,code',
+                'items:id,campaign_id,channel_item_id',
             ])
             ->whereIn('store_id', $storeIds)
             ->get();
@@ -378,14 +379,51 @@ class AdsDashboardService
                 $acos = $camp->gmv > 0 && $camp->spend > 0 ? round($camp->spend / $camp->gmv, 4) : null;
                 $camp->acos_pct = $acos !== null ? round($acos * 100, 1) : null;
 
+                $campaignItemIds = collect([$camp->channel_item_id])
+                    ->merge($camp->items->pluck('channel_item_id'))
+                    ->filter(fn ($itemId) => $itemId !== null && $itemId !== '')
+                    ->map(fn ($itemId) => (string) $itemId)
+                    ->unique()
+                    ->values();
+                if ($camp->channel_item_id === null && $campaignItemIds->isNotEmpty()) {
+                    $camp->channel_item_id = $campaignItemIds->first();
+                }
+
                 $campaignKey = str_starts_with((string) $camp->channel_campaign_id, 'GMS-')
                     ? $camp->store_id . '|GMS'
                     : $camp->store_id . '|' . (string) $camp->channel_item_id;
                 $internalUnitCogs = $this->resolveItemUnitCogs($camp->internalItem);
-                $camp->unit_cogs = (float) ($unitCogsByKey[$campaignKey] ?? $internalUnitCogs);
-                $camp->variant_empty = (bool) ($variantEmptyByKey[$camp->store_id . '|' . (string) $camp->channel_item_id] ?? false);
+                $itemAnalytics = $campaignItemIds
+                    ->map(function (string $itemId) use ($camp, $unitCogsByKey, $avgPriceByKey, $revenueRatioByKey) {
+                        $key = $camp->store_id . '|' . $itemId;
+                        $ratio = $revenueRatioByKey[$key] ?? null;
 
-                $trueAvgPrice = (float) ($avgPriceByKey[$campaignKey] ?? 0);
+                        return [
+                            'unit_cogs' => (float) ($unitCogsByKey[$key] ?? 0),
+                            'avg_price' => (float) ($avgPriceByKey[$key] ?? 0),
+                            'ratio' => $ratio !== null ? (float) $ratio[0] : self::DEFAULT_NET_REVENUE_RATIO,
+                            'ratio_value' => $ratio !== null ? (float) ($ratio[2] ?? 0) : 0.0,
+                            'ratio_source' => $ratio[1] ?? 'default',
+                            'variant_empty' => (bool) ($variantEmptyByKey[$key] ?? false),
+                        ];
+                    })
+                    ->values();
+
+                $weightedRatioValue = (float) $itemAnalytics->sum('ratio_value');
+                $itemRatioRows = $itemAnalytics->filter(fn ($row) => $row['ratio_source'] === 'item');
+                $ratio = $weightedRatioValue > 0
+                    ? $itemAnalytics->sum(fn ($row) => $row['ratio'] * $row['ratio_value']) / $weightedRatioValue
+                    : ($itemRatioRows->isNotEmpty() ? (float) $itemRatioRows->avg('ratio') : self::DEFAULT_NET_REVENUE_RATIO);
+                $ratioSource = $weightedRatioValue > 0 || $itemRatioRows->isNotEmpty() ? 'item' : 'default';
+
+                $weightedAnalyticsValue = $weightedRatioValue > 0
+                    ? $weightedRatioValue
+                    : max(1, $itemAnalytics->count());
+                $unitCogs = $itemAnalytics->sum(fn ($row) => $row['unit_cogs'] * ($row['ratio_value'] > 0 ? $row['ratio_value'] : 1)) / $weightedAnalyticsValue;
+                $trueAvgPrice = $itemAnalytics->sum(fn ($row) => $row['avg_price'] * ($row['ratio_value'] > 0 ? $row['ratio_value'] : 1)) / $weightedAnalyticsValue;
+                $camp->unit_cogs = $unitCogs > 0 ? (float) $unitCogs : (float) ($unitCogsByKey[$campaignKey] ?? $internalUnitCogs);
+                $camp->variant_empty = (bool) $itemAnalytics->contains(fn ($row) => $row['variant_empty']);
+
                 if (! $trueAvgPrice || $trueAvgPrice <= 0) {
                     $trueAvgPrice = ($camp->orders > 0 && $camp->gmv > 0) ? ($camp->gmv / $camp->orders) : 0;
                 }
@@ -394,9 +432,6 @@ class AdsDashboardService
                 $manualFeeRatio = $manualFeeRatioByStore[(string) $camp->store_id] ?? null;
                 if ($manualFeeRatio !== null) {
                     [$ratio, $ratioSource] = [$manualFeeRatio, 'manual'];
-                } else {
-                    [$ratio, $ratioSource] = $revenueRatioByKey[$camp->store_id . '|' . (string) $camp->channel_item_id]
-                        ?? [self::DEFAULT_NET_REVENUE_RATIO, 'default'];
                 }
                 $camp->net_revenue_ratio = $ratio;
                 $camp->net_revenue_ratio_source = $ratioSource;
@@ -719,10 +754,20 @@ class AdsDashboardService
             ->values()
             ->all();
 
+        // Historical comparison memakai sumber omzet yang sama dengan KPI
+        // (shop daily, campaign+GMS hanya sebagai fallback) dan sudah
+        // menghitung rasio net revenue per toko/tanggal.
+        $historicalData = $analytics->getHistoricalComparison($storeIds, $dateFrom, $dateTo, 3, $compareMode);
+        $historicalNetRevenue = function (int $periodIndex) use ($historicalData): float {
+            return (float) collect($historicalData[$periodIndex]['data'] ?? [])
+                ->sum(fn ($row) => (float) ($row['net_revenue'] ?? 0));
+        };
+
         // -------------------------------------------------------------
         // KPI CALCULATION
-        // Directly aggregate from $campaigns so that top KPI 
-        // perfectly matches the sum of table data.
+        // Net revenue harus mengikuti GMV shop-level yang dipakai KPI.
+        // Jika hanya menjumlahkan campaign, campaign yang belum tersinkron
+        // membuat net revenue lebih kecil dari omzet yang ditampilkan.
         // -------------------------------------------------------------
         $kpi = [
             'current' => (object) [
@@ -731,7 +776,7 @@ class AdsDashboardService
                 'orders' => $summaryCurrent->orders,
                 'clicks' => $summaryCurrent->clicks,
                 'impressions' => $summaryCurrent->impressions,
-                'net_revenue' => $campaigns->sum('net_revenue'),
+                'net_revenue' => $historicalNetRevenue(0),
                 'total_cogs' => $campaigns->sum('total_cogs'),
             ],
             'previous' => (object) [
@@ -740,7 +785,7 @@ class AdsDashboardService
                 'orders' => $summaryPrevious->orders,
                 'clicks' => $summaryPrevious->clicks,
                 'impressions' => $summaryPrevious->impressions,
-                'net_revenue' => $campaigns->sum('prev_net_revenue'),
+                'net_revenue' => $historicalNetRevenue(1),
                 'total_cogs' => $campaigns->sum('prev_total_cogs'),
             ],
             'changes' => []
@@ -833,8 +878,6 @@ class AdsDashboardService
             ->first();
 
         $heatmapData = $analytics->getHourlyHeatmap($storeIds, $dateFrom, $dateTo);
-        $historicalData = $analytics->getHistoricalComparison($storeIds, $dateFrom, $dateTo, 3, $compareMode);
-
         $itemPerformanceRaw = DB::table('marketplace_ad_campaign_dailies as cd')
             ->join('marketplace_ad_campaigns as c', function ($join) {
                 $join->on('cd.channel_campaign_id', '=', 'c.channel_campaign_id')
@@ -1007,7 +1050,7 @@ class AdsDashboardService
     }
 
     /**
-     * @return array{0: array<string, float>, 1: array<string, float>, 2: array<string, array{0: float, 1: string}>, 3: array<string, bool>, 4: array<string, array<int, string>>}
+     * @return array{0: array<string, float>, 1: array<string, float>, 2: array<string, array{0: float, 1: string, 2?: float}>, 3: array<string, bool>, 4: array<string, array<int, string>>}
      */
     private function preloadCampaignAnalytics(Collection $campaigns, string $dateFrom, string $dateTo): array
     {
@@ -1017,7 +1060,12 @@ class AdsDashboardService
         });
 
         $storeIds = $realCampaigns->pluck('store_id')->filter()->unique()->values();
-        $itemIds = $realCampaigns->pluck('channel_item_id')->filter()->map(fn ($v) => (string) $v)->unique()->values();
+        $itemIds = $realCampaigns
+            ->flatMap(fn ($camp) => collect([$camp->channel_item_id])->merge($camp->items->pluck('channel_item_id')))
+            ->filter(fn ($itemId) => $itemId !== null && $itemId !== '')
+            ->map(fn ($itemId) => (string) $itemId)
+            ->unique()
+            ->values();
 
         $avgPriceByKey = [];
         $unitCogsByKey = [];
@@ -1172,14 +1220,17 @@ class AdsDashboardService
 
         $ratioRows = MarketplaceOrderSettlement::query()
             ->from('marketplace_order_settlements as mos')
+            ->leftJoin('marketplace_orders as mo', 'mo.id', '=', 'mos.order_id')
             ->joinSub($orderItemsSub, 'oi', function ($join) {
                 $join->on('oi.order_id', '=', 'mos.order_id');
             })
             ->joinSub($orderItemTotals, 'ot', function ($join) {
                 $join->on('ot.order_id', '=', 'mos.order_id');
             })
+            ->whereIn('mos.store_id', $storeIds)
             ->where('mos.final_income', '>', 0)
             ->whereRaw('ot.order_item_value > 0')
+            ->whereBetween(DB::raw('DATE(COALESCE(mo.ordered_at, mo.order_date, mos.settlement_time, mos.created_at))'), [$dateFrom, $dateTo])
             ->groupBy('oi.store_id', 'oi.external_item_id')
             ->selectRaw('oi.store_id, oi.external_item_id, SUM((mos.final_income * oi.item_value) / NULLIF(ot.order_item_value, 0)) as total_final_income, SUM(oi.item_value) as total_item_value')
             ->get();
@@ -1192,7 +1243,11 @@ class AdsDashboardService
                 continue;
             }
 
-            $revenueRatioByKey[$row->store_id . '|' . $itemId] = [round(min(1, $totalFinalIncome / $totalItemValue), 4), 'item'];
+            $revenueRatioByKey[$row->store_id . '|' . $itemId] = [
+                round(min(1, $totalFinalIncome / $totalItemValue), 4),
+                'item',
+                $totalItemValue,
+            ];
         }
 
         return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey, $variantStockEmptySkusByKey];

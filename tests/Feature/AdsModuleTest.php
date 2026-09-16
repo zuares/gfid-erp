@@ -198,6 +198,61 @@ class AdsModuleTest extends TestCase
         $response2->assertSessionHas('success'); // Authorized
     }
 
+    public function test_sync_cancel_only_deletes_jobs_for_selected_store()
+    {
+        $store1 = $this->createStore('CANCEL1');
+        $store2 = $this->createStore('CANCEL2');
+        $now = now()->timestamp;
+
+        foreach ([$store1->id, $store2->id] as $storeId) {
+            \Illuminate\Support\Facades\DB::table('jobs')->insert([
+                'queue' => 'ads',
+                'payload' => json_encode([
+                    'displayName' => ShopeeAdsSyncJob::class,
+                    'data' => ['command' => 's:7:"storeId";i:' . $storeId . ';'],
+                ]),
+                'attempts' => 0,
+                'reserved_at' => null,
+                'available_at' => $now,
+                'created_at' => $now,
+            ]);
+        }
+        \Illuminate\Support\Facades\DB::table('jobs')->insert([
+            'queue' => 'ads',
+            'payload' => json_encode(['displayName' => 'App\\Jobs\\OtherAdsJob']),
+            'attempts' => 0,
+            'reserved_at' => null,
+            'available_at' => $now,
+            'created_at' => $now,
+        ]);
+
+        MarketplaceAdsSyncRun::create([
+            'store_id' => $store1->id,
+            'sync_type' => 'daily_all',
+            'status' => 'processing',
+        ]);
+        MarketplaceAdsSyncRun::create([
+            'store_id' => $store2->id,
+            'sync_type' => 'daily_all',
+            'status' => 'processing',
+        ]);
+
+        $this->withoutMiddleware();
+        $response = $this->actingAs($this->createUser('admin'))
+            ->postJson(route('marketplace.ads.sync.cancel'), ['store_id' => $store1->id]);
+
+        $response->assertOk()->assertJsonPath('jobs_deleted', 1);
+        $this->assertDatabaseCount('jobs', 2);
+        $this->assertDatabaseHas('marketplace_ads_sync_runs', [
+            'store_id' => $store1->id,
+            'status' => 'cancelled',
+        ]);
+        $this->assertDatabaseHas('marketplace_ads_sync_runs', [
+            'store_id' => $store2->id,
+            'status' => 'processing',
+        ]);
+    }
+
     // 6, 7, 8. Sync idempotent
     public function test_sync_upsert_is_idempotent()
     {
@@ -1385,6 +1440,161 @@ class AdsModuleTest extends TestCase
         $this->assertSame('item', $source);
     }
 
+    public function test_multi_item_campaign_uses_all_child_items_for_net_revenue()
+    {
+        $store = $this->createStore('MULTIITEMCAMPAIGN');
+        $campaign = MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'MULTI-CAMPAIGN',
+            'channel_item_id' => 111111,
+            'campaign_status' => 'ongoing',
+        ]);
+        \App\Models\MarketplaceAdsCampaignItem::create([
+            'campaign_id' => $campaign->id,
+            'channel_item_id' => 111111,
+        ]);
+        \App\Models\MarketplaceAdsCampaignItem::create([
+            'campaign_id' => $campaign->id,
+            'channel_item_id' => 222222,
+        ]);
+
+        foreach ([
+            ['id' => 'ORDER-MULTI-A', 'item' => 111111, 'line' => 100000, 'income' => 80000],
+            ['id' => 'ORDER-MULTI-B', 'item' => 222222, 'line' => 100000, 'income' => 50000],
+        ] as $index => $fixture) {
+            $order = \App\Models\MarketplaceOrder::create([
+                'store_id' => $store->id,
+                'external_order_id' => $fixture['id'],
+                'channel_order_id' => $fixture['id'],
+                'order_date' => '2026-07-30 10:00:00',
+                'ordered_at' => '2026-07-30 10:00:00',
+                'order_status' => 'COMPLETED',
+                'total_amount' => $fixture['line'],
+                'total_paid_customer' => $fixture['line'],
+            ]);
+            \App\Models\MarketplaceOrderItem::create([
+                'order_id' => $order->id,
+                'marketplace_order_id' => $order->id,
+                'line_no' => $index + 1,
+                'external_item_id' => $fixture['item'],
+                'qty' => 1,
+                'price' => $fixture['line'],
+                'price_after_discount' => $fixture['line'],
+                'line_gross_amount' => $fixture['line'],
+                'line_net_amount' => $fixture['line'],
+            ]);
+            \App\Models\MarketplaceOrderSettlement::create([
+                'store_id' => $store->id,
+                'order_id' => $order->id,
+                'channel_order_id' => $fixture['id'],
+                'buyer_payment_amount' => $fixture['line'],
+                'final_income' => $fixture['income'],
+            ]);
+        }
+
+        $now = now();
+        \Illuminate\Support\Facades\DB::table('marketplace_ads_dailies')->insert([
+            'store_id' => $store->id,
+            'date' => '2026-07-30',
+            'spend' => 10000,
+            'orders' => 2,
+            'gmv' => 200000,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'MULTI-CAMPAIGN',
+            'date' => '2026-07-30',
+            'expense' => 10000,
+            'broad_order' => 2,
+            'broad_gmv' => 200000,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+
+        $row = $data['campaigns']->firstWhere('channel_campaign_id', 'MULTI-CAMPAIGN');
+        $this->assertNotNull($row);
+        $this->assertSame(130000.0, round((float) $row->net_revenue, 2));
+    }
+
+    public function test_campaign_net_revenue_ratio_uses_selected_settlement_period()
+    {
+        $store = $this->createStore('PERIODRATIO');
+        $campaign = MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'PERIOD-CAMPAIGN',
+            'channel_item_id' => 333333,
+            'campaign_status' => 'ongoing',
+        ]);
+
+        foreach ([
+            ['id' => 'ORDER-PERIOD-OLD', 'date' => '2026-07-29 10:00:00', 'income' => 50000],
+            ['id' => 'ORDER-PERIOD-CURRENT', 'date' => '2026-07-30 10:00:00', 'income' => 80000],
+        ] as $index => $fixture) {
+            $order = \App\Models\MarketplaceOrder::create([
+                'store_id' => $store->id,
+                'external_order_id' => $fixture['id'],
+                'channel_order_id' => $fixture['id'],
+                'order_date' => $fixture['date'],
+                'ordered_at' => $fixture['date'],
+                'order_status' => 'COMPLETED',
+                'total_amount' => 100000,
+                'total_paid_customer' => 100000,
+            ]);
+            \App\Models\MarketplaceOrderItem::create([
+                'order_id' => $order->id,
+                'marketplace_order_id' => $order->id,
+                'line_no' => $index + 1,
+                'external_item_id' => 333333,
+                'qty' => 1,
+                'price' => 100000,
+                'price_after_discount' => 100000,
+                'line_gross_amount' => 100000,
+                'line_net_amount' => 100000,
+            ]);
+            \App\Models\MarketplaceOrderSettlement::create([
+                'store_id' => $store->id,
+                'order_id' => $order->id,
+                'channel_order_id' => $fixture['id'],
+                'buyer_payment_amount' => 100000,
+                'final_income' => $fixture['income'],
+            ]);
+        }
+
+        $now = now();
+        \Illuminate\Support\Facades\DB::table('marketplace_ads_dailies')->insert([
+            'store_id' => $store->id,
+            'date' => '2026-07-30',
+            'spend' => 10000,
+            'orders' => 1,
+            'gmv' => 100000,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => $campaign->channel_campaign_id,
+            'date' => '2026-07-30',
+            'expense' => 10000,
+            'broad_order' => 1,
+            'broad_gmv' => 100000,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+
+        $row = $data['campaigns']->firstWhere('channel_campaign_id', 'PERIOD-CAMPAIGN');
+        $this->assertSame(0.8, (float) $row->net_revenue_ratio);
+        $this->assertSame(80000.0, (float) $row->net_revenue);
+        $this->assertSame(80000.0, (float) $data['kpi']['current']->net_revenue);
+    }
+
     public function test_summary_prefers_seller_center_without_double_counting_gms()
     {
         $store = $this->createStore('SUMMARYSOURCE');
@@ -1424,6 +1634,7 @@ class AdsModuleTest extends TestCase
 
         $this->assertSame(10000.0, (float) $data['kpi']['current']->spend);
         $this->assertSame(100000.0, (float) $data['kpi']['current']->gmv);
+        $this->assertSame(78100.0, (float) $data['kpi']['current']->net_revenue);
 
         $historical = app(AdsAnalyticsService::class)
             ->getHistoricalComparison($store->id, '2026-07-30', '2026-07-30', 1, 'prev_period');

@@ -142,8 +142,7 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
         Route::get('ads-dashboard/gms-items/{store}', [AdsDashboardController::class, 'gmsItems'])
             ->name('ads.gms.items');
         Route::patch('ads-dashboard/gms-items/{store}/{channelItemId}/map', [AdsDashboardController::class, 'mapGmsItem'])
-            ->name('ads.gms.items.map')
-            ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+            ->name('ads.gms.items.map');
         Route::post('ads-dashboard/gms-item-action', [AdsDashboardController::class, 'actionGmsItem'])
             ->name('ads.gms.action');
         Route::post('ads-dashboard/gms-campaign-edit', [AdsDashboardController::class, 'actionGmsCampaign'])

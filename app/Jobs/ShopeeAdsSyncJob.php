@@ -26,6 +26,7 @@ class ShopeeAdsSyncJob implements ShouldQueue
     public function __construct(Store $store, Carbon $dateFrom, Carbon $dateTo, bool $isHourly = false, bool $skipMeta = false)
     {
         $this->store = $store;
+        $this->storeId = (int) $store->id;
         $this->dateFrom = $dateFrom;
         $this->dateTo = $dateTo;
         $this->isHourly = $isHourly;
@@ -51,6 +52,7 @@ class ShopeeAdsSyncJob implements ShouldQueue
     // dipakai chunk backfill ke-2 dst yang datanya sama dengan chunk pertama).
     protected bool $skipMeta = false;
     public ?int $syncRunId = null;
+    public int $storeId;
 
 
 
@@ -107,6 +109,10 @@ class ShopeeAdsSyncJob implements ShouldQueue
         $componentFailures = [];
 
         try {
+            if ($this->isRunCancelled($run)) {
+                return;
+            }
+
             // Hormati cooldown rate-limit toko: jangan buang percobaan selagi
             // Shopee masih menolak. Exception yang sama ditangani blok
             // release/retry di bawah (job menunda diri sesuai sisa cooldown).
@@ -126,9 +132,17 @@ class ShopeeAdsSyncJob implements ShouldQueue
                 $syncService->syncBalance($this->store, $run);
                 $updateUIProgress(15, "Menyinkronkan Saldo");
 
+                if ($this->isRunCancelled($run)) {
+                    return;
+                }
+
                 // 2. Sync Campaigns and Settings
                 $syncService->syncCampaignsAndSettings($this->store, $run);
                 $updateUIProgress(30, "Menyinkronkan Kampanye");
+            }
+
+            if ($this->isRunCancelled($run)) {
+                return;
             }
 
             // SAT-SET: chunk historis murni yang datanya sudah LENGKAP tidak
@@ -150,6 +164,10 @@ class ShopeeAdsSyncJob implements ShouldQueue
                 $totalDays = $start->diffInDays($this->dateTo) + 1;
                 $currentDay = 1;
                 while ($start->lte($this->dateTo)) {
+                    if ($this->isRunCancelled($run)) {
+                        return;
+                    }
+
                     $syncService->syncShopHourlyPerformance($this->store, $start->toDateString(), $run);
                     $pct = min(99, 10 + round(($currentDay / $totalDays) * 85));
                     $updateUIProgress($pct, "Menyinkronkan Performa Per Jam (" . $start->format('d/m') . ")");
@@ -160,6 +178,10 @@ class ShopeeAdsSyncJob implements ShouldQueue
                 // 3. Sync Shop Daily
                 $syncService->syncShopDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run);
                 $updateUIProgress(50, "Menyinkronkan Performa Harian");
+
+                if ($this->isRunCancelled($run)) {
+                    return;
+                }
 
                 // 4. Sync Campaign Daily (CPC)
                 if (! $syncService->syncCampaignDailyPerformance($this->store, $this->dateFrom->toDateString(), $this->dateTo->toDateString(), $run)) {
@@ -172,6 +194,10 @@ class ShopeeAdsSyncJob implements ShouldQueue
                     $componentFailures[] = 'GMS';
                 }
                 $updateUIProgress(95, "Menyinkronkan Performa Iklan Otomatis (GMS)");
+            }
+
+            if ($this->isRunCancelled($run)) {
+                return;
             }
 
             $updateUIProgress(100, "Menyimpan data");
@@ -310,7 +336,7 @@ class ShopeeAdsSyncJob implements ShouldQueue
     {
         if ($this->syncRunId) {
             $run = MarketplaceAdsSyncRun::find($this->syncRunId);
-            if ($run && $run->status !== 'success') {
+            if ($run && ! in_array($run->status, ['success', 'cancelled'], true)) {
                 $run->update([
                     'status' => 'error',
                     'error_message' => substr($exception->getMessage(), 0, 1000),
@@ -318,5 +344,21 @@ class ShopeeAdsSyncJob implements ShouldQueue
                 ]);
             }
         }
+    }
+
+    protected function isRunCancelled(MarketplaceAdsSyncRun $run): bool
+    {
+        $run->refresh();
+        if ($run->status !== 'cancelled') {
+            return false;
+        }
+
+        $payload = \Illuminate\Support\Facades\Cache::get('marketplace:ads_sync_progress:' . $this->store->id) ?? [];
+        $payload['status'] = 'cancelled';
+        $payload['label'] = 'Sinkronisasi dibatalkan.';
+        \Illuminate\Support\Facades\Cache::put('marketplace:ads_sync_progress:' . $this->store->id, $payload, 1800);
+        \Illuminate\Support\Facades\Cache::put('marketplace:ads_sync_progress:all', $payload, 1800);
+
+        return true;
     }
 }

@@ -94,6 +94,11 @@ class MarketplaceAdCampaign extends Model
         return $this->hasMany(MarketplaceAdCampaignDaily::class, 'channel_campaign_id', 'channel_campaign_id');
     }
 
+    public function items(): HasMany
+    {
+        return $this->hasMany(MarketplaceAdsCampaignItem::class, 'campaign_id');
+    }
+
     public function internalItem(): BelongsTo
     {
         return $this->belongsTo(Item::class, 'internal_item_id');
