@@ -1532,7 +1532,7 @@ class AdsModuleTest extends TestCase
         ]);
 
         foreach ([
-            ['id' => 'ORDER-PERIOD-OLD', 'date' => '2026-07-29 10:00:00', 'income' => 50000],
+            ['id' => 'ORDER-PERIOD-OLD', 'date' => '2026-06-30 10:00:00', 'income' => 50000],
             ['id' => 'ORDER-PERIOD-CURRENT', 'date' => '2026-07-30 10:00:00', 'income' => 80000],
         ] as $index => $fixture) {
             $order = \App\Models\MarketplaceOrder::create([
@@ -1585,13 +1585,25 @@ class AdsModuleTest extends TestCase
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => $campaign->channel_campaign_id,
+            'date' => '2026-06-30',
+            'expense' => 10000,
+            'broad_order' => 1,
+            'broad_gmv' => 100000,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
 
         $data = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
-            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_period', app(AdsAnalyticsService::class));
+            ->buildDashboardData(collect([$store]), $store->id, '2026-07-30', '2026-07-30', 'prev_month', app(AdsAnalyticsService::class));
 
         $row = $data['campaigns']->firstWhere('channel_campaign_id', 'PERIOD-CAMPAIGN');
         $this->assertSame(0.8, (float) $row->net_revenue_ratio);
         $this->assertSame(80000.0, (float) $row->net_revenue);
+        $this->assertSame(50000.0, (float) $row->prev_net_revenue);
+        $this->assertSame(50000.0, (float) $data['kpi']['previous']->net_revenue);
         $this->assertSame(80000.0, (float) $data['kpi']['current']->net_revenue);
     }
 

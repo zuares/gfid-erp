@@ -311,9 +311,10 @@ class AdsDashboardService
             ->get();
 
         [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey, $variantStockEmptySkusByKey] = $this->preloadCampaignAnalytics($campaigns, $dateFrom, $dateTo);
+        $previousRevenueRatioByKey = $this->preloadSettlementRevenueRatios($campaigns, $prevDateFrom, $prevDateTo);
 
         $campaigns = $campaigns
-            ->map(function ($camp) use ($manualFeeRatioByStore, $aggCur, $aggPrev, $avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey) {
+            ->map(function ($camp) use ($manualFeeRatioByStore, $aggCur, $aggPrev, $avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $previousRevenueRatioByKey, $variantEmptyByKey) {
                 $k = $camp->store_id . '|' . $camp->channel_campaign_id;
                 $a = $aggCur->get($k);
                 $p = $aggPrev->get($k);
@@ -436,6 +437,26 @@ class AdsDashboardService
                 $camp->net_revenue_ratio = $ratio;
                 $camp->net_revenue_ratio_source = $ratioSource;
 
+                $previousItemAnalytics = $campaignItemIds
+                    ->map(function (string $itemId) use ($camp, $previousRevenueRatioByKey) {
+                        $ratio = $previousRevenueRatioByKey[$camp->store_id . '|' . $itemId] ?? null;
+
+                        return [
+                            'ratio' => $ratio !== null ? (float) $ratio[0] : self::DEFAULT_NET_REVENUE_RATIO,
+                            'ratio_value' => $ratio !== null ? (float) ($ratio[2] ?? 0) : 0.0,
+                            'ratio_source' => $ratio[1] ?? 'default',
+                        ];
+                    })
+                    ->values();
+                $previousWeightedRatioValue = (float) $previousItemAnalytics->sum('ratio_value');
+                $previousItemRatioRows = $previousItemAnalytics->filter(fn ($row) => $row['ratio_source'] === 'item');
+                $previousRatio = $previousWeightedRatioValue > 0
+                    ? $previousItemAnalytics->sum(fn ($row) => $row['ratio'] * $row['ratio_value']) / $previousWeightedRatioValue
+                    : ($previousItemRatioRows->isNotEmpty() ? (float) $previousItemRatioRows->avg('ratio') : self::DEFAULT_NET_REVENUE_RATIO);
+                if ($manualFeeRatio !== null) {
+                    $previousRatio = $manualFeeRatio;
+                }
+
                 $netRevRatio = $camp->net_revenue_ratio ?? self::DEFAULT_NET_REVENUE_RATIO;
                 $beAcos = null;
                 if ($camp->unit_cogs > 0 && $trueAvgPrice > 0) {
@@ -485,7 +506,7 @@ class AdsDashboardService
                 }
 
                 // Kalkulasi Previous Net & Profit
-                $prevNetRevenue = $camp->prev_gmv * $netRevRatio;
+                $prevNetRevenue = $camp->prev_gmv * $previousRatio;
                 $prevTotalCogs = ($camp->unit_cogs > 0 && ($camp->prev_items_sold ?? 0) > 0)
                     ? $camp->unit_cogs * ($camp->prev_items_sold ?? 0)
                     : $camp->prev_gmv * ($camp->cogs_ratio ?? 0);
@@ -1199,6 +1220,37 @@ class AdsDashboardService
             }
         }
 
+        $revenueRatioByKey = $this->preloadSettlementRevenueRatios($realCampaigns, $dateFrom, $dateTo);
+
+        return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey, $variantStockEmptySkusByKey];
+    }
+
+    /**
+     * Ambil rasio settlement per item untuk periode tertentu.
+     * Settlement satu baris per order dialokasikan ke item berdasarkan nilai
+     * line_net_amount (dengan fallback legacy), sehingga periode pembanding
+     * tidak memakai rasio periode aktif.
+     *
+     * @return array<string, array{0: float, 1: string, 2: float}>
+     */
+    private function preloadSettlementRevenueRatios(Collection $campaigns, string $dateFrom, string $dateTo): array
+    {
+        $realCampaigns = $campaigns->filter(function ($camp) {
+            $itemId = (string) ($camp->channel_item_id ?? '');
+            return $itemId !== '' && ! str_starts_with($itemId, 'GMS-');
+        });
+        $storeIds = $realCampaigns->pluck('store_id')->filter()->unique()->values();
+        $itemIds = $realCampaigns
+            ->flatMap(fn ($camp) => collect([$camp->channel_item_id])->merge($camp->items->pluck('channel_item_id')))
+            ->filter(fn ($itemId) => $itemId !== null && $itemId !== '')
+            ->map(fn ($itemId) => (string) $itemId)
+            ->unique()
+            ->values();
+
+        if ($storeIds->isEmpty() || $itemIds->isEmpty()) {
+            return [];
+        }
+
         $itemValueExpression = $this->itemRevenueExpression('moi');
         $orderItemsSub = MarketplaceOrderItem::query()
             ->from('marketplace_order_items as moi')
@@ -1210,14 +1262,14 @@ class AdsDashboardService
             ->groupBy('mo.store_id', 'moi.external_item_id', 'moi.order_id');
 
         // Settlement hanya satu baris per order. Hitung total seluruh item
-        // order agar final_income dapat dialokasikan ke item yang diiklankan
-        // berdasarkan porsi line_net_amount-nya.
+        // order agar final_income dapat dialokasikan ke item yang diiklankan.
         $orderItemTotals = MarketplaceOrderItem::query()
             ->from('marketplace_order_items as moi')
             ->selectRaw("moi.order_id, SUM({$itemValueExpression}) as order_item_value")
             ->whereNotNull('moi.order_id')
             ->groupBy('moi.order_id');
 
+        $dateExpression = 'DATE(COALESCE(mo.ordered_at, mo.order_date, mos.settlement_time, mos.created_at))';
         $ratioRows = MarketplaceOrderSettlement::query()
             ->from('marketplace_order_settlements as mos')
             ->leftJoin('marketplace_orders as mo', 'mo.id', '=', 'mos.order_id')
@@ -1230,11 +1282,12 @@ class AdsDashboardService
             ->whereIn('mos.store_id', $storeIds)
             ->where('mos.final_income', '>', 0)
             ->whereRaw('ot.order_item_value > 0')
-            ->whereBetween(DB::raw('DATE(COALESCE(mo.ordered_at, mo.order_date, mos.settlement_time, mos.created_at))'), [$dateFrom, $dateTo])
+            ->whereBetween(DB::raw($dateExpression), [$dateFrom, $dateTo])
             ->groupBy('oi.store_id', 'oi.external_item_id')
             ->selectRaw('oi.store_id, oi.external_item_id, SUM((mos.final_income * oi.item_value) / NULLIF(ot.order_item_value, 0)) as total_final_income, SUM(oi.item_value) as total_item_value')
             ->get();
 
+        $ratios = [];
         foreach ($ratioRows as $row) {
             $itemId = (string) ($row->external_item_id ?? '');
             $totalItemValue = (float) ($row->total_item_value ?? 0);
@@ -1243,14 +1296,14 @@ class AdsDashboardService
                 continue;
             }
 
-            $revenueRatioByKey[$row->store_id . '|' . $itemId] = [
+            $ratios[$row->store_id . '|' . $itemId] = [
                 round(min(1, $totalFinalIncome / $totalItemValue), 4),
                 'item',
                 $totalItemValue,
             ];
         }
 
-        return [$avgPriceByKey, $unitCogsByKey, $revenueRatioByKey, $variantEmptyByKey, $variantStockEmptySkusByKey];
+        return $ratios;
     }
 
     /**
