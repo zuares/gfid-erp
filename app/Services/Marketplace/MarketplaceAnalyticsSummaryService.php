@@ -165,10 +165,12 @@ class MarketplaceAnalyticsSummaryService
         $filters = $this->normalizeFilters($filters);
         $page = max(1, $page);
         $perPage = max(10, min(100, $perPage));
-        $settlement = in_array($settlement, ['all', 'unsettled'], true) ? $settlement : 'settled';
+        $settlement = in_array($settlement, ['all', 'unsettled', 'shipped', 'cancelled'], true) ? $settlement : 'settled';
         $base = match ($settlement) {
             'all' => $this->allCashBase($filters),
             'unsettled' => $this->unsettledBase($filters),
+            'shipped' => $this->cashStatusBase($filters, 'shipped'),
+            'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
             default => $this->cashBase($filters),
         };
 
@@ -349,14 +351,28 @@ class MarketplaceAnalyticsSummaryService
         return ['key' => 'other', 'label' => 'Status lainnya'];
     }
 
+    private function cashStatusBase(array $filters, string $group)
+    {
+        $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
+        $base = $this->allCashBase($filters);
+
+        return match ($group) {
+            'shipped' => $base->whereRaw("{$status} IN ('READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE', 'TO_RETURN')"),
+            'cancelled' => $base->whereRaw("{$status} IN ('CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL')"),
+            default => $base,
+        };
+    }
+
     private function cashOrderRevenueAggregate(array $filters, string $settlement): float
     {
         $base = match ($settlement) {
             'all' => $this->allCashBase($filters),
             'unsettled' => $this->unsettledBase($filters),
+            'shipped' => $this->cashStatusBase($filters, 'shipped'),
+            'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
             default => $this->cashBase($filters),
         };
-        if ($settlement === 'all') {
+        if (in_array($settlement, ['all', 'cancelled'], true)) {
             $base->whereRaw($this->isRevenueStatus());
         }
         $rows = $base
@@ -953,9 +969,11 @@ class MarketplaceAnalyticsSummaryService
         $base = match ($settlement) {
             'all' => $this->allCashBase($filters),
             'unsettled' => $this->unsettledBase($filters),
+            'shipped' => $this->cashStatusBase($filters, 'shipped'),
+            'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
             default => $this->cashBase($filters),
         };
-        if ($settlement === 'all') {
+        if (in_array($settlement, ['all', 'cancelled'], true)) {
             $base->whereRaw($this->isRevenueStatus());
         }
         $row = $base
@@ -1460,7 +1478,7 @@ class MarketplaceAnalyticsSummaryService
     private function isRevenueStatus(): string
     {
         $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
-        return "{$status} NOT IN ('CANCELLED', 'CANCELED', 'BATAL')";
+        return "{$status} NOT IN ('CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL')";
     }
 
     private function normalizeAggregate($row): array

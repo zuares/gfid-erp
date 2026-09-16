@@ -501,6 +501,8 @@
                 <div class="an-modal-tabs" id="cashOrdersTabs" role="tablist" aria-label="Status pencairan order">
                     <button class="an-modal-tab active" type="button" role="tab" aria-selected="true" data-cash-settlement="all">Semua status</button>
                     <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="settled">Sudah cair</button>
+                    <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="shipped">Masih dikirim</button>
+                    <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="cancelled">Dibatalkan</button>
                     <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="unsettled">Belum cair</button>
                 </div>
                 <div class="an-modal-summary" id="cashOrdersSummary"><div class="an-empty">Memuat ringkasan…</div></div>
@@ -909,8 +911,9 @@
         const feePercent = value => aggregate.cash_order_revenue > 0 ? `${(n(value) / n(aggregate.cash_order_revenue) * 100).toFixed(1)}% omzet order` : '0.0% omzet order';
         const settlementLabel = row => String(row.settlement_status || '').toLowerCase() === 'complete' ? 'Sudah cair' : 'Belum cair';
         const statusLabel = row => row.status_group_label || cashStatus(row.status);
+        const modeLabel = { all: 'semua status', settled: 'settlement complete', shipped: 'shipped · masih dikirim', cancelled: 'dibatalkan', unsettled: 'belum settlement complete' }[cashSettlement] || 'semua status';
         $('cashOrdersTitle').textContent = isFeeFocus ? 'Rincian fee marketplace actual' : 'Status order & pencairan';
-        $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · ${isAll ? 'semua status' : (isSettled ? 'settlement complete' : 'belum settlement complete')} · ${totalOrders} order`;
+        $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · ${modeLabel} · ${totalOrders} order`;
         $('cashOrdersSummary').innerHTML = isFeeFocus ? [
             cashStat(isSettled ? 'Total fee marketplace' : 'Fee marketplace tercatat', money(aggregate.cash_marketplace_fees), feePercent(aggregate.cash_marketplace_fees)),
             cashStat('Administrasi', money(aggregate.cash_commission_fee), feePercent(aggregate.cash_commission_fee)),
@@ -949,7 +952,7 @@
         document.body.classList.remove('an-modal-open');
     }
     function setCashSettlementTab(value) {
-        cashSettlement = ['all', 'unsettled'].includes(value) ? value : 'settled';
+        cashSettlement = ['all', 'settled', 'shipped', 'cancelled', 'unsettled'].includes(value) ? value : 'settled';
         document.querySelectorAll('[data-cash-settlement]').forEach(button => {
             const active = button.dataset.cashSettlement === cashSettlement;
             button.classList.toggle('active', active);

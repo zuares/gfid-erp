@@ -192,7 +192,7 @@ class MarketplaceController extends Controller
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
-            'settlement' => ['nullable', 'in:all,settled,unsettled'],
+            'settlement' => ['nullable', 'in:all,settled,unsettled,shipped,cancelled'],
         ]);
 
         return response()
