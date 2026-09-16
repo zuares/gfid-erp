@@ -479,6 +479,11 @@
               <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-executive" id="anPulseGrid"><div class="an-empty">Memuat insight…</div></div></div>
           </section>
 
+          <section class="an-enterprise-card an-tab-pane" data-an-pane="summary">
+              <div class="an-enterprise-head"><div><div class="an-enterprise-title">KPI keputusan</div><div class="an-enterprise-sub">Arus kas, biaya marketplace, dan efektivitas iklan</div></div></div>
+              <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-finance" id="anDecisionPulse"><div class="an-empty">Memuat KPI…</div></div></div>
+          </section>
+
         <div class="an-grid-main an-grid-main-chart an-tab-pane" data-an-pane="summary">
             <section class="an-card"><div class="an-card-head"><div><div class="an-card-title"><i class="bi bi-graph-up-arrow me-1" style="color:#16a34a"></i>Grafik harian</div><div class="an-card-sub">Omzet &amp; estimasi profit</div></div></div><div class="an-card-body"><div class="an-chart-panel-head"><div class="an-chart-panel-title">Performa harian</div><div class="an-chart-summary" id="chartCompareNote">Memuat…</div></div><div class="an-chart" id="revenueChart"><div class="an-empty">Memuat grafik…</div></div></div></section>
         </div>
@@ -1349,6 +1354,25 @@
         const previousEstimatedProfit = Number(previous.estimated_profit ?? previousEstimatedProfitFallback);
         const estimatedMargin = Number(current.estimated_profit_margin ?? (netOrderRevenue > 0 ? estimatedProfit / netOrderRevenue * 100 : 0));
         const previousEstimatedMargin = Number(previous.estimated_profit_margin ?? (previousNetOrderRevenue > 0 ? previousEstimatedProfit / previousNetOrderRevenue * 100 : 0));
+        const estimatedPayout = Number(current.estimated_payout ?? cashPayout);
+        const previousCashPayout = Number(previous.cash_payout ?? previous.payout ?? 0);
+        const previousEstimatedPayout = Number(previous.estimated_payout ?? previousCashPayout);
+        const pendingPayout = Math.max(0, estimatedPayout - cashPayout);
+        const previousPendingPayout = Math.max(0, previousEstimatedPayout - previousCashPayout);
+        const payoutRealization = estimatedPayout > 0 ? cashPayout / estimatedPayout * 100 : 0;
+        const previousPayoutRealization = previousEstimatedPayout > 0 ? previousCashPayout / previousEstimatedPayout * 100 : 0;
+        const settledRevenue = Number(current.cash_order_revenue || 0);
+        const previousSettledRevenue = Number(previous.cash_order_revenue || 0);
+        const feeRate = settledRevenue > 0
+            ? actualCashFee / settledRevenue * 100
+            : Number(current.marketplace_fee_estimate_rate || 0);
+        const previousFeeRate = previousSettledRevenue > 0
+            ? Number(previous.cash_marketplace_fees || 0) / previousSettledRevenue * 100
+            : Number(previous.marketplace_fee_estimate_rate || 0);
+        const roas = adCost > 0 ? netOrderRevenue / adCost : 0;
+        const previousRoas = previousAdCost > 0 ? previousNetOrderRevenue / previousAdCost : 0;
+        const poas = adCost > 0 ? estimatedProfit / adCost : 0;
+        const previousPoas = previousAdCost > 0 ? previousEstimatedProfit / previousAdCost : 0;
         const previousBuyerPayment = Number(previous.cash_gross_sales || 0) + Number(previous.cash_unsettled_gross_sales || 0);
         const previousBuyerPaymentOrders = Number(previous.cash_order_count || 0) + Number(previous.cash_unsettled_order_count || 0);
         const previousApc = previousBuyerPaymentOrders > 0 ? previousBuyerPayment / previousBuyerPaymentOrders : 0;
@@ -1374,6 +1398,12 @@
         const estimatedProfitChange = pulseChange(estimatedProfit, previousEstimatedProfit, moneyText);
         const percentText = value => `${Number(value || 0).toFixed(1)}%`;
         const estimatedMarginChange = pulseChange(estimatedMargin, previousEstimatedMargin, percentText);
+        const multipleText = value => `${Number(value || 0).toFixed(2)}x`;
+        const payoutRealizationChange = pulseChange(payoutRealization, previousPayoutRealization, percentText);
+        const pendingPayoutChange = pulseChange(pendingPayout, previousPendingPayout, moneyText);
+        const feeRateChange = pulseChange(feeRate, previousFeeRate, percentText);
+        const roasChange = pulseChange(roas, previousRoas, multipleText);
+        const poasChange = pulseChange(poas, previousPoas, multipleText);
         const returnRefundRate = placedOrders > 0 ? returnRefundOrders / placedOrders * 100 : 0;
         const total = Math.max(Number(quality.total || 0), 1);
         const readyRate = Number(quality.ready || 0) / total * 100;
@@ -1391,6 +1421,14 @@
             ['Margin estimasi', `${estimatedMargin.toFixed(1)}%`, estimatedMarginChange, 'estimated-margin'],
         ];
         $('anPulseGrid').innerHTML = pulse.map(([label,value,change,metric]) => `<div class="an-pulse an-pulse-action ${selectedPulseMetric === metric ? 'is-active' : ''}" data-pulse-metric="${metric}" role="button" tabindex="0" title="Bandingkan grafik dengan tanggal sama bulan lalu"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-pulse-note ${change.className}">${change.text}</div></div>`).join('');
+        const decisionPulse = [
+            ['Payout terealisasi', `${payoutRealization.toFixed(1)}%`, { text: `${money(cashPayout)} cair · ${payoutRealizationChange.text}`, className: payoutRealizationChange.className }, 'Cash payout ÷ estimasi payout periode ini'],
+            ['Payout pending', money(pendingPayout), { text: `estimasi belum cair · ${pendingPayoutChange.text}`, className: pendingPayoutChange.className }, 'Estimasi dana yang belum masuk sebagai payout'],
+            ['Fee marketplace', `${feeRate.toFixed(1)}%`, { text: `${money(actualCashFee)} aktual · ${feeRateChange.text}`, className: feeRateChange.className }, 'Fee marketplace ÷ omzet order yang sudah settlement'],
+            ['ROAS net', adCost > 0 ? multipleText(roas) : '—', { text: `${money(netOrderRevenue)} omzet / iklan · ${roasChange.text}`, className: roasChange.className }, 'Omzet net ÷ biaya iklan incl. PPN'],
+            ['POAS estimasi', adCost > 0 ? multipleText(poas) : '—', { text: `${money(estimatedProfit)} profit / iklan · ${poasChange.text}`, className: poasChange.className }, 'Estimasi profit ÷ biaya iklan incl. PPN'],
+        ];
+        $('anDecisionPulse').innerHTML = decisionPulse.map(([label,value,note,title]) => `<div class="an-pulse" title="${title}"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-pulse-note ${note.className}">${note.text}</div></div>`).join('');
         const scoreClass = healthClass(readyRate);
         $('anOverallScore').className = `an-health-score ${scoreClass}`;
         $('anOverallScore').textContent = `Data ready ${readyRate.toFixed(0)}%`;
