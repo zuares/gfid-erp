@@ -316,6 +316,10 @@
     .an-cash-money.good { color:#15803d; }
     .an-cash-money.fee { color:#b45309; }
     .an-cash-money.affiliate { color:#9333ea; }
+    .an-cash-group { margin-bottom:.85rem; }
+    .an-cash-group:last-child { margin-bottom:0; }
+    .an-cash-group-head { display:flex; align-items:center; justify-content:space-between; gap:.6rem; margin-bottom:.35rem; padding:.5rem .65rem; border:1px solid var(--dsh-border); border-radius:8px; background:var(--hero-bg,#f8fafc); color:var(--text,#0f172a); font-size:.68rem; }
+    .an-cash-group-head span { color:var(--dsh-muted); font-size:.6rem; font-weight:700; }
     .an-exception-kind { display:inline-block; margin-top:.22rem; padding:.16rem .35rem; border-radius:5px; background:#fee2e2; color:#991b1b; font-size:.58rem; font-weight:800; }
     .an-exception-kind.return { background:#fef3c7; color:#92400e; }
     .an-modal-page { color:var(--dsh-muted); font-size:.66rem; font-weight:750; }
@@ -488,14 +492,15 @@
             <section class="an-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="cashOrdersTitle">
                 <div class="an-modal-head">
                     <div>
-                        <div class="an-modal-eyebrow">Settlement complete</div>
+                        <div class="an-modal-eyebrow">Status order &amp; pencairan</div>
                         <div class="an-modal-title" id="cashOrdersTitle">Status pencairan order</div>
                 <div class="an-modal-sub" id="cashOrdersSubtitle">Periode aktif</div>
                     </div>
                     <button class="an-modal-close" type="button" data-cash-close aria-label="Tutup">×</button>
                 </div>
                 <div class="an-modal-tabs" id="cashOrdersTabs" role="tablist" aria-label="Status pencairan order">
-                    <button class="an-modal-tab active" type="button" role="tab" aria-selected="true" data-cash-settlement="settled">Sudah cair</button>
+                    <button class="an-modal-tab active" type="button" role="tab" aria-selected="true" data-cash-settlement="all">Semua status</button>
+                    <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="settled">Sudah cair</button>
                     <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="unsettled">Belum cair</button>
                 </div>
                 <div class="an-modal-summary" id="cashOrdersSummary"><div class="an-empty">Memuat ringkasan…</div></div>
@@ -605,7 +610,7 @@
     let cashPage = 1;
     let cashPayload = null;
     let cashLoading = false;
-    let cashSettlement = 'settled';
+    let cashSettlement = 'all';
     let cashFocus = 'payout';
     let returnPage = 1;
     let returnPayload = null;
@@ -897,26 +902,41 @@
         const aggregate = payload.summary || {};
         const meta = payload.meta || {};
         const rows = Array.isArray(payload.data) ? payload.data : [];
+        const isAll = cashSettlement === 'all';
         const isSettled = cashSettlement === 'settled';
         const isFeeFocus = cashFocus === 'fees';
         const totalOrders = Number(meta.total || aggregate.cash_order_count || 0).toLocaleString('id-ID');
         const feePercent = value => aggregate.cash_order_revenue > 0 ? `${(n(value) / n(aggregate.cash_order_revenue) * 100).toFixed(1)}% omzet order` : '0.0% omzet order';
-        $('cashOrdersTitle').textContent = isFeeFocus ? 'Rincian fee marketplace actual' : 'Status pencairan order';
-        $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · ${isSettled ? 'settlement complete' : 'belum settlement complete'} · ${totalOrders} order`;
+        const settlementLabel = row => String(row.settlement_status || '').toLowerCase() === 'complete' ? 'Sudah cair' : 'Belum cair';
+        const statusLabel = row => row.status_group_label || cashStatus(row.status);
+        $('cashOrdersTitle').textContent = isFeeFocus ? 'Rincian fee marketplace actual' : 'Status order & pencairan';
+        $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · ${isAll ? 'semua status' : (isSettled ? 'settlement complete' : 'belum settlement complete')} · ${totalOrders} order`;
         $('cashOrdersSummary').innerHTML = isFeeFocus ? [
             cashStat(isSettled ? 'Total fee marketplace' : 'Fee marketplace tercatat', money(aggregate.cash_marketplace_fees), feePercent(aggregate.cash_marketplace_fees)),
             cashStat('Administrasi', money(aggregate.cash_commission_fee), feePercent(aggregate.cash_commission_fee)),
             cashStat('Layanan', money(aggregate.cash_service_fee), feePercent(aggregate.cash_service_fee)),
             cashStat('Transaksi', money(aggregate.cash_transaction_fee), feePercent(aggregate.cash_transaction_fee)),
         ].join('') : [
-            cashStat(isSettled ? 'Omzet cair' : 'Omzet belum cair', money(isSettled ? aggregate.cash_payout : aggregate.cash_gross_sales)),
+            cashStat(isAll ? 'Omzet revenue' : (isSettled ? 'Omzet cair' : 'Omzet belum cair'), money(isSettled ? aggregate.cash_payout : aggregate.cash_gross_sales)),
             cashStat(isSettled ? 'Fee marketplace actual' : 'Fee marketplace tercatat', money(aggregate.cash_marketplace_fees)),
             cashStat('Affiliate / AMS', money(aggregate.cash_affiliate_fees)),
             cashStat('Refund / adjustment', money(aggregate.cash_refund)),
         ].join('');
         const feeBreakdown = isFeeFocus ? `<div class="an-modal-fee-breakdown"><div><span>Total fee marketplace</span><strong>${money(aggregate.cash_marketplace_fees)}<small>${feePercent(aggregate.cash_marketplace_fees)}</small></strong></div><div><span>Administrasi</span><strong>${money(aggregate.cash_commission_fee)}<small>${feePercent(aggregate.cash_commission_fee)}</small></strong></div><div><span>Layanan</span><strong>${money(aggregate.cash_service_fee)}<small>${feePercent(aggregate.cash_service_fee)}</small></strong></div><div><span>Transaksi</span><strong>${money(aggregate.cash_transaction_fee)}<small>${feePercent(aggregate.cash_transaction_fee)}</small></strong></div><div><span>Asuransi</span><strong>${money(aggregate.cash_shipping_insurance_fee)}<small>${feePercent(aggregate.cash_shipping_insurance_fee)}</small></strong></div><div><span>Pajak escrow</span><strong>${money(aggregate.cash_escrow_tax)}<small>${feePercent(aggregate.cash_escrow_tax)}</small></strong></div></div>` : '';
-        const table = rows.length ? `<div class="an-table-wrap"><table class="an-table an-cash-table"><thead><tr><th>Order</th><th>Toko &amp; status</th><th>Omzet order</th><th>Pembayaran pembeli</th><th>${isSettled ? 'Omzet cair' : 'Payout tercatat'}</th><th>Fee marketplace</th><th>Affiliate / AMS</th></tr></thead><tbody>${rows.map(row => { const payout = isSettled ? money(row.cash_payout) : (n(row.cash_payout) > 0 ? money(row.cash_payout) : 'Belum tersedia'); return `<tr><td><div class="an-cash-order">${esc(row.channel_order_id)}</div><span class="an-cash-meta">Order ${esc(dateTime(row.ordered_at))}</span><details class="an-cash-detail"><summary>Rincian fee</summary><div class="an-cash-detail-grid">${cashFeeDetail(row, 'Administrasi', row.commission_fee, 'fee')}${cashFeeDetail(row, 'Layanan', row.service_fee, 'fee')}${cashFeeDetail(row, 'Transaksi', row.transaction_fee, 'fee')}${cashFeeDetail(row, 'Asuransi', row.shipping_insurance_fee, 'fee')}${cashFeeDetail(row, 'Pajak escrow', row.escrow_tax, 'fee')}${cashFeeDetail(row, 'Affiliate fee', row.affiliate_fee_raw, 'affiliate')}${cashFeeDetail(row, 'Activity / AMS', row.activity_fee, 'affiliate')}${cashFeeDetail(row, 'Refund', row.refund)}${cashFeeDetail(row, 'Total fee', row.total_fees, 'fee')}</div></details></td><td><div>${esc(row.store_name)}</div><span class="an-cash-status">${esc(cashStatus(row.status))}</span><span class="an-cash-meta">${isSettled ? `Cair ${esc(dateTime(row.settlement_time))}` : 'Belum cair'}</span></td><td class="an-cash-money">${money(row.gross_sales)}</td><td class="an-cash-money">${money(row.buyer_payment_amount)}</td><td class="an-cash-money ${isSettled ? 'good' : ''}">${payout}</td><td class="an-cash-money fee">${money(row.marketplace_fee)}</td><td class="an-cash-money affiliate">${money(row.affiliate_fee)}</td></tr>`; }).join('')}</tbody></table></div>` : `<div class="an-empty">Tidak ada order ${isSettled ? 'yang sudah cair' : 'yang belum cair'} pada periode ini.</div>`;
-        $('cashOrdersBody').innerHTML = feeBreakdown + table;
+        const renderRows = groupRows => groupRows.map(row => {
+            const rowSettled = String(row.settlement_status || '').toLowerCase() === 'complete';
+            const payout = rowSettled && n(row.cash_payout) > 0 ? money(row.cash_payout) : (n(row.cash_payout) > 0 ? money(row.cash_payout) : 'Belum tersedia');
+            return `<tr><td><div class="an-cash-order">${esc(row.channel_order_id)}</div><span class="an-cash-meta">Order ${esc(dateTime(row.ordered_at))}</span><details class="an-cash-detail"><summary>Rincian fee</summary><div class="an-cash-detail-grid">${cashFeeDetail(row, 'Administrasi', row.commission_fee, 'fee')}${cashFeeDetail(row, 'Layanan', row.service_fee, 'fee')}${cashFeeDetail(row, 'Transaksi', row.transaction_fee, 'fee')}${cashFeeDetail(row, 'Asuransi', row.shipping_insurance_fee, 'fee')}${cashFeeDetail(row, 'Pajak escrow', row.escrow_tax, 'fee')}${cashFeeDetail(row, 'Affiliate fee', row.affiliate_fee_raw, 'affiliate')}${cashFeeDetail(row, 'Activity / AMS', row.activity_fee, 'affiliate')}${cashFeeDetail(row, 'Refund', row.refund)}${cashFeeDetail(row, 'Total fee', row.total_fees, 'fee')}</div></details></td><td><div>${esc(row.store_name)}</div><span class="an-cash-status">${esc(statusLabel(row))}</span><span class="an-cash-meta">${settlementLabel(row)}</span></td><td class="an-cash-money">${money(row.gross_sales)}</td><td class="an-cash-money">${money(row.buyer_payment_amount)}</td><td class="an-cash-money ${rowSettled ? 'good' : ''}">${payout}</td><td class="an-cash-money fee">${money(row.marketplace_fee)}</td><td class="an-cash-money affiliate">${money(row.affiliate_fee)}</td></tr>`;
+        }).join('');
+        const renderTable = (groupRows, groupLabel = '') => groupRows.length ? `${groupLabel ? `<div class="an-cash-group-head"><strong>${esc(groupLabel)}</strong><span>${groupRows.length.toLocaleString('id-ID')} order</span></div>` : ''}<div class="an-table-wrap"><table class="an-table an-cash-table"><thead><tr><th>Order</th><th>Toko &amp; status</th><th>${isAll ? 'Nilai order' : 'Omzet order'}</th><th>Pembayaran pembeli</th><th>${isSettled ? 'Omzet cair' : 'Payout tercatat'}</th><th>Fee marketplace</th><th>Affiliate / AMS</th></tr></thead><tbody>${renderRows(groupRows)}</tbody></table></div>` : '';
+        const groups = isAll
+            ? ['completed', 'shipped', 'cancelled', 'other'].map(key => ({ key, label: rows.find(row => row.status_group === key)?.status_group_label || key, rows: rows.filter(row => row.status_group === key) })).filter(group => group.rows.length)
+            : [{ key: 'flat', label: '', rows }];
+        const table = groups.length ? groups.map(group => `<section class="an-cash-group">${renderTable(group.rows, isAll ? group.label : '')}</section>`).join('') : `<div class="an-empty">Tidak ada order pada periode ini.</div>`;
+        const body = isFeeFocus
+            ? (rows.length ? renderTable(rows) : '<div class="an-empty">Tidak ada order pada periode ini.</div>')
+            : table;
+        $('cashOrdersBody').innerHTML = feeBreakdown + body;
         const currentPage = Number(meta.current_page || cashPage);
         const lastPage = Number(meta.last_page || 1);
         $('cashOrdersPage').textContent = `Halaman ${currentPage} / ${lastPage}`;
@@ -929,7 +949,7 @@
         document.body.classList.remove('an-modal-open');
     }
     function setCashSettlementTab(value) {
-        cashSettlement = value === 'unsettled' ? 'unsettled' : 'settled';
+        cashSettlement = ['all', 'unsettled'].includes(value) ? value : 'settled';
         document.querySelectorAll('[data-cash-settlement]').forEach(button => {
             const active = button.dataset.cashSettlement === cashSettlement;
             button.classList.toggle('active', active);
@@ -939,7 +959,7 @@
     async function loadCashOrders() {
         if (cashLoading) return;
         cashLoading = true;
-        $('cashOrdersBody').innerHTML = '<div class="an-empty">Memuat order cair…</div>';
+        $('cashOrdersBody').innerHTML = '<div class="an-empty">Memuat order…</div>';
         $('cashOrdersSummary').innerHTML = '<div class="an-empty">Memuat ringkasan…</div>';
         $('cashOrdersPrev').disabled = true;
         $('cashOrdersNext').disabled = true;
@@ -965,8 +985,8 @@
         document.body.classList.add('an-modal-open');
         cashPage = 1;
         cashPayload = null;
-        setCashSettlementTab('settled');
-        $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · settlement complete`;
+        setCashSettlementTab('all');
+        $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · semua status`;
         loadCashOrders();
     }
     function openFeeOrders() {

@@ -156,17 +156,21 @@ class MarketplaceAnalyticsSummaryService
     }
 
     /**
-     * Return only settlement-complete orders for the lazy cash-detail drawer.
-     * Keeping this separate from the summary prevents the dashboard from
-     * loading every order until the user explicitly asks for the detail.
+     * Return order detail for the lazy cash-detail drawer. The all-status
+     * view includes cancelled rows for audit, while its aggregate still
+     * excludes cancelled orders from revenue.
      */
     public function cashOrders(array $filters, int $page = 1, int $perPage = 50, string $settlement = 'settled'): array
     {
         $filters = $this->normalizeFilters($filters);
         $page = max(1, $page);
         $perPage = max(10, min(100, $perPage));
-        $settlement = $settlement === 'unsettled' ? 'unsettled' : 'settled';
-        $base = $settlement === 'settled' ? $this->cashBase($filters) : $this->unsettledBase($filters);
+        $settlement = in_array($settlement, ['all', 'unsettled'], true) ? $settlement : 'settled';
+        $base = match ($settlement) {
+            'all' => $this->allCashBase($filters),
+            'unsettled' => $this->unsettledBase($filters),
+            default => $this->cashBase($filters),
+        };
 
         $paginator = $base
             ->join('stores as st', 'st.id', '=', 'mo.store_id')
@@ -211,6 +215,7 @@ class MarketplaceAnalyticsSummaryService
             $grossSales = $this->cashOrderGrossSales($row);
             $marketplaceFees = $marketplaceFee($row);
             $affiliateFees = $affiliateFee($row);
+            $statusGroup = $this->cashOrderStatusGroup($row);
             $buyerPayment = collect([
                 $row->buyer_payment_amount ?? null,
                 $row->total_amount ?? null,
@@ -224,6 +229,8 @@ class MarketplaceAnalyticsSummaryService
                 'store_id' => (int) $row->store_id,
                 'store_name' => (string) ($row->store_name ?: 'Tanpa toko'),
                 'status' => (string) ($row->order_status ?: $row->status ?: '-'),
+                'status_group' => $statusGroup['key'],
+                'status_group_label' => $statusGroup['label'],
                 'settlement_status' => (string) ($row->data_status ?: 'not_settled'),
                 'ordered_at' => $row->ordered_at,
                 'settlement_time' => $row->settlement_time,
@@ -323,9 +330,35 @@ class MarketplaceAnalyticsSummaryService
         return round(max(0, $grossSales - $sellerVoucher), 2);
     }
 
+    private function cashOrderStatusGroup($row): array
+    {
+        $status = strtoupper(trim((string) ($row->order_status ?: $row->status ?: '')));
+
+        if (in_array($status, ['CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL'], true)) {
+            return ['key' => 'cancelled', 'label' => 'Dibatalkan'];
+        }
+
+        if ($status === 'COMPLETED') {
+            return ['key' => 'completed', 'label' => 'Completed · Sudah cair'];
+        }
+
+        if (in_array($status, ['READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE', 'TO_RETURN'], true)) {
+            return ['key' => 'shipped', 'label' => 'Shipped · Masih dikirim'];
+        }
+
+        return ['key' => 'other', 'label' => 'Status lainnya'];
+    }
+
     private function cashOrderRevenueAggregate(array $filters, string $settlement): float
     {
-        $base = $settlement === 'unsettled' ? $this->unsettledBase($filters) : $this->cashBase($filters);
+        $base = match ($settlement) {
+            'all' => $this->allCashBase($filters),
+            'unsettled' => $this->unsettledBase($filters),
+            default => $this->cashBase($filters),
+        };
+        if ($settlement === 'all') {
+            $base->whereRaw($this->isRevenueStatus());
+        }
         $rows = $base
             ->select([
                 'mo.total_amount',
@@ -880,6 +913,7 @@ class MarketplaceAnalyticsSummaryService
             ->join('stores as st', 'st.id', '=', 'mo.store_id')
             ->where('mo.financial_data_status', MarketplaceFinancialDataQualityService::ORDER_READY)
             ->where('ms.data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
+            ->whereRaw($this->isRevenueStatus())
             ->whereNotNull('mo.ordered_at');
 
         return $this->applyDateAndStoreFilters($query, $filters, 'mo');
@@ -916,7 +950,14 @@ class MarketplaceAnalyticsSummaryService
             ->map(fn (string $field) => "COALESCE(ms.{$field}, 0)")
             ->implode(' + ');
 
-        $base = $settlement === 'unsettled' ? $this->unsettledBase($filters) : $this->cashBase($filters);
+        $base = match ($settlement) {
+            'all' => $this->allCashBase($filters),
+            'unsettled' => $this->unsettledBase($filters),
+            default => $this->cashBase($filters),
+        };
+        if ($settlement === 'all') {
+            $base->whereRaw($this->isRevenueStatus());
+        }
         $row = $base
             ->selectRaw('COUNT(DISTINCT mo.id) AS cash_order_count')
             ->selectRaw('SUM(COALESCE(NULLIF(ms.buyer_payment_amount, 0), NULLIF(mo.total_amount, 0), NULLIF(mo.total_paid_customer, 0), NULLIF(mo.subtotal_items, 0), 0)) AS cash_gross_sales')
@@ -1013,6 +1054,17 @@ class MarketplaceAnalyticsSummaryService
                 ->join('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
                 ->where('ms.data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
                 ->whereRaw($this->isRevenueStatus()),
+            $filters,
+            'mo'
+        );
+    }
+
+    private function allCashBase(array $filters)
+    {
+        return $this->applyDateAndStoreFilters(
+            DB::table('marketplace_orders as mo')
+                ->leftJoin('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
+                ->whereNotNull('mo.ordered_at'),
             $filters,
             'mo'
         );
