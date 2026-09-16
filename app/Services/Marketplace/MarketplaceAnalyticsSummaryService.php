@@ -46,6 +46,8 @@ class MarketplaceAnalyticsSummaryService
         $previousCash = $this->cashAggregate($previousFilters);
         $currentUnsettledCash = $this->cashAggregate($filters, 'unsettled');
         $previousUnsettledCash = $this->cashAggregate($previousFilters, 'unsettled');
+        $currentUnsettledEstimate = $this->estimatedUnsettledPayout($filters, $currentCash);
+        $previousUnsettledEstimate = $this->estimatedUnsettledPayout($previousFilters, $previousCash);
         $currentHpp = $this->hppAggregate($filters);
         $previousHpp = $this->hppAggregate($previousFilters);
         $currentReturnHpp = $this->returnRefundHppAggregate($filters);
@@ -63,6 +65,8 @@ class MarketplaceAnalyticsSummaryService
             'cash_unsettled_order_count' => $currentUnsettledCash['cash_order_count'],
             'cash_unsettled_gross_sales' => $currentUnsettledCash['cash_gross_sales'],
             'cash_unsettled_order_revenue' => $currentUnsettledCash['cash_order_revenue'],
+            'estimated_unsettled_payout' => $currentUnsettledEstimate['payout'],
+            'estimated_unsettled_order_count' => $currentUnsettledEstimate['order_count'],
             'hpp_total' => $currentHpp['hpp_total'],
             'hpp_settled' => $currentHpp['hpp_settled'],
             'hpp_unsettled' => $currentHpp['hpp_unsettled'],
@@ -84,6 +88,8 @@ class MarketplaceAnalyticsSummaryService
             'cash_unsettled_order_count' => $previousUnsettledCash['cash_order_count'],
             'cash_unsettled_gross_sales' => $previousUnsettledCash['cash_gross_sales'],
             'cash_unsettled_order_revenue' => $previousUnsettledCash['cash_order_revenue'],
+            'estimated_unsettled_payout' => $previousUnsettledEstimate['payout'],
+            'estimated_unsettled_order_count' => $previousUnsettledEstimate['order_count'],
             'hpp_total' => $previousHpp['hpp_total'],
             'hpp_settled' => $previousHpp['hpp_settled'],
             'hpp_unsettled' => $previousHpp['hpp_unsettled'],
@@ -1043,14 +1049,24 @@ class MarketplaceAnalyticsSummaryService
                     $query->whereIn('mo.channel_order_id', $orderKeys->all())
                         ->orWhereIn('mo.external_order_id', $orderKeys->all());
                 })
-                ->select(['mo.id', 'mo.store_id', 'mo.channel_order_id', 'mo.external_order_id', 'ms.data_status as settlement_status'])
+                ->select([
+                    'mo.id',
+                    'mo.store_id',
+                    'mo.channel_order_id',
+                    'mo.external_order_id',
+                    'ms.data_status as settlement_status',
+                    'ms.drc_adjustable_refund as settlement_refund_amount',
+                ])
                 ->get();
 
         $settlementByKey = [];
         foreach ($orders as $order) {
             foreach ([(string) $order->channel_order_id, (string) $order->external_order_id] as $key) {
                 if ($key !== '') {
-                    $settlementByKey[$order->store_id . '|' . $key] = $order->settlement_status;
+                    $settlementByKey[$order->store_id . '|' . $key] = [
+                        'status' => $order->settlement_status,
+                        'refund_amount' => max(0, (float) ($order->settlement_refund_amount ?? 0)),
+                    ];
                 }
             }
         }
@@ -1058,19 +1074,24 @@ class MarketplaceAnalyticsSummaryService
         $seenReturnOrders = [];
         $settledReturnOrders = 0;
         $unsettledReturnOrders = 0;
-        foreach ($returns as $return) {
+        $returnRefundAmount = 0.0;
+        foreach ($returns->groupBy(function ($return): string {
             $orderKey = (string) ($return->order_sn ?? '');
-            $key = $return->store_id . '|' . ($orderKey !== '' ? $orderKey : 'return:' . $return->id);
-            if (isset($seenReturnOrders[$key])) {
-                continue;
-            }
-
+            return $return->store_id . '|' . ($orderKey !== '' ? $orderKey : 'return:' . $return->id);
+        }) as $key => $returnRows) {
             $seenReturnOrders[$key] = true;
-            if (($settlementByKey[$key] ?? null) === MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE) {
+            $settlement = $settlementByKey[$key] ?? null;
+            if (($settlement['status'] ?? null) === MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE) {
                 $settledReturnOrders++;
             } else {
                 $unsettledReturnOrders++;
             }
+
+            // Prefer the actual settlement refund. amount_before_discount is
+            // only a fallback because it is the pre-discount item value.
+            $returnRefundAmount += ($settlement['refund_amount'] ?? 0) > 0
+                ? (float) $settlement['refund_amount']
+                : (float) $returnRows->sum(fn ($row) => (float) ($row->amount_before_discount ?? 0));
         }
 
         return [
@@ -1078,7 +1099,7 @@ class MarketplaceAnalyticsSummaryService
             'return_refund_order_count' => count($seenReturnOrders),
             'return_refund_settled_order_count' => $settledReturnOrders,
             'return_refund_unsettled_order_count' => $unsettledReturnOrders,
-            'return_refund_amount' => round((float) $returns->sum(fn ($return) => (float) ($return->amount_before_discount ?? 0)), 2),
+            'return_refund_amount' => round($returnRefundAmount, 2),
         ];
     }
 
@@ -1143,10 +1164,12 @@ class MarketplaceAnalyticsSummaryService
             return $this->withRates($this->applyAdCost(array_merge([
                 'store_id' => (int) $id,
                 'store_name' => $finance?->store_name ?? $ops?->store_name ?? $ad?->store_name ?? 'Tanpa toko',
+                'placed_order_count' => (int) ($ops->placed_order_count ?? 0),
                 'order_total' => (int) ($ops->order_total ?? 0),
                 'shipped_count' => (int) ($ops->shipped_count ?? 0),
                 'completed_count' => (int) ($ops->completed_count ?? 0),
                 'cancelled_count' => (int) ($ops->cancelled_count ?? 0),
+                'cancelled_amount' => round((float) ($ops->cancelled_amount ?? 0), 2),
                 'gmv' => round((float) ($ops->gmv ?? 0), 2),
             ], $aggregate), [
                 'ad_cost_before_tax' => (float) ($ad->ad_cost_before_tax ?? 0),
@@ -1163,10 +1186,12 @@ class MarketplaceAnalyticsSummaryService
             ->first();
 
         return [
+            'placed_order_count' => (int) ($row->placed_order_count ?? 0),
             'order_total' => (int) ($row->order_total ?? 0),
             'shipped_count' => (int) ($row->shipped_count ?? 0),
             'completed_count' => (int) ($row->completed_count ?? 0),
             'cancelled_count' => (int) ($row->cancelled_count ?? 0),
+            'cancelled_amount' => round((float) ($row->cancelled_amount ?? 0), 2),
             'gmv' => round((float) ($row->gmv ?? 0), 2),
         ];
     }
@@ -1239,14 +1264,13 @@ class MarketplaceAnalyticsSummaryService
             ->when($filters['store_id'], fn ($query, $storeId) => $query->where('mr.store_id', $storeId))
             ->sum(DB::raw('CASE WHEN ri.return_item_quantity > 0 THEN ri.return_item_quantity ELSE 0 END'));
 
-        $returnQty = min($returnQty, $total);
-        $unsettledAfterReturn = max(0, $unsettled - $returnQty);
-        $settledAfterReturn = max(0, $settled - max(0, $returnQty - $unsettled));
-
         return [
-            'total' => $settledAfterReturn + $unsettledAfterReturn + $returnQty,
-            'settled' => $settledAfterReturn,
-            'unsettled' => $unsettledAfterReturn,
+            // The base query already excludes return/refund orders. Keep
+            // returned units as a separate audit metric instead of adding
+            // them back into "Produk Terjual".
+            'total' => $total,
+            'settled' => $settled,
+            'unsettled' => $unsettled,
             'return_refund' => $returnQty,
         ];
     }
@@ -1477,12 +1501,16 @@ class MarketplaceAnalyticsSummaryService
     private function operationalSelect(bool $includeStore = true): string
     {
         $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
+        $cancelled = "{$status} IN ('CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL')"
+            . ' AND NOT ' . $this->returnRefundExistsSql();
 
         return implode(', ', [
+            'COUNT(DISTINCT mo.id) AS placed_order_count',
             'SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN 1 ELSE 0 END) AS order_total',
             "SUM(CASE WHEN {$status} IN ('SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE', 'COMPLETED') THEN 1 ELSE 0 END) AS shipped_count",
             "SUM(CASE WHEN {$status} = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_count",
-            "SUM(CASE WHEN {$status} IN ('CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL') THEN 1 ELSE 0 END) AS cancelled_count",
+            "SUM(CASE WHEN {$cancelled} THEN 1 ELSE 0 END) AS cancelled_count",
+            "SUM(CASE WHEN {$cancelled} THEN {$this->orderValueExpression()} ELSE 0 END) AS cancelled_amount",
             'SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $this->orderValueExpression() . ' ELSE 0 END) AS gmv',
         ]);
     }
@@ -1544,7 +1572,7 @@ class MarketplaceAnalyticsSummaryService
 
     private function withRates(array $aggregate): array
     {
-        $orders = (int) ($aggregate['order_total'] ?? 0);
+        $orders = (int) ($aggregate['placed_order_count'] ?? $aggregate['order_total'] ?? 0);
         $gross = (float) ($aggregate['gross_sales'] ?? 0);
 
         return array_merge($this->withEstimatedFee($aggregate), [
@@ -1588,23 +1616,76 @@ class MarketplaceAnalyticsSummaryService
         $actualMarketplaceFee = (float) ($aggregate['cash_marketplace_fees'] ?? 0);
         $hpp = (float) ($aggregate['hpp_total'] ?? $aggregate['hpp'] ?? 0);
         $adCost = (float) ($aggregate['ad_cost'] ?? 0);
-        $returnRefund = (float) ($aggregate['return_refund_amount'] ?? 0);
         $feeRate = $marketplaceRevenue > 0 && $actualMarketplaceFee > 0
             ? $actualMarketplaceFee / $marketplaceRevenue
             : self::ESTIMATED_MARKETPLACE_FEE_RATE;
-        $estimatedFee = $grossOrderRevenue * $feeRate;
-        $estimatedProfit = $grossOrderRevenue - $estimatedFee - $returnRefund - $hpp - $adCost;
-        $netOrderRevenue = max(0, $grossOrderRevenue - $returnRefund);
+        $unsettledGross = (float) ($aggregate['cash_unsettled_order_revenue'] ?? 0);
+        $estimatedUnsettledPayout = array_key_exists('estimated_unsettled_payout', $aggregate)
+            ? (float) $aggregate['estimated_unsettled_payout']
+            : max(0, $unsettledGross * (1 - $feeRate));
+        $estimatedPayout = $cashPayout + $estimatedUnsettledPayout;
+        $estimatedFee = max(0, $actualMarketplaceFee + ($unsettledGross - $estimatedUnsettledPayout));
+        // cash/order revenue already comes from isRevenueStatus(), which
+        // excludes cancelled and return/refund orders. Keep those exceptions
+        // as separate audit metrics; do not subtract them a second time here.
+        $netOrderRevenue = max(0, $grossOrderRevenue);
+        $estimatedGrossProfit = $estimatedPayout - $hpp;
+        $estimatedProfit = $estimatedGrossProfit - $adCost;
 
         return array_merge($aggregate, [
+            'gross_order_revenue' => round($grossOrderRevenue, 2),
+            'net_order_revenue' => round($netOrderRevenue, 2),
             'marketplace_fee_estimate_rate' => round($feeRate * 100, 2),
             'marketplace_fee_estimate' => round($estimatedFee, 2),
-            'marketplace_fee_estimate_on_payout' => round($cashPayout * $feeRate, 2),
-            'marketplace_fee_estimate_on_cash' => round($cashPayout * $feeRate, 2),
+            'marketplace_fee_estimate_on_payout' => round($estimatedFee, 2),
+            'marketplace_fee_estimate_on_cash' => round($estimatedFee, 2),
+            'estimated_payout' => round($estimatedPayout, 2),
+            'estimated_gross_profit' => round($estimatedGrossProfit, 2),
             'estimated_profit' => round($estimatedProfit, 2),
             'estimated_profit_margin' => $netOrderRevenue > 0 ? round(($estimatedProfit / $netOrderRevenue) * 100, 2) : 0.0,
             'marketplace_fees_actual' => round((float) ($aggregate['cash_marketplace_fees'] ?? $aggregate['marketplace_fees'] ?? 0), 2),
             'affiliate_fees_actual' => round((float) ($aggregate['cash_affiliate_fees'] ?? $aggregate['affiliate_fees'] ?? 0), 2),
         ]);
+    }
+
+    /**
+     * Resolve pending payout from Shopee income detail when available. Rows
+     * without an estimate use the same period fee rate as the visible
+     * fallback, so the forecast remains deterministic while data is syncing.
+     */
+    private function estimatedUnsettledPayout(array $filters, array $settledCash): array
+    {
+        $settledRevenue = (float) ($settledCash['cash_order_revenue'] ?? 0);
+        $actualFees = (float) ($settledCash['cash_marketplace_fees'] ?? 0);
+        $feeRate = $settledRevenue > 0 && $actualFees > 0
+            ? $actualFees / $settledRevenue
+            : self::ESTIMATED_MARKETPLACE_FEE_RATE;
+
+        $rows = $this->unsettledBase($filters)
+            ->leftJoin('marketplace_order_income_estimates as ie', 'ie.marketplace_order_id', '=', 'mo.id')
+            ->select([
+                'mo.total_amount',
+                'mo.total_paid_customer',
+                'mo.subtotal_items',
+                'mo.raw_json as order_raw_json',
+                'ms.buyer_payment_amount',
+                'ms.seller_voucher',
+                'ms.raw_json as settlement_raw_json',
+                'ie.estimated_escrow_amount',
+            ])
+            ->get();
+
+        $payout = 0.0;
+        foreach ($rows as $row) {
+            $gross = $this->cashOrderGrossSales($row);
+            $payout += $row->estimated_escrow_amount !== null
+                ? max(0, (float) $row->estimated_escrow_amount)
+                : max(0, $gross * (1 - $feeRate));
+        }
+
+        return [
+            'payout' => round($payout, 2),
+            'order_count' => $rows->count(),
+        ];
     }
 }

@@ -60,6 +60,7 @@ class MarketplaceProfitReportService
             ->all();
 
         $ordersQuery = $this->filteredOrders($filters, $settlementSource)
+            ->whereRaw($this->revenueOrderPredicate())
             ->where(function (Builder $query) use ($filters) {
                 $query->where(function (Builder $completed) {
                     $completed
@@ -227,6 +228,22 @@ class MarketplaceProfitReportService
         }
 
         return $query;
+    }
+
+    /**
+     * A completed order can receive a return record after the original order
+     * status was already stored as COMPLETED. It must not remain in omzet or
+     * profit just because the fulfillment status did not change in time.
+     */
+    private function revenueOrderPredicate(): string
+    {
+        $status = "UPPER(COALESCE(NULLIF(marketplace_orders.order_status, ''), marketplace_orders.status, ''))";
+
+        return "{$status} NOT IN ('CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL', 'TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED')"
+            . " AND NOT EXISTS (SELECT 1 FROM marketplace_returns AS mr_status"
+            . " WHERE mr_status.store_id = marketplace_orders.store_id"
+            . " AND (mr_status.order_sn = marketplace_orders.channel_order_id"
+            . " OR mr_status.order_sn = marketplace_orders.external_order_id))";
     }
 
     private function applyDateRange(Builder $query, string $column, ?string $from, ?string $to): void

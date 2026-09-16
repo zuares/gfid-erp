@@ -202,6 +202,7 @@
     .an-kpi:nth-child(4)::before { background:linear-gradient(90deg,#16a34a,#22c55e); }
     .an-kpi:nth-child(5)::before { background:linear-gradient(90deg,#b45309,#f59e0b); }
     .an-kpi:nth-child(6)::before { background:linear-gradient(90deg,#16a34a,#22c55e); }
+    .an-kpi.kpi-cancelled::before, .an-kpi.kpi-refund::before { background:linear-gradient(90deg,#dc2626,#fb7185); }
     .an-kpi.primary { background:var(--card,#fff); color:var(--text,#0f172a); border-color:var(--dsh-border); }
     .an-kpi.primary .an-kpi-label, .an-kpi.primary .an-kpi-value { color:var(--text,#0f172a); }
     .an-kpi-label { color:var(--dsh-muted); font-size:.62rem; font-weight:900; letter-spacing:.08em; }
@@ -557,15 +558,16 @@
 
         <div class="an-tab-pane is-hidden" data-an-pane="stores">
           <div class="an-kpis">
-            <div class="an-kpi primary"><span class="an-kpi-label">Total Order <i id="kpiOrdersInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Total Order" data-tooltip="Order non-batal · cair · belum cair · return/refund"></i></span><strong class="an-kpi-value" id="kpiOrders">—</strong><span class="an-kpi-note" id="kpiOrdersNote"><span title="Sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span> · <span title="Return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span></span></div>
+            <div class="an-kpi primary"><span class="an-kpi-label">Total Order <i id="kpiOrdersInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Total Order" data-tooltip="Order aktif yang tidak batal dan tidak return/refund"></i></span><strong class="an-kpi-value" id="kpiOrders">—</strong><span class="an-kpi-note" id="kpiOrdersNote"><span title="Sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span></span></div>
+            <div class="an-kpi kpi-cancelled"><span class="an-kpi-label">Dibatalkan <i id="kpiCancelledInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan order dibatalkan" data-tooltip="Order batal dipisahkan dan tidak masuk omzet maupun estimasi profit"></i></span><strong class="an-kpi-value" id="kpiCancelled">—</strong><span class="an-kpi-note" id="kpiCancelledNote"><span title="Nilai order batal"><i class="bi bi-x-circle" aria-hidden="true"></i> —</span> · tidak masuk omzet</span></div>
             <div class="an-kpi"><span class="an-kpi-label">Produk Terjual <i id="kpiProductsSoldInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Produk Terjual" data-tooltip="Total unit · cair · pending · refund"></i></span><strong class="an-kpi-value" id="kpiProductsSold">—</strong><span class="an-kpi-note" id="kpiProductsSoldNote"><span title="Produk sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Produk pending"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span> · <span title="Produk refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span></span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Omzet / Gross Sales <i id="kpiRevenueInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Omzet atau Gross Sales" data-tooltip="Omzet non-batal setelah return/refund"></i></span><strong class="an-kpi-value" id="kpiRevenue">—</strong><span class="an-kpi-note" id="kpiRevenueNote"><span title="Sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Estimasi belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span> · <span title="Return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span></span></div>
+            <div class="an-kpi"><span class="an-kpi-label">Omzet Eligible / Gross Sales <i id="kpiRevenueInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Omzet Eligible atau Gross Sales" data-tooltip="Omzet dari order aktif; batal dan return/refund sudah dikecualikan"></i></span><strong class="an-kpi-value" id="kpiRevenue">—</strong><span class="an-kpi-note" id="kpiRevenueNote"><span title="Sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Estimasi belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span> · <span title="Batal/refund dikecualikan"><i class="bi bi-shield-check" aria-hidden="true"></i> batal/refund dikecualikan</span></span></div>
             <div class="an-kpi"><span class="an-kpi-label">Prakiraan Admin Fee <i id="kpiAdminFeeInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Prakiraan Admin Fee" data-tooltip="Omzet × rate fee actual · komposisi fee"></i></span><strong class="an-kpi-value" id="kpiAdminFee">—</strong><span class="an-kpi-note" id="kpiAdminFeeNote">komposisi fee actual</span></div>
             <div class="an-kpi"><span class="an-kpi-label">Prakiraan Cair / Net sales <i id="kpiEstimatedCashInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Prakiraan Cair atau Net sales" data-tooltip="Omzet − admin fee · net cair + estimasi"></i></span><strong class="an-kpi-value" id="kpiEstimatedCash">—</strong><span class="an-kpi-note" id="kpiEstimatedCashNote"><span title="Net sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Estimasi net belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span> · <span title="Return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span></span></div>
             <div class="an-kpi"><span class="an-kpi-label">Total HPP / COGS <i id="kpiHppInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Total HPP atau COGS" data-tooltip="Total HPP · cair · belum cair · return/refund"></i></span><strong class="an-kpi-value" id="kpiHpp">—</strong><span class="an-kpi-note" id="kpiHppKpiNote"><span title="HPP sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="HPP belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span> · <span title="HPP return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span></span></div>
             <div class="an-kpi"><span class="an-kpi-label">Biaya Iklan (incl. PPN)</span><strong class="an-kpi-value" id="kpiAdCost">—</strong><span class="an-kpi-note" id="kpiAdCostNote"><span title="Biaya iklan sebelum PPN"><i class="bi bi-receipt" aria-hidden="true"></i> —</span> · <span title="PPN 11%"><i class="bi bi-percent" aria-hidden="true"></i> —</span> · <span title="Biaya per order"><i class="bi bi-bag" aria-hidden="true"></i> —</span></span></div>
             <div class="an-kpi"><span class="an-kpi-label">Omzet Cair / Net Revenue</span><strong class="an-kpi-value" id="kpiPayout">—</strong><span class="an-kpi-note" id="kpiPayoutNote"><span title="Order settlement complete"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Payout rate"><i class="bi bi-percent" aria-hidden="true"></i> —</span></span></div>
-            <div class="an-kpi"><span class="an-kpi-label">Return / Refund Rate</span><strong class="an-kpi-value" id="kpiReturnRate">—</strong><span class="an-kpi-note" id="kpiReturnRateNote"><span title="Nilai return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span> · <span title="Jumlah order"><i class="bi bi-bag" aria-hidden="true"></i> —</span></span></div>
+            <div class="an-kpi kpi-refund"><span class="an-kpi-label">Refund / Return <i id="kpiRefundInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan refund atau return" data-tooltip="Nilai refund dipisahkan dan tidak masuk omzet maupun estimasi profit"></i></span><strong class="an-kpi-value" id="kpiRefund">—</strong><span class="an-kpi-note" id="kpiRefundNote"><span title="Jumlah order refund"><i class="bi bi-bag" aria-hidden="true"></i> —</span> · rate —</span></div>
             <div class="an-kpi"><span class="an-kpi-label">Laba Kotor / Gross Profit <i id="kpiGrossProfitInfo" class="bi bi-info-circle an-kpi-info" tabindex="0" role="img" aria-label="Penjelasan Laba Kotor atau Gross Profit" data-tooltip="Net revenue − total HPP"></i></span><strong class="an-kpi-value" id="kpiGrossProfit">—</strong><span class="an-kpi-note" id="kpiHppNote"><span title="Net revenue"><i class="bi bi-cash-stack" aria-hidden="true"></i> —</span> · <span title="Total HPP"><i class="bi bi-box-seam" aria-hidden="true"></i> —</span></span></div>
             <div class="an-kpi"><span class="an-kpi-label">Est. Laba Bersih / Est. Net Profit</span><strong class="an-kpi-value" id="kpiEstimatedProfit">—</strong><span class="an-kpi-note" id="kpiEstimatedProfitNote"><span title="Margin estimasi"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i> —</span> · <span title="Net revenue − HPP − iklan"><i class="bi bi-calculator" aria-hidden="true"></i> estimasi</span></span></div>
             <div class="an-kpi"><span class="an-kpi-label">Laba Operasional / Net Operasional</span><strong class="an-kpi-value" id="kpiOperatingProfit">—</strong><span class="an-kpi-note" id="kpiOperatingProfitNote"><span title="Omzet cair"><i class="bi bi-cash-coin" aria-hidden="true"></i> —</span> · <span title="Total HPP + iklan"><i class="bi bi-dash-circle" aria-hidden="true"></i> —</span></span></div>
@@ -726,7 +728,9 @@
         const unsettledOrderRevenue = Number(current.cash_unsettled_order_revenue || 0);
         const orderRevenue = settledOrderRevenue + unsettledOrderRevenue || Number(current.gmv || 0);
         const returnRefundAmount = Number(current.return_refund_amount ?? current.cash_refund ?? current.refund ?? 0);
-        const netOrderRevenue = Math.max(0, orderRevenue - returnRefundAmount);
+        const netOrderRevenue = Math.max(0, Number(current.net_order_revenue ?? orderRevenue));
+        const cancelledCount = Number(current.cancelled_count || 0);
+        const cancelledAmount = Number(current.cancelled_amount || 0);
         const cashPayout = Number(current.cash_payout ?? current.payout ?? 0);
         const reportedHppTotal = Number(current.hpp_total ?? current.hpp ?? 0);
         const rawHppSettled = Number(current.hpp_settled ?? 0);
@@ -736,21 +740,21 @@
         const hppReturnRefund = Number(current.hpp_return_refund ?? 0);
         const hppReturnRefundSettled = Number(current.hpp_return_refund_settled ?? 0);
         const hppReturnRefundUnsettled = Number(current.hpp_return_refund_unsettled ?? 0);
-        const hppSettled = Math.max(0, rawHppSettled - hppReturnRefundSettled);
-        const hppUnsettled = Math.max(0, rawHppUnsettled - hppReturnRefundUnsettled);
-        const hppTotal = hppSettled + hppUnsettled + hppReturnRefund || reportedHppTotal;
+        const hppSettled = Math.max(0, rawHppSettled);
+        const hppUnsettled = Math.max(0, rawHppUnsettled);
+        // Return/refund HPP is shown only as an audit detail. It belongs to
+        // excluded orders and must not reduce estimated profit.
+        const hppTotal = hppSettled + hppUnsettled || reportedHppTotal;
         const hppShipped = Number(current.hpp_shipped ?? 0);
         const actualFee = Number(current.cash_marketplace_fees ?? current.marketplace_fees_actual ?? 0);
         const actualFeeRate = settledOrderRevenue > 0 ? actualFee / settledOrderRevenue : 0;
         const effectiveFeeRate = actualFeeRate > 0 ? actualFeeRate : 0.21;
-        const estimatedFee = orderRevenue * effectiveFeeRate;
+        const estimatedFee = Number(current.marketplace_fee_estimate ?? orderRevenue * effectiveFeeRate);
         const netSettledBeforeRefund = Math.max(0, settledOrderRevenue - actualFee);
         const estimatedUnsettledNetBeforeRefund = Math.max(0, unsettledOrderRevenue * (1 - effectiveFeeRate));
-        const unsettledRefund = Math.min(returnRefundAmount, estimatedUnsettledNetBeforeRefund);
-        const settledRefund = Math.max(0, returnRefundAmount - unsettledRefund);
-        const netSettled = Math.max(0, netSettledBeforeRefund - settledRefund);
-        const estimatedUnsettledNet = Math.max(0, estimatedUnsettledNetBeforeRefund - unsettledRefund);
-        const estimatedPayout = netSettled + estimatedUnsettledNet;
+        const netSettled = netSettledBeforeRefund;
+        const estimatedUnsettledNet = estimatedUnsettledNetBeforeRefund;
+        const estimatedPayout = Number(current.estimated_payout ?? (netSettled + estimatedUnsettledNet));
         const feeComponents = [
             ['bi-receipt', 'Administrasi', Number(current.cash_commission_fee || 0)],
             ['bi-headset', 'Layanan', Number(current.cash_service_fee || 0)],
@@ -769,11 +773,12 @@
             ? feeComponents.filter(([, , value]) => value > 0).map(([, label, value]) => `${({Administrasi: 'Adm', Layanan: 'Lyn', Transaksi: 'Trx', Asuransi: 'Asr', 'Pajak escrow': 'Esc'})[label] || label} ${(value / feeRateBase * 100).toFixed(1)}%`).join(' · ')
             : 'komposisi belum tersedia';
         const grossProfit = estimatedPayout - hppTotal;
-        const estimatedProfit = grossProfit - adCost;
+        const estimatedProfit = Number(current.estimated_profit ?? (grossProfit - adCost));
         const operatingProfit = cashPayout - hppTotal - adCost;
         const payoutRate = orderRevenue > 0 ? cashPayout / orderRevenue * 100 : 0;
-        const returnRefundRate = orderRevenue > 0 ? returnRefundAmount / orderRevenue * 100 : 0;
+        const placedOrderCount = Number(current.placed_order_count ?? current.order_total ?? 0);
         const returnRefundCount = Number(current.return_refund_order_count ?? current.return_refund_count ?? 0);
+        const returnRefundRate = placedOrderCount > 0 ? returnRefundCount / placedOrderCount * 100 : 0;
         const totalQty = Number(current.product_qty ?? current.qty ?? 0);
         const productQtySettled = Number(current.product_qty_settled ?? 0);
         const productQtyUnsettled = Number(current.product_qty_unsettled ?? Math.max(0, totalQty - productQtySettled));
@@ -787,6 +792,8 @@
         const settledOrderCount = Math.max(0, settledOrderCountRaw - returnSettledOrderCount);
         const unsettledOrderCount = Math.max(0, unsettledOrderCountRaw - returnUnsettledOrderCount);
         $('kpiOrders').textContent = Number(current.order_total || 0).toLocaleString('id-ID');
+        $('kpiCancelled').textContent = cancelledCount.toLocaleString('id-ID');
+        $('kpiCancelledNote').innerHTML = `<span title="Nilai order batal"><i class="bi bi-x-circle" aria-hidden="true"></i> ${money(cancelledAmount)}</span> · tidak masuk omzet/profit`;
         $('kpiProductsSold').textContent = totalQty.toLocaleString('id-ID');
         $('kpiProductsSoldNote').innerHTML = `<span title="Produk sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> ${productQtySettled.toLocaleString('id-ID')}</span> · <span title="Produk pending"><i class="bi bi-clock-history" aria-hidden="true"></i> ${productQtyUnsettled.toLocaleString('id-ID')}</span> · <span title="Produk refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> ${productQtyReturnRefund.toLocaleString('id-ID')}</span>`;
         $('kpiProductsSoldInfo').dataset.tooltip = `Total ${totalQty.toLocaleString('id-ID')} · cair ${productQtySettled.toLocaleString('id-ID')} · pending ${productQtyUnsettled.toLocaleString('id-ID')} · refund ${productQtyReturnRefund.toLocaleString('id-ID')}`;
@@ -799,29 +806,31 @@
         $('kpiEstimatedProfit').textContent = money(estimatedProfit);
         $('kpiPayout').textContent = money(cashPayout);
         $('kpiOperatingProfit').textContent = money(operatingProfit);
-        $('kpiReturnRate').textContent = `${returnRefundRate.toFixed(1)}%`;
-        $('kpiRevenueNote').innerHTML = `<span title="Sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> ${money(settledOrderRevenue)}</span> · <span title="Estimasi belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> ${money(unsettledOrderRevenue)}</span> · <span title="Return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> ${money(returnRefundAmount)}</span>`;
-        $('kpiEstimatedCashNote').innerHTML = `<span title="Net sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> ${money(netSettled)}</span> · <span title="Estimasi net belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> ${money(estimatedUnsettledNet)}</span> · <span title="Return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> ${money(returnRefundAmount)}</span>`;
+        $('kpiRefund').textContent = money(returnRefundAmount);
+        $('kpiRevenueNote').innerHTML = `<span title="Sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> ${money(settledOrderRevenue)}</span> · <span title="Estimasi belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> ${money(unsettledOrderRevenue)}</span> · <span title="Batal/refund dikecualikan"><i class="bi bi-shield-check" aria-hidden="true"></i> batal/refund dikecualikan</span>`;
+        $('kpiEstimatedCashNote').innerHTML = `<span title="Net sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> ${money(netSettled)}</span> · <span title="Estimasi net belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> ${money(estimatedUnsettledNet)}</span> · <span title="Batal/refund dikecualikan"><i class="bi bi-shield-check" aria-hidden="true"></i> batal/refund dikecualikan</span>`;
         $('kpiAdminFeeNote').innerHTML = feeRateTotal ? `${feeRateTotal} · ${feeComposition}` : feeComposition;
-        $('kpiOrdersNote').innerHTML = `<span title="Sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> ${settledOrderCount.toLocaleString('id-ID')}</span> · <span title="Belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> ${unsettledOrderCount.toLocaleString('id-ID')}</span> · <span title="Return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> ${returnRefundCount.toLocaleString('id-ID')}</span>`;
+        $('kpiOrdersNote').innerHTML = `<span title="Sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> ${settledOrderCount.toLocaleString('id-ID')}</span> · <span title="Belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> ${unsettledOrderCount.toLocaleString('id-ID')}</span>`;
         $('kpiHppKpiNote').innerHTML = `<span title="HPP sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> ${money(hppSettled)}</span> · <span title="HPP belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> ${money(hppUnsettled)}</span> · <span title="HPP return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> ${money(hppReturnRefund)}</span>`;
         $('kpiHppNote').innerHTML = `<span title="Net revenue"><i class="bi bi-cash-stack" aria-hidden="true"></i> ${money(estimatedPayout)}</span> · <span title="Total HPP"><i class="bi bi-box-seam" aria-hidden="true"></i> ${money(hppTotal)}</span>`;
         $('kpiAdCostNote').innerHTML = `<span title="Biaya iklan sebelum PPN"><i class="bi bi-receipt" aria-hidden="true"></i> ${money(adCostBeforeTax)}</span> · <span title="PPN 11%"><i class="bi bi-percent" aria-hidden="true"></i> ${money(adCostVat)}</span> · <span title="Biaya per order"><i class="bi bi-bag" aria-hidden="true"></i> ${money(adCostPerOrder)}</span>`;
         $('kpiEstimatedProfitNote').innerHTML = `<span title="Margin estimasi"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i> ${orderRevenue > 0 ? (estimatedProfit / orderRevenue * 100).toFixed(1) : '0.0'}%</span> · <span title="Net revenue − HPP − iklan"><i class="bi bi-calculator" aria-hidden="true"></i> estimasi</span>`;
         $('kpiPayoutNote').innerHTML = `<span title="Order settlement complete"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> ${Number(current.cash_order_count || 0).toLocaleString('id-ID')}</span> · <span title="Rasio omzet cair"><i class="bi bi-percent" aria-hidden="true"></i> ${payoutRate.toFixed(1)}%</span>`;
         $('kpiOperatingProfitNote').innerHTML = `<span title="Omzet cair"><i class="bi bi-cash-coin" aria-hidden="true"></i> ${money(cashPayout)}</span> · <span title="Total HPP + iklan"><i class="bi bi-dash-circle" aria-hidden="true"></i> ${money(hppTotal + adCost)}</span>`;
-        $('kpiReturnRateNote').innerHTML = `<span title="Nilai return/refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> ${money(returnRefundAmount)}</span> · <span title="Jumlah order"><i class="bi bi-bag" aria-hidden="true"></i> ${returnRefundCount.toLocaleString('id-ID')}</span>`;
-        $('kpiOrdersInfo').dataset.tooltip = `Order ${Number(current.order_total || 0).toLocaleString('id-ID')} · cair ${settledOrderCount.toLocaleString('id-ID')} · belum ${unsettledOrderCount.toLocaleString('id-ID')} · return ${returnRefundCount.toLocaleString('id-ID')}`;
-        $('kpiRevenueInfo').dataset.tooltip = `Net ${money(netOrderRevenue)} · gross ${money(orderRevenue)} · return ${money(returnRefundAmount)}`;
+        $('kpiRefundNote').innerHTML = `<span title="Jumlah order refund"><i class="bi bi-bag" aria-hidden="true"></i> ${returnRefundCount.toLocaleString('id-ID')} order</span> · rate ${returnRefundRate.toFixed(1)}% · tidak masuk omzet/profit`;
+        $('kpiOrdersInfo').dataset.tooltip = `Order aktif ${Number(current.order_total || 0).toLocaleString('id-ID')} · ditempatkan ${placedOrderCount.toLocaleString('id-ID')} · cair ${settledOrderCount.toLocaleString('id-ID')} · belum ${unsettledOrderCount.toLocaleString('id-ID')}`;
+        $('kpiCancelledInfo').dataset.tooltip = `${cancelledCount.toLocaleString('id-ID')} order batal · nilai ${money(cancelledAmount)} · tidak masuk omzet/profit`;
+        $('kpiRefundInfo').dataset.tooltip = `${returnRefundCount.toLocaleString('id-ID')} order · nilai ${money(returnRefundAmount)} · tidak masuk omzet/profit`;
+        $('kpiRevenueInfo').dataset.tooltip = `Omzet aktif ${money(netOrderRevenue)} · order batal ${money(cancelledAmount)} dan refund ${money(returnRefundAmount)} dikecualikan`;
         $('kpiAdminFeeInfo').dataset.tooltip = `Total ${money(estimatedFee)} · rate ${(effectiveFeeRate * 100).toFixed(1)}% · ${feeCompositionText}`;
-        $('kpiEstimatedCashInfo').dataset.tooltip = `Total ${money(estimatedPayout)} · cair ${money(netSettled)} · est. belum ${money(estimatedUnsettledNet)} · return ${money(returnRefundAmount)}`;
+        $('kpiEstimatedCashInfo').dataset.tooltip = `Total ${money(estimatedPayout)} · cair ${money(netSettled)} · est. belum ${money(estimatedUnsettledNet)} · batal/refund dikecualikan`;
         $('kpiHppInfo').dataset.tooltip = `Total ${money(hppTotal)} · cair ${money(hppSettled)} · belum ${money(hppUnsettled)} · return ${money(hppReturnRefund)}`;
         $('kpiGrossProfitInfo').dataset.tooltip = `Laba ${money(grossProfit)} · net ${money(estimatedPayout)} · HPP ${money(hppTotal)}`;
 
         const previous = summary?.previous || {};
         const previousGrossOrderRevenue = Number(previous.cash_order_revenue || 0) + Number(previous.cash_unsettled_order_revenue || 0) || Number(previous.gmv || 0);
         const previousReturnRefundAmount = Number(previous.return_refund_amount ?? previous.cash_refund ?? previous.refund ?? 0);
-        const previousNetOrderRevenue = Math.max(0, previousGrossOrderRevenue - previousReturnRefundAmount);
+        const previousNetOrderRevenue = Math.max(0, Number(previous.net_order_revenue ?? previousGrossOrderRevenue));
         const previousSettledOrderRevenue = Number(previous.cash_order_revenue || 0);
         const previousUnsettledOrderRevenue = Number(previous.cash_unsettled_order_revenue || 0);
         const previousActualFee = Number(previous.cash_marketplace_fees ?? previous.marketplace_fees_actual ?? 0);
@@ -829,11 +838,9 @@
         const previousEstimatedFee = previousGrossOrderRevenue * previousFeeRate;
         const previousNetSettledBeforeRefund = Math.max(0, previousSettledOrderRevenue - previousActualFee);
         const previousEstimatedUnsettledNetBeforeRefund = Math.max(0, previousUnsettledOrderRevenue * (1 - previousFeeRate));
-        const previousUnsettledRefund = Math.min(previousReturnRefundAmount, previousEstimatedUnsettledNetBeforeRefund);
-        const previousSettledRefund = Math.max(0, previousReturnRefundAmount - previousUnsettledRefund);
-        const previousNetSettled = Math.max(0, previousNetSettledBeforeRefund - previousSettledRefund);
-        const previousEstimatedUnsettledNet = Math.max(0, previousEstimatedUnsettledNetBeforeRefund - previousUnsettledRefund);
-        const previousEstimatedPayout = previousNetSettled + previousEstimatedUnsettledNet;
+        const previousNetSettled = previousNetSettledBeforeRefund;
+        const previousEstimatedUnsettledNet = previousEstimatedUnsettledNetBeforeRefund;
+        const previousEstimatedPayout = Number(previous.estimated_payout ?? (previousNetSettled + previousEstimatedUnsettledNet));
         const previousReportedHpp = Number(previous.hpp_total ?? previous.hpp ?? 0);
         const previousHppSettledRaw = Number(previous.hpp_settled ?? 0);
         const previousHppUnsettledRaw = previous.hpp_unsettled !== undefined
@@ -842,15 +849,16 @@
         const previousHppReturnRefund = Number(previous.hpp_return_refund ?? 0);
         const previousHppReturnRefundSettled = Number(previous.hpp_return_refund_settled ?? 0);
         const previousHppReturnRefundUnsettled = Number(previous.hpp_return_refund_unsettled ?? 0);
-        const previousHppSettled = Math.max(0, previousHppSettledRaw - previousHppReturnRefundSettled);
-        const previousHppUnsettled = Math.max(0, previousHppUnsettledRaw - previousHppReturnRefundUnsettled);
-        const previousHppTotal = previousHppSettled + previousHppUnsettled + previousHppReturnRefund || previousReportedHpp;
+        const previousHppSettled = Math.max(0, previousHppSettledRaw);
+        const previousHppUnsettled = Math.max(0, previousHppUnsettledRaw);
+        const previousHppTotal = previousHppSettled + previousHppUnsettled || previousReportedHpp;
         const previousAdCost = Number(previous.ad_cost || 0);
         const previousCashPayout = Number(previous.cash_payout ?? previous.payout ?? 0);
         const previousGrossProfit = previousEstimatedPayout - previousHppTotal;
         const previousEstimatedProfit = Number(previous.estimated_profit ?? (previousGrossProfit - previousAdCost));
         const previousOperatingProfit = previousCashPayout - previousHppTotal - previousAdCost;
-        const previousReturnRate = previousGrossOrderRevenue > 0 ? previousReturnRefundAmount / previousGrossOrderRevenue * 100 : 0;
+        const previousPlacedOrderCount = Number(previous.placed_order_count ?? previous.order_total ?? 0);
+        const previousReturnRate = previousPlacedOrderCount > 0 ? Number(previous.return_refund_order_count ?? previous.return_refund_count ?? 0) / previousPlacedOrderCount * 100 : 0;
         const comparisonText = (value, baseline, formatter = money) => {
             const currentValue = Number(value || 0);
             const previousValue = Number(baseline || 0);
@@ -885,7 +893,8 @@
         setKpiComparison('kpiHpp', hppTotal, previousHppTotal);
         setKpiComparison('kpiAdCost', adCost, previousAdCost);
         setKpiComparison('kpiPayout', cashPayout, previousCashPayout);
-        setKpiComparison('kpiReturnRate', returnRefundRate, previousReturnRate, percentFormatter);
+        setKpiComparison('kpiCancelled', cancelledCount, Number(previous.cancelled_count || 0), countFormatter);
+        setKpiComparison('kpiRefund', returnRefundAmount, previousReturnRefundAmount);
         setKpiComparison('kpiGrossProfit', grossProfit, previousGrossProfit);
         setKpiComparison('kpiEstimatedProfit', estimatedProfit, previousEstimatedProfit);
         setKpiComparison('kpiOperatingProfit', operatingProfit, previousOperatingProfit);
@@ -1211,9 +1220,10 @@
     }
     function renderFunnel() {
         const current = summary?.current || {};
-        const max = Math.max(Number(current.order_total || 0), 1);
+        const max = Math.max(Number(current.placed_order_count ?? current.order_total ?? 0), 1);
         const data = [
-            ['Order masuk', Number(current.order_total || 0), Number(current.order_total || 0)],
+            ['Order masuk', Number(current.placed_order_count ?? current.order_total ?? 0), Number(current.placed_order_count ?? current.order_total ?? 0)],
+            ['Order eligible', Number(current.order_total || 0), Number(current.order_total || 0)],
             ['Order dikirim', Number(current.shipped_count || 0), Number(current.shipped_count || 0)],
             ['Order selesai', Number(current.completed_count || 0), Number(current.completed_count || 0)],
             ['Order dibatalkan', Number(current.cancelled_count || 0), Number(current.cancelled_count || 0)],
@@ -1305,7 +1315,7 @@
         const actualCashFee = Number(current.cash_marketplace_fees ?? current.marketplace_fees_actual ?? 0);
         const actualAffiliateFee = Number(current.cash_affiliate_fees ?? current.affiliate_fees_actual ?? 0);
         const grossOrderRevenue = Number(current.cash_order_revenue || 0) + Number(current.cash_unsettled_order_revenue || 0) || Number(current.gmv || 0);
-        const netOrderRevenue = Math.max(0, grossOrderRevenue - Number(current.return_refund_amount ?? 0));
+        const netOrderRevenue = Math.max(0, Number(current.net_order_revenue ?? grossOrderRevenue));
         const totalHpp = Number(current.hpp_total ?? current.hpp ?? 0);
         const adCost = Number(current.ad_cost || 0);
         const buyerPayment = Number(current.cash_gross_sales || 0) + Number(current.cash_unsettled_gross_sales || 0);
@@ -1319,9 +1329,15 @@
         const totalOrder = Number(current.order_total || 0);
         const totalProducts = Number(current.product_qty ?? current.qty ?? 0);
         const cancelledOrders = Number(current.cancelled_count || 0);
+        const cancelledAmount = Number(current.cancelled_amount || 0);
+        const returnRefundOrders = Number(current.return_refund_order_count ?? current.return_refund_count ?? 0);
+        const returnRefundAmount = Number(current.return_refund_amount ?? current.cash_refund ?? current.refund ?? 0);
+        const placedOrders = Number(current.placed_order_count ?? totalOrder);
         const previous = summary?.previous || {};
         const previousGrossOrderRevenue = Number(previous.cash_order_revenue || 0) + Number(previous.cash_unsettled_order_revenue || 0) || Number(previous.gmv || 0);
-        const previousNetOrderRevenue = Math.max(0, previousGrossOrderRevenue - Number(previous.return_refund_amount ?? 0));
+        const previousNetOrderRevenue = Math.max(0, Number(previous.net_order_revenue ?? previousGrossOrderRevenue));
+        const previousCancelledAmount = Number(previous.cancelled_amount || 0);
+        const previousReturnRefundAmount = Number(previous.return_refund_amount ?? previous.cash_refund ?? previous.refund ?? 0);
         const previousHpp = Number(previous.hpp_total ?? previous.hpp ?? 0);
         const previousAdCost = Number(previous.ad_cost || 0);
         const previousFeeRate = Number(previous.cash_order_revenue || 0) > 0
@@ -1352,14 +1368,20 @@
         const adCostChange = pulseChange(adCost, previousAdCost, moneyText);
         const aovChange = pulseChange(aovNet, previousAovNet, moneyText);
         const apcChange = pulseChange(apc, previousApc, moneyText);
+        const cancelledAmountChange = pulseChange(cancelledAmount, previousCancelledAmount, moneyText);
+        const refundAmountChange = pulseChange(returnRefundAmount, previousReturnRefundAmount, moneyText);
+        const exceptionChange = change => ({ ...change, className: change.className === 'good' ? 'bad' : (change.className === 'bad' ? 'good' : '') });
         const estimatedProfitChange = pulseChange(estimatedProfit, previousEstimatedProfit, moneyText);
         const percentText = value => `${Number(value || 0).toFixed(1)}%`;
         const estimatedMarginChange = pulseChange(estimatedMargin, previousEstimatedMargin, percentText);
+        const returnRefundRate = placedOrders > 0 ? returnRefundOrders / placedOrders * 100 : 0;
         const total = Math.max(Number(quality.total || 0), 1);
         const readyRate = Number(quality.ready || 0) / total * 100;
         const topStores = [...(summary?.stores || [])].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0)).slice(0, 5);
         const pulse = [
-            ['Total order', totalOrder.toLocaleString('id-ID'), { text: `batal ${cancelledOrders.toLocaleString('id-ID')} · ${totalOrderChange.text}`, className: totalOrderChange.className }, 'orders'],
+            ['Total order', totalOrder.toLocaleString('id-ID'), { text: `eligible · ${totalOrderChange.text}`, className: totalOrderChange.className }, 'orders'],
+            ['Dibatalkan', cancelledOrders.toLocaleString('id-ID'), { text: `${money(cancelledAmount)} · ${cancelledAmountChange.text}`, className: exceptionChange(cancelledAmountChange).className }, 'cancelled'],
+            ['Refund / return', money(returnRefundAmount), { text: `${returnRefundOrders.toLocaleString('id-ID')} order · ${returnRefundRate.toFixed(1)}% · ${refundAmountChange.text}`, className: exceptionChange(refundAmountChange).className }, 'refund'],
             ['Produk terjual', totalProducts.toLocaleString('id-ID'), { text: `unit · ${totalProductsChange.text}`, className: totalProductsChange.className }, 'products'],
             ['Omzet net', money(netOrderRevenue), netRevenueChange, 'revenue'],
             ['Biaya iklan incl. PPN', money(adCost), adCostChange, 'ads'],
@@ -1403,13 +1425,12 @@
         const hppReturnRefund = Number(current.hpp_return_refund || 0);
         const hppReturnRefundSettled = Number(current.hpp_return_refund_settled || 0);
         const hppReturnRefundUnsettled = Number(current.hpp_return_refund_unsettled || 0);
-        const hppSettled = Math.max(0, rawHppSettled - hppReturnRefundSettled);
-        const hppUnsettled = Math.max(0, rawHppUnsettled - hppReturnRefundUnsettled);
-        const hppTotal = hppSettled + hppUnsettled + hppReturnRefund || rawHppTotal;
+        const hppSettled = Math.max(0, rawHppSettled);
+        const hppUnsettled = Math.max(0, rawHppUnsettled);
+        const hppTotal = hppSettled + hppUnsettled || rawHppTotal;
         const hppSettledPct = hppTotal > 0 ? hppSettled / hppTotal * 100 : 0;
         const hppUnsettledPct = hppTotal > 0 ? hppUnsettled / hppTotal * 100 : 0;
         const hppReturnRefundPct = hppTotal > 0 ? hppReturnRefund / hppTotal * 100 : 0;
-        const returnRefundAmount = Number(current.return_refund_amount ?? current.cash_refund ?? current.refund ?? 0);
         const economics = [
             ['Omzet', totalOmzet, 100, '#16a34a'],
             ['Return / refund', returnRefundAmount, economicsBase ? returnRefundAmount / economicsBase * 100 : 0, '#dc2626'],
