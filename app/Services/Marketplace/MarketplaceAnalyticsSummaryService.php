@@ -30,6 +30,26 @@ class MarketplaceAnalyticsSummaryService
         'activity_fee',
     ];
 
+    /**
+     * Order statuses which must never contribute to omzet/GMV. Pending
+     * payment is not revenue yet, even when the marketplace supplies an
+     * order amount that can be used for operational display elsewhere.
+     */
+    private const NON_REVENUE_ORDER_STATUSES = [
+        'UNPAID',
+        'INVOICE_PENDING',
+        'CANCELLED',
+        'CANCELED',
+        'CANCELLED_BEFORE_SHIPPING',
+        'BATAL',
+        'IN_CANCEL',
+        'TO_RETURN',
+        'RETURNING',
+        'RETURNED',
+        'REFUND',
+        'REFUNDED',
+    ];
+
     public function __construct(private MarketplaceProfitReportService $profitReport)
     {
     }
@@ -426,7 +446,7 @@ class MarketplaceAnalyticsSummaryService
                 ->whereRaw("{$status} IN ('READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE')")
                 ->whereRaw('NOT ' . $this->returnRefundExistsSql()),
             'cancelled' => $base
-                ->whereRaw("{$status} IN ('CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL')")
+                ->whereRaw("{$status} IN ('CANCELLED', 'CANCELED', 'CANCELLED_BEFORE_SHIPPING', 'BATAL', 'IN_CANCEL')")
                 ->whereRaw('NOT ' . $this->returnRefundExistsSql()),
             'return_refund' => $base->where(function ($query) use ($status) {
                 $query->whereRaw($this->returnRefundExistsSql())
@@ -1547,7 +1567,7 @@ class MarketplaceAnalyticsSummaryService
     private function operationalSelect(bool $includeStore = true): string
     {
         $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
-        $cancelled = "{$status} IN ('CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL')"
+        $cancelled = "{$status} IN ('CANCELLED', 'CANCELED', 'CANCELLED_BEFORE_SHIPPING', 'BATAL', 'IN_CANCEL')"
             . ' AND NOT ' . $this->returnRefundExistsSql();
 
         return implode(', ', [
@@ -1569,7 +1589,9 @@ class MarketplaceAnalyticsSummaryService
     private function isRevenueStatus(): string
     {
         $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
-        return "{$status} NOT IN ('CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL', 'TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED')"
+        $excluded = "'" . implode("', '", self::NON_REVENUE_ORDER_STATUSES) . "'";
+
+        return "{$status} NOT IN ({$excluded})"
             . ' AND NOT ' . $this->returnRefundExistsSql();
     }
 

@@ -15,7 +15,10 @@ class MarketplaceProfitOverviewService
 {
     private const EXCLUDED_ORDER_STATUSES = [
         'UNPAID',
+        'INVOICE_PENDING',
         'CANCELLED',
+        'CANCELED',
+        'CANCELLED_BEFORE_SHIPPING',
         'BATAL',
         'IN_CANCEL',
         'RETURNED',

@@ -17,13 +17,17 @@ class MarketplaceCohortService
 {
     private const EXCLUDED_ORDER_STATUSES = [
         'UNPAID',
+        'INVOICE_PENDING',
         'CANCELLED',
+        'CANCELED',
+        'CANCELLED_BEFORE_SHIPPING',
         'BATAL',
         'IN_CANCEL',
-        'CANCELLED_BEFORE_SHIPPING',
         'TO_RETURN',
+        'RETURNING',
         'RETURNED',
         'REFUND',
+        'REFUNDED',
     ];
 
     private const CUSTOMER_METRICS = [

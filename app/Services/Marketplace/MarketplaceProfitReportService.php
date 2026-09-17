@@ -239,7 +239,7 @@ class MarketplaceProfitReportService
     {
         $status = "UPPER(COALESCE(NULLIF(marketplace_orders.order_status, ''), marketplace_orders.status, ''))";
 
-        return "{$status} NOT IN ('CANCELLED', 'CANCELED', 'BATAL', 'IN_CANCEL', 'TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED')"
+        return "{$status} NOT IN ('UNPAID', 'INVOICE_PENDING', 'CANCELLED', 'CANCELED', 'CANCELLED_BEFORE_SHIPPING', 'BATAL', 'IN_CANCEL', 'TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED')"
             . " AND NOT EXISTS (SELECT 1 FROM marketplace_returns AS mr_status"
             . " WHERE mr_status.store_id = marketplace_orders.store_id"
             . " AND (mr_status.order_sn = marketplace_orders.channel_order_id"
