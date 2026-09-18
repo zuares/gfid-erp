@@ -461,6 +461,7 @@
         $open('admin.website.*');
 
     $openCrm = $open('admin.crm.*');
+    $openMarketplaceCrm = $open('admin.crm.marketplace.*');
     $openAi = $open('ai.*');
     $openCommunication = $open('whatsapp.*') || $open('settings.whatsapp.*');
 
@@ -944,6 +945,44 @@
                     </div>
                 </li>
             @endif
+            @if ($isOwner && $router->has('admin.crm.marketplace.dashboard'))
+                <x-sidebar.label text="CRM Marketplace" />
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openMarketplaceCrm ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navMarketplaceCrm"
+                        aria-expanded="{{ $openMarketplaceCrm ? 'true' : 'false' }}" aria-controls="navMarketplaceCrm">
+                        <span class="icon"><i class="bi bi-shop"></i></span>
+                        <span>CRM Marketplace</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openMarketplaceCrm ? 'show' : '' }}" id="navMarketplaceCrm">
+                        <x-sidebar.sub-link href="{{ route('admin.crm.marketplace.dashboard') }}" icon="bi bi-grid-1x2"
+                            :active="request()->routeIs('admin.crm.marketplace.dashboard')">
+                            Beranda
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.marketplace.orders') }}" icon="bi bi-bag-check"
+                            :active="request()->routeIs('admin.crm.marketplace.orders*')">
+                            Pesanan
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.marketplace.prospects') }}" icon="bi bi-person-lines-fill"
+                            :active="request()->routeIs('admin.crm.marketplace.prospects')">
+                            Prospects
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.marketplace.customers') }}" icon="bi bi-people"
+                            :active="request()->routeIs('admin.crm.marketplace.customers')">
+                            Pelanggan
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.marketplace.segments') }}" icon="bi bi-diagram-3"
+                            :active="request()->routeIs('admin.crm.marketplace.segments*')">
+                            Segments
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.marketplace.import') }}" icon="bi bi-upload"
+                            :active="request()->routeIs('admin.crm.marketplace.import*')">
+                            Import Order
+                        </x-sidebar.sub-link>
+                    </div>
+                </li>
+            @endif
             <div class="sidebar-divider"></div>
         @endif
 
@@ -1233,6 +1272,45 @@
                         <x-sidebar.sub-link href="{{ route('admin.crm.segments') }}" icon="bi bi-diagram-3"
                             :active="request()->routeIs('admin.crm.segments*')">
                             Segments
+                        </x-sidebar.sub-link>
+                    </div>
+                </li>
+            @endif
+
+            @if ($isOwner && $router->has('admin.crm.marketplace.dashboard'))
+                <x-sidebar.label text="CRM Marketplace" />
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openMarketplaceCrm ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navMarketplaceCrmAdmin"
+                        aria-expanded="{{ $openMarketplaceCrm ? 'true' : 'false' }}" aria-controls="navMarketplaceCrmAdmin">
+                        <span class="icon"><i class="bi bi-shop"></i></span>
+                        <span>CRM Marketplace</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openMarketplaceCrm ? 'show' : '' }}" id="navMarketplaceCrmAdmin">
+                        <x-sidebar.sub-link href="{{ route('admin.crm.marketplace.dashboard') }}" icon="bi bi-grid-1x2"
+                            :active="request()->routeIs('admin.crm.marketplace.dashboard')">
+                            Beranda
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.marketplace.orders') }}" icon="bi bi-bag-check"
+                            :active="request()->routeIs('admin.crm.marketplace.orders*')">
+                            Pesanan
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.marketplace.prospects') }}" icon="bi bi-person-lines-fill"
+                            :active="request()->routeIs('admin.crm.marketplace.prospects')">
+                            Prospects
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.marketplace.customers') }}" icon="bi bi-people"
+                            :active="request()->routeIs('admin.crm.marketplace.customers')">
+                            Pelanggan
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.marketplace.segments') }}" icon="bi bi-diagram-3"
+                            :active="request()->routeIs('admin.crm.marketplace.segments*')">
+                            Segments
+                        </x-sidebar.sub-link>
+                        <x-sidebar.sub-link href="{{ route('admin.crm.marketplace.import') }}" icon="bi bi-upload"
+                            :active="request()->routeIs('admin.crm.marketplace.import*')">
+                            Import Order
                         </x-sidebar.sub-link>
                     </div>
                 </li>

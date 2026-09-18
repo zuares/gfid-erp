@@ -43,7 +43,7 @@
         </div>
 
         <div class="d-flex gap-2">
-            <a href="{{ route('accounting.accounts.edit', $account) }}" class="btn btn-warning">Edit</a>
+            <a href="{{ route('accounting.accounts.edit', $account) }}" class="btn btn-warning">Edit nama</a>
 
             <form method="POST" action="{{ route('accounting.accounts.destroy', $account) }}"
                 onsubmit="return confirm('Nonaktifkan account ini?')">

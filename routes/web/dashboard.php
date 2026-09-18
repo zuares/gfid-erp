@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\StorefrontProductCategoryController;
 use App\Http\Controllers\Admin\StorefrontSegmentController;
 use App\Http\Controllers\Admin\StorefrontVisitorController;
 use App\Http\Controllers\Admin\StorefrontWebsiteSettingsController;
+use App\Http\Controllers\Admin\MarketplaceCrmController;
 use App\Http\Controllers\Storefront\CartController;
 use App\Http\Controllers\Storefront\CustomerAuthController;
 use App\Http\Controllers\Storefront\EventTrackController;
@@ -218,6 +219,24 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/dev-seed-abandoned',       [StorefrontCrmController::class, 'devSeedAbandoned'])->name('dev_seed_abandoned');
             Route::post('/dev-reset',                [StorefrontCrmController::class, 'devReset'])->name('dev_reset');
             Route::post('/dev-backfill-city',        [StorefrontCrmController::class, 'devBackfillCity'])->name('dev_backfill_city');
+
+            // CRM Marketplace: sumber data marketplace, terpisah dari CRM Storefront.
+            Route::prefix('marketplace')->name('marketplace.')->group(function () {
+                Route::get('/',         [MarketplaceCrmController::class, 'dashboard'])->name('dashboard');
+                Route::get('/orders',   [MarketplaceCrmController::class, 'orders'])->name('orders');
+                Route::get('/orders/{order}', [MarketplaceCrmController::class, 'showOrder'])->name('orders.show');
+                Route::get('/customers', [MarketplaceCrmController::class, 'customers'])->name('customers');
+                Route::get('/prospects', [MarketplaceCrmController::class, 'prospects'])->name('prospects');
+                Route::get('/prospects/items/search', [MarketplaceCrmController::class, 'searchProspectItems'])->name('prospects.items.search');
+                Route::patch('/prospects/order-items/{item}/mapping', [MarketplaceCrmController::class, 'mapProspectItem'])->name('prospects.items.map');
+                Route::post('/prospects/bulk-follow-up', [MarketplaceCrmController::class, 'composeBulkProspectFollowUp'])->name('prospects.bulk_follow_up');
+                Route::post('/prospects/bulk-follow-up/send', [MarketplaceCrmController::class, 'sendBulkProspectFollowUp'])->name('prospects.bulk_follow_up.send');
+                Route::get('/prospects/{customer}/follow-up', [MarketplaceCrmController::class, 'composeProspectFollowUp'])->name('prospects.follow_up');
+                Route::get('/segments', [MarketplaceCrmController::class, 'segments'])->name('segments');
+                Route::get('/segments/{segment}', [MarketplaceCrmController::class, 'segmentShow'])->name('segments.show');
+                Route::get('/import',   [MarketplaceCrmController::class, 'importPage'])->name('import');
+                Route::post('/import',  [MarketplaceCrmController::class, 'import'])->name('import.store');
+            });
         });
     });
 });

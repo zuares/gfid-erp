@@ -100,6 +100,11 @@ class MarketplaceOrder extends Model
         return $this->belongsTo(Store::class);
     }
 
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
     public function fulfillment(): HasOne
     {
         return $this->hasOne(OrderFulfillment::class, 'marketplace_order_id');

@@ -9,6 +9,7 @@ use App\Models\SewingPickupLine;
 use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class AccountController extends Controller
 {
@@ -121,6 +122,7 @@ class AccountController extends Controller
     public function edit(Account $account)
     {
         $types = ['asset', 'liability', 'equity', 'revenue', 'expense'];
+
         return view('accounting.accounts.edit', compact('account', 'types'));
     }
 
@@ -132,15 +134,41 @@ class AccountController extends Controller
             'type' => ['required', 'in:asset,liability,equity,revenue,expense'],
             'is_cash' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
+        ], [
+            'name.required' => 'Nama akun wajib diisi.',
+            'name.max' => 'Nama akun maksimal 255 karakter.',
+            'code.required' => 'Kode akun wajib diisi.',
+            'code.unique' => 'Kode akun sudah digunakan akun lain.',
         ]);
 
+        $data['code'] = trim($data['code']);
+        $data['name'] = trim($data['name']);
         $data['is_cash'] = (bool) ($data['is_cash'] ?? false);
-        $data['is_active'] = (bool) ($data['is_active'] ?? true);
+        $data['is_active'] = (bool) ($data['is_active'] ?? false);
+
+        $hasJournalLines = $account->journalLines()->exists();
+        $codeChanged = $data['code'] !== $account->code;
+        $typeChanged = $data['type'] !== $account->type;
+        $cashFlagChanged = $data['is_cash'] !== (bool) $account->is_cash;
+
+        if ($hasJournalLines && ($codeChanged || $typeChanged || $cashFlagChanged)) {
+            throw ValidationException::withMessages([
+                'code' => 'Kode, jenis, dan tanda Kas/Bank tidak dapat diubah setelah akun memiliki transaksi. Nama dan status aktif tetap bisa diubah.',
+            ]);
+        }
+
+        // Kode-kode ini dipakai langsung oleh posting otomatis dan laporan.
+        // Mengubahnya tanpa migrasi seluruh referensi akan membuat transaksi baru gagal.
+        if ($codeChanged && in_array($account->code, array_merge(self::CASH_BASIS_CODES, self::TECHNICAL_CODES), true)) {
+            throw ValidationException::withMessages([
+                'code' => 'Kode akun sistem tidak dapat diubah dari halaman ini karena dipakai posting otomatis.',
+            ]);
+        }
 
         $account->update($data);
 
-        return redirect()->route('accounting.accounts.show', $account)
-            ->with('status', 'ok')->with('message', 'Account diupdate.');
+        return redirect()->route('accounting.accounts.index')
+            ->with('success', 'Detail akun berhasil diperbarui.');
     }
 
     public function destroy(Account $account)

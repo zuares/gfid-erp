@@ -71,7 +71,7 @@ class WhatsAppCenterController extends Controller
             'reference_type' => ['nullable', 'string', 'max:160'],
             'reference_id' => ['nullable', 'integer'],
             'reference_label' => ['nullable', 'string', 'max:120'],
-            'return_to' => ['nullable', 'in:whatsapp,purchase_order'],
+            'return_to' => ['nullable', 'in:whatsapp,purchase_order,marketplace_prospect'],
         ]);
 
         $template = ! empty($data['template_key'])
@@ -108,6 +108,14 @@ class WhatsAppCenterController extends Controller
             && ! empty($data['reference_id'])) {
             return redirect()
                 ->route('purchasing.purchase_orders.show', (int) $data['reference_id'])
+                ->with($flashKey, $flashMessage);
+        }
+
+        if (($data['return_to'] ?? 'whatsapp') === 'marketplace_prospect'
+            && ($data['reference_type'] ?? null) === \App\Models\Customer::class
+            && ! empty($data['reference_id'])) {
+            return redirect()
+                ->route('admin.crm.marketplace.prospects')
                 ->with($flashKey, $flashMessage);
         }
 

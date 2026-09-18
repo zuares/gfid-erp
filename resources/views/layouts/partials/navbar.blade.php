@@ -424,7 +424,6 @@ if ($navShowBell) {
         {{-- LEFT: Brand --}}
         <a class="navbar-brand" href="{{ url('/') }}">
             <img src="{{ asset('images/logo-mark.svg') }}" alt="{{ config('app.name', 'Greatfit') }}">
-            <span>{{ config('app.name', 'Greatfit') }}</span>
         </a>
 
         {{-- RIGHT: mobile cluster (theme + logout + hamburger) + desktop nav --}}

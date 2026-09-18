@@ -63,14 +63,12 @@
 }
 .coa-group-total { font-size: .9rem; font-weight: 950; color: #0f172a; font-variant-numeric: tabular-nums; }
 
-/* Account row — full row is a link */
 .coa-row {
     display: grid;
-    grid-template-columns: 64px 1fr auto auto;
+    grid-template-columns: 64px minmax(0, 1fr) auto auto;
     gap: 0 1rem;
     align-items: center;
     padding: .75rem 1rem;
-    border-bottom: 1px solid #f1f5f9;
     text-decoration: none;
     color: inherit;
     transition: background .1s;
@@ -83,7 +81,7 @@
     font-size: .78rem; font-weight: 900; color: #64748b;
     font-variant-numeric: tabular-nums; letter-spacing: .02em;
 }
-.coa-row-name  { font-size: .88rem; font-weight: 850; color: #0f172a; }
+.coa-row-name  { font-size: .88rem; font-weight: 850; color: #0f172a; overflow-wrap: anywhere; }
 .coa-row-meta  { font-size: .73rem; color: #94a3b8; margin-top: .1rem; }
 .coa-row-txn   {
     font-size: .75rem; font-weight: 850; color: #94a3b8;
@@ -116,7 +114,7 @@
 .coa-kpi-val.neg { color: #b91c1c; }
 
 @media (max-width: 640px) {
-    .coa-row { grid-template-columns: 52px 1fr auto; }
+    .coa-row { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 0 .5rem; }
     .coa-row-txn { display: none; }
     .coa-kpis { grid-template-columns: repeat(2, 1fr); }
     .coa-kpis .coa-kpi:last-child { display: none; }
