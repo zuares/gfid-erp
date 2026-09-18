@@ -199,6 +199,7 @@
 
             <div class="lg-row">
                 <a class="lg-btn" href="{{ route('accounting.accounts.index') }}">← Accounts</a>
+                <a class="lg-btn" href="{{ route('accounting.accounts.edit', $account) }}">Edit akun</a>
                 <a class="lg-btn primary" href="{{ route('accounting.journals.index') }}">Journals</a>
             </div>
         </div>
