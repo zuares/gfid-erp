@@ -234,43 +234,194 @@ class MarketplaceCrmController extends Controller
     {
         $storeId = $request->integer('store_id') ?: null;
         $search = trim((string) $request->query('q', ''));
-        [$sort, $direction] = $this->sortParameters($request, ['customer', 'location', 'orders', 'total', 'last_order'], 'total');
-        $sortColumns = [
-            'customer' => 'customers.name',
-            'location' => 'customers.city',
-            'orders' => 'marketplace_order_count',
-            'total' => 'marketplace_total_spent',
-            'last_order' => 'last_marketplace_order_at',
-        ];
+        $segment = trim((string) $request->query('segment', ''));
+        $orderAge = trim((string) $request->query('order_age', ''));
+        $paidRange = trim((string) $request->query('paid_range', ''));
+        $city = trim((string) $request->query('city', ''));
+        $province = trim((string) $request->query('province', ''));
+        $perPageOptions = [25, 50, 100];
+        $perPage = (int) $request->query('per_page', 25);
+        if (! in_array($perPage, $perPageOptions, true)) {
+            $perPage = 25;
+        }
 
-        $customers = Customer::query()
-            ->join('marketplace_orders', 'marketplace_orders.customer_id', '=', 'customers.id')
-            ->whereNotNull('marketplace_orders.channel_order_id')
-            ->when($storeId, fn ($q) => $q->where('marketplace_orders.store_id', $storeId))
-            ->when($search, function ($q) use ($search) {
-                $q->where(function ($query) use ($search) {
-                    $query->where('customers.name', 'like', "%{$search}%")
-                        ->orWhere('customers.phone', 'like', "%{$search}%");
-                });
-            })
-            ->select('customers.*')
-            ->selectRaw('COUNT(DISTINCT marketplace_orders.id) as marketplace_order_count')
-            ->selectRaw('SUM(CASE WHEN marketplace_orders.status != ? THEN marketplace_orders.total_amount ELSE 0 END) as marketplace_total_spent', ['cancelled'])
-            ->selectRaw('MAX(COALESCE(marketplace_orders.ordered_at, marketplace_orders.order_date)) as last_marketplace_order_at')
-            ->groupBy('customers.id')
-            ->orderBy($sortColumns[$sort], $direction)
-            ->orderBy('customers.id')
-            ->paginate(25)
-            ->withPath($request->url())
-            ->appends($request->query());
+        [$sort, $direction] = $this->sortParameters($request, ['customer', 'location', 'orders', 'total', 'last_order', 'segment'], 'total');
+        $profiles = $this->customerProfiles($storeId);
+        $cities = $profiles->map(fn ($customer) => trim((string) $customer->city))
+            ->filter()->unique()->sortBy(fn ($value) => mb_strtolower($value))->values();
+        $provinces = $profiles->map(fn ($customer) => trim((string) $customer->province))
+            ->filter()->unique()->sortBy(fn ($value) => mb_strtolower($value))->values();
+
+        $customers = $profiles;
+        if ($search !== '') {
+            $needle = mb_strtolower($search);
+            $customers = $customers->filter(fn ($customer) =>
+                str_contains(mb_strtolower((string) $customer->name), $needle)
+                || str_contains(mb_strtolower((string) $customer->phone), $needle)
+                || str_contains(mb_strtolower((string) $customer->city), $needle)
+                || str_contains(mb_strtolower((string) $customer->province), $needle)
+            )->values();
+        }
+        if ($segment !== '') {
+            $customers = $customers->filter(fn ($customer) => (string) $customer->segment === $segment)->values();
+        }
+        if ($orderAge !== '') {
+            $customers = $customers->filter(function ($customer) use ($orderAge) {
+                $days = (int) $customer->days_since_last_order;
+                return match ($orderAge) {
+                    '0_30' => $days <= 30,
+                    '31_90' => $days >= 31 && $days <= 90,
+                    '91_180' => $days >= 91 && $days <= 180,
+                    '181_plus' => $days >= 181,
+                    default => true,
+                };
+            })->values();
+        }
+        if ($paidRange !== '') {
+            $customers = $customers->filter(function ($customer) use ($paidRange) {
+                $paid = (float) $customer->marketplace_total_paid;
+                return match ($paidRange) {
+                    'under_100k' => $paid < 100_000,
+                    '100k_300k' => $paid >= 100_000 && $paid < 300_000,
+                    '300k_plus' => $paid >= 300_000,
+                    default => true,
+                };
+            })->values();
+        }
+        if ($city !== '') {
+            $customers = $customers->filter(fn ($customer) => mb_strtolower(trim((string) $customer->city)) === mb_strtolower($city))->values();
+        }
+        if ($province !== '') {
+            $customers = $customers->filter(fn ($customer) => mb_strtolower(trim((string) $customer->province)) === mb_strtolower($province))->values();
+        }
+
+        $totalCustomers = $customers->count();
+        $totalRevenue = (float) $customers->sum(fn ($customer) => (float) $customer->marketplace_total_spent);
+        $totalOrders = (int) $customers->sum(fn ($customer) => (int) $customer->marketplace_order_count);
+        $repeatCustomers = $customers->filter(fn ($customer) => (int) $customer->marketplace_order_count >= 2)->count();
+        $revenueAtRisk = (float) $customers->whereIn('segment', ['at_risk', 'lost'])->sum('marketplace_total_spent');
+        $engagedCustomers = $customers->filter(fn ($customer) => (int) $customer->days_since_last_order <= 90)->count();
+        $definitions = self::segmentDefinitions();
+        $segmentMetrics = collect($definitions)->map(function ($definition, $key) use ($customers, $totalCustomers, $totalRevenue) {
+            $group = $customers->where('segment', $key);
+            return $definition + [
+                'key' => $key,
+                'count' => $group->count(),
+                'revenue' => (float) $group->sum('marketplace_total_spent'),
+                'share' => $totalCustomers > 0 ? ($group->count() / $totalCustomers) * 100 : 0,
+                'revenue_share' => $totalRevenue > 0 ? ($group->sum('marketplace_total_spent') / $totalRevenue) * 100 : 0,
+            ];
+        })->values();
+        // Matrix ini membaca seluruh histori customer. Recency tetap ditampilkan
+        // di panel Engagement decay, tetapi tidak dipakai untuk menentukan
+        // komposisi lifetime segment pada matrix.
+        $matrixDefinitions = [
+            'champions' => ['label' => 'Champions', 'icon' => 'bi-trophy', 'color' => '#f59e0b', 'bg' => '#fffbeb', 'desc' => '3 order atau lebih sepanjang histori.'],
+            'loyal' => ['label' => 'Loyal', 'icon' => 'bi-heart', 'color' => '#ef4444', 'bg' => '#fef2f2', 'desc' => '2 order sepanjang histori.'],
+            'big_spender' => ['label' => 'Big Spender', 'icon' => 'bi-gem', 'color' => '#8b5cf6', 'bg' => '#faf5ff', 'desc' => 'Total belanja minimal Rp1 juta.'],
+            'new' => ['label' => 'One-time Buyer', 'icon' => 'bi-stars', 'color' => '#6366f1', 'bg' => '#eef2ff', 'desc' => 'Baru memiliki 1 order sepanjang histori.'],
+            'promising' => ['label' => 'Emerging', 'icon' => 'bi-graph-up-arrow', 'color' => '#10b981', 'bg' => '#f0fdf4', 'desc' => 'Customer dengan histori transaksi awal.'],
+        ];
+        $lifetimeSegment = static function ($customer): string {
+            $orders = (int) $customer->marketplace_order_count;
+            $spent = (float) $customer->marketplace_total_spent;
+
+            return match (true) {
+                $orders >= 3 => 'champions',
+                $orders >= 2 => 'loyal',
+                $spent >= 1_000_000 => 'big_spender',
+                $orders === 1 => 'new',
+                default => 'promising',
+            };
+        };
+        $matrixSegmentMetrics = collect($matrixDefinitions)->map(function ($definition, $key) use ($customers, $totalCustomers, $totalRevenue, $lifetimeSegment) {
+            $group = $customers->filter(fn ($customer) => $lifetimeSegment($customer) === $key);
+            return $definition + [
+                'key' => $key,
+                'count' => $group->count(),
+                'revenue' => (float) $group->sum('marketplace_total_spent'),
+                'share' => $totalCustomers > 0 ? ($group->count() / $totalCustomers) * 100 : 0,
+                'revenue_share' => $totalRevenue > 0 ? ($group->sum('marketplace_total_spent') / $totalRevenue) * 100 : 0,
+            ];
+        })->values();
+        $recencyBuckets = collect([
+            ['label' => '0–30 hari', 'color' => '#2563eb', 'min' => 0, 'max' => 30],
+            ['label' => '31–90 hari', 'color' => '#10b981', 'min' => 31, 'max' => 90],
+            ['label' => '91–180 hari', 'color' => '#f97316', 'min' => 91, 'max' => 180],
+            ['label' => '181+ hari', 'color' => '#94a3b8', 'min' => 181, 'max' => PHP_INT_MAX],
+        ])->map(function (array $bucket) use ($customers) {
+            $group = $customers->filter(fn ($customer) =>
+                (int) $customer->days_since_last_order >= $bucket['min']
+                && (int) $customer->days_since_last_order <= $bucket['max']
+            );
+            $bucket['count'] = $group->count();
+            $bucket['revenue'] = (float) $group->sum('marketplace_total_spent');
+            return $bucket;
+        });
+        $valueTiers = collect([
+            ['label' => 'Premium', 'range' => '≥ Rp1 juta', 'min' => 1_000_000, 'max' => PHP_INT_MAX, 'color' => '#7c3aed'],
+            ['label' => 'High value', 'range' => 'Rp250 ribu–999 ribu', 'min' => 250_000, 'max' => 999_999, 'color' => '#2563eb'],
+            ['label' => 'Core', 'range' => 'Rp100 ribu–249 ribu', 'min' => 100_000, 'max' => 249_999, 'color' => '#10b981'],
+            ['label' => 'Entry', 'range' => '< Rp100 ribu', 'min' => 0, 'max' => 99_999, 'color' => '#94a3b8'],
+        ])->map(function (array $tier) use ($customers) {
+            $group = $customers->filter(fn ($customer) =>
+                (float) $customer->marketplace_total_spent >= $tier['min']
+                && (float) $customer->marketplace_total_spent <= $tier['max']
+            );
+            $tier['count'] = $group->count();
+            $tier['revenue'] = (float) $group->sum('marketplace_total_spent');
+            return $tier;
+        });
+        $topProvinces = $customers->map(fn ($customer) => trim((string) $customer->province))
+            ->filter()->countBy()->sortDesc()->take(5)
+            ->map(fn ($count, $label) => ['label' => $label, 'count' => $count])->values();
+        $topRevenueSegment = $matrixSegmentMetrics->sortByDesc('revenue')->first();
+
+        $customers = $this->sortCollection($customers, [
+            'customer' => fn ($customer) => mb_strtolower((string) $customer->name),
+            'location' => fn ($customer) => mb_strtolower((string) $customer->city),
+            'orders' => fn ($customer) => (int) $customer->marketplace_order_count,
+            'total' => fn ($customer) => (float) $customer->marketplace_total_spent,
+            'last_order' => fn ($customer) => (string) $customer->last_marketplace_order_at,
+            'segment' => fn ($customer) => mb_strtolower((string) $customer->segment),
+        ], $sort, $direction);
+        $customers = $this->paginateCollection($customers, $request, $perPage);
 
         return view('admin.crm.marketplace.customers', [
             'customers' => $customers,
             'stores' => $this->stores(),
             'storeId' => $storeId,
             'search' => $search,
+            'segment' => $segment,
+            'segmentDefinitions' => $definitions,
+            'orderAge' => $orderAge,
+            'paidRange' => $paidRange,
+            'city' => $city,
+            'cities' => $cities,
+            'province' => $province,
+            'provinces' => $provinces,
+            'perPage' => $perPage,
+            'perPageOptions' => $perPageOptions,
             'sort' => $sort,
             'direction' => $direction,
+            'totalCustomers' => $totalCustomers,
+            'totalRevenue' => $totalRevenue,
+            'totalOrders' => $totalOrders,
+            'repeatCustomers' => $repeatCustomers,
+            'repeatRate' => $totalCustomers > 0 ? ($repeatCustomers / $totalCustomers) * 100 : 0,
+            'averageCustomerValue' => $totalCustomers > 0 ? $totalRevenue / $totalCustomers : 0,
+            'averageOrderValue' => $totalOrders > 0 ? $totalRevenue / $totalOrders : 0,
+            'revenueAtRisk' => $revenueAtRisk,
+            'revenueAtRiskShare' => $totalRevenue > 0 ? ($revenueAtRisk / $totalRevenue) * 100 : 0,
+            'engagedCustomers' => $engagedCustomers,
+            'segmentMetrics' => $segmentMetrics,
+            'matrixSegmentMetrics' => $matrixSegmentMetrics,
+            'matrixDefinitions' => $matrixDefinitions,
+            'recencyBuckets' => $recencyBuckets,
+            'valueTiers' => $valueTiers,
+            'topProvinces' => $topProvinces,
+            'topRevenueSegment' => $topRevenueSegment,
+            'analysisDate' => now()->startOfDay(),
         ]);
     }
 
@@ -401,19 +552,24 @@ class MarketplaceCrmController extends Controller
             'wa_total_attempts' => (int) $prospects->sum(fn ($customer) => (int) ($customer->whatsapp_message_count ?? 0)),
             'wa_coverage' => $totalProspects > 0 ? ($waReady / $totalProspects) * 100 : 0,
         ];
+        $cityCounts = $prospects
+            ->map(fn ($customer) => trim((string) $customer->city) ?: 'Tidak diketahui')
+            ->countBy()
+            ->sortDesc();
+        $otherCityCounts = $cityCounts->skip(6);
+        $topCityCounts = $cityCounts->take(6)
+            ->map(fn ($count, $label) => ['label' => $label, 'count' => $count, 'expandable' => false])
+            ->values();
+        $otherCityCount = (int) $otherCityCounts->sum();
+        if ($otherCityCount > 0) {
+            $topCityCounts->push(['label' => 'Kota lainnya', 'count' => $otherCityCount, 'expandable' => true]);
+        }
         $prospectAnalytics = [
-            'order_age' => collect([
-                ['label' => '0–30 hari', 'count' => $prospects->filter(fn ($customer) => (int) $customer->days_since_last_order <= 30)->count()],
-                ['label' => '31–90 hari', 'count' => $prospects->filter(fn ($customer) => (int) $customer->days_since_last_order >= 31 && (int) $customer->days_since_last_order <= 90)->count()],
-                ['label' => '91 hari–1 tahun', 'count' => $prospects->filter(fn ($customer) => (int) $customer->days_since_last_order >= 91 && (int) $customer->days_since_last_order <= 365)->count()],
-                ['label' => '> 1 tahun', 'count' => $prospects->filter(fn ($customer) => (int) $customer->days_since_last_order >= 366)->count()],
-            ])->values()->all(),
-            'follow_up' => collect([
-                ['label' => 'Belum dikirim', 'count' => $prospects->filter(fn ($customer) => (int) ($customer->whatsapp_message_count ?? 0) === 0)->count()],
-                ['label' => '1 kali', 'count' => $prospects->filter(fn ($customer) => (int) ($customer->whatsapp_message_count ?? 0) === 1)->count()],
-                ['label' => '2–3 kali', 'count' => $prospects->filter(fn ($customer) => (int) ($customer->whatsapp_message_count ?? 0) >= 2 && (int) ($customer->whatsapp_message_count ?? 0) <= 3)->count()],
-                ['label' => '>3 kali', 'count' => $prospects->filter(fn ($customer) => (int) ($customer->whatsapp_message_count ?? 0) >= 4)->count()],
-            ])->values()->all(),
+            'top_cities' => $topCityCounts->all(),
+            'other_cities' => $otherCityCounts
+                ->map(fn ($count, $label) => ['label' => $label, 'count' => $count])
+                ->values()
+                ->all(),
             'top_provinces' => $prospects
                 ->map(fn ($customer) => trim((string) $customer->province))
                 ->filter()
@@ -432,6 +588,12 @@ class MarketplaceCrmController extends Controller
                 ->map(fn ($count, $label) => ['label' => $label, 'count' => $count])
                 ->values()
                 ->all(),
+            'follow_up' => collect([
+                ['label' => 'Belum dikirim', 'count' => $prospects->filter(fn ($customer) => (int) ($customer->whatsapp_message_count ?? 0) === 0)->count()],
+                ['label' => '1 kali', 'count' => $prospects->filter(fn ($customer) => (int) ($customer->whatsapp_message_count ?? 0) === 1)->count()],
+                ['label' => '2–3 kali', 'count' => $prospects->filter(fn ($customer) => (int) ($customer->whatsapp_message_count ?? 0) >= 2 && (int) ($customer->whatsapp_message_count ?? 0) <= 3)->count()],
+                ['label' => '>3 kali', 'count' => $prospects->filter(fn ($customer) => (int) ($customer->whatsapp_message_count ?? 0) >= 4)->count()],
+            ])->values()->all(),
         ];
         $prospects = $this->sortCollection($prospects, [
             'customer' => fn ($customer) => mb_strtolower((string) $customer->name),
@@ -981,9 +1143,17 @@ class MarketplaceCrmController extends Controller
 
     private function importFailureReason(\Throwable $e): string
     {
-        return str_contains(strtolower($e->getMessage()), 'database is locked')
-            ? 'database sedang sibuk, coba lagi'
-            : 'terjadi kesalahan';
+        $message = strtolower($e->getMessage());
+
+        if (str_contains($message, 'database is locked')) {
+            return 'database sedang sibuk, coba lagi';
+        }
+
+        if (str_contains($message, 'formula error')) {
+            return 'formula pada file tidak kompatibel, silakan simpan ulang sebagai nilai biasa';
+        }
+
+        return 'terjadi kesalahan';
     }
 
     private function ordersQuery(?int $storeId = null)

@@ -9,7 +9,7 @@
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
         <div>
             <h5 class="fw-bold mb-1">Prospects Marketplace</h5>
-            <div class="text-secondary" style="font-size:.78rem;">Buyer yang baru satu kali order; usia order membantu menentukan prioritas follow-up.</div>
+            <div class="text-secondary" style="font-size:.78rem;">Buyer yang baru satu kali order; lokasi, pembayaran, dan aktivitas komunikasi membantu menentukan prioritas follow-up.</div>
         </div>
         <span class="mpcrm-pill" style="background:#f0fdf4;color:#15803d;">{{ $prospects->total() }} prospects</span>
     </div>
@@ -43,25 +43,34 @@
         </div>
         <div class="mpcrm-kpi-card mpcrm-kpi-coverage">
             <div class="mpcrm-kpi-icon"><i class="bi bi-broadcast-pin"></i></div>
-            <div><div class="mpcrm-kpi-label">Coverage WhatsApp</div><div class="mpcrm-kpi-value">{{ number_format($prospectMetrics['wa_coverage'], 1, ',', '.') }}%</div><div class="mpcrm-kpi-note">Prospect dengan nomor valid</div></div>
+            <div><div class="mpcrm-kpi-label">Coverage</div><div class="mpcrm-kpi-value">{{ number_format($prospectMetrics['wa_coverage'], 1, ',', '.') }}%</div><div class="mpcrm-kpi-note">Prospect dengan nomor valid</div></div>
         </div>
     </section>
 
     <section class="mpcrm-analytics-grid mb-3" aria-label="Analitik prospect marketplace">
         <div class="mpcrm-analysis-card">
-            <div class="mpcrm-analysis-head"><div><div class="mpcrm-label">Prioritas waktu</div><h6 class="mpcrm-analysis-title">Usia order terakhir</h6></div><i class="bi bi-clock-history"></i></div>
+            <div class="mpcrm-analysis-head"><div><div class="mpcrm-label">Distribusi lokasi</div><h6 class="mpcrm-analysis-title">Kota terbanyak</h6></div><i class="bi bi-buildings"></i></div>
             <div class="mpcrm-analysis-list">
-                @foreach($prospectAnalytics['order_age'] as $metric)
-                    <div class="mpcrm-analysis-row"><div class="mpcrm-analysis-row-head"><span>{{ $metric['label'] }}</span><b>{{ $formatMetricPercentage($metric['count']) }}%</b></div><div class="mpcrm-analysis-track"><span style="width:{{ round(($metric['count'] / $prospectTotalForAnalytics) * 100, 2) }}%"></span></div><div class="mpcrm-analysis-row-meta">{{ number_format($metric['count'], 0, ',', '.') }} prospect</div></div>
-                @endforeach
-            </div>
-        </div>
-        <div class="mpcrm-analysis-card">
-            <div class="mpcrm-analysis-head"><div><div class="mpcrm-label">Aktivitas komunikasi</div><h6 class="mpcrm-analysis-title">Frekuensi pengiriman</h6></div><i class="bi bi-send-check"></i></div>
-            <div class="mpcrm-analysis-list">
-                @foreach($prospectAnalytics['follow_up'] as $metric)
-                    <div class="mpcrm-analysis-row"><div class="mpcrm-analysis-row-head"><span>{{ $metric['label'] }}</span><b>{{ $formatMetricPercentage($metric['count']) }}%</b></div><div class="mpcrm-analysis-track"><span class="mpcrm-analysis-track-green" style="width:{{ round(($metric['count'] / $prospectTotalForAnalytics) * 100, 2) }}%"></span></div><div class="mpcrm-analysis-row-meta">{{ number_format($metric['count'], 0, ',', '.') }} prospect</div></div>
-                @endforeach
+                @forelse($prospectAnalytics['top_cities'] as $metric)
+                    <div class="mpcrm-analysis-row {{ $metric['expandable'] ? 'mpcrm-analysis-row-expandable' : '' }}" @if($metric['expandable']) data-city-other-toggle role="button" tabindex="0" aria-expanded="false" @endif>
+                        <div class="mpcrm-analysis-row-head"><span title="{{ $metric['label'] }}">{{ mb_strimwidth($metric['label'], 0, 24, '…') }}</span><span class="d-inline-flex align-items-center gap-1"><b>{{ $formatMetricPercentage($metric['count']) }}%</b>@if($metric['expandable'])<i class="bi bi-chevron-down mpcrm-city-toggle-icon"></i>@endif</span></div>
+                        <div class="mpcrm-analysis-track"><span style="width:{{ round(($metric['count'] / $prospectTotalForAnalytics) * 100, 2) }}%"></span></div>
+                        <div class="mpcrm-analysis-row-meta">{{ number_format($metric['count'], 0, ',', '.') }} prospect{{ $metric['expandable'] ? ' · klik untuk lihat rincian' : '' }}</div>
+                    </div>
+                    @if($metric['expandable'])
+                        <div class="mpcrm-city-breakdown" data-city-other-list hidden>
+                            @foreach($prospectAnalytics['other_cities'] as $otherCity)
+                                <div class="mpcrm-analysis-row mpcrm-analysis-row-sub">
+                                    <div class="mpcrm-analysis-row-head"><span title="{{ $otherCity['label'] }}">{{ mb_strimwidth($otherCity['label'], 0, 24, '…') }}</span><b>{{ $formatMetricPercentage($otherCity['count']) }}%</b></div>
+                                    <div class="mpcrm-analysis-track"><span style="width:{{ round(($otherCity['count'] / $prospectTotalForAnalytics) * 100, 2) }}%"></span></div>
+                                    <div class="mpcrm-analysis-row-meta">{{ number_format($otherCity['count'], 0, ',', '.') }} prospect</div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                @empty
+                    <div class="mpcrm-empty-analytics">Belum ada data kota.</div>
+                @endforelse
             </div>
         </div>
         <div class="mpcrm-analysis-card">
@@ -82,6 +91,14 @@
                 @empty
                     <div class="mpcrm-empty-analytics">Belum ada data metode pembayaran.</div>
                 @endforelse
+            </div>
+        </div>
+        <div class="mpcrm-analysis-card">
+            <div class="mpcrm-analysis-head"><div><div class="mpcrm-label">Aktivitas komunikasi</div><h6 class="mpcrm-analysis-title">Frekuensi pengiriman</h6></div><i class="bi bi-send-check"></i></div>
+            <div class="mpcrm-analysis-list">
+                @foreach($prospectAnalytics['follow_up'] as $metric)
+                    <div class="mpcrm-analysis-row"><div class="mpcrm-analysis-row-head"><span>{{ $metric['label'] }}</span><b>{{ $formatMetricPercentage($metric['count']) }}%</b></div><div class="mpcrm-analysis-track"><span class="mpcrm-analysis-track-green" style="width:{{ round(($metric['count'] / $prospectTotalForAnalytics) * 100, 2) }}%"></span></div><div class="mpcrm-analysis-row-meta">{{ number_format($metric['count'], 0, ',', '.') }} prospect</div></div>
+                @endforeach
             </div>
         </div>
     </section>
@@ -139,7 +156,7 @@
                 </select>
             </div>
             <div class="col-md-2">
-                <label class="form-label mb-1" style="font-size:.7rem;font-weight:800;">Kesiapan WhatsApp</label>
+                <label class="form-label mb-1" style="font-size:.7rem;font-weight:800;">Kesiapan kontak</label>
                 <select name="wa_status" class="form-select form-select-sm">
                     <option value="">Semua kondisi</option>
                     <option value="ready" @selected($waStatus === 'ready')>Siap follow-up</option>
@@ -220,14 +237,14 @@
             <div class="table-responsive">
                 <table class="table mb-0 mpcrm-table">
                 <thead><tr>
-                    <th style="width:42px;text-align:center;"><input type="checkbox" id="mpcrmSelectAll" title="Pilih semua yang memiliki WhatsApp"></th>
+                    <th style="width:42px;text-align:center;"><input type="checkbox" id="mpcrmSelectAll" title="Pilih semua yang memiliki nomor"></th>
                     <th><a class="mpcrm-sort {{ $sort === 'customer' ? 'active' : '' }}" href="{{ $sortUrl('customer') }}">Customer <i class="bi {{ $sortIcon('customer') }}"></i></a></th>
                     <th>Kota</th>
                     <th>Provinsi</th>
                     <th><a class="mpcrm-sort {{ $sort === 'first_order' ? 'active' : '' }}" href="{{ $sortUrl('first_order') }}">Order pertama <i class="bi {{ $sortIcon('first_order') }}"></i></a></th>
                     <th>Metode pembayaran</th>
                     <th><a class="mpcrm-sort {{ $sort === 'paid' ? 'active' : '' }}" href="{{ $sortUrl('paid') }}">Pembayaran pembeli <i class="bi {{ $sortIcon('paid') }}"></i></a></th>
-                    <th class="mpcrm-wa-cell">Status WhatsApp</th>
+                    <th class="mpcrm-wa-cell">Status pengiriman</th>
                     <th>Aksi</th>
                 </tr></thead>
                 <tbody>
@@ -238,7 +255,7 @@
                         $waSent = (int) ($prospect->whatsapp_sent_count ?? 0);
                     @endphp
                     <tr class="mpcrm-prospect-row" data-prospect-toggle data-detail-id="mpcrm-order-detail-{{ $prospect->id }}" tabindex="0" role="button" aria-expanded="false">
-                        <td class="text-center"><input type="checkbox" name="customer_ids[]" value="{{ $prospect->id }}" class="mpcrm-prospect-check" @disabled(!$prospect->wa_phone) title="{{ $prospect->wa_phone ? 'Pilih customer ini' : 'Nomor WhatsApp tidak tersedia' }}"></td>
+                        <td class="text-center"><input type="checkbox" name="customer_ids[]" value="{{ $prospect->id }}" class="mpcrm-prospect-check" @disabled(!$prospect->wa_phone) title="{{ $prospect->wa_phone ? 'Pilih customer ini' : 'Nomor tidak tersedia' }}"></td>
                         <td><div class="fw-semibold">{{ $prospect->name ?: 'Buyer Marketplace' }}</div><div class="mpcrm-sub">{{ $prospect->phone ?: 'Telepon tidak ada' }}</div></td>
                         <td>{{ $prospect->city ?: '-' }}</td>
                         <td>{{ $prospect->province ?: '-' }}</td>
@@ -457,6 +474,23 @@ document.addEventListener('DOMContentLoaded', function () {
             if (event.key !== 'Enter' && event.key !== ' ') return;
             event.preventDefault();
             toggleOrderDetail(this);
+        });
+    });
+
+    document.querySelectorAll('[data-city-other-toggle]').forEach(trigger => {
+        const breakdown = trigger.parentElement?.querySelector('[data-city-other-list]');
+        if (!breakdown) return;
+        const toggleCityBreakdown = function () {
+            const willOpen = breakdown.hidden;
+            breakdown.hidden = !willOpen;
+            trigger.classList.toggle('is-expanded', willOpen);
+            trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        };
+        trigger.addEventListener('click', toggleCityBreakdown);
+        trigger.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            toggleCityBreakdown();
         });
     });
 

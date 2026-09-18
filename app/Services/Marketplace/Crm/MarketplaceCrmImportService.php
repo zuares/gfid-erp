@@ -209,7 +209,11 @@ class MarketplaceCrmImportService
         }
         $spreadsheet = $reader->load($path);
         $sheet = $spreadsheet->getActiveSheet();
-        $rows = $sheet->toArray(null, true, true, true);
+        // Jangan menghitung ulang formula dari file export marketplace.
+        // Beberapa file menyimpan formula alamat/nomor telepon yang tidak
+        // kompatibel dengan parser formula PhpSpreadsheet, misalnya formula
+        // dengan pemisah koma. Nilai export tetap bisa dibaca dari cache file.
+        $rows = $sheet->toArray(null, false, true, true);
         $headers = $this->headerMap($rows[1] ?? []);
         if (! isset($headers['no. pesanan'])) {
             throw new \InvalidArgumentException('Header "No. Pesanan" tidak ditemukan pada file marketplace.');

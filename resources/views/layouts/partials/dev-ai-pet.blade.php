@@ -21,14 +21,11 @@
         will-change: transform;
     }
 
-    .gf-dev-pet.is-docked-left {
-        left: 18px;
+    .gf-dev-pet.is-positioned {
+        top: var(--gf-dev-pet-top);
         right: auto;
-    }
-
-    .gf-dev-pet.is-docked-right {
-        right: 18px;
-        left: auto;
+        bottom: auto;
+        left: var(--gf-dev-pet-left);
     }
 
     .gf-dev-pet.is-dragging {
@@ -402,16 +399,6 @@
             left: auto;
         }
 
-        .gf-dev-pet.is-docked-left {
-            left: 12px;
-            right: auto;
-        }
-
-        .gf-dev-pet.is-docked-right {
-            right: 12px;
-            left: auto;
-        }
-
         .gf-dev-pet-panel {
             width: min(100vw - 20px, 372px);
             max-height: 58vh;
@@ -494,22 +481,24 @@
     const pageContextKey = pageContext.route || pageContext.path || pageContext.url || 'page';
     const storageOpenKey = 'gf-dev-pet-open';
     const storageHistoryKey = 'gf-dev-pet-history';
-    const storageDockKey = 'gf-dev-pet-dock';
-    const storageShiftYKey = 'gf-dev-pet-shift-y';
+    const storagePositionKey = 'gf-dev-pet-position';
     const storageMinimizedKey = 'gf-dev-pet-minimized';
     const storageAutoInsightKey = `gf-dev-pet-auto-insight:${pageContextKey}`;
     const maxHistory = 18;
 
     pageContext.page_title = document.title;
-    let currentDockSide = readJson(storageDockKey, 'right');
-    let currentShiftY = Number(readJson(storageShiftYKey, 0)) || 0;
+    let currentPosition = readJson(storagePositionKey, null);
+    if (!currentPosition || typeof currentPosition !== 'object') {
+        currentPosition = null;
+    }
     let dragState = {
         active: false,
         pointerId: null,
         source: null,
         startX: 0,
         startY: 0,
-        startShiftY: 0,
+        startLeft: 0,
+        startTop: 0,
         moved: false,
         justDragged: false,
     };
@@ -554,31 +543,47 @@
         }
     }
 
-    function applyDock(side) {
-        currentDockSide = side === 'left' ? 'left' : 'right';
-        root.classList.toggle('is-docked-left', currentDockSide === 'left');
-        root.classList.toggle('is-docked-right', currentDockSide !== 'left');
-        saveJson(storageDockKey, currentDockSide);
+    function getViewportMargin() {
+        return window.innerWidth <= 768 ? 12 : 18;
     }
 
-    function clampShiftY(value) {
-        const maxShift = Math.max(120, window.innerHeight - 160);
-        return Math.max(-maxShift, Math.min(maxShift, value));
+    function clampPosition(left, top) {
+        const margin = getViewportMargin();
+        const maxLeft = Math.max(margin, window.innerWidth - root.offsetWidth - margin);
+        const maxTop = Math.max(margin, window.innerHeight - root.offsetHeight - margin);
+
+        return {
+            left: Math.max(margin, Math.min(maxLeft, Number(left) || 0)),
+            top: Math.max(margin, Math.min(maxTop, Number(top) || 0)),
+        };
     }
 
-    function applyShiftY(value) {
-        currentShiftY = clampShiftY(Number(value) || 0);
-        root.style.setProperty('--gf-dev-pet-shift-y', `${currentShiftY}px`);
-        saveJson(storageShiftYKey, currentShiftY);
+    function applyPosition(position, persist = true) {
+        if (!position) {
+            root.classList.remove('is-positioned');
+            root.style.removeProperty('--gf-dev-pet-left');
+            root.style.removeProperty('--gf-dev-pet-top');
+            currentPosition = null;
+            return;
+        }
+
+        currentPosition = clampPosition(position.left, position.top);
+        root.classList.add('is-positioned');
+        root.style.setProperty('--gf-dev-pet-left', `${currentPosition.left}px`);
+        root.style.setProperty('--gf-dev-pet-top', `${currentPosition.top}px`);
+        if (persist) {
+            saveJson(storagePositionKey, currentPosition);
+        }
     }
 
     function resetDragTransform() {
         root.style.setProperty('--gf-dev-pet-shift-x', '0px');
+        root.style.setProperty('--gf-dev-pet-shift-y', '0px');
     }
 
     function setDragTransform(deltaX, deltaY) {
         root.style.setProperty('--gf-dev-pet-shift-x', `${deltaX}px`);
-        root.style.setProperty('--gf-dev-pet-shift-y', `${clampShiftY(deltaY)}px`);
+        root.style.setProperty('--gf-dev-pet-shift-y', `${deltaY}px`);
     }
 
     function normalizeHistory(history) {
@@ -604,8 +609,9 @@
         saveJson(storageHistoryKey, history);
     }
 
-    applyDock(currentDockSide);
-    applyShiftY(currentShiftY);
+    if (currentPosition) {
+        applyPosition(currentPosition);
+    }
 
     function setMinimized(next) {
         const isMinimized = Boolean(next);
@@ -687,6 +693,11 @@
         saveJson(storageOpenKey, isOpen);
 
         if (isOpen) {
+            requestAnimationFrame(() => {
+                if (currentPosition) {
+                    applyPosition(currentPosition);
+                }
+            });
             setTimeout(() => promptEl.focus(), 50);
         }
     }
@@ -798,17 +809,30 @@
                 return;
             }
 
+            // The panel header is also a drag handle, but its action buttons
+            // must keep their native click behavior for close/minimize.
+            const interactiveTarget = event.target.closest(
+                'button, a, input, textarea, select, option, [contenteditable="true"]'
+            );
+            if (interactiveTarget && interactiveTarget !== handle) {
+                return;
+            }
+
             dragState = {
                 active: true,
                 pointerId: event.pointerId,
                 source: handle,
                 startX: event.clientX,
                 startY: event.clientY,
-                startShiftY: currentShiftY,
+                startLeft: root.getBoundingClientRect().left,
+                startTop: root.getBoundingClientRect().top,
                 moved: false,
                 justDragged: false,
             };
 
+            // Convert the default right/bottom placement to explicit coordinates
+            // before dragging so horizontal and vertical movement stay continuous.
+            applyPosition({ left: dragState.startLeft, top: dragState.startTop }, false);
             root.classList.add('is-dragging');
             try {
                 handle.setPointerCapture(event.pointerId);
@@ -831,7 +855,7 @@
             dragState.moved = true;
         }
 
-        setDragTransform(deltaX, dragState.startShiftY + deltaY);
+        setDragTransform(deltaX, deltaY);
         event.preventDefault();
     }
 
@@ -846,9 +870,10 @@
         const moved = dragState.moved || Math.abs(deltaX) > 6 || Math.abs(deltaY) > 6;
 
         if (moved) {
-            const side = event.clientX < (window.innerWidth / 2) ? 'left' : 'right';
-            applyDock(side);
-            applyShiftY(dragState.startShiftY + deltaY);
+            applyPosition({
+                left: dragState.startLeft + deltaX,
+                top: dragState.startTop + deltaY,
+            });
             resetDragTransform();
             dragState.justDragged = true;
         } else {
@@ -891,6 +916,11 @@
     document.addEventListener('pointermove', onPointerMove, { passive: false });
     document.addEventListener('pointerup', finishDrag, { passive: false });
     document.addEventListener('pointercancel', finishDrag, { passive: false });
+    window.addEventListener('resize', function () {
+        if (currentPosition) {
+            applyPosition(currentPosition);
+        }
+    });
 
     closeBtn.addEventListener('click', function () {
         setMinimized(false);
