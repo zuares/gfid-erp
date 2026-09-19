@@ -50,6 +50,8 @@ class ProfitLossTest extends TestCase
         $this->assertSame(950.0, $data['totalRevenue']);
         $this->assertSame(400.0, $data['totalCogs']);
         $this->assertSame(80.0, $data['totalExpenses']);
+        $this->assertSame(31, $data['periodDays']);
+        $this->assertSame(2.58, $data['averageDailyExpenses']);
         $expenseRows = collect($data['expenseRows'])->keyBy('code');
         $this->assertSame($expense->id, $expenseRows['6101']->id);
         $this->assertSame(125.0, $expenseRows['6101']->percentage);

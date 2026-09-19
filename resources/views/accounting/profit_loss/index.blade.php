@@ -24,8 +24,9 @@
         .pl-positive { color:#16a34a; }
         .pl-negative { color:#dc2626; }
         .pl-neutral  { color:#0f172a; }
-        .pl-grid3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; }
-        @media(max-width:768px){ .pl-grid3{grid-template-columns:1fr;} }
+        .pl-grid4 { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.75rem; }
+        @media(max-width:992px){ .pl-grid4{grid-template-columns:repeat(2,minmax(0,1fr));} }
+        @media(max-width:768px){ .pl-grid4{grid-template-columns:1fr;} }
     </style>
 @endphp
 
@@ -76,7 +77,7 @@
     </form>
 
     {{-- Summary cards --}}
-    <div class="pl-grid3">
+    <div class="pl-grid4">
         <div class="pl-summary-card" style="background:#dcfce7; border:1px solid #bbf7d0">
             <div style="font-size:.7rem; font-weight:900; text-transform:uppercase; color:#166534; letter-spacing:.05em">Pendapatan</div>
             <div style="font-size:1.4rem; font-weight:950; color:#15803d" class="pl-num">Rp {{ $fmt($totalRevenue) }}</div>
@@ -84,6 +85,11 @@
         <div class="pl-summary-card" style="background:#fee2e2; border:1px solid #fecaca">
             <div style="font-size:.7rem; font-weight:900; text-transform:uppercase; color:#991b1b; letter-spacing:.05em">HPP + Beban Operasional</div>
             <div style="font-size:1.4rem; font-weight:950; color:#dc2626" class="pl-num">Rp {{ $fmt($totalCogs + $totalExpenses) }}</div>
+        </div>
+        <div class="pl-summary-card" style="background:#fef3c7; border:1px solid #fde68a">
+            <div style="font-size:.7rem; font-weight:900; text-transform:uppercase; color:#92400e; letter-spacing:.05em">Rata-rata Beban / Hari</div>
+            <div style="font-size:1.4rem; font-weight:950; color:#b45309" class="pl-num">Rp {{ $fmt($averageDailyExpenses) }}</div>
+            <div style="font-size:.72rem;color:#92400e;margin-top:.15rem">{{ $periodDays }} hari kalender</div>
         </div>
         <div class="pl-summary-card {{ $netProfit >= 0 ? 'bg-dark text-white' : '' }}"
              style="{{ $netProfit < 0 ? 'background:#fff7ed;border:1px solid #fed7aa' : 'border:1px solid #0f172a' }}">

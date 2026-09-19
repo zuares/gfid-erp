@@ -124,6 +124,8 @@ class ProfitLossController extends Controller
 
             return $row;
         });
+        $periodDays = max(1, (int) Carbon::parse($from)->diffInDays(Carbon::parse($to)) + 1);
+        $averageDailyExpenses = round($totalExpenses / $periodDays, 2);
         $netProfit = round($grossProfit - $totalExpenses - $inventoryVariance, 2);
 
         return view('accounting.profit_loss.index', compact(
@@ -131,7 +133,7 @@ class ProfitLossController extends Controller
             'revenueRows', 'totalRevenue',
             'cogsRows', 'totalCogs',
             'grossProfit',
-            'expenseRows', 'totalExpenses',
+            'expenseRows', 'totalExpenses', 'periodDays', 'averageDailyExpenses',
             'netProfit'
         ));
     }
