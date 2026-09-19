@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Accounting;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\JournalLine;
+use App\Models\PurchaseReceipt;
 use App\Models\SewingPickupLine;
 use App\Models\SystemSetting;
 use Illuminate\Http\Request;
@@ -269,6 +270,61 @@ class AccountController extends Controller
         }
 
         $lines = $q->paginate(50)->withQueryString();
+
+        // Jurnal GRN menyimpan source_id sebagai ID purchase receipt. Ambil
+        // detail item untuk seluruh baris di halaman ini sekaligus supaya
+        // ledger bisa menampilkan asal item tanpa N+1 query.
+        $grnSourceTypes = [
+            'grn',
+            'grn_inv',
+            'grn_exp',
+            'purchase_receipt',
+            'purchase_receipt_post',
+            'purchase_dp_apply',
+        ];
+        $grnIds = $lines->getCollection()
+            ->whereIn('source_type', $grnSourceTypes)
+            ->pluck('source_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $grnsById = $grnIds->isEmpty()
+            ? collect()
+            : PurchaseReceipt::query()
+                ->with(['supplier', 'lines.item'])
+                ->whereIn('id', $grnIds)
+                ->get()
+                ->keyBy('id');
+
+        $lines->getCollection()->transform(function ($line) use ($account, $grnsById, $grnSourceTypes) {
+            $line->grn_items = collect();
+            $line->grn_supplier_name = null;
+
+            if (in_array($line->source_type, $grnSourceTypes, true) && $line->source_id) {
+                $receipt = $grnsById->get((int) $line->source_id);
+
+                if ($receipt) {
+                    $line->grn_supplier_name = $receipt->supplier?->name;
+                    $items = $receipt->lines;
+
+                    // Jurnal split GRN hanya boleh menampilkan item yang
+                    // membentuk akun pada baris ledger tersebut.
+                    if ($line->source_type === 'grn_exp') {
+                        $items = $items
+                            ->where('allocation', 'expense')
+                            ->where('expense_account_id', $account->id);
+                    } elseif ($line->source_type === 'grn_inv') {
+                        $items = $items->where('allocation', 'hpp');
+                    }
+
+                    $line->grn_items = $items->values();
+                }
+            }
+
+            return $line;
+        });
 
         // Upah Ambil Jahit disimpan per SewingPickupLine, sehingga source_id
         // bukan ID pickup header. Resolve ke pickup induknya agar klik dari
