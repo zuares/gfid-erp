@@ -12,9 +12,13 @@
         .pl-card { border:1px solid rgba(15,23,42,.08); border-radius:12px; background:#fff; overflow:hidden; }
         .pl-section-head { background:#f8fafc; padding:.6rem 1rem; font-size:.74rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; color:#475569; border-bottom:1px solid rgba(15,23,42,.06); }
         .pl-row { display:flex; justify-content:space-between; align-items:center; padding:.5rem 1rem; border-bottom:1px solid rgba(15,23,42,.04); font-size:.84rem; }
+        .pl-row-link { color:inherit; text-decoration:none; }
+        .pl-row-link:hover { color:#0f172a; background:#f8fafc; }
         .pl-row:last-child { border-bottom:none; }
         .pl-row-code { color:#94a3b8; font-size:.75rem; margin-right:.5rem; }
         .pl-row-total { display:flex; justify-content:space-between; padding:.65rem 1rem; font-weight:950; font-size:.88rem; border-top:2px solid rgba(15,23,42,.12); }
+        .pl-expense-value { display:flex; align-items:center; gap:.75rem; }
+        .pl-expense-pct { min-width:58px; color:#64748b; font-size:.76rem; font-weight:800; text-align:right; }
         .pl-summary-card { border-radius:12px; padding:1rem 1.2rem; }
         .pl-num { font-variant-numeric:tabular-nums; font-weight:900; }
         .pl-positive { color:#16a34a; }
@@ -159,18 +163,27 @@
         {{-- Beban Operasional --}}
         <div>
             <div class="pl-card">
-                <div class="pl-section-head">Beban Operasional</div>
+                <div class="pl-section-head" style="display:flex;justify-content:space-between;align-items:center">
+                    <span>Beban Operasional</span>
+                    <span style="font-size:.68rem;color:#64748b;text-transform:none;letter-spacing:0">% dari total beban</span>
+                </div>
                 @forelse($expenseRows as $r)
-                    <div class="pl-row">
+                    <a class="pl-row pl-row-link" href="{{ route('accounting.accounts.ledger', ['account' => $r->id, 'from' => $from, 'to' => $to]) }}" title="Buka ledger {{ $r->code }}">
                         <span><span class="pl-row-code">{{ $r->code }}</span>{{ $r->name }}</span>
-                        <span class="pl-num pl-negative">Rp {{ $fmt($r->amount) }}</span>
-                    </div>
+                        <span class="pl-expense-value">
+                            <span class="pl-expense-pct">{{ number_format($r->percentage, 2, ',', '.') }}%</span>
+                            <span class="pl-num pl-negative">Rp {{ $fmt($r->amount) }}</span>
+                        </span>
+                    </a>
                 @empty
                     <div class="pl-row" style="color:#94a3b8">Belum ada data</div>
                 @endforelse
                 <div class="pl-row-total">
                     <span>Total Beban</span>
-                    <span class="pl-num pl-negative">Rp {{ $fmt($totalExpenses) }}</span>
+                    <span class="pl-expense-value">
+                        <span class="pl-expense-pct">{{ $totalExpenses != 0 ? '100,00%' : '—' }}</span>
+                        <span class="pl-num pl-negative">Rp {{ $fmt($totalExpenses) }}</span>
+                    </span>
                 </div>
             </div>
 

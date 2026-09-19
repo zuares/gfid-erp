@@ -107,6 +107,7 @@ class ProfitLossController extends Controller
                 }
 
                 return (object) [
+                    'id' => $r->id,
                     'code' => $r->code,
                     'name' => $r->name,
                     'amount' => round($amount, 2),
@@ -116,6 +117,13 @@ class ProfitLossController extends Controller
             ->sortBy('code')
             ->values();
         $totalExpenses = round((float) $expenseRows->sum('amount'), 2);
+        $expenseRows = $expenseRows->map(function ($row) use ($totalExpenses) {
+            $row->percentage = $totalExpenses != 0.0
+                ? round(((float) $row->amount / $totalExpenses) * 100, 2)
+                : 0.0;
+
+            return $row;
+        });
         $netProfit = round($grossProfit - $totalExpenses - $inventoryVariance, 2);
 
         return view('accounting.profit_loss.index', compact(
