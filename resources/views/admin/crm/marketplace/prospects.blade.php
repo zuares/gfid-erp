@@ -9,7 +9,7 @@
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
         <div>
             <h5 class="fw-bold mb-1">Prospects Marketplace</h5>
-            <div class="text-secondary" style="font-size:.78rem;">Buyer yang baru satu kali order; lokasi, pembayaran, dan aktivitas komunikasi membantu menentukan prioritas follow-up.</div>
+            <div class="text-secondary" style="font-size:.78rem;">Username marketplace dengan satu order aktif; lokasi, pembayaran, dan aktivitas komunikasi membantu menentukan prioritas follow-up.</div>
         </div>
         <span class="mpcrm-pill" style="background:#f0fdf4;color:#15803d;">{{ $prospects->total() }} prospects</span>
     </div>
@@ -253,10 +253,11 @@
                         $order = $prospect->prospect_order ?? null;
                         $waAttempts = (int) ($prospect->whatsapp_message_count ?? 0);
                         $waSent = (int) ($prospect->whatsapp_sent_count ?? 0);
+                        $prospectRowId = 'mpcrm-prospect-'.$loop->index;
                     @endphp
-                    <tr class="mpcrm-prospect-row" data-prospect-toggle data-detail-id="mpcrm-order-detail-{{ $prospect->id }}" tabindex="0" role="button" aria-expanded="false">
-                        <td class="text-center"><input type="checkbox" name="customer_ids[]" value="{{ $prospect->id }}" class="mpcrm-prospect-check" @disabled(!$prospect->wa_phone) title="{{ $prospect->wa_phone ? 'Pilih customer ini' : 'Nomor tidak tersedia' }}"></td>
-                        <td><div class="fw-semibold">{{ $prospect->name ?: 'Buyer Marketplace' }}</div><div class="mpcrm-sub">{{ $prospect->phone ?: 'Telepon tidak ada' }}</div></td>
+                    <tr class="mpcrm-prospect-row" data-prospect-toggle data-detail-id="mpcrm-order-detail-{{ $prospectRowId }}" tabindex="0" role="button" aria-expanded="false">
+                        <td class="text-center"><input type="checkbox" name="customer_ids[]" value="{{ $prospect->id }}" class="mpcrm-prospect-check" @disabled(!$prospect->id || !$prospect->wa_phone) title="{{ $prospect->wa_phone && $prospect->id ? 'Pilih customer ini' : 'Customer atau nomor WhatsApp tidak tersedia' }}"></td>
+                        <td><div class="fw-semibold">{{ $prospect->name ?: 'Buyer Marketplace' }}</div><div class="mpcrm-sub">{{ $prospect->buyer_username ? '@'.$prospect->buyer_username.' · ' : '' }}{{ $prospect->phone ?: 'Telepon tidak ada' }}</div></td>
                         <td>{{ $prospect->city ?: '-' }}</td>
                         <td>{{ $prospect->province ?: '-' }}</td>
                         <td>{{ $prospect->first_marketplace_order_at ? \Carbon\Carbon::parse($prospect->first_marketplace_order_at)->format('d M Y') : '-' }}<div class="mpcrm-sub">{{ \App\Http\Controllers\Admin\MarketplaceCrmController::formatElapsedDays((int) $prospect->days_since_last_order) }}</div></td>
@@ -286,9 +287,9 @@
                                 <span class="mpcrm-wa-status mpcrm-wa-status-none">Belum pernah dikirim</span>
                             @endif
                         </td>
-                        <td>@if($prospect->wa_phone)<a class="btn btn-sm" href="{{ route('admin.crm.marketplace.prospects.follow_up', $prospect->id) }}" title="Tinjau lalu kirim lewat Fonnte" style="background:#25d366;color:#fff;border-radius:8px;font-size:.68rem;font-weight:700;"><i class="bi bi-whatsapp me-1"></i>Follow up</a>@else<span class="text-secondary" style="font-size:.72rem;">Nomor tidak ada</span>@endif</td>
+                        <td>@if($prospect->wa_phone && $prospect->id)<a class="btn btn-sm" href="{{ route('admin.crm.marketplace.prospects.follow_up', $prospect->id) }}" title="Tinjau lalu kirim lewat Fonnte" style="background:#25d366;color:#fff;border-radius:8px;font-size:.68rem;font-weight:700;"><i class="bi bi-whatsapp me-1"></i>Follow up</a>@else<span class="text-secondary" style="font-size:.72rem;">{{ $prospect->wa_phone ? 'Profil belum terhubung' : 'Nomor tidak ada' }}</span>@endif</td>
                     </tr>
-                    <tr id="mpcrm-order-detail-{{ $prospect->id }}" class="mpcrm-accordion-detail" hidden>
+                    <tr id="mpcrm-order-detail-{{ $prospectRowId }}" class="mpcrm-accordion-detail" hidden>
                         <td colspan="9">
                             <div class="mpcrm-order-detail">
                                 <div class="mpcrm-order-detail-head">

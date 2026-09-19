@@ -23,7 +23,7 @@
             ['Order', number_format($analytics['totalOrders']), 'sesuai filter aktif', 'bi-bag-check', 'mpcrm-kpi-primary'],
             ['Revenue', 'Rp'.number_format($analytics['revenue'], 0, ',', '.'), 'tidak termasuk cancel', 'bi-cash-stack', 'mpcrm-kpi-success'],
             ['Average order', 'Rp'.number_format($analytics['averageOrder'], 0, ',', '.'), 'nilai rata-rata non-cancel', 'bi-graph-up-arrow', 'mpcrm-kpi-purple'],
-            ['Customer unik', number_format($analytics['customerCount']), 'customer teridentifikasi', 'bi-people', 'mpcrm-kpi-whatsapp'],
+            ['Customer unik', number_format($analytics['customerCount']), 'berdasarkan username marketplace', 'bi-people', 'mpcrm-kpi-whatsapp'],
             ['Cancel rate', number_format($analytics['cancelRate'], 1, ',', '.').'%', $analytics['cancelledOrders'].' order dibatalkan', 'bi-x-circle', 'mpcrm-kpi-danger'],
         ] as [$label,$value,$sub,$icon,$tone])
             <article class="mpcrm-kpi-card {{ $tone }}"><div class="mpcrm-kpi-icon"><i class="bi {{ $icon }}"></i></div><div class="min-w-0"><div class="mpcrm-kpi-label">{{ $label }}</div><div class="mpcrm-kpi-value">{{ $value }}</div><div class="mpcrm-kpi-note">{{ $sub }}</div></div></article>

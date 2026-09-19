@@ -10,9 +10,9 @@
         <div>
             <div class="mpcrm-eyebrow"><span class="mpcrm-eyebrow-mark"></span>Customer intelligence <span>·</span> Marketplace</div>
             <h1 class="mpcrm-page-title">Segment <span>command center</span></h1>
-            <p class="mpcrm-page-description">Pusat analisa customer untuk membaca kualitas revenue, risiko churn, dan peluang campaign berdasarkan recency, frequency, dan monetary value.</p>
+            <p class="mpcrm-page-description">Analisa customer unik berdasarkan username marketplace untuk membaca kualitas revenue, risiko churn, dan peluang campaign berbasis recency, frequency, dan monetary value.</p>
             @if($analysisDate)
-                <div class="mpcrm-context-note mt-2"><i class="bi bi-calendar-check me-1"></i>Basis recency {{ \Carbon\Carbon::parse($analysisDate)->format('d M Y') }} · {{ number_format($totalCustomers) }} customer terpetakan</div>
+                <div class="mpcrm-context-note mt-2"><i class="bi bi-calendar-check me-1"></i>Basis recency {{ \Carbon\Carbon::parse($analysisDate)->format('d M Y') }} · {{ number_format($totalCustomers) }} username customer terpetakan</div>
             @endif
         </div>
         <div class="mpcrm-page-context">
@@ -30,7 +30,7 @@
     </div>
 
     <section class="mpcrm-executive-grid mpcrm-segment-kpis mb-4" aria-label="Executive metrics">
-        <div class="mpcrm-kpi-card mpcrm-kpi-primary"><div class="mpcrm-kpi-icon"><i class="bi bi-people"></i></div><div><div class="mpcrm-kpi-label">Customer base</div><div class="mpcrm-kpi-value">{{ number_format($totalCustomers) }}</div><div class="mpcrm-kpi-note">customer teridentifikasi</div></div></div>
+        <div class="mpcrm-kpi-card mpcrm-kpi-primary"><div class="mpcrm-kpi-icon"><i class="bi bi-people"></i></div><div><div class="mpcrm-kpi-label">Customer base</div><div class="mpcrm-kpi-value">{{ number_format($totalCustomers) }}</div><div class="mpcrm-kpi-note">username marketplace unik</div></div></div>
         <div class="mpcrm-kpi-card mpcrm-kpi-success"><div class="mpcrm-kpi-icon"><i class="bi bi-wallet2"></i></div><div><div class="mpcrm-kpi-label">Lifetime revenue</div><div class="mpcrm-kpi-value">Rp{{ number_format($totalRevenue,0,',','.') }}</div><div class="mpcrm-kpi-note">total belanja tercatat</div></div></div>
         <div class="mpcrm-kpi-card mpcrm-kpi-purple"><div class="mpcrm-kpi-icon"><i class="bi bi-arrow-repeat"></i></div><div><div class="mpcrm-kpi-label">Repeat rate</div><div class="mpcrm-kpi-value">{{ number_format($repeatRate,1,',','.') }}%</div><div class="mpcrm-kpi-note">{{ number_format($repeatCustomers) }} repeat customer</div></div></div>
         <div class="mpcrm-kpi-card mpcrm-kpi-danger"><div class="mpcrm-kpi-icon"><i class="bi bi-fire"></i></div><div><div class="mpcrm-kpi-label">Revenue at risk</div><div class="mpcrm-kpi-value">Rp{{ number_format($revenueAtRisk,0,',','.') }}</div><div class="mpcrm-kpi-note">{{ number_format($revenueAtRiskShare,1,',','.') }}% dari total revenue</div></div></div>

@@ -10,8 +10,8 @@
         <div>
             <div class="mpcrm-eyebrow"><span class="mpcrm-eyebrow-mark"></span>Customer intelligence <span>·</span> Marketplace</div>
             <h1 class="mpcrm-page-title">Customer <span>command center</span></h1>
-            <p class="mpcrm-page-description">Pusat data customer dari order marketplace untuk membaca nilai pelanggan, repeat purchase, kesehatan recency, dan prioritas campaign.</p>
-            <div class="mpcrm-context-note mt-2"><i class="bi bi-calendar-check me-1"></i>Basis recency {{ \Carbon\Carbon::parse($analysisDate)->format('d M Y') }} · {{ number_format($totalCustomers) }} customer dalam scope</div>
+            <p class="mpcrm-page-description">Pusat analisa customer unik berdasarkan username marketplace untuk membaca nilai pelanggan, repeat purchase, kesehatan recency, dan prioritas campaign.</p>
+            <div class="mpcrm-context-note mt-2"><i class="bi bi-calendar-check me-1"></i>Basis recency {{ \Carbon\Carbon::parse($analysisDate)->format('d M Y') }} · {{ number_format($totalCustomers) }} username customer dalam scope</div>
         </div>
         <div class="mpcrm-page-context">
             <form method="GET" class="mpcrm-scope-form">
@@ -28,7 +28,7 @@
     </div>
 
     <section class="mpcrm-executive-grid mpcrm-segment-kpis mb-4" aria-label="Executive metrics customer">
-        <div class="mpcrm-kpi-card mpcrm-kpi-primary"><div class="mpcrm-kpi-icon"><i class="bi bi-people"></i></div><div><div class="mpcrm-kpi-label">Customer base</div><div class="mpcrm-kpi-value">{{ number_format($totalCustomers) }}</div><div class="mpcrm-kpi-note">customer teridentifikasi</div></div></div>
+        <div class="mpcrm-kpi-card mpcrm-kpi-primary"><div class="mpcrm-kpi-icon"><i class="bi bi-people"></i></div><div><div class="mpcrm-kpi-label">Customer base</div><div class="mpcrm-kpi-value">{{ number_format($totalCustomers) }}</div><div class="mpcrm-kpi-note">username marketplace unik</div></div></div>
         <div class="mpcrm-kpi-card mpcrm-kpi-success"><div class="mpcrm-kpi-icon"><i class="bi bi-wallet2"></i></div><div><div class="mpcrm-kpi-label">Lifetime revenue</div><div class="mpcrm-kpi-value">Rp{{ number_format($totalRevenue,0,',','.') }}</div><div class="mpcrm-kpi-note">total belanja tercatat</div></div></div>
         <div class="mpcrm-kpi-card mpcrm-kpi-purple"><div class="mpcrm-kpi-icon"><i class="bi bi-arrow-repeat"></i></div><div><div class="mpcrm-kpi-label">Repeat rate</div><div class="mpcrm-kpi-value">{{ number_format($repeatRate,1,',','.') }}%</div><div class="mpcrm-kpi-note">{{ number_format($repeatCustomers) }} repeat customer</div></div></div>
         <div class="mpcrm-kpi-card mpcrm-kpi-danger"><div class="mpcrm-kpi-icon"><i class="bi bi-fire"></i></div><div><div class="mpcrm-kpi-label">Revenue at risk</div><div class="mpcrm-kpi-value">Rp{{ number_format($revenueAtRisk,0,',','.') }}</div><div class="mpcrm-kpi-note">{{ number_format($revenueAtRiskShare,1,',','.') }}% dari total revenue</div></div></div>
@@ -101,7 +101,7 @@
     <section class="mpcrm-filter-card mpcrm-card mb-4">
         <div class="mpcrm-filter-head"><div><div class="mpcrm-section-kicker"><i class="bi bi-funnel"></i> Customer explorer</div><h2 class="mpcrm-filter-title">Cari dan filter customer</h2></div><div class="mpcrm-filter-meta"><span class="mpcrm-filter-count"><i class="bi bi-people"></i>{{ number_format($totalCustomers) }} hasil</span><span class="mpcrm-filter-hint">Filter otomatis saat pilihan berubah</span></div></div>
         <form method="GET" action="{{ route('admin.crm.marketplace.customers') }}" id="mpcrmCustomerFilterForm" class="row g-2 align-items-end">
-            <div class="col-12 col-lg-5"><label class="mpcrm-field-label">Cari customer</label><div class="mpcrm-input-wrap"><i class="bi bi-search"></i><input name="q" value="{{ $search }}" class="form-control" placeholder="Nama, nomor telepon, kota, atau provinsi…" autocomplete="off"></div></div>
+            <div class="col-12 col-lg-5"><label class="mpcrm-field-label">Cari customer</label><div class="mpcrm-input-wrap"><i class="bi bi-search"></i><input name="q" value="{{ $search }}" class="form-control" placeholder="Username, nama, telepon, kota, atau provinsi…" autocomplete="off"></div></div>
             <div class="col-6 col-lg-2"><label class="mpcrm-field-label">Data per halaman</label><select name="per_page" class="form-select"><option value="25" @selected($perPage === 25)>25 data</option><option value="50" @selected($perPage === 50)>50 data</option><option value="100" @selected($perPage === 100)>100 data</option></select></div>
             <div class="col-6 col-lg-2"><button class="mpcrm-apply-btn w-100"><i class="bi bi-search me-1"></i>Terapkan</button></div>
             <div class="col-6 col-lg-2"><a href="{{ route('admin.crm.marketplace.customers', $storeId ? ['store_id'=>$storeId] : []) }}" class="mpcrm-reset-btn w-100 text-decoration-none"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</a></div>
@@ -137,7 +137,7 @@
                 $customerSegment = $segmentDefinitions[$customer->segment] ?? null;
             @endphp
             <tr>
-                <td><div class="fw-semibold">{{ $customer->name ?: 'Buyer Marketplace' }}</div><div class="mpcrm-sub">{{ $customer->phone ?: 'Telepon tidak ada' }}</div></td>
+                <td><div class="fw-semibold">{{ $customer->name ?: 'Buyer Marketplace' }}</div><div class="mpcrm-sub">{{ $customer->buyer_username ? '@'.$customer->buyer_username : 'Username tidak tersedia' }} · {{ $customer->phone ?: 'Telepon tidak ada' }}</div></td>
                 <td>{{ $customer->city ?: '-' }}<div class="mpcrm-sub">{{ $customer->province ?: '-' }}</div></td>
                 <td>@if($customerSegment)<span class="mpcrm-pill" style="background:{{ $customerSegment['bg'] }};color:{{ $customerSegment['color'] }};"><i class="bi {{ $customerSegment['icon'] }} me-1"></i>{{ $customerSegment['label'] }}</span>@else<span class="mpcrm-pill" style="background:#f1f5f9;color:#64748b;">Tidak terklasifikasi</span>@endif</td>
                 <td><span class="mpcrm-pill" style="background:#eff6ff;color:#1d4ed8;">{{ number_format($customer->marketplace_order_count) }} order</span></td>

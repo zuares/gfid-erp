@@ -50,23 +50,10 @@ class MarketplaceCrmController extends Controller
         $totalOrders = (clone $orders)->count();
         $totalRevenue = (clone $orders)->where('status', '!=', 'cancelled')->sum('total_amount');
         $averageOrder = $totalOrders > 0 ? $totalRevenue / max(1, (clone $orders)->where('status', '!=', 'cancelled')->count()) : 0;
-        $customerCount = (clone $orders)->whereNotNull('customer_id')->distinct()->count('customer_id');
+        $customerCount = $this->uniqueCustomerCount($orders);
         $pendingOrders = (clone $orders)->whereIn('status', ['new', 'packed', 'shipped'])->count();
 
-        $repeatCustomers = DB::table('marketplace_orders')
-            ->whereNotNull('channel_order_id')
-            ->whereNotNull('customer_id')
-            ->where(function ($q) use ($since) {
-                $q->where('ordered_at', '>=', $since)
-                    ->orWhere(function ($q) use ($since) {
-                        $q->whereNull('ordered_at')->where('order_date', '>=', $since);
-                    });
-            })
-            ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
-            ->select('customer_id')
-            ->groupBy('customer_id')
-            ->havingRaw('COUNT(*) > 1')
-            ->count();
+        $repeatCustomers = $this->repeatCustomerCount($orders);
 
         $statusCounts = (clone $orders)
             ->select('status', DB::raw('COUNT(*) as total'))
@@ -167,7 +154,7 @@ class MarketplaceCrmController extends Controller
         $cancelledOrders = (clone $filteredQuery)->where('status', 'cancelled')->count();
         $completedQuery = (clone $filteredQuery)->where('status', '!=', 'cancelled');
         $revenue = (clone $completedQuery)->sum('total_amount');
-        $customerCount = (clone $filteredQuery)->whereNotNull('customer_id')->distinct()->count('customer_id');
+        $customerCount = $this->uniqueCustomerCount($filteredQuery);
         $averageOrder = $completedQuery->count() > 0 ? $revenue / $completedQuery->count() : 0;
 
         $chartRows = (clone $filteredQuery)
@@ -258,6 +245,7 @@ class MarketplaceCrmController extends Controller
             $customers = $customers->filter(fn ($customer) =>
                 str_contains(mb_strtolower((string) $customer->name), $needle)
                 || str_contains(mb_strtolower((string) $customer->phone), $needle)
+                || str_contains(mb_strtolower((string) $customer->buyer_username), $needle)
                 || str_contains(mb_strtolower((string) $customer->city), $needle)
                 || str_contains(mb_strtolower((string) $customer->province), $needle)
             )->values();
@@ -530,15 +518,16 @@ class MarketplaceCrmController extends Controller
             })->values();
         }
         if ($productTitle !== '') {
-            $matchingCustomerIds = $this->prospectItemCustomerIds($storeId, $productTitle);
-            $prospects = $prospects->filter(fn ($customer) => $matchingCustomerIds->contains((int) $customer->id))->values();
+            $matchingCustomerKeys = $this->prospectItemKeys($storeId, $productTitle);
+            $prospects = $prospects->filter(fn ($customer) => $matchingCustomerKeys->contains($customer->identity_key))->values();
         }
         if ($search !== '') {
             $needle = mb_strtolower($search);
-            $matchingCustomerIds = $this->prospectItemCustomerIds($storeId, $search);
-            $prospects = $prospects->filter(fn ($customer) => $matchingCustomerIds->contains((int) $customer->id)
+            $matchingCustomerKeys = $this->prospectItemKeys($storeId, $search);
+            $prospects = $prospects->filter(fn ($customer) => $matchingCustomerKeys->contains($customer->identity_key)
                 || str_contains(mb_strtolower((string) $customer->name), $needle)
-                || str_contains(mb_strtolower((string) $customer->phone), $needle))->values();
+                || str_contains(mb_strtolower((string) $customer->phone), $needle)
+                || str_contains(mb_strtolower((string) $customer->buyer_username), $needle))->values();
         }
         $totalProspects = $prospects->count();
         $totalPaid = (float) $prospects->sum(fn ($customer) => (float) $customer->marketplace_total_paid);
@@ -687,15 +676,27 @@ class MarketplaceCrmController extends Controller
 
     public function composeProspectFollowUp(Customer $customer)
     {
-        $marketplaceOrderCount = MarketplaceOrder::query()
+        $activeOrders = MarketplaceOrder::query()
             ->where('customer_id', $customer->id)
             ->whereNotNull('channel_order_id')
             ->where('status', '!=', 'cancelled')
-            ->count();
+            ->orderByDesc('id')
+            ->get(['buyer_username', 'buyer_phone']);
+        $activeOrder = $activeOrders->first();
+        $buyerUsername = trim((string) $activeOrder?->buyer_username);
+        $marketplaceOrderCountQuery = MarketplaceOrder::query()
+            ->whereNotNull('channel_order_id')
+            ->where('status', '!=', 'cancelled');
+        if ($buyerUsername !== '') {
+            $marketplaceOrderCountQuery->whereRaw('LOWER(TRIM(buyer_username)) = ?', [mb_strtolower($buyerUsername)]);
+        } else {
+            $marketplaceOrderCountQuery->where('customer_id', $customer->id);
+        }
+        $marketplaceOrderCount = $marketplaceOrderCountQuery->count();
 
         abort_unless($marketplaceOrderCount === 1, 404);
 
-        $phone = $this->normalizePhone($customer->phone);
+        $phone = $this->normalizePhone($customer->phone ?: $activeOrder?->buyer_phone);
         if ($phone === '') {
             return redirect()
                 ->route('admin.crm.marketplace.prospects')
@@ -841,16 +842,71 @@ class MarketplaceCrmController extends Controller
             return collect();
         }
 
-        return Customer::query()
+        $customers = Customer::query()
             ->whereIn('id', $ids)
-            ->withCount(['marketplaceOrders as active_marketplace_order_count' => function ($query) {
-                $query->whereNotNull('channel_order_id')->where('status', '!=', 'cancelled');
-            }])
             ->get(['id', 'name', 'phone'])
-            ->filter(function ($customer) {
-                $customer->wa_phone = $this->normalizePhone($customer->phone);
-                return (int) $customer->active_marketplace_order_count === 1 && $customer->wa_phone !== '';
-            })
+            ->keyBy('id');
+        $activeOrders = MarketplaceOrder::query()
+            ->whereIn('customer_id', $ids)
+            ->whereNotNull('channel_order_id')
+            ->where('status', '!=', 'cancelled')
+            ->orderByDesc('id')
+            ->get(['customer_id', 'buyer_username', 'buyer_phone'])
+            ->groupBy('customer_id')
+            ->map->first();
+        $buyerKeys = $activeOrders
+            ->pluck('buyer_username')
+            ->map(fn ($username) => mb_strtolower(trim((string) $username)))
+            ->filter()
+            ->unique()
+            ->values();
+        $usernameOrderCounts = $buyerKeys->isEmpty()
+            ? collect()
+            : MarketplaceOrder::query()
+                ->whereNotNull('channel_order_id')
+                ->where('status', '!=', 'cancelled')
+                ->whereIn(DB::raw('LOWER(TRIM(buyer_username))'), $buyerKeys)
+                ->selectRaw('LOWER(TRIM(buyer_username)) as buyer_key, COUNT(*) as total')
+                ->groupByRaw('LOWER(TRIM(buyer_username))')
+                ->pluck('total', 'buyer_key');
+        $legacyIds = $activeOrders
+            ->filter(fn ($order) => trim((string) $order->buyer_username) === '')
+            ->keys()
+            ->map(fn ($id) => (int) $id)
+            ->values();
+        $legacyOrderCounts = $legacyIds->isEmpty()
+            ? collect()
+            : MarketplaceOrder::query()
+                ->whereNotNull('channel_order_id')
+                ->where('status', '!=', 'cancelled')
+                ->whereIn('customer_id', $legacyIds)
+                ->selectRaw('customer_id, COUNT(*) as total')
+                ->groupBy('customer_id')
+                ->pluck('total', 'customer_id');
+
+        return $activeOrders->map(function ($order, $customerId) use ($customers, $usernameOrderCounts, $legacyOrderCounts) {
+            $customer = $customers->get($customerId);
+            if (! $customer) {
+                return null;
+            }
+            $username = trim((string) $order->buyer_username);
+            $customer->buyer_username = $username;
+            $customer->phone = $customer->phone ?: $order->buyer_phone;
+            $customer->active_marketplace_order_count = $username !== ''
+                ? (int) $usernameOrderCounts->get(mb_strtolower($username), 0)
+                : (int) $legacyOrderCounts->get($customerId, 0);
+            $customer->identity_key = $this->customerIdentityKey(
+                $username,
+                $username === '' ? (int) $customerId : null,
+            );
+            $customer->wa_phone = $this->normalizePhone($customer->phone);
+
+            return $customer;
+        })
+            ->filter(fn ($customer) => $customer
+                && (int) $customer->active_marketplace_order_count === 1
+                && $customer->wa_phone !== '')
+            ->unique('identity_key')
             ->values();
     }
 
@@ -1163,6 +1219,57 @@ class MarketplaceCrmController extends Controller
             ->when($storeId, fn ($q) => $q->where('store_id', $storeId));
     }
 
+    /** Count marketplace buyers by normalized username, with a safe legacy fallback. */
+    private function uniqueCustomerCount($query): int
+    {
+        $named = (clone $query)
+            ->whereRaw("NULLIF(TRIM(buyer_username), '') IS NOT NULL")
+            ->selectRaw("COUNT(DISTINCT LOWER(TRIM(buyer_username))) as aggregate")
+            ->value('aggregate');
+        $legacy = (clone $query)
+            ->where(function ($q) {
+                $q->whereNull('buyer_username')->orWhereRaw("TRIM(buyer_username) = ''");
+            })
+            ->selectRaw('COUNT(DISTINCT COALESCE(customer_id, id)) as aggregate')
+            ->value('aggregate');
+
+        return (int) $named + (int) $legacy;
+    }
+
+    private function repeatCustomerCount($query): int
+    {
+        $named = (clone $query)
+            ->whereRaw("NULLIF(TRIM(buyer_username), '') IS NOT NULL")
+            ->selectRaw('LOWER(TRIM(buyer_username)) as buyer_key')
+            ->groupByRaw('LOWER(TRIM(buyer_username))')
+            ->havingRaw('COUNT(*) > 1')
+            ->get()
+            ->count();
+        $legacy = (clone $query)
+            ->where(function ($q) {
+                $q->whereNull('buyer_username')->orWhereRaw("TRIM(buyer_username) = ''");
+            })
+            ->selectRaw('COALESCE(customer_id, id) as buyer_key')
+            ->groupByRaw('COALESCE(customer_id, id)')
+            ->havingRaw('COUNT(*) > 1')
+            ->get()
+            ->count();
+
+        return $named + $legacy;
+    }
+
+    private function customerIdentityKey(?string $username, ?int $customerId, ?int $orderId = null): string
+    {
+        $username = mb_strtolower(trim((string) $username));
+        if ($username !== '') {
+            return 'username:'.$username;
+        }
+
+        return $customerId
+            ? 'customer:'.$customerId
+            : 'order:'.(int) $orderId;
+    }
+
     private function parseOrderDate(mixed $value): ?Carbon
     {
         if (! is_string($value) || trim($value) === '') {
@@ -1219,8 +1326,10 @@ class MarketplaceCrmController extends Controller
 
     private function customerProfiles(?int $storeId = null)
     {
-        $baseQuery = DB::table('customers')
-            ->join('marketplace_orders', 'marketplace_orders.customer_id', '=', 'customers.id')
+        $usernameKey = "NULLIF(LOWER(TRIM(marketplace_orders.buyer_username)), '')";
+        $legacyKey = "CASE WHEN NULLIF(TRIM(marketplace_orders.buyer_username), '') IS NULL THEN COALESCE(marketplace_orders.customer_id, marketplace_orders.id) ELSE NULL END";
+        $baseQuery = DB::table('marketplace_orders')
+            ->leftJoin('customers', 'marketplace_orders.customer_id', '=', 'customers.id')
             ->whereNotNull('marketplace_orders.channel_order_id')
             ->where('marketplace_orders.status', '!=', 'cancelled')
             ->when($storeId, fn ($q) => $q->where('marketplace_orders.store_id', $storeId));
@@ -1229,39 +1338,93 @@ class MarketplaceCrmController extends Controller
         // terakhir di dataset membuat data historis terlihat lebih baru dari
         // kondisi sebenarnya dan mengacaukan segment Lost/At Risk.
         $analysisDate = now()->startOfDay();
-        $whatsappMessages = DB::table('whatsapp_messages as wm')
-            ->where('wm.module', 'marketplace_crm')
-            ->where('wm.reference_type', Customer::class)
-            ->whereColumn('wm.reference_id', 'customers.id')
-            ->where('wm.direction', 'outbound');
-
-        return $baseQuery
-            ->select('customers.id', 'customers.name', 'customers.phone', 'customers.city', 'customers.province')
+        $profiles = $baseQuery
+            ->selectRaw("{$usernameKey} as username_key")
+            ->selectRaw("{$legacyKey} as legacy_key")
+            ->selectRaw('MIN(customers.id) as id')
+            ->selectRaw('GROUP_CONCAT(DISTINCT customers.id) as customer_ids')
+            ->selectRaw("MAX(NULLIF(TRIM(marketplace_orders.buyer_username), '')) as buyer_username")
+            ->selectRaw("COALESCE(MAX(NULLIF(TRIM(customers.name), '')), MAX(NULLIF(TRIM(marketplace_orders.buyer_name), '')), 'Buyer Marketplace') as name")
+            ->selectRaw("COALESCE(MAX(NULLIF(TRIM(customers.phone), '')), MAX(NULLIF(TRIM(marketplace_orders.buyer_phone), ''))) as phone")
+            ->selectRaw("COALESCE(MAX(NULLIF(TRIM(customers.city), '')), MAX(NULLIF(TRIM(marketplace_orders.shipping_city), ''))) as city")
+            ->selectRaw("COALESCE(MAX(NULLIF(TRIM(customers.province), '')), MAX(NULLIF(TRIM(marketplace_orders.shipping_province), ''))) as province")
             ->selectRaw('COUNT(DISTINCT marketplace_orders.id) as marketplace_order_count')
             ->selectRaw('SUM(marketplace_orders.total_amount) as marketplace_total_spent')
             ->selectRaw('SUM(COALESCE(NULLIF(marketplace_orders.total_paid_customer, 0), marketplace_orders.total_amount)) as marketplace_total_paid')
             ->selectRaw('MAX(marketplace_orders.payment_method) as marketplace_payment_method')
             ->selectRaw('MAX(COALESCE(marketplace_orders.ordered_at, marketplace_orders.order_date)) as last_marketplace_order_at')
             ->selectRaw('MIN(COALESCE(marketplace_orders.ordered_at, marketplace_orders.order_date)) as first_marketplace_order_at')
-            ->selectSub((clone $whatsappMessages)->selectRaw('COUNT(*)'), 'whatsapp_message_count')
-            ->selectSub((clone $whatsappMessages)->where('wm.status', 'sent')->selectRaw('COUNT(*)'), 'whatsapp_sent_count')
-            ->selectSub((clone $whatsappMessages)->select('wm.status')->latest('wm.id')->limit(1), 'whatsapp_last_status')
-            ->groupBy('customers.id', 'customers.name', 'customers.phone', 'customers.city', 'customers.province')
+            ->groupByRaw("{$usernameKey}, {$legacyKey}")
             ->get()
-            ->map(function ($customer) use ($analysisDate) {
-                $days = $customer->last_marketplace_order_at
-                    ? Carbon::parse($customer->last_marketplace_order_at)->startOfDay()->diffInDays($analysisDate->copy()->startOfDay())
-                    : 99999;
-                $days = (int) $days;
-                $customer->days_since_last_order = $days;
-                $customer->segment = self::classify(
-                    (int) $customer->marketplace_order_count,
-                    (int) $days,
-                    (float) $customer->marketplace_total_spent
+            ->map(function ($customer) {
+                $customer->customer_ids = collect(explode(',', (string) $customer->customer_ids))
+                    ->map(fn ($id) => (int) $id)
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+                $customer->identity_key = $this->customerIdentityKey(
+                    $customer->username_key,
+                    $customer->id ? (int) $customer->legacy_key : null,
+                    $customer->id ? null : (int) $customer->legacy_key,
                 );
-                $customer->wa_phone = $this->normalizePhone($customer->phone);
+
                 return $customer;
             });
+
+        $customerIds = $profiles->flatMap(fn ($customer) => $customer->customer_ids)
+            ->unique()
+            ->values();
+        $whatsappStats = collect();
+        $latestWhatsappStatuses = collect();
+        foreach ($customerIds->chunk(500) as $customerIdChunk) {
+            $messageBase = fn () => DB::table('whatsapp_messages')
+                ->where('module', 'marketplace_crm')
+                ->where('reference_type', Customer::class)
+                ->where('direction', 'outbound')
+                ->whereIn('reference_id', $customerIdChunk);
+            $whatsappStats = $whatsappStats->union($messageBase()
+                ->select('reference_id')
+                ->selectRaw('COUNT(*) as message_count')
+                ->selectRaw("SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as sent_count")
+                ->groupBy('reference_id')
+                ->get()
+                ->keyBy('reference_id'));
+            $latestWhatsappIds = $messageBase()
+                ->selectRaw('MAX(id) as id')
+                ->groupBy('reference_id');
+            $latestWhatsappStatuses = $latestWhatsappStatuses->union($messageBase()
+                ->whereIn('id', $latestWhatsappIds)
+                ->get(['id', 'reference_id', 'status'])
+                ->keyBy('reference_id'));
+        }
+
+        return $profiles->map(function ($customer) use ($analysisDate, $whatsappStats, $latestWhatsappStatuses) {
+            $customer->whatsapp_message_count = collect($customer->customer_ids)
+                ->sum(fn ($id) => (int) ($whatsappStats->get($id)?->message_count ?? 0));
+            $customer->whatsapp_sent_count = collect($customer->customer_ids)
+                ->sum(fn ($id) => (int) ($whatsappStats->get($id)?->sent_count ?? 0));
+            $latestMessage = collect($customer->customer_ids)
+                ->map(fn ($id) => $latestWhatsappStatuses->get($id))
+                ->filter()
+                ->sortByDesc('id')
+                ->first();
+            $customer->whatsapp_last_status = $latestMessage?->status;
+
+            $days = $customer->last_marketplace_order_at
+                ? Carbon::parse($customer->last_marketplace_order_at)->startOfDay()->diffInDays($analysisDate->copy()->startOfDay())
+                : 99999;
+            $days = (int) $days;
+            $customer->days_since_last_order = $days;
+            $customer->segment = self::classify(
+                (int) $customer->marketplace_order_count,
+                $days,
+                (float) $customer->marketplace_total_spent
+            );
+            $customer->wa_phone = $this->normalizePhone($customer->phone);
+
+            return $customer;
+        });
     }
 
     private function normalizePhone(?string $phone): string
@@ -1273,7 +1436,7 @@ class MarketplaceCrmController extends Controller
         return $phone;
     }
 
-    private function prospectItemCustomerIds(?int $storeId, string $needle): Collection
+    private function prospectItemKeys(?int $storeId, string $needle): Collection
     {
         $needle = trim($needle);
         if ($needle === '') {
@@ -1301,22 +1464,49 @@ class MarketplaceCrmController extends Controller
                     ->orWhere('marketplace_order_items.item_code_snapshot', 'like', $like)
                     ->orWhere('marketplace_order_items.marketplace_sku', 'like', $like);
             })
+            ->select('matched_orders.id', 'matched_orders.customer_id', 'matched_orders.buyer_username')
             ->distinct()
-            ->pluck('matched_orders.customer_id')
-            ->filter()
-            ->map(fn ($id) => (int) $id)
+            ->get()
+            ->map(fn ($order) => $this->customerIdentityKey(
+                $order->buyer_username,
+                $order->customer_id ? (int) $order->customer_id : null,
+                (int) $order->id,
+            ))
             ->values();
     }
 
     private function attachProspectItems(Collection $prospects, ?int $storeId, bool $withItems = true): Collection
     {
-        $customerIds = $prospects->pluck('id')->filter()->map(fn ($id) => (int) $id)->values();
-        if ($customerIds->isEmpty()) {
-            return $prospects;
-        }
+        $identityKeys = $prospects->pluck('identity_key');
+        $usernameKeys = $identityKeys->filter(fn ($key) => str_starts_with($key, 'username:'))
+            ->map(fn ($key) => substr($key, strlen('username:')))
+            ->values();
+        $customerIds = $identityKeys->filter(fn ($key) => str_starts_with($key, 'customer:'))
+            ->map(fn ($key) => (int) substr($key, strlen('customer:')))
+            ->filter()
+            ->values();
+        $orderIds = $identityKeys->filter(fn ($key) => str_starts_with($key, 'order:'))
+            ->map(fn ($key) => (int) substr($key, strlen('order:')))
+            ->filter()
+            ->values();
 
         $orders = MarketplaceOrder::query()
-            ->whereIn('customer_id', $customerIds)
+            ->where(function ($query) use ($usernameKeys, $customerIds, $orderIds) {
+                if ($usernameKeys->isNotEmpty()) {
+                    $query->whereIn(DB::raw('LOWER(TRIM(buyer_username))'), $usernameKeys);
+                }
+                if ($customerIds->isNotEmpty()) {
+                    $method = $usernameKeys->isNotEmpty() ? 'orWhereIn' : 'whereIn';
+                    $query->{$method}('customer_id', $customerIds);
+                }
+                if ($orderIds->isNotEmpty()) {
+                    $method = $usernameKeys->isNotEmpty() || $customerIds->isNotEmpty() ? 'orWhereIn' : 'whereIn';
+                    $query->{$method}('id', $orderIds);
+                }
+                if ($usernameKeys->isEmpty() && $customerIds->isEmpty() && $orderIds->isEmpty()) {
+                    $query->whereRaw('1 = 0');
+                }
+            })
             ->whereNotNull('channel_order_id')
             ->where('status', '!=', 'cancelled')
             ->when($storeId, fn ($query) => $query->where('store_id', $storeId))
@@ -1332,7 +1522,13 @@ class MarketplaceCrmController extends Controller
                 'shipping_postal_code', 'shipping_awb_no',
             ]);
 
-        $firstOrdersByCustomer = $orders->groupBy('customer_id')->map->first();
+        $firstOrdersByCustomer = $orders
+            ->groupBy(fn ($order) => $this->customerIdentityKey(
+                $order->buyer_username,
+                $order->customer_id ? (int) $order->customer_id : null,
+                (int) $order->id,
+            ))
+            ->map->first();
         $orderIds = $firstOrdersByCustomer->pluck('id')->map(fn ($id) => (int) $id)->values();
         if ($orderIds->isEmpty()) {
             return $prospects;
@@ -1340,7 +1536,7 @@ class MarketplaceCrmController extends Controller
 
         if (! $withItems) {
             return $prospects->map(function ($prospect) use ($firstOrdersByCustomer) {
-                $order = $firstOrdersByCustomer->get((int) $prospect->id);
+                $order = $firstOrdersByCustomer->get($prospect->identity_key);
                 $prospect->prospect_order = $order;
                 $prospect->prospect_items = collect();
 
@@ -1367,7 +1563,7 @@ class MarketplaceCrmController extends Controller
         });
 
         return $prospects->map(function ($prospect) use ($firstOrdersByCustomer, $itemsByOrder) {
-            $order = $firstOrdersByCustomer->get((int) $prospect->id);
+            $order = $firstOrdersByCustomer->get($prospect->identity_key);
             $prospect->prospect_order = $order;
             $prospect->prospect_items = $order
                 ? $itemsByOrder->get((int) $order->id, collect())

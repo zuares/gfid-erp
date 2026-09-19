@@ -37,8 +37,8 @@
         @foreach([
             ['Order', number_format($totalOrders), 'periode terpilih', 'bi-bag-check', '#2563eb'],
             ['Revenue', 'Rp'.number_format($totalRevenue, 0, ',', '.'), 'tidak termasuk cancel', 'bi-cash-stack', '#16a34a'],
-            ['Customer', number_format($customerCount), 'teridentifikasi dari order', 'bi-people', '#7c3aed'],
-            ['Repeat Buyer', number_format($repeatCustomers), 'lebih dari satu order', 'bi-arrow-repeat', '#ea580c'],
+            ['Customer', number_format($customerCount), 'username unik pada order periode ini', 'bi-people', '#7c3aed'],
+            ['Repeat Buyer', number_format($repeatCustomers), 'username dengan lebih dari satu order', 'bi-arrow-repeat', '#ea580c'],
         ] as [$label,$value,$sub,$icon,$color])
         <div class="col-6 col-xl-3"><div class="mpcrm-card h-100">
             <div class="d-flex justify-content-between"><div class="mpcrm-label">{{ $label }}</div><i class="bi {{ $icon }}" style="color:{{ $color }}"></i></div>
