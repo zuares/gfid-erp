@@ -3,9 +3,13 @@
 namespace App\Services\Payroll;
 
 use App\Models\Account;
+use App\Models\EmployeeLoan;
+use App\Models\EmployeeLoanRepayment;
+use App\Models\EmployeeSavingsTransaction;
 use App\Models\Journal;
 use App\Models\PieceworkPayrollPeriod;
 use App\Services\Accounting\JournalService;
+use App\Services\Payroll\DailyAttendanceBonusCalculator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -61,8 +65,10 @@ class PieceworkPayrollPostingService
                 return $period->fresh();
             }
 
-            // hitung total
-            $total = (float) $period->lines()->sum('amount');
+            // Hitung total termasuk bonus kehadiran harian yang eligible.
+            $attendanceBonuses = DailyAttendanceBonusCalculator::forPeriod($period);
+            $bonusTotal = (float) $attendanceBonuses->sum('bonus_amount');
+            $total = round((float) $period->lines()->sum('amount') + $bonusTotal, 2);
             if ($total <= 0) {
                 throw new \RuntimeException('Total payroll 0. Tidak bisa finalize.');
             }
@@ -138,11 +144,18 @@ class PieceworkPayrollPostingService
     /**
      * PAY:
      * Dr 2102 Hutang Upah Borongan
-     * Cr Kas/Bank (yang dipilih)
+     * Cr Kas/Bank (setelah bonus tabungan dan potongan hutang karyawan)
+     * Cr Tabungan Karyawan (jika bonus disisihkan)
+     * Cr Piutang Pinjaman Karyawan (jika ada potongan)
      */
-    public function pay(PieceworkPayrollPeriod $period, int $paidFromAccountId): PieceworkPayrollPeriod
+    public function pay(
+        PieceworkPayrollPeriod $period,
+        int $paidFromAccountId,
+        array $loanDeductions = [],
+        array $attendanceBonusDestinations = [],
+    ): PieceworkPayrollPeriod
     {
-        return DB::transaction(function () use ($period, $paidFromAccountId) {
+        return DB::transaction(function () use ($period, $paidFromAccountId, $loanDeductions, $attendanceBonusDestinations) {
             // Satu lock per payroll period menjadi guard utama terhadap double
             // submit dari dua request yang datang hampir bersamaan.
             $period = PieceworkPayrollPeriod::query()
@@ -170,7 +183,13 @@ class PieceworkPayrollPostingService
                 }
 
                 $paidFromLine = $existingPayment->lines
-                    ->first(fn ($line) => (float) $line->credit > 0);
+                    ->first(function ($line) {
+                        return (float) $line->credit > 0
+                            && Account::query()
+                                ->whereKey($line->account_id)
+                                ->where('is_cash', true)
+                                ->exists();
+                    });
 
                 $period->forceFill([
                     'payment_journal_id' => $existingPayment->id,
@@ -191,10 +210,92 @@ class PieceworkPayrollPostingService
             $total = (float) ($period->total_amount ?? 0);
             if ($total <= 0) {
                 // safety: hitung ulang kalau total kosong
-                $total = (float) $period->lines()->sum('amount');
+                $attendanceBonuses = DailyAttendanceBonusCalculator::forPeriod($period);
+                $total = round(
+                    (float) $period->lines()->sum('amount')
+                    + (float) $attendanceBonuses->sum('bonus_amount'),
+                    2
+                );
             }
             if ($total <= 0) {
                 throw new \RuntimeException('Total payroll 0. Tidak bisa dibayar.');
+            }
+
+            $attendanceBonuses ??= DailyAttendanceBonusCalculator::forPeriod($period);
+            $eligibleBonusEmployeeIds = $attendanceBonuses
+                ->pluck('employee_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            $requestedBonusDestinations = collect($attendanceBonusDestinations)
+                ->mapWithKeys(fn ($destination, $employeeId) => [(int) $employeeId => (string) $destination])
+                ->all();
+
+            foreach ($requestedBonusDestinations as $employeeId => $destination) {
+                if (! in_array($employeeId, $eligibleBonusEmployeeIds, true)) {
+                    throw new \RuntimeException('Pilihan bonus kehadiran tidak sesuai dengan operator yang eligible.');
+                }
+                if (! in_array($destination, ['savings', 'paid'], true)) {
+                    throw new \RuntimeException('Tujuan bonus kehadiran tidak valid.');
+                }
+            }
+
+            $savedBonusRows = $attendanceBonuses
+                ->map(function (array $bonus) use ($requestedBonusDestinations) {
+                    $destination = $requestedBonusDestinations[$bonus['employee_id']] ?? 'savings';
+
+                    return $bonus + ['destination' => $destination];
+                })
+                ->filter(fn (array $bonus) => $bonus['destination'] === 'savings')
+                ->values();
+            $savedBonusTotal = round((float) $savedBonusRows->sum('bonus_amount'), 2);
+
+            $deductions = collect($loanDeductions)
+                ->mapWithKeys(fn ($amount, $loanId) => [(int) $loanId => round((float) $amount, 2)])
+                ->filter(fn (float $amount) => $amount > 0)
+                ->all();
+            $loans = collect();
+            $deductionTotal = 0.0;
+
+            if ($deductions) {
+                $periodEmployeeIds = $period->lines()
+                    ->pluck('employee_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->unique();
+
+                $loans = EmployeeLoan::query()
+                    ->whereIn('id', array_keys($deductions))
+                    ->whereIn('status', ['posted', 'settled'])
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id');
+
+                foreach ($deductions as $loanId => $amount) {
+                    $loan = $loans->get($loanId);
+                    if (! $loan) {
+                        throw new \RuntimeException("Pinjaman karyawan #{$loanId} tidak ditemukan atau belum POSTED.");
+                    }
+                    if (! $periodEmployeeIds->contains((int) $loan->employee_id)) {
+                        throw new \RuntimeException("Pinjaman karyawan #{$loanId} bukan milik operator pada payroll ini.");
+                    }
+
+                    $paid = (float) $loan->repayments()
+                        ->where('status', 'posted')
+                        ->sum('amount');
+                    $outstanding = max(0, round((float) $loan->principal_amount - $paid, 2));
+                    if ($amount > $outstanding + 0.01) {
+                        throw new \RuntimeException(
+                            "Potongan pinjaman #{$loanId} melebihi sisa hutang (Rp "
+                            .number_format($outstanding, 2, ',', '.').').'
+                        );
+                    }
+
+                    $deductionTotal += $amount;
+                }
+            }
+
+            $deductionTotal = round($deductionTotal, 2);
+            if ($deductionTotal + $savedBonusTotal > $total + 0.01) {
+                throw new \RuntimeException('Total potongan hutang melebihi total payroll.');
             }
 
             // hutang upah borongan (ambil dari period kalau ada)
@@ -210,25 +311,98 @@ class PieceworkPayrollPostingService
 
             // akun kas/bank pembayaran
             $paidFrom = Account::findOrFail($paidFromAccountId);
-            if (! $paidFrom->is_cash) {
+            if (! $paidFrom->is_cash || ! $paidFrom->is_active) {
                 throw new \RuntimeException('Akun pembayaran harus akun Kas/Bank.');
             }
 
             $payrollLabel = $period->module === 'daily' ? 'Payroll Harian' : 'Payroll Borongan';
+            $netPayment = round($total - $deductionTotal - $savedBonusTotal, 2);
             $desc = strtoupper($period->module).' '.$payrollLabel.' (PAY) '
             .$period->period_start.' s/d '.$period->period_end
-            .' via '.$paidFrom->name;
+            .' via '.$paidFrom->name
+            .($savedBonusTotal > 0 ? ' · Bonus tabungan Rp '.number_format($savedBonusTotal, 2, ',', '.') : '')
+            .($deductionTotal > 0 ? ' · Potongan hutang karyawan Rp '.number_format($deductionTotal, 2, ',', '.') : '');
+
+            $paymentLines = [
+                ['account_id' => $payableId, 'debit' => $total, 'credit' => 0],
+            ];
+            if ($netPayment > 0) {
+                $paymentLines[] = ['account_id' => $paidFrom->id, 'debit' => 0, 'credit' => $netPayment];
+            }
+            if ($savedBonusTotal > 0) {
+                $savingsAccount = Account::firstOrCreate(
+                    ['code' => '2104'],
+                    [
+                        'name' => 'Tabungan Karyawan',
+                        'type' => 'liability',
+                        'is_cash' => false,
+                        'is_active' => true,
+                    ]
+                );
+                if ($savingsAccount->type !== 'liability' || ! $savingsAccount->is_active) {
+                    throw new \RuntimeException('Akun 2104 harus aktif dan bertipe liability untuk Tabungan Karyawan.');
+                }
+
+                $paymentLines[] = [
+                    'account_id' => $savingsAccount->id,
+                    'debit' => 0,
+                    'credit' => $savedBonusTotal,
+                ];
+            }
+            foreach ($deductions as $loanId => $amount) {
+                $paymentLines[] = [
+                    'account_id' => (int) $loans->get($loanId)->receivable_account_id,
+                    'debit' => 0,
+                    'credit' => $amount,
+                ];
+            }
 
             $journal = $this->journalService->post(
                 date: now()->toDateString(),
                 sourceType: 'piecework_payroll_period_payment',
                 sourceId: $period->id,
                 description: $desc,
-                lines: [
-                    ['account_id' => $payableId, 'debit' => $total, 'credit' => 0],
-                    ['account_id' => $paidFrom->id, 'debit' => 0, 'credit' => $total],
-                ]
+                lines: $paymentLines,
             );
+
+            foreach ($savedBonusRows as $bonus) {
+                EmployeeSavingsTransaction::create([
+                    'employee_id' => $bonus['employee_id'],
+                    'payroll_period_id' => $period->id,
+                    'date' => now()->toDateString(),
+                    'amount' => $bonus['bonus_amount'],
+                    'type' => EmployeeSavingsTransaction::TYPE_DEPOSIT,
+                    'status' => 'posted',
+                    'journal_id' => $journal->id,
+                    'source_type' => EmployeeSavingsTransaction::SOURCE_PAYROLL_BONUS,
+                    'source_id' => $period->id,
+                    'created_by' => Auth::id(),
+                    'notes' => 'Bonus kehadiran 10% disisihkan ke tabungan karyawan.',
+                ]);
+            }
+
+            foreach ($deductions as $loanId => $amount) {
+                $loan = $loans->get($loanId);
+                $paid = (float) $loan->repayments()->where('status', 'posted')->sum('amount');
+
+                EmployeeLoanRepayment::create([
+                    'employee_loan_id' => $loan->id,
+                    'date' => now()->toDateString(),
+                    'amount' => $amount,
+                    'cash_account_id' => $paidFrom->id,
+                    'reference' => 'PAYROLL-'.$period->module.'-'.$period->id,
+                    'status' => 'posted',
+                    'journal_id' => $journal->id,
+                    'source_type' => EmployeeLoanRepayment::SOURCE_PAYROLL_DEDUCTION,
+                    'source_id' => $period->id,
+                    'created_by' => Auth::id(),
+                    'notes' => 'Potongan hutang dari pembayaran payroll.',
+                ]);
+
+                if ($paid + $amount >= (float) $loan->principal_amount - 0.01) {
+                    $loan->update(['status' => 'settled']);
+                }
+            }
 
             $period->forceFill([
                 'paid_from_account_id' => $paidFrom->id,

@@ -7,9 +7,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EmployeeLoanRepayment extends Model
 {
+    public const SOURCE_PAYROLL_DEDUCTION = 'payroll_deduction';
+
     protected $fillable = [
         'employee_loan_id', 'date', 'amount', 'cash_account_id', 'reference',
-        'status', 'journal_id', 'created_by', 'notes',
+        'status', 'journal_id', 'source_type', 'source_id', 'created_by', 'notes',
     ];
 
     protected $casts = ['date' => 'date', 'amount' => 'decimal:2'];

@@ -125,6 +125,11 @@ class EmployeeLoanService
             if ($locked->status === 'void') {
                 return $locked;
             }
+            if ($locked->source_type === EmployeeLoanRepayment::SOURCE_PAYROLL_DEDUCTION) {
+                throw ValidationException::withMessages([
+                    'status' => 'Angsuran dari payroll tidak bisa di-VOID terpisah. Void pembayaran payroll secara keseluruhan jika diperlukan.',
+                ]);
+            }
             if ($locked->status !== 'posted' || ! $locked->journal) {
                 throw ValidationException::withMessages(['status' => 'Hanya angsuran POSTED yang bisa di-VOID.']);
             }

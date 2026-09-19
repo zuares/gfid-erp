@@ -313,6 +313,89 @@
             font-size: .82rem
         }
 
+        .pw-pay-form {
+            align-items: center
+        }
+
+        .pw-pay-account {
+            order: 1;
+            display: grid;
+            gap: .25rem;
+            min-width: 210px
+        }
+
+        .pw-pay-account .pw-sel {
+            width: 100%
+        }
+
+        .pw-pay-account-label {
+            color: var(--muted);
+            font-size: .68rem;
+            font-weight: 800;
+            letter-spacing: .03em;
+            text-transform: uppercase
+        }
+
+        .pw-loan-panel {
+            order: 3;
+            flex-basis: 100%;
+            margin-top: .25rem;
+            padding: .65rem .7rem;
+            border: 1px solid rgba(245, 158, 11, .28);
+            border-radius: 8px
+        }
+
+        .pw-bonus-panel {
+            order: 4;
+            flex-basis: 100%;
+            margin-top: .25rem;
+            padding: .65rem .7rem;
+            border: 1px solid rgba(16, 185, 129, .28);
+            border-radius: 8px
+        }
+
+        .pw-bonus-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .65rem;
+            margin-top: .4rem
+        }
+
+        .pw-bonus-meta {
+            min-width: 0;
+            font-size: .78rem
+        }
+
+        .pw-bonus-select {
+            min-width: 145px
+        }
+
+        .pw-loan-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .65rem;
+            margin-top: .4rem
+        }
+
+        .pw-loan-meta {
+            min-width: 0;
+            font-size: .78rem
+        }
+
+        .pw-loan-input {
+            width: 145px
+        }
+
+        .pw-pay-form > .pw-btn {
+            order: 2
+        }
+
+        .pw-detail-table {
+            min-width: 640px
+        }
+
         .pw-daily-table th {
             white-space: nowrap
         }
@@ -368,13 +451,20 @@
         }
 
         @media (max-width: 640px) {
+            .pw-wrap {
+                padding: .5rem .55rem 2rem;
+                font-size: .82rem
+            }
+
             .pw-hide-sm {
                 display: none
             }
 
             .pw-top {
                 flex-direction: column;
-                align-items: stretch
+                align-items: stretch;
+                margin: 0 -.55rem .55rem;
+                padding: .45rem .55rem
             }
 
             .pw-top > .pw-row {
@@ -384,6 +474,223 @@
             .pw-top > .pw-row .pw-btn {
                 flex: 1;
                 justify-content: center
+            }
+
+            .pw-title {
+                font-size: .92rem;
+                line-height: 1.25
+            }
+
+            .pw-sub {
+                font-size: .7rem;
+                line-height: 1.35
+            }
+
+            .pw-btn {
+                min-height: 36px;
+                padding: .45rem .55rem;
+                font-size: .74rem
+            }
+
+            .pw-card {
+                border-radius: 8px
+            }
+
+            .pw-h,
+            .pw-b {
+                padding: .65rem
+            }
+
+            .pw-table th {
+                padding: .45rem .42rem;
+                font-size: .64rem
+            }
+
+            .pw-table td {
+                padding: .48rem .42rem;
+                font-size: .76rem
+            }
+
+            .pw-summary-table {
+                min-width: 100%
+            }
+
+            .pw-summary-table,
+            .pw-summary-table tbody,
+            .pw-summary-table tr,
+            .pw-summary-table td,
+            .pw-category-table,
+            .pw-category-table tbody,
+            .pw-category-table tr,
+            .pw-category-table td {
+                display: block;
+                width: 100%;
+                box-sizing: border-box
+            }
+
+            .pw-summary-table thead,
+            .pw-category-table thead {
+                display: none
+            }
+
+            .pw-summary-table tbody tr,
+            .pw-category-table tbody tr {
+                padding: .7rem .65rem;
+                border-bottom: 1px solid rgba(148, 163, 184, .16)
+            }
+
+            .pw-summary-table tbody tr:last-child,
+            .pw-category-table tbody tr:last-child {
+                border-bottom: 0
+            }
+
+            .pw-summary-table tbody td,
+            .pw-category-table tbody td {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: .75rem;
+                padding: .25rem 0;
+                border: 0;
+                text-align: right
+            }
+
+            .pw-summary-table tbody td:first-child,
+            .pw-category-table tbody td:first-child {
+                display: block;
+                padding-bottom: .5rem;
+                margin-bottom: .2rem;
+                border-bottom: 1px solid rgba(148, 163, 184, .12);
+                text-align: left
+            }
+
+            .pw-summary-table tbody td:not(:first-child)::before,
+            .pw-category-table tbody td:not(:first-child)::before {
+                content: attr(data-label);
+                flex: 0 0 auto;
+                color: var(--muted);
+                font-size: .68rem;
+                font-weight: 750;
+                text-align: left
+            }
+
+            .pw-summary-table tbody td:not(:first-child) > *,
+            .pw-category-table tbody td:not(:first-child) > * {
+                text-align: right
+            }
+
+            .pw-category-table {
+                min-width: 100%
+            }
+
+            .pw-category-table tfoot,
+            .pw-category-table tfoot tr,
+            .pw-category-table tfoot th {
+                display: block;
+                width: 100%;
+                box-sizing: border-box
+            }
+
+            .pw-category-table tfoot tr {
+                padding: .65rem;
+                border-top: 2px solid rgba(148, 163, 184, .28)
+            }
+
+            .pw-category-table tfoot th {
+                display: flex;
+                justify-content: space-between;
+                padding: .18rem 0;
+                border: 0;
+                text-align: right
+            }
+
+            .pw-category-table tfoot th:first-child {
+                text-align: left
+            }
+
+            .pw-category-table tfoot th:not(:first-child)::before {
+                content: attr(data-label);
+                color: var(--muted);
+                font-size: .68rem;
+                font-weight: 750;
+                text-align: left
+            }
+
+            .pw-daily-table {
+                min-width: 0
+            }
+
+            .pw-pay-form {
+                align-items: stretch
+            }
+
+            .pw-pay-form > .pw-sel,
+            .pw-pay-form > .pw-btn {
+                width: 100%;
+                min-height: 38px
+            }
+
+            .pw-pay-account {
+                order: 1;
+                flex: 1 1 0;
+                width: auto;
+                min-width: 0
+            }
+
+            .pw-pay-form > .pw-btn {
+                order: 2;
+                width: auto;
+                min-width: 76px;
+                flex: 0 0 auto;
+                align-self: end
+            }
+
+            .pw-loan-panel {
+                order: 3;
+                padding: .6rem
+            }
+
+            .pw-bonus-panel {
+                order: 4;
+                padding: .6rem
+            }
+
+            .pw-bonus-row {
+                align-items: stretch;
+                flex-direction: column;
+                gap: .3rem
+            }
+
+            .pw-bonus-meta {
+                font-size: .74rem;
+                line-height: 1.35
+            }
+
+            .pw-bonus-select {
+                width: 100%;
+                min-height: 38px
+            }
+
+            .pw-loan-row {
+                align-items: stretch;
+                flex-direction: column;
+                gap: .3rem
+            }
+
+            .pw-loan-meta {
+                font-size: .74rem;
+                line-height: 1.35
+            }
+
+            .pw-loan-input {
+                width: 100%;
+                min-height: 38px
+            }
+
+            .pw-summary-total-amount {
+                margin-top: .35rem;
+                font-size: 1rem;
+                text-align: left
             }
 
             .pw-daily-status-form {
@@ -582,25 +889,61 @@
 
                     {{-- PAY (only if final & not paid) --}}
                     @if ($period->status === 'final' && !$period->paid_at)
-                        <form class="pw-row" method="POST"
+                        <form class="pw-row pw-pay-form" method="POST"
                             action="{{ $moduleRoute('pay', ['period' => $period]) }}">
                             @csrf
-                            <select class="pw-sel" name="paid_from_account_id" required>
-                                <option value="">Bayar dari...</option>
-                                @foreach ($cashAccounts as $acc)
-                                    <option value="{{ $acc->id }}">{{ $acc->code }} • {{ $acc->name }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            <label class="pw-pay-account">
+                                <span class="pw-pay-account-label">Akun pembayaran hutang</span>
+                                <select class="pw-sel" name="paid_from_account_id" required>
+                                    <option value="">Pilih akun Kas/Bank...</option>
+                                    @foreach ($cashAccounts as $acc)
+                                        <option value="{{ $acc->id }}">{{ $acc->code }} • {{ $acc->name }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+
+                            @if ($employeeLoansByEmployee->isNotEmpty())
+                                <div class="pw-loan-panel">
+                                    <div style="font-weight:800;font-size:.8rem">Potongan hutang karyawan <span class="pw-sub">(opsional)</span></div>
+                                    @foreach ($summaryByEmployee as $summaryEmployee)
+                                        @foreach ($employeeLoansByEmployee->get($summaryEmployee['employee_id'], collect()) as $loan)
+                                            <label class="pw-loan-row">
+                                                <span class="pw-loan-meta">
+                                                    {{ $summaryEmployee['employee_name'] }} · {{ $loan->reference ?: 'Pinjaman #'.$loan->id }}
+                                                    <span class="pw-sub">Sisa Rp {{ number_format($loan->outstanding_amount, 0, ',', '.') }}</span>
+                                                </span>
+                                                <input class="pw-in pw-loan-input" type="number" name="loan_deductions[{{ $loan->id }}]"
+                                                    min="0" max="{{ $loan->outstanding_amount }}" step="0.01"
+                                                    placeholder="0" aria-label="Potongan {{ $summaryEmployee['employee_name'] }}">
+                                            </label>
+                                        @endforeach
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            @if ($module === 'daily' && $attendanceBonuses->isNotEmpty())
+                                <div class="pw-bonus-panel">
+                                    <div style="font-weight:800;font-size:.8rem">Bonus kehadiran 10%</div>
+                                    @foreach ($attendanceBonuses as $bonus)
+                                        <label class="pw-bonus-row">
+                                            <span class="pw-bonus-meta">
+                                                {{ $bonus['employee_name'] }} · {{ $bonus['present_count'] }} hari hadir
+                                                <span class="pw-sub">Bonus Rp {{ number_format($bonus['bonus_amount'], 0, ',', '.') }}</span>
+                                            </span>
+                                            <select class="pw-sel pw-bonus-select" name="attendance_bonus_destinations[{{ $bonus['employee_id'] }}]">
+                                                <option value="savings" selected>Tabungkan</option>
+                                                <option value="paid">Bayarkan</option>
+                                            </select>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            @endif
 
                             <button class="pw-btn success" type="submit"
                                 onclick="return confirm('Catat pembayaran? Ini akan melunasi hutang payroll.')">
                                 BAYAR
                             </button>
                         </form>
-                        <div class="pw-sub" style="margin-top:.5rem">
-                            Bayar akan mencatat: Dr Hutang Upah Borongan (2102) / Cr Kas/Bank.
-                        </div>
                     @elseif($period->paid_at)
                         <div class="pw-sub">Pembayaran sudah dicatat.</div>
                     @endif
@@ -609,7 +952,7 @@
 
                     {{-- SUMMARY TABLE --}}
                     <div class="pw-table-wrap">
-                        <table class="pw-table">
+                        <table class="pw-table pw-summary-table">
                             <thead>
                                 <tr>
                                     <th>Operator</th>
@@ -617,6 +960,7 @@
                                         <th class="pw-right">Hadir</th>
                                         <th class="pw-right">Libur</th>
                                         <th class="pw-right">Hari Efektif</th>
+                                        <th class="pw-right">Bonus</th>
                                     @else
                                         <th class="pw-right">{{ $qtyLabel }}</th>
                                     @endif
@@ -626,7 +970,7 @@
                             <tbody>
                                 @forelse($summaryByEmployee as $s)
                                     <tr>
-                                        <td>
+                                        <td data-label="Operator">
                                             <div style="font-weight:800">{{ $s['employee_name'] }}</div>
                                             <div class="pw-row" style="margin-top:.3rem">
                                                 <a class="pw-btn"
@@ -636,22 +980,25 @@
                                             </div>
                                         </td>
                                         @if ($module === 'daily')
-                                            <td class="pw-right">{{ number_format((int) ($s['present_count'] ?? 0), 0, ',', '.') }}</td>
-                                            <td class="pw-right">{{ number_format((int) ($s['holiday_count'] ?? 0), 0, ',', '.') }}</td>
-                                            <td class="pw-right">
+                                            <td data-label="Hadir" class="pw-right">{{ number_format((int) ($s['present_count'] ?? 0), 0, ',', '.') }}</td>
+                                            <td data-label="Libur" class="pw-right">{{ number_format((int) ($s['holiday_count'] ?? 0), 0, ',', '.') }}</td>
+                                            <td data-label="Hari Efektif" class="pw-right">
                                                 {{ rtrim(rtrim(number_format((float) $s['total_qty'], 2, '.', ''), '0'), '.') }}
                                             </td>
+                                            <td data-label="Bonus" class="pw-right">
+                                                {{ number_format((float) ($s['attendance_bonus'] ?? 0), 0, ',', '.') }}
+                                            </td>
                                         @else
-                                            <td class="pw-right">
+                                            <td data-label="{{ $qtyLabel }}" class="pw-right">
                                                 {{ rtrim(rtrim(number_format((float) $s['total_qty'], 2, '.', ''), '0'), '.') }}
                                             </td>
                                         @endif
-                                        <td class="pw-right" style="font-weight:800">
+                                        <td data-label="Amount" class="pw-right" style="font-weight:800">
                                             {{ number_format((float) $s['total_amount'], 0, ',', '.') }}</td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="{{ $module === 'daily' ? 5 : 3 }}" style="padding:1rem;color:var(--muted)">Tidak ada data.</td>
+                                        <td colspan="{{ $module === 'daily' ? 6 : 3 }}" style="padding:1rem;color:var(--muted)">Tidak ada data.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -676,7 +1023,7 @@
                                     <tbody>
                                         @foreach ($summaryByCategory as $categorySummary)
                                             <tr>
-                                                <td>
+                                                <td data-label="Kategori">
                                                     <div style="font-weight:750">
                                                         {{ $categorySummary['category_name'] ?: ($categorySummary['category_code'] ?: 'Tanpa Kategori') }}
                                                     </div>
@@ -684,10 +1031,10 @@
                                                         <div class="pw-sub">{{ $categorySummary['category_code'] }}</div>
                                                     @endif
                                                 </td>
-                                                <td class="pw-right">
+                                                <td data-label="Total Qty" class="pw-right">
                                                     {{ rtrim(rtrim(number_format((float) $categorySummary['total_qty'], 2, '.', ''), '0'), '.') }}
                                                 </td>
-                                                <td class="pw-right" style="font-weight:800">
+                                                <td data-label="Amount" class="pw-right" style="font-weight:800">
                                                     {{ number_format((float) $categorySummary['total_amount'], 0, ',', '.') }}
                                                 </td>
                                             </tr>
@@ -696,10 +1043,10 @@
                                     <tfoot>
                                         <tr>
                                             <th>Total</th>
-                                            <th class="pw-right">
+                                            <th data-label="Total Qty" class="pw-right">
                                                 {{ rtrim(rtrim(number_format((float) $grandTotalQty, 2, '.', ''), '0'), '.') }}
                                             </th>
-                                            <th class="pw-right">
+                                            <th data-label="Amount" class="pw-right">
                                                 {{ number_format((float) $grandTotalAmount, 0, ',', '.') }}
                                             </th>
                                         </tr>
@@ -778,7 +1125,7 @@
                                     'libur' => 'Libur',
                                 ];
                             @endphp
-                            <table class="pw-table pw-daily-table">
+                            <table class="pw-table pw-daily-table pw-detail-table">
                                 <thead>
                                     <tr>
                                         <th>Tanggal</th>
@@ -833,7 +1180,7 @@
                                 </tbody>
                             </table>
                         @else
-                            <table class="pw-table">
+                            <table class="pw-table pw-detail-table">
                                 <thead>
                                     <tr>
                                         @if ($module !== 'daily')

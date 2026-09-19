@@ -411,7 +411,6 @@
         <span class="gf-dev-pet-orb"><i class="bi bi-stars"></i></span>
         <span class="gf-dev-pet-copy">
             <strong>Dev Pet</strong>
-            <small>AI helper untuk halaman ini</small>
         </span>
     </button>
 
@@ -419,7 +418,6 @@
         <div class="gf-dev-pet-header" id="gfDevPetHeader">
             <div>
                 <div class="gf-dev-pet-title">Dev Pet</div>
-                <div class="gf-dev-pet-subtitle">Nanya AI dari halaman mana pun saat mode developer aktif.</div>
             </div>
             <div class="gf-dev-pet-header-actions">
                 <button type="button" class="gf-dev-pet-close" id="gfDevPetMinimize" aria-label="Minimize pet">−</button>

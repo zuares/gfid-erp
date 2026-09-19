@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Payroll;
 
 use App\Http\Controllers\Controller;
 use App\Models\Account;
+use App\Models\EmployeeLoan;
+use App\Models\EmployeeLoanRepayment;
 use App\Models\PieceworkPayrollLine;
 use App\Models\PieceworkPayrollPeriod;
+use App\Services\Payroll\DailyAttendanceBonusCalculator;
 use App\Services\Payroll\PieceworkPayrollPostingService;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -104,7 +107,33 @@ class PieceworkPayrollController extends Controller
         }
 
         $filteredPeriods = (clone $query)->get();
+        if ($module === 'all' || $module === 'daily') {
+            $filteredPeriods->each(function (PieceworkPayrollPeriod $period): void {
+                if ($period->module !== 'daily') {
+                    return;
+                }
+
+                $period->lines_total_amount = round(
+                    (float) $period->lines_total_amount
+                    + (float) DailyAttendanceBonusCalculator::forPeriod($period)->sum('bonus_amount'),
+                    2
+                );
+            });
+        }
         $periods = $query->paginate(15)->withQueryString();
+        if ($module === 'all' || $module === 'daily') {
+            $periods->getCollection()->each(function (PieceworkPayrollPeriod $period): void {
+                if ($period->module !== 'daily') {
+                    return;
+                }
+
+                $period->lines_total_amount = round(
+                    (float) $period->lines_total_amount
+                    + (float) DailyAttendanceBonusCalculator::forPeriod($period)->sum('bonus_amount'),
+                    2
+                );
+            });
+        }
         $kpis = [
             'period_count' => $filteredPeriods->count(),
             'total_qty' => (float) $filteredPeriods->sum('lines_total_qty'),
@@ -281,6 +310,15 @@ class PieceworkPayrollController extends Controller
             })
             ->get();
 
+        $attendanceBonuses = DailyAttendanceBonusCalculator::forPeriod($period)
+            ->map(function (array $bonus) use ($lines): array {
+                $employee = $lines->firstWhere('employee_id', $bonus['employee_id'])?->employee;
+                $bonus['employee_name'] = $employee?->name ?? '-';
+
+                return $bonus;
+            });
+        $attendanceBonusesByEmployee = $attendanceBonuses->keyBy('employee_id');
+
         $summaryByEmployee = $lines
             ->groupBy('employee_id')
             ->map(function ($group) {
@@ -332,12 +370,21 @@ class PieceworkPayrollController extends Controller
                         'total_qty' => (float) $group->sum('attendance_factor'),
                         'present_count' => $group->where('attendance_status', 'hadir')->count(),
                         'holiday_count' => $group->where('attendance_status', 'libur')->count(),
+                        'attendance_bonus' => 0.0,
                         'total_amount' => (float) $group->sum('amount'),
                     ];
+                })
+                ->map(function (array $summary) use ($attendanceBonusesByEmployee): array {
+                    $bonus = $attendanceBonusesByEmployee->get($summary['employee_id']);
+                    $summary['attendance_bonus'] = (float) ($bonus['bonus_amount'] ?? 0);
+                    $summary['total_amount'] = round($summary['total_amount'] + $summary['attendance_bonus'], 2);
+
+                    return $summary;
                 })
                 ->values();
 
             $grandTotalQty = (float) $lines->sum('attendance_factor');
+            $grandTotalAmount = round((float) $lines->sum('amount') + (float) $attendanceBonuses->sum('bonus_amount'), 2);
         }
 
         $cashAccounts = Account::query()
@@ -345,6 +392,16 @@ class PieceworkPayrollController extends Controller
             ->where('is_active', true)
             ->orderBy('code')
             ->get();
+
+        $employeeIds = $lines->pluck('employee_id')->filter()->unique()->values();
+        $employeeLoansByEmployee = EmployeeLoan::query()
+            ->with('employee')
+            ->withSum(['repayments as posted_repayment_amount' => fn ($query) => $query->where('status', 'posted')], 'amount')
+            ->whereIn('employee_id', $employeeIds)
+            ->whereIn('status', ['posted', 'settled'])
+            ->get()
+            ->filter(fn (EmployeeLoan $loan) => $loan->outstanding_amount > 0.009)
+            ->groupBy('employee_id');
 
         return view("{$cfg['views']}.show", [
             'module' => $cfg['module'],
@@ -358,6 +415,8 @@ class PieceworkPayrollController extends Controller
             'periodDays' => $periodDays,
             'averageDailyAmount' => $averageDailyAmount,
             'cashAccounts' => $cashAccounts,
+            'employeeLoansByEmployee' => $employeeLoansByEmployee,
+            'attendanceBonuses' => $attendanceBonuses,
             'allowSlipAll' => (bool) $cfg['allow_slip_all'],
         ]);
     }
@@ -512,6 +571,29 @@ class PieceworkPayrollController extends Controller
 
         $totalQty = (float) $lines->sum('total_qty_ok');
         $totalAmount = (float) $lines->sum('amount');
+        $attendanceBonus = DailyAttendanceBonusCalculator::forPeriod($period)
+            ->firstWhere('employee_id', (int) $employeeId);
+        $attendanceBonusAmount = (float) ($attendanceBonus['bonus_amount'] ?? 0);
+        if ($cfg['module'] === 'daily') {
+            $totalAmount = round($totalAmount + $attendanceBonusAmount, 2);
+        }
+
+        $employeeLoans = EmployeeLoan::query()
+            ->withSum(['repayments as posted_repayment_amount' => fn ($query) => $query->where('status', 'posted')], 'amount')
+            ->where('employee_id', $employeeId)
+            ->whereIn('status', ['posted', 'settled'])
+            ->get();
+        $loanPayments = EmployeeLoanRepayment::query()
+            ->where('source_type', EmployeeLoanRepayment::SOURCE_PAYROLL_DEDUCTION)
+            ->where('source_id', $period->id)
+            ->where('status', 'posted')
+            ->whereIn('employee_loan_id', $employeeLoans->pluck('id'))
+            ->get()
+            ->groupBy('employee_loan_id');
+        $employeeLoans = $employeeLoans
+            ->filter(fn (EmployeeLoan $loan) => $loan->outstanding_amount > 0.009 || $loanPayments->has($loan->id))
+            ->values();
+        $loanPaymentTotal = (float) $loanPayments->flatten(1)->sum('amount');
 
         return view("{$cfg['views']}.slip", [
             'module' => $cfg['module'],
@@ -522,6 +604,11 @@ class PieceworkPayrollController extends Controller
             'lines' => $lines,
             'totalQty' => $totalQty,
             'totalAmount' => $totalAmount,
+            'attendanceBonus' => $attendanceBonus,
+            'attendanceBonusAmount' => $attendanceBonusAmount,
+            'employeeLoans' => $employeeLoans,
+            'loanPayments' => $loanPayments,
+            'loanPaymentTotal' => $loanPaymentTotal,
         ]);
     }
 
@@ -610,10 +697,19 @@ class PieceworkPayrollController extends Controller
 
         $data = $request->validate([
             'paid_from_account_id' => ['required', 'integer', 'exists:accounts,id'],
+            'loan_deductions' => ['nullable', 'array'],
+            'loan_deductions.*' => ['nullable', 'numeric', 'min:0'],
+            'attendance_bonus_destinations' => ['nullable', 'array'],
+            'attendance_bonus_destinations.*' => ['required', 'in:savings,paid'],
         ]);
 
         try {
-            $svc->pay($period, (int) $data['paid_from_account_id']);
+            $svc->pay(
+                $period,
+                (int) $data['paid_from_account_id'],
+                $data['loan_deductions'] ?? [],
+                $data['attendance_bonus_destinations'] ?? [],
+            );
 
             return redirect()
                 ->to($this->moduleRoute($cfg['module'], 'show', ['period' => $period]))

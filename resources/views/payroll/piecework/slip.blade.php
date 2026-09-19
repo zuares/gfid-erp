@@ -53,6 +53,8 @@
         .slip-stat-value { margin-top:.25rem; color:var(--text); font-size:1rem; font-weight:900; font-variant-numeric:tabular-nums }
         .slip-stat.total { background:color-mix(in srgb,var(--accent-soft) 24%,var(--card) 76%) }
         .slip-stat.total .slip-stat-value { color:var(--accent) }
+        .slip-debt-section { margin-top:1rem; padding-top:1rem; border-top:1px solid rgba(148,163,184,.2) }
+        .slip-debt-section .slip-table { min-width:560px }
         .slip-section-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; margin-bottom:.55rem }
         .slip-section-title { color:var(--text); font-size:.78rem; font-weight:850 }
         .slip-section-note { margin-top:.15rem; color:var(--muted); font-size:.68rem }
@@ -383,7 +385,55 @@
                         <div class="slip-stat"><div class="slip-stat-label">Hari Efektif</div><div class="slip-stat-value">{{ rtrim(rtrim(number_format((float) $totalQty, 2, ',', '.'), '0'), ',') }}</div></div>
                         <div class="slip-stat"><div class="slip-stat-label">Hadir</div><div class="slip-stat-value">{{ number_format((int) $presentCount, 0, ',', '.') }} hari</div></div>
                         <div class="slip-stat"><div class="slip-stat-label">Libur</div><div class="slip-stat-value">{{ number_format((int) $holidayCount, 0, ',', '.') }} hari</div></div>
+                        <div class="slip-stat"><div class="slip-stat-label">Bonus Kehadiran</div><div class="slip-stat-value">{{ number_format((float) ($attendanceBonusAmount ?? 0), 0, ',', '.') }}</div></div>
                         <div class="slip-stat total"><div class="slip-stat-label">Total Dibayarkan</div><div class="slip-stat-value">{{ number_format((float) $totalAmount, 0, ',', '.') }}</div></div>
+                    </section>
+                @endif
+
+                @if (($employeeLoans ?? collect())->isNotEmpty())
+                    <section class="slip-debt-section" aria-label="Rincian hutang karyawan">
+                        <div class="slip-section-heading">
+                            <div>
+                                <div class="slip-section-title">Rincian Pembayaran Hutang</div>
+                                <div class="slip-section-note">Pembayaran hutang melalui payroll dan sisa hutang setelah pembayaran</div>
+                            </div>
+                        </div>
+                        <div class="slip-table-wrap">
+                            <table class="slip-table">
+                                <thead>
+                                    <tr>
+                                        <th>Pinjaman</th>
+                                        <th class="slip-right">Bayar Periode Ini</th>
+                                        <th class="slip-right">Total Dibayar</th>
+                                        <th class="slip-right">Sisa Hutang</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($employeeLoans as $loan)
+                                        @php
+                                            $periodLoanPayment = (float) $loanPayments->get($loan->id, collect())->sum('amount');
+                                        @endphp
+                                        <tr>
+                                            <td>
+                                                <div class="slip-item-code">{{ $loan->reference ?: 'Pinjaman #'.$loan->id }}</div>
+                                                <div class="slip-date-value">{{ optional($loan->date)->format('d/m/Y') }}</div>
+                                            </td>
+                                            <td class="slip-right slip-mono">{{ number_format($periodLoanPayment, 0, ',', '.') }}</td>
+                                            <td class="slip-right slip-mono">{{ number_format((float) $loan->posted_repayment_amount, 0, ',', '.') }}</td>
+                                            <td class="slip-right slip-mono" style="font-weight:850">{{ number_format((float) $loan->outstanding_amount, 0, ',', '.') }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td>Total</td>
+                                        <td class="slip-right slip-mono">{{ number_format((float) ($loanPaymentTotal ?? 0), 0, ',', '.') }}</td>
+                                        <td></td>
+                                        <td class="slip-right slip-mono">{{ number_format((float) $employeeLoans->sum(fn ($loan) => $loan->outstanding_amount), 0, ',', '.') }}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
                     </section>
                 @endif
 
