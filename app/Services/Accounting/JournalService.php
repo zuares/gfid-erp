@@ -124,6 +124,10 @@ class JournalService
 
     public const SRC_SUPPLIER_LOAN_APPLY = 'supplier_loan_apply';
 
+    public const SRC_EMPLOYEE_LOAN = 'employee_loan';
+
+    public const SRC_EMPLOYEE_LOAN_REPAYMENT = 'employee_loan_repayment';
+
     // public const SRC_PO_EXPENSE_APPROVE = 'purchase_order_expense_approve';
 
     /**

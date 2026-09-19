@@ -35,4 +35,9 @@ class Employee extends Model
     {
         return $this->hasMany(SewingPickup::class, 'operator_id');
     }
+
+    public function loans()
+    {
+        return $this->hasMany(EmployeeLoan::class);
+    }
 }

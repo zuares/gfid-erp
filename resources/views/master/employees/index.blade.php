@@ -547,7 +547,7 @@
                                 <th style="width:130px;">Payment</th>
                                 <th style="width:145px;">Phone</th>
                                 <th style="width:110px;" class="text-center">Status</th>
-                                <th style="width:145px;" class="text-end">Aksi</th>
+                                <th style="width:235px;" class="text-end">Aksi</th>
                             </tr>
                         </thead>
 
@@ -594,6 +594,12 @@
 
                                     <td class="text-end">
                                         <div class="gf-row-actions">
+                                            @if (Route::has('accounting.employee-loans.index'))
+                                                <a href="{{ route('accounting.employee-loans.index', ['employee_id' => $employee->id]) }}"
+                                                    class="btn btn-outline-secondary btn-sm rounded-pill">
+                                                    Pinjaman
+                                                </a>
+                                            @endif
                                             <a href="{{ route('master.employees.edit', $employee) }}"
                                                 class="btn btn-outline-primary btn-sm rounded-pill">
                                                 Edit

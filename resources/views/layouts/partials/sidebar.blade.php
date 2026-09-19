@@ -198,6 +198,7 @@
     $hasCashBasisReportIndex = $router->has('accounting.cash-basis-report.index');
     $hasCashReceiptsIndex = $router->has('accounting.cash-receipts.index');
     $hasLoansIndex = $router->has('accounting.loans.index');
+    $hasEmployeeLoansIndex = $router->has('accounting.employee-loans.index');
     $hasSupplierLoansIndex = $router->has('accounting.supplier-loans.index');
     $hasJournalsIndex = $router->has('accounting.journals.index');
     $hasOpeningBalancesIndex = $router->has('accounting.opening-balances.index');
@@ -297,7 +298,7 @@
     if (!$canModule('accounting')) {
         $hasAccountingIndex = $hasAccountsIndex = $hasCashBasisReportIndex = false;
         $hasCashReceiptsIndex = $hasJournalsIndex = $hasOpeningBalancesIndex = false;
-        $hasLoansIndex = $hasSupplierLoansIndex = false;
+        $hasLoansIndex = $hasEmployeeLoansIndex = $hasSupplierLoansIndex = false;
         $hasOpeningBalancesBatchIndex = $hasCashTransfersIndex = false;
         $hasSupplierApOpeningsIndex = false;
     }
@@ -432,6 +433,7 @@
         $open('accounting.cash-expenses.*') ||
         $open('accounting.cash-receipts.*') ||
         $open('accounting.loans.*') ||
+        $open('accounting.employee-loans.*') ||
         $open('accounting.supplier-loans.*') ||
         $open('accounting.cash-transfers.*') ||
         $open('accounting.marketplace-payouts.*') ||
@@ -1637,6 +1639,7 @@
                 $hasCashTransfersIndex,
                 $hasCashReceiptsIndex,
                 $hasLoansIndex,
+                $hasEmployeeLoansIndex,
                 $hasSupplierLoansIndex,
                 $hasCashBasisReportIndex,
                 $hasJournalsIndex,
@@ -1703,6 +1706,13 @@
                         <x-sidebar.simple-link href="{{ route('accounting.supplier-loans.index') }}" icon="bi bi-person-check"
                             :active="request()->routeIs('accounting.supplier-loans.*')">
                             Dana Supplier
+                        </x-sidebar.simple-link>
+                    @endif
+
+                    @if ($hasEmployeeLoansIndex)
+                        <x-sidebar.simple-link href="{{ route('accounting.employee-loans.index') }}" icon="bi bi-person-vcard"
+                            :active="request()->routeIs('accounting.employee-loans.*')">
+                            Pinjaman Karyawan
                         </x-sidebar.simple-link>
                     @endif
 
@@ -2555,7 +2565,7 @@
             @endif
 
             {{-- FINANCE --}}
-            @if ($canShow($hasAccountingIndex, $hasOpeningBalancesIndex, $hasOpeningBalancesBatchIndex, $hasSupplierApOpeningsIndex, $hasCashExpensesIndex, $hasCashReceiptsIndex, $hasLoansIndex, $hasSupplierLoansIndex, $hasCashTransfersIndex, $hasCashBasisReportIndex, $hasJournalsIndex, $hasAccountsIndex, $hasMarketplacePayoutsIndex, $hasApReportIndex, $hasTrialBalanceIndex, $hasProfitLossIndex, $hasBukuBesarIndex))
+            @if ($canShow($hasAccountingIndex, $hasOpeningBalancesIndex, $hasOpeningBalancesBatchIndex, $hasSupplierApOpeningsIndex, $hasCashExpensesIndex, $hasCashReceiptsIndex, $hasLoansIndex, $hasEmployeeLoansIndex, $hasSupplierLoansIndex, $hasCashTransfersIndex, $hasCashBasisReportIndex, $hasJournalsIndex, $hasAccountsIndex, $hasMarketplacePayoutsIndex, $hasApReportIndex, $hasTrialBalanceIndex, $hasProfitLossIndex, $hasBukuBesarIndex))
                 <x-sidebar.label text="Keuangan" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openAccounting ? 'is-open' : '' }}" type="button"
@@ -2633,6 +2643,13 @@
                             <x-sidebar.sub-link href="{{ route('accounting.supplier-loans.index') }}" icon="bi bi-person-check"
                                 :active="request()->routeIs('accounting.supplier-loans.*')">
                                 Dana Supplier
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasEmployeeLoansIndex)
+                            <x-sidebar.sub-link href="{{ route('accounting.employee-loans.index') }}" icon="bi bi-person-vcard"
+                                :active="request()->routeIs('accounting.employee-loans.*')">
+                                Pinjaman Karyawan
                             </x-sidebar.sub-link>
                         @endif
 
