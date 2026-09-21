@@ -536,7 +536,7 @@
             </div>
           </div>
           <section class="an-enterprise-card an-executive-top an-tab-pane" data-an-pane="summary">
-              <div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Executive overview</div><div class="an-enterprise-title">Executive pulse</div><div class="an-enterprise-sub">Metrik utama periode aktif</div></div><span class="an-health-score" id="anOverallScore">—</span></div>
+              <div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Executive overview</div><div class="an-enterprise-title">Executive pulse</div><div class="an-enterprise-sub">Volume, basket, dan exception operasional</div></div></div>
               <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-executive" id="anPulseGrid"><div class="an-empty">Memuat insight…</div></div></div>
           </section>
 
@@ -1491,17 +1491,11 @@
         const topStores = [...(summary?.stores || [])].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0)).slice(0, 5);
         const pulse = [
             ['Total order', totalOrder.toLocaleString('id-ID'), { text: `eligible · ${totalOrderChange.text}`, className: totalOrderChange.className }, 'orders'],
-            ['Dibatalkan', cancelledOrders.toLocaleString('id-ID'), { text: `${money(cancelledAmount)} · ${cancelledAmountChange.text}`, className: exceptionChange(cancelledAmountChange).className }, 'cancelled'],
-            ['Refund / return', money(returnRefundAmount), { text: `${returnRefundOrders.toLocaleString('id-ID')} order · ${returnRefundRate.toFixed(1)}% · ${refundAmountChange.text}`, className: exceptionChange(refundAmountChange).className }, 'refund'],
             ['Produk terjual', totalProducts.toLocaleString('id-ID'), { text: `unit · ${totalProductsChange.text}`, className: totalProductsChange.className }, 'products'],
-            ['Omzet net', money(netOrderRevenue), netRevenueChange, 'revenue'],
-            ['Biaya iklan incl. PPN', money(adCost), adCostChange, 'ads'],
-            ['Fee marketplace', money(actualCashFee), { text: `actual · ${marketplaceFeeChange.text}`, className: exceptionChange(marketplaceFeeChange).className }, 'marketplace-fee'],
-            ['Affiliate / AMS', money(actualAffiliateFee), { text: `actual · ${affiliateFeeChange.text}`, className: exceptionChange(affiliateFeeChange).className }, 'affiliate'],
             ['AOV net', money(aovNet), aovChange, 'aov'],
             ['APC pembeli', money(apc), { text: `cair + pending · ${apcChange.text}`, className: apcChange.className }, 'apc'],
-            ['Estimasi profit', money(estimatedProfit), estimatedProfitChange, 'estimated-profit'],
-            ['Margin estimasi', `${estimatedMargin.toFixed(1)}%`, estimatedMarginChange, 'estimated-margin'],
+            ['Dibatalkan', cancelledOrders.toLocaleString('id-ID'), { text: `${money(cancelledAmount)} · ${cancelledAmountChange.text}`, className: exceptionChange(cancelledAmountChange).className }, 'cancelled'],
+            ['Refund / return', money(returnRefundAmount), { text: `${returnRefundOrders.toLocaleString('id-ID')} order · ${returnRefundRate.toFixed(1)}% · ${refundAmountChange.text}`, className: exceptionChange(refundAmountChange).className }, 'refund'],
         ];
         $('anPulseGrid').innerHTML = pulse.map(([label,value,change,metric]) => `<div class="an-pulse an-pulse-action ${selectedPulseMetric === metric ? 'is-active' : ''}" data-pulse-metric="${metric}" role="button" tabindex="0" title="Bandingkan grafik dengan tanggal sama bulan lalu"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-pulse-note ${change.className}">${change.text}</div></div>`).join('');
         const decisionPulse = [
@@ -1513,9 +1507,6 @@
             ['Est. net profit', money(estimatedNetProfit), { text: `${estimatedMargin.toFixed(1)}% margin`, className: netProfitChange.className }, netProfitChange, 'profit'],
         ];
         $('anDecisionPulse').innerHTML = decisionPulse.map(([label,value,note,comparison,group]) => `<div class="an-pulse decision-${group}"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-decision-pulse-footer"><div class="an-pulse-note ${note.className}">${note.text}</div><span class="an-pulse-compare ${comparison.className}">${comparison.text}</span></div></div>`).join('');
-        const scoreClass = healthClass(readyRate);
-        $('anOverallScore').className = `an-health-score ${scoreClass}`;
-        $('anOverallScore').textContent = `Data ready ${readyRate.toFixed(0)}%`;
         const health = [
             ['Completion rate', Number(current.completion_rate || 0), false, `${Number(current.completed_count || 0).toLocaleString('id-ID')} selesai`],
             ['Cancellation', Number(current.cancel_rate || 0), true, `${Number(current.cancelled_count || 0).toLocaleString('id-ID')} dibatalkan`],
