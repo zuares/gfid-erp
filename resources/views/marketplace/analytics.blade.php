@@ -541,7 +541,7 @@
           </section>
 
           <section class="an-enterprise-card an-tab-pane" data-an-pane="summary">
-              <div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Decision cockpit</div><div class="an-enterprise-title">KPI keputusan</div><div class="an-enterprise-sub">Urutan baca: dana → profit → biaya</div></div></div>
+              <div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Decision cockpit</div><div class="an-enterprise-title">KPI keputusan</div><div class="an-enterprise-sub">GMV → dana → biaya → net profit</div></div></div>
               <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-finance an-decision-pulse-grid" id="anDecisionPulse"><div class="an-empty">Memuat KPI…</div></div></div>
           </section>
 
@@ -1416,6 +1416,8 @@
         const previousAovNet = Number(previous.order_total || 0) > 0 ? previousNetOrderRevenue / Number(previous.order_total) : 0;
         const estimatedProfit = Number(current.estimated_profit ?? estimatedProfitFallback);
         const previousEstimatedProfit = Number(previous.estimated_profit ?? previousEstimatedProfitFallback);
+        const gmv = Number(current.gmv || grossOrderRevenue || 0);
+        const previousGmv = Number(previous.gmv || previousGrossOrderRevenue || 0);
         const settledProfit = Number(current.settled_profit ?? current.operating_profit ?? 0);
         const estimatedUnsettledProfit = Number(current.estimated_unsettled_profit ?? (estimatedProfit - settledProfit));
         const previousSettledProfit = Number(previous.settled_profit ?? previous.operating_profit ?? 0);
@@ -1473,6 +1475,7 @@
             const change = (currentValue - baseline) / Math.abs(baseline) * 100;
             return { text: `${change > 0 ? '+' : ''}${change.toFixed(1)}% vs lalu`, className: inverse ? (change > 0 ? 'bad' : (change < 0 ? 'good' : '')) : (change > 0 ? 'good' : (change < 0 ? 'bad' : '')) };
         };
+        const gmvChange = decisionChange(gmv, previousGmv);
         const decisionPayoutChange = decisionChange(cashPayout, previousCashPayout);
         const decisionSettledProfitChange = decisionChange(settledProfit, previousSettledProfit);
         const decisionPendingPayoutChange = decisionChange(pendingPayout, previousPendingPayout, true);
@@ -1499,12 +1502,12 @@
         ];
         $('anPulseGrid').innerHTML = pulse.map(([label,value,change,metric]) => `<div class="an-pulse an-pulse-action ${selectedPulseMetric === metric ? 'is-active' : ''}" data-pulse-metric="${metric}" role="button" tabindex="0" title="Bandingkan grafik dengan tanggal sama bulan lalu"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-pulse-note ${change.className}">${change.text}</div></div>`).join('');
         const decisionPulse = [
-            ['Dana sudah cair', money(cashPayout), { text: `${payoutRealization.toFixed(1)}% dari estimasi`, className: cashPayoutChange.className }, decisionPayoutChange, 'cash'],
+            ['GMV', money(gmv), { text: 'omzet order eligible', className: gmvChange.className }, gmvChange, 'cash'],
+            ['Dana cair', money(cashPayout), { text: `${payoutRealization.toFixed(1)}% dari estimasi`, className: cashPayoutChange.className }, decisionPayoutChange, 'cash'],
             ['Dana belum cair', money(pendingPayout), { text: `${pendingPayoutRate.toFixed(1)}% dari estimasi`, className: decisionPendingPayoutChange.className }, decisionPendingPayoutChange, 'cash'],
-            ['Profit terealisasi', money(settledProfit), { text: `${settledProfitMargin.toFixed(1)}% margin`, className: settledProfitChange.className }, decisionSettledProfitChange, 'profit'],
-            ['Est. profit belum cair', money(estimatedUnsettledProfit), { text: `${estimatedUnsettledProfitMargin.toFixed(1)}% margin`, className: estimatedUnsettledProfitChange.className }, decisionUnsettledProfitChange, 'profit'],
-            ['Fee marketplace', money(actualCashFee), { text: `${feeRate.toFixed(1)}% dari dana cair`, className: exceptionChange(marketplaceFeeChange).className }, decisionFeeChange, 'cost'],
+            ['Biaya marketplace', money(actualCashFee), { text: `${feeRate.toFixed(1)}% dari dana cair`, className: exceptionChange(marketplaceFeeChange).className }, decisionFeeChange, 'cost'],
             ['Biaya iklan', money(adCost), { text: `${adCostRate.toFixed(1)}% dari omzet net`, className: exceptionChange(adCostChange).className }, decisionAdCostChange, 'cost'],
+            ['Net profit', money(estimatedProfit), { text: `${estimatedMargin.toFixed(1)}% margin`, className: estimatedProfitChange.className }, decisionChange(estimatedProfit, previousEstimatedProfit), 'profit'],
         ];
         $('anDecisionPulse').innerHTML = decisionPulse.map(([label,value,note,comparison,group]) => `<div class="an-pulse decision-${group}"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-decision-pulse-footer"><div class="an-pulse-note ${note.className}">${note.text}</div><span class="an-pulse-compare ${comparison.className}">${comparison.text}</span></div></div>`).join('');
         const scoreClass = healthClass(readyRate);
