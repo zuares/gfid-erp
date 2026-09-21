@@ -112,6 +112,11 @@
     .an-pulse-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.55rem; }
     .an-pulse-grid-executive { grid-template-columns:repeat(4,minmax(0,1fr)); }
     .an-pulse-grid-finance { grid-template-columns:repeat(5,minmax(0,1fr)); }
+    .an-decision-pulse-grid { grid-template-columns:repeat(3,minmax(0,1fr)); align-items:stretch; }
+    .an-decision-pulse-grid .an-pulse { min-height:136px; display:flex; flex-direction:column; justify-content:space-between; gap:.45rem; }
+    .an-decision-pulse-grid .an-pulse-label { min-height:2.35em; line-height:1.25; }
+    .an-decision-pulse-grid .an-pulse-value { font-size:clamp(.95rem,1.55vw,1.12rem); white-space:nowrap; }
+    .an-decision-pulse-grid .an-pulse-note { white-space:normal; overflow:visible; text-overflow:clip; line-height:1.4; }
     .an-pulse-grid-executive .an-pulse { min-height:96px; display:flex; flex-direction:column; justify-content:space-between; }
     .an-pulse-grid-executive .an-pulse-label { font-size:.66rem; text-transform:none; letter-spacing:0; }
     .an-pulse-grid-executive .an-pulse-note { white-space:normal; overflow:visible; text-overflow:clip; line-height:1.35; }
@@ -161,7 +166,8 @@
     .an-empty { padding:1.6rem 0; text-align:center; color:#94a3b8; font-size:.75rem; font-weight:750; }
     .an-error { padding:.8rem .9rem; border:1px solid #fecaca; border-radius:12px; background:#fef2f2; color:#b91c1c; font-size:.73rem; font-weight:750; }
     @media (max-width: 1100px) and (min-width: 761px) { .an-pulse-grid-executive, .an-pulse-grid-finance { grid-template-columns:repeat(3,minmax(0,1fr)); } }
-    @media (max-width: 760px) { .an-grid-main, .an-grid-secondary, .an-enterprise-grid, .an-contribution-grid { grid-template-columns:1fr; } .an-pulse-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-kpi-value { font-size:1.12rem; } .an-field input { min-width:150px; } .an-product-toolbar { width:100%; justify-content:flex-start; margin-top:.35rem; } .an-product-toolbar input, .an-product-toolbar select { flex:1 1 140px; width:auto; } .an-chart-panel-head { flex-direction:column; gap:.35rem; } .an-chart-summary { text-align:left; } .an-health-wide .an-funnel { grid-template-columns:1fr; } }
+    @media (max-width: 760px) { .an-grid-main, .an-grid-secondary, .an-enterprise-grid, .an-contribution-grid { grid-template-columns:1fr; } .an-pulse-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-decision-pulse-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-kpi-value { font-size:1.12rem; } .an-field input { min-width:150px; } .an-product-toolbar { width:100%; justify-content:flex-start; margin-top:.35rem; } .an-product-toolbar input, .an-product-toolbar select { flex:1 1 140px; width:auto; } .an-chart-panel-head { flex-direction:column; gap:.35rem; } .an-chart-summary { text-align:left; } .an-health-wide .an-funnel { grid-template-columns:1fr; } }
+    @media (max-width: 520px) { .an-decision-pulse-grid { grid-template-columns:1fr; } .an-decision-pulse-grid .an-pulse { min-height:116px; } }
     @media (max-width: 420px) { .an-kpis { grid-template-columns:1fr 1fr; gap:.45rem; } .an-kpi { padding:.72rem; min-height:100px; } .an-toolbar, .an-toolbar-controls { align-items:stretch; } .an-field, .an-field input, .an-btn { width:100%; } }
 
     /* Selaras dengan Ads Dashboard: header flat, panel rapat, dan KPI beraksen. */
@@ -481,7 +487,7 @@
 
           <section class="an-enterprise-card an-tab-pane" data-an-pane="summary">
               <div class="an-enterprise-head"><div><div class="an-enterprise-title">KPI keputusan</div><div class="an-enterprise-sub">Arus kas, biaya, dan profit periode aktif</div></div></div>
-              <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-finance" id="anDecisionPulse"><div class="an-empty">Memuat KPI…</div></div></div>
+              <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-finance an-decision-pulse-grid" id="anDecisionPulse"><div class="an-empty">Memuat KPI…</div></div></div>
           </section>
 
         <div class="an-grid-main an-grid-main-chart an-tab-pane" data-an-pane="summary">
