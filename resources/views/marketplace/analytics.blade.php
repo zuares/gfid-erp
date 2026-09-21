@@ -1353,6 +1353,7 @@
         const estimatedProfit = Number(current.estimated_profit ?? estimatedProfitFallback);
         const previousEstimatedProfit = Number(previous.estimated_profit ?? previousEstimatedProfitFallback);
         const estimatedMargin = Number(current.estimated_profit_margin ?? (netOrderRevenue > 0 ? estimatedProfit / netOrderRevenue * 100 : 0));
+        const previousEstimatedMargin = Number(previous.estimated_profit_margin ?? (previousNetOrderRevenue > 0 ? previousEstimatedProfit / previousNetOrderRevenue * 100 : 0));
         const previousActualCashFee = Number(previous.cash_marketplace_fees ?? previous.marketplace_fees_actual ?? 0);
         const previousActualAffiliateFee = Number(previous.cash_affiliate_fees ?? previous.affiliate_fees_actual ?? 0);
         const estimatedPayout = Number(current.estimated_payout ?? cashPayout);
@@ -1385,6 +1386,8 @@
         const refundAmountChange = pulseChange(returnRefundAmount, previousReturnRefundAmount, moneyText);
         const exceptionChange = change => ({ ...change, className: change.className === 'good' ? 'bad' : (change.className === 'bad' ? 'good' : '') });
         const estimatedProfitChange = pulseChange(estimatedProfit, previousEstimatedProfit, moneyText);
+        const percentText = value => `${Number(value || 0).toFixed(1)}%`;
+        const estimatedMarginChange = pulseChange(estimatedMargin, previousEstimatedMargin, percentText);
         const pendingPayoutChange = pulseChange(pendingPayout, previousPendingPayout, moneyText);
         const cashPayoutChange = pulseChange(cashPayout, previousCashPayout, moneyText);
         const returnRefundRate = placedOrders > 0 ? returnRefundOrders / placedOrders * 100 : 0;
