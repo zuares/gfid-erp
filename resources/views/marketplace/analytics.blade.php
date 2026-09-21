@@ -454,6 +454,48 @@
     @media (max-width:1100px) { .an-cohort-primary-controls { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-cohort-run-wrap { grid-column:1/-1; justify-content:flex-start; } .an-cohort-run-hint { text-align:left; } .an-cohort-advanced-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-cohort-apply { width:auto; } .an-cohort-insights, .an-cohort-detail-layout { grid-template-columns:1fr; } }
     @media (max-width:760px) { .an-cohort-hero { flex-direction:column; } .an-cohort-hero-meta { align-items:flex-start; } .an-cohort-period-label { text-align:left; } .an-cohort-control-head { align-items:flex-start; } .an-cohort-primary-controls, .an-cohort-advanced-grid { grid-template-columns:1fr; } .an-cohort-run-wrap { grid-column:auto; flex-direction:column; align-items:stretch; gap:.45rem; } .an-cohort-run-hint { text-align:left; } .an-cohort-apply { width:100%; } .an-cohort-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-cohort-field, .an-cohort-field input, .an-cohort-field select { width:100%; min-width:0; } .an-cohort-reading-hint { width:100%; margin-left:0; padding-top:.35rem; border-top:1px solid var(--dsh-border); } }
     @media (max-width:420px) { .an-cohort-summary-grid { grid-template-columns:1fr; } .an-cohort-apply { grid-column:auto; } .an-cohort-control-head { flex-direction:column; } .an-cohort-reset { align-self:flex-start; } .an-cohort-advanced summary { align-items:flex-start; flex-direction:column; gap:.15rem; } .an-cohort-advanced summary small { margin-left:0; } }
+
+    /* Enterprise command-center pass: stronger hierarchy, denser context, and clearer executive scanning. */
+    .an-page { max-width:1280px; }
+    .an-shell { gap:1rem; }
+    .an-hero { position:relative; min-height:132px; margin-inline:-.75rem; padding:1.15rem 1.25rem; border:1px solid #1e3a5f; border-radius:18px; background:linear-gradient(135deg,#0b1220 0%,#10233f 62%,#12395a 100%); box-shadow:0 18px 34px rgba(15,23,42,.16); align-items:flex-end; }
+    .an-hero::after { content:''; position:absolute; inset:auto 1.2rem 0 auto; width:210px; height:76px; border-radius:100% 0 0 0; background:radial-gradient(ellipse at bottom right,rgba(56,189,248,.2),transparent 68%); pointer-events:none; }
+    .an-hero-copy { position:relative; z-index:1; }
+    .an-hero-eyebrow { display:flex; align-items:center; gap:.4rem; color:#93c5fd; font-size:.61rem; font-weight:850; letter-spacing:.11em; text-transform:uppercase; }
+    .an-hero-eyebrow::before { content:''; width:7px; height:7px; border-radius:99px; background:#38bdf8; box-shadow:0 0 0 4px rgba(56,189,248,.16); }
+    .an-hero-title { margin-top:.4rem; color:#fff; font-size:1.35rem; font-weight:850; letter-spacing:-.04em; }
+    .an-hero-title i { color:#7dd3fc; }
+    .an-hero-sub { margin-top:.25rem; color:#cbd5e1; font-size:.7rem; font-weight:600; }
+    .an-hero .an-sync-note { color:#94a3b8 !important; font-size:.63rem; }
+    .an-hero-controls { position:relative; z-index:1; padding:.55rem .65rem; border:1px solid rgba(191,219,254,.2); border-radius:12px; background:rgba(15,23,42,.38); backdrop-filter:blur(8px); }
+    .an-hero .an-field label { color:#bfdbfe; }
+    .an-hero .an-field input, .an-hero .an-field select { border-color:rgba(148,163,184,.34); }
+    .an-hero .an-btn-dark { background:#38bdf8; border-color:#38bdf8; color:#082f49; }
+    .an-hero .an-btn-dark:hover { background:#7dd3fc; border-color:#7dd3fc; color:#082f49; }
+    .an-tabs-wrap { padding:.25rem 0 .15rem; border-bottom:0; }
+    .an-tabs { border-color:var(--dsh-border); border-radius:12px; background:var(--card,#fff); box-shadow:0 8px 18px rgba(15,23,42,.05); }
+    .an-tab { padding:.58rem .85rem; border-radius:9px; font-size:.7rem; }
+    .an-tab.active { background:#172554; box-shadow:0 6px 14px rgba(23,37,84,.18); }
+    .an-enterprise-card, .an-card { border-radius:16px; box-shadow:0 14px 30px rgba(15,23,42,.055); }
+    .an-enterprise-head, .an-card-head { padding:1rem 1.05rem .82rem; }
+    .an-enterprise-head { background:linear-gradient(180deg,rgba(248,250,252,.78),rgba(255,255,255,0)); }
+    .an-enterprise-title, .an-card-title { font-size:.86rem; font-weight:850; letter-spacing:-.01em; }
+    .an-enterprise-sub, .an-card-sub { max-width:720px; line-height:1.45; }
+    .an-executive-top { border-color:#bfdbfe; }
+    .an-executive-top .an-enterprise-head { border-left:3px solid #2563eb; padding-left:.85rem; }
+    .an-executive-top .an-pulse { background:linear-gradient(180deg,#f8fbff,#fff); }
+    .an-tab-pane[data-an-pane="summary"]:nth-of-type(4) .an-enterprise-head { border-left:3px solid #0f766e; padding-left:.85rem; }
+    .an-health-wide .an-card-head, .an-health-wide .an-enterprise-head { border-left:3px solid #2563eb; padding-left:.85rem; }
+    .an-chart-panel-title { color:var(--text,#0f172a); font-size:.73rem; font-weight:850; text-transform:uppercase; letter-spacing:.06em; }
+    .an-chart-summary { color:#2563eb; font-size:.67rem; font-weight:850; }
+    .an-chart-canvas { border:1px solid #eef2f7; }
+    .an-kpi { border-radius:14px; box-shadow:0 10px 22px rgba(15,23,42,.045); }
+    .an-kpi.primary { background:linear-gradient(135deg,#0f172a,#1e293b); }
+    body[data-theme="dark"] .an-hero { border-color:#1e40af; background:linear-gradient(135deg,#020617 0%,#0f172a 62%,#12395a 100%); }
+    body[data-theme="dark"] .an-enterprise-head { background:linear-gradient(180deg,rgba(30,41,59,.55),rgba(30,41,59,0)); }
+    body[data-theme="dark"] .an-executive-top .an-pulse { background:linear-gradient(180deg,#1e293b,#172033); }
+    @media (min-width:1200px) { .an-page { min-width:0; } }
+    @media (max-width:760px) { .an-hero { margin-inline:-.5rem; padding:.9rem .8rem; } .an-hero-title { font-size:1.12rem; } .an-hero-controls { padding:.55rem; } .an-enterprise-head, .an-card-head { padding:.85rem .8rem .7rem; } }
 </style>
 @endpush
 
@@ -464,6 +506,7 @@
             <div class="an-hero-copy">
                 <div class="an-hero-eyebrow">Marketplace · Analytics</div>
                 <div class="an-hero-title"><i class="bi bi-bar-chart-line me-1"></i>Analytics Marketplace</div>
+                <div class="an-hero-sub">Executive command center untuk omzet, pencairan, biaya, dan profit.</div>
                 <div class="an-sync-note" id="anSyncNote">Memuat data marketplace…</div>
             </div>
             <div class="an-hero-controls">
@@ -485,21 +528,21 @@
             </div>
           </div>
           <section class="an-enterprise-card an-executive-top an-tab-pane" data-an-pane="summary">
-              <div class="an-enterprise-head"><div><div class="an-enterprise-title">Executive pulse</div><div class="an-enterprise-sub">Metrik utama periode aktif</div></div><span class="an-health-score" id="anOverallScore">—</span></div>
+              <div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Executive overview</div><div class="an-enterprise-title">Executive pulse</div><div class="an-enterprise-sub">Metrik utama periode aktif</div></div><span class="an-health-score" id="anOverallScore">—</span></div>
               <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-executive" id="anPulseGrid"><div class="an-empty">Memuat insight…</div></div></div>
           </section>
 
           <section class="an-enterprise-card an-tab-pane" data-an-pane="summary">
-              <div class="an-enterprise-head"><div><div class="an-enterprise-title">KPI keputusan</div><div class="an-enterprise-sub">Arus kas, biaya, dan profit periode aktif</div></div></div>
+              <div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Decision cockpit</div><div class="an-enterprise-title">KPI keputusan</div><div class="an-enterprise-sub">Arus kas, biaya, dan profit periode aktif</div></div></div>
               <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-finance an-decision-pulse-grid" id="anDecisionPulse"><div class="an-empty">Memuat KPI…</div></div></div>
           </section>
 
         <div class="an-grid-main an-grid-main-chart an-tab-pane" data-an-pane="summary">
-            <section class="an-card"><div class="an-card-head"><div><div class="an-card-title"><i class="bi bi-graph-up-arrow me-1" style="color:#16a34a"></i>Grafik harian</div><div class="an-card-sub">Omzet &amp; estimasi profit</div></div></div><div class="an-card-body"><div class="an-chart-panel-head"><div class="an-chart-panel-title">Performa harian</div><div class="an-chart-summary" id="chartCompareNote">Memuat…</div></div><div class="an-chart" id="revenueChart"><div class="an-empty">Memuat grafik…</div></div></div></section>
+            <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Performance trend</div><div class="an-card-title"><i class="bi bi-graph-up-arrow me-1" style="color:#16a34a"></i>Grafik harian</div><div class="an-card-sub">Omzet &amp; estimasi profit</div></div></div><div class="an-card-body"><div class="an-chart-panel-head"><div class="an-chart-panel-title">Performa harian</div><div class="an-chart-summary" id="chartCompareNote">Memuat…</div></div><div class="an-chart" id="revenueChart"><div class="an-empty">Memuat grafik…</div></div></div></section>
         </div>
 
         <section class="an-card an-health-wide an-tab-pane" data-an-pane="summary">
-            <div class="an-card-head"><div><div class="an-card-title"><i class="bi bi-activity me-1" style="color:#2563eb"></i>Kesehatan order &amp; keuangan</div><div class="an-card-sub">Order operasional dan profit yang sudah tervalidasi.</div></div></div>
+            <div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Operational health</div><div class="an-card-title"><i class="bi bi-activity me-1" style="color:#2563eb"></i>Kesehatan order &amp; keuangan</div><div class="an-card-sub">Order operasional dan profit yang sudah tervalidasi.</div></div></div>
             <div class="an-card-body"><div class="an-funnel" id="salesFunnel"><div class="an-empty">Memuat…</div></div></div>
         </section>
 
