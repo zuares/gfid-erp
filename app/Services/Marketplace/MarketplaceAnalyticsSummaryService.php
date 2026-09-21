@@ -182,6 +182,7 @@ class MarketplaceAnalyticsSummaryService
             'hpp_total' => $hpp['hpp_total'],
             'hpp_settled' => $hpp['hpp_settled'],
             'hpp_unsettled' => $hpp['hpp_unsettled'],
+            'hpp_shipped' => $hpp['hpp_shipped'],
             'return_refund_count' => $returns['return_refund_count'],
             'return_refund_order_count' => $returns['return_refund_order_count'],
             'return_refund_amount' => $returns['return_refund_amount'],
@@ -443,7 +444,7 @@ class MarketplaceAnalyticsSummaryService
 
         return match ($group) {
             'shipped' => $base
-                ->whereRaw("{$status} IN ('READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE')")
+                ->whereRaw("{$status} IN ('SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE')")
                 ->whereRaw('NOT ' . $this->returnRefundExistsSql()),
             'cancelled' => $base
                 ->whereRaw("{$status} IN ('CANCELLED', 'CANCELED', 'CANCELLED_BEFORE_SHIPPING', 'BATAL', 'IN_CANCEL')")
@@ -1196,10 +1197,13 @@ class MarketplaceAnalyticsSummaryService
 
     private function unsettledBase(array $filters)
     {
+        $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
+
         return $this->applyDateAndStoreFilters(
             DB::table('marketplace_orders as mo')
                 ->leftJoin('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
                 ->whereRaw($this->isRevenueStatus())
+                ->whereRaw("{$status} NOT IN ('READY_TO_SHIP', 'PROCESSED')")
                 ->where(function ($query) {
                     $query->whereNull('ms.settlement_time');
                 }),
@@ -1672,17 +1676,23 @@ class MarketplaceAnalyticsSummaryService
 
     private function withEstimatedFee(array $aggregate): array
     {
+        $hasCashScope = array_key_exists('cash_order_revenue', $aggregate)
+            || array_key_exists('cash_unsettled_order_revenue', $aggregate);
         $grossOrderRevenue = (float) ($aggregate['cash_order_revenue'] ?? 0)
             + (float) ($aggregate['cash_unsettled_order_revenue'] ?? 0);
-        $grossOrderRevenue = $grossOrderRevenue > 0
-            ? $grossOrderRevenue
+        $grossOrderRevenue = $hasCashScope
+            ? max(0, $grossOrderRevenue)
             : (float) ($aggregate['gmv'] ?? 0);
         $cashPayout = (float) ($aggregate['cash_payout'] ?? $aggregate['payout'] ?? 0);
         // Fee actual is known from settlement, but its rate is compared with
         // marketplace order revenue—not the final payout after deductions.
         $marketplaceRevenue = (float) ($aggregate['cash_order_revenue'] ?? 0);
         $actualMarketplaceFee = (float) ($aggregate['cash_marketplace_fees'] ?? 0);
-        $hpp = (float) ($aggregate['hpp_total'] ?? $aggregate['hpp'] ?? 0);
+        // Projected payout intentionally excludes READY_TO_SHIP/PROCESSED;
+        // use the matching HPP scope when it is available as well.
+        $hpp = array_key_exists('hpp_shipped', $aggregate)
+            ? (float) $aggregate['hpp_shipped']
+            : (float) ($aggregate['hpp_total'] ?? $aggregate['hpp'] ?? 0);
         $adCost = (float) ($aggregate['ad_cost'] ?? 0);
         $feeRate = $marketplaceRevenue > 0 && $actualMarketplaceFee > 0
             ? $actualMarketplaceFee / $marketplaceRevenue
