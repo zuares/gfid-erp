@@ -477,6 +477,9 @@
     .an-decision-pulse-grid .an-pulse-note { font-size:.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .an-decision-pulse-footer { min-height:1.5em; grid-template-columns:minmax(0,1fr) auto; gap:.35rem; }
     .an-decision-pulse-footer .an-pulse-compare { font-size:.57rem; white-space:nowrap; }
+    .an-decision-pulse-grid .an-pulse.decision-cash { border-top:3px solid #2563eb; }
+    .an-decision-pulse-grid .an-pulse.decision-profit { border-top:3px solid #16a34a; }
+    .an-decision-pulse-grid .an-pulse.decision-cost { border-top:3px solid #d97706; }
     .an-tabs-wrap { padding:.25rem 0 .15rem; border-bottom:0; }
     .an-tabs { border-color:var(--dsh-border); border-radius:12px; background:var(--card,#fff); box-shadow:0 8px 18px rgba(15,23,42,.05); }
     .an-tab { padding:.58rem .85rem; border-radius:9px; font-size:.7rem; }
@@ -538,7 +541,7 @@
           </section>
 
           <section class="an-enterprise-card an-tab-pane" data-an-pane="summary">
-              <div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Decision cockpit</div><div class="an-enterprise-title">KPI keputusan</div><div class="an-enterprise-sub">Arus kas, biaya, dan profit periode aktif</div></div></div>
+              <div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Decision cockpit</div><div class="an-enterprise-title">KPI keputusan</div><div class="an-enterprise-sub">Urutan baca: dana → profit → biaya</div></div></div>
               <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-finance an-decision-pulse-grid" id="anDecisionPulse"><div class="an-empty">Memuat KPI…</div></div></div>
           </section>
 
@@ -1496,14 +1499,14 @@
         ];
         $('anPulseGrid').innerHTML = pulse.map(([label,value,change,metric]) => `<div class="an-pulse an-pulse-action ${selectedPulseMetric === metric ? 'is-active' : ''}" data-pulse-metric="${metric}" role="button" tabindex="0" title="Bandingkan grafik dengan tanggal sama bulan lalu"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-pulse-note ${change.className}">${change.text}</div></div>`).join('');
         const decisionPulse = [
-            ['Payout cair', money(cashPayout), { text: `${payoutRealization.toFixed(1)}% dari estimasi`, className: cashPayoutChange.className }, decisionPayoutChange],
-            ['Profit cair', money(settledProfit), { text: `${settledProfitMargin.toFixed(1)}% margin`, className: settledProfitChange.className }, decisionSettledProfitChange],
-            ['Payout belum cair', money(pendingPayout), { text: `${pendingPayoutRate.toFixed(1)}% dari estimasi`, className: decisionPendingPayoutChange.className }, decisionPendingPayoutChange],
-            ['Est. profit belum cair', money(estimatedUnsettledProfit), { text: `${estimatedUnsettledProfitMargin.toFixed(1)}% margin`, className: estimatedUnsettledProfitChange.className }, decisionUnsettledProfitChange],
-            ['Fee marketplace', money(actualCashFee), { text: `${feeRate.toFixed(1)}% dari payout cair`, className: exceptionChange(marketplaceFeeChange).className }, decisionFeeChange],
-            ['Biaya iklan', money(adCost), { text: `${adCostRate.toFixed(1)}% dari omzet net`, className: exceptionChange(adCostChange).className }, decisionAdCostChange],
+            ['Dana sudah cair', money(cashPayout), { text: `${payoutRealization.toFixed(1)}% dari estimasi`, className: cashPayoutChange.className }, decisionPayoutChange, 'cash'],
+            ['Dana belum cair', money(pendingPayout), { text: `${pendingPayoutRate.toFixed(1)}% dari estimasi`, className: decisionPendingPayoutChange.className }, decisionPendingPayoutChange, 'cash'],
+            ['Profit terealisasi', money(settledProfit), { text: `${settledProfitMargin.toFixed(1)}% margin`, className: settledProfitChange.className }, decisionSettledProfitChange, 'profit'],
+            ['Est. profit belum cair', money(estimatedUnsettledProfit), { text: `${estimatedUnsettledProfitMargin.toFixed(1)}% margin`, className: estimatedUnsettledProfitChange.className }, decisionUnsettledProfitChange, 'profit'],
+            ['Fee marketplace', money(actualCashFee), { text: `${feeRate.toFixed(1)}% dari dana cair`, className: exceptionChange(marketplaceFeeChange).className }, decisionFeeChange, 'cost'],
+            ['Biaya iklan', money(adCost), { text: `${adCostRate.toFixed(1)}% dari omzet net`, className: exceptionChange(adCostChange).className }, decisionAdCostChange, 'cost'],
         ];
-        $('anDecisionPulse').innerHTML = decisionPulse.map(([label,value,note,comparison]) => `<div class="an-pulse"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-decision-pulse-footer"><div class="an-pulse-note ${note.className}">${note.text}</div><span class="an-pulse-compare ${comparison.className}">${comparison.text}</span></div></div>`).join('');
+        $('anDecisionPulse').innerHTML = decisionPulse.map(([label,value,note,comparison,group]) => `<div class="an-pulse decision-${group}"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-decision-pulse-footer"><div class="an-pulse-note ${note.className}">${note.text}</div><span class="an-pulse-compare ${comparison.className}">${comparison.text}</span></div></div>`).join('');
         const scoreClass = healthClass(readyRate);
         $('anOverallScore').className = `an-health-score ${scoreClass}`;
         $('anOverallScore').textContent = `Data ready ${readyRate.toFixed(0)}%`;
