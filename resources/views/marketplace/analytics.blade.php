@@ -1361,6 +1361,11 @@
         const previousEstimatedPayout = Number(previous.estimated_payout ?? previousCashPayout);
         const pendingPayout = Math.max(0, estimatedPayout - cashPayout);
         const previousPendingPayout = Math.max(0, previousEstimatedPayout - previousCashPayout);
+        const payoutRealization = estimatedPayout > 0 ? cashPayout / estimatedPayout * 100 : 0;
+        const pendingPayoutRate = estimatedPayout > 0 ? pendingPayout / estimatedPayout * 100 : 0;
+        const settledRevenue = Number(current.cash_order_revenue || 0);
+        const feeRate = settledRevenue > 0 ? actualCashFee / settledRevenue * 100 : 0;
+        const adCostRate = netOrderRevenue > 0 ? adCost / netOrderRevenue * 100 : 0;
         const previousBuyerPayment = Number(previous.cash_gross_sales || 0) + Number(previous.cash_unsettled_gross_sales || 0);
         const previousBuyerPaymentOrders = Number(previous.cash_order_count || 0) + Number(previous.cash_unsettled_order_count || 0);
         const previousApc = previousBuyerPaymentOrders > 0 ? previousBuyerPayment / previousBuyerPaymentOrders : 0;
@@ -1410,11 +1415,11 @@
         ];
         $('anPulseGrid').innerHTML = pulse.map(([label,value,change,metric]) => `<div class="an-pulse an-pulse-action ${selectedPulseMetric === metric ? 'is-active' : ''}" data-pulse-metric="${metric}" role="button" tabindex="0" title="Bandingkan grafik dengan tanggal sama bulan lalu"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-pulse-note ${change.className}">${change.text}</div></div>`).join('');
         const decisionPulse = [
-            ['Payout terealisasi', money(cashPayout), { text: `sudah cair · ${cashPayoutChange.text}`, className: cashPayoutChange.className }, 'Dana yang sudah diterima dari settlement marketplace'],
-            ['Payout pending', money(pendingPayout), { text: `estimasi belum cair · ${pendingPayoutChange.text}`, className: pendingPayoutChange.className }, 'Estimasi dana yang belum masuk sebagai payout'],
-            ['Fee marketplace', money(actualCashFee), { text: `aktual · ${marketplaceFeeChange.text}`, className: marketplaceFeeChange.className }, 'Biaya marketplace aktual dari settlement'],
-            ['Biaya iklan incl. PPN', money(adCost), { text: `periode aktif · ${adCostChange.text}`, className: adCostChange.className }, 'Biaya iklan termasuk PPN 11%'],
-            ['Profit estimasi', money(estimatedProfit), { text: `setelah HPP dan iklan · ${estimatedProfitChange.text}`, className: estimatedProfitChange.className }, 'Estimasi payout − HPP − biaya iklan'],
+            ['Payout terealisasi', money(cashPayout), { text: `${payoutRealization.toFixed(1)}% dari estimasi · sudah cair · ${cashPayoutChange.text}`, className: cashPayoutChange.className }, 'Dana yang sudah diterima dari settlement marketplace'],
+            ['Payout pending', money(pendingPayout), { text: `${pendingPayoutRate.toFixed(1)}% dari estimasi · belum cair · ${pendingPayoutChange.text}`, className: pendingPayoutChange.className }, 'Estimasi dana yang belum masuk sebagai payout'],
+            ['Fee marketplace', money(actualCashFee), { text: `${feeRate.toFixed(1)}% dari omzet settlement · aktual · ${marketplaceFeeChange.text}`, className: marketplaceFeeChange.className }, 'Biaya marketplace aktual dari settlement'],
+            ['Biaya iklan incl. PPN', money(adCost), { text: `${adCostRate.toFixed(1)}% dari omzet net · periode aktif · ${adCostChange.text}`, className: adCostChange.className }, 'Biaya iklan termasuk PPN 11%'],
+            ['Profit estimasi', money(estimatedProfit), { text: `margin ${estimatedMargin.toFixed(1)}% · setelah HPP dan iklan · ${estimatedProfitChange.text}`, className: estimatedProfitChange.className }, 'Estimasi payout − HPP − biaya iklan'],
         ];
         $('anDecisionPulse').innerHTML = decisionPulse.map(([label,value,note,title]) => `<div class="an-pulse" title="${title}"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-pulse-note ${note.className}">${note.text}</div></div>`).join('');
         const scoreClass = healthClass(readyRate);
