@@ -238,7 +238,7 @@
     .an-table td { border-bottom:1px solid var(--dsh-border); color:var(--text,#0f172a); padding:.52rem .62rem; font-size:.75rem; }
     .an-table tr:hover td { background:rgba(148,163,184,.05); }
     .an-table-subline { display:block; margin-top:.18rem; color:var(--dsh-muted); font-size:.62rem; font-weight:600; }
-    .an-product-table { min-width:760px; }
+    .an-product-table { min-width:920px; }
     .an-product-table th, .an-product-table td { padding:.44rem .5rem; }
     .an-product-table .an-product { min-width:155px; gap:.45rem; }
     .an-product-table .an-product-name { max-width:180px; font-size:.7rem; }
@@ -610,7 +610,7 @@
         </div>
 
         <section class="an-enterprise-card an-tab-pane is-hidden" data-an-pane="stores">
-            <div class="an-enterprise-head"><div><div class="an-enterprise-title">Executive pulse</div><div class="an-enterprise-sub">Ringkasan efisiensi akun dan profitabilitas</div></div></div>
+            <div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Account performance</div><div class="an-enterprise-title">Executive pulse</div><div class="an-enterprise-sub">Efisiensi toko berbasis omzet dan profit yang sudah siap secara finansial.</div></div></div>
             <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-finance" id="anFinancePulse"><div class="an-empty">Memuat…</div></div></div>
         </section>
 
@@ -633,23 +633,23 @@
         </div>
 
         <div class="an-enterprise-grid an-tab-pane is-hidden" data-an-pane="stores">
-            <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-enterprise-title">Store performance snapshot</div><div class="an-enterprise-sub">Ranking toko berdasarkan omzet dan profit operasional</div></div></div><div class="an-enterprise-body"><div class="an-pulse-grid" id="anStorePulse"><div class="an-empty">Memuat…</div></div></div></section>
-            <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-enterprise-title">Cost efficiency</div><div class="an-enterprise-sub">Beban biaya dan payout per toko</div></div></div><div class="an-enterprise-body"><div class="an-health-list" id="anStoreCostPulse"><div class="an-empty">Memuat…</div></div></div></section>
+            <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Portfolio view</div><div class="an-enterprise-title">Store performance snapshot</div><div class="an-enterprise-sub">Ranking toko berdasarkan gross sales dan profit operasional terverifikasi.</div></div></div><div class="an-enterprise-body"><div class="an-pulse-grid" id="anStorePulse"><div class="an-empty">Memuat…</div></div></div></section>
+            <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Cost structure</div><div class="an-enterprise-title">Cost efficiency</div><div class="an-enterprise-sub">Rasio biaya terhadap gross sales terverifikasi, bukan GMV operasional.</div></div></div><div class="an-enterprise-body"><div class="an-health-list" id="anStoreCostPulse"><div class="an-empty">Memuat…</div></div></div></section>
         </div>
 
         <div class="an-grid-secondary an-tab-pane is-hidden" data-an-pane="stores">
-            <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Performa per toko</div><div class="an-card-sub">Omzet dan laba memakai order financial ready, settlement complete, serta HPP yang tersedia</div></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order</th><th>Selesai</th><th>Cancel</th><th>Omzet Terverifikasi</th><th>Laba Operasional Terverifikasi</th></tr></thead><tbody id="storeBody"><tr><td colspan="6"><div class="an-empty">Memuat…</div></td></tr></tbody></table></div></div></section>
+            <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Store ledger</div><div class="an-card-title">Performa per toko</div><div class="an-card-sub">Hanya order financial-ready: settlement complete, item valid, dan HPP tersedia.</div></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order eligible</th><th>Selesai</th><th>Cancel</th><th>Gross sales terverifikasi</th><th>Profit operasional</th></tr></thead><tbody id="storeBody"><tr><td colspan="6"><div class="an-empty">Memuat…</div></td></tr></tbody></table></div></div></section>
             <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Biaya marketplace</div><div class="an-card-sub">Fee estimasi mengikuti rate actual Unit economics; biaya settlement tetap tersedia untuk audit</div></div></div><div class="an-card-body"><div class="an-costs" id="costBody"><div class="an-empty">Memuat…</div></div></div></section>
         </div>
 
         <div class="an-enterprise-grid an-tab-pane is-hidden" data-an-pane="products">
-            <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-enterprise-title">Product portfolio</div><div class="an-enterprise-sub">Kualitas portofolio berdasarkan profit tervalidasi</div></div></div><div class="an-enterprise-body"><div class="an-pulse-grid" id="anProductPulse"><div class="an-empty">Menunggu tab Produk dibuka…</div></div></div></section>
-            <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-enterprise-title">Product focus</div><div class="an-enterprise-sub">Rekomendasi fokus berdasarkan data periode ini</div></div></div><div class="an-enterprise-body"><div class="an-alerts" id="anProductFocus"><div class="an-empty">Menunggu data produk…</div></div></div></section>
+            <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Portfolio view</div><div class="an-enterprise-title">Product portfolio</div><div class="an-enterprise-sub">Top produk berdasarkan gross sales dari order financial-ready dengan HPP valid.</div></div></div><div class="an-enterprise-body"><div class="an-pulse-grid" id="anProductPulse"><div class="an-empty">Menunggu tab Produk dibuka…</div></div></div></section>
+            <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Decision support</div><div class="an-enterprise-title">Product focus</div><div class="an-enterprise-sub">Prioritas berdasarkan profit setelah HPP dan alokasi biaya iklan.</div></div></div><div class="an-enterprise-body"><div class="an-alerts" id="anProductFocus"><div class="an-empty">Menunggu data produk…</div></div></div></section>
         </div>
 
         <div class="an-grid-secondary an-tab-pane is-hidden" data-an-pane="products">
-            <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Semua penjualan produk</div><div class="an-card-sub">Hanya produk dari order dengan settlement dan HPP tervalidasi; iklan dialokasikan berdasar omzet produk</div></div><div class="an-product-toolbar"><input id="anProductSearch" type="search" placeholder="Cari produk / SKU…"><select id="anProductSort"><option value="gross_sales">Urutkan: Omzet</option><option value="operating_profit">Urutkan: Laba</option><option value="margin_pct">Urutkan: Margin</option><option value="qty">Urutkan: Qty</option></select></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table an-product-table"><thead><tr><th>#</th><th>Produk</th><th>Qty</th><th>Omzet</th><th>HPP</th><th>Iklan incl. PPN</th><th>Laba Kotor</th><th>Laba Operasional</th></tr></thead><tbody id="bestProductBody"><tr><td colspan="8"><div class="an-empty">Buka tab Produk untuk memuat detail.</div></td></tr></tbody></table></div></div></section>
-            <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Produk perlu perhatian</div></div></div><div class="an-card-body"><div class="an-list" id="worstProductBody"><div class="an-empty">Memuat…</div></div></div></section>
+            <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Product ledger</div><div class="an-card-title">Top produk financial-ready</div><div class="an-card-sub">Maksimal 100 produk, diurutkan dari gross sales. Gross sales dan payout berasal dari settlement complete; iklan dialokasikan proporsional terhadap gross sales produk.</div></div><div class="an-product-toolbar"><input id="anProductSearch" type="search" placeholder="Cari produk / SKU…"><select id="anProductSort"><option value="gross_sales">Urutkan: Gross sales</option><option value="operating_profit">Urutkan: Profit operasional</option><option value="margin_pct">Urutkan: Margin operasional</option><option value="qty">Urutkan: Qty</option></select></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table an-product-table"><thead><tr><th>#</th><th>Produk</th><th>Qty</th><th>Gross sales</th><th>Payout bersih</th><th>HPP</th><th>Iklan incl. PPN</th><th>Profit setelah HPP</th><th>Profit operasional</th></tr></thead><tbody id="bestProductBody"><tr><td colspan="9"><div class="an-empty">Buka tab Produk untuk memuat detail.</div></td></tr></tbody></table></div></div></section>
+            <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Exception review</div><div class="an-card-title">Produk perlu perhatian</div><div class="an-card-sub">Urut dari profit operasional terendah.</div></div></div><div class="an-card-body"><div class="an-list" id="worstProductBody"><div class="an-empty">Memuat…</div></div></div></section>
         </div>
 
         @include('marketplace.partials._analytics_cohort')
@@ -1327,22 +1327,23 @@
     }
     function renderStores() {
         const list = summary?.stores || [];
-        const totalGross = list.reduce((sum, store) => sum + Number(store.gmv || 0), 0);
-        const top = [...list].sort((a,b) => Number(b.gmv || 0) - Number(a.gmv || 0))[0];
-        const bestMargin = [...list].sort((a,b) => Number(b.margin_pct || 0) - Number(a.margin_pct || 0))[0];
+        const contributing = list.filter(store => Number(store.gross_sales || 0) > 0);
+        const totalGross = contributing.reduce((sum, store) => sum + Number(store.gross_sales || 0), 0);
+        const top = [...contributing].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0))[0];
+        const bestMargin = [...contributing].sort((a,b) => Number(b.margin_pct || 0) - Number(a.margin_pct || 0))[0];
         $('anStorePulse').innerHTML = [
-            ['Toko aktif', Number(list.length || 0).toLocaleString('id-ID'), 'dalam periode terpilih'],
-            ['Kontributor utama', top?.store_name || '—', top ? `${(Number(top.gmv || 0) / Math.max(totalGross,1) * 100).toFixed(1)}% omzet` : '—'],
-            ['Margin terbaik', bestMargin?.store_name || '—', bestMargin ? `${Number(bestMargin.margin_pct || 0).toFixed(1)}% margin` : '—'],
+            ['Toko berkontribusi', Number(contributing.length || 0).toLocaleString('id-ID'), 'dengan gross sales terverifikasi'],
+            ['Kontributor utama', top?.store_name || '—', top ? `${(Number(top.gross_sales || 0) / Math.max(totalGross,1) * 100).toFixed(1)}% gross sales` : '—'],
+            ['Margin terbaik', bestMargin?.store_name || '—', bestMargin ? `${Number(bestMargin.margin_pct || 0).toFixed(1)}% profit operasional` : '—'],
         ].map(([label,value,note]) => `<div class="an-pulse"><div class="an-pulse-label">${label}</div><div class="an-pulse-value" style="font-size:${String(value).length > 16 ? '.78rem' : '1rem'}">${esc(value)}</div><div class="an-pulse-note">${note}</div></div>`).join('');
         const storeBase = Math.max(totalGross, 1);
         $('anStoreCostPulse').innerHTML = [
-            ['Payout rate', list.reduce((sum, store) => sum + Number(store.payout || 0), 0) / storeBase * 100],
-            ['Fee rate (actual)', list.reduce((sum, store) => sum + Number(store.marketplace_fee_estimate || 0), 0) / storeBase * 100],
-            ['HPP rate', list.reduce((sum, store) => sum + Number(store.hpp || 0), 0) / storeBase * 100],
-            ['Ad rate', list.reduce((sum, store) => sum + Number(store.ad_cost || 0), 0) / storeBase * 100],
-        ].map(([label,value]) => `<div class="an-health-row"><span>${label}<small>terhadap omzet</small></span><div class="an-health-track"><span style="width:${Math.min(100, Math.max(0, value))}%"></span></div><strong>${Number(value || 0).toFixed(1)}%</strong></div>`).join('');
-        $('storeBody').innerHTML = list.length ? list.map(s=>`<tr><td style="text-align:left;font-weight:850;color:#0f172a">${esc(s.store_name || 'Tanpa toko')}</td><td>${Number(s.order_total || 0).toLocaleString('id-ID')}</td><td>${Number(s.completed_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(s.completed_count,s.order_total)})</small></td><td style="color:${s.cancelled_count?'#dc2626':'inherit'}">${Number(s.cancelled_count || 0).toLocaleString('id-ID')}</td><td style="font-weight:900">${money(s.gross_sales)}<span class="an-table-subline">AOV terverifikasi ${money(s.order_count ? s.gross_sales / s.order_count : 0)}</span></td><td style="font-weight:900;color:${s.operating_profit>=0?'#15803d':'#dc2626'}">${money(s.operating_profit)}<span class="an-table-subline">Payout − HPP − iklan incl. PPN 11% · Iklan ${money(s.ad_cost)}</span></td></tr>`).join('') : '<tr><td colspan="6"><div class="an-empty">Belum ada data toko siap profit.</div></td></tr>';
+            ['Payout / gross sales', list.reduce((sum, store) => sum + Number(store.payout || 0), 0) / storeBase * 100],
+            ['Fee marketplace / gross sales', list.reduce((sum, store) => sum + Number(store.marketplace_fees || 0), 0) / storeBase * 100],
+            ['HPP / gross sales', list.reduce((sum, store) => sum + Number(store.hpp || 0), 0) / storeBase * 100],
+            ['Iklan / gross sales', list.reduce((sum, store) => sum + Number(store.ad_cost || 0), 0) / storeBase * 100],
+        ].map(([label,value]) => `<div class="an-health-row"><span>${label}<small>basis: gross sales terverifikasi</small></span><div class="an-health-track"><span style="width:${Math.min(100, Math.max(0, value))}%"></span></div><strong>${Number(value || 0).toFixed(1)}%</strong></div>`).join('');
+        $('storeBody').innerHTML = list.length ? list.map(s=>`<tr><td style="text-align:left;font-weight:850;color:#0f172a">${esc(s.store_name || 'Tanpa toko')}</td><td>${Number(s.order_total || 0).toLocaleString('id-ID')}</td><td>${Number(s.completed_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(s.completed_count,s.order_total)})</small></td><td style="color:${s.cancelled_count?'#dc2626':'inherit'}">${Number(s.cancelled_count || 0).toLocaleString('id-ID')}</td><td style="font-weight:900">${money(s.gross_sales)}<span class="an-table-subline">AOV financial-ready ${money(s.order_count ? s.gross_sales / s.order_count : 0)}</span></td><td style="font-weight:900;color:${s.operating_profit>=0?'#15803d':'#dc2626'}">${money(s.operating_profit)}<span class="an-table-subline">Payout − HPP − iklan · Iklan ${money(s.ad_cost)}</span></td></tr>`).join('') : '<tr><td colspan="6"><div class="an-empty">Belum ada data toko siap profit.</div></td></tr>';
     }
     function renderCosts() {
         const current = summary?.current || {};
@@ -1503,8 +1504,8 @@
         if (Number(summary?.changes?.operating_profit || 0) < 0) alerts.push(['warn','bi-arrow-down-right','Laba turun dari periode lalu',`${delta('operating_profit').text}`,'Analisis biaya']);
         if (!alerts.length) alerts.push(['','bi-check2-circle','Tidak ada alert kritis','Performa dan kualitas data berada dalam batas aman','—']);
         $('anAlerts').innerHTML = alerts.map(([level,icon,title,note,action]) => `<div class="an-alert ${level}"><span class="an-alert-icon"><i class="bi ${icon}"></i></span><div><div class="an-alert-title">${title}</div><div class="an-alert-note">${note}</div></div><span class="an-alert-action">${action}</span></div>`).join('');
-        const maxStore = Math.max(...topStores.map(store => Number(store.gmv || 0)), 1);
-        $('anTopStores').innerHTML = topStores.length ? topStores.map(store => `<div class="an-contribution-row"><div><div class="an-contribution-name">${esc(store.store_name || 'Tanpa toko')}</div><div class="an-contribution-meta">${Number(store.order_total || 0).toLocaleString('id-ID')} order · profit verified ${money(store.operating_profit)}</div><div class="an-contribution-bar"><span style="width:${Math.max(4, Number(store.gmv || 0) / maxStore * 100)}%"></span></div></div><div class="an-contribution-value">${money(store.gmv)}</div></div>`).join('') : '<div class="an-empty">Belum ada kontribusi toko.</div>';
+        const maxStore = Math.max(...topStores.map(store => Number(store.gross_sales || 0)), 1);
+        $('anTopStores').innerHTML = topStores.length ? topStores.map(store => `<div class="an-contribution-row"><div><div class="an-contribution-name">${esc(store.store_name || 'Tanpa toko')}</div><div class="an-contribution-meta">${Number(store.order_count || 0).toLocaleString('id-ID')} order financial-ready · profit ${money(store.operating_profit)}</div><div class="an-contribution-bar"><span style="width:${Math.max(4, Number(store.gross_sales || 0) / maxStore * 100)}%"></span></div></div><div class="an-contribution-value">${money(store.gross_sales)}</div></div>`).join('') : '<div class="an-empty">Belum ada kontribusi toko.</div>';
         const settledGross = Number(current.cash_order_revenue ?? current.cash_gross_sales ?? 0);
         const unsettledGross = Number(current.cash_unsettled_order_revenue ?? Math.max(0, Number(current.gmv || 0) - settledGross));
         const totalOmzet = settledGross + unsettledGross || Number(current.gmv || 0);
@@ -1593,17 +1594,19 @@
         const list = rows || [];
         const negative = list.filter(product => Number(product.operating_profit || 0) < 0).length;
         const totalGross = list.reduce((sum, product) => sum + Number(product.gross_sales || 0), 0);
+        const totalPayout = list.reduce((sum, product) => sum + Number(product.payout || 0), 0);
         const totalProfit = list.reduce((sum, product) => sum + Number(product.operating_profit || 0), 0);
         $('anProductPulse').innerHTML = [
-            ['Produk tervalidasi', Number(list.length).toLocaleString('id-ID'), 'dengan HPP lengkap'],
+            ['Produk teratas', Number(list.length).toLocaleString('id-ID'), 'financial-ready · max 100 gross sales'],
+            ['Payout bersih', money(totalPayout), 'setelah fee settlement'],
             ['Produk rugi', Number(negative).toLocaleString('id-ID'), negative ? 'perlu review segera' : 'tidak ada'],
-            ['Profit produk', money(totalProfit), `${totalGross > 0 ? (totalProfit / totalGross * 100).toFixed(1) : '0.0'}% margin`],
+            ['Profit operasional', money(totalProfit), `${totalGross > 0 ? (totalProfit / totalGross * 100).toFixed(1) : '0.0'}% vs gross sales`],
         ].map(([label,value,note]) => `<div class="an-pulse"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${esc(value)}</div><div class="an-pulse-note ${negative && label === 'Produk rugi' ? 'bad' : ''}">${note}</div></div>`).join('');
         const focus = [];
         const best = [...list].sort((a,b) => Number(b.operating_profit || 0) - Number(a.operating_profit || 0))[0];
         const worst = [...list].sort((a,b) => Number(a.operating_profit || 0) - Number(b.operating_profit || 0))[0];
-        if (best) focus.push(['','bi-trophy','Produk profit tertinggi',`${esc(best.product_name)} · ${money(best.operating_profit)}`,'Pertahankan']);
-        if (worst && Number(worst.operating_profit || 0) < 0) focus.push(['bad','bi-exclamation-triangle','Produk dengan profit negatif',`${esc(worst.product_name)} · ${money(worst.operating_profit)}`,'Review harga/HPP']);
+        if (best) focus.push(['','bi-trophy','Profit operasional tertinggi',`${esc(best.product_name)} · ${money(best.operating_profit)}`,'Pertahankan']);
+        if (worst && Number(worst.operating_profit || 0) < 0) focus.push(['bad','bi-exclamation-triangle','Produk dengan profit negatif',`${esc(worst.product_name)} · ${money(worst.operating_profit)}`,'Review harga/HPP/iklan']);
         if (!focus.length) focus.push(['','bi-check2-circle','Portofolio sehat','Belum ada produk dengan profit negatif','—']);
         $('anProductFocus').innerHTML = focus.map(([level,icon,title,note,action]) => `<div class="an-alert ${level}"><span class="an-alert-icon"><i class="bi ${icon}"></i></span><div><div class="an-alert-title">${title}</div><div class="an-alert-note">${note}</div></div><span class="an-alert-action">${action}</span></div>`).join('');
     }
@@ -1615,7 +1618,7 @@
         const worst = [...sales].sort((a,b) => a.operating_profit - b.operating_profit).slice(0, 6);
         const max = Math.max(...sales.map(p => Math.abs(Number(p.operating_profit || 0))), 1);
         renderProductInsights(rows || []);
-        $('bestProductBody').innerHTML = sales.length ? sales.map((p,i) => `<tr><td class="an-product-value">${i+1}</td><td><span class="an-product"><span class="an-product-copy"><a class="an-product-link" href="${productUrl(p)}" title="Buka produk terkait"> <span class="an-product-name">${esc(p.product_name)}</span></a><span class="an-product-sku">Kode: ${esc(p.sku || '—')}</span></span></span></td><td>${Number(p.qty || 0).toLocaleString('id-ID')}</td><td class="an-product-value">${money(p.gross_sales)}</td><td class="an-product-value">${money(p.hpp)}</td><td class="an-product-value" style="color:#b45309">${money(p.ad_cost)}</td><td class="an-product-value" style="color:${p.gross_profit>=0?'#15803d':'#dc2626'}">${money(p.gross_profit)}<span class="an-table-subline">${p.margin_pct}%</span></td><td class="an-product-value" style="color:${p.operating_profit>=0?'#15803d':'#dc2626'}">${money(p.operating_profit)}</td></tr>`).join('') : '<tr><td colspan="8"><div class="an-empty">Belum ada produk siap profit.</div></td></tr>';
+        $('bestProductBody').innerHTML = sales.length ? sales.map((p,i) => `<tr><td class="an-product-value">${i+1}</td><td><span class="an-product"><span class="an-product-copy"><a class="an-product-link" href="${productUrl(p)}" title="Buka produk terkait"> <span class="an-product-name">${esc(p.product_name)}</span></a><span class="an-product-sku">Kode: ${esc(p.sku || '—')}</span></span></span></td><td>${Number(p.qty || 0).toLocaleString('id-ID')}</td><td class="an-product-value">${money(p.gross_sales)}<span class="an-table-subline">basis gross sales eligible</span></td><td class="an-product-value">${money(p.payout)}<span class="an-table-subline">setelah fee marketplace</span></td><td class="an-product-value">${money(p.hpp)}</td><td class="an-product-value" style="color:#b45309">${money(p.ad_cost)}<span class="an-table-subline">alokasi proporsional</span></td><td class="an-product-value" style="color:${p.gross_profit>=0?'#15803d':'#dc2626'}">${money(p.gross_profit)}<span class="an-table-subline">${Number(p.gross_sales || 0) > 0 ? (Number(p.gross_profit || 0) / Number(p.gross_sales) * 100).toFixed(1) : '0.0'}% gross sales</span></td><td class="an-product-value" style="color:${p.operating_profit>=0?'#15803d':'#dc2626'}">${money(p.operating_profit)}<span class="an-table-subline">${Number(p.margin_pct || 0).toFixed(1)}% margin</span></td></tr>`).join('') : '<tr><td colspan="9"><div class="an-empty">Belum ada produk siap profit.</div></td></tr>';
         $('worstProductBody').innerHTML = worst.length ? worst.map(p => `<div class="an-list-row"><div class="an-list-main"><div class="an-list-name"><span class="an-dot ${p.operating_profit<0?'red':''}"></span> <a class="an-product-link" href="${productUrl(p)}" title="Buka produk terkait">${esc(p.product_name)}</a></div><div class="an-list-meta">Kode: ${esc(p.sku || '—')} · ${Number(p.qty || 0).toLocaleString('id-ID')} pcs</div><div class="an-bar"><span style="width:${Math.max(4, Math.min(100, Math.round(Math.abs(Number(p.operating_profit || 0)) / max * 100)))}%;background:${p.operating_profit<0?'#ef4444':'#facc15'}"></span></div></div><div class="an-list-value" style="color:${p.operating_profit<0?'#dc2626':'#a16207'}">${money(p.operating_profit)}</div></div>`).join('') : '<div class="an-empty">Belum ada produk untuk ditinjau.</div>';
     }
     function render() {
@@ -1648,7 +1651,7 @@
     }
     async function loadProducts() {
         if (productsLoaded) return;
-        $('bestProductBody').innerHTML = '<tr><td colspan="8"><div class="an-empty">Memuat detail produk…</div></td></tr>';
+        $('bestProductBody').innerHTML = '<tr><td colspan="9"><div class="an-empty">Memuat detail produk…</div></td></tr>';
         try {
             const params = new URLSearchParams({ date_from: from(), date_to: to() });
             if (selectedStore()) params.set('store_id', selectedStore());
@@ -1658,15 +1661,15 @@
             productsLoaded = true;
             renderProductSummary(productData);
         } catch (e) {
-            $('bestProductBody').innerHTML = '<tr><td colspan="8"><div class="an-error">Detail produk gagal dimuat.</div></td></tr>';
+            $('bestProductBody').innerHTML = '<tr><td colspan="9"><div class="an-error">Detail produk gagal dimuat.</div></td></tr>';
         }
     }
     const cohortMetricOptions = {
         customer: [
-            ['retention_pct', 'Retention %'], ['active_customers', 'Active Customers'], ['orders', 'Orders'], ['qty_sold', 'Qty Sold'], ['revenue', 'Revenue'],
+            ['retention_pct', 'Retention %'], ['active_customers', 'Active Customers'], ['orders', 'Orders'], ['qty_sold', 'Qty Sold'], ['revenue', 'Gross Sales'],
         ],
         product: [
-            ['qty_sold', 'Qty Sold'], ['revenue', 'Revenue'], ['gross_profit', 'Gross Profit'], ['gross_margin_pct', 'Gross Margin %'], ['net_profit', 'Net Profit'],
+            ['qty_sold', 'Qty Sold'], ['revenue', 'Gross Sales'], ['gross_profit', 'Gross Profit (covered)'], ['gross_margin_pct', 'Gross Margin %'], ['net_profit', 'Net Profit (covered)'],
         ],
     };
     const cohortMetricHints = {
@@ -1674,10 +1677,10 @@
         active_customers: 'Jumlah customer unik yang aktif pada periode tersebut.',
         orders: 'Jumlah order yang tercatat dari cohort pada periode tersebut.',
         qty_sold: 'Total unit produk yang terjual pada periode tersebut.',
-        revenue: 'Nilai omzet kotor dari transaksi pada periode tersebut.',
-        gross_profit: 'Omzet dikurangi fee marketplace dan HPP yang ter-cover.',
+        revenue: 'Gross sales dari order eligible pada periode tersebut; bukan payout bersih.',
+        gross_profit: 'Gross sales dikurangi fee marketplace dan HPP dari order dengan settlement complete.',
         gross_margin_pct: 'Gross profit sebagai persentase dari revenue.',
-        net_profit: 'Gross profit setelah alokasi biaya iklan.',
+        net_profit: 'Gross profit setelah alokasi biaya iklan pada order dengan settlement complete.',
     };
     function syncCohortMetricOptions() {
         const mode = $('anCohortMode').value === 'product' ? 'product' : 'customer';
@@ -1749,16 +1752,16 @@
         const periodLabel = `${from()} — ${to()}`;
         const cards = isProduct
             ? [
-                ['Product cohorts', Number(summary.product_count ?? 0).toLocaleString('id-ID'), 'Unique products in scope'],
+                ['Product cohorts', Number(summary.product_count ?? 0).toLocaleString('id-ID'), 'Produk unik dalam scope'],
                 ['Primary metric', payload.metric_label || '—', 'Metric aktif'],
-                ['Revenue in scope', money(summary.revenue || 0), 'Across selected cohorts'],
-                ['Financial coverage', `${Number(summary.avg_financial_coverage_pct || 0).toFixed(1)}%`, 'Average settlement coverage'],
+                ['Gross sales in scope', money(summary.revenue || 0), 'Order eligible dalam scope'],
+                ['Avg. coverage', `${Number(summary.avg_financial_coverage_pct || 0).toFixed(1)}%`, 'Rata-rata settlement complete per cell'],
             ]
             : [
                 ['Customer cohorts', Number(summary.cohort_count ?? 0).toLocaleString('id-ID'), 'First transaction month'],
                 ['Primary metric', payload.metric_label || '—', 'Metric aktif'],
                 ['Latest activity', Number(summary.latest_active_customers || 0).toLocaleString('id-ID'), 'Active customers in latest month'],
-                ['Data confidence', summary.avg_m1_retention_pct === null ? '—' : `${Number(summary.avg_m1_retention_pct).toFixed(1)}%`, 'Average M1 retention'],
+                ['Avg. M1 retention', summary.avg_m1_retention_pct === null ? '—' : `${Number(summary.avg_m1_retention_pct).toFixed(1)}%`, 'Customer yang kembali aktif'],
             ];
         $('anCohortKpis').innerHTML = cards.map(([label, value, note], index) => `<div class="an-cohort-summary-card ${index === 0 ? 'is-primary' : ''}"><span class="an-cohort-summary-label">${esc(label)}</span><strong class="an-cohort-summary-value">${esc(value)}</strong><span class="an-cohort-summary-note">${esc(note)}</span></div>`).join('');
         $('anCohortPeriodLabel').textContent = periodLabel;
@@ -1773,11 +1776,11 @@
         if (value === null || value === undefined) return '<span class="an-cohort-cell is-empty" title="Metric tidak tersedia pada periode ini">—</span>';
         const intensity = Math.min(.46, .08 + (Math.abs(Number(value || 0)) / Math.max(maxValue, 1)) * .38);
         const encoded = esc(JSON.stringify({ ...context, ...detail, metric, metric_label: payloadMetricLabel(metric), is_product: isProduct }));
-        const supportingValue = isProduct ? `Rev ${money(detail.revenue)}` : `${Number(detail.active_customers || 0).toLocaleString('id-ID')} active`;
+        const supportingValue = isProduct ? `Sales ${money(detail.revenue)} · Cov ${Number(detail.financial_coverage_pct || 0).toFixed(0)}%` : `${Number(detail.active_customers || 0).toLocaleString('id-ID')} active`;
         const cellLabel = `${payloadMetricLabel(metric)} ${cohortFormat(value, metric)}, ${supportingValue}`;
         return `<button type="button" class="an-cohort-cell ${isProduct ? 'product' : ''}" style="--heat:${intensity}" title="${esc(cellLabel)}" aria-label="${esc(cellLabel)}" data-cohort-detail="${encoded}"><span class="an-cohort-cell-value">${cohortFormat(value, metric)}</span><span class="an-cohort-cell-sub">${esc(supportingValue)}</span></button>`;
     }
-    const payloadMetricLabel = metric => ({retention_pct:'Retention %',active_customers:'Active Customers',orders:'Orders',qty_sold:'Qty Sold',revenue:'Revenue',gross_profit:'Gross Profit',gross_margin_pct:'Gross Margin %',net_profit:'Net Profit'})[metric] || metric;
+    const payloadMetricLabel = metric => ({retention_pct:'Retention %',active_customers:'Active Customers',orders:'Orders',qty_sold:'Qty Sold',revenue:'Gross Sales',gross_profit:'Gross Profit (covered)',gross_margin_pct:'Gross Margin %',net_profit:'Net Profit (covered)'})[metric] || metric;
     const cohortHeader = (label, sub = '') => `<th>${label}${sub ? `<small>${sub}</small>` : ''}</th>`;
     function renderCohortTable(payload) {
         const mode = payload?.mode === 'product' ? 'product' : 'customer';
@@ -1801,11 +1804,11 @@
         $('cohortDetailTitle').textContent = `${detail.metric_label} · ${label}`;
         $('cohortDetailSubtitle').textContent = `M${detail.period_index} · ${detail.period_month || detail.cohort_month} · filter aktif`;
         const entries = detail.is_product
-            ? [['Nilai', cohortFormat(detail[detail.metric], detail.metric)], ['Orders', Number(detail.orders || 0).toLocaleString('id-ID')], ['Qty Sold', Number(detail.qty_sold || 0).toLocaleString('id-ID')], ['Revenue', money(detail.revenue)], ['Gross Profit', money(detail.gross_profit)], ['Coverage', `${Number(detail.financial_coverage_pct || 0).toFixed(1)}%`]]
+            ? [['Nilai', cohortFormat(detail[detail.metric], detail.metric)], ['Orders', Number(detail.orders || 0).toLocaleString('id-ID')], ['Qty Sold', Number(detail.qty_sold || 0).toLocaleString('id-ID')], ['Gross Sales', money(detail.revenue)], ['Fee marketplace', money(detail.marketplace_fee)], ['HPP', money(detail.hpp)], ['Gross Profit', money(detail.gross_profit)], ['Iklan', money(detail.ads)], ['Net Profit', money(detail.net_profit)], ['Coverage', `${Number(detail.financial_coverage_pct || 0).toFixed(1)}%`]]
             : [['Nilai', cohortFormat(detail[detail.metric], detail.metric)], ['Active Customers', Number(detail.active_customers || 0).toLocaleString('id-ID')], ['Orders', Number(detail.orders || 0).toLocaleString('id-ID')], ['Qty Sold', Number(detail.qty_sold || 0).toLocaleString('id-ID')], ['Revenue', money(detail.revenue)]];
         $('cohortDetailSummary').innerHTML = entries.map(([key, value]) => cashStat(key, value)).join('');
         $('cohortDetailNote').textContent = detail.is_product
-            ? 'Nilai ini menunjukkan performa produk pada umur cohort tersebut. Coverage menunjukkan bagian order dengan settlement lengkap.'
+            ? 'Nilai ini menunjukkan performa produk pada umur cohort tersebut. Gross sales dapat mencakup order eligible; profit hanya dihitung dari settlement complete dan coverage menunjukkan proporsinya.'
             : 'Nilai ini menunjukkan performa customer cohort pada umur tersebut. M0 adalah bulan transaksi pertama; M1+ adalah aktivitas berulang.';
         $('cohortDetailModal').classList.add('is-open');
         $('cohortDetailModal').setAttribute('aria-hidden', 'false');
@@ -1882,14 +1885,14 @@
             summary = summaryPayload;
             fillStores();
             render();
-            $('bestProductBody').innerHTML = '<tr><td colspan="8"><div class="an-empty">Buka tab Produk untuk memuat detail.</div></td></tr>';
+            $('bestProductBody').innerHTML = '<tr><td colspan="9"><div class="an-empty">Buka tab Produk untuk memuat detail.</div></td></tr>';
             if (document.querySelector('[data-an-tab="cohort"]')?.classList.contains('active')) await loadCohort();
         } catch (e) {
             console.error('Analytics summary load failed', e);
             summary = null;
             $('anSyncNote').textContent = 'Data gagal dimuat';
             $('storeBody').innerHTML = '<tr><td colspan="6"><div class="an-error">Tidak dapat memuat ringkasan analytics.</div></td></tr>';
-            $('bestProductBody').innerHTML = '<tr><td colspan="8"><div class="an-error">Tidak dapat memuat data analytics.</div></td></tr>';
+            $('bestProductBody').innerHTML = '<tr><td colspan="9"><div class="an-error">Tidak dapat memuat data analytics.</div></td></tr>';
         } finally {
             $('anRefresh').disabled = false;
             $('anRefresh').textContent = '↻ Refresh';

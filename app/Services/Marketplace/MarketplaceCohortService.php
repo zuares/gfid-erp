@@ -292,8 +292,8 @@ class MarketplaceCohortService
             'summary' => $this->productSummary($productRows),
             'notes' => [
                 'product_key' => 'internal_item_id, model_sku, item_sku, external_sku, then item snapshot fallback.',
-                'profit' => 'Marketplace fee and ads are allocated by item revenue only where settlement data_status is complete.',
-                'coverage' => 'Financial coverage is exposed per cell so incomplete profit data is visible.',
+                'profit' => 'Fee marketplace, HPP, dan iklan hanya dihitung dari baris settlement yang complete.',
+                'coverage' => 'Gross sales dapat mencakup order eligible yang belum complete; coverage ditampilkan per cell agar profit tidak terlihat lebih pasti dari datanya.',
             ],
         ];
     }
@@ -334,12 +334,21 @@ class MarketplaceCohortService
 
     private function baseOrderQuery(array $filters, bool $withDate = true): Builder
     {
+        $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
+        $excludedStatuses = "'" . implode("', '", self::EXCLUDED_ORDER_STATUSES) . "'";
+
         $query = DB::table('marketplace_orders as mo')
             ->join('stores as st', 'st.id', '=', 'mo.store_id')
             ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
-            ->where(function (Builder $builder) {
-                $builder->whereNull('mo.order_status')
-                    ->orWhereNotIn('mo.order_status', self::EXCLUDED_ORDER_STATUSES);
+            ->whereRaw("{$status} NOT IN ({$excludedStatuses})")
+            ->whereNotExists(function (Builder $builder) {
+                $builder->selectRaw('1')
+                    ->from('marketplace_returns as mr_cohort')
+                    ->whereColumn('mr_cohort.store_id', 'mo.store_id')
+                    ->where(function (Builder $nested) {
+                        $nested->whereColumn('mr_cohort.order_sn', 'mo.channel_order_id')
+                            ->orWhereColumn('mr_cohort.order_sn', 'mo.external_order_id');
+                    });
             })
             ->when($filters['store_id'], fn (Builder $builder, $storeId) => $builder->where('mo.store_id', $storeId))
             ->when($filters['marketplace'], function (Builder $builder, string $marketplace) {
@@ -489,10 +498,10 @@ class MarketplaceCohortService
             'active_customers' => 'Active Customers',
             'orders' => 'Orders',
             'qty_sold' => 'Qty Sold',
-            'revenue' => 'Revenue',
-            'gross_profit' => 'Gross Profit',
+            'revenue' => 'Gross Sales',
+            'gross_profit' => 'Gross Profit (covered)',
             'gross_margin_pct' => 'Gross Margin %',
-            'net_profit' => 'Net Profit',
+            'net_profit' => 'Net Profit (covered)',
         ][$metric] ?? $metric;
     }
 

@@ -3,7 +3,7 @@
         <div class="an-cohort-hero-copy">
             <div class="an-section-kicker"><span class="an-section-kicker-dot"></span> Customer intelligence</div>
             <h2 class="an-cohort-title" id="cohortWorkspaceTitle">Cohort Analysis</h2>
-            <p class="an-cohort-description">Ukur retensi customer dan perkembangan produk dari transaksi pertama sampai aktivitas berulang.</p>
+            <p class="an-cohort-description">Ukur retensi customer dan perkembangan produk dari transaksi eligible, dengan coverage settlement yang transparan.</p>
         </div>
         <div class="an-cohort-hero-meta">
             <span class="an-status-pill"><i class="bi bi-database-check" aria-hidden="true"></i> SQL aggregated</span>
@@ -16,7 +16,7 @@
             <div>
                 <div class="an-cohort-control-eyebrow">Scope &amp; methodology</div>
                 <h3 class="an-cohort-control-title" id="cohortControlsTitle"><i class="bi bi-sliders2 me-1" aria-hidden="true"></i>Analysis controls</h3>
-                <p class="an-cohort-control-sub">Atur sudut pandang dan metric utama. Filter global periode serta toko tetap mengikuti toolbar Analytics.</p>
+                <p class="an-cohort-control-sub">Atur sudut pandang dan metric utama. Gross sales mengikuti order eligible; profit hanya muncul dari settlement complete.</p>
             </div>
             <button class="an-cohort-reset" id="anCohortReset" type="button"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset filter</button>
         </div>
@@ -90,7 +90,7 @@
                     <div class="an-cohort-guide-item"><span class="an-cohort-guide-icon green"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></span><div><strong>M1+ = returning activity</strong><p>Retention customer dihitung dari customer unik yang kembali bertransaksi.</p></div></div>
                     <div class="an-cohort-guide-item"><span class="an-cohort-guide-icon amber"><i class="bi bi-exclamation-circle" aria-hidden="true"></i></span><div><strong>Blank = no activity</strong><p>Sel dengan tanda dash berarti belum ada aktivitas pada umur cohort tersebut.</p></div></div>
                 </div>
-                <div class="an-cohort-guide-footer"><i class="bi bi-info-circle me-1" aria-hidden="true"></i><span>Profit hanya dialokasikan saat settlement coverage tersedia.</span></div>
+        <div class="an-cohort-guide-footer"><i class="bi bi-info-circle me-1" aria-hidden="true"></i><span>Gross sales bisa lebih luas dari profit; profit hanya dihitung pada settlement complete dan coverage ditampilkan per cell.</span></div>
             </div>
         </aside>
     </div>
