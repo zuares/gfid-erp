@@ -116,7 +116,11 @@
     .an-decision-pulse-grid .an-pulse { min-height:136px; display:flex; flex-direction:column; justify-content:space-between; gap:.45rem; }
     .an-decision-pulse-grid .an-pulse-label { min-height:2.35em; line-height:1.25; }
     .an-decision-pulse-grid .an-pulse-value { font-size:clamp(.95rem,1.55vw,1.12rem); white-space:nowrap; }
-    .an-decision-pulse-grid .an-pulse-note { white-space:normal; overflow:visible; text-overflow:clip; line-height:1.4; }
+    .an-decision-pulse-grid .an-pulse-note { white-space:normal; overflow:visible; text-overflow:clip; line-height:1.35; margin:0; }
+    .an-decision-pulse-footer { display:grid; grid-template-columns:minmax(0,1fr) minmax(96px,auto); align-items:center; gap:.55rem; min-height:2.4em; }
+    .an-decision-pulse-footer .an-pulse-compare { color:var(--dsh-muted); font-size:.58rem; line-height:1.3; text-align:right; white-space:normal; }
+    .an-decision-pulse-footer .an-pulse-compare.good { color:#15803d; }
+    .an-decision-pulse-footer .an-pulse-compare.bad { color:#b91c1c; }
     .an-pulse-grid-executive .an-pulse { min-height:96px; display:flex; flex-direction:column; justify-content:space-between; }
     .an-pulse-grid-executive .an-pulse-label { font-size:.66rem; text-transform:none; letter-spacing:0; }
     .an-pulse-grid-executive .an-pulse-note { white-space:normal; overflow:visible; text-overflow:clip; line-height:1.35; }
@@ -1326,6 +1330,8 @@
         const actualCashFee = Number(current.cash_marketplace_fees ?? current.marketplace_fees_actual ?? 0);
         const actualAffiliateFee = Number(current.cash_affiliate_fees ?? current.affiliate_fees_actual ?? 0);
         const grossOrderRevenue = Number(current.cash_order_revenue || 0) + Number(current.cash_unsettled_order_revenue || 0) || Number(current.gmv || 0);
+        const settledOrderRevenue = Number(current.cash_order_revenue || 0);
+        const unsettledOrderRevenue = Number(current.cash_unsettled_order_revenue || 0);
         const netOrderRevenue = Math.max(0, Number(current.net_order_revenue ?? grossOrderRevenue));
         const totalHpp = Number(current.hpp_total ?? current.hpp ?? 0);
         const adCost = Number(current.ad_cost || 0);
@@ -1358,6 +1364,10 @@
         const previousAovNet = Number(previous.order_total || 0) > 0 ? previousNetOrderRevenue / Number(previous.order_total) : 0;
         const estimatedProfit = Number(current.estimated_profit ?? estimatedProfitFallback);
         const previousEstimatedProfit = Number(previous.estimated_profit ?? previousEstimatedProfitFallback);
+        const settledProfit = Number(current.settled_profit ?? current.operating_profit ?? 0);
+        const estimatedUnsettledProfit = Number(current.estimated_unsettled_profit ?? (estimatedProfit - settledProfit));
+        const previousSettledProfit = Number(previous.settled_profit ?? previous.operating_profit ?? 0);
+        const previousEstimatedUnsettledProfit = Number(previous.estimated_unsettled_profit ?? (previousEstimatedProfit - previousSettledProfit));
         const estimatedMargin = Number(current.estimated_profit_margin ?? (netOrderRevenue > 0 ? estimatedProfit / netOrderRevenue * 100 : 0));
         const previousEstimatedMargin = Number(previous.estimated_profit_margin ?? (previousNetOrderRevenue > 0 ? previousEstimatedProfit / previousNetOrderRevenue * 100 : 0));
         const previousActualCashFee = Number(previous.cash_marketplace_fees ?? previous.marketplace_fees_actual ?? 0);
@@ -1369,9 +1379,10 @@
         const previousPendingPayout = Math.max(0, previousEstimatedPayout - previousCashPayout);
         const payoutRealization = estimatedPayout > 0 ? cashPayout / estimatedPayout * 100 : 0;
         const pendingPayoutRate = estimatedPayout > 0 ? pendingPayout / estimatedPayout * 100 : 0;
-        const settledRevenue = Number(current.cash_order_revenue || 0);
-        const feeRate = settledRevenue > 0 ? actualCashFee / settledRevenue * 100 : 0;
+        const feeRate = settledOrderRevenue > 0 ? actualCashFee / settledOrderRevenue * 100 : 0;
         const adCostRate = netOrderRevenue > 0 ? adCost / netOrderRevenue * 100 : 0;
+        const settledProfitMargin = settledOrderRevenue > 0 ? settledProfit / settledOrderRevenue * 100 : 0;
+        const estimatedUnsettledProfitMargin = unsettledOrderRevenue > 0 ? estimatedUnsettledProfit / unsettledOrderRevenue * 100 : 0;
         const previousBuyerPayment = Number(previous.cash_gross_sales || 0) + Number(previous.cash_unsettled_gross_sales || 0);
         const previousBuyerPaymentOrders = Number(previous.cash_order_count || 0) + Number(previous.cash_unsettled_order_count || 0);
         const previousApc = previousBuyerPaymentOrders > 0 ? previousBuyerPayment / previousBuyerPaymentOrders : 0;
@@ -1397,6 +1408,8 @@
         const refundAmountChange = pulseChange(returnRefundAmount, previousReturnRefundAmount, moneyText);
         const exceptionChange = change => ({ ...change, className: change.className === 'good' ? 'bad' : (change.className === 'bad' ? 'good' : '') });
         const estimatedProfitChange = pulseChange(estimatedProfit, previousEstimatedProfit, moneyText);
+        const settledProfitChange = pulseChange(settledProfit, previousSettledProfit, moneyText);
+        const estimatedUnsettledProfitChange = pulseChange(estimatedUnsettledProfit, previousEstimatedUnsettledProfit, moneyText);
         const percentText = value => `${Number(value || 0).toFixed(1)}%`;
         const estimatedMarginChange = pulseChange(estimatedMargin, previousEstimatedMargin, percentText);
         const pendingPayoutChange = pulseChange(pendingPayout, previousPendingPayout, moneyText);
@@ -1421,13 +1434,14 @@
         ];
         $('anPulseGrid').innerHTML = pulse.map(([label,value,change,metric]) => `<div class="an-pulse an-pulse-action ${selectedPulseMetric === metric ? 'is-active' : ''}" data-pulse-metric="${metric}" role="button" tabindex="0" title="Bandingkan grafik dengan tanggal sama bulan lalu"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-pulse-note ${change.className}">${change.text}</div></div>`).join('');
         const decisionPulse = [
-            ['Payout terealisasi', money(cashPayout), { text: `${payoutRealization.toFixed(1)}% dari estimasi · sudah cair · ${cashPayoutChange.text}`, className: cashPayoutChange.className }, 'Dana yang sudah diterima dari settlement marketplace'],
-            ['Payout pending', money(pendingPayout), { text: `${pendingPayoutRate.toFixed(1)}% dari estimasi · belum cair · ${pendingPayoutChange.text}`, className: pendingPayoutChange.className }, 'Estimasi dana yang belum masuk sebagai payout'],
-            ['Fee marketplace', money(actualCashFee), { text: `${feeRate.toFixed(1)}% dari omzet settlement · aktual · ${marketplaceFeeChange.text}`, className: marketplaceFeeChange.className }, 'Biaya marketplace aktual dari settlement'],
-            ['Biaya iklan incl. PPN', money(adCost), { text: `${adCostRate.toFixed(1)}% dari omzet net · periode aktif · ${adCostChange.text}`, className: adCostChange.className }, 'Biaya iklan termasuk PPN 11%'],
-            ['Profit estimasi', money(estimatedProfit), { text: `margin ${estimatedMargin.toFixed(1)}% · setelah HPP dan iklan · ${estimatedProfitChange.text}`, className: estimatedProfitChange.className }, 'Estimasi payout − HPP − biaya iklan'],
+            ['Payout terealisasi', money(cashPayout), { text: `${payoutRealization.toFixed(1)}% dari estimasi · sudah cair`, className: cashPayoutChange.className }, cashPayoutChange, 'Dana yang sudah diterima dari settlement marketplace'],
+            ['Profit order cair', money(settledProfit), { text: `margin ${settledProfitMargin.toFixed(1)}% · order sudah cair`, className: settledProfitChange.className }, settledProfitChange, 'Payout cair − HPP cair − alokasi biaya iklan'],
+            ['Payout pending', money(pendingPayout), { text: `${pendingPayoutRate.toFixed(1)}% dari estimasi · belum cair`, className: pendingPayoutChange.className }, pendingPayoutChange, 'Estimasi dana yang belum masuk sebagai payout'],
+            ['Est. profit belum cair', money(estimatedUnsettledProfit), { text: `margin ${estimatedUnsettledProfitMargin.toFixed(1)}% · order belum cair`, className: estimatedUnsettledProfitChange.className }, estimatedUnsettledProfitChange, 'Estimasi payout pending − HPP pending − alokasi iklan'],
+            ['Fee marketplace', money(actualCashFee), { text: `${feeRate.toFixed(1)}% dari omzet settlement · aktual`, className: marketplaceFeeChange.className }, marketplaceFeeChange, 'Biaya marketplace aktual dari settlement'],
+            ['Biaya iklan incl. PPN', money(adCost), { text: `${adCostRate.toFixed(1)}% dari omzet net · periode aktif`, className: adCostChange.className }, adCostChange, 'Biaya iklan termasuk PPN 11%'],
         ];
-        $('anDecisionPulse').innerHTML = decisionPulse.map(([label,value,note,title]) => `<div class="an-pulse" title="${title}"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-pulse-note ${note.className}">${note.text}</div></div>`).join('');
+        $('anDecisionPulse').innerHTML = decisionPulse.map(([label,value,note,comparison,title]) => `<div class="an-pulse" title="${title}"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-decision-pulse-footer"><div class="an-pulse-note ${note.className}">${note.text}</div><span class="an-pulse-compare ${comparison.className}">${comparison.text}</span></div></div>`).join('');
         const scoreClass = healthClass(readyRate);
         $('anOverallScore').className = `an-health-score ${scoreClass}`;
         $('anOverallScore').textContent = `Data ready ${readyRate.toFixed(0)}%`;

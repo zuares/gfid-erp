@@ -1699,6 +1699,13 @@ class MarketplaceAnalyticsSummaryService
         $netOrderRevenue = max(0, $grossOrderRevenue);
         $estimatedGrossProfit = $estimatedPayout - $hpp;
         $estimatedProfit = $estimatedGrossProfit - $adCost;
+        $settledRevenue = max(0, (float) ($aggregate['cash_order_revenue'] ?? 0));
+        $unsettledRevenue = max(0, (float) ($aggregate['cash_unsettled_order_revenue'] ?? 0));
+        $revenueBasis = $settledRevenue + $unsettledRevenue;
+        $settledHpp = max(0, (float) ($aggregate['hpp_settled'] ?? 0));
+        $settledAdCost = $revenueBasis > 0 ? $adCost * ($settledRevenue / $revenueBasis) : 0;
+        $settledProfit = $cashPayout - $settledHpp - $settledAdCost;
+        $estimatedUnsettledProfit = $estimatedProfit - $settledProfit;
 
         return array_merge($aggregate, [
             'gross_order_revenue' => round($grossOrderRevenue, 2),
@@ -1711,6 +1718,10 @@ class MarketplaceAnalyticsSummaryService
             'estimated_gross_profit' => round($estimatedGrossProfit, 2),
             'estimated_profit' => round($estimatedProfit, 2),
             'estimated_profit_margin' => $netOrderRevenue > 0 ? round(($estimatedProfit / $netOrderRevenue) * 100, 2) : 0.0,
+            'settled_profit' => round($settledProfit, 2),
+            'estimated_unsettled_profit' => round($estimatedUnsettledProfit, 2),
+            'settled_profit_margin' => $settledRevenue > 0 ? round(($settledProfit / $settledRevenue) * 100, 2) : 0.0,
+            'estimated_unsettled_profit_margin' => $unsettledRevenue > 0 ? round(($estimatedUnsettledProfit / $unsettledRevenue) * 100, 2) : 0.0,
             'marketplace_fees_actual' => round((float) ($aggregate['cash_marketplace_fees'] ?? $aggregate['marketplace_fees'] ?? 0), 2),
             'affiliate_fees_actual' => round((float) ($aggregate['cash_affiliate_fees'] ?? $aggregate['affiliate_fees'] ?? 0), 2),
         ]);
