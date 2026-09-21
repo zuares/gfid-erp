@@ -472,6 +472,11 @@
     .an-hero .an-field input, .an-hero .an-field select { border-color:rgba(148,163,184,.34); }
     .an-hero .an-btn-dark { background:#38bdf8; border-color:#38bdf8; color:#082f49; }
     .an-hero .an-btn-dark:hover { background:#7dd3fc; border-color:#7dd3fc; color:#082f49; }
+    .an-decision-pulse-grid .an-pulse { min-height:112px; gap:.28rem; }
+    .an-decision-pulse-grid .an-pulse-label { min-height:1.3em; }
+    .an-decision-pulse-grid .an-pulse-note { font-size:.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .an-decision-pulse-footer { min-height:1.5em; grid-template-columns:minmax(0,1fr) auto; gap:.35rem; }
+    .an-decision-pulse-footer .an-pulse-compare { font-size:.57rem; white-space:nowrap; }
     .an-tabs-wrap { padding:.25rem 0 .15rem; border-bottom:0; }
     .an-tabs { border-color:var(--dsh-border); border-radius:12px; background:var(--card,#fff); box-shadow:0 8px 18px rgba(15,23,42,.05); }
     .an-tab { padding:.58rem .85rem; border-radius:9px; font-size:.7rem; }
@@ -1458,6 +1463,19 @@
         const estimatedMarginChange = pulseChange(estimatedMargin, previousEstimatedMargin, percentText);
         const pendingPayoutChange = pulseChange(pendingPayout, previousPendingPayout, moneyText);
         const cashPayoutChange = pulseChange(cashPayout, previousCashPayout, moneyText);
+        const decisionChange = (value, previousValue, inverse = false) => {
+            const currentValue = Number(value || 0);
+            const baseline = Number(previousValue || 0);
+            if (baseline === 0) return { text: currentValue === 0 ? '0% vs lalu' : 'Baru', className: inverse && currentValue > 0 ? 'bad' : (currentValue > 0 ? 'good' : '') };
+            const change = (currentValue - baseline) / Math.abs(baseline) * 100;
+            return { text: `${change > 0 ? '+' : ''}${change.toFixed(1)}% vs lalu`, className: inverse ? (change > 0 ? 'bad' : (change < 0 ? 'good' : '')) : (change > 0 ? 'good' : (change < 0 ? 'bad' : '')) };
+        };
+        const decisionPayoutChange = decisionChange(cashPayout, previousCashPayout);
+        const decisionSettledProfitChange = decisionChange(settledProfit, previousSettledProfit);
+        const decisionPendingPayoutChange = decisionChange(pendingPayout, previousPendingPayout, true);
+        const decisionUnsettledProfitChange = decisionChange(estimatedUnsettledProfit, previousEstimatedUnsettledProfit);
+        const decisionFeeChange = decisionChange(actualCashFee, previousActualCashFee, true);
+        const decisionAdCostChange = decisionChange(adCost, previousAdCost, true);
         const returnRefundRate = placedOrders > 0 ? returnRefundOrders / placedOrders * 100 : 0;
         const total = Math.max(Number(quality.total || 0), 1);
         const readyRate = Number(quality.ready || 0) / total * 100;
@@ -1478,14 +1496,14 @@
         ];
         $('anPulseGrid').innerHTML = pulse.map(([label,value,change,metric]) => `<div class="an-pulse an-pulse-action ${selectedPulseMetric === metric ? 'is-active' : ''}" data-pulse-metric="${metric}" role="button" tabindex="0" title="Bandingkan grafik dengan tanggal sama bulan lalu"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-pulse-note ${change.className}">${change.text}</div></div>`).join('');
         const decisionPulse = [
-            ['Payout terealisasi', money(cashPayout), { text: `${payoutRealization.toFixed(1)}% dari estimasi · sudah cair`, className: cashPayoutChange.className }, cashPayoutChange, 'Dana yang sudah diterima dari settlement marketplace'],
-            ['Profit order cair', money(settledProfit), { text: `margin ${settledProfitMargin.toFixed(1)}% · order sudah cair`, className: settledProfitChange.className }, settledProfitChange, 'Payout cair − HPP cair − alokasi biaya iklan'],
-            ['Payout pending', money(pendingPayout), { text: `${pendingPayoutRate.toFixed(1)}% dari estimasi · belum cair`, className: pendingPayoutChange.className }, pendingPayoutChange, 'Estimasi dana yang belum masuk sebagai payout'],
-            ['Est. profit belum cair', money(estimatedUnsettledProfit), { text: `margin ${estimatedUnsettledProfitMargin.toFixed(1)}% · order belum cair`, className: estimatedUnsettledProfitChange.className }, estimatedUnsettledProfitChange, 'Estimasi payout pending − HPP pending − alokasi iklan'],
-            ['Fee marketplace', money(actualCashFee), { text: `${feeRate.toFixed(1)}% dari omzet settlement · aktual`, className: marketplaceFeeChange.className }, marketplaceFeeChange, 'Biaya marketplace aktual dari settlement'],
-            ['Biaya iklan incl. PPN', money(adCost), { text: `${adCostRate.toFixed(1)}% dari omzet net · periode aktif`, className: adCostChange.className }, adCostChange, 'Biaya iklan termasuk PPN 11%'],
+            ['Payout cair', money(cashPayout), { text: `${payoutRealization.toFixed(1)}% dari estimasi`, className: cashPayoutChange.className }, decisionPayoutChange],
+            ['Profit cair', money(settledProfit), { text: `${settledProfitMargin.toFixed(1)}% margin`, className: settledProfitChange.className }, decisionSettledProfitChange],
+            ['Payout belum cair', money(pendingPayout), { text: `${pendingPayoutRate.toFixed(1)}% dari estimasi`, className: decisionPendingPayoutChange.className }, decisionPendingPayoutChange],
+            ['Est. profit belum cair', money(estimatedUnsettledProfit), { text: `${estimatedUnsettledProfitMargin.toFixed(1)}% margin`, className: estimatedUnsettledProfitChange.className }, decisionUnsettledProfitChange],
+            ['Fee marketplace', money(actualCashFee), { text: `${feeRate.toFixed(1)}% dari payout cair`, className: exceptionChange(marketplaceFeeChange).className }, decisionFeeChange],
+            ['Biaya iklan', money(adCost), { text: `${adCostRate.toFixed(1)}% dari omzet net`, className: exceptionChange(adCostChange).className }, decisionAdCostChange],
         ];
-        $('anDecisionPulse').innerHTML = decisionPulse.map(([label,value,note,comparison,title]) => `<div class="an-pulse" title="${title}"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-decision-pulse-footer"><div class="an-pulse-note ${note.className}">${note.text}</div><span class="an-pulse-compare ${comparison.className}">${comparison.text}</span></div></div>`).join('');
+        $('anDecisionPulse').innerHTML = decisionPulse.map(([label,value,note,comparison]) => `<div class="an-pulse"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-decision-pulse-footer"><div class="an-pulse-note ${note.className}">${note.text}</div><span class="an-pulse-compare ${comparison.className}">${comparison.text}</span></div></div>`).join('');
         const scoreClass = healthClass(readyRate);
         $('anOverallScore').className = `an-health-score ${scoreClass}`;
         $('anOverallScore').textContent = `Data ready ${readyRate.toFixed(0)}%`;
