@@ -113,7 +113,14 @@
         $('cashOrdersBody').innerHTML = feeBreakdown + body;
         const currentPage = Number(meta.current_page || cashPage);
         const lastPage = Number(meta.last_page || 1);
+        const total = Number(meta.total || 0);
+        const perPage = Number(meta.per_page || 50);
+        const firstRow = total > 0 ? ((currentPage - 1) * perPage) + 1 : 0;
+        const lastRow = total > 0 ? Math.min(currentPage * perPage, total) : 0;
         $('cashOrdersPage').textContent = `Halaman ${currentPage} / ${lastPage}`;
+        $('cashOrdersPageMeta').textContent = total > 0
+            ? `${firstRow.toLocaleString('id-ID')}–${lastRow.toLocaleString('id-ID')} dari ${total.toLocaleString('id-ID')} order`
+            : 'Tidak ada order pada periode ini';
         $('cashOrdersPrev').disabled = cashLoading || currentPage <= 1;
         $('cashOrdersNext').disabled = cashLoading || currentPage >= lastPage;
     }
@@ -135,6 +142,8 @@
         cashLoading = true;
         $('cashOrdersBody').innerHTML = '<div class="an-empty">Memuat order…</div>';
         $('cashOrdersSummary').innerHTML = '<div class="an-empty">Memuat ringkasan…</div>';
+        $('cashOrdersPage').textContent = 'Memuat…';
+        $('cashOrdersPageMeta').textContent = 'Mengambil data terbaru';
         $('cashOrdersPrev').disabled = true;
         $('cashOrdersNext').disabled = true;
         try {
@@ -146,7 +155,8 @@
             console.error('Cash order detail load failed', e);
             $('cashOrdersSummary').innerHTML = '<div class="an-error">Ringkasan order cair gagal dimuat.</div>';
             $('cashOrdersBody').innerHTML = '<div class="an-error">Detail order cair gagal dimuat.</div>';
-            $('cashOrdersPage').textContent = '—';
+            $('cashOrdersPage').textContent = 'Gagal memuat';
+            $('cashOrdersPageMeta').textContent = 'Coba lagi';
         } finally {
             cashLoading = false;
             if (cashPayload) renderCashOrders();

@@ -358,7 +358,7 @@
     .an-modal-backdrop { position:absolute; inset:0; background:rgba(15,23,42,.44); backdrop-filter:blur(3px); }
     .an-modal-dialog { position:relative; z-index:1; display:flex; flex-direction:column; width:calc(100% - 1.5rem); max-width:980px; max-height:calc(100vh - 2rem); margin:1rem auto; overflow:hidden; border:1px solid var(--dsh-border); border-radius:16px; background:var(--card,#fff); box-shadow:0 24px 70px rgba(15,23,42,.22); }
     .an-modal-head, .an-modal-foot { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.8rem .9rem; border-bottom:1px solid var(--dsh-border); }
-    .an-modal-foot { justify-content:center; border-top:1px solid var(--dsh-border); border-bottom:0; }
+    .an-modal-foot { justify-content:space-between; border-top:1px solid var(--dsh-border); border-bottom:0; background:var(--hero-bg,#f8fafc); }
     .an-modal-eyebrow { color:var(--dsh-muted); font-size:.6rem; font-weight:850; text-transform:uppercase; letter-spacing:.07em; }
     .an-modal-title { color:var(--text,#0f172a); font-size:.92rem; font-weight:800; margin-top:.12rem; }
     .an-modal-sub { color:var(--dsh-muted); font-size:.66rem; font-weight:600; margin-top:.18rem; }
@@ -404,12 +404,15 @@
     .an-cash-group-head span { color:var(--dsh-muted); font-size:.6rem; font-weight:700; }
     .an-exception-kind { display:inline-block; margin-top:.22rem; padding:.16rem .35rem; border-radius:5px; background:#fee2e2; color:#991b1b; font-size:.58rem; font-weight:800; }
     .an-exception-kind.return { background:#fef3c7; color:#92400e; }
-    .an-modal-page { color:var(--dsh-muted); font-size:.66rem; font-weight:750; }
+    .an-modal-pagination { display:flex; align-items:center; justify-content:center; min-width:0; gap:.45rem; text-align:center; }
+    .an-modal-page { color:var(--text,#0f172a); font-size:.66rem; font-weight:850; white-space:nowrap; }
+    .an-modal-page-meta { display:block; margin-top:.12rem; color:var(--dsh-muted); font-size:.56rem; font-weight:650; white-space:nowrap; }
+    .an-modal-foot .an-btn:disabled { cursor:not-allowed; opacity:.42; }
     body.an-modal-open { overflow:hidden; }
     body[data-theme="dark"] .an-modal-dialog, body[data-theme="dark"] .an-modal-close { background:var(--card,#1e293b); }
     body[data-theme="dark"] .an-modal-stat, body[data-theme="dark"] .an-cash-detail-grid { background:#0f172a; }
     body[data-theme="dark"] .an-modal-fee-breakdown { background:#0f172a; }
-    @media (max-width:760px) { .an-modal-dialog { width:calc(100% - .75rem); max-height:calc(100vh - .75rem); margin:.375rem auto; } .an-modal-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-modal-body { padding-inline:.5rem; } .an-modal-head { padding-inline:.65rem; } }
+    @media (max-width:760px) { .an-modal-dialog { width:calc(100% - .75rem); max-height:calc(100vh - .75rem); margin:.375rem auto; } .an-modal-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-modal-body { padding-inline:.5rem; } .an-modal-head { padding-inline:.65rem; } .an-modal-foot { flex-wrap:wrap; gap:.45rem; } .an-modal-foot > .an-btn { flex:1 1 0; } .an-modal-pagination { order:-1; width:100%; } }
     .an-cohort-workspace { display:grid; gap:1rem; min-width:0; }
     .an-cohort-hero { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; padding:1.15rem 1.2rem; border:1px solid #1e293b; border-radius:16px; background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%); box-shadow:0 12px 28px rgba(15,23,42,.12); }
     .an-cohort-hero-copy { min-width:0; }
@@ -878,12 +881,19 @@
         }
     }
     async function load() {
-        closeCashOrders();
+        const cashModalWasOpen = $('cashOrdersModal').classList.contains('is-open');
+        if (!cashModalWasOpen) closeCashOrders();
         closeReturnOrders();
         cashPage = 1;
         cashPayload = null;
+        cashTabSummaries = {};
+        cashTabSummaryToken++;
         returnPage = 1;
         returnPayload = null;
+        if (cashModalWasOpen) {
+            loadCashOrders();
+            loadCashTabSummaries();
+        }
         setLoading('Menyiapkan KPI utama…');
         $('anRefresh').disabled = true;
         $('anRefresh').textContent = 'Memuat…';

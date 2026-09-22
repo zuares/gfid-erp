@@ -169,7 +169,7 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             'is_active' => true,
         ]);
 
-        foreach (['READY_TO_SHIP', 'PROCESSED'] as $index => $status) {
+        foreach (['READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER'] as $index => $status) {
             MarketplaceOrder::create([
                 'store_id' => $store->id,
                 'external_order_id' => "SHIPPED-{$index}",
@@ -192,16 +192,16 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             'settlement' => 'shipped',
         ]));
 
-        $response->assertOk()->assertJsonPath('meta.total', 2);
-        $this->assertSame(['shipped', 'shipped'], collect($response->json('data'))->pluck('status_group')->all());
-        $this->assertSame(['Masih dikirim', 'Masih dikirim'], collect($response->json('data'))->pluck('status_group_label')->all());
+        $response->assertOk()->assertJsonPath('meta.total', 4);
+        $this->assertSame(['shipped', 'shipped', 'shipped', 'shipped'], collect($response->json('data'))->pluck('status_group')->all());
+        $this->assertSame(['Masih dikirim', 'Masih dikirim', 'Masih dikirim', 'Masih dikirim'], collect($response->json('data'))->pluck('status_group_label')->all());
 
         $this->actingAs($user)->getJson('/api/marketplace/analytics-cash-orders?' . http_build_query([
             'store_id' => $store->id,
             'date_from' => '2026-09-01',
             'date_to' => '2026-09-30',
             'settlement' => 'unsettled',
-        ]))->assertOk()->assertJsonPath('meta.total', 2);
+        ]))->assertOk()->assertJsonPath('meta.total', 4);
     }
 
     public function test_cash_orders_exposes_shopee_warehouse_tab_for_kilat_booking(): void

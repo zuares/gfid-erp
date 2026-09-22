@@ -62,7 +62,7 @@
         </div>
         <div class="an-modal-summary" id="cashOrdersSummary"><div class="an-empty">Memuat ringkasan…</div></div>
         <div class="an-modal-body" id="cashOrdersBody"><div class="an-empty">Pilih status pencairan untuk memuat order.</div></div>
-        <div class="an-modal-foot"><button class="an-btn" id="cashOrdersPrev" type="button">‹ Sebelumnya</button><span class="an-modal-page" id="cashOrdersPage">—</span><button class="an-btn" id="cashOrdersNext" type="button">Berikutnya ›</button></div>
+        <div class="an-modal-foot"><button class="an-btn" id="cashOrdersPrev" type="button" aria-label="Halaman sebelumnya">‹ Sebelumnya</button><div class="an-modal-pagination" aria-live="polite"><div><strong class="an-modal-page" id="cashOrdersPage">—</strong><small class="an-modal-page-meta" id="cashOrdersPageMeta">—</small></div></div><button class="an-btn" id="cashOrdersNext" type="button" aria-label="Halaman berikutnya">Berikutnya ›</button></div>
     </section>
 </div>
 
