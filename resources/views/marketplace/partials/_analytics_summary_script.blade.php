@@ -311,8 +311,10 @@
         const distribution = mode === 'customer'
             ? rows.map(row => ({ label: cohortMonthLabel(row.cohort_month), value: Number(row.cohort_size || 0) }))
             : Object.entries(rows.reduce((carry, row) => { carry[row.cohort_month] = (carry[row.cohort_month] || 0) + 1; return carry; }, {})).sort(([a], [b]) => a.localeCompare(b)).map(([label, value]) => ({ label: cohortMonthLabel(label), value }));
-        $('anCohortCurveSubtitle').textContent = `${payload.metric_label || 'Metric'} · rata-rata ${mode === 'product' ? 'product cohort' : 'customer cohort'} per umur`;
-        $('anCohortDistributionSubtitle').textContent = mode === 'customer' ? 'Ukuran customer cohort berdasarkan bulan transaksi pertama.' : 'Jumlah product cohort berdasarkan bulan transaksi pertama.';
+        $('anCohortCurveSubtitle').textContent = `${payload.metric_label || 'Metric'} · rata-rata ${mode === 'product' ? (payload.group_by === 'category' ? 'kategori' : 'produk') : 'cohort pelanggan'} per umur`;
+        $('anCohortDistributionSubtitle').textContent = mode === 'customer'
+            ? 'Ukuran cohort pelanggan berdasarkan bulan transaksi pertama.'
+            : `Jumlah ${payload.group_by === 'category' ? 'kategori' : 'produk'} berdasarkan bulan transaksi pertama.`;
         $('anCohortCurveChart').innerHTML = '<canvas id="anCohortCurveCanvas" aria-label="Grafik progression cohort"></canvas>';
         $('anCohortDistributionChart').innerHTML = '<canvas id="anCohortDistributionCanvas" aria-label="Grafik distribusi cohort"></canvas>';
         if (cohortChartInstance) cohortChartInstance.destroy();
@@ -325,7 +327,7 @@
         });
         cohortDistributionChartInstance = new Chart($('anCohortDistributionCanvas').getContext('2d'), {
             type:'bar',
-            data:{ labels:distribution.map(item => item.label), datasets:[{ label:mode === 'customer' ? 'Customers' : 'Product cohorts', data:distribution.map(item => item.value), backgroundColor:mode === 'product' ? 'rgba(217,119,6,.72)' : 'rgba(22,163,74,.72)', borderRadius:5, maxBarThickness:32 }] },
+            data:{ labels:distribution.map(item => item.label), datasets:[{ label:mode === 'customer' ? 'Pelanggan' : (payload.group_by === 'category' ? 'Kategori' : 'Produk'), data:distribution.map(item => item.value), backgroundColor:mode === 'product' ? 'rgba(217,119,6,.72)' : 'rgba(22,163,74,.72)', borderRadius:5, maxBarThickness:32 }] },
             options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'rgba(15,23,42,.95)', titleColor:'#f8fafc', bodyColor:'#f8fafc', borderColor:'rgba(255,255,255,.15)', borderWidth:1, padding:9, callbacks:{ label:context => `${context.dataset.label}: ${Number(context.parsed.y || 0).toLocaleString('id-ID')}` } } }, scales:{ x:{grid:{display:false}, ticks:{color:'#94a3b8',font:{size:10,family:'Inter, sans-serif'},maxRotation:0,autoSkip:true,maxTicksLimit:8}}, y:{beginAtZero:true, grid:{color:'rgba(148,163,184,.16)'}, ticks:{color:'#94a3b8',font:{size:10,family:'Inter, sans-serif'},precision:0}} } },
         });
     }
