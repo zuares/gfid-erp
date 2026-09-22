@@ -499,6 +499,27 @@
     .an-chart-canvas { border:1px solid #eef2f7; }
     .an-kpi { border-radius:14px; box-shadow:0 10px 22px rgba(15,23,42,.045); }
     .an-kpi.primary { background:linear-gradient(135deg,#0f172a,#1e293b); }
+    /* Keep the default analytics surface light and readable; dark mode remains opt-in. */
+    .an-hero { border-color:#bfdbfe; background:linear-gradient(135deg,#f8fbff 0%,#eff6ff 58%,#e0f2fe 100%); box-shadow:0 18px 34px rgba(37,99,235,.09); }
+    .an-hero::after { background:radial-gradient(ellipse at bottom right,rgba(37,99,235,.12),transparent 68%); }
+    .an-hero-title { color:#0f172a; }
+    .an-hero-title i { color:#2563eb; }
+    .an-hero-sub { color:#475569; }
+    .an-hero .an-sync-note { color:#64748b !important; }
+    .an-hero-controls { border-color:#bfdbfe; background:rgba(255,255,255,.78); }
+    .an-hero .an-field label { color:#334155; }
+    .an-hero .an-btn-dark, .an-btn-dark { background:#2563eb; border-color:#2563eb; color:#fff; }
+    .an-hero .an-btn-dark:hover, .an-btn-dark:hover { background:#1d4ed8; border-color:#1d4ed8; color:#fff; }
+    .an-tab.active { background:#2563eb; box-shadow:0 6px 14px rgba(37,99,235,.18); }
+    .an-kpi.primary { background:linear-gradient(135deg,#eff6ff,#dbeafe); color:#0f172a; border-color:#bfdbfe; }
+    .an-kpi.primary .an-kpi-label, .an-kpi.primary .an-kpi-value { color:#0f172a; }
+    .an-cohort-hero { border-color:#bfdbfe; background:linear-gradient(135deg,#f8fbff 0%,#eff6ff 60%,#e0f2fe 100%); }
+    .an-cohort-title { color:#0f172a; }
+    .an-cohort-description { color:#475569; }
+    .an-cohort-summary-card.is-primary { border-color:#bfdbfe; background:#eff6ff; }
+    .an-cohort-summary-card.is-primary .an-cohort-summary-label,
+    .an-cohort-summary-card.is-primary .an-cohort-summary-value,
+    .an-cohort-summary-card.is-primary .an-cohort-summary-note { color:#0f172a; }
     body[data-theme="dark"] .an-hero { border-color:#1e40af; background:linear-gradient(135deg,#020617 0%,#0f172a 62%,#12395a 100%); }
     body[data-theme="dark"] .an-enterprise-head { background:linear-gradient(180deg,rgba(30,41,59,.55),rgba(30,41,59,0)); }
     body[data-theme="dark"] .an-executive-top .an-pulse { background:linear-gradient(180deg,#1e293b,#172033); }
@@ -1402,11 +1423,15 @@
         const returnRefundOrders = Number(current.return_refund_order_count ?? current.return_refund_count ?? 0);
         const returnRefundAmount = Number(current.return_refund_amount ?? current.cash_refund ?? current.refund ?? 0);
         const placedOrders = Number(current.placed_order_count ?? totalOrder);
+        const completedOrders = Number(current.completed_count || 0);
+        const completionRate = Number(current.completion_rate ?? (totalOrder > 0 ? completedOrders / totalOrder * 100 : 0));
         const previous = summary?.previous || {};
         const previousGrossOrderRevenue = Number(previous.cash_order_revenue || 0) + Number(previous.cash_unsettled_order_revenue || 0) || Number(previous.gmv || 0);
         const previousNetOrderRevenue = Math.max(0, Number(previous.net_order_revenue ?? previousGrossOrderRevenue));
         const previousCancelledAmount = Number(previous.cancelled_amount || 0);
         const previousReturnRefundAmount = Number(previous.return_refund_amount ?? previous.cash_refund ?? previous.refund ?? 0);
+        const previousCompletedOrders = Number(previous.completed_count || 0);
+        const previousCompletionRate = Number(previous.completion_rate ?? (Number(previous.order_total || 0) > 0 ? previousCompletedOrders / Number(previous.order_total) * 100 : 0));
         const previousHpp = Number(previous.hpp_total ?? previous.hpp ?? 0);
         const previousAdCost = Number(previous.ad_cost || 0);
         const previousFeeRate = Number(previous.cash_order_revenue || 0) > 0
@@ -1467,6 +1492,8 @@
         const settledProfitChange = pulseChange(settledProfit, previousSettledProfit, moneyText);
         const estimatedUnsettledProfitChange = pulseChange(estimatedUnsettledProfit, previousEstimatedUnsettledProfit, moneyText);
         const percentText = value => `${Number(value || 0).toFixed(1)}%`;
+        const completedOrdersChange = pulseChange(completedOrders, previousCompletedOrders, countText);
+        const completionRateChange = pulseChange(completionRate, previousCompletionRate, percentText);
         const estimatedMarginChange = pulseChange(estimatedMargin, previousEstimatedMargin, percentText);
         const pendingPayoutChange = pulseChange(pendingPayout, previousPendingPayout, moneyText);
         const cashPayoutChange = pulseChange(cashPayout, previousCashPayout, moneyText);
@@ -1491,6 +1518,8 @@
         const topStores = [...(summary?.stores || [])].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0)).slice(0, 5);
         const pulse = [
             ['Total order', totalOrder.toLocaleString('id-ID'), { text: `eligible · ${totalOrderChange.text}`, className: totalOrderChange.className }, 'orders'],
+            ['Order selesai', completedOrders.toLocaleString('id-ID'), { text: `${completionRate.toFixed(1)}% completion · ${completedOrdersChange.text}`, className: completedOrdersChange.className }, 'completed'],
+            ['Completion rate', `${completionRate.toFixed(1)}%`, completionRateChange, 'completion-rate'],
             ['Produk terjual', totalProducts.toLocaleString('id-ID'), { text: `unit · ${totalProductsChange.text}`, className: totalProductsChange.className }, 'products'],
             ['AOV net', money(aovNet), aovChange, 'aov'],
             ['APC pembeli', money(apc), { text: `cair + pending · ${apcChange.text}`, className: apcChange.className }, 'apc'],
