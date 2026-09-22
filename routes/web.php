@@ -76,6 +76,7 @@ use App\Http\Controllers\ShopeeStoreAuthController;
 use App\Http\Controllers\TikTokShopAuthController;
 use App\Http\Controllers\Marketplace\EscrowController;
 use App\Http\Controllers\Marketplace\PayoutController;
+use App\Http\Controllers\Marketplace\MarketplaceAnalyticsController;
 
 // Marketplace — halaman
 Route::middleware(['auth', 'access:marketplace'])->group(function () {
@@ -114,7 +115,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('marketplace/settings/sample-greeting', [MarketplaceSettingsController::class, 'printSampleGreetingCard'])->name('marketplace.settings.sample_greeting');
     Route::post('/marketplace/settings/preview-pdf', [MarketplaceSettingsController::class, 'previewSettingsPdf'])->name('marketplace.settings.previewPdf');
     Route::post('/marketplace/settings/delete-template', [MarketplaceSettingsController::class, 'deleteTemplate'])->name('marketplace.settings.delete_template');
-    Route::get('/marketplace/analytics',  [MarketplaceController::class, 'analytics'])->name('marketplace.analytics');
+    Route::get('/marketplace/analytics',  [MarketplaceAnalyticsController::class, 'index'])->name('marketplace.analytics');
     Route::get('/marketplace/issues',      [MarketplaceSystemController::class, 'issueCenter'])->name('marketplace.issues');
     Route::get('/marketplace/returns',     [\App\Http\Controllers\MarketplaceReturnController::class, 'index'])->name('marketplace.returns');
     Route::get('/marketplace/kilat',       [\App\Http\Controllers\MarketplaceBookingController::class, 'index'])->name('marketplace.kilat');
@@ -179,13 +180,13 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
 
     Route::get('/local-orders',                [MarketplaceController::class, 'localOrders']);
     Route::get('/analytics-orders',            [MarketplaceController::class, 'analyticsOrders']);
-    Route::get('/analytics-summary',           [MarketplaceController::class, 'analyticsSummary']);
-    Route::get('/analytics-kpis',              [MarketplaceController::class, 'analyticsKpis']);
-    Route::get('/analytics-products',          [MarketplaceController::class, 'analyticsProducts']);
-    Route::get('/analytics-cohort',            [MarketplaceController::class, 'analyticsCohort']);
-    Route::get('/analytics-cohort-options',    [MarketplaceController::class, 'analyticsCohortOptions']);
-    Route::get('/analytics-cash-orders',       [MarketplaceController::class, 'analyticsCashOrders']);
-    Route::get('/analytics-return-orders',      [MarketplaceController::class, 'analyticsReturnOrders']);
+    Route::get('/analytics-summary',           [MarketplaceAnalyticsController::class, 'summary']);
+    Route::get('/analytics-kpis',              [MarketplaceAnalyticsController::class, 'kpis']);
+    Route::get('/analytics-products',          [MarketplaceAnalyticsController::class, 'products']);
+    Route::get('/analytics-cohort',            [MarketplaceAnalyticsController::class, 'cohort']);
+    Route::get('/analytics-cohort-options',    [MarketplaceAnalyticsController::class, 'cohortOptions']);
+    Route::get('/analytics-cash-orders',       [MarketplaceAnalyticsController::class, 'cashOrders']);
+    Route::get('/analytics-return-orders',      [MarketplaceAnalyticsController::class, 'returnOrders']);
     Route::get('/analytics-ad-cost',           [MarketplaceController::class, 'analyticsAdCost']);
     Route::get('/local-orders/{order}/buyer-completed-orders', [MarketplaceController::class, 'buyerCompletedOrders']);
     Route::get('/local-orders-paginated',      [MarketplaceController::class, 'localOrdersPaginated']);
