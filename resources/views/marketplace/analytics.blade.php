@@ -412,7 +412,7 @@
     .an-cohort-reading-item i { color:#2563eb; font-size:.72rem; }
     .an-cohort-reading-item small { color:var(--dsh-muted); font-size:.58rem; font-weight:650; }
     .an-cohort-reading-hint { margin-left:auto; color:var(--dsh-muted); font-size:.6rem; font-weight:700; }
-    .an-cohort-table-wrap { overflow:hidden; border:1px solid var(--dsh-border); border-radius:10px; }
+    .an-cohort-table-wrap { overflow-x:auto; border:1px solid var(--dsh-border); border-radius:10px; }
     .an-cohort-table { width:100%; min-width:0; table-layout:fixed; }
     .an-cohort-table th, .an-cohort-table td { overflow:hidden; text-align:right; white-space:normal; }
     .an-cohort-table:not(.is-product) th:first-child { width:18%; }
@@ -1818,14 +1818,14 @@
         $('anCohortNote').textContent = notes.join(' · ') || 'Agregasi cohort mengikuti filter periode dan toko di halaman ini.';
     }
     function cohortCell(detail, metric, isProduct, maxValue, context = {}) {
-        if (!detail) return '<span class="an-cohort-cell is-empty" title="Tidak ada aktivitas pada periode ini">—</span>';
+        if (!detail) return '<td><span class="an-cohort-cell is-empty" title="Tidak ada aktivitas pada periode ini">—</span></td>';
         const value = detail[metric];
-        if (value === null || value === undefined) return '<span class="an-cohort-cell is-empty" title="Metric tidak tersedia pada periode ini">—</span>';
+        if (value === null || value === undefined) return '<td><span class="an-cohort-cell is-empty" title="Metric tidak tersedia pada periode ini">—</span></td>';
         const intensity = Math.min(.46, .08 + (Math.abs(Number(value || 0)) / Math.max(maxValue, 1)) * .38);
         const encoded = esc(JSON.stringify({ ...context, ...detail, metric, metric_label: payloadMetricLabel(metric), is_product: isProduct }));
         const supportingValue = isProduct ? `Sales ${money(detail.revenue)} · Cov ${Number(detail.financial_coverage_pct || 0).toFixed(0)}%` : `${Number(detail.active_customers || 0).toLocaleString('id-ID')} active`;
         const cellLabel = `${payloadMetricLabel(metric)} ${cohortFormat(value, metric)}, ${supportingValue}`;
-        return `<button type="button" class="an-cohort-cell ${isProduct ? 'product' : ''}" style="--heat:${intensity}" title="${esc(cellLabel)}" aria-label="${esc(cellLabel)}" data-cohort-detail="${encoded}"><span class="an-cohort-cell-value">${cohortFormat(value, metric)}</span><span class="an-cohort-cell-sub">${esc(supportingValue)}</span></button>`;
+        return `<td><button type="button" class="an-cohort-cell ${isProduct ? 'product' : ''}" style="--heat:${intensity}" title="${esc(cellLabel)}" aria-label="${esc(cellLabel)}" data-cohort-detail="${encoded}"><span class="an-cohort-cell-value">${cohortFormat(value, metric)}</span><span class="an-cohort-cell-sub">${esc(supportingValue)}</span></button></td>`;
     }
     const payloadMetricLabel = metric => ({retention_pct:'Retention %',active_customers:'Active Customers',orders:'Orders',qty_sold:'Qty Sold',revenue:'Gross Sales',gross_profit:'Gross Profit (covered)',gross_margin_pct:'Gross Margin %',net_profit:'Net Profit (covered)'})[metric] || metric;
     const cohortHeader = (label, sub = '') => `<th>${label}${sub ? `<small>${sub}</small>` : ''}</th>`;
