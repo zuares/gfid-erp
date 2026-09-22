@@ -8,10 +8,6 @@
     <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-finance an-decision-pulse-grid" id="anDecisionPulse"><div class="an-empty">Memuat KPI…</div></div></div>
 </section>
 
-<div class="an-grid-main an-grid-main-chart an-tab-pane" data-an-pane="summary">
-    <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Performance trend</div><div class="an-card-title"><i class="bi bi-graph-up-arrow me-1" style="color:#16a34a"></i>Grafik harian</div><div class="an-card-sub">Omzet &amp; estimasi profit</div></div></div><div class="an-card-body"><div class="an-chart-panel-head"><div class="an-chart-panel-title">Performa harian</div><div class="an-chart-summary" id="chartCompareNote">Memuat…</div></div><div class="an-chart" id="revenueChart"><div class="an-empty">Memuat grafik…</div></div></div></section>
-</div>
-
 <section class="an-control-tower an-tab-pane" data-an-pane="summary">
     <div class="an-control-head">
         <div>
@@ -38,6 +34,10 @@
         </div>
     </div>
 </section>
+
+<div class="an-grid-main an-grid-main-chart an-tab-pane" data-an-pane="summary">
+    <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Performance trend</div><div class="an-card-title"><i class="bi bi-graph-up-arrow me-1" style="color:#16a34a"></i>Grafik harian</div><div class="an-card-sub">Omzet &amp; estimasi profit</div></div></div><div class="an-card-body"><div class="an-chart-panel-head"><div class="an-chart-panel-title">Performa harian</div><div class="an-chart-summary" id="chartCompareNote">Memuat…</div></div><div class="an-chart" id="revenueChart"><div class="an-empty">Memuat grafik…</div></div></div></section>
+</div>
 
 <div class="an-modal" id="cashOrdersModal" aria-hidden="true">
     <div class="an-modal-backdrop" data-cash-close></div>
