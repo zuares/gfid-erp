@@ -78,7 +78,7 @@
     {{-- Penjelasan singkat agar owner tidak bingung --}}
     <div id="kiltHelp" class="orders-help">
         <span style="font-size:1rem">💡</span>
-        <span>Pesanan <strong>Kilat</strong> dikelola gudang Shopee. Alur: <strong>Perlu Proses Penjual</strong> → <strong>Dikirim ke DC</strong> → <strong>Dikirim ke Pembeli</strong>. Kolom di bawah menampilkan status tiap pesanan secara ringkas.</span>
+        <span>Pesanan <strong>Kilat</strong> dikelola gudang Shopee. Alur: <strong>Perlu Proses Penjual</strong> → <strong>Dikirim ke DC</strong> → <strong>Disimpan di Gudang Shopee</strong> → <strong>Dikirim ke Pembeli</strong>. Kolom di bawah menampilkan status tiap pesanan secara ringkas.</span>
     </div>
 
     {{-- TABS (label mengikuti alur Pesanan Kilat, ramah-owner) --}}
@@ -89,8 +89,11 @@
         <button class="ord-tab active" data-tab="ready" onclick="switchTab('ready', this)" title="Penjual perlu memproses / menyerahkan barang (READY_TO_SHIP/PROCESSED)">
             📦 Perlu Proses Penjual <span class="ord-badge urgent" id="badge-ready">—</span>
         </button>
-        <button class="ord-tab" data-tab="shipped" onclick="switchTab('shipped', this)" title="Barang sudah dikirim ke gudang/DC Shopee (SHIPPED/COMPLETED)">
+        <button class="ord-tab" data-tab="shipped" onclick="switchTab('shipped', this)" title="Barang sedang dikirim ke DC Shopee (READY_TO_HANDOVER/COMPLETED)">
             🚚 Dikirim ke DC <span class="ord-badge" id="badge-shipped" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">—</span>
+        </button>
+        <button class="ord-tab" data-tab="warehouse" onclick="switchTab('warehouse', this)" title="Barang sudah berada di gudang Shopee (SHIPPED)">
+            🏬 Disimpan di Gudang Shopee <span class="ord-badge" id="badge-warehouse" style="background:#f5f3ff;color:#7c3aed;border-color:#ddd6fe">—</span>
         </button>
         <button class="ord-tab" data-tab="waiting" onclick="switchTab('waiting', this)" title="Barang di gudang Shopee, dalam perjalanan ke pembeli (MATCHED/PENDING)">
             🏠 Dikirim ke Pembeli <span class="ord-badge" id="badge-waiting" style="background:#f0fdf4;color:#16a34a;border-color:#bbf7d0">—</span>
@@ -342,7 +345,7 @@
         PENDING:       ['Dikirim ke Pembeli',   'fstatus-done'],
         READY_TO_SHIP: ['Perlu Proses Penjual', 'fstatus-draft'],
         PROCESSED:     ['Sedang Diproses',      'fstatus-draft'],
-        SHIPPED:       ['Dikirim ke DC',        'fstatus-pending'],
+        SHIPPED:       ['Disimpan di Gudang Shopee', 'fstatus-pending'],
         COMPLETED:     ['Selesai',              'fstatus-done'],
         CANCELLED:     ['Dibatalkan',           'fstatus-none'],
         FAILED:        ['Gagal',                'fstatus-none'],
@@ -358,8 +361,10 @@
     // Satu sumber kebenaran pemetaan status → tab, supaya jumlah antar-tab pasti pas.
     function bucketOf(b){
         const s = (b.booking_status||'').toUpperCase();
+        if (b.fulfillment_stage) return b.fulfillment_stage;
         if (s === 'CANCELLED' || s === 'FAILED') return 'cancelled';
-        if (s === 'SHIPPED' || s === 'COMPLETED') return 'shipped';
+        if (s === 'SHIPPED') return 'warehouse';
+        if (s === 'READY_TO_HANDOVER' || s === 'COMPLETED') return 'shipped';
         if (s === 'READY_TO_SHIP' || s === 'PROCESSED' || b.needs_shipping) return 'ready';
         return 'waiting'; // MATCHED, PENDING, atau status lain yang belum diproses
     }
@@ -464,12 +469,13 @@
     }
 
     function updateBadges() {
-        const cnt = { waiting: 0, ready: 0, shipped: 0, cancelled: 0 };
+        const cnt = { waiting: 0, ready: 0, shipped: 0, warehouse: 0, cancelled: 0 };
         bookings.forEach(b => { cnt[bucketOf(b)]++; });
         document.getElementById('badge-all').textContent = bookings.length;
         document.getElementById('badge-waiting').textContent = cnt.waiting;
         document.getElementById('badge-ready').textContent = cnt.ready;
         document.getElementById('badge-shipped').textContent = cnt.shipped;
+        document.getElementById('badge-warehouse').textContent = cnt.warehouse;
         document.getElementById('badge-cancelled').textContent = cnt.cancelled;
 
         // Sembunyikan badge "urgent" (merah) di tab Siap Kirim bila memang 0.

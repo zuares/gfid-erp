@@ -86,6 +86,11 @@ class MarketplaceBookingController extends Controller
                 'create_time'              => $b->create_time,
                 'update_time'              => $b->update_time,
                 'meta'                     => $b->meta,
+                // SHIPPED pada lifecycle booking berarti barang sudah keluar
+                // dari penjual dan berada di alur fulfillment gudang Shopee.
+                // Kirim stage ter-normalisasi agar UI tidak perlu menebak dari
+                // beberapa kode status yang berbeda.
+                'fulfillment_stage'        => $this->bookingFulfillmentStage($b),
                 'items'                    => (!empty($b->items) && is_array($b->items)) ? $b->items : (optional($od)->items ?? []),
                 'fulfillment_status'       => optional($od)->fulfillment?->status,
             ];
@@ -97,6 +102,17 @@ class MarketplaceBookingController extends Controller
             'source'         => 'db',
             'stores_queried' => $storeIds->count(),
         ]);
+    }
+
+    protected function bookingFulfillmentStage(MarketplaceBooking $booking): string
+    {
+        return match (strtoupper((string) $booking->booking_status)) {
+            'SHIPPED' => 'warehouse',
+            'READY_TO_HANDOVER', 'COMPLETED' => 'shipped',
+            'READY_TO_SHIP', 'PROCESSED' => 'ready',
+            'CANCELLED', 'CANCELLED_BEFORE_SHIPPING', 'FAILED' => 'cancelled',
+            default => $booking->needsShipping() ? 'ready' : 'waiting',
+        };
     }
 
     /** Tarik & simpan booking dari Shopee untuk SEMUA toko aktif. */
