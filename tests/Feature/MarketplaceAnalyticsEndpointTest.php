@@ -24,7 +24,7 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
         $page = $this->actingAs($user)->get('/marketplace/analytics?date_from=2099-01-01&date_to=2099-01-31');
 
         $page->assertOk()->assertViewIs('marketplace.analytics')
-            ->assertSee('Perlu dikirim')
+            ->assertSee('Masih dikirim')
             ->assertSee('Dana belum cair');
 
         $response = $this->actingAs($user)->getJson('/api/marketplace/analytics-kpis?date_from=2099-01-01&date_to=2099-01-31');
@@ -194,6 +194,7 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
 
         $response->assertOk()->assertJsonPath('meta.total', 2);
         $this->assertSame(['shipped', 'shipped'], collect($response->json('data'))->pluck('status_group')->all());
+        $this->assertSame(['Masih dikirim', 'Masih dikirim'], collect($response->json('data'))->pluck('status_group_label')->all());
 
         $this->actingAs($user)->getJson('/api/marketplace/analytics-cash-orders?' . http_build_query([
             'store_id' => $store->id,

@@ -469,7 +469,7 @@ class MarketplaceAnalyticsSummaryService
         }
 
         if (in_array($status, ['READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_RETURN'], true)) {
-            return ['key' => 'shipped', 'label' => 'Perlu dikirim'];
+            return ['key' => 'shipped', 'label' => 'Masih dikirim'];
         }
 
         return ['key' => 'other', 'label' => 'Status lainnya'];
