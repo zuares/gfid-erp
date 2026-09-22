@@ -549,7 +549,7 @@ class MarketplaceAnalyticsSummaryService
             ->when($filters['store_id'], fn ($query, $storeId) => $query->where('mo.store_id', $storeId))
             ->selectRaw("SUM({$hppExpression}) AS hpp_total")
             ->selectRaw("SUM(CASE WHEN ms.data_status = ? THEN {$hppExpression} ELSE 0 END) AS hpp_settled", [MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE])
-            ->selectRaw("SUM(CASE WHEN UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, '')) IN ('SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE', 'COMPLETED') THEN {$hppExpression} ELSE 0 END) AS hpp_shipped")
+            ->selectRaw("SUM(CASE WHEN UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, '')) IN ('READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE', 'COMPLETED') THEN {$hppExpression} ELSE 0 END) AS hpp_shipped")
             ->first();
 
         $rawFallback = $this->rawOrderHppAggregate($filters);
@@ -635,7 +635,7 @@ class MarketplaceAnalyticsSummaryService
         foreach ($orders as $order) {
             $isSettled = $order->settlement_status === MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE;
             $status = strtoupper((string) ($order->order_status ?: $order->status ?: ''));
-            $isShipped = in_array($status, ['SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE', 'COMPLETED'], true);
+            $isShipped = in_array($status, ['READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE', 'COMPLETED'], true);
             foreach ($decode($order->order_raw_json)['item_list'] ?? [] as $item) {
                 if (! is_array($item)) {
                     continue;
@@ -1246,10 +1246,7 @@ class MarketplaceAnalyticsSummaryService
 
     private function unsettledBase(array $filters)
     {
-        $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
-
-        return $this->unsettledOrdersBase($filters)
-            ->whereRaw("{$status} NOT IN ('READY_TO_SHIP', 'PROCESSED')");
+        return $this->unsettledOrdersBase($filters);
     }
 
     private function unsettledOrdersBase(array $filters)
@@ -1756,8 +1753,8 @@ class MarketplaceAnalyticsSummaryService
         // marketplace order revenue—not the final payout after deductions.
         $marketplaceRevenue = (float) ($aggregate['cash_order_revenue'] ?? 0);
         $actualMarketplaceFee = (float) ($aggregate['cash_marketplace_fees'] ?? 0);
-        // Projected payout intentionally excludes READY_TO_SHIP/PROCESSED;
-        // use the matching HPP scope when it is available as well.
+        // Projected payout follows the same operational scope as Dana belum
+        // cair, including READY_TO_SHIP and PROCESSED orders.
         $hpp = array_key_exists('hpp_shipped', $aggregate)
             ? (float) $aggregate['hpp_shipped']
             : (float) ($aggregate['hpp_total'] ?? $aggregate['hpp'] ?? 0);
