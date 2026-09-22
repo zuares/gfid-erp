@@ -555,7 +555,7 @@
                 <button class="an-tab active" type="button" data-an-tab="summary" role="tab" aria-selected="true"><i class="bi bi-grid-1x2 me-1"></i>Ringkasan</button>
                 <button class="an-tab" type="button" data-an-tab="stores" role="tab" aria-selected="false"><i class="bi bi-shop me-1"></i>Akun &amp; Biaya</button>
                 <button class="an-tab" type="button" data-an-tab="products" role="tab" aria-selected="false"><i class="bi bi-box-seam me-1"></i>Produk</button>
-                <button class="an-tab" type="button" data-an-tab="cohort" role="tab" aria-selected="false"><i class="bi bi-grid-3x3-gap me-1"></i>Cohort</button>
+                <button class="an-tab" type="button" data-an-tab="cohort" role="tab" aria-selected="false"><i class="bi bi-grid-3x3-gap me-1"></i>Cohort pelanggan &amp; produk</button>
             </div>
           </div>
         @include('marketplace.partials._analytics_summary')
