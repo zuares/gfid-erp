@@ -7,6 +7,23 @@
     const cashStatus = value => String(value || '—').replace(/_/g, ' ').toLowerCase();
     const cashStat = (label, value, note = '') => `<div class="an-modal-stat"><div class="an-modal-stat-label">${label}</div><div class="an-modal-stat-value">${value}</div>${note ? `<span class="an-modal-stat-note">${note}</span>` : ''}</div>`;
     const cashFeeDetail = (row, label, value, className = '') => `<span>${label}<strong class="${className}">${money(value)}</strong></span>`;
+    const paymentLabel = value => {
+        const raw = String(value || '').trim();
+        if (!raw) return 'Tidak tersedia';
+        const normalized = raw.toUpperCase().replace(/[\s-]+/g, '_');
+        const labels = {
+            COD: 'COD',
+            CASH_ON_DELIVERY: 'COD',
+            NON_COD: 'Non-COD',
+            BANK_TRANSFER: 'Transfer bank',
+            TRANSFER: 'Transfer bank',
+            VIRTUAL_ACCOUNT: 'Virtual account',
+            CREDIT_CARD: 'Kartu kredit',
+            DEBIT_CARD: 'Kartu debit',
+            E_WALLET: 'E-wallet',
+        };
+        return labels[normalized] || raw.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
+    };
 
     function renderCashOrders() {
         const payload = cashPayload || {};
@@ -20,7 +37,7 @@
         const feePercent = value => aggregate.cash_order_revenue > 0 ? `${(n(value) / n(aggregate.cash_order_revenue) * 100).toFixed(1)}% omzet order` : '0.0% omzet order';
         const settlementLabel = row => row.settlement_time ? 'Sudah cair' : 'Belum cair';
         const statusLabel = row => row.status_group_label || cashStatus(row.status);
-        const modeLabel = { all: 'semua status order', settled: 'payout sudah cair', shipped: 'order shipped · masih dikirim', cancelled: 'order dibatalkan', return_refund: 'order return / refund', unsettled: 'payout belum cair' }[cashSettlement] || 'semua status order';
+        const modeLabel = { all: 'semua status order', settled: 'payout sudah cair', shipped: 'order shipped · masih dikirim', confirm: 'menunggu konfirmasi pembeli', cancelled: 'order dibatalkan', return_refund: 'order return / refund', unsettled: 'payout belum cair' }[cashSettlement] || 'semua status order';
         $('cashOrdersTitle').textContent = isFeeFocus ? 'Rincian fee marketplace actual' : 'Status order & pencairan';
         $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · ${modeLabel} · ${totalOrders} order`;
         $('cashOrdersSummary').innerHTML = isFeeFocus ? [
@@ -38,11 +55,11 @@
         const renderRows = groupRows => groupRows.map(row => {
             const rowSettled = Boolean(row.settlement_time);
             const payout = rowSettled && n(row.cash_payout) > 0 ? money(row.cash_payout) : (n(row.cash_payout) > 0 ? money(row.cash_payout) : 'Belum tersedia');
-            return `<tr><td><div class="an-cash-order">${esc(row.channel_order_id)}</div><span class="an-cash-meta">Order ${esc(dateTime(row.ordered_at))}</span><details class="an-cash-detail"><summary>Rincian fee</summary><div class="an-cash-detail-grid">${cashFeeDetail(row, 'Administrasi', row.commission_fee, 'fee')}${cashFeeDetail(row, 'Layanan', row.service_fee, 'fee')}${cashFeeDetail(row, 'Transaksi', row.transaction_fee, 'fee')}${cashFeeDetail(row, 'Asuransi', row.shipping_insurance_fee, 'fee')}${cashFeeDetail(row, 'Pajak escrow', row.escrow_tax, 'fee')}${cashFeeDetail(row, 'Affiliate fee', row.affiliate_fee_raw, 'affiliate')}${cashFeeDetail(row, 'Activity / AMS', row.activity_fee, 'affiliate')}${cashFeeDetail(row, 'Refund', row.refund)}${cashFeeDetail(row, 'Total fee', row.total_fees, 'fee')}</div></details></td><td><div>${esc(row.store_name)}</div><span class="an-cash-status">${esc(statusLabel(row))}</span><span class="an-cash-meta">Payout: ${settlementLabel(row)}</span></td><td class="an-cash-money">${money(row.gross_sales)}</td><td class="an-cash-money">${money(row.buyer_payment_amount)}</td><td class="an-cash-money ${rowSettled ? 'good' : ''}">${payout}</td><td class="an-cash-money fee">${money(row.marketplace_fee)}</td><td class="an-cash-money affiliate">${money(row.affiliate_fee)}</td></tr>`;
+            return `<tr><td><div class="an-cash-order">${esc(row.channel_order_id)}</div><span class="an-cash-meta">Order ${esc(dateTime(row.ordered_at))}</span><details class="an-cash-detail"><summary>Rincian fee</summary><div class="an-cash-detail-grid">${cashFeeDetail(row, 'Administrasi', row.commission_fee, 'fee')}${cashFeeDetail(row, 'Layanan', row.service_fee, 'fee')}${cashFeeDetail(row, 'Transaksi', row.transaction_fee, 'fee')}${cashFeeDetail(row, 'Asuransi', row.shipping_insurance_fee, 'fee')}${cashFeeDetail(row, 'Pajak escrow', row.escrow_tax, 'fee')}${cashFeeDetail(row, 'Affiliate fee', row.affiliate_fee_raw, 'affiliate')}${cashFeeDetail(row, 'Activity / AMS', row.activity_fee, 'affiliate')}${cashFeeDetail(row, 'Refund', row.refund)}${cashFeeDetail(row, 'Total fee', row.total_fees, 'fee')}</div></details></td><td><div>${esc(row.store_name)}</div><span class="an-cash-status">${esc(statusLabel(row))}</span><span class="an-cash-meta">Payout: ${settlementLabel(row)}</span></td><td><span class="an-cash-payment">${esc(paymentLabel(row.payment_method))}</span></td><td class="an-cash-money">${money(row.gross_sales)}</td><td class="an-cash-money">${money(row.buyer_payment_amount)}</td><td class="an-cash-money ${rowSettled ? 'good' : ''}">${payout}</td><td class="an-cash-money fee">${money(row.marketplace_fee)}</td><td class="an-cash-money affiliate">${money(row.affiliate_fee)}</td></tr>`;
         }).join('');
-        const renderTable = (groupRows, groupLabel = '') => groupRows.length ? `${groupLabel ? `<div class="an-cash-group-head"><strong>${esc(groupLabel)}</strong><span>${groupRows.length.toLocaleString('id-ID')} order</span></div>` : ''}<div class="an-table-wrap"><table class="an-table an-cash-table"><thead><tr><th>Order</th><th>Toko &amp; status</th><th>${isAll ? 'Nilai order' : 'Omzet order'}</th><th>Pembayaran pembeli</th><th>${isSettled ? 'Omzet cair' : 'Payout tercatat'}</th><th>Fee marketplace</th><th>Affiliate / AMS</th></tr></thead><tbody>${renderRows(groupRows)}</tbody></table></div>` : '';
+        const renderTable = (groupRows, groupLabel = '') => groupRows.length ? `${groupLabel ? `<div class="an-cash-group-head"><strong>${esc(groupLabel)}</strong><span>${groupRows.length.toLocaleString('id-ID')} order</span></div>` : ''}<div class="an-table-wrap"><table class="an-table an-cash-table"><thead><tr><th>Order</th><th>Toko &amp; status</th><th>Metode pembayaran</th><th>${isAll ? 'Nilai order' : 'Omzet order'}</th><th>Pembayaran pembeli</th><th>${isSettled ? 'Omzet cair' : 'Payout tercatat'}</th><th>Fee marketplace</th><th>Affiliate / AMS</th></tr></thead><tbody>${renderRows(groupRows)}</tbody></table></div>` : '';
         const groups = isAll
-            ? ['completed', 'shipped', 'return_refund', 'cancelled', 'other'].map(key => ({ key, label: rows.find(row => row.status_group === key)?.status_group_label || key, rows: rows.filter(row => row.status_group === key) })).filter(group => group.rows.length)
+            ? ['completed', 'shipped', 'confirm', 'return_refund', 'cancelled', 'other'].map(key => ({ key, label: rows.find(row => row.status_group === key)?.status_group_label || key, rows: rows.filter(row => row.status_group === key) })).filter(group => group.rows.length)
             : [{ key: 'flat', label: '', rows }];
         const table = groups.length ? groups.map(group => `<section class="an-cash-group">${renderTable(group.rows, isAll ? group.label : '')}</section>`).join('') : `<div class="an-empty">Tidak ada order pada periode ini.</div>`;
         const body = isFeeFocus
@@ -61,7 +78,7 @@
         document.body.classList.remove('an-modal-open');
     }
     function setCashSettlementTab(value) {
-        cashSettlement = ['all', 'settled', 'shipped', 'cancelled', 'return_refund', 'unsettled'].includes(value) ? value : 'settled';
+        cashSettlement = ['all', 'settled', 'shipped', 'confirm', 'cancelled', 'return_refund', 'unsettled'].includes(value) ? value : 'settled';
         document.querySelectorAll('[data-cash-settlement]').forEach(button => {
             const active = button.dataset.cashSettlement === cashSettlement;
             button.classList.toggle('active', active);

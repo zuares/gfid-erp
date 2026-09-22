@@ -32,6 +32,7 @@
             <button class="an-modal-tab active" type="button" role="tab" aria-selected="true" data-cash-settlement="all">Semua status</button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="settled">Sudah cair</button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="shipped">Masih dikirim</button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="confirm">Menunggu konfirmasi</button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="cancelled">Dibatalkan</button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="return_refund">Return / Refund</button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="unsettled">Belum cair</button>

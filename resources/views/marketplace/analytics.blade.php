@@ -310,8 +310,9 @@
     .an-modal-fee-breakdown div { display:flex; align-items:center; justify-content:space-between; gap:.5rem; color:var(--dsh-muted); font-size:.64rem; font-weight:700; }
     .an-modal-fee-breakdown strong { color:var(--text,#0f172a); font-weight:850; }
     .an-modal-fee-breakdown small { display:block; margin-top:.12rem; color:var(--dsh-muted); font-size:.55rem; font-weight:700; text-align:right; }
-    .an-cash-table { min-width:900px; }
+    .an-cash-table { min-width:1040px; }
     .an-cash-table td { vertical-align:top; }
+    .an-cash-payment { display:inline-block; max-width:140px; color:var(--text,#0f172a); font-size:.64rem; font-weight:800; line-height:1.25; overflow-wrap:anywhere; }
     .an-cash-order { color:var(--text,#0f172a); font-weight:800; white-space:nowrap; }
     .an-cash-status { display:inline-block; margin-top:.22rem; padding:.16rem .35rem; border-radius:5px; background:#dcfce7; color:#166534; font-size:.58rem; font-weight:800; text-transform:capitalize; }
     .an-cash-meta { display:block; margin-top:.18rem; color:var(--dsh-muted); font-size:.6rem; font-weight:600; white-space:nowrap; }

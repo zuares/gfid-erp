@@ -244,11 +244,12 @@ class MarketplaceAnalyticsSummaryService
         $filters = $this->normalizeFilters($filters);
         $page = max(1, $page);
         $perPage = max(10, min(100, $perPage));
-        $settlement = in_array($settlement, ['all', 'unsettled', 'shipped', 'cancelled', 'return_refund'], true) ? $settlement : 'settled';
+        $settlement = in_array($settlement, ['all', 'unsettled', 'shipped', 'confirm', 'cancelled', 'return_refund'], true) ? $settlement : 'settled';
         $base = match ($settlement) {
             'all' => $this->allCashBase($filters),
             'unsettled' => $this->unsettledBase($filters),
             'shipped' => $this->cashStatusBase($filters, 'shipped'),
+            'confirm' => $this->cashStatusBase($filters, 'confirm'),
             'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
             'return_refund' => $this->cashStatusBase($filters, 'return_refund'),
             default => $this->cashBase($filters),
@@ -262,6 +263,7 @@ class MarketplaceAnalyticsSummaryService
                 'mo.external_order_id',
                 'mo.order_status',
                 'mo.status',
+                'mo.payment_method',
                 'mo.ordered_at',
                 'mo.total_amount',
                 'mo.total_paid_customer',
@@ -314,6 +316,7 @@ class MarketplaceAnalyticsSummaryService
                 'status' => (string) ($row->order_status ?: $row->status ?: '-'),
                 'status_group' => $statusGroup['key'],
                 'status_group_label' => $statusGroup['label'],
+                'payment_method' => $this->cashPaymentMethod($row),
                 'settlement_status' => (string) ($row->data_status ?: 'not_settled'),
                 'ordered_at' => $row->ordered_at,
                 'settlement_time' => $row->settlement_time,
@@ -413,6 +416,31 @@ class MarketplaceAnalyticsSummaryService
         return round(max(0, $grossSales - $sellerVoucher), 2);
     }
 
+    private function cashPaymentMethod($row): ?string
+    {
+        $paymentMethod = trim((string) ($row->payment_method ?? ''));
+        if ($paymentMethod !== '') {
+            return $paymentMethod;
+        }
+
+        $rawOrder = $row->order_raw_json ?? null;
+        if (! is_array($rawOrder)) {
+            $rawOrder = json_decode((string) $rawOrder, true);
+        }
+        if (! is_array($rawOrder)) {
+            return null;
+        }
+
+        foreach (['payment_method', 'pay_method', 'buyer_payment_method', 'payment_info.payment_method'] as $key) {
+            $value = data_get($rawOrder, $key);
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                return trim((string) $value);
+            }
+        }
+
+        return null;
+    }
+
     private function cashOrderStatusGroup($row): array
     {
         $status = strtoupper(trim((string) ($row->order_status ?: $row->status ?: '')));
@@ -430,7 +458,11 @@ class MarketplaceAnalyticsSummaryService
             return ['key' => 'completed', 'label' => 'Completed · ' . (! empty($row->settlement_time) ? 'Sudah cair' : 'Belum cair')];
         }
 
-        if (in_array($status, ['READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE', 'TO_RETURN'], true)) {
+        if ($status === 'TO_CONFIRM_RECEIVE') {
+            return ['key' => 'confirm', 'label' => 'Menunggu konfirmasi'];
+        }
+
+        if (in_array($status, ['READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_RETURN'], true)) {
             return ['key' => 'shipped', 'label' => 'Shipped · Masih dikirim'];
         }
 
@@ -444,7 +476,10 @@ class MarketplaceAnalyticsSummaryService
 
         return match ($group) {
             'shipped' => $base
-                ->whereRaw("{$status} IN ('SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE')")
+                ->whereRaw("{$status} IN ('SHIPPED', 'READY_TO_HANDOVER')")
+                ->whereRaw('NOT ' . $this->returnRefundExistsSql()),
+            'confirm' => $base
+                ->whereRaw("{$status} = 'TO_CONFIRM_RECEIVE'")
                 ->whereRaw('NOT ' . $this->returnRefundExistsSql()),
             'cancelled' => $base
                 ->whereRaw("{$status} IN ('CANCELLED', 'CANCELED', 'CANCELLED_BEFORE_SHIPPING', 'BATAL', 'IN_CANCEL')")
@@ -463,6 +498,7 @@ class MarketplaceAnalyticsSummaryService
             'all' => $this->allCashBase($filters),
             'unsettled' => $this->unsettledBase($filters),
             'shipped' => $this->cashStatusBase($filters, 'shipped'),
+            'confirm' => $this->cashStatusBase($filters, 'confirm'),
             'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
             'return_refund' => $this->cashStatusBase($filters, 'return_refund'),
             default => $this->cashBase($filters),
@@ -1061,6 +1097,7 @@ class MarketplaceAnalyticsSummaryService
             'all' => $this->allCashBase($filters),
             'unsettled' => $this->unsettledBase($filters),
             'shipped' => $this->cashStatusBase($filters, 'shipped'),
+            'confirm' => $this->cashStatusBase($filters, 'confirm'),
             'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
             'return_refund' => $this->cashStatusBase($filters, 'return_refund'),
             default => $this->cashBase($filters),

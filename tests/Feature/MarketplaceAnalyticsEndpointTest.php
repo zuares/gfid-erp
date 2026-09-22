@@ -74,6 +74,46 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
         $this->assertSame(1, $juneCohort['periods'][1]['active_customers']);
     }
 
+    public function test_cash_orders_exposes_payment_method_and_waiting_confirmation_tab(): void
+    {
+        $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'ANALYTICS-CASH']);
+        $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'CASH-TEST',
+            'name' => 'Cash Test Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'CASH-CONFIRM-1',
+            'channel_order_id' => 'CASH-CONFIRM-1',
+            'order_status' => 'TO_CONFIRM_RECEIVE',
+            'status' => 'to_confirm_receive',
+            'payment_method' => 'COD',
+            'total_amount' => 150000,
+            'total_paid_customer' => 150000,
+            'subtotal_items' => 150000,
+            'order_date' => '2026-09-20 10:00:00',
+            'ordered_at' => '2026-09-20 10:00:00',
+            'raw_json' => [],
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/api/marketplace/analytics-cash-orders?' . http_build_query([
+            'store_id' => $store->id,
+            'date_from' => '2026-09-01',
+            'date_to' => '2026-09-30',
+            'settlement' => 'confirm',
+        ]));
+
+        $response->assertOk()
+            ->assertJsonPath('data.0.payment_method', 'COD')
+            ->assertJsonPath('data.0.status_group', 'confirm')
+            ->assertJsonPath('data.0.status_group_label', 'Menunggu konfirmasi');
+    }
+
     private function order(Store $store, string $buyer, string $date, string $externalId): MarketplaceOrder
     {
         return MarketplaceOrder::create([
