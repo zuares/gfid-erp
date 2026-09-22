@@ -362,8 +362,8 @@
     .an-modal-eyebrow { color:var(--dsh-muted); font-size:.6rem; font-weight:850; text-transform:uppercase; letter-spacing:.07em; }
     .an-modal-title { color:var(--text,#0f172a); font-size:.92rem; font-weight:800; margin-top:.12rem; }
     .an-modal-sub { color:var(--dsh-muted); font-size:.66rem; font-weight:600; margin-top:.18rem; }
-    .an-modal-tabs { display:flex; gap:.25rem; padding:.45rem .85rem 0; border-bottom:1px solid var(--dsh-border); overflow-x:auto; }
-    .an-modal-tab { display:flex; flex:0 0 auto; flex-direction:column; align-items:flex-start; gap:.12rem; border:0; border-bottom:2px solid transparent; padding:.5rem .65rem .42rem; background:transparent; color:var(--dsh-muted); font-size:.68rem; font-weight:800; cursor:pointer; text-align:left; }
+    .an-modal-tabs { display:flex !important; flex:0 0 auto; min-height:3.35rem; gap:.25rem; padding:.45rem .85rem 0; border-bottom:1px solid var(--dsh-border); overflow-x:auto; visibility:visible; opacity:1; }
+    .an-modal-tab { display:flex !important; visibility:visible; flex:0 0 auto; flex-direction:column; align-items:flex-start; gap:.12rem; border:0; border-bottom:2px solid transparent; padding:.5rem .65rem .42rem; background:transparent; color:var(--dsh-muted,#64748b); font-size:.68rem; font-weight:800; cursor:pointer; text-align:left; }
     .an-modal-tab:hover { color:var(--text,#0f172a); }
     .an-modal-tab.active { border-bottom-color:#2563eb; color:#2563eb; }
     .an-modal-tab small { color:var(--dsh-muted); font-size:.56rem; font-weight:700; line-height:1.1; white-space:nowrap; }

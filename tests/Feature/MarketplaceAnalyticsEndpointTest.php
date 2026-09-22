@@ -25,7 +25,12 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
 
         $page->assertOk()->assertViewIs('marketplace.analytics')
             ->assertSee('Masih dikirim')
-            ->assertSee('Dana belum cair');
+            ->assertSee('Dana belum cair')
+            ->assertSee('Sudah cair')
+            ->assertSee('Disimpan di Gudang Shopee')
+            ->assertSee('Menunggu konfirmasi')
+            ->assertSee('Dibatalkan')
+            ->assertSee('Return / Refund');
 
         $response = $this->actingAs($user)->getJson('/api/marketplace/analytics-kpis?date_from=2099-01-01&date_to=2099-01-31');
 
