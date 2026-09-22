@@ -51,7 +51,7 @@
             <button class="an-modal-close" type="button" data-cash-close aria-label="Tutup">×</button>
         </div>
         <div class="an-modal-tabs" id="cashOrdersTabs" role="tablist" aria-label="Status pencairan order">
-            <button class="an-modal-tab active" type="button" role="tab" aria-selected="true" data-cash-settlement="all"><span>Semua status</span><small data-cash-tab-kpi>—</small></button>
+            <button class="an-modal-tab active" type="button" role="tab" aria-selected="true" data-cash-settlement="all"><span>Pesanan</span><small data-cash-tab-kpi>—</small></button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="settled"><span>Sudah cair</span><small data-cash-tab-kpi>—</small></button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="shipped"><span>Masih dikirim</span><small data-cash-tab-kpi>—</small></button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="warehouse"><span>Disimpan di Gudang Shopee</span><small data-cash-tab-kpi>—</small></button>
