@@ -1,6 +1,6 @@
     function setLoading(message) { $('anSyncNote').textContent = message; }
     function fillStores() {
-        const current = selectedStore();
+        const current = selectedStore() || String(initialStore || '');
         const unique = new Map(stores
             .filter(store => store && store.id)
             .map(store => [String(store.id), store.name || `Toko #${store.id}`]));
