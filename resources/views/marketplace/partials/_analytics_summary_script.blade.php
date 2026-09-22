@@ -449,6 +449,8 @@
         const previousEstimatedMargin = Number(previous.estimated_profit_margin ?? (previousNetOrderRevenue > 0 ? previousEstimatedProfit / previousNetOrderRevenue * 100 : 0));
         const previousActualCashFee = Number(previous.cash_marketplace_fees ?? previous.marketplace_fees_actual ?? 0);
         const previousActualAffiliateFee = Number(previous.cash_affiliate_fees ?? previous.affiliate_fees_actual ?? 0);
+        const estimatedMarketplaceFee = Number(current.marketplace_fee_estimate ?? grossOrderRevenue * actualFeeRate);
+        const previousEstimatedMarketplaceFee = Number(previous.marketplace_fee_estimate ?? previousGrossOrderRevenue * previousFeeRate);
         const estimatedPayout = Number(current.estimated_payout ?? cashPayout);
         const previousCashPayout = Number(previous.cash_payout ?? previous.payout ?? 0);
         const previousEstimatedPayout = Number(previous.estimated_payout ?? previousCashPayout);
@@ -456,7 +458,7 @@
         const previousPendingPayout = Math.max(0, previousEstimatedPayout - previousCashPayout);
         const payoutRealization = estimatedPayout > 0 ? cashPayout / estimatedPayout * 100 : 0;
         const pendingPayoutRate = estimatedPayout > 0 ? pendingPayout / estimatedPayout * 100 : 0;
-        const feeRate = settledOrderRevenue > 0 ? actualCashFee / settledOrderRevenue * 100 : 0;
+        const feeRate = grossOrderRevenue > 0 ? estimatedMarketplaceFee / grossOrderRevenue * 100 : 0;
         const adCostRate = netOrderRevenue > 0 ? adCost / netOrderRevenue * 100 : 0;
         const settledProfitMargin = settledOrderRevenue > 0 ? settledProfit / settledOrderRevenue * 100 : 0;
         const estimatedUnsettledProfitMargin = unsettledOrderRevenue > 0 ? estimatedUnsettledProfit / unsettledOrderRevenue * 100 : 0;
@@ -477,7 +479,7 @@
         const totalProductsChange = pulseChange(totalProducts, previous.product_qty ?? previous.qty, countText);
         const netRevenueChange = pulseChange(netOrderRevenue, previousNetOrderRevenue, moneyText);
         const adCostChange = pulseChange(adCost, previousAdCost, moneyText);
-        const marketplaceFeeChange = pulseChange(actualCashFee, previousActualCashFee, moneyText);
+        const marketplaceFeeChange = pulseChange(estimatedMarketplaceFee, previousEstimatedMarketplaceFee, moneyText);
         const affiliateFeeChange = pulseChange(actualAffiliateFee, previousActualAffiliateFee, moneyText);
         const aovChange = pulseChange(aovNet, previousAovNet, moneyText);
         const apcChange = pulseChange(apc, previousApc, moneyText);
@@ -505,7 +507,7 @@
         const decisionSettledProfitChange = decisionChange(settledProfit, previousSettledProfit);
         const decisionPendingPayoutChange = decisionChange(pendingPayout, previousPendingPayout, true);
         const decisionUnsettledProfitChange = decisionChange(estimatedUnsettledProfit, previousEstimatedUnsettledProfit);
-        const decisionFeeChange = decisionChange(actualCashFee, previousActualCashFee, true);
+        const decisionFeeChange = decisionChange(estimatedMarketplaceFee, previousEstimatedMarketplaceFee, true);
         const decisionAdCostChange = decisionChange(adCost, previousAdCost, true);
         const netProfitChange = decisionChange(estimatedNetProfit, previousEstimatedNetProfit);
         const returnRefundRate = placedOrders > 0 ? returnRefundOrders / placedOrders * 100 : 0;
@@ -527,7 +529,7 @@
             ['GMV', money(gmv), { text: 'omzet order eligible', className: gmvChange.className }, gmvChange, 'cash'],
             ['Dana cair', money(cashPayout), { text: `${payoutRealization.toFixed(1)}% dari estimasi`, className: cashPayoutChange.className }, decisionPayoutChange, 'cash'],
             ['Dana belum cair', money(pendingPayout), { text: `${pendingPayoutRate.toFixed(1)}% dari estimasi`, className: decisionPendingPayoutChange.className }, decisionPendingPayoutChange, 'cash'],
-            ['Biaya marketplace', money(actualCashFee), { text: `${feeRate.toFixed(1)}% dari dana cair`, className: exceptionChange(marketplaceFeeChange).className }, decisionFeeChange, 'cost'],
+            ['Biaya marketplace', money(estimatedMarketplaceFee), { text: `estimasi ${feeRate.toFixed(1)}% dari omzet order`, className: exceptionChange(marketplaceFeeChange).className }, decisionFeeChange, 'cost'],
             ['Biaya iklan', money(adCost), { text: `${adCostRate.toFixed(1)}% dari omzet net`, className: exceptionChange(adCostChange).className }, decisionAdCostChange, 'cost'],
             ['Est. net profit', money(estimatedNetProfit), { text: `${estimatedMargin.toFixed(1)}% margin`, className: netProfitChange.className }, netProfitChange, 'profit'],
         ];

@@ -45,6 +45,7 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
         $this->assertSame(3, $current['cash_unsettled_order_count']);
         $this->assertSame(1200000.0, (float) $current['cash_unsettled_order_revenue']);
         $this->assertSame(948000.0, (float) $current['estimated_unsettled_payout']);
+        $this->assertSame(252000.0, (float) $current['marketplace_fee_estimate']);
         $this->assertSame(1200000.0, (float) $current['gmv']);
         $this->assertSame((float) $current['estimated_profit'], (float) $current['estimated_net_profit']);
         $this->assertSame((float) $current['settled_profit'], (float) $current['realized_net_profit']);
