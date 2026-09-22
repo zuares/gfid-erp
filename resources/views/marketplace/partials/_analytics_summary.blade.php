@@ -53,12 +53,12 @@
         <div class="an-modal-tabs" id="cashOrdersTabs" role="tablist" aria-label="Status pencairan order">
             <button class="an-modal-tab active" type="button" role="tab" aria-selected="true" data-cash-settlement="all"><span>Semua status</span><small data-cash-tab-kpi>—</small></button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="settled"><span>Sudah cair</span><small data-cash-tab-kpi>—</small></button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="shipped"><span>Masih dikirim</span><small data-cash-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="shipped"><span>Perlu dikirim</span><small data-cash-tab-kpi>—</small></button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="warehouse"><span>Disimpan di Gudang Shopee</span><small data-cash-tab-kpi>—</small></button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="confirm"><span>Menunggu konfirmasi</span><small data-cash-tab-kpi>—</small></button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="cancelled"><span>Dibatalkan</span><small data-cash-tab-kpi>—</small></button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="return_refund"><span>Return / Refund</span><small data-cash-tab-kpi>—</small></button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="unsettled"><span>Belum cair</span><small data-cash-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="unsettled"><span>Dana belum cair</span><small data-cash-tab-kpi>—</small></button>
         </div>
         <div class="an-modal-summary" id="cashOrdersSummary"><div class="an-empty">Memuat ringkasan…</div></div>
         <div class="an-modal-body" id="cashOrdersBody"><div class="an-empty">Pilih status pencairan untuk memuat order.</div></div>

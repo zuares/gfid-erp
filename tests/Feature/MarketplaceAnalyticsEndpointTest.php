@@ -23,7 +23,9 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
 
         $page = $this->actingAs($user)->get('/marketplace/analytics?date_from=2099-01-01&date_to=2099-01-31');
 
-        $page->assertOk()->assertViewIs('marketplace.analytics');
+        $page->assertOk()->assertViewIs('marketplace.analytics')
+            ->assertSee('Perlu dikirim')
+            ->assertSee('Dana belum cair');
 
         $response = $this->actingAs($user)->getJson('/api/marketplace/analytics-kpis?date_from=2099-01-01&date_to=2099-01-31');
 
@@ -192,6 +194,13 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
 
         $response->assertOk()->assertJsonPath('meta.total', 2);
         $this->assertSame(['shipped', 'shipped'], collect($response->json('data'))->pluck('status_group')->all());
+
+        $this->actingAs($user)->getJson('/api/marketplace/analytics-cash-orders?' . http_build_query([
+            'store_id' => $store->id,
+            'date_from' => '2026-09-01',
+            'date_to' => '2026-09-30',
+            'settlement' => 'unsettled',
+        ]))->assertOk()->assertJsonPath('meta.total', 2);
     }
 
     public function test_cash_orders_exposes_shopee_warehouse_tab_for_kilat_booking(): void

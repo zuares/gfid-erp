@@ -247,7 +247,7 @@ class MarketplaceAnalyticsSummaryService
         $settlement = in_array($settlement, ['all', 'unsettled', 'shipped', 'warehouse', 'confirm', 'cancelled', 'return_refund'], true) ? $settlement : 'settled';
         $base = match ($settlement) {
             'all' => $this->allCashBase($filters),
-            'unsettled' => $this->unsettledBase($filters),
+            'unsettled' => $this->unsettledOrdersBase($filters),
             'shipped' => $this->cashStatusBase($filters, 'shipped'),
             'warehouse' => $this->cashStatusBase($filters, 'warehouse'),
             'confirm' => $this->cashStatusBase($filters, 'confirm'),
@@ -347,7 +347,7 @@ class MarketplaceAnalyticsSummaryService
                 'per_page' => $paginator->perPage(),
                 'total' => $paginator->total(),
             ],
-            'summary' => $this->cashAggregate($filters, $settlement),
+            'summary' => $this->cashAggregate($filters, $settlement, true),
         ];
     }
 
@@ -469,7 +469,7 @@ class MarketplaceAnalyticsSummaryService
         }
 
         if (in_array($status, ['READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_RETURN'], true)) {
-            return ['key' => 'shipped', 'label' => 'Shipped · Masih dikirim'];
+            return ['key' => 'shipped', 'label' => 'Perlu dikirim'];
         }
 
         return ['key' => 'other', 'label' => 'Status lainnya'];
@@ -502,11 +502,11 @@ class MarketplaceAnalyticsSummaryService
         };
     }
 
-    private function cashOrderRevenueAggregate(array $filters, string $settlement): float
+    private function cashOrderRevenueAggregate(array $filters, string $settlement, bool $includePreShipment = false): float
     {
         $base = match ($settlement) {
             'all' => $this->allCashBase($filters),
-            'unsettled' => $this->unsettledBase($filters),
+            'unsettled' => $includePreShipment ? $this->unsettledOrdersBase($filters) : $this->unsettledBase($filters),
             'shipped' => $this->cashStatusBase($filters, 'shipped'),
             'warehouse' => $this->cashStatusBase($filters, 'warehouse'),
             'confirm' => $this->cashStatusBase($filters, 'confirm'),
@@ -1095,7 +1095,7 @@ class MarketplaceAnalyticsSummaryService
             ->all();
     }
 
-    private function cashAggregate(array $filters, string $settlement = 'settled'): array
+    private function cashAggregate(array $filters, string $settlement = 'settled', bool $includePreShipment = false): array
     {
         $fees = collect(self::MARKETPLACE_FEE_FIELDS)
             ->map(fn (string $field) => "COALESCE(ms.{$field}, 0)")
@@ -1106,7 +1106,7 @@ class MarketplaceAnalyticsSummaryService
 
         $base = match ($settlement) {
             'all' => $this->allCashBase($filters),
-            'unsettled' => $this->unsettledBase($filters),
+            'unsettled' => $includePreShipment ? $this->unsettledOrdersBase($filters) : $this->unsettledBase($filters),
             'shipped' => $this->cashStatusBase($filters, 'shipped'),
             'warehouse' => $this->cashStatusBase($filters, 'warehouse'),
             'confirm' => $this->cashStatusBase($filters, 'confirm'),
@@ -1130,7 +1130,7 @@ class MarketplaceAnalyticsSummaryService
             ->selectRaw('SUM(COALESCE(ms.escrow_tax, 0)) AS cash_escrow_tax')
             ->selectRaw('SUM(COALESCE(ms.drc_adjustable_refund, 0)) AS cash_refund')
             ->first();
-        $orderRevenue = $this->cashOrderRevenueAggregate($filters, $settlement);
+        $orderRevenue = $this->cashOrderRevenueAggregate($filters, $settlement, $includePreShipment);
 
         return [
             'cash_order_count' => (int) ($row->cash_order_count ?? 0),
@@ -1248,14 +1248,17 @@ class MarketplaceAnalyticsSummaryService
     {
         $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
 
+        return $this->unsettledOrdersBase($filters)
+            ->whereRaw("{$status} NOT IN ('READY_TO_SHIP', 'PROCESSED')");
+    }
+
+    private function unsettledOrdersBase(array $filters)
+    {
         return $this->applyDateAndStoreFilters(
             DB::table('marketplace_orders as mo')
                 ->leftJoin('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
                 ->whereRaw($this->isRevenueStatus())
-                ->whereRaw("{$status} NOT IN ('READY_TO_SHIP', 'PROCESSED')")
-                ->where(function ($query) {
-                    $query->whereNull('ms.settlement_time');
-                }),
+                ->whereNull('ms.settlement_time'),
             $filters,
             'mo'
         );
