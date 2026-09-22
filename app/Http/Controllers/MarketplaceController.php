@@ -2229,9 +2229,15 @@ class MarketplaceController extends Controller
             $arr['api_platform_pending'] = $livePlatformPending;
             $arr['status_source'] = $liveStatus ? 'api' : 'database';
             if ($liveStatus) {
-                $arr['order_status'] = ($liveNeedsShipping === true)
+                $resolvedLiveStatus = ($liveNeedsShipping === true)
                     ? 'READY_TO_SHIP'
                     : $liveStatus;
+                $arr['order_status'] = $resolvedLiveStatus;
+
+                // Persist recovery ketika pembatalan ternyata sudah ditarik di
+                // platform. Tanpa ini UI memang terlihat benar sesaat, tetapi
+                // analytics berikutnya masih membaca CANCELLED dari database.
+                $this->sync->reconcileLiveOrderStatus($o, $resolvedLiveStatus);
             }
             $arr['fulfillment_id'] = $o->fulfillment?->id;
             $arr['fulfillment_status'] = $o->fulfillment?->status; // null|draft|pending_review|confirmed|cancelled

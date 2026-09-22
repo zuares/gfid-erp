@@ -600,6 +600,90 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         $this->assertSame('api', $row['status_source']);
     }
 
+    public function test_local_orders_memulihkan_cancelled_ketika_pembatalan_ditarik(): void
+    {
+        $order = $this->createOrder('CANCELLED-WITHDRAWN', 'CANCELLED');
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($order): void {
+            $mock->shouldReceive('getOrderDetail')
+                ->once()
+                ->andReturn([
+                    'response' => [
+                        'order_list' => [[
+                            'order_sn' => $order->channel_order_id,
+                            'order_status' => 'SHIPPED',
+                        ]],
+                    ],
+                ]);
+        });
+
+        $this->app->instance('request', Request::create(
+            '/api/marketplace/local-orders?live_status=1&live_status_scope=active',
+            'GET',
+            ['live_status' => '1', 'live_status_scope' => 'active'],
+        ));
+
+        $row = collect(app(MarketplaceController::class)->localOrders()->getData(true))
+            ->firstWhere('id', $order->id);
+
+        $this->assertSame('SHIPPED', $row['order_status']);
+        $this->assertSame('SHIPPED', $row['api_order_status']);
+        $this->assertDatabaseHas('marketplace_orders', [
+            'id' => $order->id,
+            'order_status' => 'SHIPPED',
+            'status' => 'shipped',
+        ]);
+    }
+
+    public function test_verify_processed_orders_memulihkan_cancelled_setelah_pembatalan_ditarik(): void
+    {
+        $order = $this->createOrder('CANCELLED-VERIFY', 'CANCELLED');
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($order): void {
+            $mock->shouldReceive('getOrderDetail')
+                ->once()
+                ->andReturn([
+                    'response' => [
+                        'order_list' => [[
+                            'order_sn' => $order->channel_order_id,
+                            'order_status' => 'SHIPPED',
+                        ]],
+                    ],
+                ]);
+        });
+
+        $this->artisan('marketplace:verify-processed-orders', [
+            '--order' => $order->channel_order_id,
+            '--apply' => true,
+        ])->assertSuccessful();
+
+        $this->assertDatabaseHas('marketplace_orders', [
+            'id' => $order->id,
+            'order_status' => 'SHIPPED',
+            'status' => 'shipped',
+        ]);
+    }
+
+    public function test_sync_service_memulihkan_cancelled_dari_detail_api_terbaru(): void
+    {
+        $order = $this->createOrder('CANCELLED-SYNC', 'CANCELLED');
+        $method = new \ReflectionMethod(MarketplaceSyncService::class, 'upsertOrders');
+        $method->setAccessible(true);
+
+        $method->invoke(app(MarketplaceSyncService::class), $this->store, [[
+            'order_sn' => $order->channel_order_id,
+            'order_status' => 'SHIPPED',
+            'total_amount' => 100000,
+            'item_list' => [],
+        ]]);
+
+        $this->assertDatabaseHas('marketplace_orders', [
+            'id' => $order->id,
+            'order_status' => 'SHIPPED',
+            'status' => 'shipped',
+        ]);
+    }
+
     public function test_local_orders_memakai_status_live_api_untuk_ready_to_ship(): void
     {
         $order = $this->createOrder('LIVE-READY-TO-SHIP-ORDER', 'READY_TO_SHIP');

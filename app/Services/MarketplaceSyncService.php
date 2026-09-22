@@ -37,6 +37,20 @@ class MarketplaceSyncService
         'REFUNDED',
     ];
 
+    /**
+     * Status fulfillment yang menandakan pembatalan sebelumnya sudah ditarik.
+     * Status return/refund sengaja tidak masuk agar order terminal tidak hidup
+     * kembali hanya karena respons API datang tidak berurutan.
+     */
+    private const RECOVERABLE_AFTER_CANCELLATION = [
+        'READY_TO_SHIP',
+        'PROCESSED',
+        'READY_TO_HANDOVER',
+        'SHIPPED',
+        'TO_CONFIRM_RECEIVE',
+        'COMPLETED',
+    ];
+
     private const API_STATUS_RANKS = [
         'UNPAID' => 0,
         'READY_TO_SHIP' => 10,
@@ -2293,7 +2307,15 @@ class MarketplaceSyncService
             // PROCESSED perlu diverifikasi agar tidak tertahan, sementara
             // SHIPPED/TO_CONFIRM_RECEIVE juga perlu sweep karena webhook bisa
             // terlambat atau datang tidak berurutan sebelum COMPLETED.
-            ->whereIn('order_status', ['PROCESSED', 'SHIPPED', 'TO_CONFIRM_RECEIVE'])
+            // CANCELLED/IN_CANCEL ikut diverifikasi karena pembatalan bisa
+            // ditarik oleh pembeli dan status API kembali ke fulfillment.
+            ->whereIn('order_status', [
+                'PROCESSED',
+                'SHIPPED',
+                'TO_CONFIRM_RECEIVE',
+                'CANCELLED',
+                'IN_CANCEL',
+            ])
             ->where(function ($query) {
                 $query->whereNull('processed_api_checked_at')
                     ->orWhere('processed_api_checked_at', '<=', now()->subMinutes(10));
@@ -2366,7 +2388,8 @@ class MarketplaceSyncService
                 continue;
             }
 
-            if (! in_array($status, self::PROCESSED_API_ADVANCED_STATUSES, true)
+            $isCancellationRecovery = $this->isCancellationRecoveryStatus($order->order_status, $status);
+            if ((! in_array($status, self::PROCESSED_API_ADVANCED_STATUSES, true) && ! $isCancellationRecovery)
                 || ! $this->shouldApplyApiStatus($order->order_status, $status)) {
                 $stats['unchanged']++;
                 $order->update([
@@ -2439,11 +2462,45 @@ class MarketplaceSyncService
             return ! in_array($current, ['CANCELLED', 'RETURNED', 'REFUNDED'], true);
         }
         if (in_array($current, ['CANCELLED', 'IN_CANCEL'], true)) {
-            return false;
+            return in_array($incoming, self::RECOVERABLE_AFTER_CANCELLATION, true);
         }
 
         return (self::API_STATUS_RANKS[$incoming] ?? -1)
             >= (self::API_STATUS_RANKS[$current] ?? -1);
+    }
+
+    private function isCancellationRecoveryStatus(?string $current, string $incoming): bool
+    {
+        return in_array(strtoupper(trim((string) $current)), ['CANCELLED', 'IN_CANCEL'], true)
+            && in_array(strtoupper(trim($incoming)), self::RECOVERABLE_AFTER_CANCELLATION, true);
+    }
+
+    /**
+     * Simpan status terbaru dari endpoint live Orders bila status lokal sudah
+     * tertinggal. Ini terutama memulihkan order CANCELLED setelah pembatalan
+     * ditarik, agar request berikutnya (termasuk analytics) membaca DB yang
+     * sudah direkonsiliasi.
+     */
+    public function reconcileLiveOrderStatus(MarketplaceOrder $order, string $incoming): bool
+    {
+        $status = $this->canonicalProcessedApiStatus($incoming);
+        if ($status === null || ! array_key_exists($status, self::API_STATUS_RANKS)) {
+            return false;
+        }
+
+        if (strtoupper((string) $order->order_status) === $status
+            || ! $this->shouldApplyApiStatus($order->order_status, $status)) {
+            return false;
+        }
+
+        $order->update([
+            'order_status' => $status,
+            'status' => $this->legacyStatusForProcessedApi($status, $order->status),
+            'synced_at' => now(),
+            'processed_api_checked_at' => now(),
+        ]);
+
+        return true;
     }
 
     private function upsertOrders(Store $store, array $details, bool $dryRun = false): array
@@ -2560,8 +2617,13 @@ class MarketplaceSyncService
                 // Response detail/list Shopee bisa stale dan datang tidak
                 // berurutan. Jangan biarkan status API yang lebih rendah
                 // menurunkan status lokal yang sudah lebih maju.
+                $processedBookingMayReturnToReadyToShip = $existingOrder?->order_status === 'PROCESSED'
+                    && filled($existingOrder?->booking_sn)
+                    && $orderStatus === 'READY_TO_SHIP';
+
                 if ($existingOrder
                     && $orderStatus !== null
+                    && ! $processedBookingMayReturnToReadyToShip
                     && ! $this->shouldApplyApiStatus($existingOrder->order_status, $orderStatus)) {
                     $orderStatus = $existingOrder->order_status;
                 }

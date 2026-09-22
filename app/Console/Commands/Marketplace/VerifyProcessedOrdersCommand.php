@@ -36,6 +36,15 @@ class VerifyProcessedOrdersCommand extends Command
         'REFUNDED',
     ];
 
+    private const RECOVERABLE_AFTER_CANCELLATION = [
+        'READY_TO_SHIP',
+        'PROCESSED',
+        'READY_TO_HANDOVER',
+        'SHIPPED',
+        'TO_CONFIRM_RECEIVE',
+        'COMPLETED',
+    ];
+
     private const STATUS_RANKS = [
         'UNPAID' => 0,
         'READY_TO_SHIP' => 10,
@@ -61,7 +70,13 @@ class VerifyProcessedOrdersCommand extends Command
 
         $query = MarketplaceOrder::query()
             ->with('store.channel')
-            ->whereIn('order_status', ['PROCESSED', 'SHIPPED', 'TO_CONFIRM_RECEIVE'])
+            ->whereIn('order_status', [
+                'PROCESSED',
+                'SHIPPED',
+                'TO_CONFIRM_RECEIVE',
+                'CANCELLED',
+                'IN_CANCEL',
+            ])
             ->orderBy('id');
 
         // Scheduler berjalan tiap 5 menit. Jeda ini membuat antrean adil bila
@@ -173,7 +188,10 @@ class VerifyProcessedOrdersCommand extends Command
                     continue;
                 }
 
-                if (! in_array($apiStatus, self::ADVANCED_STATUSES, true)
+                $isCancellationRecovery = in_array(strtoupper((string) $order->order_status), ['CANCELLED', 'IN_CANCEL'], true)
+                    && in_array($apiStatus, self::RECOVERABLE_AFTER_CANCELLATION, true);
+
+                if ((! in_array($apiStatus, self::ADVANCED_STATUSES, true) && ! $isCancellationRecovery)
                     || ! $this->shouldApplyStatus($order->order_status, $apiStatus)) {
                     $stats['unchanged']++;
                     $this->line($this->formatLine($order, 'UNCHANGED', "API status={$apiStatus}"));
@@ -239,7 +257,7 @@ class VerifyProcessedOrdersCommand extends Command
             return ! in_array($current, ['CANCELLED', 'RETURNED', 'REFUNDED'], true);
         }
         if (in_array($current, ['CANCELLED', 'IN_CANCEL'], true)) {
-            return false;
+            return in_array($incoming, self::RECOVERABLE_AFTER_CANCELLATION, true);
         }
 
         return (self::STATUS_RANKS[$incoming] ?? -1)
