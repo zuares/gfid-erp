@@ -28,7 +28,7 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             ->assertSee('Masih dikirim')
             ->assertSee('Dana belum cair')
             ->assertSee('Sudah cair')
-            ->assertSee('Dikirim dari Gudang Shopee')
+            ->assertSee('Disimpan di Gudang Shopee')
             ->assertSee('Menunggu konfirmasi')
             ->assertSee('Dibatalkan')
             ->assertSee('Return / Refund');
@@ -257,7 +257,7 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             ->assertJsonPath('meta.total', 1)
             ->assertJsonPath('data.0.channel_order_id', '260915AASADZEU6ZP7ZP7')
             ->assertJsonPath('data.0.status_group', 'warehouse')
-            ->assertJsonPath('data.0.status_group_label', 'Dikirim dari Gudang Shopee');
+            ->assertJsonPath('data.0.status_group_label', 'Disimpan di Gudang Shopee');
     }
 
     private function order(Store $store, string $buyer, string $date, string $externalId): MarketplaceOrder

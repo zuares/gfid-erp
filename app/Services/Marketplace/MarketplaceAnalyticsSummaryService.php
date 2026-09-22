@@ -465,7 +465,7 @@ class MarketplaceAnalyticsSummaryService
         }
 
         if ((int) ($row->has_warehouse_booking ?? 0) === 1) {
-            return ['key' => 'warehouse', 'label' => 'Dikirim dari Gudang Shopee'];
+            return ['key' => 'warehouse', 'label' => 'Disimpan di Gudang Shopee'];
         }
 
         if (in_array($status, ['READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_RETURN'], true)) {
