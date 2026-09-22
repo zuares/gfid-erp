@@ -12,9 +12,31 @@
     <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Performance trend</div><div class="an-card-title"><i class="bi bi-graph-up-arrow me-1" style="color:#16a34a"></i>Grafik harian</div><div class="an-card-sub">Omzet &amp; estimasi profit</div></div></div><div class="an-card-body"><div class="an-chart-panel-head"><div class="an-chart-panel-title">Performa harian</div><div class="an-chart-summary" id="chartCompareNote">Memuat…</div></div><div class="an-chart" id="revenueChart"><div class="an-empty">Memuat grafik…</div></div></div></section>
 </div>
 
-<section class="an-card an-health-wide an-tab-pane" data-an-pane="summary">
-    <div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Operational health</div><div class="an-card-title"><i class="bi bi-activity me-1" style="color:#2563eb"></i>Kesehatan order &amp; keuangan</div><div class="an-card-sub">Order operasional dan profit yang sudah tervalidasi.</div></div></div>
-    <div class="an-card-body"><div class="an-funnel" id="salesFunnel"><div class="an-empty">Memuat…</div></div></div>
+<section class="an-control-tower an-tab-pane" data-an-pane="summary">
+    <div class="an-control-head">
+        <div>
+            <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Executive control</div>
+            <div class="an-control-title">Business control tower</div>
+            <div class="an-control-sub">Ringkasan operasional, kualitas data, dan prioritas tindakan dalam satu tampilan.</div>
+        </div>
+        <div class="an-control-status"><span class="an-control-status-dot"></span><strong>Live monitoring</strong><small id="anControlPeriod">Periode aktif</small></div>
+    </div>
+    <div class="an-control-grid">
+        <section class="an-control-panel an-control-flow">
+            <div class="an-control-panel-head"><div><div class="an-control-panel-kicker">Operational health</div><div class="an-control-panel-title">Order-to-cash flow</div><div class="an-control-panel-sub">Alur order dari masuk sampai profit tervalidasi.</div></div><span class="an-control-panel-value" id="anFlowStatus">—</span></div>
+            <div class="an-control-panel-body"><div class="an-funnel" id="salesFunnel"><div class="an-empty">Memuat…</div></div></div>
+        </section>
+        <div class="an-control-column">
+            <section class="an-control-panel">
+                <div class="an-control-panel-head"><div><div class="an-control-panel-kicker">Business health</div><div class="an-control-panel-title">Execution quality</div><div class="an-control-panel-sub">Kualitas data dan eksekusi order.</div></div><span class="an-health-score" id="anHealthScore">—</span></div>
+                <div class="an-control-panel-body"><div class="an-health-list" id="anHealthList"><div class="an-empty">Memuat health score…</div></div></div>
+            </section>
+            <section class="an-control-panel">
+                <div class="an-control-panel-head"><div><div class="an-control-panel-kicker">Management attention</div><div class="an-control-panel-title">Priority actions</div><div class="an-control-panel-sub">Exception yang perlu ditindaklanjuti.</div></div><span class="an-alert-count" id="anAlertCount">—</span></div>
+                <div class="an-control-panel-body"><div class="an-alerts" id="anAlerts"><div class="an-empty">Memuat alert…</div></div></div>
+            </section>
+        </div>
+    </div>
 </section>
 
 <div class="an-modal" id="cashOrdersModal" aria-hidden="true">
@@ -29,14 +51,14 @@
             <button class="an-modal-close" type="button" data-cash-close aria-label="Tutup">×</button>
         </div>
         <div class="an-modal-tabs" id="cashOrdersTabs" role="tablist" aria-label="Status pencairan order">
-            <button class="an-modal-tab active" type="button" role="tab" aria-selected="true" data-cash-settlement="all">Semua status</button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="settled">Sudah cair</button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="shipped">Masih dikirim</button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="warehouse">Disimpan di Gudang Shopee</button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="confirm">Menunggu konfirmasi</button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="cancelled">Dibatalkan</button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="return_refund">Return / Refund</button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="unsettled">Belum cair</button>
+            <button class="an-modal-tab active" type="button" role="tab" aria-selected="true" data-cash-settlement="all"><span>Semua status</span><small data-cash-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="settled"><span>Sudah cair</span><small data-cash-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="shipped"><span>Masih dikirim</span><small data-cash-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="warehouse"><span>Disimpan di Gudang Shopee</span><small data-cash-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="confirm"><span>Menunggu konfirmasi</span><small data-cash-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="cancelled"><span>Dibatalkan</span><small data-cash-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="return_refund"><span>Return / Refund</span><small data-cash-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="unsettled"><span>Belum cair</span><small data-cash-tab-kpi>—</small></button>
         </div>
         <div class="an-modal-summary" id="cashOrdersSummary"><div class="an-empty">Memuat ringkasan…</div></div>
         <div class="an-modal-body" id="cashOrdersBody"><div class="an-empty">Pilih status pencairan untuk memuat order.</div></div>
@@ -64,18 +86,6 @@
         <div class="an-modal-foot"><button class="an-btn" id="returnOrdersPrev" type="button">‹ Sebelumnya</button><span class="an-modal-page" id="returnOrdersPage">—</span><button class="an-btn" id="returnOrdersNext" type="button">Berikutnya ›</button></div>
     </section>
 </div>
-
-<div class="an-enterprise-grid an-enterprise-grid-summary an-tab-pane" data-an-pane="summary">
-    <section class="an-enterprise-card">
-        <div class="an-enterprise-head"><div><div class="an-enterprise-title">Business health</div><div class="an-enterprise-sub">Kualitas data dan eksekusi order</div></div></div>
-        <div class="an-enterprise-body"><div class="an-health-list" id="anHealthList"><div class="an-empty">Memuat health score…</div></div></div>
-    </section>
-</div>
-
-<section class="an-enterprise-card an-tab-pane" data-an-pane="summary">
-    <div class="an-enterprise-head"><div><div class="an-enterprise-title">Management attention</div><div class="an-enterprise-sub">Prioritas yang perlu ditindaklanjuti pada periode ini</div></div></div>
-    <div class="an-enterprise-body"><div class="an-alerts" id="anAlerts"><div class="an-empty">Memuat alert…</div></div></div>
-</section>
 
 <div class="an-contribution-grid an-tab-pane" data-an-pane="summary">
     <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-enterprise-title">Kontribusi toko</div><div class="an-enterprise-sub">Toko dengan kontribusi omzet terbesar</div></div></div><div class="an-enterprise-body"><div class="an-contribution-list" id="anTopStores"><div class="an-empty">Memuat…</div></div></div></section>

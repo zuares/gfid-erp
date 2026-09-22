@@ -6,6 +6,7 @@
     };
     const cashStatus = value => String(value || '—').replace(/_/g, ' ').toLowerCase();
     const cashStat = (label, value, note = '') => `<div class="an-modal-stat"><div class="an-modal-stat-label">${label}</div><div class="an-modal-stat-value">${value}</div>${note ? `<span class="an-modal-stat-note">${note}</span>` : ''}</div>`;
+    const cashSettlementTabs = ['all', 'settled', 'unsettled', 'shipped', 'warehouse', 'confirm', 'cancelled', 'return_refund'];
     const cashFeeDetail = (row, label, value, className = '') => `<span>${label}<strong class="${className}">${money(value)}</strong></span>`;
     const paymentLabel = value => {
         const raw = String(value || '').trim();
@@ -24,6 +25,48 @@
         };
         return labels[normalized] || raw.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
     };
+
+    const cashTabAmount = (settlement, summary) => {
+        if (!summary) return null;
+        if (settlement === 'settled') return Number(summary.cash_payout || 0);
+        return Number(summary.cash_gross_sales ?? summary.cash_order_revenue ?? 0);
+    };
+
+    function renderCashTabSummaries() {
+        document.querySelectorAll('[data-cash-settlement]').forEach(button => {
+            const settlement = button.dataset.cashSettlement;
+            const summary = cashTabSummaries[settlement];
+            const element = button.querySelector('[data-cash-tab-kpi]');
+            if (!element) return;
+            if (!summary) {
+                element.textContent = 'Memuat KPI…';
+                return;
+            }
+            const count = Number(summary.cash_order_count || 0).toLocaleString('id-ID');
+            const amount = money(cashTabAmount(settlement, summary));
+            element.textContent = `${count} order · ${amount}`;
+        });
+    }
+
+    async function loadCashTabSummaries() {
+        const token = ++cashTabSummaryToken;
+        renderCashTabSummaries();
+        const settlements = cashSettlementTabs.filter(settlement => !cashTabSummaries[settlement]);
+        if (!settlements.length) return;
+        const results = await Promise.allSettled(settlements.map(async settlement => {
+            const params = new URLSearchParams({ date_from: from(), date_to: to(), settlement, page: '1', per_page: '10', _ts: Date.now().toString() });
+            if (selectedStore()) params.set('store_id', selectedStore());
+            return [settlement, await api('/api/marketplace/analytics-cash-orders?' + params.toString(), { cache: 'no-store' })];
+        }));
+        if (token !== cashTabSummaryToken) return;
+        results.forEach(result => {
+            if (result.status === 'fulfilled') {
+                const [settlement, payload] = result.value;
+                cashTabSummaries[settlement] = payload?.summary || {};
+            }
+        });
+        renderCashTabSummaries();
+    }
 
     function renderCashOrders() {
         const payload = cashPayload || {};
@@ -51,6 +94,8 @@
             cashStat('Affiliate / AMS', money(aggregate.cash_affiliate_fees)),
             cashStat('Refund / adjustment', money(aggregate.cash_refund)),
         ].join('');
+        cashTabSummaries[cashSettlement] = aggregate;
+        renderCashTabSummaries();
         const feeBreakdown = isFeeFocus ? `<div class="an-modal-fee-breakdown"><div><span>Total fee marketplace</span><strong>${money(aggregate.cash_marketplace_fees)}<small>${feePercent(aggregate.cash_marketplace_fees)}</small></strong></div><div><span>Administrasi</span><strong>${money(aggregate.cash_commission_fee)}<small>${feePercent(aggregate.cash_commission_fee)}</small></strong></div><div><span>Layanan</span><strong>${money(aggregate.cash_service_fee)}<small>${feePercent(aggregate.cash_service_fee)}</small></strong></div><div><span>Transaksi</span><strong>${money(aggregate.cash_transaction_fee)}<small>${feePercent(aggregate.cash_transaction_fee)}</small></strong></div><div><span>Asuransi</span><strong>${money(aggregate.cash_shipping_insurance_fee)}<small>${feePercent(aggregate.cash_shipping_insurance_fee)}</small></strong></div><div><span>Pajak escrow</span><strong>${money(aggregate.cash_escrow_tax)}<small>${feePercent(aggregate.cash_escrow_tax)}</small></strong></div></div>` : '';
         const renderRows = groupRows => groupRows.map(row => {
             const rowSettled = Boolean(row.settlement_time);
@@ -114,9 +159,12 @@
         document.body.classList.add('an-modal-open');
         cashPage = 1;
         cashPayload = null;
+        cashTabSummaries = {};
+        cashTabSummaryToken++;
         setCashSettlementTab('all');
         $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · semua status`;
         loadCashOrders();
+        loadCashTabSummaries();
     }
     function openFeeOrders() {
         closeReturnOrders();
@@ -126,9 +174,12 @@
         document.body.classList.add('an-modal-open');
         cashPage = 1;
         cashPayload = null;
+        cashTabSummaries = {};
+        cashTabSummaryToken++;
         setCashSettlementTab('settled');
         $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · settlement complete`;
         loadCashOrders();
+        loadCashTabSummaries();
     }
     function renderReturnOrders() {
         const payload = returnPayload || {};

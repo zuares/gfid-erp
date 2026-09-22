@@ -343,6 +343,7 @@
             ['Return / refund', Number(current.return_refund_count || 0), Number(current.return_refund_count || 0)],
             ['Laba operasional', money(current.operating_profit), Math.max(Number(current.operating_profit || 0), 0)],
         ];
+        $('anFlowStatus').textContent = `${Number(current.order_total || 0).toLocaleString('id-ID')} eligible · ${Number(current.completed_count || 0).toLocaleString('id-ID')} selesai`;
         $('salesFunnel').innerHTML = data.map(([label,value,amount]) => `<div class="an-funnel-row"><span>${label}</span><div class="an-funnel-track"><span style="width:${Math.max(5,Math.round(amount / max * 100))}%"></span></div><strong class="an-funnel-value">${typeof value === 'number' ? value.toLocaleString('id-ID') : value}</strong></div>`).join('');
     }
     function renderFinancePulse() {
@@ -537,6 +538,8 @@
             ['Data readiness', readyRate, false, `${Number(quality.ready || 0).toLocaleString('id-ID')} siap profit · ${Number(quality.waiting || 0).toLocaleString('id-ID')} menunggu selesai`],
             ['Profit margin', Math.max(0, Number(current.profit_margin || 0)), false, `${Number(current.profit_margin || 0).toFixed(1)}% operasional`],
         ];
+        const healthScore = health.reduce((total, [, value, inverse]) => total + Math.max(0, Math.min(100, inverse ? 100 - value : value)), 0) / Math.max(health.length, 1);
+        $('anHealthScore').textContent = `${healthScore.toFixed(0)} / 100`;
         $('anHealthList').innerHTML = health.map(([label,value,inverse,note]) => `<div class="an-health-row"><span>${label}<small>${note}</small></span><div class="an-health-track"><span class="${healthClass(value,inverse)}" style="width:${Math.min(100, Math.max(0, inverse ? 100 - value : value))}%"></span></div><strong>${Number(value || 0).toFixed(1)}%</strong></div>`).join('');
         const alerts = [];
         if (Number(quality.incomplete || 0) + Number(quality.unknown || 0) > 0) alerts.push(['warn','bi-clipboard2-x','Data finansial belum lengkap',`${(Number(quality.incomplete || 0) + Number(quality.unknown || 0)).toLocaleString('id-ID')} order belum siap dihitung profit`,'Audit data']);
@@ -545,6 +548,7 @@
         if (Number(current.profit_margin || 0) < 10) alerts.push(['bad','bi-graph-down-arrow','Margin operasional rendah',`Margin saat ini ${Number(current.profit_margin || 0).toFixed(1)}%`,'Review pricing']);
         if (Number(summary?.changes?.operating_profit || 0) < 0) alerts.push(['warn','bi-arrow-down-right','Laba turun dari periode lalu',`${delta('operating_profit').text}`,'Analisis biaya']);
         if (!alerts.length) alerts.push(['','bi-check2-circle','Tidak ada alert kritis','Performa dan kualitas data berada dalam batas aman','—']);
+        $('anAlertCount').textContent = alerts[0][1] === 'bi-check2-circle' ? 'Aman' : `${alerts.length} prioritas`;
         $('anAlerts').innerHTML = alerts.map(([level,icon,title,note,action]) => `<div class="an-alert ${level}"><span class="an-alert-icon"><i class="bi ${icon}"></i></span><div><div class="an-alert-title">${title}</div><div class="an-alert-note">${note}</div></div><span class="an-alert-action">${action}</span></div>`).join('');
         const maxStore = Math.max(...topStores.map(store => Number(store.gross_sales || 0)), 1);
         $('anTopStores').innerHTML = topStores.length ? topStores.map(store => `<div class="an-contribution-row"><div><div class="an-contribution-name">${esc(store.store_name || 'Tanpa toko')}</div><div class="an-contribution-meta">${Number(store.order_count || 0).toLocaleString('id-ID')} order financial-ready · profit ${money(store.operating_profit)}</div><div class="an-contribution-bar"><span style="width:${Math.max(4, Number(store.gross_sales || 0) / maxStore * 100)}%"></span></div></div><div class="an-contribution-value">${money(store.gross_sales)}</div></div>`).join('') : '<div class="an-empty">Belum ada kontribusi toko.</div>';
