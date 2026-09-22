@@ -1578,7 +1578,8 @@ class MarketplaceAnalyticsSummaryService
             'COUNT(DISTINCT mo.id) AS placed_order_count',
             'SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN 1 ELSE 0 END) AS order_total',
             "SUM(CASE WHEN {$status} IN ('SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE', 'COMPLETED') THEN 1 ELSE 0 END) AS shipped_count",
-            "SUM(CASE WHEN {$status} = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_count",
+            // Keep completed orders on the same eligible/revenue basis as order_total.
+            "SUM(CASE WHEN {$status} = 'COMPLETED' AND ({$this->isRevenueStatus()}) THEN 1 ELSE 0 END) AS completed_count",
             "SUM(CASE WHEN {$cancelled} THEN 1 ELSE 0 END) AS cancelled_count",
             "SUM(CASE WHEN {$cancelled} THEN {$this->orderValueExpression()} ELSE 0 END) AS cancelled_amount",
             'SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $this->orderValueExpression() . ' ELSE 0 END) AS gmv',

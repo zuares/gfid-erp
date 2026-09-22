@@ -1518,7 +1518,7 @@
         const topStores = [...(summary?.stores || [])].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0)).slice(0, 5);
         const pulse = [
             ['Total order', totalOrder.toLocaleString('id-ID'), { text: `eligible · ${totalOrderChange.text}`, className: totalOrderChange.className }, 'orders'],
-            ['Order selesai', completedOrders.toLocaleString('id-ID'), { text: `${completionRate.toFixed(1)}% completion · ${completedOrdersChange.text}`, className: completedOrdersChange.className }, 'completed'],
+            ['Order selesai', completedOrders.toLocaleString('id-ID'), { text: `${completionRate.toFixed(1)}% dari order masuk · ${completedOrdersChange.text}`, className: completedOrdersChange.className }, 'completed'],
             ['Completion rate', `${completionRate.toFixed(1)}%`, completionRateChange, 'completion-rate'],
             ['Produk terjual', totalProducts.toLocaleString('id-ID'), { text: `unit · ${totalProductsChange.text}`, className: totalProductsChange.className }, 'products'],
             ['AOV net', money(aovNet), aovChange, 'aov'],
