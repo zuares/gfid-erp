@@ -244,11 +244,12 @@ class MarketplaceAnalyticsSummaryService
         $filters = $this->normalizeFilters($filters);
         $page = max(1, $page);
         $perPage = max(10, min(100, $perPage));
-        $settlement = in_array($settlement, ['all', 'unsettled', 'shipped', 'confirm', 'cancelled', 'return_refund'], true) ? $settlement : 'settled';
+        $settlement = in_array($settlement, ['all', 'unsettled', 'shipped', 'warehouse', 'confirm', 'cancelled', 'return_refund'], true) ? $settlement : 'settled';
         $base = match ($settlement) {
             'all' => $this->allCashBase($filters),
             'unsettled' => $this->unsettledBase($filters),
             'shipped' => $this->cashStatusBase($filters, 'shipped'),
+            'warehouse' => $this->cashStatusBase($filters, 'warehouse'),
             'confirm' => $this->cashStatusBase($filters, 'confirm'),
             'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
             'return_refund' => $this->cashStatusBase($filters, 'return_refund'),
@@ -286,6 +287,7 @@ class MarketplaceAnalyticsSummaryService
                 'ms.shipping_insurance_fee',
                 'ms.escrow_tax',
                 DB::raw($this->returnRefundExistsSql() . ' AS has_return_refund'),
+                DB::raw($this->warehouseBookingExistsSql() . ' AS has_warehouse_booking'),
             ])
             ->orderByDesc('ms.settlement_time')
             ->orderByDesc('mo.ordered_at')
@@ -462,6 +464,10 @@ class MarketplaceAnalyticsSummaryService
             return ['key' => 'confirm', 'label' => 'Menunggu konfirmasi'];
         }
 
+        if ((int) ($row->has_warehouse_booking ?? 0) === 1) {
+            return ['key' => 'warehouse', 'label' => 'Disimpan di Gudang Shopee'];
+        }
+
         if (in_array($status, ['READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_RETURN'], true)) {
             return ['key' => 'shipped', 'label' => 'Shipped · Masih dikirim'];
         }
@@ -477,6 +483,10 @@ class MarketplaceAnalyticsSummaryService
         return match ($group) {
             'shipped' => $base
                 ->whereRaw("{$status} IN ('SHIPPED', 'READY_TO_HANDOVER')")
+                ->whereRaw('NOT ' . $this->returnRefundExistsSql()),
+            'warehouse' => $base
+                ->whereRaw($this->warehouseBookingExistsSql())
+                ->whereRaw("{$status} NOT IN ('CANCELLED', 'CANCELED', 'CANCELLED_BEFORE_SHIPPING', 'BATAL', 'IN_CANCEL', 'TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED')")
                 ->whereRaw('NOT ' . $this->returnRefundExistsSql()),
             'confirm' => $base
                 ->whereRaw("{$status} = 'TO_CONFIRM_RECEIVE'")
@@ -498,6 +508,7 @@ class MarketplaceAnalyticsSummaryService
             'all' => $this->allCashBase($filters),
             'unsettled' => $this->unsettledBase($filters),
             'shipped' => $this->cashStatusBase($filters, 'shipped'),
+            'warehouse' => $this->cashStatusBase($filters, 'warehouse'),
             'confirm' => $this->cashStatusBase($filters, 'confirm'),
             'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
             'return_refund' => $this->cashStatusBase($filters, 'return_refund'),
@@ -1097,6 +1108,7 @@ class MarketplaceAnalyticsSummaryService
             'all' => $this->allCashBase($filters),
             'unsettled' => $this->unsettledBase($filters),
             'shipped' => $this->cashStatusBase($filters, 'shipped'),
+            'warehouse' => $this->cashStatusBase($filters, 'warehouse'),
             'confirm' => $this->cashStatusBase($filters, 'confirm'),
             'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
             'return_refund' => $this->cashStatusBase($filters, 'return_refund'),
@@ -1642,6 +1654,21 @@ class MarketplaceAnalyticsSummaryService
         return "EXISTS (SELECT 1 FROM marketplace_returns AS mr_status"
             . " WHERE mr_status.store_id = mo.store_id"
             . " AND (mr_status.order_sn = mo.channel_order_id OR mr_status.order_sn = mo.external_order_id))";
+    }
+
+    /**
+     * Shopee Kilat bookings with SHIPPED status are physically held by
+     * Shopee, so they need their own analytics bucket instead of being mixed
+     * with regular shipped orders.
+     */
+    private function warehouseBookingExistsSql(): string
+    {
+        return "EXISTS (SELECT 1 FROM marketplace_bookings AS mb_status"
+            . " WHERE mb_status.store_id = mo.store_id"
+            . " AND UPPER(COALESCE(mb_status.booking_status, '')) = 'SHIPPED'"
+            . " AND (mb_status.booking_sn = mo.booking_sn"
+            . " OR mb_status.order_sn = mo.channel_order_id"
+            . " OR mb_status.order_sn = mo.external_order_id))";
     }
 
     private function normalizeAggregate($row): array

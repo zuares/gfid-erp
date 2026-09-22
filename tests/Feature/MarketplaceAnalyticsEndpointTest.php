@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Channel;
 use App\Models\Item;
 use App\Models\ItemCategory;
+use App\Models\MarketplaceBooking;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\Store;
@@ -152,6 +153,56 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             ->assertJsonPath('data.0.payment_method', 'COD')
             ->assertJsonPath('data.0.status_group', 'confirm')
             ->assertJsonPath('data.0.status_group_label', 'Menunggu konfirmasi');
+    }
+
+    public function test_cash_orders_exposes_shopee_warehouse_tab_for_kilat_booking(): void
+    {
+        $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'ANALYTICS-WAREHOUSE']);
+        $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'WAREHOUSE-TEST',
+            'name' => 'Warehouse Test Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => '260915AASADZEU6ZP7ZP7',
+            'channel_order_id' => '260915AASADZEU6ZP7ZP7',
+            'booking_sn' => '260915AASADZEU6ZP7ZP7',
+            'order_status' => 'SHIPPED',
+            'status' => 'shipped',
+            'payment_method' => 'COD',
+            'total_amount' => 175000,
+            'total_paid_customer' => 175000,
+            'subtotal_items' => 175000,
+            'order_date' => '2026-09-20 10:00:00',
+            'ordered_at' => '2026-09-20 10:00:00',
+            'raw_json' => [],
+        ]);
+
+        MarketplaceBooking::create([
+            'store_id' => $store->id,
+            'booking_sn' => '260915AASADZEU6ZP7ZP7',
+            'order_sn' => '260915AASADZEU6ZP7ZP7',
+            'booking_status' => 'SHIPPED',
+            'tracking_number' => 'SPXID067342336109',
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/api/marketplace/analytics-cash-orders?' . http_build_query([
+            'store_id' => $store->id,
+            'date_from' => '2026-09-01',
+            'date_to' => '2026-09-30',
+            'settlement' => 'warehouse',
+        ]));
+
+        $response->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.channel_order_id', '260915AASADZEU6ZP7ZP7')
+            ->assertJsonPath('data.0.status_group', 'warehouse')
+            ->assertJsonPath('data.0.status_group_label', 'Disimpan di Gudang Shopee');
     }
 
     private function order(Store $store, string $buyer, string $date, string $externalId): MarketplaceOrder

@@ -37,7 +37,7 @@
         const feePercent = value => aggregate.cash_order_revenue > 0 ? `${(n(value) / n(aggregate.cash_order_revenue) * 100).toFixed(1)}% omzet order` : '0.0% omzet order';
         const settlementLabel = row => row.settlement_time ? 'Sudah cair' : 'Belum cair';
         const statusLabel = row => row.status_group_label || cashStatus(row.status);
-        const modeLabel = { all: 'semua status order', settled: 'payout sudah cair', shipped: 'order shipped · masih dikirim', confirm: 'menunggu konfirmasi pembeli', cancelled: 'order dibatalkan', return_refund: 'order return / refund', unsettled: 'payout belum cair' }[cashSettlement] || 'semua status order';
+        const modeLabel = { all: 'semua status order', settled: 'payout sudah cair', shipped: 'order shipped · masih dikirim', warehouse: 'disimpan di gudang Shopee', confirm: 'menunggu konfirmasi pembeli', cancelled: 'order dibatalkan', return_refund: 'order return / refund', unsettled: 'payout belum cair' }[cashSettlement] || 'semua status order';
         $('cashOrdersTitle').textContent = isFeeFocus ? 'Rincian fee marketplace actual' : 'Status order & pencairan';
         $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · ${modeLabel} · ${totalOrders} order`;
         $('cashOrdersSummary').innerHTML = isFeeFocus ? [
@@ -59,7 +59,7 @@
         }).join('');
         const renderTable = (groupRows, groupLabel = '') => groupRows.length ? `${groupLabel ? `<div class="an-cash-group-head"><strong>${esc(groupLabel)}</strong><span>${groupRows.length.toLocaleString('id-ID')} order</span></div>` : ''}<div class="an-table-wrap"><table class="an-table an-cash-table"><thead><tr><th>Order</th><th>Toko &amp; status</th><th>Metode pembayaran</th><th>${isAll ? 'Nilai order' : 'Omzet order'}</th><th>Pembayaran pembeli</th><th>${isSettled ? 'Omzet cair' : 'Payout tercatat'}</th><th>Fee marketplace</th><th>Affiliate / AMS</th></tr></thead><tbody>${renderRows(groupRows)}</tbody></table></div>` : '';
         const groups = isAll
-            ? ['completed', 'shipped', 'confirm', 'return_refund', 'cancelled', 'other'].map(key => ({ key, label: rows.find(row => row.status_group === key)?.status_group_label || key, rows: rows.filter(row => row.status_group === key) })).filter(group => group.rows.length)
+            ? ['completed', 'warehouse', 'shipped', 'confirm', 'return_refund', 'cancelled', 'other'].map(key => ({ key, label: rows.find(row => row.status_group === key)?.status_group_label || key, rows: rows.filter(row => row.status_group === key) })).filter(group => group.rows.length)
             : [{ key: 'flat', label: '', rows }];
         const table = groups.length ? groups.map(group => `<section class="an-cash-group">${renderTable(group.rows, isAll ? group.label : '')}</section>`).join('') : `<div class="an-empty">Tidak ada order pada periode ini.</div>`;
         const body = isFeeFocus
@@ -78,7 +78,7 @@
         document.body.classList.remove('an-modal-open');
     }
     function setCashSettlementTab(value) {
-        cashSettlement = ['all', 'settled', 'shipped', 'confirm', 'cancelled', 'return_refund', 'unsettled'].includes(value) ? value : 'settled';
+        cashSettlement = ['all', 'settled', 'shipped', 'warehouse', 'confirm', 'cancelled', 'return_refund', 'unsettled'].includes(value) ? value : 'settled';
         document.querySelectorAll('[data-cash-settlement]').forEach(button => {
             const active = button.dataset.cashSettlement === cashSettlement;
             button.classList.toggle('active', active);
