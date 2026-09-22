@@ -190,6 +190,10 @@ class MarketplaceCohortService
         $productName = $this->productNameExpression();
         $sku = $this->skuExpression('moi');
         $category = "COALESCE(NULLIF(ic.name, ''), 'Tanpa kategori')";
+        $categoryKey = $this->categoryKeyExpression('ic');
+        $isCategoryGrouping = $filters['group_by'] === 'category';
+        $groupKey = $isCategoryGrouping ? $categoryKey : $productKey;
+        $groupLabel = $isCategoryGrouping ? $category : $productName;
         $periodDate = 'COALESCE(mo.ordered_at, mo.order_date)';
         $cohortMonth = $this->monthExpression('first_product.first_transaction_at');
         $periodMonth = $this->monthExpression($periodDate);
@@ -199,9 +203,9 @@ class MarketplaceCohortService
         $ads = 'COALESCE(mos.ad_cost, 0)';
 
         $firstProducts = $this->productOrderItemQuery($filters, true)
-            ->selectRaw("{$productKey} AS product_key")
+            ->selectRaw("{$groupKey} AS product_key")
             ->selectRaw('MIN(COALESCE(mo.ordered_at, mo.order_date)) AS first_transaction_at')
-            ->groupByRaw($productKey);
+            ->groupByRaw($groupKey);
 
         $orderItemTotals = DB::table('marketplace_order_items as total_moi')
             ->selectRaw('COALESCE(total_moi.marketplace_order_id, total_moi.order_id) AS order_id')
@@ -209,17 +213,18 @@ class MarketplaceCohortService
             ->groupByRaw('COALESCE(total_moi.marketplace_order_id, total_moi.order_id)');
 
         $rows = $this->productOrderItemQuery($filters, true)
-            ->joinSub($firstProducts, 'first_product', function (JoinClause $join) use ($productKey) {
-                $join->on(DB::raw($productKey), '=', 'first_product.product_key');
+            ->joinSub($firstProducts, 'first_product', function (JoinClause $join) use ($groupKey) {
+                $join->on(DB::raw($groupKey), '=', 'first_product.product_key');
             })
             ->leftJoinSub($orderItemTotals, 'order_item_totals', 'order_item_totals.order_id', '=', 'mo.id')
             ->leftJoin('marketplace_order_settlements as mos', 'mos.order_id', '=', 'mo.id')
             ->selectRaw("{$cohortMonth} AS cohort_month")
             ->selectRaw("{$periodMonth} AS period_month")
-            ->selectRaw("{$productKey} AS product_key")
-            ->selectRaw("{$productName} AS product_name")
-            ->selectRaw("{$sku} AS sku")
+            ->selectRaw("{$groupKey} AS product_key")
+            ->selectRaw("{$groupLabel} AS product_name")
+            ->selectRaw($isCategoryGrouping ? 'NULL AS sku' : "{$sku} AS sku")
             ->selectRaw("{$category} AS category")
+            ->selectRaw($isCategoryGrouping ? "COUNT(DISTINCT {$productKey}) AS product_count" : '1 AS product_count')
             ->selectRaw('COUNT(DISTINCT mo.id) AS orders')
             ->selectRaw('COALESCE(SUM(CASE WHEN COALESCE(moi.qty, 0) > 0 THEN moi.qty ELSE 0 END), 0) AS qty_sold')
             ->selectRaw("COALESCE(SUM({$itemRevenue}), 0) AS revenue")
@@ -227,8 +232,10 @@ class MarketplaceCohortService
             ->selectRaw("COALESCE(SUM(CASE WHEN mos.data_status = 'complete' AND COALESCE(order_item_totals.order_item_revenue, 0) > 0 THEN ({$fee}) * ({$itemRevenue}) / order_item_totals.order_item_revenue ELSE 0 END), 0) AS marketplace_fee")
             ->selectRaw("COALESCE(SUM(CASE WHEN mos.data_status = 'complete' AND COALESCE(order_item_totals.order_item_revenue, 0) > 0 THEN ({$ads}) * ({$itemRevenue}) / order_item_totals.order_item_revenue ELSE 0 END), 0) AS ads")
             ->selectRaw("COUNT(DISTINCT CASE WHEN mos.data_status = 'complete' THEN mo.id END) AS financial_order_count")
-            ->groupByRaw("{$cohortMonth}, {$periodMonth}, {$productKey}, {$productName}, {$sku}, {$category}")
-            ->orderByRaw("{$cohortMonth}, {$productKey}, {$periodMonth}")
+            ->groupByRaw($isCategoryGrouping
+                ? "{$cohortMonth}, {$periodMonth}, {$groupKey}, {$groupLabel}, {$category}"
+                : "{$cohortMonth}, {$periodMonth}, {$groupKey}, {$groupLabel}, {$sku}, {$category}")
+            ->orderByRaw("{$cohortMonth}, {$groupKey}, {$periodMonth}")
             ->get();
 
         $grouped = [];
@@ -256,8 +263,13 @@ class MarketplaceCohortService
                 'product_name' => (string) ($row->product_name ?: $row->product_key),
                 'sku' => (string) ($row->sku ?: '-'),
                 'category' => (string) ($row->category ?: 'Tanpa kategori'),
+                'product_count' => (int) ($row->product_count ?? 1),
                 'periods' => [],
             ];
+            $grouped[$key]['product_count'] = max(
+                (int) $grouped[$key]['product_count'],
+                (int) ($row->product_count ?? 1),
+            );
             $grouped[$key]['periods'][$periodIndex] = [
                 'period_month' => $periodMonthValue,
                 'period_index' => $periodIndex,
@@ -284,6 +296,8 @@ class MarketplaceCohortService
 
         return [
             'mode' => 'product',
+            'group_by' => $filters['group_by'],
+            'group_label' => $isCategoryGrouping ? 'Kategori master' : 'Produk / SKU',
             'metric' => $filters['metric'],
             'metric_label' => $this->metricLabel($filters['metric']),
             'filters' => $filters,
@@ -292,6 +306,9 @@ class MarketplaceCohortService
             'summary' => $this->productSummary($productRows),
             'notes' => [
                 'product_key' => 'internal_item_id, model_sku, item_sku, external_sku, then item snapshot fallback.',
+                'grouping' => $isCategoryGrouping
+                    ? 'Produk digabung berdasarkan kategori master items.item_category_id dan nama item_categories.'
+                    : 'Setiap baris mewakili satu produk berdasarkan product key yang tersedia.',
                 'profit' => 'Fee marketplace, HPP, dan iklan hanya dihitung dari baris settlement yang complete.',
                 'coverage' => 'Gross sales dapat mencakup order eligible yang belum complete; coverage ditampilkan per cell agar profit tidak terlihat lebih pasti dari datanya.',
             ],
@@ -462,7 +479,8 @@ class MarketplaceCohortService
         }
 
         return [
-            'product_count' => count($rows),
+            'product_count' => array_sum(array_map(fn (array $row): int => (int) ($row['product_count'] ?? 1), $rows)),
+            'group_count' => count($rows),
             'revenue' => round($revenue, 2),
             'gross_profit' => round($grossProfit, 2),
             'gross_margin_pct' => $revenue > 0 ? round(($grossProfit / $revenue) * 100, 2) : null,
@@ -480,6 +498,7 @@ class MarketplaceCohortService
 
         return [
             'mode' => $mode,
+            'group_by' => ($mode === 'product' && ($filters['group_by'] ?? null) === 'category') ? 'category' : 'product',
             'metric' => $metric,
             'store_id' => ! empty($filters['store_id']) ? (int) $filters['store_id'] : null,
             'marketplace' => trim((string) ($filters['marketplace'] ?? '')) ?: null,
@@ -494,14 +513,14 @@ class MarketplaceCohortService
     private function metricLabel(string $metric): string
     {
         return [
-            'retention_pct' => 'Retention %',
-            'active_customers' => 'Active Customers',
-            'orders' => 'Orders',
-            'qty_sold' => 'Qty Sold',
-            'revenue' => 'Gross Sales',
-            'gross_profit' => 'Gross Profit (covered)',
-            'gross_margin_pct' => 'Gross Margin %',
-            'net_profit' => 'Net Profit (covered)',
+            'retention_pct' => 'Retention pelanggan',
+            'active_customers' => 'Pelanggan aktif',
+            'orders' => 'Jumlah order',
+            'qty_sold' => 'Unit terjual',
+            'revenue' => 'Omzet kotor',
+            'gross_profit' => 'Laba kotor (covered)',
+            'gross_margin_pct' => 'Margin kotor',
+            'net_profit' => 'Laba bersih (covered)',
         ][$metric] ?? $metric;
     }
 
@@ -521,6 +540,13 @@ class MarketplaceCohortService
         }
 
         return "COALESCE(NULLIF(CAST({$alias}.internal_item_id AS CHAR), '0'), NULLIF(TRIM({$alias}.model_sku), ''), NULLIF(TRIM({$alias}.item_sku), ''), NULLIF(TRIM({$alias}.external_sku), ''), NULLIF(TRIM({$alias}.item_code_snapshot), ''))";
+    }
+
+    private function categoryKeyExpression(string $alias): string
+    {
+        return DB::connection()->getDriverName() === 'sqlite'
+            ? "COALESCE(NULLIF(CAST({$alias}.id AS TEXT), '0'), 'uncategorized')"
+            : "COALESCE(NULLIF(CAST({$alias}.id AS CHAR), '0'), 'uncategorized')";
     }
 
     private function productNameExpression(string $itemAlias = 'moi', string $internalItemAlias = 'i'): string

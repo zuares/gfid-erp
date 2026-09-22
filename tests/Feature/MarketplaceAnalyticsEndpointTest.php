@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Channel;
+use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\MarketplaceOrder;
+use App\Models\MarketplaceOrderItem;
 use App\Models\Store;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -72,6 +75,43 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
         $this->assertSame(100.0, (float) $juneCohort['periods'][0]['retention_pct']);
         $this->assertSame(50.0, (float) $juneCohort['periods'][1]['retention_pct']);
         $this->assertSame(1, $juneCohort['periods'][1]['active_customers']);
+    }
+
+    public function test_product_cohort_can_group_products_by_master_item_category(): void
+    {
+        $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'ANALYTICS-PRODUCT-GROUP']);
+        $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'PRODUCT-GROUP-TEST',
+            'name' => 'Product Group Test Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $category = ItemCategory::create(['code' => 'JACKET', 'name' => 'Jaket', 'active' => true]);
+        $firstItem = Item::create(['code' => 'JACKET-1', 'name' => 'Jaket Navy', 'unit' => 'pcs', 'type' => 'finished', 'item_category_id' => $category->id, 'active' => true]);
+        $secondItem = Item::create(['code' => 'JACKET-2', 'name' => 'Jaket Black', 'unit' => 'pcs', 'type' => 'finished', 'item_category_id' => $category->id, 'active' => true]);
+
+        $firstOrder = $this->order($store, 'buyer-a', '2026-06-10', 'PRODUCT-GROUP-A');
+        $secondOrder = $this->order($store, 'buyer-b', '2026-06-15', 'PRODUCT-GROUP-B');
+        MarketplaceOrderItem::create(['order_id' => $firstOrder->id, 'internal_item_id' => $firstItem->id, 'item_name_snapshot' => $firstItem->name, 'item_code_snapshot' => $firstItem->code, 'qty' => 1, 'line_net_amount' => 100000]);
+        MarketplaceOrderItem::create(['order_id' => $secondOrder->id, 'internal_item_id' => $secondItem->id, 'item_name_snapshot' => $secondItem->name, 'item_code_snapshot' => $secondItem->code, 'qty' => 1, 'line_net_amount' => 100000]);
+
+        $response = $this->actingAs($user)->getJson('/api/marketplace/analytics-cohort?' . http_build_query([
+            'mode' => 'product',
+            'group_by' => 'category',
+            'metric' => 'revenue',
+            'store_id' => $store->id,
+            'date_from' => '2026-06-01',
+            'date_to' => '2026-06-30',
+        ]));
+
+        $response->assertOk()->assertJsonPath('group_by', 'category');
+        $rows = collect($response->json('rows'));
+        $this->assertCount(1, $rows);
+        $this->assertSame('Jaket', $rows->first()['category']);
+        $this->assertSame(2, $rows->first()['product_count']);
+        $this->assertSame(200000.0, (float) $rows->first()['periods'][0]['revenue']);
     }
 
     public function test_cash_orders_exposes_payment_method_and_waiting_confirmation_tab(): void

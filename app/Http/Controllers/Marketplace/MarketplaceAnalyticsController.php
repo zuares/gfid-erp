@@ -62,6 +62,7 @@ class MarketplaceAnalyticsController extends Controller
     {
         $filters = $request->validate([
             'mode' => ['nullable', 'in:customer,product'],
+            'group_by' => ['nullable', 'in:product,category'],
             'metric' => ['nullable', 'in:retention_pct,active_customers,orders,qty_sold,revenue,gross_profit,gross_margin_pct,net_profit'],
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
             'marketplace' => ['nullable', 'string', 'max:100'],
