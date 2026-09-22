@@ -155,6 +155,45 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             ->assertJsonPath('data.0.status_group_label', 'Menunggu konfirmasi');
     }
 
+    public function test_cash_orders_shipped_tab_includes_ready_to_ship_and_processed_orders(): void
+    {
+        $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'ANALYTICS-SHIPPED']);
+        $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'SHIPPED-TEST',
+            'name' => 'Shipped Test Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        foreach (['READY_TO_SHIP', 'PROCESSED'] as $index => $status) {
+            MarketplaceOrder::create([
+                'store_id' => $store->id,
+                'external_order_id' => "SHIPPED-{$index}",
+                'channel_order_id' => "SHIPPED-{$index}",
+                'order_status' => $status,
+                'status' => strtolower($status),
+                'total_amount' => 100000,
+                'total_paid_customer' => 100000,
+                'subtotal_items' => 100000,
+                'order_date' => '2026-09-20 10:00:00',
+                'ordered_at' => '2026-09-20 10:00:00',
+                'raw_json' => [],
+            ]);
+        }
+
+        $response = $this->actingAs($user)->getJson('/api/marketplace/analytics-cash-orders?' . http_build_query([
+            'store_id' => $store->id,
+            'date_from' => '2026-09-01',
+            'date_to' => '2026-09-30',
+            'settlement' => 'shipped',
+        ]));
+
+        $response->assertOk()->assertJsonPath('meta.total', 2);
+        $this->assertSame(['shipped', 'shipped'], collect($response->json('data'))->pluck('status_group')->all());
+    }
+
     public function test_cash_orders_exposes_shopee_warehouse_tab_for_kilat_booking(): void
     {
         $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'ANALYTICS-WAREHOUSE']);

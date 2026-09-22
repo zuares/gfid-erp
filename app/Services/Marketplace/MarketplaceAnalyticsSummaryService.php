@@ -482,7 +482,7 @@ class MarketplaceAnalyticsSummaryService
 
         return match ($group) {
             'shipped' => $base
-                ->whereRaw("{$status} IN ('SHIPPED', 'READY_TO_HANDOVER')")
+                ->whereRaw("{$status} IN ('READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER')")
                 ->whereRaw('NOT ' . $this->returnRefundExistsSql()),
             'warehouse' => $base
                 ->whereRaw($this->warehouseBookingExistsSql())
