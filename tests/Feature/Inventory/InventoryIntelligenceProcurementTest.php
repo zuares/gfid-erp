@@ -231,3 +231,15 @@ it('creates a purchase request draft from inventory intelligence suggestions', f
         ->and($draft->status)->toBe('draft')
         ->and((float) $draft->lines()->where('item_id', $item->id)->value('qty'))->toBe(12.0);
 });
+
+it('shows inventory intelligence in the admin sidebar', function () {
+    $admin = User::factory()->create([
+        'employee_code' => 'ADMIN-INVENTORY-INTELLIGENCE',
+        'role' => 'admin',
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('inventory.intelligence'));
+
+    $response->assertOk()
+        ->assertSee('href="' . route('inventory.intelligence') . '"', false);
+});

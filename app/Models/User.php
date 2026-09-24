@@ -157,6 +157,7 @@ class User extends Authenticatable
     {
         return match (strtolower($role)) {
             'admin' => [
+                'inventory'   => ['on' => true,  'reason' => 'Admin selalu punya akses modul ini.'],
                 'production'  => ['on' => true,  'reason' => 'Admin selalu punya akses modul ini.'],
                 'purchasing'  => ['on' => true,  'reason' => 'Admin selalu punya akses modul ini.'],
                 'marketplace' => ['on' => true,  'reason' => 'Admin selalu punya akses modul ini.'],
