@@ -803,6 +803,7 @@
 
 @section('content')
     @php
+        $isFinalized = $period->isFinalized();
         $qtyLabel = $module === 'daily' ? 'Hari Efektif' : ($module === 'sewing' ? 'Qty Ambil' : 'Qty Payroll');
         $pageLabel = $module === 'daily' ? 'Payroll Harian' : 'Payroll Borongan';
         $moduleRoute = function (string $action, array $parameters = []) use ($module) {
@@ -829,7 +830,7 @@
                 <div class="pw-sub">
                     Minggu ke-{{ $periodWeek }} · {{ $periodMonth }} · {{ $periodDateRange }} · ID #{{ $period->id }}
                     ·
-                    @if ($period->status === 'final')
+                    @if ($isFinalized)
                         <span class="pw-chip final">FINAL</span>
                     @else
                         <span class="pw-chip draft">DRAFT</span>
@@ -864,7 +865,7 @@
                 <div class="pw-b">
                     {{-- ACTIONS --}}
                     <div class="pw-row" style="margin-bottom:.75rem">
-                        @if ($period->status !== 'final')
+                        @if (! $isFinalized)
                             <form method="POST"
                                 action="{{ $moduleRoute('finalize', ['period' => $period]) }}">
                                 @csrf
@@ -883,12 +884,22 @@
                                 </button>
                             </form>
                         @else
-                            <span class="pw-chip final">FINAL LOCKED</span>
+                            @if (! $period->paid_at)
+                                <form method="POST" action="{{ $moduleRoute('unpost', ['period' => $period]) }}">
+                                    @csrf
+                                    <button class="pw-btn" type="submit"
+                                        onclick="return confirm('Unpost payroll ini? Jurnal accrual akan di-reversal dan periode dikembalikan ke DRAFT.')">
+                                        UNPOST
+                                    </button>
+                                </form>
+                            @else
+                                <span class="pw-chip final">FINAL LOCKED</span>
+                            @endif
                         @endif
                     </div>
 
                     {{-- PAY (only if final & not paid) --}}
-                    @if ($period->status === 'final' && !$period->paid_at)
+                    @if ($isFinalized && !$period->paid_at)
                         <form class="pw-row pw-pay-form" method="POST"
                             action="{{ $moduleRoute('pay', ['period' => $period]) }}">
                             @csrf

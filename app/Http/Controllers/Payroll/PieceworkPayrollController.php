@@ -251,7 +251,7 @@ class PieceworkPayrollController extends Controller
             ->whereDate('period_end', $data['period_end'])
             ->first();
 
-        if ($existing && $existing->status === 'final') {
+        if ($existing && $existing->isFinalized()) {
             $redirect = $returnToOverview
                 ? redirect()->route('payroll.piecework.overview', ['module' => $cfg['module']])
                 : redirect()->to($this->moduleRoute($cfg['module'], 'show', ['period' => $existing]));
@@ -430,7 +430,7 @@ class PieceworkPayrollController extends Controller
         abort_unless($cfg['module'] === 'daily', 404);
         abort_unless((int) $line->payroll_period_id === (int) $period->id, 404);
 
-        if ($period->status === 'final' || $period->paid_at) {
+        if ($period->isFinalized() || $period->paid_at) {
             return back()->with('error', 'Payroll harian yang sudah FINAL atau dibayar tidak bisa diubah.');
         }
 
@@ -519,6 +519,11 @@ class PieceworkPayrollController extends Controller
     public function dailyFinalize(PieceworkPayrollPeriod $period, PieceworkPayrollPostingService $svc): RedirectResponse
     {
         return $this->finalize('daily', $period, $svc);
+    }
+
+    public function dailyUnpost(PieceworkPayrollPeriod $period, PieceworkPayrollPostingService $svc): RedirectResponse
+    {
+        return $this->unpost('daily', $period, $svc);
     }
 
     public function dailyPay(Request $request, PieceworkPayrollPeriod $period, PieceworkPayrollPostingService $svc): RedirectResponse
@@ -688,6 +693,27 @@ class PieceworkPayrollController extends Controller
     }
 
     /**
+     * UNPOST: kembalikan payroll FINAL ke DRAFT dan void jurnal accrual-nya.
+     */
+    public function unpost(string $module, PieceworkPayrollPeriod $period, PieceworkPayrollPostingService $svc): RedirectResponse
+    {
+        $cfg = $this->moduleConfig($module);
+        abort_unless($period->module === $cfg['module'], 404);
+
+        try {
+            $svc->unpost($period);
+
+            return redirect()
+                ->to($this->moduleRoute($cfg['module'], 'show', ['period' => $period]))
+                ->with('status', "Periode payroll {$cfg['label']} berhasil di-unpost dan dikembalikan ke DRAFT.");
+        } catch (\Throwable $e) {
+            return redirect()
+                ->to($this->moduleRoute($cfg['module'], 'show', ['period' => $period]))
+                ->with('error', $e->getMessage());
+        }
+    }
+
+    /**
      * PAY: Dr Hutang Upah Borongan, Cr Kas/Bank
      */
     public function pay(Request $request, string $module, PieceworkPayrollPeriod $period, PieceworkPayrollPostingService $svc): RedirectResponse
@@ -729,7 +755,7 @@ class PieceworkPayrollController extends Controller
         $cfg = $this->moduleConfig($module);
         abort_unless($period->module === $cfg['module'], 404);
 
-        if ($period->status === 'final') {
+        if ($period->isFinalized()) {
             return redirect()
                 ->to($this->moduleRoute($cfg['module'], 'show', ['period' => $period]))
                 ->with('error', 'Periode yang sudah FINAL tidak boleh digenerate ulang.');

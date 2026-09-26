@@ -142,6 +142,79 @@ class PieceworkPayrollPostingService
     }
 
     /**
+     * UNPOST: kembalikan payroll FINAL ke DRAFT.
+     *
+     * Jurnal accrual tidak dihapus. Jurnal tersebut di-void dan dibuatkan
+     * reversal oleh JournalService agar histori akuntansi tetap terlacak.
+     * Payroll yang sudah dibayar sengaja ditolak karena unpost akan membuat
+     * kas, potongan pinjaman, dan tabungan karyawan tidak konsisten.
+     */
+    public function unpost(PieceworkPayrollPeriod $period): PieceworkPayrollPeriod
+    {
+        return DB::transaction(function () use ($period) {
+            $period = PieceworkPayrollPeriod::query()
+                ->lockForUpdate()
+                ->findOrFail($period->getKey());
+
+            if (! in_array($period->status, ['final', 'posted'], true)) {
+                throw new \RuntimeException('Periode payroll belum FINAL, sehingga tidak perlu di-unpost.');
+            }
+
+            $activePayment = Journal::query()
+                ->where('source_type', 'piecework_payroll_period_payment')
+                ->where('source_id', $period->id)
+                ->whereNull('voided_at')
+                ->exists();
+
+            if ($period->paid_at || $period->payment_journal_id || $activePayment) {
+                throw new \RuntimeException('Payroll yang sudah dibayar tidak bisa di-unpost. Batalkan pembayaran terlebih dahulu.');
+            }
+
+            $journalIds = collect([
+                $period->accrual_journal_id,
+                $period->journal_id, // marker legacy
+            ])->filter()->map(fn ($id) => (int) $id);
+
+            $sourceJournals = Journal::query()
+                ->where('source_id', $period->id)
+                ->whereIn('source_type', [
+                    'piecework_payroll_period_accrual',
+                    'daily_payroll_operating_expense_reclass',
+                ])
+                ->whereNull('voided_at')
+                ->pluck('id');
+
+            $journalIds = $journalIds
+                ->merge($sourceJournals)
+                ->unique()
+                ->values();
+
+            foreach ($journalIds as $journalId) {
+                $journal = Journal::query()->find($journalId);
+                if ($journal && ! $journal->voided_at) {
+                    $this->journalService->void(
+                        $journal,
+                        'UNPOST payroll periode '.$period->id,
+                    );
+                }
+            }
+
+            $period->forceFill([
+                'status' => 'draft',
+                'total_amount' => $period->lines()->sum('amount'),
+                'finalized_at' => null,
+                'finalized_by' => null,
+                'posted_by' => null,
+                'journal_id' => null,
+                'accrual_journal_id' => null,
+                'payable_account_id' => null,
+            ])->save();
+
+            return $period->fresh();
+        });
+    }
+
+    /**
      * PAY:
      * Dr 2102 Hutang Upah Borongan
      * Cr Kas/Bank (setelah bonus tabungan dan potongan hutang karyawan)

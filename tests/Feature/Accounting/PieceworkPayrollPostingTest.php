@@ -70,6 +70,43 @@ class PieceworkPayrollPostingTest extends TestCase
         $this->assertSame($journalCount, Journal::count());
     }
 
+    public function test_unpost_returns_unpaid_final_payroll_to_draft_and_reverses_accrual(): void
+    {
+        [$period] = $this->makePayroll();
+
+        $service = app(PieceworkPayrollPostingService::class);
+        $service->finalize($period);
+
+        $accrual = Journal::query()
+            ->where('source_type', 'piecework_payroll_period_accrual')
+            ->where('source_id', $period->id)
+            ->firstOrFail();
+
+        $service->unpost($period->fresh());
+
+        $this->assertSame('draft', $period->fresh()->status);
+        $this->assertNull($period->fresh()->accrual_journal_id);
+        $this->assertNotNull(Journal::query()->findOrFail($accrual->id)->voided_at);
+        $this->assertSame(2, Journal::query()
+            ->where('source_type', 'piecework_payroll_period_accrual')
+            ->where('source_id', $period->id)
+            ->whereNotNull('voided_at')
+            ->count());
+    }
+
+    public function test_unpost_rejects_payroll_that_has_been_paid(): void
+    {
+        [$period, $bank] = $this->makePayroll();
+
+        $service = app(PieceworkPayrollPostingService::class);
+        $service->finalize($period);
+        $service->pay($period, $bank->id);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('sudah dibayar');
+        $service->unpost($period->fresh());
+    }
+
     public function test_payroll_payment_can_deduct_employee_loan_and_pay_net_salary(): void
     {
         [$period, $bank] = $this->makePayroll();

@@ -73,6 +73,9 @@ Route::middleware(['web', 'auth', 'access:payroll'])->group(function () {
             Route::post('/{period}/finalize', [PieceworkPayrollController::class, 'finalize'])
                 ->name('finalize');
 
+            Route::post('/{period}/unpost', [PieceworkPayrollController::class, 'unpost'])
+                ->name('unpost');
+
             // PAY → Dr Hutang / Cr Kas-Bank
             Route::post('/{period}/pay', [PieceworkPayrollController::class, 'pay'])
                 ->name('pay');
@@ -116,6 +119,9 @@ Route::middleware(['web', 'auth', 'access:payroll'])->group(function () {
 
             Route::post('/{period}/finalize', [PieceworkPayrollController::class, 'dailyFinalize'])
                 ->name('finalize');
+
+            Route::post('/{period}/unpost', [PieceworkPayrollController::class, 'dailyUnpost'])
+                ->name('unpost');
 
             Route::post('/{period}/pay', [PieceworkPayrollController::class, 'dailyPay'])
                 ->name('pay');

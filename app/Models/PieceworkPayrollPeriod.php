@@ -71,4 +71,9 @@ class PieceworkPayrollPeriod extends Model
     {
         return $this->status === 'posted';
     }
+
+    public function isFinalized(): bool
+    {
+        return in_array($this->status, ['final', 'posted'], true);
+    }
 }
