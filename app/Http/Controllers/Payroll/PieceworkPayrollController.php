@@ -12,6 +12,7 @@ use App\Services\Payroll\DailyAttendanceBonusCalculator;
 use App\Services\Payroll\PieceworkPayrollPostingService;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -424,13 +425,19 @@ class PieceworkPayrollController extends Controller
     /**
      * Update kehadiran satu baris payroll harian.
      */
-    public function updateDailyLine(Request $request, string $module, PieceworkPayrollPeriod $period, PieceworkPayrollLine $line): RedirectResponse
+    public function updateDailyLine(Request $request, string $module, PieceworkPayrollPeriod $period, PieceworkPayrollLine $line): RedirectResponse|JsonResponse
     {
         $cfg = $this->moduleConfig($module);
         abort_unless($cfg['module'] === 'daily', 404);
         abort_unless((int) $line->payroll_period_id === (int) $period->id, 404);
 
         if ($period->isFinalized() || $period->paid_at) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Payroll harian yang sudah FINAL atau dibayar tidak bisa diubah.',
+                ], 422);
+            }
+
             return back()->with('error', 'Payroll harian yang sudah FINAL atau dibayar tidak bisa diubah.');
         }
 
@@ -446,7 +453,7 @@ class PieceworkPayrollController extends Controller
         $rate = round((float) ($line->rate_per_day ?: $line->rate_per_pcs), 2);
         $amount = round($factor * $rate, 2);
 
-        DB::transaction(function () use ($period, $line, $data, $factor, $rate, $amount): void {
+        $result = DB::transaction(function () use ($period, $line, $data, $factor, $rate, $amount): array {
             $lockedPeriod = PieceworkPayrollPeriod::query()
                 ->lockForUpdate()
                 ->findOrFail($period->id);
@@ -467,7 +474,33 @@ class PieceworkPayrollController extends Controller
             $lockedPeriod->forceFill([
                 'total_amount' => $lockedPeriod->lines()->sum('amount'),
             ])->save();
+
+            $periodTotalAmount = round(
+                (float) $lockedPeriod->lines()->sum('amount')
+                + (float) DailyAttendanceBonusCalculator::forPeriod($lockedPeriod)->sum('bonus_amount'),
+                2
+            );
+
+            return [
+                'line' => $lockedLine->fresh(),
+                'period_total_amount' => $periodTotalAmount,
+            ];
         });
+
+        if ($request->expectsJson()) {
+            /** @var PieceworkPayrollLine $updatedLine */
+            $updatedLine = $result['line'];
+
+            return response()->json([
+                'message' => 'Kehadiran payroll harian berhasil disimpan.',
+                'line' => [
+                    'id' => (int) $updatedLine->id,
+                    'attendance_status' => $updatedLine->attendance_status,
+                    'amount' => (float) $updatedLine->amount,
+                ],
+                'period_total_amount' => (float) $result['period_total_amount'],
+            ]);
+        }
 
         return back()->with('status', 'Kehadiran payroll harian berhasil disimpan.');
     }
@@ -536,7 +569,7 @@ class PieceworkPayrollController extends Controller
         return $this->regenerate('daily', $period);
     }
 
-    public function dailyLineUpdate(Request $request, PieceworkPayrollPeriod $period, PieceworkPayrollLine $line): RedirectResponse
+    public function dailyLineUpdate(Request $request, PieceworkPayrollPeriod $period, PieceworkPayrollLine $line): RedirectResponse|JsonResponse
     {
         return $this->updateDailyLine($request, 'daily', $period, $line);
     }

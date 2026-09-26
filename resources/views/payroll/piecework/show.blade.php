@@ -295,6 +295,21 @@
             white-space: nowrap
         }
 
+        .pw-daily-save-state {
+            min-width: 4.6rem;
+            color: var(--muted);
+            font-size: .68rem;
+            white-space: nowrap
+        }
+
+        .pw-daily-save-state.is-saved {
+            color: #15803d
+        }
+
+        .pw-daily-save-state.is-error {
+            color: #b91c1c
+        }
+
         .pw-daily-day {
             color: var(--text);
             font-size: .78rem;
@@ -1077,7 +1092,7 @@
                                 <div class="pw-summary-average-label">Rata-rata pengeluaran per hari</div>
                                 <div class="pw-summary-average-note">Total payroll dibagi {{ $periodDays }} hari periode</div>
                             </div>
-                            <div class="pw-summary-average-value">{{ number_format((float) $averageDailyAmount, 0, ',', '.') }}</div>
+                            <div class="pw-summary-average-value" @if ($module === 'daily') data-pw-daily-average @endif>{{ number_format((float) $averageDailyAmount, 0, ',', '.') }}</div>
                         </div>
                     @endif
 
@@ -1087,7 +1102,7 @@
                             <div class="pw-summary-total-note">{{ $module === 'daily' ? 'Setelah rekap kehadiran seluruh operator' : 'Total seluruh baris payroll' }}</div>
                         </div>
                         <div>
-                            <div class="pw-summary-total-amount">{{ number_format((float) $grandTotalAmount, 0, ',', '.') }}</div>
+                            <div class="pw-summary-total-amount" @if ($module === 'daily') data-pw-daily-grand-total @endif>{{ number_format((float) $grandTotalAmount, 0, ',', '.') }}</div>
                             <div class="pw-summary-total-qty">{{ $module === 'daily' ? 'Hari efektif: ' : 'Qty: ' }}{{ rtrim(rtrim(number_format((float) $grandTotalQty, 2, '.', ''), '0'), '.') }}</div>
                         </div>
                     </div>
@@ -1103,6 +1118,14 @@
 
                 <div class="pw-b" style="padding:0">
                     @if ($module === 'daily')
+                        @php
+                            $dailyEmployees = $lines
+                                ->pluck('employee')
+                                ->filter()
+                                ->unique('id')
+                                ->sortBy(fn ($employee) => mb_strtolower((string) $employee->name))
+                                ->values();
+                        @endphp
                         <div class="pw-daily-toolbar">
                             <label class="pw-daily-filter-field" for="pw-daily-day-filter">
                                 <span>Filter Hari</span>
@@ -1115,6 +1138,15 @@
                                     <option value="5">Jumat</option>
                                     <option value="6">Sabtu</option>
                                     <option value="0">Minggu</option>
+                                </select>
+                            </label>
+                            <label class="pw-daily-filter-field" for="pw-daily-employee-filter">
+                                <span>Filter Karyawan</span>
+                                <select class="pw-daily-filter" id="pw-daily-employee-filter">
+                                    <option value="all">Semua Karyawan</option>
+                                    @foreach ($dailyEmployees as $employee)
+                                        <option value="{{ $employee->id }}">{{ $employee->name }}</option>
+                                    @endforeach
                                 </select>
                             </label>
                             <span class="pw-daily-filter-count" id="pw-daily-filter-count">{{ $lines->count() }} baris</span>
@@ -1144,7 +1176,8 @@
                                 </thead>
                                 <tbody>
                                     @forelse($lines as $l)
-                                        <tr data-pw-day="{{ $l->work_date ? \Carbon\Carbon::parse($l->work_date)->dayOfWeek : '' }}">
+                                        <tr data-pw-day="{{ $l->work_date ? \Carbon\Carbon::parse($l->work_date)->dayOfWeek : '' }}"
+                                            data-pw-employee="{{ $l->employee_id }}">
                                             <td data-label="Tanggal" style="white-space:nowrap">
                                                 @if ($l->work_date)
                                                     @php $workDate = \Carbon\Carbon::parse($l->work_date)->locale('id'); @endphp
@@ -1168,14 +1201,14 @@
                                                                 <option value="{{ $status }}" @selected(($l->attendance_status ?: 'pending') === $status)>{{ $label }}</option>
                                                             @endforeach
                                                         </select>
-                                                        <button class="pw-daily-save" type="submit">Simpan</button>
+                                                        <span class="pw-daily-save-state" aria-live="polite"></span>
                                                     </form>
                                                 @endif
                                             </td>
                                             <td data-label="Upah Harian" class="pw-right" style="white-space:nowrap">
                                                 {{ number_format((float) ($l->rate_per_day ?: $l->rate_per_pcs), 0, ',', '.') }}
                                             </td>
-                                            <td data-label="Total" class="pw-right" style="font-weight:800;white-space:nowrap">
+                                            <td data-label="Total" data-pw-daily-amount class="pw-right" style="font-weight:800;white-space:nowrap">
                                                 {{ number_format((float) $l->amount, 0, ',', '.') }}
                                             </td>
                                         </tr>
@@ -1246,17 +1279,90 @@
         <script>
             document.addEventListener('DOMContentLoaded', function () {
                 const filter = document.getElementById('pw-daily-day-filter');
+                const employeeFilter = document.getElementById('pw-daily-employee-filter');
                 const count = document.getElementById('pw-daily-filter-count');
                 const rows = Array.from(document.querySelectorAll('.pw-daily-table tbody tr[data-pw-day]'));
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+                const periodDays = {{ (int) $periodDays }};
 
-                if (!filter) return;
+                if (!filter || !employeeFilter) return;
+
+                const formatAmount = function (amount) {
+                    return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Number(amount || 0));
+                };
+
+                const saveAttendance = async function (form, select) {
+                    const row = form.closest('tr');
+                    const state = form.querySelector('.pw-daily-save-state');
+                    const previousValue = select.dataset.previousValue || select.value;
+
+                    select.disabled = true;
+                    if (state) {
+                        state.textContent = 'Menyimpan...';
+                        state.classList.remove('is-saved', 'is-error');
+                    }
+
+                    try {
+                        const response = await fetch(form.action, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': csrfToken,
+                            },
+                            body: new FormData(form),
+                        });
+                        const payload = await response.json().catch(function () { return {}; });
+
+                        if (!response.ok) {
+                            throw new Error(payload.message || 'Status kehadiran gagal disimpan.');
+                        }
+
+                        select.dataset.previousValue = select.value;
+                        if (row && payload.line) {
+                            const amountCell = row.querySelector('[data-pw-daily-amount]');
+                            if (amountCell) amountCell.textContent = formatAmount(payload.line.amount);
+                        }
+
+                        const grandTotal = document.querySelector('[data-pw-daily-grand-total]');
+                        const average = document.querySelector('[data-pw-daily-average]');
+                        if (grandTotal) grandTotal.textContent = formatAmount(payload.period_total_amount);
+                        if (average) average.textContent = formatAmount(Number(payload.period_total_amount || 0) / periodDays);
+
+                        if (state) {
+                            state.textContent = 'Tersimpan';
+                            state.classList.add('is-saved');
+                        }
+                    } catch (error) {
+                        select.value = previousValue;
+                        if (state) {
+                            state.textContent = error.message || 'Gagal menyimpan';
+                            state.classList.add('is-error');
+                        }
+                    } finally {
+                        select.disabled = false;
+                    }
+                };
+
+                document.querySelectorAll('.pw-daily-status-form').forEach(function (form) {
+                    const select = form.querySelector('.pw-daily-status');
+                    if (!select) return;
+
+                    select.dataset.previousValue = select.value;
+                    select.addEventListener('change', function () {
+                        saveAttendance(form, select);
+                    });
+                });
 
                 const updateRows = function () {
                     const selectedDay = filter.value;
+                    const selectedEmployee = employeeFilter.value;
                     let visibleRows = 0;
 
                     rows.forEach(function (row) {
-                        const visible = selectedDay === 'all' || row.dataset.pwDay === selectedDay;
+                        const visibleDay = selectedDay === 'all' || row.dataset.pwDay === selectedDay;
+                        const visibleEmployee = selectedEmployee === 'all' || row.dataset.pwEmployee === selectedEmployee;
+                        const visible = visibleDay && visibleEmployee;
                         row.hidden = !visible;
                         if (visible) visibleRows += 1;
                     });
@@ -1267,6 +1373,7 @@
                 };
 
                 filter.addEventListener('change', updateRows);
+                employeeFilter.addEventListener('change', updateRows);
                 updateRows();
             });
         </script>
