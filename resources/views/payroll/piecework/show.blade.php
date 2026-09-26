@@ -884,17 +884,13 @@
                                 </button>
                             </form>
                         @else
-                            @if (! $period->paid_at)
-                                <form method="POST" action="{{ $moduleRoute('unpost', ['period' => $period]) }}">
-                                    @csrf
-                                    <button class="pw-btn" type="submit"
-                                        onclick="return confirm('Unpost payroll ini? Jurnal accrual akan di-reversal dan periode dikembalikan ke DRAFT.')">
-                                        UNPOST
-                                    </button>
-                                </form>
-                            @else
-                                <span class="pw-chip final">FINAL LOCKED</span>
-                            @endif
+                            <form method="POST" action="{{ $moduleRoute('unpost', ['period' => $period]) }}">
+                                @csrf
+                                <button class="pw-btn" type="submit"
+                                    onclick="return confirm('{{ $period->paid_at ? 'Pembayaran, potongan pinjaman, dan bonus tabungan akan dibatalkan secara akuntansi. ' : '' }}Unpost payroll ini dan kembalikan ke DRAFT?')">
+                                    UNPOST
+                                </button>
+                            </form>
                         @endif
                     </div>
 

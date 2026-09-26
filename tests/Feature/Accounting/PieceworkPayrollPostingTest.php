@@ -94,17 +94,47 @@ class PieceworkPayrollPostingTest extends TestCase
             ->count());
     }
 
-    public function test_unpost_rejects_payroll_that_has_been_paid(): void
+    public function test_unpost_paid_payroll_reverses_payment_and_restores_loan_balance(): void
     {
         [$period, $bank] = $this->makePayroll();
+        $employee = Employee::where('code', 'EMP-PAYROLL-TEST')->firstOrFail();
+        $receivable = Account::firstOrCreate(['code' => '1307'], [
+            'name' => 'Piutang Pinjaman Karyawan',
+            'type' => 'asset',
+            'is_cash' => false,
+            'is_active' => true,
+        ]);
+        $loan = EmployeeLoan::create([
+            'employee_id' => $employee->id,
+            'date' => '2026-08-01',
+            'principal_amount' => 8000,
+            'cash_account_id' => $bank->id,
+            'receivable_account_id' => $receivable->id,
+            'status' => 'posted',
+        ]);
 
         $service = app(PieceworkPayrollPostingService::class);
         $service->finalize($period);
-        $service->pay($period, $bank->id);
+        $service->pay($period, $bank->id, [$loan->id => 4000]);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('sudah dibayar');
+        $payment = Journal::query()
+            ->where('source_type', 'piecework_payroll_period_payment')
+            ->where('source_id', $period->id)
+            ->firstOrFail();
+
         $service->unpost($period->fresh());
+
+        $unposted = $period->fresh();
+        $this->assertSame('draft', $unposted->status);
+        $this->assertNull($unposted->paid_at);
+        $this->assertNull($unposted->payment_journal_id);
+        $this->assertNotNull(Journal::query()->findOrFail($payment->id)->voided_at);
+        $this->assertDatabaseHas('employee_loan_repayments', [
+            'employee_loan_id' => $loan->id,
+            'source_id' => $period->id,
+            'status' => 'void',
+        ]);
+        $this->assertSame(8000.0, $loan->fresh()->outstanding_amount);
     }
 
     public function test_payroll_payment_can_deduct_employee_loan_and_pay_net_salary(): void
@@ -320,6 +350,14 @@ class PieceworkPayrollPostingTest extends TestCase
             'account_id' => $payrollExpense->id,
             'debit' => 660000,
             'credit' => 0,
+        ]);
+
+        $service->unpost($period->fresh());
+
+        $this->assertDatabaseHas('employee_savings_transactions', [
+            'employee_id' => $employee->id,
+            'payroll_period_id' => $period->id,
+            'status' => 'void',
         ]);
     }
 

@@ -144,10 +144,10 @@ class PieceworkPayrollPostingService
     /**
      * UNPOST: kembalikan payroll FINAL ke DRAFT.
      *
-     * Jurnal accrual tidak dihapus. Jurnal tersebut di-void dan dibuatkan
-     * reversal oleh JournalService agar histori akuntansi tetap terlacak.
-     * Payroll yang sudah dibayar sengaja ditolak karena unpost akan membuat
-     * kas, potongan pinjaman, dan tabungan karyawan tidak konsisten.
+     * Jurnal tidak dihapus. Jurnal pembayaran, accrual, dan reclass di-void
+     * dan dibuatkan reversal oleh JournalService agar histori akuntansi tetap
+     * terlacak. Transaksi potongan pinjaman dan bonus tabungan juga dibatalkan
+     * secara soft agar saldo turunannya kembali konsisten.
      */
     public function unpost(PieceworkPayrollPeriod $period): PieceworkPayrollPeriod
     {
@@ -160,20 +160,59 @@ class PieceworkPayrollPostingService
                 throw new \RuntimeException('Periode payroll belum FINAL, sehingga tidak perlu di-unpost.');
             }
 
-            $activePayment = Journal::query()
+            $paymentJournals = Journal::query()
                 ->where('source_type', 'piecework_payroll_period_payment')
                 ->where('source_id', $period->id)
                 ->whereNull('voided_at')
-                ->exists();
+                ->pluck('id');
 
-            if ($period->paid_at || $period->payment_journal_id || $activePayment) {
-                throw new \RuntimeException('Payroll yang sudah dibayar tidak bisa di-unpost. Batalkan pembayaran terlebih dahulu.');
+            $payrollRepayments = EmployeeLoanRepayment::query()
+                ->where('source_type', EmployeeLoanRepayment::SOURCE_PAYROLL_DEDUCTION)
+                ->where('source_id', $period->id)
+                ->where('status', 'posted')
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($payrollRepayments as $repayment) {
+                $loan = EmployeeLoan::query()
+                    ->lockForUpdate()
+                    ->find($repayment->employee_loan_id);
+
+                $repayment->forceFill([
+                    'status' => 'void',
+                    'notes' => trim(($repayment->notes ? $repayment->notes.' ' : '')
+                        .'Void karena UNPOST payroll periode '.$period->id.'.'),
+                ])->save();
+
+                if ($loan && $loan->status === 'settled') {
+                    $postedAmount = (float) $loan->repayments()
+                        ->where('status', 'posted')
+                        ->sum('amount');
+
+                    if ($postedAmount < (float) $loan->principal_amount - 0.01) {
+                        $loan->forceFill(['status' => 'posted'])->save();
+                    }
+                }
             }
+
+            EmployeeSavingsTransaction::query()
+                ->where('source_type', EmployeeSavingsTransaction::SOURCE_PAYROLL_BONUS)
+                ->where('source_id', $period->id)
+                ->where('status', 'posted')
+                ->lockForUpdate()
+                ->get()
+                ->each(function (EmployeeSavingsTransaction $transaction) use ($period): void {
+                    $transaction->forceFill([
+                        'status' => 'void',
+                        'notes' => trim(($transaction->notes ? $transaction->notes.' ' : '')
+                            .'Void karena UNPOST payroll periode '.$period->id.'.'),
+                    ])->save();
+                });
 
             $journalIds = collect([
                 $period->accrual_journal_id,
                 $period->journal_id, // marker legacy
-            ])->filter()->map(fn ($id) => (int) $id);
+            ])->merge($paymentJournals)->filter()->map(fn ($id) => (int) $id);
 
             $sourceJournals = Journal::query()
                 ->where('source_id', $period->id)
@@ -207,7 +246,11 @@ class PieceworkPayrollPostingService
                 'posted_by' => null,
                 'journal_id' => null,
                 'accrual_journal_id' => null,
+                'payment_journal_id' => null,
                 'payable_account_id' => null,
+                'paid_at' => null,
+                'paid_by' => null,
+                'paid_from_account_id' => null,
             ])->save();
 
             return $period->fresh();
