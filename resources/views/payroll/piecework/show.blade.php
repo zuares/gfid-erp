@@ -1295,6 +1295,7 @@
                     const row = form.closest('tr');
                     const state = form.querySelector('.pw-daily-save-state');
                     const previousValue = select.dataset.previousValue || select.value;
+                    const formData = new FormData(form);
 
                     select.disabled = true;
                     if (state) {
@@ -1310,7 +1311,7 @@
                                 'X-Requested-With': 'XMLHttpRequest',
                                 'X-CSRF-TOKEN': csrfToken,
                             },
-                            body: new FormData(form),
+                            body: formData,
                         });
                         const payload = await response.json().catch(function () { return {}; });
 
