@@ -980,8 +980,6 @@
                                     <th>Operator</th>
                                     @if ($module === 'daily')
                                         <th class="pw-right">Hadir</th>
-                                        <th class="pw-right">Libur</th>
-                                        <th class="pw-right">Hari Efektif</th>
                                         <th class="pw-right">Bonus</th>
                                     @else
                                         <th class="pw-right">{{ $qtyLabel }}</th>
@@ -1003,10 +1001,6 @@
                                         </td>
                                         @if ($module === 'daily')
                                             <td data-label="Hadir" class="pw-right">{{ number_format((int) ($s['present_count'] ?? 0), 0, ',', '.') }}</td>
-                                            <td data-label="Libur" class="pw-right">{{ number_format((int) ($s['holiday_count'] ?? 0), 0, ',', '.') }}</td>
-                                            <td data-label="Hari Efektif" class="pw-right">
-                                                {{ rtrim(rtrim(number_format((float) $s['total_qty'], 2, '.', ''), '0'), '.') }}
-                                            </td>
                                             <td data-label="Bonus" class="pw-right">
                                                 {{ number_format((float) ($s['attendance_bonus'] ?? 0), 0, ',', '.') }}
                                             </td>
@@ -1020,7 +1014,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="{{ $module === 'daily' ? 6 : 3 }}" style="padding:1rem;color:var(--muted)">Tidak ada data.</td>
+                                        <td colspan="{{ $module === 'daily' ? 4 : 3 }}" style="padding:1rem;color:var(--muted)">Tidak ada data.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
