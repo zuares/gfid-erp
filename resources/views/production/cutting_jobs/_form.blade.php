@@ -2018,6 +2018,24 @@
                         tr.classList.remove('bundle-row-color-mismatch');
                         return;
                     }
+
+                    // Jika pasangan item jadi + bahan baku sudah tercatat di
+                    // BOM aktif, BOM adalah sumber kebenaran. Kode material
+                    // seperti "CRCKL-P/IR" tidak selalu memakai suffix warna
+                    // yang sama dengan kode item jadi (contoh: B5BLK), jadi
+                    // pemeriksaan suffix warna tidak boleh memblokir pasangan
+                    // BOM yang valid.
+                    const finishedItemId = parseInt(hiddenItem.value || '0', 10);
+                    const fabricItemId = getRowFabricItemId(tr);
+                    const hasBomPair = !!(bomData[finishedItemId]?.[fabricItemId]);
+                    if (hasBomPair) {
+                        tr.classList.remove('bundle-row-color-mismatch');
+                        if (itemInput.title && itemInput.title.startsWith('Warna item jadi')) {
+                            itemInput.title = '';
+                        }
+                        return;
+                    }
+
                     const fgColor = wcColorCode(itemInput.value);
                     const mismatch = !!fgColor && fgColor !== fabColor;
                     tr.classList.toggle('bundle-row-color-mismatch', mismatch);
