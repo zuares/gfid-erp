@@ -612,7 +612,7 @@
                                 data-code="{{ $u['material_code'] ?? '' }}"
                                 data-name="{{ $u['material_name'] ?? '' }}"
                                 data-kg="{{ $u['kg_per_pcs'] }}">
-                          Pakai sebagai bahan utama
+                          Tambah sebagai bahan utama
                         </button>
                       </div>
                       <div style="font-size:.65rem;color:#94a3b8;margin-top:2px;">
@@ -703,7 +703,7 @@
         </table>
       </div>
 
-      <div class="small mt-2">Tip: jangan duplikat material; kalau perlu, gabungkan qty-nya.</div>
+      <div class="small mt-2">Bahan baku utama boleh lebih dari satu. Satu material hanya boleh muncul sekali; jika materialnya sama, gabungkan qty-nya.</div>
     </div>
   </form>
 </div>
@@ -882,19 +882,9 @@
       }
     });
 
-    // 2) Kalau tidak ada: GANTI material di baris "bahan baku utama" yang sudah ada
-    //    (replace, bukan tambah baris — BOM utama diasumsikan satu bahan).
-    if (!$target) {
-      $('#lines tr.line').each(function(){
-        if ($(this).find('select.usage-stage').val() === 'main_material'
-            && $(this).find('select.mat').val()) {
-          $target = $(this);
-          return false;
-        }
-      });
-    }
-
-    // 3) Fallback: baris kosong pertama, atau tambah baris baru
+    // 2) Kalau tidak ada: pakai baris kosong pertama, atau tambah baris baru.
+    //    Jangan mengganti bahan baku utama lain karena satu BOM boleh punya
+    //    beberapa bahan baku utama.
     if (!$target) {
       $('#lines tr.line').each(function(){
         if (!$(this).find('select.mat').val()) { $target = $(this); return false; }

@@ -30,7 +30,8 @@ class FinishingBomService
     {
         $job->loadMissing([
             'lines',
-            'lines.bundle.cuttingJob', // ✅ untuk fabric_item_id (skip FLC)
+            'lines.bundle.cuttingJob',
+            'lines.bundle.cuttingJob.lots.lot',
         ]);
 
         $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
@@ -50,14 +51,14 @@ class FinishingBomService
             $bom = ItemBom::where('item_id', $fgItemId)->where('active', true)->first();
             if (!$bom) continue;
 
-            $excludeFLC = (int) ($line->bundle?->cuttingJob?->fabric_item_id ?? 0);
+            $excludeFLCIds = $this->cuttingMaterialIds($line->bundle?->cuttingJob);
             $bomLines   = ItemBomLine::where('item_bom_id', $bom->id)
                 ->where('usage_stage', ItemBomLine::STAGE_PACKING_SUPPLY)
                 ->where('is_optional', false)
                 ->get();
 
             foreach ($bomLines as $bl) {
-                if ($excludeFLC > 0 && (int) $bl->material_item_id === $excludeFLC) continue;
+                if ($excludeFLCIds->contains((int) $bl->material_item_id)) continue;
                 $bomQty = (float) ($bl->qty ?? 0);
                 if ($bomQty <= 0) continue;
                 $need   = $qtyOk * $bomQty * (1 + ((float) ($bl->scrap_pct ?? 0) / 100.0));
@@ -131,7 +132,7 @@ class FinishingBomService
             }
 
             // ✅ kain utama sudah dipotong di Cutting (LOT)
-            $excludeFLC = (int) ($line->bundle?->cuttingJob?->fabric_item_id ?? 0);
+            $excludeFLCIds = $this->cuttingMaterialIds($line->bundle?->cuttingJob);
 
             $bomLines = ItemBomLine::where('item_bom_id', $bom->id)
                 ->where('usage_stage', ItemBomLine::STAGE_PACKING_SUPPLY)
@@ -147,7 +148,7 @@ class FinishingBomService
 
             foreach ($bomLines as $bl) {
                 // ✅ skip kain utama (FLC) biar tidak double stockOut
-                if ($excludeFLC > 0 && (int) $bl->material_item_id === $excludeFLC) {
+                if ($excludeFLCIds->contains((int) $bl->material_item_id)) {
                     continue;
                 }
 
@@ -200,5 +201,18 @@ class FinishingBomService
             $line->bom_applied_at = now();
             $line->save();
         }
+    }
+
+    private function cuttingMaterialIds(?\App\Models\CuttingJob $job): \Illuminate\Support\Collection
+    {
+        if (!$job) {
+            return collect();
+        }
+
+        return collect([(int) $job->fabric_item_id])
+            ->merge($job->lots->map(fn ($jobLot) => (int) ($jobLot->lot?->item_id ?? 0)))
+            ->filter()
+            ->unique()
+            ->values();
     }
 }

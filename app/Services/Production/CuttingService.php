@@ -244,10 +244,9 @@ class CuttingService
     {
         $job->loadMissing(['bundles', 'lots']);
 
-        $fabricItemId = $job->fabric_item_id;
         $warehouseId = $job->warehouse_id;
 
-        if (!$fabricItemId || !$warehouseId) {
+        if (!$warehouseId) {
             return;
         }
 
@@ -266,6 +265,12 @@ class CuttingService
         $lotPlans = $job->lots;
 
         if ($lotPlans && $lotPlans->count() > 0) {
+            // LOT adalah sumber kebenaran material. Header fabric_item_id
+            // tetap dipertahankan untuk kompatibilitas job lama, tetapi
+            // setiap LOT boleh memiliki bahan baku utama yang berbeda.
+            $lotItemIds = \App\Models\Lot::query()
+                ->whereIn('id', $lotPlans->pluck('lot_id')->all())
+                ->pluck('item_id', 'id');
             $totalPlanned = (float) $lotPlans->sum('planned_fabric_qty');
 
             // Ambil qty_onhand tiap LOT sebagai batas atas per LOT
@@ -339,7 +344,7 @@ class CuttingService
 
                 $this->inventory->stockOut(
                     warehouseId: $warehouseId,
-                    itemId: $fabricItemId,
+                    itemId: (int) ($lotItemIds[$lid] ?? $job->fabric_item_id),
                     qty: $qtyOut,
                     date: $job->date,
                     sourceType: 'cutting_job',
@@ -384,9 +389,13 @@ class CuttingService
                 continue;
             }
 
+            $lotItemId = (int) (\App\Models\Lot::query()
+                ->whereKey($lotId)
+                ->value('item_id') ?? $job->fabric_item_id);
+
             $this->inventory->stockOut(
                 warehouseId: $warehouseId,
-                itemId: $fabricItemId,
+                itemId: $lotItemId,
                 qty: $qtyUsedTotal,
                 date: $job->date,
                 sourceType: 'cutting_job',

@@ -950,6 +950,12 @@ class CuttingJobController extends Controller
             ->whereIn('id', $selectedLotIds)
             ->pluck('item_id', 'id'); // [lot_id => item_id]
 
+        if ($lotItems->isEmpty()) {
+            return back()
+                ->withErrors(['selected_lots' => 'Material dari LOT yang dipilih tidak ditemukan.'])
+                ->withInput();
+        }
+
         // ==========================================
         // 2) HITUNG SALDO PER LOT (info saja, tidak memblok jika 0)
         // ==========================================
@@ -957,9 +963,10 @@ class CuttingJobController extends Controller
         $totalLotBalance = 0.0;
 
         foreach ($selectedLotIds as $lotId) {
+            $lotItemId = (int) ($lotItems[$lotId] ?? $fabricItemId);
             $saldo = (float) $this->inventory->getLotBalance(
                 warehouseId: $warehouseId,
-                itemId: $fabricItemId,
+                itemId: $lotItemId,
                 lotId: $lotId,
             );
             // Simpan saldo asli (bisa 0 atau negatif — tidak diblok)
@@ -1017,14 +1024,17 @@ class CuttingJobController extends Controller
         //    LOT dengan saldo 0 tetap diproses (boleh minus di RM).
         // =======================================================
 
-        // Load active BOM lines untuk fabric item ini — hanya main_material, keyed by finished_item_id
+        // Load active BOM lines untuk semua material pada LOT terpilih.
+        // Satu cutting job boleh memakai beberapa bahan baku utama; material
+        // yang dipakai oleh sebuah bundle ditentukan dari LOT bundle tersebut.
         $bomLines = \App\Models\ItemBomLine::query()
-            ->where('material_item_id', $fabricItemId)
+            ->whereIn('material_item_id', $lotItems->values()->unique()->all())
             ->where('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
             ->whereHas('bom', fn($q) => $q->where('active', true))
             ->with('bom:id,item_id')
             ->get()
-            ->keyBy(fn($line) => (int) $line->bom->item_id);
+            ->groupBy(fn($line) => (int) $line->bom->item_id)
+            ->map(fn($lines) => $lines->keyBy(fn($line) => (int) $line->material_item_id));
 
         foreach ($bundlesIndexByLot as $lotId => $indexes) {
             $saldoLot = $lotBalances[$lotId] ?? 0.0;
@@ -1035,10 +1045,12 @@ class CuttingJobController extends Controller
 
             // Hitung qty_used_fabric per baris
             // Prioritas: (1) user submit manual → (2) hitung dari BOM → (3) fallback saldo LOT
-            $anyBom = false;
+            $fallbackIndexes = [];
+            $bomUsed = 0.0;
             foreach ($indexes as $idx) {
                 $finishedItemId = (int) ($validBundles[$idx]['finished_item_id'] ?? 0);
                 $qtyPcs         = (float) ($validBundles[$idx]['qty_pcs'] ?? 0);
+                $bundleMaterialId = (int) ($lotItems[$lotId] ?? $fabricItemId);
 
                 // Prioritas 1: user sudah isi qty_used_fabric manual di form
                 $userFabric = (float) ($validBundles[$idx]['qty_used_fabric'] ?? 0);
@@ -1046,7 +1058,7 @@ class CuttingJobController extends Controller
                     // ✅ GUARD BOM: pemakaian tidak boleh melebihi standar BOM (+scrap).
                     //    Kalau realita memang lebih besar → update BOM dulu
                     //    (tombol "Update BOM" tersedia di form cutting).
-                    $guardBomLine = $bomLines[$finishedItemId] ?? null;
+                    $guardBomLine = $bomLines[$finishedItemId][$bundleMaterialId] ?? null;
                     if ($guardBomLine && $qtyPcs > 0) {
                         $maxByBom = $qtyPcs * (float) $guardBomLine->qty * (1 + (float) $guardBomLine->scrap_pct / 100);
                         if ($userFabric > $maxByBom + 0.0005) {
@@ -1064,12 +1076,12 @@ class CuttingJobController extends Controller
                         }
                     }
 
-                    $anyBom = true; // ada nilai → skip fallback LOT
+                    $bomUsed += $userFabric;
                     continue;       // nilai sudah ada di $validBundles[$idx], tidak perlu overwrite
                 }
 
                 // Prioritas 2: hitung dari BOM main_material
-                $bomLine = $bomLines[$finishedItemId] ?? null;
+                $bomLine = $bomLines[$finishedItemId][$bundleMaterialId] ?? null;
                 if ($bomLine && $qtyPcs > 0) {
                     $bomQty   = (float) $bomLine->qty;
                     $scrapPct = (float) $bomLine->scrap_pct;
@@ -1077,19 +1089,24 @@ class CuttingJobController extends Controller
                         $qtyPcs * $bomQty * (1 + $scrapPct / 100),
                         4
                     );
-                    $anyBom = true;
+                    $bomUsed += $validBundles[$idx]['qty_used_fabric'];
+                } else {
+                    $fallbackIndexes[] = $idx;
                 }
             }
 
-            if (!$anyBom) {
-                // Fallback: distribusi saldo LOT secara merata
-                // Jika saldo 0 → qty_used_fabric juga 0 (tidak ada deduction)
-                $perRow = $saldoLot > 0 ? round($saldoLot / $countInLot, 2) : 0.0;
+            if (!empty($fallbackIndexes)) {
+                // Fallback hanya untuk bundle yang tidak punya pasangan
+                // material + BOM. Jangan sampai satu bundle yang punya BOM
+                // membuat bundle lain kehilangan qty kain.
+                $fallbackBalance = max($saldoLot - $bomUsed, 0.0);
+                $fallbackCount = count($fallbackIndexes);
+                $perRow = $fallbackBalance > 0 ? round($fallbackBalance / $fallbackCount, 2) : 0.0;
                 $usedSoFar = 0.0;
 
-                foreach ($indexes as $i => $idx) {
-                    if ($i === $countInLot - 1) {
-                        $validBundles[$idx]['qty_used_fabric'] = max($saldoLot - $usedSoFar, 0);
+                foreach ($fallbackIndexes as $i => $idx) {
+                    if ($i === $fallbackCount - 1) {
+                        $validBundles[$idx]['qty_used_fabric'] = max($fallbackBalance - $usedSoFar, 0);
                     } else {
                         $validBundles[$idx]['qty_used_fabric'] = $perRow;
                         $usedSoFar += $perRow;
@@ -1875,19 +1892,26 @@ class CuttingJobController extends Controller
 
         // Potongan standar (kg jadi pcs) per LOT: Σ qty_pcs × BOM qty (tanpa scrap).
         // Dipakai untuk memisahkan scrap dari pemakaian vs scrap dari sisa LOT.
+        $lotItemIds = Lot::query()
+            ->whereIn('id', $cuttingJob->lots->pluck('lot_id')->all())
+            ->pluck('item_id', 'id');
+
         $bomQtyByItem = \App\Models\ItemBomLine::query()
-            ->where('material_item_id', (int) $cuttingJob->fabric_item_id)
+            ->whereIn('material_item_id', $lotItemIds->values()->unique()->all())
             ->where('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
             ->whereHas('bom', fn($q) => $q->where('active', true))
             ->with('bom:id,item_id')
             ->get()
-            ->keyBy(fn($l) => (int) $l->bom->item_id)
-            ->map(fn($l) => (float) $l->qty);
+            ->groupBy(fn($l) => (int) $l->bom->item_id)
+            ->map(fn($lines) => $lines->keyBy(fn($l) => (int) $l->material_item_id)
+                ->map(fn($l) => (float) $l->qty));
 
         $goodByLot = [];
         foreach ($cuttingJob->bundles as $b) {
+            $materialId = (int) ($lotItemIds[(int) $b->lot_id] ?? $cuttingJob->fabric_item_id);
+            $bomQty = (float) ($bomQtyByItem[(int) $b->finished_item_id][$materialId] ?? 0);
             $goodByLot[(int) $b->lot_id] = ($goodByLot[(int) $b->lot_id] ?? 0.0)
-                + (float) $b->qty_pcs * (float) ($bomQtyByItem[(int) $b->finished_item_id] ?? 0);
+                + (float) $b->qty_pcs * $bomQty;
         }
 
         DB::transaction(function () use ($validated, $cuttingJob, $rmWarehouseId, $epsilon, $goodByLot, &$processed) {
@@ -1921,6 +1945,7 @@ class CuttingJobController extends Controller
                 }
 
                 $lot     = Lot::lockForUpdate()->findOrFail($lotId);
+                $lotMaterialId = (int) ($lot->item_id ?? $cuttingJob->fabric_item_id);
                 $avgCost = (float) ($lot->avg_cost ?? 0);
 
                 $usedQty   = (float) ($cjLot->used_fabric_qty ?? 0);
@@ -1952,7 +1977,7 @@ class CuttingJobController extends Controller
                     // 1. StockIn ke RM (hanya porsi dari pemakaian)
                     $this->inventory->stockIn(
                         warehouseId: $rmWarehouseId,
-                        itemId: (int) $cuttingJob->fabric_item_id,
+                        itemId: $lotMaterialId,
                         qty: $sisaFromUsed,
                         date: now(),
                         sourceType: 'cutting_job_sisa',
@@ -1983,7 +2008,7 @@ class CuttingJobController extends Controller
                     if ($writeOff > $epsilon) {
                         $this->inventory->stockOut(
                             warehouseId: $rmWarehouseId,
-                            itemId: (int) $cuttingJob->fabric_item_id,
+                            itemId: $lotMaterialId,
                             qty: $writeOff,
                             date: now(),
                             sourceType: 'cutting_job_scrap',

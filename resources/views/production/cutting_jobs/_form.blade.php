@@ -1094,6 +1094,21 @@
                 return infos;
             }
 
+            // Material sebuah bundle mengikuti LOT yang otomatis ditetapkan
+            // untuk bundle tersebut. Header fabric_item_id hanya material
+            // pertama untuk kompatibilitas job lama.
+            function getRowFabricItemId(tr) {
+                const lotId = parseInt(tr?.querySelector('.bundle-lot-select')?.value || '0', 10);
+                const lotInfo = lotId ? lotInfoMap[lotId] : null;
+                if (lotInfo?.itemId) return parseInt(lotInfo.itemId, 10);
+                return fabricSelect ? parseInt(fabricSelect.value || '0', 10) : 0;
+            }
+
+            function getRowFabricCode(tr) {
+                const lotId = parseInt(tr?.querySelector('.bundle-lot-select')?.value || '0', 10);
+                return lotId ? (lotInfoMap[lotId]?.itemCode || '') : '';
+            }
+
             // Ekstrak warna dari kode item kain (e.g. "K7BLK" → "BLK", "FLC280-BLK" → "BLK")
             function extractColorFromItemCode(code) {
                 if (!code) return '';
@@ -1292,6 +1307,11 @@
                     tr.classList.add('lot-assigned');
                     updateRowItemSuggestExtraParams(tr);
                 });
+
+                // Assignment LOT dapat mengubah material bahan baku baris.
+                // Hitung ulang qty/validasi setelah material per baris sudah
+                // diketahui, bukan memakai material LOT pertama.
+                refreshAllRowsFabric();
             }
 
             function updateBundleRowIndices() {
@@ -1333,8 +1353,6 @@
                 });
 
                 const totalBalance = parseFloat(lotBalanceInput.value || '0');
-                const fabricItemId = fabricSelect ? parseInt(fabricSelect.value || '0', 10) : 0;
-
                 while (lotSummaryList.firstChild) lotSummaryList.removeChild(lotSummaryList.firstChild);
 
                 if (totalPcs <= 0 && validRowCount === 0) {
@@ -1360,6 +1378,7 @@
                     if (!qtyInput || !itemIdInput) return;
                     const qty = parseFloat(qtyInput.value || '0');
                     const finishedItemId = parseInt(itemIdInput.value || '0', 10);
+                    const fabricItemId = getRowFabricItemId(tr);
                     if (qty <= 0 || !finishedItemId || !fabricItemId) return;
 
                     const bom = bomData[finishedItemId];
@@ -1528,9 +1547,6 @@
             };
 
             function getShortageBomCandidates() {
-                const fabricItemId = fabricSelect ? parseInt(fabricSelect.value || '0', 10) : 0;
-                if (!fabricItemId) return [];
-
                 const totalStock = parseFloat(lotBalanceInput?.value || '0');
                 if (totalStock <= 0) return [];
 
@@ -1538,14 +1554,16 @@
                 bundlesTbody.querySelectorAll('.bundle-row').forEach(tr => {
                     const finishedItemId = parseInt(tr.querySelector('[name*="finished_item_id"]')?.value || '0', 10);
                     const qtyPcs = parseFloat(tr.querySelector('.bundle-qty-pcs')?.value || '0');
+                    const fabricItemId = getRowFabricItemId(tr);
                     if (!finishedItemId || qtyPcs <= 0) return;
 
                     const bom = bomData[finishedItemId]?.[fabricItemId];
                     const quickUrl = bomQuickUrls[finishedItemId] ?? null;
                     if (!bom || !quickUrl) return;
 
-                    if (!candidates[finishedItemId]) {
-                        candidates[finishedItemId] = {
+                    const candidateKey = `${finishedItemId}:${fabricItemId}`;
+                    if (!candidates[candidateKey]) {
+                        candidates[candidateKey] = {
                             finishedItemId,
                             fabricItemId,
                             quickUrl,
@@ -1556,7 +1574,7 @@
                         };
                     }
 
-                    candidates[finishedItemId].totalQtyPcs += qtyPcs;
+                    candidates[candidateKey].totalQtyPcs += qtyPcs;
                 });
 
                 Object.keys(candidates).forEach((key) => {
@@ -1578,7 +1596,8 @@
                 const perPcsWithScrap = Number(newQty) * (1 + Number(candidate.scrapPct || 0) / 100);
                 bundlesTbody.querySelectorAll('.bundle-row').forEach(rowTr => {
                     const rowItemId = parseInt(rowTr.querySelector('[name*="finished_item_id"]')?.value || '0', 10);
-                    if (rowItemId !== candidate.finishedItemId) return;
+                    if (rowItemId !== candidate.finishedItemId
+                        || getRowFabricItemId(rowTr) !== candidate.fabricItemId) return;
 
                     const qtyPcs = parseFloat(rowTr.querySelector('.bundle-qty-pcs')?.value || '0');
                     const fabricInput = rowTr.querySelector('.bundle-qty-fabric');
@@ -1724,7 +1743,8 @@
                 }, 80);
             }
 
-            // Set fabric_item_id dari LOT pertama yang dicentang (tanpa validasi)
+            // Set fabric_item_id utama dari LOT pertama untuk kompatibilitas
+            // header. Validasi dan pemakaian per bundle tetap mengikuti LOT.
             function enforceSingleFabricForCheckedLots(changedCb = null) {
                 const checkedCbs = lotCheckboxes.filter(cb => cb.checked);
 
@@ -1791,7 +1811,7 @@
                 const qtyFabricInput = tr.querySelector('.bundle-qty-fabric');
                 if (!hiddenItemId || !qtyFabricInput) return;
                 const finishedItemId = parseInt(hiddenItemId.value || '0', 10);
-                const fabricItemId   = fabricSelect ? parseInt(fabricSelect.value || '0', 10) : 0;
+                const fabricItemId   = getRowFabricItemId(tr);
                 const qtyPcs         = parseFloat(tr.querySelector('.bundle-qty-pcs')?.value || '0');
 
                 if (finishedItemId && fabricItemId && qtyPcs > 0) {
@@ -1818,7 +1838,7 @@
                 const infoEl = tr.querySelector('.fabric-usage-info');
                 if (!infoEl) return;
                 const finishedItemId = parseInt(tr.querySelector('[name*="finished_item_id"]')?.value || '0', 10);
-                const fabricItemId   = fabricSelect ? parseInt(fabricSelect.value || '0', 10) : 0;
+                const fabricItemId   = getRowFabricItemId(tr);
                 if (!finishedItemId || !fabricItemId) { infoEl.innerHTML = ''; return; }
 
                 const bom   = bomData[finishedItemId]?.[fabricItemId];
@@ -1848,7 +1868,7 @@
                 if (!warnEl || !qtyFabricInput) return;
 
                 const finishedItemId = parseInt(tr.querySelector('[name*="finished_item_id"]')?.value || '0', 10);
-                const fabricItemId   = fabricSelect ? parseInt(fabricSelect.value || '0', 10) : 0;
+                const fabricItemId   = getRowFabricItemId(tr);
                 const qtyPcs         = parseFloat(tr.querySelector('.bundle-qty-pcs')?.value || '0');
                 const usedKg         = parseFloat(qtyFabricInput.value || '0');
                 const maxKg          = bomMaxKg(finishedItemId, fabricItemId, qtyPcs);
@@ -1986,13 +2006,14 @@
 
             // Tandai baris yang warnanya beda (input merah) + return true jika ada mismatch.
             function markColorMismatches() {
-                const fabColor = wcFabricColor();
                 let anyMismatch = false;
                 bundlesTbody.querySelectorAll('.bundle-row').forEach(tr => {
                     const hiddenItem = tr.querySelector('[name*="finished_item_id"]');
                     const itemInput = tr.querySelector('.js-item-suggest-input');
                     if (!itemInput) return;
                     const hasItem = !!(hiddenItem && hiddenItem.value);
+                    const rowFabricCode = getRowFabricCode(tr);
+                    const fabColor = wcColorCode(rowFabricCode) || wcFabricColor();
                     if (!hasItem || !fabColor) {
                         tr.classList.remove('bundle-row-color-mismatch');
                         return;
