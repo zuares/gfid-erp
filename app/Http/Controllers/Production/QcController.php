@@ -8,6 +8,7 @@ use App\Models\CuttingJobBundle;
 use App\Models\InventoryAdjustment;
 use App\Models\InventoryAdjustmentLine;
 use App\Models\QcResult;
+use App\Models\SewingPickupLine;
 use App\Models\SewingReturn;
 use App\Models\Warehouse;
 use App\Services\Accounting\JournalService;
@@ -141,6 +142,15 @@ class QcController extends Controller
             ->get()
             ->keyBy('cutting_job_bundle_id');
 
+        $activePickedBundleIds = SewingPickupLine::query()
+            ->whereIn('cutting_job_bundle_id', $cuttingJob->bundles->pluck('id'))
+            ->where('status', '!=', 'void')
+            ->where('qty_bundle', '>', 0)
+            ->pluck('cutting_job_bundle_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $isOwner = (Auth::user()->role ?? null) === 'owner';
+
         $rows = [];
         foreach ($cuttingJob->bundles as $bundle) {
             $qc = $existingQc->get($bundle->id); // index berdasarkan bundle->id
@@ -158,6 +168,10 @@ class QcController extends Controller
                 'qty_reject' => $qc?->qty_reject ?? 0,
                 'reject_reason' => $qc?->reject_reason ?? null,
                 'notes' => $qc?->notes ?? null,
+                'can_partial_cancel' => $isOwner
+                    && $qc
+                    && !in_array((int) $bundle->id, $activePickedBundleIds, true)
+                    && (float) ($bundle->sewing_picked_qty ?? 0) <= 0.000001,
             ];
         }
 
@@ -393,6 +407,11 @@ class QcController extends Controller
             if (!$journal) {
                 throw new \RuntimeException('Jurnal hasil QC Cutting tidak terbentuk. QC dibatalkan.');
             }
+
+            // Jika bundle sebelumnya dibuka lewat Partial Cancel QC, jurnal
+            // job-level lama tetap aktif karena bundle lain mungkin sudah
+            // dipakai sewing. Post jurnal tambahan khusus bundle yang dibuka.
+            $this->qc->postReopenedCuttingQcJournals($job->fresh(), $payload['qc_date']);
 
             $totalBundles = $job->bundles()->count();
             $doneCount = QcResult::query()
@@ -646,6 +665,40 @@ class QcController extends Controller
         return redirect()
             ->route('production.cutting_jobs.show', $bundle->cutting_job_id)
             ->with('success', 'QC bundle berhasil di-adjust.');
+    }
+
+    public function cancelCuttingBundle(
+        Request $request,
+        CuttingJob $cuttingJob,
+        CuttingJobBundle $bundle,
+    ): RedirectResponse {
+        if ((Auth::user()->role ?? null) !== 'owner') {
+            return back()->with('error', 'Hanya OWNER yang boleh membatalkan QC per bundle.');
+        }
+
+        if ((int) $bundle->cutting_job_id !== (int) $cuttingJob->id) {
+            return back()->with('error', 'Bundle tidak ditemukan di Cutting Job ini.');
+        }
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        try {
+            $this->qc->cancelCuttingBundleQc(
+                bundle: $bundle,
+                reason: $validated['reason'],
+                actorId: Auth::id(),
+            );
+        } catch (\Throwable $e) {
+            return back()
+                ->withInput()
+                ->with('error', 'Partial Cancel QC gagal: ' . $e->getMessage());
+        }
+
+        return redirect()
+            ->route('production.qc.cutting.edit', $cuttingJob)
+            ->with('success', "QC bundle {$bundle->bundle_code} dibatalkan. Bundle lain tetap berjalan.");
     }
 
     /* ============================================================

@@ -1741,6 +1741,14 @@
                                                     </div>
                                                 </div>
                                                 @endif
+
+                                                @if (($row['can_partial_cancel'] ?? false) && Route::has('production.qc.cutting.bundle_cancel'))
+                                                    <button type="button" class="qcs-row-btn qcs-link-chip-danger"
+                                                        title="Batalkan QC bundle ini saja"
+                                                        onclick="return partialCancelBundle(@js(route('production.qc.cutting.bundle_cancel', [$cuttingJob, $bundleId])), @js($row['bundle_code'] ?? 'bundle ini'))">
+                                                        ↩
+                                                    </button>
+                                                @endif
                                             </div>
                                         </td>
                                     </tr>
@@ -1915,6 +1923,43 @@
 
 @push('scripts')
     <script>
+        function partialCancelBundle(action, bundleCode) {
+            const reason = window.prompt(
+                'Alasan Partial Cancel QC untuk ' + bundleCode + ':'
+            );
+            if (!reason || reason.trim() === '') {
+                return false;
+            }
+
+            if (!window.confirm(
+                'Batalkan QC hanya untuk ' + bundleCode + '?\\n\\n'
+                + 'Bundle lain yang sudah diambil jahit tidak akan disentuh.'
+            )) {
+                return false;
+            }
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = action;
+            form.style.display = 'none';
+
+            const csrf = document.querySelector('input[name="_token"]');
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = '_token';
+            csrfInput.value = csrf ? csrf.value : '';
+
+            const reasonInput = document.createElement('input');
+            reasonInput.type = 'hidden';
+            reasonInput.name = 'reason';
+            reasonInput.value = reason.trim();
+
+            form.append(csrfInput, reasonInput);
+            document.body.appendChild(form);
+            form.submit();
+            return false;
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const inputsReject = document.querySelectorAll('.input-reject');
             const sumOkSpan = document.getElementById('sum-ok');

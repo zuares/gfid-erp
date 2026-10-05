@@ -4,8 +4,12 @@ namespace App\Services\Production;
 
 use App\Models\CuttingJob;
 use App\Models\CuttingJobBundle;
+use App\Models\CuttingQcCancellation;
 use App\Models\FinishingJob;
+use App\Models\InventoryMutation;
+use App\Models\ProductionLog;
 use App\Models\QcResult;
+use App\Models\SewingPickupLine;
 use App\Models\SewingReturn;
 use App\Models\Warehouse;
 use App\Services\Accounting\JournalService;
@@ -826,6 +830,43 @@ class QcService
                 return;
             }
 
+            // Partial cancel membuat reversal mutation/journal tersendiri.
+            // Saat seluruh job dibatalkan, jejak partial tersebut juga harus
+            // dibalik agar total ledger kembali benar-benar nol.
+            $partialCancellations = CuttingQcCancellation::query()
+                ->where('cutting_job_id', $job->id)
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($partialCancellations as $partial) {
+                $this->inventory->reverseBySource(
+                    originalSourceTypes: ['cutting_qc_bundle_void'],
+                    originalSourceId: (int) $partial->id,
+                    voidSourceType: 'cutting_qc_full_void',
+                    voidSourceId: (int) $job->id,
+                    notesPrefix: "VOID partial QC {$job->code} / {$partial->id}",
+                    date: now(),
+                );
+
+                $this->journal->voidBySource(
+                    'cutting_qc_bundle_void',
+                    (int) $partial->id,
+                    "VOID partial QC {$job->code} / {$partial->id}",
+                );
+                $this->journal->voidBySource(
+                    'cutting_qc_bundle_repost',
+                    (int) $partial->id,
+                    "VOID re-QC partial {$job->code} / {$partial->id}",
+                );
+
+                $partial->update([
+                    'metadata' => array_merge($partial->metadata ?? [], [
+                        'closed_by_full_cancel' => true,
+                        'closed_at' => now()->toISOString(),
+                    ]),
+                ]);
+            }
+
             /**
              * 1) Reverse mutasi hasil QC
              * Original dibuat oleh createWipFromCuttingQc():
@@ -895,6 +936,361 @@ class QcService
                 'updated_by' => auth()->id(),
             ]);
         });
+    }
+
+    /**
+     * Batalkan QC hanya untuk satu bundle yang belum pernah diambil jahit.
+     *
+     * Reversal stok ditag dengan id audit partial-cancel, bukan id job,
+     * sehingga bundle lain dalam Cutting Job yang sama tidak ikut tersentuh.
+     */
+    public function cancelCuttingBundleQc(
+        CuttingJobBundle $bundle,
+        string $reason,
+        ?int $actorId = null,
+    ): void {
+        $reason = trim($reason);
+        if ($reason === '') {
+            throw new \RuntimeException('Alasan pembatalan QC wajib diisi.');
+        }
+
+        DB::transaction(function () use ($bundle, $reason, $actorId) {
+            $bundle = CuttingJobBundle::query()
+                ->whereKey($bundle->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $job = CuttingJob::query()
+                ->whereKey($bundle->cutting_job_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $activePickedQty = (float) SewingPickupLine::query()
+                ->where('cutting_job_bundle_id', $bundle->id)
+                ->where('status', '!=', 'void')
+                ->sum('qty_bundle');
+
+            if ($activePickedQty > 0.000001 || (float) ($bundle->sewing_picked_qty ?? 0) > 0.000001) {
+                throw new \RuntimeException(
+                    "Bundle {$bundle->bundle_code} tidak bisa dibatalkan: sudah ada qty yang diambil jahit."
+                );
+            }
+
+            $qc = QcResult::query()
+                ->where('stage', QcResult::STAGE_CUTTING)
+                ->where('cutting_job_id', $job->id)
+                ->where('cutting_job_bundle_id', $bundle->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$qc) {
+                throw new \RuntimeException("Bundle {$bundle->bundle_code} belum memiliki QC Cutting aktif.");
+            }
+
+            $qtyOkBefore = (float) $qc->qty_ok;
+            $qtyRejectBefore = (float) $qc->qty_reject;
+
+            $qcMutations = InventoryMutation::query()
+                ->whereIn('source_type', [
+                    'cutting_wip',
+                    'cutting_reject',
+                    'cutting_qc_adjust_in',
+                    'cutting_qc_adjust_out',
+                ])
+                ->where('source_id', $job->id)
+                ->where('cutting_job_bundle_id', $bundle->id)
+                ->lockForUpdate()
+                ->get();
+
+            if ($qcMutations->contains(fn (InventoryMutation $mutation) => str_starts_with(
+                (string) $mutation->source_type,
+                'cutting_qc_adjust_'
+            ))) {
+                throw new \RuntimeException(
+                    "Bundle {$bundle->bundle_code} sudah pernah di-Adjust QC. "
+                    . 'Batalkan adjustment tersebut terlebih dahulu atau gunakan Cancel QC penuh.'
+                );
+            }
+
+            $okCost = round((float) $qcMutations
+                ->where('source_type', 'cutting_wip')
+                ->where('qty_change', '>', 0)
+                ->sum('total_cost'), 2);
+            $rejectCost = round((float) $qcMutations
+                ->where('source_type', 'cutting_reject')
+                ->where('qty_change', '>', 0)
+                ->sum('total_cost'), 2);
+            $selectedOutputCost = round($okCost + $rejectCost, 2);
+
+            $allOutputCost = round((float) InventoryMutation::query()
+                ->whereIn('source_type', ['cutting_wip', 'cutting_reject'])
+                ->where('source_id', $job->id)
+                ->where('qty_change', '>', 0)
+                ->sum('total_cost'), 2);
+            $rawCost = round(abs((float) InventoryMutation::query()
+                ->where('source_type', 'cutting_job')
+                ->where('source_id', $job->id)
+                ->where('qty_change', '<', 0)
+                ->sum('total_cost')), 2);
+
+            // Ikuti normalisasi yang dipakai JournalService::postCuttingWip.
+            $journalRawCost = $rawCost;
+            $journalLabor = round($allOutputCost - $journalRawCost, 2);
+            if ($journalLabor <= 0.01) {
+                $journalRawCost = $allOutputCost;
+                $journalLabor = 0.0;
+            }
+
+            $share = $allOutputCost > 0.000001
+                ? min(max($selectedOutputCost / $allOutputCost, 0), 1)
+                : 0.0;
+            $rawCostShare = round(min($journalRawCost * $share, $selectedOutputCost), 2);
+            // Paksa debit reversal tetap sama persis dengan credit output
+            // setelah pembulatan 2 desimal, supaya jurnal tidak selisih 0.01.
+            $laborCostShare = round(max($selectedOutputCost - $rawCostShare, 0), 2);
+
+            $audit = CuttingQcCancellation::create([
+                'cutting_job_id' => $job->id,
+                'cutting_job_bundle_id' => $bundle->id,
+                'qc_result_id' => $qc->id,
+                'item_id' => $bundle->finished_item_id,
+                'qty_ok' => $qtyOkBefore,
+                'qty_reject' => $qtyRejectBefore,
+                'ok_cost' => $okCost,
+                'reject_cost' => $rejectCost,
+                'raw_cost_share' => $rawCostShare,
+                'labor_cost_share' => $laborCostShare,
+                'reason' => $reason,
+                'cancelled_by' => $actorId ?: auth()->id(),
+                'cancelled_at' => now(),
+            ]);
+
+            $reversalMutationIds = [];
+            foreach ($qcMutations as $mutation) {
+                $reversal = $this->inventory->adjustByDifference(
+                    warehouseId: (int) $mutation->warehouse_id,
+                    itemId: (int) $mutation->item_id,
+                    qtyChange: -((float) $mutation->qty_change),
+                    date: now(),
+                    sourceType: 'cutting_qc_bundle_void',
+                    sourceId: (int) $audit->id,
+                    notes: "Partial VOID QC {$job->code} / {$bundle->bundle_code} | reverse mut#{$mutation->id}",
+                    lotId: $mutation->lot_id ? (int) $mutation->lot_id : null,
+                    allowNegative: false,
+                    unitCostOverride: $mutation->unit_cost !== null ? (float) $mutation->unit_cost : null,
+                    affectLotCost: false,
+                    cuttingJobBundleId: $bundle->id,
+                );
+
+                if ($reversal?->id) {
+                    $reversalMutationIds[] = (int) $reversal->id;
+                }
+            }
+
+            $audit->update([
+                'reversal_cutoff_mutation_id' => !empty($reversalMutationIds)
+                    ? max($reversalMutationIds)
+                    : (int) InventoryMutation::max('id'),
+                'metadata' => [
+                    'original_mutation_ids' => $qcMutations->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
+                    'reversal_mutation_ids' => $reversalMutationIds,
+                    'active_picked_qty_at_cancel' => $activePickedQty,
+                ],
+            ]);
+
+            if ($selectedOutputCost > 0.01) {
+                $journal = $this->journal->post(
+                    date: now()->toDateString(),
+                    sourceType: 'cutting_qc_bundle_void',
+                    sourceId: (int) $audit->id,
+                    description: "Partial VOID QC {$job->code} — {$bundle->bundle_code}",
+                    lines: $this->buildBundleCancelJournalLines(
+                        okCost: $okCost,
+                        rejectCost: $rejectCost,
+                        rawCostShare: $rawCostShare,
+                        laborCostShare: $laborCostShare,
+                    ),
+                    meta: [
+                        'reference_no' => $bundle->bundle_code,
+                        'notes' => $reason,
+                        'created_by' => $actorId ?: auth()->id(),
+                    ],
+                );
+                $audit->update(['reversal_journal_id' => $journal->id]);
+            }
+
+            $bundle->qty_qc_ok = 0;
+            $bundle->qty_qc_reject = 0;
+            $bundle->status = 'cut';
+            $bundle->wip_qty = 0;
+            $bundle->wip_warehouse_id = null;
+            $bundle->wip_posted_at = null;
+            $bundle->cut_wip_qty = 0;
+            $bundle->cut_wip_warehouse_id = null;
+            $bundle->save();
+
+            $qc->delete();
+
+            $totalBundles = $job->bundles()->count();
+            $doneCount = QcResult::query()
+                ->where('stage', QcResult::STAGE_CUTTING)
+                ->where('cutting_job_id', $job->id)
+                ->distinct('cutting_job_bundle_id')
+                ->count('cutting_job_bundle_id');
+
+            $job->update([
+                'status' => $doneCount >= $totalBundles ? 'qc_done' : 'sent_to_qc',
+                'updated_by' => $actorId ?: auth()->id(),
+            ]);
+
+            ProductionLog::record(
+                event: 'qc_bundle_cancelled',
+                summary: "Partial VOID QC {$job->code} — {$bundle->bundle_code}",
+                meta: [
+                    'cutting_job_id' => (int) $job->id,
+                    'bundle_id' => (int) $bundle->id,
+                    'item_id' => (int) $bundle->finished_item_id,
+                    'qty_ok' => $qtyOkBefore,
+                    'qty_reject' => $qtyRejectBefore,
+                    'reason' => $reason,
+                    'audit_id' => (int) $audit->id,
+                ],
+                sourceType: CuttingQcCancellation::class,
+                sourceId: (int) $audit->id,
+                reference: $bundle->bundle_code,
+            );
+        });
+    }
+
+    /**
+     * Post jurnal tambahan ketika bundle yang pernah partial-cancel di-QC ulang.
+     * Journal QC job lama tetap aktif karena bundle lain masih dipakai sewing.
+     */
+    public function postReopenedCuttingQcJournals(CuttingJob $job, string $qcDate): void
+    {
+        $cancellations = CuttingQcCancellation::query()
+            ->where('cutting_job_id', $job->id)
+            ->whereNull('reprocessed_at')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($cancellations as $audit) {
+            if (($audit->metadata['closed_by_full_cancel'] ?? false) === true) {
+                continue;
+            }
+
+            $qc = QcResult::query()
+                ->where('stage', QcResult::STAGE_CUTTING)
+                ->where('cutting_job_id', $job->id)
+                ->where('cutting_job_bundle_id', $audit->cutting_job_bundle_id)
+                ->latest('id')
+                ->first();
+
+            if (!$qc) {
+                continue;
+            }
+
+            $newMutations = InventoryMutation::query()
+                ->whereIn('source_type', ['cutting_wip', 'cutting_reject'])
+                ->where('source_id', $job->id)
+                ->where('cutting_job_bundle_id', $audit->cutting_job_bundle_id)
+                ->where('id', '>', (int) ($audit->reversal_cutoff_mutation_id ?? 0))
+                ->where('qty_change', '>', 0)
+                ->lockForUpdate()
+                ->get();
+
+            $okCost = round((float) $newMutations
+                ->where('source_type', 'cutting_wip')
+                ->sum('total_cost'), 2);
+            $rejectCost = round((float) $newMutations
+                ->where('source_type', 'cutting_reject')
+                ->sum('total_cost'), 2);
+            $outputCost = round($okCost + $rejectCost, 2);
+
+            if ($outputCost <= 0.01) {
+                continue;
+            }
+
+            // Kalau item pengganti punya cost lebih rendah, gunakan output
+            // aktual sebagai batas credit raw agar jurnal tetap balance.
+            $rawCredit = min(max((float) $audit->raw_cost_share, 0), $outputCost);
+            $laborCredit = round($outputCost - $rawCredit, 2);
+
+            $journal = $this->journal->post(
+                date: $qcDate,
+                sourceType: 'cutting_qc_bundle_repost',
+                sourceId: (int) $audit->id,
+                description: "Re-QC partial {$job->code} — {$audit->bundle?->bundle_code}",
+                lines: $this->buildBundleRepostJournalLines(
+                    okCost: $okCost,
+                    rejectCost: $rejectCost,
+                    rawCredit: $rawCredit,
+                    laborCredit: $laborCredit,
+                ),
+                meta: [
+                    'reference_no' => $audit->bundle?->bundle_code,
+                    'notes' => 'Re-QC setelah partial cancel QC',
+                    'created_by' => auth()->id(),
+                ],
+            );
+
+            $audit->update([
+                'repost_journal_id' => $journal->id,
+                'reprocessed_qc_result_id' => $qc->id,
+                'reprocessed_at' => now(),
+            ]);
+        }
+    }
+
+    private function journalAccountId(string $code): int
+    {
+        return (int) DB::table('accounts')->where('code', $code)->value('id');
+    }
+
+    private function buildBundleCancelJournalLines(
+        float $okCost,
+        float $rejectCost,
+        float $rawCostShare,
+        float $laborCostShare,
+    ): array {
+        $lines = [];
+        if ($rawCostShare > 0.01) {
+            $lines[] = ['account_id' => $this->journalAccountId(JournalService::CODE_INV_WIP), 'debit' => $rawCostShare, 'credit' => 0];
+        }
+        if ($laborCostShare > 0.01) {
+            $lines[] = ['account_id' => $this->journalAccountId(JournalService::CODE_PAYROLL_PAYABLE), 'debit' => $laborCostShare, 'credit' => 0];
+        }
+        if ($okCost > 0.01) {
+            $lines[] = ['account_id' => $this->journalAccountId(JournalService::CODE_INV_WIP), 'debit' => 0, 'credit' => $okCost];
+        }
+        if ($rejectCost > 0.01) {
+            $lines[] = ['account_id' => $this->journalAccountId(JournalService::CODE_INV_DEFECT), 'debit' => 0, 'credit' => $rejectCost];
+        }
+
+        return $lines;
+    }
+
+    private function buildBundleRepostJournalLines(
+        float $okCost,
+        float $rejectCost,
+        float $rawCredit,
+        float $laborCredit,
+    ): array {
+        $lines = [];
+        if ($okCost > 0.01) {
+            $lines[] = ['account_id' => $this->journalAccountId(JournalService::CODE_INV_WIP), 'debit' => $okCost, 'credit' => 0];
+        }
+        if ($rejectCost > 0.01) {
+            $lines[] = ['account_id' => $this->journalAccountId(JournalService::CODE_INV_DEFECT), 'debit' => $rejectCost, 'credit' => 0];
+        }
+        if ($rawCredit > 0.01) {
+            $lines[] = ['account_id' => $this->journalAccountId(JournalService::CODE_INV_WIP), 'debit' => 0, 'credit' => $rawCredit];
+        }
+        if ($laborCredit > 0.01) {
+            $lines[] = ['account_id' => $this->journalAccountId(JournalService::CODE_PAYROLL_PAYABLE), 'debit' => 0, 'credit' => $laborCredit];
+        }
+
+        return $lines;
     }
 
     public function adjustCuttingBundleQc(
