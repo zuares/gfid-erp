@@ -345,6 +345,7 @@
     $hasMarketplaceProfit = $router->has('marketplace.profit');
     $hasMarketplaceAds = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics = $router->has('marketplace.analytics');
+    $hasMarketplaceSalesDashboard = $router->has('marketplace.dashboard.sales');
     $hasMarketplaceIssues = $router->has('marketplace.issues');
     $hasMarketplaceShopeeApiLogs = $router->has('marketplace.shopee-api-logs');
     $hasMarketplaceIndex = $router->has('marketplace.orders');
@@ -481,6 +482,7 @@
         $hasMarketplacePickingBarang = $hasMarketplaceSkuMapping = $hasMarketplaceSync = false;
         $hasMarketplacePencairanDana = $hasMarketplaceProfit = $hasMarketplaceAds = false;
         $hasMarketplaceAnalytics = $hasMarketplaceIssues = $hasMarketplaceShopeeApiLogs = false;
+        $hasMarketplaceSalesDashboard = false;
         $hasMarketplaceIndex = $hasMarketplaceSalesReport = false;
         $hasMarketplaceReconcileQueue = $hasMarketplaceReconcileItemsIndex = false;
     }
@@ -580,6 +582,7 @@
         request()->routeIs('marketplace.ads') ||
         request()->routeIs('marketplace.ads.dashboard') ||
         request()->routeIs('marketplace.analytics') ||
+        request()->routeIs('marketplace.dashboard.sales') ||
         request()->routeIs('marketplace.issues') ||
         request()->routeIs('marketplace.shopee-api-logs') ||
         request()->routeIs('imports.marketplace.*') ||
@@ -1753,7 +1756,7 @@
                     @endif
 
                     {{-- SALES & MARKETPLACE --}}
-                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceProfit || $hasMarketplaceSalesReport || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialQuality || $hasMarketplaceFinance || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues || $hasMarketplaceShopeeApiLogs || $hasImportMarketplaceIndex || $hasImportMarketplaceDraft || $hasImportMarketplaceIncomeIndex || $hasImportMarketplaceIncomeDraft)
+                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceProfit || $hasMarketplaceSalesReport || $hasMarketplaceSalesDashboard || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialQuality || $hasMarketplaceFinance || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues || $hasMarketplaceShopeeApiLogs || $hasImportMarketplaceIndex || $hasImportMarketplaceDraft || $hasImportMarketplaceIncomeIndex || $hasImportMarketplaceIncomeDraft)
                     <div class="mobile-sidebar-section-label">Toko Online</div>
                     <li class="mb-1">
                         <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}"
@@ -1965,6 +1968,12 @@
                                 <a href="{{ route('marketplace.analytics') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.analytics') ? 'active' : '' }}">
                                     <span class="icon">📊</span><span>Analisa Penjualan</span>
+                                </a>
+                            @endif
+                            @if ($hasMarketplaceSalesDashboard)
+                                <a href="{{ route('marketplace.dashboard.sales') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.dashboard.sales') ? 'active' : '' }}">
+                                    <span class="icon">📈</span><span>Dashboard Penjualan</span>
                                 </a>
                             @endif
                             @if ($hasMarketplaceSalesReport)

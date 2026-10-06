@@ -110,6 +110,7 @@
     $hasMarketplaceProfit      = $router->has('marketplace.profit');
     $hasMarketplaceAds         = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics   = $router->has('marketplace.analytics');
+    $hasMarketplaceSalesDashboard = $router->has('marketplace.dashboard.sales');
     $hasMarketplaceIssues      = $router->has('marketplace.issues');
     $hasMarketplaceShopeeApiLogs = $router->has('marketplace.shopee-api-logs');
 
@@ -258,6 +259,7 @@
         $hasMarketplacePickingBarang = $hasMarketplaceSkuMapping = $hasMarketplaceSync = false;
         $hasMarketplacePencairanDana = $hasMarketplaceProfit = $hasMarketplaceAds = false;
         $hasMarketplaceAnalytics = $hasMarketplaceIssues = $hasMarketplaceShopeeApiLogs = false;
+        $hasMarketplaceSalesDashboard = false;
         $hasMarketplaceIndex = $hasMarketplaceCreate = $hasMarketplaceShow = false;
         $hasMarketplaceSalesReport = $hasMarketplaceSalesExport = false;
         $hasMarketplaceFinance = false;
@@ -349,6 +351,7 @@
         $open('marketplace.reports.*') ||
         $open('marketplace.finance.*') ||
         $open('marketplace.analytics') ||
+        $open('marketplace.dashboard.sales') ||
         $open('marketplace.ads.dashboard');
 
     $openMarketplaceDataGroup =
@@ -382,6 +385,7 @@
         $open('marketplace.ads') ||
         $open('marketplace.ads.dashboard') ||
         $open('marketplace.analytics') ||
+        $open('marketplace.dashboard.sales') ||
         $open('marketplace.issues') ||
         $open('marketplace.reports.*') ||
         $open('marketplace.finance.*') ||
@@ -1129,7 +1133,7 @@
             @endif
 
             {{-- Toko Online --}}
-            @if ($canShow($hasMarketplaceIndex, $router->has('marketplace.products'), $hasMarketplacePromotions, $hasMarketplacePromotionsSummary, $hasMarketplaceSalesReport, $hasMarketplaceFinance, $hasMarketplaceReconcileQueue, $hasMarketplaceReconcileItemsIndex))
+            @if ($canShow($hasMarketplaceIndex, $router->has('marketplace.products'), $hasMarketplacePromotions, $hasMarketplacePromotionsSummary, $hasMarketplaceSalesReport, $hasMarketplaceSalesDashboard, $hasMarketplaceFinance, $hasMarketplaceReconcileQueue, $hasMarketplaceReconcileItemsIndex))
                 <x-sidebar.label text="Toko Online" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openMarketplaceTools ? 'is-open' : '' }}" type="button"
@@ -1200,7 +1204,7 @@
                             </div>
                         @endif
 
-                        @if ($hasMarketplaceSalesReport || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
+                        @if ($hasMarketplaceSalesReport || $hasMarketplaceSalesDashboard || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
                             <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceFinanceGroup ? 'is-open' : '' }}" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminFinance"
                                 aria-expanded="{{ $openMarketplaceFinanceGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminFinance">
@@ -1209,6 +1213,12 @@
                                 <span class="chevron">▸</span>
                             </button>
                             <div class="collapse sidebar-nested-collapse {{ $openMarketplaceFinanceGroup ? 'show' : '' }}" id="navMarketplaceAdminFinance">
+                                @if ($hasMarketplaceSalesDashboard)
+                                    <x-sidebar.sub-link href="{{ route('marketplace.dashboard.sales') }}" icon="bi bi-speedometer2"
+                                        :active="request()->routeIs('marketplace.dashboard.sales')">
+                                        Dashboard Penjualan
+                                    </x-sidebar.sub-link>
+                                @endif
                                 @if ($hasMarketplaceSalesReport)
                                     <x-sidebar.sub-link href="{{ route('marketplace.reports.sales') }}" icon="bi bi-graph-up"
                                         :active="request()->routeIs('marketplace.reports.sales')">
@@ -1933,7 +1943,7 @@
                             </div>
                         @endif
 
-                        @if ($hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialClosing || $hasMarketplaceSalesReport || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceFinance)
+                        @if ($hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialClosing || $hasMarketplaceSalesReport || $hasMarketplaceSalesDashboard || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceFinance)
                             <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceFinanceGroup ? 'is-open' : '' }}" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerFinance"
                                 aria-expanded="{{ $openMarketplaceFinanceGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerFinance">
@@ -1943,6 +1953,12 @@
                             </button>
                             <div class="collapse sidebar-nested-collapse {{ $openMarketplaceFinanceGroup ? 'show' : '' }}" id="navMarketplaceOwnerFinance">
                                 @php $subhead('Analisa'); @endphp
+                        @if ($hasMarketplaceSalesDashboard)
+                            <x-sidebar.sub-link href="{{ route('marketplace.dashboard.sales') }}" icon="bi bi-speedometer2"
+                                :active="request()->routeIs('marketplace.dashboard.sales')">
+                                Dashboard Penjualan
+                            </x-sidebar.sub-link>
+                        @endif
                         @if ($hasMarketplacePencairanDana)
                             <x-sidebar.sub-link href="{{ route('marketplace.settlement') }}" icon="bi bi-coin"
                                 :active="request()->routeIs('marketplace.settlement')">
