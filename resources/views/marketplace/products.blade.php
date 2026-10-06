@@ -78,6 +78,12 @@
     }
     .prd-sku{ font-size:.67rem; color:#94a3b8; }
     .muted{ font-size:.74rem; color:#6b7280; }
+    .prd-money{ font-weight:700; white-space:nowrap; color:#334155; }
+    .prd-money.promo{ color:#b45309; }
+    .prd-money.buyer{ color:#0f766e; }
+    .prd-no{ color:#64748b; font-size:.7rem!important; font-weight:800; text-align:center; }
+    .prd-product-link{ display:block; color:inherit; text-decoration:none; cursor:pointer; }
+    .prd-product-link:hover .prd-name{ color:#2563eb; text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:2px; }
 
     /* Badge status ala shipment (dengan titik) */
     .badge-status{
@@ -298,10 +304,10 @@
     <div class="card-main table-wrap" style="max-height: calc(100vh - 210px); overflow-y: auto;">
         <table class="table-list table-hover">
             <thead><tr>
-                <th style="width:26px"></th><th style="width:50px"></th><th>Produk</th>
-                <th>Status</th><th>Harga Setelah Diskon</th><th>Stok</th><th>Terjual</th><th>Statistik</th><th>Mapping</th><th style="width:230px">Aksi</th>
+                <th style="width:38px;text-align:center">#</th><th style="width:26px"></th><th style="width:50px"></th><th>Produk</th>
+                <th>Status</th><th>Harga Setelah Diskon</th><th>Stok</th><th>Terjual</th><th>Statistik</th><th>Total Promosi</th><th>Pembayaran Pembeli</th><th>Mapping</th><th style="width:230px">Aksi</th>
             </tr></thead>
-            <tbody id="prdBody"><tr><td colspan="10" class="empty">Memuat…</td></tr></tbody>
+            <tbody id="prdBody"><tr><td colspan="13" class="empty">Memuat…</td></tr></tbody>
         </table>
     </div>
     </div>{{-- /tabProduk --}}
@@ -459,6 +465,11 @@
     const $ = id => document.getElementById(id);
     const esc = s => (s ?? '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const rp = n => n == null ? '—' : 'Rp' + Number(n).toLocaleString('id-ID');
+    const orderDate = value => {
+        if (!value) return '—';
+        const date = new Date(String(value).replace(' ', 'T'));
+        return Number.isNaN(date.getTime()) ? esc(value) : date.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+    };
 
     async function api(url, opts = {}) {
         const res = await fetch(url, { headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }, ...opts });
@@ -474,7 +485,7 @@
             render();
             if ($('tabStok') && $('tabStok').classList.contains('active')) stRender();
         } catch (e) {
-            $('prdBody').innerHTML = `<tr><td colspan="10" class="empty text-danger">${esc(e.message)}</td></tr>`;
+            $('prdBody').innerHTML = `<tr><td colspan="13" class="empty text-danger">${esc(e.message)}</td></tr>`;
         }
     };
 
@@ -586,16 +597,22 @@
         const unlist   = products.filter(p => p.item_status === 'UNLIST').length;
         const habis    = products.filter(p => (p.stock_total ?? 0) === 0 && p.item_status === 'NORMAL').length;
         const unmapped = products.filter(p => productMapState(p) === 'unmapped').length;
+        const totalPromotion = products.reduce((sum, p) => sum + Number(p.total_promotion || 0), 0);
+        const buyerPayment = products.reduce((sum, p) => sum + Number(p.buyer_payment || 0), 0);
 
         const kpi = (key, lbl, val) =>
             `<span class="kpi ${kpiFilter === key ? 'active' : ''}" onclick="kpiClick('${key}')"><span class="lbl">${lbl}</span><span class="val">${val}</span></span>`;
+        const metricKpi = (lbl, val, cls) =>
+            `<span class="kpi ${cls || ''}" title="Akumulasi dari transaksi marketplace"><span class="lbl">${lbl}</span><span class="val">${rp(val)}</span></span>`;
 
         $('kpiRow').innerHTML =
             kpi('', 'Total', total) +
             kpi('NORMAL', 'Tampil', normal) +
             kpi('UNLIST', 'Sembunyi', unlist) +
             kpi('zero', 'Stok Habis', habis) +
-            kpi('unmapped', 'Belum Map', unmapped);
+            kpi('unmapped', 'Belum Map', unmapped) +
+            metricKpi('Total Promosi', totalPromotion, 'kpi-finance-promo') +
+            metricKpi('Bayar Pembeli', buyerPayment, 'kpi-finance-buyer');
     }
 
     window.kpiClick = function (key) {
@@ -668,11 +685,11 @@
         $('fReset').style.display = anyFilterActive() ? '' : 'none';
 
         if (!rows.length) {
-            $('prdBody').innerHTML = `<tr><td colspan="10" class="empty">${products.length ? 'Tidak ada produk yang cocok dengan filter. <a href="javascript:resetFilters()">Reset filter</a>' : 'Belum ada produk. Klik "⟳ Sync Shopee".'}</td></tr>`;
+            $('prdBody').innerHTML = `<tr><td colspan="13" class="empty">${products.length ? 'Tidak ada produk yang cocok dengan filter. <a href="javascript:resetFilters()">Reset filter</a>' : 'Belum ada produk. Klik "⟳ Sync Shopee".'}</td></tr>`;
             return;
         }
 
-        $('prdBody').innerHTML = rows.map(p => {
+        $('prdBody').innerHTML = rows.map((p, rowIndex) => {
             const st = p.item_status || '—';
             const models = p.models || [];
             const multiModel = p.has_model && models.length > 0;
@@ -680,6 +697,8 @@
                 ? (p.price_min === p.price_max ? rp(p.price_min) : `${rp(p.price_min)} – ${rp(p.price_max)}`)
                 : '—';
             const stats = `<div style="font-size:.7rem; line-height:1.4; white-space:nowrap;"><i class="bi bi-eye"></i> ${p.views || 0} &nbsp; <i class="bi bi-star"></i> ${p.rating_star || 0}</div>`;
+            const totalPromotion = Number(p.total_promotion || 0);
+            const buyerPayment = Number(p.buyer_payment || 0);
 
             const isBermasalahTab = $('fStore').value === 'bermasalah';
 
@@ -732,9 +751,10 @@
 
             const isModelOpened = openedModels.has(p.id);
             const mainRow = `<tr data-pid="${p.id}">
+                <td class="prd-no">${rowIndex + 1}</td>
                 <td>${multiModel ? `<span class="prd-caret" onclick="toggleModels(${p.id}, this)"><i class="bi bi-chevron-${isModelOpened ? 'down' : 'right'}"></i></span>` : ''}</td>
                 <td>${p.image_url ? `<img class="prd-img" src="${esc(p.image_url)}" loading="lazy">` : '<div class="prd-img"></div>'}</td>
-                <td><div class="prd-name" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" title="${esc(p.item_name || '')}">${esc(p.item_name || '—')}</div>
+                <td><a class="prd-product-link" href="javascript:void(0)" onclick="showProductOrders(${p.id}); return false;" title="Lihat pesanan produk"><div class="prd-name" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" title="${esc(p.item_name || '')}">${esc(p.item_name || '—')}</div></a>
                     <div class="prd-sku d-flex align-items-center gap-1 flex-wrap mt-1">
                         <span class="text-muted">SKU:</span>
                         <div class="input-group input-group-sm" style="max-width:180px;">
@@ -749,6 +769,8 @@
                 <td>${stockCell(p.stock_total)}</td>
                 <td class="muted">${p.sales ?? '—'}</td>
                 <td>${stats}</td>
+                <td class="prd-money promo">${rp(totalPromotion)}</td>
+                <td class="prd-money buyer">${rp(buyerPayment)}</td>
                 <td data-product-mapping="${p.id}">${multiModel ? mappingSummary(models) : (models.length ? mappingBadge(models[0]) : mappingBadge(p, p.item_sku, p.mapping))}</td>
                 <td>
                     ${aksiContent}
@@ -757,7 +779,7 @@
 
             const modelRows = multiModel ? models.map(m => `
                 <tr class="model-row mr-${p.id}" data-model-id="${esc(m.model_id)}" style="${isModelOpened ? '' : 'display:none'}">
-                    <td></td><td></td>
+                    <td></td><td></td><td></td>
                     <td style="padding-left:22px">↳ ${esc(m.model_name || 'Varian')} 
                         <div class="variant-sku-suggest mt-1">
                             <div class="input-group input-group-sm">
@@ -770,6 +792,8 @@
                     <td></td>
                     <td>${rp(m.price)}</td>
                     <td>${stockCell(m.stock)}</td>
+                    <td></td>
+                    <td></td>
                     <td></td>
                     <td></td>
                     <td class="variant-mapping-cell">${mappingBadge(m)}</td>
@@ -1299,6 +1323,62 @@
                 showCloseButton: true,
             });
         } catch (e) { alert('Gagal muat riwayat: ' + e.message); }
+    };
+
+    // ── Pesanan berdasarkan produk ─────────────────────────────────────────
+    window.showProductOrders = async function (pid) {
+        const p = products.find(x => x.id === pid);
+        Swal.fire({
+            title: `Pesanan · ${p?.item_name || 'Produk'}`,
+            html: '<div class="text-muted py-4">Memuat pesanan…</div>',
+            width: 1040,
+            showConfirmButton: false,
+            showCloseButton: true,
+            allowOutsideClick: false,
+        });
+
+        try {
+            const data = await api(`${API}/${pid}/orders?limit=200`);
+            const orders = data.orders || [];
+            const totalQty = orders.reduce((sum, row) => sum + Number(row.qty || 0), 0);
+            const totalBuyerPayment = orders.reduce((sum, row) => sum + Number(row.buyer_payment || 0), 0);
+            const statusLabel = value => String(value || '—').replaceAll('_', ' ');
+            const statusBadge = value => `<span class="badge-status ${['PAID','COMPLETED','SELESAI','LUNAS','SHIPPED','DELIVERED'].includes(String(value).toUpperCase()) ? 'st-normal' : 'st-unlist'}">${esc(statusLabel(value))}</span>`;
+            const body = `
+                <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.8rem;text-align:left">
+                    <span class="kpi"><span class="lbl">Total Pesanan</span><span class="val">${orders.length.toLocaleString('id-ID')}</span></span>
+                    <span class="kpi"><span class="lbl">Total Qty</span><span class="val">${totalQty.toLocaleString('id-ID')}</span></span>
+                    <span class="kpi"><span class="lbl">Pembayaran Pembeli</span><span class="val">${rp(totalBuyerPayment)}</span></span>
+                </div>
+                <div style="max-height:480px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">
+                    <table style="width:100%;min-width:820px;font-size:.75rem;text-align:right;border-collapse:collapse">
+                        <thead><tr style="color:#64748b;font-size:.65rem;text-transform:uppercase;position:sticky;top:0;background:#fff;z-index:1">
+                            <th style="text-align:center;padding:8px">#</th><th style="text-align:left;padding:8px">Pesanan</th><th style="text-align:left;padding:8px">Tanggal</th><th style="text-align:left;padding:8px">Pembeli</th><th style="padding:8px">Qty</th><th style="padding:8px">Nilai Produk</th><th style="padding:8px">Pembayaran Pembeli</th><th style="padding:8px">Pembayaran</th><th style="padding:8px">Status</th>
+                        </tr></thead>
+                        <tbody>${orders.length ? orders.map((row, index) => `<tr style="border-top:1px solid #f1f5f9">
+                            <td style="padding:8px;text-align:center;color:#64748b;font-weight:700">${index + 1}</td>
+                            <td style="padding:8px;text-align:left;font-weight:700">${esc(row.order_number)}</td>
+                            <td style="padding:8px;text-align:left;white-space:nowrap">${orderDate(row.ordered_at)}</td>
+                            <td style="padding:8px;text-align:left;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(row.buyer)}">${esc(row.buyer)}</td>
+                            <td style="padding:8px">${Number(row.qty || 0).toLocaleString('id-ID')}</td>
+                            <td style="padding:8px">${rp(row.line_total)}</td>
+                            <td style="padding:8px;color:#0f766e;font-weight:700">${rp(row.buyer_payment)}</td>
+                            <td style="padding:8px">${statusBadge(row.payment_status)}</td>
+                            <td style="padding:8px">${statusBadge(row.order_status)}</td>
+                        </tr>`).join('') : '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#64748b">Belum ada pesanan untuk produk ini.</td></tr>'}</tbody>
+                    </table>
+                </div>`;
+
+            Swal.fire({
+                title: `Pesanan · ${p?.item_name || 'Produk'}`,
+                html: body,
+                width: 1040,
+                showConfirmButton: false,
+                showCloseButton: true,
+            });
+        } catch (e) {
+            Swal.fire({ title: 'Gagal memuat pesanan', text: e.message, icon: 'error', showCloseButton: true });
+        }
     };
 
     // ── Event listeners filter (instan) ─────────────────────────────────────

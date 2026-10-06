@@ -213,6 +213,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/products/{product}/model-sku',   [\App\Http\Controllers\MarketplaceProductController::class, 'updateModelSku'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/products/{product}/orders',         [\App\Http\Controllers\MarketplaceProductController::class, 'orders']);
     Route::get('/products/{product}/history',      [\App\Http\Controllers\MarketplaceProductController::class, 'history']);
 
     // Promosi / Diskon
