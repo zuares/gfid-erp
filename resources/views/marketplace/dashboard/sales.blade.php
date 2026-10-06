@@ -171,7 +171,7 @@
             'paid_orders' => 0,
             'buyer_paid' => 0,
             'avg_ticket' => 0,
-            'success_rate' => 0,
+            'order_share' => 0,
         ]];
     });
 @endphp
@@ -409,14 +409,14 @@
             <div class="sales-section-header">
                 <div class="sales-kicker mb-1">Purchasing power trend</div>
                 <h2 class="sales-section-title mb-1">Daya beli per tanggal</h2>
-                <div class="sales-section-subtitle">Lihat perubahan nominal yang dibayar customer, average ticket, dan payment success rate. Klik tanggal untuk drill-down.</div>
+                <div class="sales-section-subtitle">Lihat perubahan nominal yang dibayar customer, average ticket, dan exposure COD sebagai indikator risiko fulfillment. Klik tanggal untuk drill-down.</div>
             </div>
             @if ($paymentDaily->isEmpty())
                 <div class="sales-empty text-center"><i class="bi bi-wallet2 d-block fs-3 mb-2"></i>Belum ada data pembayaran pada periode ini.</div>
             @else
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle sales-table">
-                        <thead><tr><th class="ps-3">Tanggal</th><th class="text-end">Order</th><th class="text-end">COD</th><th class="text-end">Non-COD</th><th class="text-end">Pay Later</th><th class="text-end">Dibayar Pembeli</th><th class="text-end">Success Rate</th><th class="text-end">Average Ticket</th><th class="text-end pe-3">Aksi</th></tr></thead>
+                        <thead><tr><th class="ps-3">Tanggal</th><th class="text-end">Order</th><th class="text-end">COD</th><th class="text-end">Non-COD</th><th class="text-end">Pay Later</th><th class="text-end">Dibayar Pembeli</th><th class="text-end">COD Exposure</th><th class="text-end">Average Ticket</th><th class="text-end pe-3">Aksi</th></tr></thead>
                         <tbody>
                             @foreach ($paymentDaily as $payment)
                                 <tr class="sales-clickable-row" data-sales-payment-detail-url="{{ route('marketplace.dashboard.payments.detail', array_merge(['date' => $payment->day], $paymentDetailQuery)) }}" tabindex="0" role="button" aria-label="Lihat detail pembayaran {{ $dateLabel($payment->day) }}">
@@ -426,7 +426,7 @@
                                     <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->non_cod_amount) }}</div><div class="small text-muted">{{ number_format($payment->non_cod_orders) }} order</div></td>
                                     <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->pay_later_amount) }}</div><div class="small text-muted">{{ number_format($payment->pay_later_orders) }} order</div></td>
                                     <td class="text-end fw-semibold">{{ $fmt($payment->buyer_paid) }}</td>
-                                    <td class="text-end">{{ number_format($payment->success_rate, 1) }}%</td>
+                                    <td class="text-end">{{ number_format($payment->cod_order_share, 1) }}%</td>
                                     <td class="text-end">{{ $fmt($payment->aov) }}</td>
                                     <td class="text-end pe-3"><span class="sales-action-link">Lihat detail <i class="bi bi-arrow-right"></i></span></td>
                                 </tr>
@@ -455,7 +455,7 @@
                                     <tr><td class="ps-3 fw-semibold">Dibayar Pembeli</td>@foreach ($paymentMix as $payment)<td class="text-end fw-semibold">{{ $fmt($payment->buyer_paid) }}</td>@endforeach</tr>
                                     <tr><td class="ps-3 fw-semibold">Share Nominal</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ number_format($paymentSummary['buyer_paid'] > 0 ? ($payment->buyer_paid / $paymentSummary['buyer_paid']) * 100 : 0, 1) }}%</td>@endforeach</tr>
                                     <tr><td class="ps-3 fw-semibold">Average Ticket</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ $fmt($payment->avg_ticket) }}</td>@endforeach</tr>
-                                    <tr><td class="ps-3 fw-semibold">Payment Success Rate</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ number_format($payment->success_rate, 1) }}%</td>@endforeach</tr>
+                                    <tr><td class="ps-3 fw-semibold">Order Share</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ number_format($paymentSummary['orders'] > 0 ? ($payment->orders / $paymentSummary['orders']) * 100 : 0, 1) }}%</td>@endforeach</tr>
                                 </tbody>
                             </table>
                         </div>
@@ -471,14 +471,14 @@
                     </div>
                     <div class="p-3 pt-0">
                         <div class="border rounded p-3 mb-2">
-                            <div class="small text-muted">Payment success rate</div>
-                            <div class="h4 mb-0">{{ number_format($paymentSummary['success_rate'], 1) }}%</div>
-                            <div class="small text-muted">{{ number_format($paymentSummary['paid_orders']) }} dari {{ number_format($paymentSummary['orders']) }} order</div>
+                            <div class="small text-muted">COD exposure</div>
+                            <div class="h4 mb-0">{{ number_format($paymentSummary['cod_order_share'], 1) }}%</div>
+                            <div class="small text-muted">{{ number_format($paymentDaily->sum('cod_orders')) }} dari {{ number_format($paymentSummary['orders']) }} order</div>
                         </div>
                         <div class="border rounded p-3 mb-2">
-                            <div class="small text-muted">Nilai pembayaran tertinggi</div>
-                            <div class="h5 mb-0">{{ $fmt($paymentSummary['max_ticket']) }}</div>
-                            <div class="small text-muted">high-value customer order</div>
+                            <div class="small text-muted">COD amount exposure</div>
+                            <div class="h5 mb-0">{{ $fmt($paymentSummary['cod_amount']) }}</div>
+                            <div class="small text-muted">{{ number_format($paymentSummary['cod_amount_share'], 1) }}% dari total dibayar pembeli</div>
                         </div>
                         <div class="border rounded p-3">
                             <div class="small text-muted">Metode dengan nominal terbesar</div>

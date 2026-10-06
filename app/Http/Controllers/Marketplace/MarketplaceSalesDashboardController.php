@@ -245,7 +245,7 @@ class MarketplaceSalesDashboardController extends Controller
                 $row->buyer_paid = (float) $row->buyer_paid;
                 $row->avg_ticket = (float) $row->avg_ticket;
                 $row->paid_orders = (int) $row->paid_orders;
-                $row->success_rate = $row->orders > 0 ? ($row->paid_orders / $row->orders) * 100 : 0;
+                $row->order_share = 0;
 
                 return $row;
             });
@@ -282,7 +282,8 @@ class MarketplaceSalesDashboardController extends Controller
                 $row->paid_amount = (float) $row->paid_amount;
                 $row->pending_amount = (float) $row->pending_amount;
                 $row->aov = $row->orders > 0 ? $row->buyer_paid / $row->orders : 0;
-                $row->success_rate = $row->orders > 0 ? ($row->paid_orders / $row->orders) * 100 : 0;
+                $row->cod_order_share = $row->orders > 0 ? ($row->cod_orders / $row->orders) * 100 : 0;
+                $row->cod_amount_share = $row->buyer_paid > 0 ? ($row->cod_amount / $row->buyer_paid) * 100 : 0;
 
                 return $row;
             });
@@ -292,6 +293,7 @@ class MarketplaceSalesDashboardController extends Controller
             'paid_orders' => (int) $paymentDaily->sum('paid_orders'),
             'pending_orders' => (int) $paymentDaily->sum('pending_orders'),
             'buyer_paid' => (float) $paymentDaily->sum('buyer_paid'),
+            'cod_amount' => (float) $paymentDaily->sum('cod_amount'),
             'paid_amount' => (float) $paymentDaily->sum('paid_amount'),
             'pending_amount' => (float) $paymentDaily->sum('pending_amount'),
         ];
@@ -310,8 +312,11 @@ class MarketplaceSalesDashboardController extends Controller
         $paymentSummary['high_value_orders'] = $highValueThreshold > 0
             ? $paymentOrderAmounts->filter(fn (float $amount): bool => $amount >= $highValueThreshold)->count()
             : 0;
-        $paymentSummary['success_rate'] = $paymentSummary['orders'] > 0
-            ? ($paymentSummary['paid_orders'] / $paymentSummary['orders']) * 100
+        $paymentSummary['cod_order_share'] = $paymentSummary['orders'] > 0
+            ? ((float) $paymentDaily->sum('cod_orders') / $paymentSummary['orders']) * 100
+            : 0;
+        $paymentSummary['cod_amount_share'] = $paymentSummary['buyer_paid'] > 0
+            ? ((float) $paymentDaily->sum('cod_amount') / $paymentSummary['buyer_paid']) * 100
             : 0;
 
         // Imported order files keep the actual product promotion on the item
@@ -618,7 +623,6 @@ SQL;
         $summary['median_ticket'] = (float) ($detailPaymentAmounts->median() ?? 0);
         $summary['max_ticket'] = (float) ($detailPaymentAmounts->max() ?? 0);
         $summary['aov'] = $summary['orders'] > 0 ? $summary['subtotal'] / $summary['orders'] : 0;
-        $summary['success_rate'] = $summary['orders'] > 0 ? ($summary['paid_orders'] / $summary['orders']) * 100 : 0;
         $detailHighValueThreshold = $summary['aov'] > 0 ? $summary['aov'] * 1.5 : 0;
         $summary['high_value_orders'] = $detailHighValueThreshold > 0
             ? $detailPaymentAmounts->filter(fn (float $amount): bool => $amount >= $detailHighValueThreshold)->count()
