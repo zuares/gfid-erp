@@ -118,6 +118,13 @@
         white-space: nowrap;
     }
     .sales-dashboard .sales-table td { border-color: color-mix(in srgb, var(--sales-line) 65%, transparent); font-size: .78rem; }
+    .sales-dashboard .sales-product-name {
+        display: block;
+        max-width: 300px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
     .sales-dashboard .sales-date-link,
     .sales-dashboard .sales-action-link { color: var(--accent, #2563eb); font-weight: 700; text-decoration: none; }
     .sales-dashboard button.sales-date-link { background: transparent; border: 0; cursor: pointer; padding: 0; }
@@ -378,14 +385,17 @@
             @else
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle sales-table">
-                        <thead><tr><th class="ps-3">Produk</th><th>SKU</th><th class="text-end">Qty</th><th class="text-end pe-3">Penjualan</th></tr></thead>
+                        <thead><tr><th class="ps-3">Produk</th><th>SKU</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">AOV</th><th class="text-end pe-3">APC</th></tr></thead>
                         <tbody>
                             @foreach ($products as $product)
                                 <tr>
-                                    <td class="ps-3 fw-semibold">{{ $product->name }}</td>
+                                    <td class="ps-3 fw-semibold"><span class="sales-product-name" title="{{ $product->name }}">{{ $product->name }}</span></td>
                                     <td class="text-muted small">{{ $product->sku }}</td>
                                     <td class="text-end">{{ number_format((int) $product->qty) }}</td>
-                                    <td class="text-end pe-3 fw-semibold">{{ $fmt($product->sales) }}</td>
+                                    <td class="text-end fw-semibold">{{ $fmt($product->sales) }}</td>
+                                    <td class="text-end fw-semibold">{{ $fmt($product->buyer_payment) }}</td>
+                                    <td class="text-end" title="Average Order Value: pembayaran pembeli dibagi jumlah order">{{ $product->orders > 0 ? $fmt($product->buyer_payment / $product->orders) : '—' }}</td>
+                                    <td class="text-end" title="Average Payment per Customer: pembayaran pembeli dibagi pembeli unik">{{ $product->buyers > 0 ? $fmt($product->buyer_payment / $product->buyers) : '—' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
