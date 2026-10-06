@@ -516,6 +516,28 @@ SQL;
                 return $row;
             });
 
+        $shippingDaily = (clone $base)
+            ->selectRaw("DATE({$dateExpression}) as day")
+            ->selectRaw('COUNT(DISTINCT o.id) as orders')
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} IN ('PENDING', 'INVOICE_PENDING', 'READY_TO_SHIP', 'MATCHED') THEN o.id END) as ready_orders")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} IN ('PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'TO_CONFIRM_RECEIVE') THEN o.id END) as transit_orders")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} IN ('COMPLETED', 'SELESAI') THEN o.id END) as completed_orders")
+            ->groupByRaw("DATE({$dateExpression})")
+            ->orderByDesc('day')
+            ->get()
+            ->map(function ($row) {
+                $row->orders = (int) $row->orders;
+                $row->ready_orders = (int) $row->ready_orders;
+                $row->transit_orders = (int) $row->transit_orders;
+                $row->completed_orders = (int) $row->completed_orders;
+                $row->other_orders = max(
+                    0,
+                    $row->orders - $row->ready_orders - $row->transit_orders - $row->completed_orders,
+                );
+
+                return $row;
+            });
+
         return view('marketplace.dashboard.sales', [
             'summary' => $summary,
             'daily' => $daily,
@@ -526,6 +548,7 @@ SQL;
             'promotionDaily' => $promotionDaily,
             'promotionOrders' => $promotionOrders,
             'shipping' => $shipping,
+            'shippingDaily' => $shippingDaily,
             'orderDetails' => $orderDetails,
             'stores' => $stores,
             'filters' => [
@@ -757,6 +780,116 @@ SQL;
             : 0;
 
         return view('marketplace.dashboard.payment-detail', [
+            'rows' => $rows,
+            'summary' => $summary,
+            'selectedDate' => $selectedDate,
+            'stores' => $stores,
+            'filters' => [
+                'store_id' => $storeId,
+                'dummy' => $isDashboardDummy,
+            ],
+        ]);
+    }
+
+    public function shippingDetail(Request $request, string $date)
+    {
+        try {
+            $selectedDate = Carbon::createFromFormat('Y-m-d', $date)->startOfDay();
+            if ($selectedDate->format('Y-m-d') !== $date) {
+                abort(404);
+            }
+        } catch (\Throwable) {
+            abort(404);
+        }
+
+        $isDashboardDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
+        $storeId = $request->integer('store_id') ?: null;
+        $stores = Store::query()
+            ->where('is_active', true)
+            ->with('channel')
+            ->orderBy('name')
+            ->get();
+
+        if ($storeId && ! $stores->contains('id', $storeId)) {
+            $storeId = null;
+        }
+
+        $dateExpression = 'COALESCE(o.ordered_at, o.order_date)';
+        $statusExpression = "UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), 'BELUM DITENTUKAN'))";
+        $nonRevenuePlaceholders = implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?'));
+
+        $rows = DB::table('marketplace_orders as o')
+            ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
+            ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
+            ->whereRaw("{$dateExpression} IS NOT NULL")
+            ->whereDate(DB::raw($dateExpression), $selectedDate->toDateString())
+            ->whereRaw("{$statusExpression} NOT IN ({$nonRevenuePlaceholders})", self::NON_REVENUE_STATUSES)
+            ->when($isDashboardDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
+            ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
+            ->select([
+                'o.id',
+                'o.channel_order_id',
+                'o.external_order_id',
+                'o.buyer_username',
+                'o.buyer_name',
+                'o.shipping_carrier',
+                'o.shipping_awb_no',
+                'o.shipping_arranged_at',
+                'o.shipped_at',
+                'o.delivered_at',
+                'st.name as store_name',
+                'ch.code as channel_code',
+            ])
+            ->selectRaw("{$dateExpression} as order_at")
+            ->selectRaw("{$statusExpression} as shipping_status")
+            ->orderByDesc('order_at')
+            ->orderByDesc('o.id')
+            ->limit(500)
+            ->get()
+            ->map(function ($row) {
+                $row->order_number = $this->orderNumberForDisplay(
+                    $row->channel_order_id,
+                    $row->external_order_id,
+                    (int) $row->id,
+                );
+                $row->customer = $row->buyer_username ?: ($row->buyer_name ?: 'Pelanggan marketplace');
+                $row->store = $row->store_name ?: 'Toko marketplace';
+                $row->channel = $row->channel_code ? ucfirst((string) $row->channel_code) : 'Marketplace';
+                $row->shipping_status = (string) $row->shipping_status;
+                $row->status_label = [
+                    'PENDING' => 'Menunggu',
+                    'INVOICE_PENDING' => 'Menunggu Invoice',
+                    'READY_TO_SHIP' => 'Siap Dikirim',
+                    'MATCHED' => 'Siap Diproses',
+                    'PROCESSED' => 'Diproses',
+                    'READY_TO_HANDOVER' => 'Siap Diserahkan',
+                    'SHIPPED' => 'Dikirim',
+                    'TO_CONFIRM_RECEIVE' => 'Menunggu Konfirmasi',
+                    'COMPLETED' => 'Selesai',
+                    'SELESAI' => 'Selesai',
+                ][$row->shipping_status] ?? ucwords(strtolower(str_replace('_', ' ', $row->shipping_status)));
+                $row->status_group = match ($row->shipping_status) {
+                    'PENDING', 'INVOICE_PENDING', 'READY_TO_SHIP', 'MATCHED' => 'ready',
+                    'PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'TO_CONFIRM_RECEIVE' => 'transit',
+                    'COMPLETED', 'SELESAI' => 'completed',
+                    default => 'other',
+                };
+
+                return $row;
+            });
+
+        $summary = [
+            'orders' => $rows->count(),
+            'ready_orders' => $rows->where('status_group', 'ready')->count(),
+            'transit_orders' => $rows->where('status_group', 'transit')->count(),
+            'completed_orders' => $rows->where('status_group', 'completed')->count(),
+        ];
+        $summary['other_orders'] = max(
+            0,
+            $summary['orders'] - $summary['ready_orders'] - $summary['transit_orders'] - $summary['completed_orders'],
+        );
+
+        return view('marketplace.dashboard.shipping-detail', [
             'rows' => $rows,
             'summary' => $summary,
             'selectedDate' => $selectedDate,

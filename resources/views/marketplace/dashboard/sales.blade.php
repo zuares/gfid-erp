@@ -183,6 +183,9 @@
     $paymentDetailQuery = ['tab' => 'payments'];
     if ($filters['store_id']) $paymentDetailQuery['store_id'] = $filters['store_id'];
     if (!empty($filters['dummy'])) $paymentDetailQuery['dummy'] = 1;
+    $shippingDetailQuery = ['tab' => 'shipping'];
+    if ($filters['store_id']) $shippingDetailQuery['store_id'] = $filters['store_id'];
+    if (!empty($filters['dummy'])) $shippingDetailQuery['dummy'] = 1;
     $topPaymentMethod = $payments->sortByDesc('buyer_paid')->first();
     $peakPaymentDay = $paymentDaily->sortByDesc('aov')->first();
     $paymentCategoryLabels = ['cod' => 'COD', 'non_cod' => 'Non-COD', 'pay_later' => 'Pay Later'];
@@ -606,18 +609,34 @@
         <section class="card sales-card shadow-sm">
             <div class="sales-section-header">
                 <div class="sales-kicker mb-1">Fulfillment marketplace</div>
-                <h2 class="sales-section-title mb-1">Status pengiriman</h2>
-                <div class="sales-section-subtitle">Jumlah order berdasarkan status yang tersimpan di marketplace.</div>
+                <h2 class="sales-section-title mb-1">Status pengiriman per tanggal</h2>
+                <div class="sales-section-subtitle">Jumlah order per tanggal dengan pecahan status yang tersimpan di marketplace.</div>
             </div>
-            @if ($shipping->isEmpty())
+            @if ($shippingDaily->isEmpty())
                 <div class="sales-empty text-center"><i class="bi bi-truck d-block fs-3 mb-2"></i>Belum ada data pengiriman pada periode ini.</div>
             @else
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle sales-table">
-                        <thead><tr><th class="ps-3">Status</th><th class="text-end pe-3">Pesanan</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th class="ps-3">Tanggal</th>
+                                <th class="text-end">Total Order</th>
+                                <th class="text-end">Siap Dikirim</th>
+                                <th class="text-end">Dalam Pengiriman</th>
+                                <th class="text-end">Selesai</th>
+                                <th class="text-end pe-3">Status Lainnya</th>
+                            </tr>
+                        </thead>
                         <tbody>
-                            @foreach ($shipping as $status)
-                                <tr><td class="ps-3 fw-semibold">{{ $status->label }}</td><td class="text-end pe-3">{{ number_format((int) $status->orders) }}</td></tr>
+                            @foreach ($shippingDaily as $row)
+                                <tr class="sales-clickable-row" data-sales-shipping-detail-url="{{ route('marketplace.dashboard.shipping.detail', array_merge(['date' => $row->day], $shippingDetailQuery)) }}" tabindex="0" role="button" aria-label="Lihat detail pengiriman {{ $dateLabel($row->day) }}">
+                                    <td class="ps-3 fw-semibold">{{ $dateLabel($row->day) }}</td>
+                                    <td class="text-end">{{ number_format($row->orders) }}</td>
+                                    <td class="text-end">{{ number_format($row->ready_orders) }}</td>
+                                    <td class="text-end">{{ number_format($row->transit_orders) }}</td>
+                                    <td class="text-end">{{ number_format($row->completed_orders) }}</td>
+                                    <td class="text-end pe-3">{{ number_format($row->other_orders) }}</td>
+                                </tr>
                             @endforeach
                         </tbody>
                     </table>
@@ -718,6 +737,20 @@
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
                     openPaymentDetail();
+                }
+            });
+        });
+
+        document.querySelectorAll('[data-sales-shipping-detail-url]').forEach(function (trigger) {
+            function openShippingDetail() {
+                window.location.href = trigger.dataset.salesShippingDetailUrl;
+            }
+
+            trigger.addEventListener('click', openShippingDetail);
+            trigger.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openShippingDetail();
                 }
             });
         });

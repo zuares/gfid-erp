@@ -121,6 +121,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/dashboard/products/orders', [MarketplaceSalesDashboardController::class, 'productOrders'])->name('marketplace.dashboard.products.orders');
     Route::get('/marketplace/dashboard/payments/{date}', [MarketplaceSalesDashboardController::class, 'paymentDetail'])->name('marketplace.dashboard.payments.detail');
     Route::get('/marketplace/dashboard/promotions/{date}', [MarketplaceSalesDashboardController::class, 'promotionDetail'])->name('marketplace.dashboard.promotions.detail');
+    Route::get('/marketplace/dashboard/shipping/{date}', [MarketplaceSalesDashboardController::class, 'shippingDetail'])->name('marketplace.dashboard.shipping.detail');
     Route::get('/marketplace/issues',      [MarketplaceSystemController::class, 'issueCenter'])->name('marketplace.issues');
     Route::get('/marketplace/returns',     [\App\Http\Controllers\MarketplaceReturnController::class, 'index'])->name('marketplace.returns');
     Route::get('/marketplace/kilat',       [\App\Http\Controllers\MarketplaceBookingController::class, 'index'])->name('marketplace.kilat');
