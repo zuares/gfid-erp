@@ -705,10 +705,9 @@ SQL;
     }
 
     /**
-     * A bundle settlement item may contain a second seller discount after the
-     * bundle price has been applied. Split the two price gaps when Shopee
-     * provides selling_price; otherwise keep the explicit bundle amount as a
-     * bundle discount.
+     * For a bundle item, Shopee defines selling_price as the price after the
+     * item/product promotion but before the bundle promotion. Therefore the
+     * first gap is product discount and the second gap is bundle discount.
      */
     private function promotionDiscountSplit(array $item): array
     {
@@ -725,17 +724,17 @@ SQL;
         $sellingPrice = max((float) ($item['selling_price'] ?? 0), 0);
         $discountedPrice = max((float) ($item['discounted_price'] ?? $item['model_discounted_price'] ?? 0), 0);
 
-        $bundleGap = max($originalPrice - $sellingPrice, 0);
-        $productGap = max($sellingPrice - $discountedPrice, 0);
+        $productGap = max($originalPrice - $sellingPrice, 0);
+        $bundleGap = max($sellingPrice - $discountedPrice, 0);
 
-        if ($bundleGap > 0 && $productGap > 0) {
-            $bundleDiscount = min($totalDiscount, $bundleGap);
-            $productDiscount = min(max($totalDiscount - $bundleDiscount, 0), $productGap);
-            $remaining = max($totalDiscount - $bundleDiscount - $productDiscount, 0);
+        if ($productGap > 0 && $bundleGap > 0) {
+            $productDiscount = min($totalDiscount, $productGap);
+            $bundleDiscount = min(max($totalDiscount - $productDiscount, 0), $bundleGap);
+            $remaining = max($totalDiscount - $productDiscount - $bundleDiscount, 0);
 
             // Preserve the complete reported seller discount if the source
             // rounds one of the price fields differently.
-            $bundleDiscount += $remaining;
+            $productDiscount += $remaining;
 
             return [
                 'product_discount' => $productDiscount,

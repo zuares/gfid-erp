@@ -279,8 +279,8 @@ class MarketplaceOrderController extends Controller
     }
 
     /**
-     * Split a bundle line when the settlement contains both the bundle price
-     * and a later seller/product discount.
+     * Shopee's selling_price is after item/product promotion and before the
+     * bundle promotion, so split the two price gaps in that order.
      */
     private function promotionDiscountSplit(array $item): array
     {
@@ -296,14 +296,14 @@ class MarketplaceOrderController extends Controller
         $originalPrice = max((float) ($item['original_price'] ?? $item['model_original_price'] ?? 0), 0);
         $sellingPrice = max((float) ($item['selling_price'] ?? 0), 0);
         $discountedPrice = max((float) ($item['discounted_price'] ?? $item['model_discounted_price'] ?? 0), 0);
-        $bundleGap = max($originalPrice - $sellingPrice, 0);
-        $productGap = max($sellingPrice - $discountedPrice, 0);
+        $productGap = max($originalPrice - $sellingPrice, 0);
+        $bundleGap = max($sellingPrice - $discountedPrice, 0);
 
-        if ($bundleGap > 0 && $productGap > 0) {
-            $bundleDiscount = min($totalDiscount, $bundleGap);
-            $productDiscount = min(max($totalDiscount - $bundleDiscount, 0), $productGap);
-            $remaining = max($totalDiscount - $bundleDiscount - $productDiscount, 0);
-            $bundleDiscount += $remaining;
+        if ($productGap > 0 && $bundleGap > 0) {
+            $productDiscount = min($totalDiscount, $productGap);
+            $bundleDiscount = min(max($totalDiscount - $productDiscount, 0), $bundleGap);
+            $remaining = max($totalDiscount - $productDiscount - $bundleDiscount, 0);
+            $productDiscount += $remaining;
 
             return [
                 'product_discount' => $productDiscount,
