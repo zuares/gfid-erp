@@ -45,6 +45,8 @@
     .shipping-detail .shipping-kpi-card.transit::after { background: #2563eb; }
     .shipping-detail .shipping-kpi-card.completed::after { background: #ea580c; }
     .shipping-detail .shipping-kpi-card.completed .shipping-kpi-icon { background: #ffedd5; color: #c2410c; }
+    .shipping-detail .shipping-kpi-card.failed-return::after { background: #dc2626; }
+    .shipping-detail .shipping-kpi-card.failed-return .shipping-kpi-icon { background: #fee2e2; color: #b91c1c; }
     .shipping-detail .shipping-table-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.15rem 1.25rem; border-bottom: 1px solid var(--shipping-line); }
     .shipping-detail .shipping-table-title { color: var(--shipping-ink); font-size: .98rem; font-weight: 800; }
     .shipping-detail .shipping-table-subtitle { color: var(--shipping-muted); font-size: .74rem; }
@@ -63,6 +65,7 @@
     .shipping-detail .shipping-status.ready { color: #15803d; background: #dcfce7; }
     .shipping-detail .shipping-status.transit { color: #1d4ed8; background: #dbeafe; }
     .shipping-detail .shipping-status.completed { color: #c2410c; background: #ffedd5; }
+    .shipping-detail .shipping-status.failed-return { color: #b91c1c; background: #fee2e2; }
     .shipping-detail .shipping-status.other { color: #64748b; background: #f1f5f9; }
     .shipping-detail .shipping-muted-small { color: var(--shipping-muted); font-size: .7rem; }
     .shipping-detail .shipping-empty { color: var(--shipping-muted); padding: 3rem 1rem; }
@@ -131,6 +134,7 @@
             ['label' => 'Siap Dikirim', 'value' => $summary['ready_orders'], 'note' => 'status operasional', 'icon' => 'bi-box-arrow-up', 'class' => 'ready'],
             ['label' => 'Dalam Pengiriman', 'value' => $summary['transit_orders'], 'note' => 'status transit', 'icon' => 'bi-truck', 'class' => 'transit'],
             ['label' => 'Selesai', 'value' => $summary['completed_orders'], 'note' => 'order selesai', 'icon' => 'bi-check2-circle', 'class' => 'completed'],
+            ['label' => 'Gagal / Return', 'value' => $summary['failed_return_orders'], 'note' => 'gagal kirim atau return', 'icon' => 'bi-arrow-return-left', 'class' => 'failed-return'],
         ] as $kpi)
             <div class="col-12 col-sm-6 col-xl-3">
                 <div class="shipping-kpi-card {{ $kpi['class'] }} h-100 p-3">

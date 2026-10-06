@@ -27,6 +27,32 @@ class MarketplaceSalesDashboardController extends Controller
         'REFUNDED',
     ];
 
+    private const SHIPPING_FAILED_STATUSES = [
+        'FAILED_DELIVERY',
+        'DELIVERY_FAILED',
+        'LOGISTICS_DELIVERY_FAILED',
+        'RETURN_TO_SELLER',
+        'RETURNED_TO_SELLER',
+        'UNDELIVERED',
+    ];
+
+    private const SHIPPING_RETURN_STATUSES = [
+        'TO_RETURN',
+        'RETURNING',
+        'RETURNED',
+        'REFUND',
+        'REFUNDED',
+    ];
+
+    private const SHIPPING_EXCLUDED_STATUSES = [
+        'UNPAID',
+        'CANCELLED',
+        'CANCELED',
+        'CANCELLED_BEFORE_SHIPPING',
+        'BATAL',
+        'IN_CANCEL',
+    ];
+
     public function index(Request $request)
     {
         $isPromotionDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
@@ -503,8 +529,20 @@ SQL;
         $summary['promotion_total'] = (float) $promotionDaily->sum('total_promotion');
         $summary['net_total'] = max($summary['subtotal'] - $summary['promotion_total'], 0);
 
-        $shippingStatusExpression = "UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), 'BELUM DITENTUKAN'))";
-        $shipping = (clone $base)
+        $shippingFailedStatusesSql = "'" . implode("', '", self::SHIPPING_FAILED_STATUSES) . "'";
+        $shippingStatusExpression = "CASE WHEN COALESCE(o.delivery_failed, 0) = 1 OR UPPER(COALESCE(NULLIF(o.tracking_status, ''), '')) IN ({$shippingFailedStatusesSql}) THEN 'FAILED_DELIVERY' ELSE UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), 'BELUM DITENTUKAN')) END";
+        $shippingExcludedPlaceholders = implode(',', array_fill(0, count(self::SHIPPING_EXCLUDED_STATUSES), '?'));
+        $shippingBase = DB::table('marketplace_orders as o')
+            ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
+            ->whereRaw("{$dateExpression} IS NOT NULL")
+            ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
+            ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
+            ->whereRaw("{$shippingStatusExpression} NOT IN ({$shippingExcludedPlaceholders})", self::SHIPPING_EXCLUDED_STATUSES)
+            ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
+            ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId));
+        $shippingFailedReturnStatusesSql = "'" . implode("', '", array_merge(['FAILED_DELIVERY'], self::SHIPPING_RETURN_STATUSES)) . "'";
+
+        $shipping = (clone $shippingBase)
             ->selectRaw("{$shippingStatusExpression} as status")
             ->selectRaw('COUNT(DISTINCT o.id) as orders')
             ->groupByRaw($shippingStatusExpression)
@@ -516,12 +554,13 @@ SQL;
                 return $row;
             });
 
-        $shippingDaily = (clone $base)
+        $shippingDaily = (clone $shippingBase)
             ->selectRaw("DATE({$dateExpression}) as day")
             ->selectRaw('COUNT(DISTINCT o.id) as orders')
             ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} IN ('PENDING', 'INVOICE_PENDING', 'READY_TO_SHIP', 'MATCHED') THEN o.id END) as ready_orders")
             ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} IN ('PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'TO_CONFIRM_RECEIVE') THEN o.id END) as transit_orders")
             ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} IN ('COMPLETED', 'SELESAI') THEN o.id END) as completed_orders")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} IN ({$shippingFailedReturnStatusesSql}) THEN o.id END) as failed_return_orders")
             ->groupByRaw("DATE({$dateExpression})")
             ->orderByDesc('day')
             ->get()
@@ -530,9 +569,10 @@ SQL;
                 $row->ready_orders = (int) $row->ready_orders;
                 $row->transit_orders = (int) $row->transit_orders;
                 $row->completed_orders = (int) $row->completed_orders;
+                $row->failed_return_orders = (int) $row->failed_return_orders;
                 $row->other_orders = max(
                     0,
-                    $row->orders - $row->ready_orders - $row->transit_orders - $row->completed_orders,
+                    $row->orders - $row->ready_orders - $row->transit_orders - $row->completed_orders - $row->failed_return_orders,
                 );
 
                 return $row;
@@ -815,15 +855,16 @@ SQL;
         }
 
         $dateExpression = 'COALESCE(o.ordered_at, o.order_date)';
-        $statusExpression = "UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), 'BELUM DITENTUKAN'))";
-        $nonRevenuePlaceholders = implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?'));
+        $shippingFailedStatusesSql = "'" . implode("', '", self::SHIPPING_FAILED_STATUSES) . "'";
+        $statusExpression = "CASE WHEN COALESCE(o.delivery_failed, 0) = 1 OR UPPER(COALESCE(NULLIF(o.tracking_status, ''), '')) IN ({$shippingFailedStatusesSql}) THEN 'FAILED_DELIVERY' ELSE UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), 'BELUM DITENTUKAN')) END";
+        $shippingExcludedPlaceholders = implode(',', array_fill(0, count(self::SHIPPING_EXCLUDED_STATUSES), '?'));
 
         $rows = DB::table('marketplace_orders as o')
             ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
             ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
             ->whereRaw("{$dateExpression} IS NOT NULL")
             ->whereDate(DB::raw($dateExpression), $selectedDate->toDateString())
-            ->whereRaw("{$statusExpression} NOT IN ({$nonRevenuePlaceholders})", self::NON_REVENUE_STATUSES)
+            ->whereRaw("{$statusExpression} NOT IN ({$shippingExcludedPlaceholders})", self::SHIPPING_EXCLUDED_STATUSES)
             ->when($isDashboardDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->select([
@@ -867,11 +908,18 @@ SQL;
                     'TO_CONFIRM_RECEIVE' => 'Menunggu Konfirmasi',
                     'COMPLETED' => 'Selesai',
                     'SELESAI' => 'Selesai',
+                    'FAILED_DELIVERY' => 'Gagal Kirim',
+                    'TO_RETURN' => 'Akan Return',
+                    'RETURNING' => 'Sedang Return',
+                    'RETURNED' => 'Sudah Return',
+                    'REFUND' => 'Refund',
+                    'REFUNDED' => 'Refund Selesai',
                 ][$row->shipping_status] ?? ucwords(strtolower(str_replace('_', ' ', $row->shipping_status)));
                 $row->status_group = match ($row->shipping_status) {
                     'PENDING', 'INVOICE_PENDING', 'READY_TO_SHIP', 'MATCHED' => 'ready',
                     'PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'TO_CONFIRM_RECEIVE' => 'transit',
                     'COMPLETED', 'SELESAI' => 'completed',
+                    'FAILED_DELIVERY', 'TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED' => 'failed-return',
                     default => 'other',
                 };
 
@@ -883,10 +931,11 @@ SQL;
             'ready_orders' => $rows->where('status_group', 'ready')->count(),
             'transit_orders' => $rows->where('status_group', 'transit')->count(),
             'completed_orders' => $rows->where('status_group', 'completed')->count(),
+            'failed_return_orders' => $rows->where('status_group', 'failed-return')->count(),
         ];
         $summary['other_orders'] = max(
             0,
-            $summary['orders'] - $summary['ready_orders'] - $summary['transit_orders'] - $summary['completed_orders'],
+            $summary['orders'] - $summary['ready_orders'] - $summary['transit_orders'] - $summary['completed_orders'] - $summary['failed_return_orders'],
         );
 
         return view('marketplace.dashboard.shipping-detail', [

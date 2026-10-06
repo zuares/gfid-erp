@@ -624,6 +624,7 @@
                                 <th class="text-end">Siap Dikirim</th>
                                 <th class="text-end">Dalam Pengiriman</th>
                                 <th class="text-end">Selesai</th>
+                                <th class="text-end">Gagal / Return</th>
                                 <th class="text-end pe-3">Status Lainnya</th>
                             </tr>
                         </thead>
@@ -635,6 +636,7 @@
                                     <td class="text-end">{{ number_format($row->ready_orders) }}</td>
                                     <td class="text-end">{{ number_format($row->transit_orders) }}</td>
                                     <td class="text-end">{{ number_format($row->completed_orders) }}</td>
+                                    <td class="text-end">{{ number_format($row->failed_return_orders) }}</td>
                                     <td class="text-end pe-3">{{ number_format($row->other_orders) }}</td>
                                 </tr>
                             @endforeach
