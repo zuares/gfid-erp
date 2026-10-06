@@ -215,22 +215,104 @@ class MarketplaceSalesDashboardController extends Controller
             ->limit(8)
             ->get();
 
-        $paymentExpression = "COALESCE(NULLIF(o.payment_method, ''), NULLIF(o.payment_status, ''), 'Belum ditentukan')";
-        $payments = (clone $base)
-            ->selectRaw("{$paymentExpression} as method")
-            ->selectRaw('COUNT(DISTINCT o.id) as orders')
-            ->selectRaw("COALESCE(SUM({$subtotalExpression}), 0) as subtotal")
-            ->groupByRaw($paymentExpression)
-            ->orderByDesc('orders')
-            ->get();
-
         $paymentStatusExpression = "UPPER(COALESCE(NULLIF(o.payment_status, ''), 'BELUM DITENTUKAN'))";
-        $paymentStatuses = (clone $base)
-            ->selectRaw("{$paymentStatusExpression} as status")
+        $paymentCategorySourceExpression = "LOWER(COALESCE(NULLIF(o.payment_method, ''), NULLIF(o.payment_status, ''), ''))";
+        $paymentCategoryExpression = "CASE
+            WHEN {$paymentCategorySourceExpression} LIKE '%paylater%'
+                OR {$paymentCategorySourceExpression} LIKE '%pay later%'
+                OR {$paymentCategorySourceExpression} LIKE '%cicilan%'
+                OR {$paymentCategorySourceExpression} LIKE '%installment%' THEN 'pay_later'
+            WHEN {$paymentCategorySourceExpression} LIKE '%cod%'
+                OR {$paymentCategorySourceExpression} LIKE '%cash on delivery%'
+                OR {$paymentCategorySourceExpression} LIKE '%bayar di tempat%' THEN 'cod'
+            ELSE 'non_cod'
+        END";
+        $buyerPaymentExpression = 'COALESCE(NULLIF(payment_ms.buyer_payment_amount, 0), NULLIF(o.total_paid_customer, 0), NULLIF(o.total_amount, 0), NULLIF(o.subtotal_items, 0), 0)';
+        $paymentBase = (clone $base)
+            ->leftJoin('marketplace_order_settlements as payment_ms', 'payment_ms.order_id', '=', 'o.id');
+        $payments = (clone $paymentBase)
+            ->selectRaw("{$paymentCategoryExpression} as category")
             ->selectRaw('COUNT(DISTINCT o.id) as orders')
-            ->groupByRaw($paymentStatusExpression)
+            ->selectRaw("COALESCE(SUM({$buyerPaymentExpression}), 0) as buyer_paid")
+            ->selectRaw("COALESCE(AVG({$buyerPaymentExpression}), 0) as avg_ticket")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$paymentStatusExpression} IN ('PAID', 'COMPLETED', 'SELESAI', 'LUNAS') THEN o.id END) as paid_orders")
+            ->groupByRaw($paymentCategoryExpression)
             ->orderByDesc('orders')
-            ->get();
+            ->get()
+            ->map(function ($row) {
+                $row->category = (string) $row->category;
+                $row->orders = (int) $row->orders;
+                $row->buyer_paid = (float) $row->buyer_paid;
+                $row->avg_ticket = (float) $row->avg_ticket;
+                $row->paid_orders = (int) $row->paid_orders;
+                $row->success_rate = $row->orders > 0 ? ($row->paid_orders / $row->orders) * 100 : 0;
+
+                return $row;
+            });
+
+        $paidPaymentStatuses = "'PAID', 'COMPLETED', 'SELESAI', 'LUNAS'";
+        $paymentDaily = (clone $paymentBase)
+            ->selectRaw("DATE({$dateExpression}) as day")
+            ->selectRaw('COUNT(DISTINCT o.id) as orders')
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$paymentStatusExpression} IN ({$paidPaymentStatuses}) THEN o.id END) as paid_orders")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$paymentStatusExpression} NOT IN ({$paidPaymentStatuses}) THEN o.id END) as pending_orders")
+            ->selectRaw("COALESCE(SUM({$buyerPaymentExpression}), 0) as buyer_paid")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN ({$paymentCategoryExpression}) = 'cod' THEN o.id END) as cod_orders")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN ({$paymentCategoryExpression}) = 'non_cod' THEN o.id END) as non_cod_orders")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN ({$paymentCategoryExpression}) = 'pay_later' THEN o.id END) as pay_later_orders")
+            ->selectRaw("COALESCE(SUM(CASE WHEN ({$paymentCategoryExpression}) = 'cod' THEN {$buyerPaymentExpression} ELSE 0 END), 0) as cod_amount")
+            ->selectRaw("COALESCE(SUM(CASE WHEN ({$paymentCategoryExpression}) = 'non_cod' THEN {$buyerPaymentExpression} ELSE 0 END), 0) as non_cod_amount")
+            ->selectRaw("COALESCE(SUM(CASE WHEN ({$paymentCategoryExpression}) = 'pay_later' THEN {$buyerPaymentExpression} ELSE 0 END), 0) as pay_later_amount")
+            ->selectRaw("COALESCE(SUM(CASE WHEN {$paymentStatusExpression} IN ({$paidPaymentStatuses}) THEN {$buyerPaymentExpression} ELSE 0 END), 0) as paid_amount")
+            ->selectRaw("COALESCE(SUM(CASE WHEN {$paymentStatusExpression} NOT IN ({$paidPaymentStatuses}) THEN {$buyerPaymentExpression} ELSE 0 END), 0) as pending_amount")
+            ->groupByRaw("DATE({$dateExpression})")
+            ->orderByDesc('day')
+            ->get()
+            ->map(function ($row) {
+                $row->orders = (int) $row->orders;
+                $row->paid_orders = (int) $row->paid_orders;
+                $row->pending_orders = (int) $row->pending_orders;
+                $row->buyer_paid = (float) $row->buyer_paid;
+                $row->cod_orders = (int) $row->cod_orders;
+                $row->non_cod_orders = (int) $row->non_cod_orders;
+                $row->pay_later_orders = (int) $row->pay_later_orders;
+                $row->cod_amount = (float) $row->cod_amount;
+                $row->non_cod_amount = (float) $row->non_cod_amount;
+                $row->pay_later_amount = (float) $row->pay_later_amount;
+                $row->paid_amount = (float) $row->paid_amount;
+                $row->pending_amount = (float) $row->pending_amount;
+                $row->aov = $row->orders > 0 ? $row->buyer_paid / $row->orders : 0;
+                $row->success_rate = $row->orders > 0 ? ($row->paid_orders / $row->orders) * 100 : 0;
+
+                return $row;
+            });
+
+        $paymentSummary = [
+            'orders' => (int) $paymentDaily->sum('orders'),
+            'paid_orders' => (int) $paymentDaily->sum('paid_orders'),
+            'pending_orders' => (int) $paymentDaily->sum('pending_orders'),
+            'buyer_paid' => (float) $paymentDaily->sum('buyer_paid'),
+            'paid_amount' => (float) $paymentDaily->sum('paid_amount'),
+            'pending_amount' => (float) $paymentDaily->sum('pending_amount'),
+        ];
+        $paymentOrderAmounts = (clone $paymentBase)
+            ->selectRaw("{$buyerPaymentExpression} as buyer_paid")
+            ->pluck('buyer_paid')
+            ->map(fn ($amount): float => (float) $amount)
+            ->filter(fn (float $amount): bool => $amount > 0)
+            ->values();
+        $paymentSummary['median_ticket'] = (float) ($paymentOrderAmounts->median() ?? 0);
+        $paymentSummary['max_ticket'] = (float) ($paymentOrderAmounts->max() ?? 0);
+        $paymentSummary['aov'] = $paymentSummary['orders'] > 0
+            ? $paymentSummary['buyer_paid'] / $paymentSummary['orders']
+            : 0;
+        $highValueThreshold = $paymentSummary['aov'] > 0 ? $paymentSummary['aov'] * 1.5 : 0;
+        $paymentSummary['high_value_orders'] = $highValueThreshold > 0
+            ? $paymentOrderAmounts->filter(fn (float $amount): bool => $amount >= $highValueThreshold)->count()
+            : 0;
+        $paymentSummary['success_rate'] = $paymentSummary['orders'] > 0
+            ? ($paymentSummary['paid_orders'] / $paymentSummary['orders']) * 100
+            : 0;
 
         // Imported order files keep the actual product promotion on the item
         // row. The legacy order-level discount columns are still used by API
@@ -421,7 +503,8 @@ SQL;
             'daily' => $daily,
             'products' => $products,
             'payments' => $payments,
-            'paymentStatuses' => $paymentStatuses,
+            'paymentDaily' => $paymentDaily,
+            'paymentSummary' => $paymentSummary,
             'promotionDaily' => $promotionDaily,
             'promotionOrders' => $promotionOrders,
             'shipping' => $shipping,
@@ -432,6 +515,123 @@ SQL;
                 'date_to' => $to->toDateString(),
                 'store_id' => $storeId,
                 'dummy' => $isPromotionDummy,
+            ],
+        ]);
+    }
+
+    public function paymentDetail(Request $request, string $date)
+    {
+        try {
+            $selectedDate = Carbon::createFromFormat('Y-m-d', $date)->startOfDay();
+            if ($selectedDate->format('Y-m-d') !== $date) {
+                abort(404);
+            }
+        } catch (\Throwable) {
+            abort(404);
+        }
+
+        $isDashboardDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
+        $storeId = $request->integer('store_id') ?: null;
+        $stores = Store::query()
+            ->where('is_active', true)
+            ->with('channel')
+            ->orderBy('name')
+            ->get();
+
+        if ($storeId && ! $stores->contains('id', $storeId)) {
+            $storeId = null;
+        }
+
+        $dateExpression = 'COALESCE(o.ordered_at, o.order_date)';
+        $orderStatusExpression = "UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), ''))";
+        $paymentStatusExpression = "UPPER(COALESCE(NULLIF(o.payment_status, ''), 'BELUM DITENTUKAN'))";
+        $productSubtotalExpression = 'CASE WHEN COALESCE(o.subtotal_items, 0) > 0 THEN o.subtotal_items ELSE COALESCE(o.total_amount, 0) END';
+        $buyerPaymentExpression = 'COALESCE(NULLIF(payment_ms.buyer_payment_amount, 0), NULLIF(o.total_paid_customer, 0), NULLIF(o.total_amount, 0), NULLIF(o.subtotal_items, 0), 0)';
+        $nonRevenuePlaceholders = implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?'));
+
+        $rows = DB::table('marketplace_orders as o')
+            ->leftJoin('marketplace_order_settlements as payment_ms', 'payment_ms.order_id', '=', 'o.id')
+            ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
+            ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
+            ->whereRaw("{$dateExpression} IS NOT NULL")
+            ->whereDate(DB::raw($dateExpression), $selectedDate->toDateString())
+            ->whereRaw("{$orderStatusExpression} NOT IN ({$nonRevenuePlaceholders})", self::NON_REVENUE_STATUSES)
+            ->when($isDashboardDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
+            ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
+            ->select([
+                'o.id',
+                'o.channel_order_id',
+                'o.external_order_id',
+                'o.buyer_username',
+                'o.buyer_name',
+                'o.payment_method',
+                'o.payment_status',
+                'o.shipping_fee_customer',
+                'st.name as store_name',
+                'ch.code as channel_code',
+            ])
+            ->selectRaw("{$dateExpression} as order_at")
+            ->selectRaw('COALESCE(o.paid_at, o.payment_date) as paid_at')
+            ->selectRaw("{$paymentStatusExpression} as payment_state")
+            ->selectRaw("{$orderStatusExpression} as order_state")
+            ->selectRaw("{$productSubtotalExpression} as product_subtotal")
+            ->selectRaw("{$buyerPaymentExpression} as buyer_paid_amount")
+            ->orderByDesc('order_at')
+            ->orderByDesc('o.id')
+            ->limit(500)
+            ->get()
+            ->map(function ($row) {
+                $row->order_number = $this->orderNumberForDisplay(
+                    $row->channel_order_id,
+                    $row->external_order_id,
+                    (int) $row->id,
+                );
+                $row->customer = $row->buyer_username ?: ($row->buyer_name ?: 'Pelanggan marketplace');
+                $row->store = $row->store_name ?: 'Toko marketplace';
+                $row->channel = $row->channel_code ? ucfirst((string) $row->channel_code) : 'Marketplace';
+                $row->payment = $row->payment_method ?: 'Belum ditentukan';
+                $row->product_subtotal = (float) $row->product_subtotal;
+                $row->buyer_paid_amount = (float) $row->buyer_paid_amount;
+                $row->shipping_fee = (float) ($row->shipping_fee_customer ?? 0);
+                $row->total_paid = $row->buyer_paid_amount;
+                $row->is_paid = in_array((string) $row->payment_state, ['PAID', 'COMPLETED', 'SELESAI', 'LUNAS'], true);
+
+                return $row;
+            });
+
+        $summary = [
+            'orders' => $rows->count(),
+            'paid_orders' => $rows->where('is_paid', true)->count(),
+            'pending_orders' => $rows->where('is_paid', false)->count(),
+            'subtotal' => (float) $rows->sum('buyer_paid_amount'),
+            'shipping_fee' => (float) $rows->sum('shipping_fee'),
+            'total_paid' => (float) $rows->sum('total_paid'),
+            'paid_amount' => (float) $rows->where('is_paid', true)->sum('buyer_paid_amount'),
+            'pending_amount' => (float) $rows->where('is_paid', false)->sum('buyer_paid_amount'),
+            'methods' => $rows->pluck('payment')->filter()->unique()->count(),
+        ];
+        $detailPaymentAmounts = $rows
+            ->pluck('buyer_paid_amount')
+            ->map(fn ($amount): float => (float) $amount)
+            ->filter(fn (float $amount): bool => $amount > 0)
+            ->values();
+        $summary['median_ticket'] = (float) ($detailPaymentAmounts->median() ?? 0);
+        $summary['max_ticket'] = (float) ($detailPaymentAmounts->max() ?? 0);
+        $summary['aov'] = $summary['orders'] > 0 ? $summary['subtotal'] / $summary['orders'] : 0;
+        $summary['success_rate'] = $summary['orders'] > 0 ? ($summary['paid_orders'] / $summary['orders']) * 100 : 0;
+        $detailHighValueThreshold = $summary['aov'] > 0 ? $summary['aov'] * 1.5 : 0;
+        $summary['high_value_orders'] = $detailHighValueThreshold > 0
+            ? $detailPaymentAmounts->filter(fn (float $amount): bool => $amount >= $detailHighValueThreshold)->count()
+            : 0;
+
+        return view('marketplace.dashboard.payment-detail', [
+            'rows' => $rows,
+            'summary' => $summary,
+            'selectedDate' => $selectedDate,
+            'stores' => $stores,
+            'filters' => [
+                'store_id' => $storeId,
+                'dummy' => $isDashboardDummy,
             ],
         ]);
     }

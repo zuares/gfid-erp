@@ -157,10 +157,23 @@
     $shippingOrders = fn (array $statuses) => (int) $shipping
         ->whereIn('status', $statuses)
         ->sum('orders');
-    $paidOrders = (int) $paymentStatuses
-        ->filter(fn ($row) => in_array((string) $row->status, ['PAID', 'COMPLETED', 'SELESAI', 'LUNAS'], true))
-        ->sum('orders');
     $netProductTotal = max($summary['subtotal'] - $promotionTotals['product_discount'], 0);
+    $paymentDetailQuery = ['tab' => 'payments'];
+    if ($filters['store_id']) $paymentDetailQuery['store_id'] = $filters['store_id'];
+    if (!empty($filters['dummy'])) $paymentDetailQuery['dummy'] = 1;
+    $topPaymentMethod = $payments->sortByDesc('buyer_paid')->first();
+    $peakPaymentDay = $paymentDaily->sortByDesc('aov')->first();
+    $paymentCategoryLabels = ['cod' => 'COD', 'non_cod' => 'Non-COD', 'pay_later' => 'Pay Later'];
+    $paymentMix = collect($paymentCategoryLabels)->mapWithKeys(function ($label, $category) use ($payments) {
+        return [$category => $payments->firstWhere('category', $category) ?: (object) [
+            'category' => $category,
+            'orders' => 0,
+            'paid_orders' => 0,
+            'buyer_paid' => 0,
+            'avg_ticket' => 0,
+            'success_rate' => 0,
+        ]];
+    });
 @endphp
 
 <div class="container-fluid py-4 sales-dashboard">
@@ -386,33 +399,99 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Pembayaran',
             'kpis' => [
-                ['label' => 'Jumlah Order', 'value' => number_format($summary['orders']), 'note' => 'periode aktif', 'icon' => 'bi-receipt'],
-                ['label' => 'Nilai Bruto', 'value' => $fmt($summary['subtotal']), 'note' => 'nilai order', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
-                ['label' => 'AOV', 'value' => $fmt($summary['aov']), 'note' => 'rata-rata order', 'icon' => 'bi-graph-up-arrow'],
-                ['label' => 'Status Pembayaran', 'value' => number_format($paidOrders), 'note' => 'order terbayar', 'icon' => 'bi-wallet2', 'variant' => 'sales-kpi--warning'],
+                ['label' => 'Total Dibayar Pembeli', 'value' => $fmt($paymentSummary['buyer_paid']), 'note' => number_format($paymentSummary['orders']).' order pada periode aktif', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
+                ['label' => 'Average Ticket', 'value' => $fmt($paymentSummary['aov']), 'note' => 'rata-rata daya beli / order', 'icon' => 'bi-graph-up-arrow'],
+                ['label' => 'Median Ticket', 'value' => $fmt($paymentSummary['median_ticket']), 'note' => 'nilai tipikal yang dibayar customer', 'icon' => 'bi-bar-chart-line'],
+                ['label' => 'High-value Orders', 'value' => number_format($paymentSummary['high_value_orders']), 'note' => '≥ 1,5× average ticket', 'icon' => 'bi-stars', 'variant' => 'sales-kpi--warning'],
             ],
         ])
-        <section class="card sales-card shadow-sm">
+        <section class="card sales-card shadow-sm mb-3">
             <div class="sales-section-header">
-                <div class="sales-kicker mb-1">Metode pembayaran</div>
-                <h2 class="sales-section-title mb-1">Ringkasan pembayaran</h2>
-                <div class="sales-section-subtitle">Distribusi pesanan berdasarkan metode atau status pembayaran yang tersimpan.</div>
+                <div class="sales-kicker mb-1">Purchasing power trend</div>
+                <h2 class="sales-section-title mb-1">Daya beli per tanggal</h2>
+                <div class="sales-section-subtitle">Lihat perubahan nominal yang dibayar customer, average ticket, dan payment success rate. Klik tanggal untuk drill-down.</div>
             </div>
-            @if ($payments->isEmpty())
+            @if ($paymentDaily->isEmpty())
                 <div class="sales-empty text-center"><i class="bi bi-wallet2 d-block fs-3 mb-2"></i>Belum ada data pembayaran pada periode ini.</div>
             @else
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle sales-table">
-                        <thead><tr><th class="ps-3">Metode / status</th><th class="text-end">Pesanan</th><th class="text-end pe-3">Subtotal</th></tr></thead>
+                        <thead><tr><th class="ps-3">Tanggal</th><th class="text-end">Order</th><th class="text-end">COD</th><th class="text-end">Non-COD</th><th class="text-end">Pay Later</th><th class="text-end">Dibayar Pembeli</th><th class="text-end">Success Rate</th><th class="text-end">Average Ticket</th><th class="text-end pe-3">Aksi</th></tr></thead>
                         <tbody>
-                            @foreach ($payments as $payment)
-                                <tr><td class="ps-3 fw-semibold">{{ ucwords(str_replace('_', ' ', strtolower($payment->method))) }}</td><td class="text-end">{{ number_format((int) $payment->orders) }}</td><td class="text-end pe-3 fw-semibold">{{ $fmt($payment->subtotal) }}</td></tr>
+                            @foreach ($paymentDaily as $payment)
+                                <tr class="sales-clickable-row" data-sales-payment-detail-url="{{ route('marketplace.dashboard.payments.detail', array_merge(['date' => $payment->day], $paymentDetailQuery)) }}" tabindex="0" role="button" aria-label="Lihat detail pembayaran {{ $dateLabel($payment->day) }}">
+                                    <td class="ps-3 fw-semibold">{{ $dateLabel($payment->day) }}</td>
+                                    <td class="text-end">{{ number_format($payment->orders) }}</td>
+                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->cod_amount) }}</div><div class="small text-muted">{{ number_format($payment->cod_orders) }} order</div></td>
+                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->non_cod_amount) }}</div><div class="small text-muted">{{ number_format($payment->non_cod_orders) }} order</div></td>
+                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->pay_later_amount) }}</div><div class="small text-muted">{{ number_format($payment->pay_later_orders) }} order</div></td>
+                                    <td class="text-end fw-semibold">{{ $fmt($payment->buyer_paid) }}</td>
+                                    <td class="text-end">{{ number_format($payment->success_rate, 1) }}%</td>
+                                    <td class="text-end">{{ $fmt($payment->aov) }}</td>
+                                    <td class="text-end pe-3"><span class="sales-action-link">Lihat detail <i class="bi bi-arrow-right"></i></span></td>
+                                </tr>
                             @endforeach
                         </tbody>
                     </table>
                 </div>
             @endif
         </section>
+        <div class="row g-3">
+            <div class="col-12 col-xl-8">
+                <section class="card sales-card shadow-sm h-100">
+                    <div class="sales-section-header">
+                        <div class="sales-kicker mb-1">Payment mix</div>
+                        <h2 class="sales-section-title mb-1">Metode pembayaran</h2>
+                        <div class="sales-section-subtitle">Kontribusi setiap metode terhadap nominal yang benar-benar dibayar customer.</div>
+                    </div>
+                    @if ($payments->isEmpty())
+                        <div class="sales-empty text-center"><i class="bi bi-credit-card d-block fs-3 mb-2"></i>Belum ada metode pembayaran.</div>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle sales-table">
+                                <thead><tr><th class="ps-3">Payment mix</th><th class="text-end">COD</th><th class="text-end">Non-COD</th><th class="text-end pe-3">Pay Later</th></tr></thead>
+                                <tbody>
+                                    <tr><td class="ps-3 fw-semibold">Order</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ number_format((int) $payment->orders) }}</td>@endforeach</tr>
+                                    <tr><td class="ps-3 fw-semibold">Dibayar Pembeli</td>@foreach ($paymentMix as $payment)<td class="text-end fw-semibold">{{ $fmt($payment->buyer_paid) }}</td>@endforeach</tr>
+                                    <tr><td class="ps-3 fw-semibold">Share Nominal</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ number_format($paymentSummary['buyer_paid'] > 0 ? ($payment->buyer_paid / $paymentSummary['buyer_paid']) * 100 : 0, 1) }}%</td>@endforeach</tr>
+                                    <tr><td class="ps-3 fw-semibold">Average Ticket</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ $fmt($payment->avg_ticket) }}</td>@endforeach</tr>
+                                    <tr><td class="ps-3 fw-semibold">Payment Success Rate</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ number_format($payment->success_rate, 1) }}%</td>@endforeach</tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </section>
+            </div>
+            <div class="col-12 col-xl-4">
+                <section class="card sales-card shadow-sm h-100">
+                    <div class="sales-section-header">
+                        <div class="sales-kicker mb-1">Customer purchasing power</div>
+                        <h2 class="sales-section-title mb-1">Daya beli customer</h2>
+                        <div class="sales-section-subtitle">Indikator nilai transaksi dan performa pembayaran periode aktif.</div>
+                    </div>
+                    <div class="p-3 pt-0">
+                        <div class="border rounded p-3 mb-2">
+                            <div class="small text-muted">Payment success rate</div>
+                            <div class="h4 mb-0">{{ number_format($paymentSummary['success_rate'], 1) }}%</div>
+                            <div class="small text-muted">{{ number_format($paymentSummary['paid_orders']) }} dari {{ number_format($paymentSummary['orders']) }} order</div>
+                        </div>
+                        <div class="border rounded p-3 mb-2">
+                            <div class="small text-muted">Nilai pembayaran tertinggi</div>
+                            <div class="h5 mb-0">{{ $fmt($paymentSummary['max_ticket']) }}</div>
+                            <div class="small text-muted">high-value customer order</div>
+                        </div>
+                        <div class="border rounded p-3">
+                            <div class="small text-muted">Metode dengan nominal terbesar</div>
+                            <div class="fw-semibold">{{ $topPaymentMethod ? ($paymentCategoryLabels[$topPaymentMethod->category] ?? $topPaymentMethod->category) : '-' }}</div>
+                            <div class="small text-muted">{{ $topPaymentMethod ? $fmt($topPaymentMethod->buyer_paid) : 'Belum ada data' }}</div>
+                        </div>
+                        @if ($peakPaymentDay)
+                            <div class="small text-muted mt-3">Peak average ticket: <strong>{{ $fmt($peakPaymentDay->aov) }}</strong> pada {{ $dateLabel($peakPaymentDay->day) }}</div>
+                        @endif
+                    </div>
+                </section>
+            </div>
+        </div>
     </div>
 
     <div class="sales-tab-pane is-hidden" data-sales-pane="promotions" role="tabpanel" aria-hidden="true">
@@ -598,6 +677,25 @@
                 });
             }
         });
+
+        document.querySelectorAll('[data-sales-payment-detail-url]').forEach(function (trigger) {
+            function openPaymentDetail() {
+                window.location.href = trigger.dataset.salesPaymentDetailUrl;
+            }
+
+            trigger.addEventListener('click', openPaymentDetail);
+            trigger.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openPaymentDetail();
+                }
+            });
+        });
+
+        const initialTab = new URLSearchParams(window.location.search).get('tab');
+        if (initialTab && document.querySelector('[data-sales-tab="' + initialTab + '"]')) {
+            activateTab(initialTab);
+        }
 
         if (orderDate) {
             orderDate.addEventListener('change', function () {
