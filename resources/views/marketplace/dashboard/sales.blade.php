@@ -408,7 +408,7 @@
                 <div>
                     <div class="sales-kicker mb-1">Dampak promosi</div>
                     <h2 class="sales-section-title mb-1">Promosi per tanggal</h2>
-                    <div class="sales-section-subtitle">Nilai promosi dikelompokkan berdasarkan tanggal pesanan. Nilai Rp0 berarti belum ada promo tercatat pada tanggal tersebut.</div>
+                    <div class="sales-section-subtitle">Voucher dan paket diskon dikelompokkan berdasarkan tanggal pesanan.</div>
                 </div>
                 <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($promotionOrders) }} order memakai promo</span>
             </div>
@@ -420,13 +420,9 @@
                         <thead>
                             <tr>
                                 <th class="ps-3">Tanggal</th>
-                                <th class="text-end">Order promo</th>
-                                <th class="text-end">Diskon produk</th>
                                 <th class="text-end">Voucher toko</th>
                                 <th class="text-end">Voucher platform</th>
                                 <th class="text-end">Paket diskon</th>
-                                <th class="text-end">Diskon lainnya</th>
-                                <th class="text-end">Subsidi ongkir</th>
                                 <th class="text-end pe-3">Total promosi</th>
                             </tr>
                         </thead>
@@ -434,13 +430,9 @@
                             @foreach ($promotionDaily as $row)
                                 <tr>
                                     <td class="ps-3 fw-semibold">{{ $dateLabel($row->day) }}</td>
-                                    <td class="text-end">{{ number_format((int) $row->promotion_orders) }}</td>
-                                    <td class="text-end">{{ $fmt($row->product_discount) }}</td>
                                     <td class="text-end">{{ $fmt($row->voucher_store) }}</td>
                                     <td class="text-end">{{ $fmt($row->voucher_platform) }}</td>
                                     <td class="text-end">{{ $fmt($row->bundle_discount) }}</td>
-                                    <td class="text-end">{{ $fmt($row->other_discount) }}</td>
-                                    <td class="text-end">{{ $fmt($row->shipping_discount) }}</td>
                                     <td class="text-end pe-3 fw-semibold">{{ $fmt($row->total_promotion) }}</td>
                                 </tr>
                             @endforeach
