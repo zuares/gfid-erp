@@ -64,11 +64,61 @@ class MarketplaceSalesDashboardController extends Controller
 
         $base = DB::table('marketplace_orders as o')
             ->leftJoinSub($itemTotals, 'itot', 'itot.order_key', '=', 'o.id')
+            ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
             ->whereRaw("{$dateExpression} IS NOT NULL")
             ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
             ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
             ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId));
+
+        $orderDetails = (clone $base)
+            ->select([
+                'o.id',
+                'o.channel_order_id',
+                'o.external_order_id',
+                'o.buyer_username',
+                'o.buyer_name',
+                'o.payment_method',
+                'o.payment_status',
+                'o.shipping_fee_customer',
+                'o.raw_json',
+                'o.raw_payload_json',
+                'st.name as store_name',
+            ])
+            ->selectRaw("{$dateExpression} as order_at")
+            ->selectRaw("DATE({$dateExpression}) as day")
+            ->selectRaw("{$statusExpression} as status")
+            ->selectRaw("{$subtotalExpression} as subtotal")
+            ->selectRaw('COALESCE(itot.total_qty, 0) as item_qty')
+            ->orderByDesc('order_at')
+            ->orderByDesc('o.id')
+            ->limit(500)
+            ->get()
+            ->map(function ($row) {
+                $quantity = (int) $row->item_qty;
+                if ($quantity <= 0) {
+                    $quantity = $this->quantityFromPayload($row->raw_json ?? $row->raw_payload_json);
+                }
+
+                $row->day = (string) $row->day;
+                $row->qty = max(0, $quantity);
+                $row->subtotal = (float) $row->subtotal;
+                // Gunakan nomor pesanan marketplace sebagai identitas utama di
+                // tab Detail Pesanan; ID internal hanya menjadi fallback terakhir.
+                $row->order_number = $this->orderNumberForDisplay(
+                    $row->channel_order_id,
+                    $row->external_order_id,
+                    (int) $row->id,
+                );
+                $row->order_ref = $row->order_number;
+                $row->buyer = $row->buyer_username ?: ($row->buyer_name ?: 'Pelanggan marketplace');
+                $row->payment = $row->payment_method ?: ($row->payment_status ?: 'Belum ditentukan');
+                $row->shipping_fee = (float) ($row->shipping_fee_customer ?? 0);
+
+                unset($row->raw_json, $row->raw_payload_json, $row->item_qty);
+
+                return $row;
+            });
 
         // Item rows are preferred. For older/imported orders, fall back to the
         // marketplace payload so the quantity KPI does not silently become 0.
@@ -176,6 +226,7 @@ class MarketplaceSalesDashboardController extends Controller
             'promotions' => $promotions,
             'promotionOrders' => (int) ($promotionTotals->discounted_orders ?? 0),
             'shipping' => $shipping,
+            'orderDetails' => $orderDetails,
             'stores' => $stores,
             'filters' => [
                 'date_from' => $from->toDateString(),
@@ -192,6 +243,22 @@ class MarketplaceSalesDashboardController extends Controller
         } catch (\Throwable) {
             return $default;
         }
+    }
+
+    private function orderNumberForDisplay(?string $channelOrderId, ?string $externalOrderId, int $internalId): string
+    {
+        foreach ([$channelOrderId, $externalOrderId] as $candidate) {
+            $candidate = trim((string) $candidate);
+
+            // Nomor order marketplace tidak berupa kalimat/catatan bebas.
+            // Record import lama yang salah mapping bisa berisi pesan pembeli;
+            // jangan tampilkan pesan tersebut sebagai No. Pesanan.
+            if ($candidate !== '' && ! preg_match('/\s/u', $candidate)) {
+                return $candidate;
+            }
+        }
+
+        return '#'.$internalId;
     }
 
     private function quantityFromPayload(mixed $payload): int

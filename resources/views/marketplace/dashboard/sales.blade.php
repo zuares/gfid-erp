@@ -120,6 +120,8 @@
     .sales-dashboard .sales-table td { border-color: color-mix(in srgb, var(--sales-line) 65%, transparent); font-size: .78rem; }
     .sales-dashboard .sales-date-link,
     .sales-dashboard .sales-action-link { color: var(--accent, #2563eb); font-weight: 700; text-decoration: none; }
+    .sales-dashboard button.sales-date-link { background: transparent; border: 0; cursor: pointer; padding: 0; }
+    .sales-dashboard button.sales-action-link { background: transparent; border: 0; cursor: pointer; padding: 0; }
     .sales-dashboard .sales-date-link:hover,
     .sales-dashboard .sales-action-link:hover { text-decoration: underline; }
     .sales-dashboard .sales-empty { color: var(--sales-muted); padding: 2.5rem 1rem; }
@@ -198,6 +200,7 @@
         <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="payments"><i class="bi bi-wallet2 me-1"></i>Pembayaran</button>
         <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="promotions"><i class="bi bi-percent me-1"></i>Promosi</button>
         <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="shipping"><i class="bi bi-truck me-1"></i>Pengiriman</button>
+        <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="orders"><i class="bi bi-list-ul me-1"></i>Detail Pesanan</button>
     </nav>
 
     <section class="row g-3 mb-4" aria-label="Ringkasan penjualan">
@@ -267,14 +270,13 @@
                     </thead>
                     <tbody>
                         @foreach ($daily as $row)
-                            @php $rowQuery = ['date_from' => $row->day, 'date_to' => $row->day]; if ($filters['store_id']) $rowQuery['store_id'] = $filters['store_id']; @endphp
                             <tr>
-                                <td class="ps-3"><a class="sales-date-link" href="{{ route('marketplace.dashboard.sales', $rowQuery) }}">{{ $dateLabel($row->day) }}</a></td>
+                                <td class="ps-3"><button class="sales-date-link" type="button" data-sales-order-detail-date="{{ $row->day }}">{{ $dateLabel($row->day) }}</button></td>
                                 <td class="text-end">{{ number_format($row->orders) }}</td>
                                 <td class="text-end">{{ number_format($row->qty) }}</td>
                                 <td class="text-end">{{ $fmt($row->subtotal) }}</td>
                                 <td class="text-end">{{ $fmt($row->aov) }}</td>
-                                <td class="text-end pe-3"><a class="sales-action-link" href="{{ route('marketplace.orders', $rowQuery) }}">Detail pesanan <i class="bi bi-arrow-right"></i></a></td>
+                                <td class="text-end pe-3"><button class="sales-action-link" type="button" data-sales-order-detail-date="{{ $row->day }}">Detail pesanan <i class="bi bi-arrow-right"></i></button></td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -282,6 +284,66 @@
             </div>
         @endif
     </section>
+    </div>
+
+    <div class="sales-tab-pane is-hidden" data-sales-pane="orders" role="tabpanel" aria-hidden="true">
+        <section class="card sales-card shadow-sm">
+            <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
+                <div>
+                    <div class="sales-kicker mb-1">Order operations</div>
+                    <h2 class="sales-section-title mb-1">Detail pesanan</h2>
+                    <div class="sales-section-subtitle">Detail order ditampilkan di dashboard ini tanpa membuka halaman lain.</div>
+                </div>
+                <span class="badge sales-badge rounded-pill px-3 py-2"><span data-sales-order-count>{{ $orderDetails->count() }}</span> order dimuat</span>
+            </div>
+
+            @if ($orderDetails->isEmpty())
+                <div class="sales-empty text-center"><i class="bi bi-receipt d-block fs-3 mb-2"></i>Belum ada detail pesanan pada periode ini.</div>
+            @else
+                <div class="px-3 pb-3">
+                    <label class="form-label small text-muted mb-1" for="sales-order-detail-date">Filter tanggal detail</label>
+                    <select id="sales-order-detail-date" class="form-select form-select-sm" style="max-width:260px">
+                        <option value="">Semua tanggal pada periode</option>
+                        @foreach ($daily as $row)
+                            <option value="{{ $row->day }}">{{ $dateLabel($row->day) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle sales-table">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">No. Pesanan</th>
+                                <th>Tanggal</th>
+                                <th>Pelanggan</th>
+                                <th>Toko</th>
+                                <th>Pembayaran</th>
+                                <th>Status</th>
+                                <th class="text-end">Qty</th>
+                                <th class="text-end">Subtotal</th>
+                                <th class="text-end pe-3">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($orderDetails as $order)
+                                <tr data-sales-order-row data-order-day="{{ $order->day }}">
+                                    <td class="ps-3 fw-semibold text-nowrap">{{ $order->order_number }}</td>
+                                    <td class="text-nowrap">{{ \Carbon\Carbon::parse($order->order_at)->format('d M Y H:i') }}</td>
+                                    <td>{{ $order->buyer }}</td>
+                                    <td class="text-muted">{{ $order->store_name ?: '-' }}</td>
+                                    <td class="text-muted">{{ ucwords(str_replace('_', ' ', strtolower($order->payment))) }}</td>
+                                    <td><span class="badge sales-badge">{{ ucwords(str_replace('_', ' ', strtolower($order->status))) }}</span></td>
+                                    <td class="text-end">{{ number_format((int) $order->qty) }}</td>
+                                    <td class="text-end">{{ $fmt($order->subtotal) }}</td>
+                                    <td class="text-end pe-3 fw-semibold">{{ $fmt($order->subtotal + $order->shipping_fee) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <div class="sales-empty d-none text-center" data-sales-order-empty>Tidak ada pesanan pada tanggal yang dipilih.</div>
+            @endif
+        </section>
     </div>
 
     <div class="sales-tab-pane is-hidden" data-sales-pane="products" role="tabpanel" aria-hidden="true">
@@ -398,24 +460,56 @@
     document.addEventListener('DOMContentLoaded', function () {
         const tabs = document.querySelectorAll('[data-sales-tab]');
         const panes = document.querySelectorAll('[data-sales-pane]');
+        const orderRows = document.querySelectorAll('[data-sales-order-row]');
+        const orderDate = document.querySelector('#sales-order-detail-date');
+        const orderCount = document.querySelector('[data-sales-order-count]');
+        const orderEmpty = document.querySelector('[data-sales-order-empty]');
+
+        function activateTab(target) {
+            tabs.forEach(function (item) {
+                const active = item.dataset.salesTab === target;
+                item.classList.toggle('active', active);
+                item.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+
+            panes.forEach(function (pane) {
+                const active = pane.dataset.salesPane === target;
+                pane.classList.toggle('is-hidden', !active);
+                pane.setAttribute('aria-hidden', active ? 'false' : 'true');
+            });
+        }
+
+        function filterOrderRows(day) {
+            let visible = 0;
+            orderRows.forEach(function (row) {
+                const show = !day || row.dataset.orderDay === day;
+                row.classList.toggle('d-none', !show);
+                if (show) visible += 1;
+            });
+            if (orderCount) orderCount.textContent = visible;
+            if (orderEmpty) orderEmpty.classList.toggle('d-none', visible > 0);
+        }
 
         tabs.forEach(function (tab) {
             tab.addEventListener('click', function () {
-                const target = tab.dataset.salesTab;
-
-                tabs.forEach(function (item) {
-                    const active = item === tab;
-                    item.classList.toggle('active', active);
-                    item.setAttribute('aria-selected', active ? 'true' : 'false');
-                });
-
-                panes.forEach(function (pane) {
-                    const active = pane.dataset.salesPane === target;
-                    pane.classList.toggle('is-hidden', !active);
-                    pane.setAttribute('aria-hidden', active ? 'false' : 'true');
-                });
+                activateTab(tab.dataset.salesTab);
             });
         });
+
+        document.querySelectorAll('[data-sales-order-detail-date]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                const day = button.dataset.salesOrderDetailDate || '';
+                if (orderDate) orderDate.value = day;
+                filterOrderRows(day);
+                activateTab('orders');
+            });
+        });
+
+        if (orderDate) {
+            orderDate.addEventListener('change', function () {
+                filterOrderRows(orderDate.value);
+            });
+        }
     });
 </script>
 @endpush

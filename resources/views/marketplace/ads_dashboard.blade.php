@@ -1536,6 +1536,231 @@ body[data-theme="dark"] .dash-sec{
 }
 
 @keyframes adsToastIn { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Ads dashboard skin: gunakan pola Bootstrap/GFID yang sama dengan dashboard
+   penjualan. Selector sengaja scoped agar chart, modal, dan komponen legacy
+   di tab lain tetap memakai hook dan ukuran yang sudah ada. */
+.ads-dashboard {
+    --ads-line: var(--line, #d4d7e3);
+    --ads-muted: var(--muted, #6b7280);
+    --ads-card: var(--card, #fff);
+    --ads-soft: var(--card-soft, #f9fafb);
+    --ads-ink: var(--text, #111827);
+    max-width: 1320px;
+    margin-inline: auto;
+    color: var(--ads-ink);
+}
+
+.ads-dashboard .ads-shell {
+    max-width: 1320px;
+    padding: 0 .75rem 4rem;
+}
+
+.ads-dashboard .ads-hero {
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 1rem !important;
+    padding: 1rem 1.15rem !important;
+    margin: 0 0 .75rem !important;
+    border: 1px solid var(--ads-line) !important;
+    border-radius: .75rem !important;
+    background: var(--ads-card) !important;
+    box-shadow: 0 .125rem .25rem rgba(15, 23, 42, .035) !important;
+}
+
+.ads-dashboard .ads-hero .title {
+    color: var(--ads-ink) !important;
+    font-size: 1.45rem !important;
+    font-weight: 800 !important;
+    letter-spacing: -.035em;
+}
+
+.ads-dashboard .ads-hero .sub,
+.ads-dashboard .global-sync-label,
+.ads-dashboard #globalSyncStatus {
+    color: var(--ads-muted) !important;
+}
+
+.ads-dashboard .ads-hero .title .text-primary { color: var(--accent, #2563eb) !important; }
+
+.ads-dashboard .ads-hero::before,
+.ads-dashboard .ads-hero::after { display: none !important; }
+
+.ads-dashboard #filterForm {
+    display: grid !important;
+    grid-template-columns: minmax(220px, .8fr) minmax(260px, 1.2fr);
+    gap: .75rem;
+    align-items: end;
+    width: 100%;
+    margin: 0 0 1rem !important;
+    padding: .9rem 1rem;
+    border: 1px solid var(--ads-line);
+    border-radius: .75rem;
+    background: var(--ads-soft);
+    box-shadow: 0 .125rem .25rem rgba(15, 23, 42, .025);
+}
+
+.ads-dashboard .ads-filter-field { min-width: 0; }
+.ads-dashboard .ads-filter-label {
+    display: block;
+    margin-bottom: .3rem;
+    color: var(--ads-muted);
+    font-size: .72rem;
+    font-weight: 700;
+}
+
+.ads-dashboard #filterForm .form-select,
+.ads-dashboard #filterForm .ads-range-control {
+    min-height: 38px;
+    border: 1px solid var(--ads-line) !important;
+    border-radius: .55rem !important;
+    background: var(--ads-card) !important;
+    color: var(--ads-ink) !important;
+    font-size: .8rem !important;
+    font-weight: 600 !important;
+}
+
+.ads-dashboard #filterForm .form-select:focus,
+.ads-dashboard #rangePicker:focus {
+    border-color: var(--accent, #2563eb) !important;
+    box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--accent, #2563eb) 18%, transparent) !important;
+}
+
+.ads-dashboard .ads-range-control {
+    display: flex !important;
+    align-items: center;
+    gap: .45rem;
+    padding: .35rem .7rem !important;
+    cursor: pointer;
+}
+
+.ads-dashboard .ads-range-control i { color: var(--accent, #2563eb) !important; }
+.ads-dashboard #rangePicker {
+    width: 100% !important;
+    min-width: 0;
+    border: 0 !important;
+    background: transparent !important;
+    color: var(--ads-ink) !important;
+    font-size: .8rem !important;
+    font-weight: 650 !important;
+    outline: 0 !important;
+}
+
+.ads-dashboard .ads-integration-card {
+    margin: 0 0 1rem !important;
+    padding: 1rem 1.1rem !important;
+    border: 1px solid var(--ads-line) !important;
+    border-radius: .75rem !important;
+    background: var(--ads-card) !important;
+    box-shadow: 0 .125rem .25rem rgba(15, 23, 42, .035) !important;
+    overflow: hidden;
+}
+
+.ads-dashboard .ads-integration-card > .ads-integration-head {
+    padding-bottom: .85rem;
+    border-bottom: 1px solid var(--ads-line);
+}
+
+.ads-dashboard .ads-tabs-wrap {
+    position: relative !important;
+    top: auto !important;
+    z-index: auto !important;
+    margin: 0 0 .55rem !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+}
+
+.ads-dashboard .dash-tabs-modern {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: .25rem;
+    width: max-content;
+    min-width: 100%;
+    padding: .25rem;
+    border: 1px solid var(--ads-line);
+    border-radius: .75rem;
+    background: var(--ads-card);
+    box-shadow: none;
+}
+
+.ads-dashboard .dash-tab-m {
+    border-radius: .55rem;
+    padding: .55rem .8rem;
+    color: var(--ads-muted);
+    font-size: .8rem;
+    font-weight: 650;
+}
+
+.ads-dashboard .dash-tab-m:hover,
+.ads-dashboard .dash-tab-m.active {
+    color: var(--accent, #2563eb);
+    background: var(--accent-soft, #dbeafe);
+    box-shadow: none;
+}
+
+.ads-dashboard .dash-tab-sm {
+    border-radius: .5rem;
+    color: var(--ads-muted);
+    font-size: .74rem;
+    font-weight: 650;
+}
+
+.ads-dashboard .dash-tab-sm:hover,
+.ads-dashboard .dash-tab-sm.active {
+    color: var(--accent, #2563eb);
+    background: var(--accent-soft, #dbeafe);
+    box-shadow: none;
+}
+
+.ads-dashboard .ads-tab-panel,
+.ads-dashboard .ads-surface,
+.ads-dashboard .dpanel {
+    border-color: var(--ads-line);
+    border-radius: .75rem;
+    background: var(--ads-card);
+    box-shadow: 0 .125rem .25rem rgba(15, 23, 42, .035);
+}
+
+.ads-dashboard .ads-tab-panel-head {
+    padding: 1rem 1.15rem .85rem;
+    background: var(--ads-card);
+    border-bottom-color: var(--ads-line);
+}
+
+.ads-dashboard .ads-tab-panel-title { color: var(--ads-ink); font-size: 1rem; }
+.ads-dashboard .ads-tab-panel-note { color: var(--ads-muted); background: var(--ads-soft); border-color: var(--ads-line); }
+
+.ads-dashboard .ads-kpi {
+    min-height: 132px;
+    border-color: var(--ads-line);
+    border-radius: .75rem;
+    background: var(--ads-card);
+    box-shadow: none;
+}
+
+.ads-dashboard .ads-kpi-label { color: var(--ads-muted); }
+.ads-dashboard .ads-kpi-value { color: var(--ads-ink); }
+.ads-dashboard .ads-kpi-sub { color: var(--ads-muted); border-top-color: var(--ads-line); }
+
+.ads-dashboard .dpanel-table thead th {
+    background: var(--ads-soft);
+    color: var(--ads-muted);
+    border-bottom-color: var(--ads-line);
+}
+
+.ads-dashboard .dpanel-table tbody td { border-bottom-color: var(--ads-line); color: var(--ads-ink); }
+
+@media (max-width: 767.98px) {
+    .ads-dashboard { padding-inline: .75rem !important; }
+    .ads-dashboard .ads-shell { padding-inline: 0; }
+    .ads-dashboard .ads-hero { padding: .85rem !important; }
+    .ads-dashboard .ads-hero .title { font-size: 1.15rem !important; }
+    .ads-dashboard #filterForm { grid-template-columns: 1fr; }
+    .ads-dashboard .ads-kpi { min-height: 118px; }
+    .ads-dashboard .ads-kpi-value { font-size: 1.15rem; }
+}
 </style>
 
 @endpush
@@ -2132,7 +2357,7 @@ document.addEventListener('DOMContentLoaded', function() {
 @endpush
 
 @section('content')
-<div class="dash py-3">
+<div class="dash py-4 ads-dashboard">
 <div class="page-wrap ads-shell">
 
     {{-- Toast ringan pengganti alert() — tipe otomatis dari isi pesan --}}
@@ -2170,37 +2395,41 @@ document.addEventListener('DOMContentLoaded', function() {
     {{-- ==============================================
          HERO SECTION (Header)
     ============================================== --}}
-    <div class="ads-hero" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+    <div class="ads-hero">
         <div>
-            <h1 class="title" style="margin-bottom: 0.2rem;"><i class="bi bi-megaphone text-primary me-1"></i> Iklan Shopee</h1>
-            <div class="sub" style="font-size: .8rem; margin: 0;">Pantau efisiensi, biaya, dan margin profit kampanye.</div>
+            <div class="text-muted small mb-1">Marketplace / Dashboard Iklan</div>
+            <h1 class="title mb-1"><i class="bi bi-megaphone text-primary me-1"></i> Iklan Shopee</h1>
+            <div class="sub">Pantau efisiensi, biaya, dan margin profit kampanye.</div>
             <div id="globalSyncStatus" data-last-sync="{{ $lastSyncTime ?? '' }}" style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin-top:.35rem;font-size:.68rem;color:var(--dsh-muted);">
                 <span class="global-sync-dot" style="width:7px;height:7px;border-radius:50%;background:#16a34a;display:inline-block;"></span>
                 <span class="global-sync-label">Sync terakhir: {{ ($lastSyncTime ?? '') ?: 'Belum pernah' }}</span>
                 <span style="opacity:.65;">· otomatis tiap jam</span>
             </div>
         </div>
-        
-        <form method="GET" action="{{ route('marketplace.ads.dashboard') }}" id="filterForm" style="display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; margin:0;">
-            <div>
-                <select name="store_id" onchange="submitAdsFilters(this.form)" class="form-select" style="border-radius:10px; font-size:.78rem; padding:.4rem 2rem .4rem .85rem; border:1px solid rgba(148,163,184,.4); font-weight:650; cursor:pointer; min-width: 140px;">
-                    <option value="all" {{ $storeId == 'all' ? 'selected' : '' }}>&#127970; Semua Toko</option>
-                    @foreach($stores as $s)
-                        <option value="{{ $s->id }}" {{ $storeId == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            
-            <div style="display:flex; align-items:center; background:rgba(148,163,184,.1); border-radius: 8px; padding: .35rem .7rem; transition: background .2s;" onmouseover="this.style.background='rgba(148,163,184,.18)'" onmouseout="this.style.background='rgba(148,163,184,.1)'">
-                <i class="bi bi-calendar2-week" style="color:var(--dsh-muted); font-size:.75rem; margin-right: .4rem;"></i>
-                <input type="text" id="rangePicker" placeholder="Pilih tanggal" readonly style="width:150px; border:none; background:transparent; font-size:.75rem; padding:0; font-weight:700; color:var(--text); cursor:pointer; box-shadow:none; outline:none;">
+    </div>
+
+    <form method="GET" action="{{ route('marketplace.ads.dashboard') }}" id="filterForm" class="ads-filter-card">
+        <div class="ads-filter-field">
+            <label class="ads-filter-label" for="ads-store-filter">Toko</label>
+            <select id="ads-store-filter" name="store_id" onchange="submitAdsFilters(this.form)" class="form-select form-select-sm">
+                <option value="all" {{ $storeId == 'all' ? 'selected' : '' }}>&#127970; Semua Toko</option>
+                @foreach($stores as $s)
+                    <option value="{{ $s->id }}" {{ $storeId == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="ads-filter-field">
+            <label class="ads-filter-label" for="rangePicker">Periode data</label>
+            <div class="ads-range-control">
+                <i class="bi bi-calendar2-week" aria-hidden="true"></i>
+                <input type="text" id="rangePicker" placeholder="Pilih tanggal" readonly aria-label="Pilih periode data">
                 <input type="hidden" name="date_from" id="fromHidden" value="{{ $dateFrom }}" data-gf-date="off">
                 <input type="hidden" name="date_to" id="toHidden" value="{{ $dateTo }}" data-gf-date="off">
                 <input type="hidden" name="compare_mode" id="compareModeHidden" value="{{ $compareMode ?? 'prev_period' }}">
             </div>
-
-        </form>
-    </div>
+        </div>
+    </form>
 
     @if(session('error'))
         <div class="dpanel dpanel-body" style="border-left: 4px solid #dc2626; color: #dc2626; font-size:.82rem; font-weight: 500;">
@@ -2216,8 +2445,8 @@ document.addEventListener('DOMContentLoaded', function() {
     {{-- ==============================================
          OFFICIAL READ-ONLY API INTEGRATION
     ============================================== --}}
-    <section class="dpanel" style="padding:1rem 1.1rem; margin:.75rem 0 1rem; border:1px solid rgba(37,99,235,.2); background:linear-gradient(135deg, rgba(239,246,255,.92), rgba(248,250,252,.9));">
-        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
+    <section class="dpanel ads-integration-card">
+        <div class="ads-integration-head" style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
             <div>
                 <div style="display:flex; align-items:center; gap:.45rem; font-size:.9rem; font-weight:800; color:#1e3a8a;">
                     <i class="bi bi-shield-lock-fill"></i> Integrasi API Ads · Read-only
