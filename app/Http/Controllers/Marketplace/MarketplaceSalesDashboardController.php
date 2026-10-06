@@ -192,18 +192,153 @@ class MarketplaceSalesDashboardController extends Controller
             ->orderByDesc('orders')
             ->get();
 
-        $promotionTotals = (clone $base)
-            ->selectRaw('COUNT(DISTINCT CASE WHEN COALESCE(o.voucher_discount, 0) + COALESCE(o.other_discount, 0) + COALESCE(o.shipping_discount_platform, 0) > 0 THEN o.id END) as discounted_orders')
-            ->selectRaw('COALESCE(SUM(o.voucher_discount), 0) as voucher_discount')
+        // Imported order files keep the actual product promotion on the item
+        // row. The legacy order-level discount columns are still used by API
+        // orders, so combine both sources without double-counting them.
+        $linePromotionExpression = <<<'SQL'
+CASE
+    WHEN COALESCE(oi.line_discount, 0) > 0 THEN oi.line_discount
+    WHEN COALESCE(oi.price_original, 0) > COALESCE(oi.price_after_discount, 0)
+        THEN (COALESCE(oi.price_original, 0) - COALESCE(oi.price_after_discount, 0)) * COALESCE(oi.qty, 0)
+    ELSE 0
+END
+SQL;
+        $promotionItemTotals = DB::table('marketplace_order_items as oi')
+            ->selectRaw('COALESCE(oi.marketplace_order_id, oi.order_id) as order_key')
+            ->selectRaw("COALESCE(SUM({$linePromotionExpression}), 0) as product_discount")
+            ->whereNotExists(function ($query) {
+                $query->selectRaw('1')
+                    ->from('marketplace_order_settlements as promo_settlement')
+                    ->whereRaw('promo_settlement.order_id = COALESCE(oi.marketplace_order_id, oi.order_id)');
+            })
+            ->groupByRaw('COALESCE(oi.marketplace_order_id, oi.order_id)');
+
+        $legacyPromotionAmountExpression = 'COALESCE(ipromo.product_discount, 0)'
+            . ' + COALESCE(o.voucher_discount, 0)'
+            . ' + COALESCE(o.other_discount, 0)'
+            . ' + COALESCE(o.shipping_discount_platform, 0)';
+
+        // Legacy/imported orders do not have a settlement breakdown. Keep them
+        // separate from settlement-backed orders so voucher and bundle values
+        // are not added twice.
+        $promotionDaily = (clone $base)
+            ->leftJoinSub($promotionItemTotals, 'ipromo', 'ipromo.order_key', '=', 'o.id')
+            ->whereNotExists(function ($query) {
+                $query->selectRaw('1')
+                    ->from('marketplace_order_settlements as promo_settlement')
+                    ->whereColumn('promo_settlement.order_id', 'o.id');
+            })
+            ->selectRaw("DATE({$dateExpression}) as day")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$legacyPromotionAmountExpression} > 0 THEN o.id END) as promotion_orders")
+            ->selectRaw('COALESCE(SUM(ipromo.product_discount), 0) as product_discount')
+            ->selectRaw('COALESCE(SUM(o.voucher_discount), 0) as voucher_store')
+            ->selectRaw('0 as voucher_platform')
+            ->selectRaw('0 as bundle_discount')
             ->selectRaw('COALESCE(SUM(o.other_discount), 0) as other_discount')
             ->selectRaw('COALESCE(SUM(o.shipping_discount_platform), 0) as shipping_discount')
-            ->first();
+            ->selectRaw("COALESCE(SUM({$legacyPromotionAmountExpression}), 0) as total_promotion")
+            ->groupByRaw("DATE({$dateExpression})")
+            ->orderByDesc('day')
+            ->get()
+            ->keyBy('day');
 
-        $promotions = collect([
-            ['label' => 'Voucher marketplace', 'amount' => (float) ($promotionTotals->voucher_discount ?? 0)],
-            ['label' => 'Diskon lainnya', 'amount' => (float) ($promotionTotals->other_discount ?? 0)],
-            ['label' => 'Subsidi ongkir platform', 'amount' => (float) ($promotionTotals->shipping_discount ?? 0)],
-        ])->filter(fn ($row) => $row['amount'] > 0)->values();
+        $settlementPromotionRows = DB::table('marketplace_order_settlements as ms')
+            ->join('marketplace_orders as o', 'o.id', '=', 'ms.order_id')
+            ->whereRaw("{$dateExpression} IS NOT NULL")
+            ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
+            ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
+            ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
+            ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
+            ->select([
+                'ms.order_id',
+                'ms.seller_voucher',
+                'ms.shipping_fee_subsidy',
+                'ms.raw_json',
+                'o.raw_json as order_raw_json',
+            ])
+            ->selectRaw("DATE({$dateExpression}) as day")
+            ->get();
+
+        foreach ($settlementPromotionRows as $settlementRow) {
+            $raw = is_array($settlementRow->raw_json)
+                ? $settlementRow->raw_json
+                : (json_decode((string) $settlementRow->raw_json, true) ?: []);
+            $orderRaw = json_decode((string) $settlementRow->order_raw_json, true) ?: [];
+
+            $voucherStore = array_key_exists('voucher_from_seller', $raw)
+                ? (float) $raw['voucher_from_seller']
+                : (float) ($settlementRow->seller_voucher ?? 0);
+            $voucherPlatform = array_key_exists('voucher_from_shopee', $raw)
+                ? (float) $raw['voucher_from_shopee']
+                : 0.0;
+            $shippingDiscount = array_key_exists('shopee_shipping_rebate', $raw)
+                ? (float) $raw['shopee_shipping_rebate']
+                : (float) ($settlementRow->shipping_fee_subsidy ?? 0);
+
+            $productDiscount = 0.0;
+            $bundleDiscount = 0.0;
+            $settlementItems = (array) ($raw['items'] ?? []);
+            $promotionItems = $settlementItems ?: (array) ($orderRaw['item_list'] ?? []);
+            foreach ($promotionItems as $item) {
+                $itemDiscount = (float) ($item['seller_discount'] ?? 0);
+                $originalPrice = (float) ($item['original_price'] ?? $item['model_original_price'] ?? 0);
+                $discountedPrice = (float) ($item['discounted_price'] ?? $item['model_discounted_price'] ?? 0);
+                if ($itemDiscount <= 0 && $discountedPrice > 0) {
+                    $itemDiscount = max($originalPrice - $discountedPrice, 0);
+                }
+
+                $promotionTypes = collect((array) ($item['promotion_list'] ?? []))
+                    ->map(fn ($promotion) => strtolower((string) ($promotion['promotion_type'] ?? '')))
+                    ->all();
+                $isBundle = in_array('bundle_deal', $promotionTypes, true)
+                    || strtolower((string) ($item['activity_type'] ?? '')) === 'bundle_deal'
+                    || strtolower((string) ($item['promotion_type'] ?? '')) === 'bundle_deal';
+
+                if ($isBundle) {
+                    $bundleDiscount += $itemDiscount;
+                } else {
+                    $productDiscount += $itemDiscount;
+                }
+            }
+
+            // Some settlement payloads do not include item details. Preserve
+            // the seller discount as an unclassified product discount rather
+            // than silently dropping it from the dashboard.
+            if ($productDiscount <= 0 && $bundleDiscount <= 0 && ! empty($raw['seller_discount'])) {
+                $productDiscount = (float) $raw['seller_discount'];
+            }
+
+            $day = (string) $settlementRow->day;
+            if (! isset($promotionDaily[$day])) {
+                $promotionDaily[$day] = (object) [
+                    'day' => $day,
+                    'promotion_orders' => 0,
+                    'product_discount' => 0,
+                    'voucher_store' => 0,
+                    'voucher_platform' => 0,
+                    'bundle_discount' => 0,
+                    'other_discount' => 0,
+                    'shipping_discount' => 0,
+                    'total_promotion' => 0,
+                ];
+            }
+
+            $row = $promotionDaily[$day];
+            $promotionTotal = $productDiscount + $voucherStore + $voucherPlatform
+                + $bundleDiscount + $shippingDiscount;
+            if ($promotionTotal > 0) {
+                $row->promotion_orders++;
+            }
+            $row->product_discount += $productDiscount;
+            $row->voucher_store += $voucherStore;
+            $row->voucher_platform += $voucherPlatform;
+            $row->bundle_discount += $bundleDiscount;
+            $row->shipping_discount += $shippingDiscount;
+            $row->total_promotion += $promotionTotal;
+        }
+
+        $promotionDaily = $promotionDaily->sortByDesc('day')->values();
+        $promotionOrders = (int) $promotionDaily->sum('promotion_orders');
 
         $shippingStatusExpression = "UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), 'BELUM DITENTUKAN'))";
         $shipping = (clone $base)
@@ -223,8 +358,8 @@ class MarketplaceSalesDashboardController extends Controller
             'daily' => $daily,
             'products' => $products,
             'payments' => $payments,
-            'promotions' => $promotions,
-            'promotionOrders' => (int) ($promotionTotals->discounted_orders ?? 0),
+            'promotionDaily' => $promotionDaily,
+            'promotionOrders' => $promotionOrders,
             'shipping' => $shipping,
             'orderDetails' => $orderDetails,
             'stores' => $stores,

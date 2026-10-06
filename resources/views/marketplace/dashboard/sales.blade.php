@@ -407,23 +407,45 @@
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
                     <div class="sales-kicker mb-1">Dampak promosi</div>
-                    <h2 class="sales-section-title mb-1">Diskon dan subsidi</h2>
-                    <div class="sales-section-subtitle">Nilai promosi yang tercatat pada order dalam periode aktif.</div>
+                    <h2 class="sales-section-title mb-1">Promosi per tanggal</h2>
+                    <div class="sales-section-subtitle">Nilai promosi dikelompokkan berdasarkan tanggal pesanan. Nilai Rp0 berarti belum ada promo tercatat pada tanggal tersebut.</div>
                 </div>
                 <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($promotionOrders) }} order memakai promo</span>
             </div>
-            @if ($promotions->isEmpty())
-                <div class="sales-empty text-center"><i class="bi bi-percent d-block fs-3 mb-2"></i>Belum ada diskon atau subsidi pada periode ini.</div>
+            @if ($promotionDaily->isEmpty())
+                <div class="sales-empty text-center"><i class="bi bi-percent d-block fs-3 mb-2"></i>Belum ada order pada periode ini.</div>
             @else
-                <div class="row g-3 p-3">
-                    @foreach ($promotions as $promotion)
-                        <div class="col-12 col-md-4">
-                            <div class="border rounded p-3 h-100">
-                                <div class="text-muted small">{{ $promotion['label'] }}</div>
-                                <div class="h5 mb-0 mt-2">{{ $fmt($promotion['amount']) }}</div>
-                            </div>
-                        </div>
-                    @endforeach
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle sales-table">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">Tanggal</th>
+                                <th class="text-end">Order promo</th>
+                                <th class="text-end">Diskon produk</th>
+                                <th class="text-end">Voucher toko</th>
+                                <th class="text-end">Voucher platform</th>
+                                <th class="text-end">Paket diskon</th>
+                                <th class="text-end">Diskon lainnya</th>
+                                <th class="text-end">Subsidi ongkir</th>
+                                <th class="text-end pe-3">Total promosi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($promotionDaily as $row)
+                                <tr>
+                                    <td class="ps-3 fw-semibold">{{ $dateLabel($row->day) }}</td>
+                                    <td class="text-end">{{ number_format((int) $row->promotion_orders) }}</td>
+                                    <td class="text-end">{{ $fmt($row->product_discount) }}</td>
+                                    <td class="text-end">{{ $fmt($row->voucher_store) }}</td>
+                                    <td class="text-end">{{ $fmt($row->voucher_platform) }}</td>
+                                    <td class="text-end">{{ $fmt($row->bundle_discount) }}</td>
+                                    <td class="text-end">{{ $fmt($row->other_discount) }}</td>
+                                    <td class="text-end">{{ $fmt($row->shipping_discount) }}</td>
+                                    <td class="text-end pe-3 fw-semibold">{{ $fmt($row->total_promotion) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
             @endif
         </section>
