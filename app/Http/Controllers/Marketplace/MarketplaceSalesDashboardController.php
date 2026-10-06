@@ -141,11 +141,7 @@ class MarketplaceSalesDashboardController extends Controller
                         continue;
                     }
 
-                    $isBundle = $this->isBundlePromotionItem($item);
-
-                    if ($isBundle) {
-                        $bundleDiscount += $this->normalizedPromotionItemDiscount($item);
-                    }
+                    $bundleDiscount += $this->promotionDiscountSplit($item)['bundle_discount'];
                 }
                 $row->voucher_store = $voucherStore;
                 $row->voucher_platform = $voucherPlatform;
@@ -335,14 +331,9 @@ SQL;
                     continue;
                 }
 
-                $itemDiscount = $this->normalizedPromotionItemDiscount($item);
-                $isBundle = $this->isBundlePromotionItem($item);
-
-                if ($isBundle) {
-                    $bundleDiscount += $itemDiscount;
-                } else {
-                    $productDiscount += $itemDiscount;
-                }
+                $split = $this->promotionDiscountSplit($item);
+                $productDiscount += $split['product_discount'];
+                $bundleDiscount += $split['bundle_discount'];
             }
 
             // Some settlement payloads do not include item details. Preserve
@@ -654,14 +645,9 @@ SQL;
                 continue;
             }
 
-            $itemDiscount = $this->normalizedPromotionItemDiscount($item);
-            $isBundle = $this->isBundlePromotionItem($item);
-
-            if ($isBundle) {
-                $bundleDiscount += $itemDiscount;
-            } else {
-                $productDiscount += $itemDiscount;
-            }
+            $split = $this->promotionDiscountSplit($item);
+            $productDiscount += $split['product_discount'];
+            $bundleDiscount += $split['bundle_discount'];
         }
 
         if ($productDiscount <= 0 && $bundleDiscount <= 0 && ! empty($settlementRaw['seller_discount'])) {
@@ -716,6 +702,48 @@ SQL;
         }
 
         return $reportedDiscount;
+    }
+
+    /**
+     * A bundle settlement item may contain a second seller discount after the
+     * bundle price has been applied. Split the two price gaps when Shopee
+     * provides selling_price; otherwise keep the explicit bundle amount as a
+     * bundle discount.
+     */
+    private function promotionDiscountSplit(array $item): array
+    {
+        $totalDiscount = $this->normalizedPromotionItemDiscount($item);
+        if ($totalDiscount <= 0) {
+            return ['product_discount' => 0.0, 'bundle_discount' => 0.0];
+        }
+
+        if (! $this->isBundlePromotionItem($item)) {
+            return ['product_discount' => $totalDiscount, 'bundle_discount' => 0.0];
+        }
+
+        $originalPrice = max((float) ($item['original_price'] ?? $item['model_original_price'] ?? 0), 0);
+        $sellingPrice = max((float) ($item['selling_price'] ?? 0), 0);
+        $discountedPrice = max((float) ($item['discounted_price'] ?? $item['model_discounted_price'] ?? 0), 0);
+
+        $bundleGap = max($originalPrice - $sellingPrice, 0);
+        $productGap = max($sellingPrice - $discountedPrice, 0);
+
+        if ($bundleGap > 0 && $productGap > 0) {
+            $bundleDiscount = min($totalDiscount, $bundleGap);
+            $productDiscount = min(max($totalDiscount - $bundleDiscount, 0), $productGap);
+            $remaining = max($totalDiscount - $bundleDiscount - $productDiscount, 0);
+
+            // Preserve the complete reported seller discount if the source
+            // rounds one of the price fields differently.
+            $bundleDiscount += $remaining;
+
+            return [
+                'product_discount' => $productDiscount,
+                'bundle_discount' => $bundleDiscount,
+            ];
+        }
+
+        return ['product_discount' => 0.0, 'bundle_discount' => $totalDiscount];
     }
 
     private function decodePayload(mixed $payload): array

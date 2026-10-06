@@ -220,12 +220,9 @@ class MarketplaceOrderController extends Controller
                 continue;
             }
 
-            $discount = $this->normalizedPromotionItemDiscount($item);
-            if ($this->isBundlePromotionItem($item)) {
-                $bundleDiscount += $discount;
-            } else {
-                $productDiscount += $discount;
-            }
+            $split = $this->promotionDiscountSplit($item);
+            $productDiscount += $split['product_discount'];
+            $bundleDiscount += $split['bundle_discount'];
         }
 
         if ($productDiscount <= 0 && $bundleDiscount <= 0 && ! empty($settlementRaw['seller_discount'])) {
@@ -279,6 +276,42 @@ class MarketplaceOrderController extends Controller
         }
 
         return $reportedDiscount;
+    }
+
+    /**
+     * Split a bundle line when the settlement contains both the bundle price
+     * and a later seller/product discount.
+     */
+    private function promotionDiscountSplit(array $item): array
+    {
+        $totalDiscount = $this->normalizedPromotionItemDiscount($item);
+        if ($totalDiscount <= 0) {
+            return ['product_discount' => 0.0, 'bundle_discount' => 0.0];
+        }
+
+        if (! $this->isBundlePromotionItem($item)) {
+            return ['product_discount' => $totalDiscount, 'bundle_discount' => 0.0];
+        }
+
+        $originalPrice = max((float) ($item['original_price'] ?? $item['model_original_price'] ?? 0), 0);
+        $sellingPrice = max((float) ($item['selling_price'] ?? 0), 0);
+        $discountedPrice = max((float) ($item['discounted_price'] ?? $item['model_discounted_price'] ?? 0), 0);
+        $bundleGap = max($originalPrice - $sellingPrice, 0);
+        $productGap = max($sellingPrice - $discountedPrice, 0);
+
+        if ($bundleGap > 0 && $productGap > 0) {
+            $bundleDiscount = min($totalDiscount, $bundleGap);
+            $productDiscount = min(max($totalDiscount - $bundleDiscount, 0), $productGap);
+            $remaining = max($totalDiscount - $bundleDiscount - $productDiscount, 0);
+            $bundleDiscount += $remaining;
+
+            return [
+                'product_discount' => $productDiscount,
+                'bundle_discount' => $bundleDiscount,
+            ];
+        }
+
+        return ['product_discount' => 0.0, 'bundle_discount' => $totalDiscount];
     }
 
     private function decodePayload(mixed $payload): array
