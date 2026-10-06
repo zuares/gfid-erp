@@ -124,6 +124,7 @@
     .sales-dashboard button.sales-action-link { background: transparent; border: 0; cursor: pointer; padding: 0; }
     .sales-dashboard .sales-date-link:hover,
     .sales-dashboard .sales-action-link:hover { text-decoration: underline; }
+    .sales-dashboard .sales-clickable-row { cursor: pointer; }
     .sales-dashboard .sales-empty { color: var(--sales-muted); padding: 2.5rem 1rem; }
     .sales-dashboard .sales-badge { background: var(--sales-soft); border: 1px solid var(--sales-line); color: var(--sales-muted); font-size: .7rem; font-weight: 650; }
 
@@ -147,6 +148,19 @@
     $dateLabel = fn ($date) => \Carbon\Carbon::parse($date)->format('d M Y');
     $detailQuery = ['date_from' => $filters['date_from'], 'date_to' => $filters['date_to']];
     if ($filters['store_id']) $detailQuery['store_id'] = $filters['store_id'];
+    $promotionTotals = [
+        'product_discount' => (float) $promotionDaily->sum('product_discount'),
+        'voucher_store' => (float) $promotionDaily->sum('voucher_store'),
+        'voucher_platform' => (float) $promotionDaily->sum('voucher_platform'),
+        'bundle_discount' => (float) $promotionDaily->sum('bundle_discount'),
+    ];
+    $shippingOrders = fn (array $statuses) => (int) $shipping
+        ->whereIn('status', $statuses)
+        ->sum('orders');
+    $paidOrders = (int) $paymentStatuses
+        ->filter(fn ($row) => in_array((string) $row->status, ['PAID', 'COMPLETED', 'SELESAI', 'LUNAS'], true))
+        ->sum('orders');
+    $netProductTotal = max($summary['subtotal'] - $promotionTotals['product_discount'], 0);
 @endphp
 
 <div class="container-fluid py-4 sales-dashboard">
@@ -166,6 +180,9 @@
                     <div class="sales-kicker mb-1">Periode data</div>
                     <div class="small text-muted">Filter angka dashboard</div>
                 </div>
+                @if (!empty($filters['dummy']))
+                    <input type="hidden" name="dummy" value="1">
+                @endif
                 <div class="col-6 col-md-2">
                     <label class="form-label" for="sales-date-from">Tanggal mulai</label>
                     <input id="sales-date-from" class="form-control form-control-sm" type="date" name="date_from" value="{{ $filters['date_from'] }}">
@@ -203,46 +220,16 @@
         <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="orders"><i class="bi bi-list-ul me-1"></i>Detail Pesanan</button>
     </nav>
 
-    <section class="row g-3 mb-4" aria-label="Ringkasan penjualan">
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card sales-card sales-kpi h-100 shadow-sm">
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-start justify-content-between mb-3"><span class="sales-kpi-label">Pesanan</span><span class="sales-kpi-icon"><i class="bi bi-receipt"></i></span></div>
-                    <div class="sales-kpi-value">{{ number_format($summary['orders']) }}</div>
-                    <div class="sales-kpi-note mt-1">pesanan tidak dibatalkan</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card sales-card sales-kpi h-100 shadow-sm">
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-start justify-content-between mb-3"><span class="sales-kpi-label">Jumlah barang</span><span class="sales-kpi-icon"><i class="bi bi-boxes"></i></span></div>
-                    <div class="sales-kpi-value">{{ number_format($summary['qty']) }}</div>
-                    <div class="sales-kpi-note mt-1">unit terjual</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card sales-card sales-kpi sales-kpi--success h-100 shadow-sm">
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-start justify-content-between mb-3"><span class="sales-kpi-label">Subtotal barang</span><span class="sales-kpi-icon"><i class="bi bi-cash-stack"></i></span></div>
-                    <div class="sales-kpi-value">{{ $fmt($summary['subtotal']) }}</div>
-                    <div class="sales-kpi-note mt-1">sebelum biaya pengiriman</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card sales-card sales-kpi sales-kpi--warning h-100 shadow-sm">
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-start justify-content-between mb-3"><span class="sales-kpi-label">AOV</span><span class="sales-kpi-icon"><i class="bi bi-bar-chart-line"></i></span></div>
-                    <div class="sales-kpi-value">{{ $fmt($summary['aov']) }}</div>
-                    <div class="sales-kpi-note mt-1">rata-rata nilai pesanan</div>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <div class="sales-tab-pane" data-sales-pane="sales" role="tabpanel">
+    @include('marketplace.dashboard.partials._kpis', [
+        'kpiTitle' => 'Penjualan',
+        'kpis' => [
+            ['label' => 'Jumlah Order', 'value' => number_format($summary['orders']), 'note' => 'order aktif', 'icon' => 'bi-receipt'],
+            ['label' => 'Nilai Bruto', 'value' => $fmt($summary['subtotal']), 'note' => 'sebelum promosi', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
+            ['label' => 'Total Promosi', 'value' => $fmt($summary['promotion_total']), 'note' => 'diskon dan voucher', 'icon' => 'bi-percent', 'variant' => 'sales-kpi--warning'],
+            ['label' => 'Nilai Neto', 'value' => $fmt($summary['net_total']), 'note' => 'setelah promosi', 'icon' => 'bi-graph-down-arrow'],
+        ],
+    ])
     <section class="card sales-card shadow-sm" aria-labelledby="daily-sales-title">
         <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
             <div>
@@ -287,6 +274,15 @@
     </div>
 
     <div class="sales-tab-pane is-hidden" data-sales-pane="orders" role="tabpanel" aria-hidden="true">
+        @include('marketplace.dashboard.partials._kpis', [
+            'kpiTitle' => 'Detail Order',
+            'kpis' => [
+                ['label' => 'Jumlah Order', 'value' => number_format($summary['orders']), 'note' => 'periode aktif', 'icon' => 'bi-receipt'],
+                ['label' => 'Unit Terjual', 'value' => number_format($summary['qty']), 'note' => 'unit marketplace', 'icon' => 'bi-boxes', 'variant' => 'sales-kpi--success'],
+                ['label' => 'Nilai Bruto', 'value' => $fmt($summary['subtotal']), 'note' => 'subtotal order', 'icon' => 'bi-cash-stack'],
+                ['label' => 'Nilai Neto', 'value' => $fmt($summary['net_total']), 'note' => 'setelah promosi', 'icon' => 'bi-graph-down-arrow'],
+            ],
+        ])
         <section class="card sales-card shadow-sm">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
@@ -318,10 +314,8 @@
                                 <th>Pelanggan</th>
                                 <th>Toko</th>
                                 <th>Pembayaran</th>
-                                <th>Status</th>
-                                <th class="text-end">Qty</th>
-                                <th class="text-end">Subtotal</th>
-                                <th class="text-end pe-3">Total</th>
+                                <th class="text-end">Voucher</th>
+                                <th class="text-end pe-3">Paket Diskon</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -332,10 +326,11 @@
                                     <td>{{ $order->buyer }}</td>
                                     <td class="text-muted">{{ $order->store_name ?: '-' }}</td>
                                     <td class="text-muted">{{ ucwords(str_replace('_', ' ', strtolower($order->payment))) }}</td>
-                                    <td><span class="badge sales-badge">{{ ucwords(str_replace('_', ' ', strtolower($order->status))) }}</span></td>
-                                    <td class="text-end">{{ number_format((int) $order->qty) }}</td>
-                                    <td class="text-end">{{ $fmt($order->subtotal) }}</td>
-                                    <td class="text-end pe-3 fw-semibold">{{ $fmt($order->subtotal + $order->shipping_fee) }}</td>
+                                    <td class="text-end">
+                                        <div>Toko: {{ $fmt($order->voucher_store) }}</div>
+                                        <div class="small text-muted">Platform: {{ $fmt($order->voucher_platform) }}</div>
+                                    </td>
+                                    <td class="text-end pe-3">{{ $fmt($order->bundle_discount) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -347,6 +342,15 @@
     </div>
 
     <div class="sales-tab-pane is-hidden" data-sales-pane="products" role="tabpanel" aria-hidden="true">
+        @include('marketplace.dashboard.partials._kpis', [
+            'kpiTitle' => 'Produk',
+            'kpis' => [
+                ['label' => 'Unit Terjual', 'value' => number_format($summary['qty']), 'note' => 'unit marketplace', 'icon' => 'bi-boxes'],
+                ['label' => 'Nilai Bruto Produk', 'value' => $fmt($summary['subtotal']), 'note' => 'sebelum diskon produk', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
+                ['label' => 'Diskon Produk', 'value' => $fmt($promotionTotals['product_discount']), 'note' => 'nilai potongan produk', 'icon' => 'bi-tag'],
+                ['label' => 'Nilai Neto Produk', 'value' => $fmt($netProductTotal), 'note' => 'setelah diskon produk', 'icon' => 'bi-graph-down-arrow'],
+            ],
+        ])
         <section class="card sales-card shadow-sm">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
@@ -379,6 +383,15 @@
     </div>
 
     <div class="sales-tab-pane is-hidden" data-sales-pane="payments" role="tabpanel" aria-hidden="true">
+        @include('marketplace.dashboard.partials._kpis', [
+            'kpiTitle' => 'Pembayaran',
+            'kpis' => [
+                ['label' => 'Jumlah Order', 'value' => number_format($summary['orders']), 'note' => 'periode aktif', 'icon' => 'bi-receipt'],
+                ['label' => 'Nilai Bruto', 'value' => $fmt($summary['subtotal']), 'note' => 'nilai order', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
+                ['label' => 'AOV', 'value' => $fmt($summary['aov']), 'note' => 'rata-rata order', 'icon' => 'bi-graph-up-arrow'],
+                ['label' => 'Status Pembayaran', 'value' => number_format($paidOrders), 'note' => 'order terbayar', 'icon' => 'bi-wallet2', 'variant' => 'sales-kpi--warning'],
+            ],
+        ])
         <section class="card sales-card shadow-sm">
             <div class="sales-section-header">
                 <div class="sales-kicker mb-1">Metode pembayaran</div>
@@ -403,14 +416,23 @@
     </div>
 
     <div class="sales-tab-pane is-hidden" data-sales-pane="promotions" role="tabpanel" aria-hidden="true">
+        @include('marketplace.dashboard.partials._kpis', [
+            'kpiTitle' => 'Promosi',
+            'kpis' => [
+                ['label' => 'Diskon Produk', 'value' => $fmt($promotionTotals['product_discount']), 'note' => 'nilai potongan produk', 'icon' => 'bi-tag'],
+                ['label' => 'Voucher Toko', 'value' => $fmt($promotionTotals['voucher_store']), 'note' => 'voucher seller', 'icon' => 'bi-ticket-perforated', 'variant' => 'sales-kpi--success'],
+                ['label' => 'Voucher Platform', 'value' => $fmt($promotionTotals['voucher_platform']), 'note' => 'voucher marketplace', 'icon' => 'bi-shop'],
+                ['label' => 'Bundle Deal', 'value' => $fmt($promotionTotals['bundle_discount']), 'note' => 'paket diskon', 'icon' => 'bi-gift', 'variant' => 'sales-kpi--warning'],
+            ],
+        ])
         <section class="card sales-card shadow-sm">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
                     <div class="sales-kicker mb-1">Dampak promosi</div>
                     <h2 class="sales-section-title mb-1">Promosi per tanggal</h2>
-                    <div class="sales-section-subtitle">Voucher dan paket diskon dikelompokkan berdasarkan tanggal pesanan.</div>
+                    <div class="sales-section-subtitle">Total promosi adalah gabungan diskon produk, voucher toko, voucher platform, dan paket diskon.</div>
                 </div>
-                <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($promotionOrders) }} order memakai promo</span>
+                <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($promotionDaily->count()) }} hari tercatat</span>
             </div>
             @if ($promotionDaily->isEmpty())
                 <div class="sales-empty text-center"><i class="bi bi-percent d-block fs-3 mb-2"></i>Belum ada order pada periode ini.</div>
@@ -420,19 +442,38 @@
                         <thead>
                             <tr>
                                 <th class="ps-3">Tanggal</th>
-                                <th class="text-end">Voucher toko</th>
-                                <th class="text-end">Voucher platform</th>
-                                <th class="text-end">Paket diskon</th>
-                                <th class="text-end pe-3">Total promosi</th>
+                                <th class="text-end">Nilai Bruto</th>
+                                <th class="text-end">Diskon produk</th>
+                                <th class="text-end">Nilai Neto</th>
+                                <th class="text-end">Voucher Toko</th>
+                                <th class="text-end">Voucher Platform</th>
+                                <th class="text-end">Bundle Deal</th>
+                                <th class="text-end pe-3">Total Promosi</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach ($promotionDaily as $row)
-                                <tr>
+                                <tr class="sales-clickable-row" data-sales-promotion-detail-url="{{ route('marketplace.dashboard.promotions.detail', ['date' => $row->day]) }}" tabindex="0" role="button" aria-label="Lihat detail promosi {{ $dateLabel($row->day) }}">
                                     <td class="ps-3 fw-semibold">{{ $dateLabel($row->day) }}</td>
-                                    <td class="text-end">{{ $fmt($row->voucher_store) }}</td>
-                                    <td class="text-end">{{ $fmt($row->voucher_platform) }}</td>
-                                    <td class="text-end">{{ $fmt($row->bundle_discount) }}</td>
+                                    <td class="text-end">
+                                        <div>{{ $fmt($row->order_before_discount ?? 0) }}</div>
+                                    </td>
+                                    <td class="text-end">
+                                        <div>{{ $fmt($row->product_discount) }}</div>
+                                    </td>
+                                    <td class="text-end">{{ $fmt(max((float) ($row->order_before_discount ?? 0) - (float) ($row->product_discount ?? 0), 0)) }}</td>
+                                    <td class="text-end">
+                                        <div>{{ $fmt($row->voucher_store) }}</div>
+                                        <div class="small text-muted">{{ number_format((int) ($row->voucher_store_orders ?? 0)) }} order</div>
+                                    </td>
+                                    <td class="text-end">
+                                        <div>{{ $fmt($row->voucher_platform) }}</div>
+                                        <div class="small text-muted">{{ number_format((int) ($row->voucher_platform_orders ?? 0)) }} order</div>
+                                    </td>
+                                    <td class="text-end">
+                                        <div>{{ $fmt($row->bundle_discount) }}</div>
+                                        <div class="small text-muted">{{ number_format((int) ($row->bundle_discount_orders ?? 0)) }} order</div>
+                                    </td>
                                     <td class="text-end pe-3 fw-semibold">{{ $fmt($row->total_promotion) }}</td>
                                 </tr>
                             @endforeach
@@ -444,6 +485,15 @@
     </div>
 
     <div class="sales-tab-pane is-hidden" data-sales-pane="shipping" role="tabpanel" aria-hidden="true">
+        @include('marketplace.dashboard.partials._kpis', [
+            'kpiTitle' => 'Pengiriman',
+            'kpis' => [
+                ['label' => 'Jumlah Order', 'value' => number_format($shipping->sum('orders')), 'note' => 'order terdistribusi', 'icon' => 'bi-receipt'],
+                ['label' => 'Siap Dikirim', 'value' => number_format($shippingOrders(['PENDING', 'INVOICE_PENDING', 'READY_TO_SHIP', 'MATCHED'])), 'note' => 'status operasional', 'icon' => 'bi-box-arrow-up', 'variant' => 'sales-kpi--success'],
+                ['label' => 'Dalam Pengiriman', 'value' => number_format($shippingOrders(['PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'TO_CONFIRM_RECEIVE'])), 'note' => 'status transit', 'icon' => 'bi-truck'],
+                ['label' => 'Selesai', 'value' => number_format($shippingOrders(['COMPLETED', 'SELESAI'])), 'note' => 'order selesai', 'icon' => 'bi-check2-circle', 'variant' => 'sales-kpi--warning'],
+            ],
+        ])
         <section class="card sales-card shadow-sm">
             <div class="sales-section-header">
                 <div class="sales-kicker mb-1">Fulfillment marketplace</div>
@@ -510,13 +560,43 @@
             });
         });
 
-        document.querySelectorAll('[data-sales-order-detail-date]').forEach(function (button) {
-            button.addEventListener('click', function () {
-                const day = button.dataset.salesOrderDetailDate || '';
+        document.querySelectorAll('[data-sales-order-detail-date]').forEach(function (trigger) {
+            function openOrderDetail() {
+                const day = trigger.dataset.salesOrderDetailDate || '';
                 if (orderDate) orderDate.value = day;
                 filterOrderRows(day);
                 activateTab('orders');
-            });
+            }
+
+            trigger.addEventListener('click', openOrderDetail);
+            if (trigger.matches('tr')) {
+                trigger.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openOrderDetail();
+                    }
+                });
+            }
+        });
+
+        document.querySelectorAll('[data-sales-promotion-detail-url]').forEach(function (trigger) {
+            function openPromotionDetail() {
+                const currentQuery = new URLSearchParams(window.location.search);
+                const target = new URL(trigger.dataset.salesPromotionDetailUrl, window.location.origin);
+                if (currentQuery.get('dummy') === '1') target.searchParams.set('dummy', '1');
+                if (currentQuery.get('store_id')) target.searchParams.set('store_id', currentQuery.get('store_id'));
+                window.location.href = target.toString();
+            }
+
+            trigger.addEventListener('click', openPromotionDetail);
+            if (trigger.matches('tr')) {
+                trigger.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openPromotionDetail();
+                    }
+                });
+            }
         });
 
         if (orderDate) {

@@ -118,6 +118,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::post('/marketplace/settings/delete-template', [MarketplaceSettingsController::class, 'deleteTemplate'])->name('marketplace.settings.delete_template');
     Route::get('/marketplace/analytics',  [MarketplaceAnalyticsController::class, 'index'])->name('marketplace.analytics');
     Route::get('/marketplace/dashboard/sales', [MarketplaceSalesDashboardController::class, 'index'])->name('marketplace.dashboard.sales');
+    Route::get('/marketplace/dashboard/promotions/{date}', [MarketplaceSalesDashboardController::class, 'promotionDetail'])->name('marketplace.dashboard.promotions.detail');
     Route::get('/marketplace/issues',      [MarketplaceSystemController::class, 'issueCenter'])->name('marketplace.issues');
     Route::get('/marketplace/returns',     [\App\Http\Controllers\MarketplaceReturnController::class, 'index'])->name('marketplace.returns');
     Route::get('/marketplace/kilat',       [\App\Http\Controllers\MarketplaceBookingController::class, 'index'])->name('marketplace.kilat');

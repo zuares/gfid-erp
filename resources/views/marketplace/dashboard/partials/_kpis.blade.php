@@ -1,0 +1,16 @@
+<section class="row g-3 mb-4" aria-label="KPI {{ $kpiTitle }}">
+    @foreach ($kpis as $kpi)
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card sales-card sales-kpi {{ $kpi['variant'] ?? '' }} h-100 shadow-sm">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-start justify-content-between mb-3">
+                        <span class="sales-kpi-label">{{ $kpi['label'] }}</span>
+                        <span class="sales-kpi-icon"><i class="bi {{ $kpi['icon'] }}"></i></span>
+                    </div>
+                    <div class="sales-kpi-value">{{ $kpi['value'] }}</div>
+                    <div class="sales-kpi-note mt-1">{{ $kpi['note'] }}</div>
+                </div>
+            </div>
+        </div>
+    @endforeach
+</section>
