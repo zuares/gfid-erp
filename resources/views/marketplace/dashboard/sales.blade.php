@@ -125,6 +125,21 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+    .sales-dashboard .sales-product-link {
+        display: block;
+        width: 100%;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        text-align: left;
+    }
+    .sales-dashboard .sales-product-link:hover .sales-product-name,
+    .sales-dashboard .sales-product-link:focus-visible .sales-product-name {
+        color: var(--accent, #2563eb);
+        text-decoration: underline;
+    }
     .sales-dashboard .sales-date-link,
     .sales-dashboard .sales-action-link { color: var(--accent, #2563eb); font-weight: 700; text-decoration: none; }
     .sales-dashboard button.sales-date-link { background: transparent; border: 0; cursor: pointer; padding: 0; }
@@ -385,16 +400,21 @@
             @else
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle sales-table">
-                        <thead><tr><th class="ps-3">Produk</th><th>SKU</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">AOV</th><th class="text-end pe-3">APC</th></tr></thead>
+                        <thead><tr><th class="ps-3">No.</th><th>Produk</th><th>SKU</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">AOV</th><th class="text-end pe-3">APC</th></tr></thead>
                         <tbody>
                             @foreach ($products as $product)
                                 <tr>
-                                    <td class="ps-3 fw-semibold"><span class="sales-product-name" title="{{ $product->name }}">{{ $product->name }}</span></td>
+                                    <td class="ps-3 text-muted fw-semibold">{{ $loop->iteration }}</td>
+                                    <td class="fw-semibold">
+                                        <button type="button" class="sales-product-link" data-sales-product-name="{{ $product->name }}" data-sales-product-sku="{{ $product->sku }}" title="Lihat pesanan produk: {{ $product->name }}">
+                                            <span class="sales-product-name">{{ $product->name }}</span>
+                                        </button>
+                                    </td>
                                     <td class="text-muted small">{{ $product->sku }}</td>
                                     <td class="text-end">{{ number_format((int) $product->qty) }}</td>
                                     <td class="text-end fw-semibold">{{ $fmt($product->sales) }}</td>
                                     <td class="text-end fw-semibold">{{ $fmt($product->buyer_payment) }}</td>
-                                    <td class="text-end" title="Average Order Value: pembayaran pembeli dibagi jumlah order">{{ $product->orders > 0 ? $fmt($product->buyer_payment / $product->orders) : '—' }}</td>
+                                    <td class="text-end" title="Average Order Value: penjualan dibagi jumlah order">{{ $product->orders > 0 ? $fmt($product->sales / $product->orders) : '—' }}</td>
                                     <td class="text-end" title="Average Payment per Customer: pembayaran pembeli dibagi pembeli unik">{{ $product->buyers > 0 ? $fmt($product->buyer_payment / $product->buyers) : '—' }}</td>
                                 </tr>
                             @endforeach
@@ -701,6 +721,82 @@
                 }
             });
         });
+
+        document.querySelectorAll('[data-sales-product-name]').forEach(function (trigger) {
+            trigger.addEventListener('click', async function () {
+                const name = trigger.dataset.salesProductName || '';
+                const sku = trigger.dataset.salesProductSku || '';
+                const query = new URLSearchParams({
+                    name: name,
+                    sku: sku,
+                    date_from: @json($filters['date_from']),
+                    date_to: @json($filters['date_to']),
+                });
+                @if ($filters['store_id'])
+                    query.set('store_id', @json($filters['store_id']));
+                @endif
+                @if (!empty($filters['dummy']))
+                    query.set('dummy', '1');
+                @endif
+
+                if (typeof Swal === 'undefined') {
+                    window.location.href = @json(route('marketplace.dashboard.products.orders')) + '?' + query.toString();
+                    return;
+                }
+
+                Swal.fire({
+                    title: 'Memuat pesanan…',
+                    html: '<div class="py-3"><div class="spinner-border spinner-border-sm text-primary" role="status"></div></div>',
+                    allowOutsideClick: false,
+                    showConfirmButton: false,
+                });
+
+                try {
+                    const response = await fetch(@json(route('marketplace.dashboard.products.orders')) + '?' + query.toString(), {
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    });
+                    const payload = await response.json();
+                    if (!response.ok) throw new Error(payload.message || 'Gagal memuat pesanan.');
+
+                    const orders = payload.orders || [];
+                    const money = function (value) {
+                        return 'Rp ' + new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Number(value || 0));
+                    };
+                    const date = function (value) {
+                        if (!value) return '—';
+                        return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+                    };
+                    const rows = orders.length
+                        ? orders.map(function (order) {
+                            return '<tr>'
+                                + '<td><strong>' + escapeHtml(order.order_number) + '</strong><div class="small text-muted">' + escapeHtml(date(order.order_at)) + '</div></td>'
+                                + '<td>' + escapeHtml(order.buyer) + '</td>'
+                                + '<td class="text-end">' + Number(order.qty || 0).toLocaleString('id-ID') + '</td>'
+                                + '<td class="text-end">' + money(order.sales) + '</td>'
+                                + '<td class="text-end">' + money(order.buyer_payment) + '</td>'
+                                + '<td><span class="badge text-bg-light">' + escapeHtml(order.order_status) + '</span></td>'
+                                + '</tr>';
+                        }).join('')
+                        : '<tr><td colspan="6" class="text-center text-muted py-4">Belum ada pesanan untuk produk ini pada periode aktif.</td></tr>';
+
+                    Swal.fire({
+                        title: 'Pesanan produk',
+                        html: '<div class="text-start mb-3"><strong>' + escapeHtml(name) + '</strong>' + (sku && sku !== '-' ? '<div class="small text-muted">SKU: ' + escapeHtml(sku) + '</div>' : '') + '</div>'
+                            + '<div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 text-start"><thead><tr><th>Order</th><th>Pembeli</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Pembayaran Pembeli</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>',
+                        width: Math.min(window.innerWidth - 32, 1100),
+                        confirmButtonText: 'Tutup',
+                    });
+                } catch (error) {
+                    Swal.fire({ icon: 'error', title: 'Pesanan tidak dapat dimuat', text: error.message || 'Terjadi kesalahan.' });
+                }
+            });
+        });
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>'\"]/g, function (character) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[character];
+            });
+        }
 
         const initialTab = new URLSearchParams(window.location.search).get('tab');
         if (initialTab && document.querySelector('[data-sales-tab="' + initialTab + '"]')) {

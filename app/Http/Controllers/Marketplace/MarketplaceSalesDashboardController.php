@@ -537,6 +537,121 @@ SQL;
         ]);
     }
 
+    public function productOrders(Request $request)
+    {
+        $name = trim((string) $request->query('name', ''));
+        $sku = trim((string) $request->query('sku', ''));
+
+        if ($name === '') {
+            return response()->json(['message' => 'Nama produk wajib diisi.'], 422);
+        }
+
+        $today = now()->startOfDay();
+        $from = $this->dateOrDefault($request->query('date_from'), (clone $today)->subDays(30));
+        $to = $this->dateOrDefault($request->query('date_to'), $today);
+
+        if ($from->greaterThan($to)) {
+            [$from, $to] = [$to, $from];
+        }
+
+        if ($from->diffInDays($to) > 366) {
+            $from = (clone $to)->subDays(366);
+        }
+
+        $storeId = $request->integer('store_id') ?: null;
+        $isPromotionDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
+        $dateExpression = 'COALESCE(o.ordered_at, o.order_date)';
+        $statusExpression = "UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), ''))";
+        $nameExpression = "COALESCE(NULLIF(oi.item_name, ''), NULLIF(oi.item_name_snapshot, ''), NULLIF(oi.variant_name, ''), NULLIF(oi.variant_snapshot, ''), 'Produk tanpa nama')";
+        $skuExpression = "COALESCE(NULLIF(oi.item_sku, ''), NULLIF(oi.marketplace_sku, ''), NULLIF(oi.model_sku, ''), NULLIF(oi.external_sku, ''), NULLIF(oi.item_code_snapshot, ''), '-')";
+
+        $rows = DB::table('marketplace_order_items as oi')
+            ->join('marketplace_orders as o', function ($join) {
+                $join->on(DB::raw('COALESCE(oi.marketplace_order_id, oi.order_id)'), '=', 'o.id');
+            })
+            ->leftJoin('marketplace_order_settlements as s', 's.order_id', '=', 'o.id')
+            ->whereRaw("{$dateExpression} IS NOT NULL")
+            ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
+            ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
+            ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
+            ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
+            ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
+            ->whereRaw("{$nameExpression} = ?", [$name])
+            ->when($sku !== '' && $sku !== '-', fn ($query) => $query->whereRaw("{$skuExpression} = ?", [$sku]))
+            ->select([
+                'o.id',
+                'o.channel_order_id',
+                'o.external_order_id',
+                'o.buyer_username',
+                'o.buyer_name',
+                'o.payment_status',
+                'o.order_status',
+                'o.status',
+                'o.total_paid_customer',
+                'o.total_amount',
+                'o.subtotal_items',
+                's.buyer_payment_amount',
+                'oi.qty',
+                'oi.price',
+                'oi.price_after_discount',
+                'oi.line_net_amount',
+                'oi.line_gross_amount',
+            ])
+            ->selectRaw("{$dateExpression} as order_at")
+            ->selectRaw("{$nameExpression} as product_name")
+            ->selectRaw("{$skuExpression} as product_sku")
+            ->orderByDesc('order_at')
+            ->orderByDesc('o.id')
+            ->limit(500)
+            ->get();
+
+        $orders = $rows
+            ->groupBy('id')
+            ->map(function ($items) {
+                $first = $items->first();
+                $sales = (float) $items->sum(function ($item) {
+                    $lineNet = (float) ($item->line_net_amount ?? 0);
+                    $price = (float) ($item->price ?? 0);
+                    $qty = max(0, (int) ($item->qty ?? 0));
+                    $lineGross = (float) ($item->line_gross_amount ?? 0);
+
+                    if ($lineNet > 0) {
+                        return $lineNet;
+                    }
+
+                    if ($price > 0) {
+                        return $price * $qty;
+                    }
+
+                    return $lineGross > 0 ? $lineGross : ((float) ($item->price_after_discount ?? 0) * $qty);
+                });
+                $buyerPayment = collect([
+                    $first->buyer_payment_amount,
+                    $first->total_paid_customer,
+                    $first->total_amount,
+                    $first->subtotal_items,
+                ])->map(fn ($value) => (float) $value)->first(fn (float $value) => $value > 0) ?? 0;
+
+                return [
+                    'id' => (int) $first->id,
+                    'order_number' => $this->orderNumberForDisplay($first->channel_order_id, $first->external_order_id, (int) $first->id),
+                    'order_at' => $first->order_at,
+                    'buyer' => $first->buyer_username ?: ($first->buyer_name ?: 'Pelanggan marketplace'),
+                    'qty' => (int) $items->sum(fn ($item) => max(0, (int) ($item->qty ?? 0))),
+                    'sales' => $sales,
+                    'buyer_payment' => $buyerPayment,
+                    'payment_status' => $first->payment_status ?: 'Belum ditentukan',
+                    'order_status' => $first->order_status ?: ($first->status ?: 'Belum ditentukan'),
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'product' => ['name' => $name, 'sku' => $sku],
+            'orders' => $orders,
+        ]);
+    }
+
     public function paymentDetail(Request $request, string $date)
     {
         try {
