@@ -101,7 +101,7 @@ class MarketplaceOrderController extends Controller
 
     public function show(MarketplaceOrder $order)
     {
-        $order->load(['store.channel', 'items.internalItem']);
+        $order->load(['store.channel', 'items.internalItem', 'settlement']);
 
         // Coba tarik data terbaru dari API agar halaman terupdate otomatis
         if ($order->store && $order->store->channel?->code === 'shopee') {
@@ -172,14 +172,126 @@ class MarketplaceOrderController extends Controller
         }
 
         $estimatedFeePct = round($estimatedFeeRatio * 100, 1);
+        $promotionBreakdown = $this->promotionBreakdownForOrder($order, $liveData ?? []);
 
         return view('marketplace.orders.show', compact(
             'order',
             'estimatedFeeRatio',
             'estimatedFeePct',
             'awbSource',
-            'internalPackageNo'
+            'internalPackageNo',
+            'promotionBreakdown'
         ));
+    }
+
+    /**
+     * Keep the order detail promotion values aligned with the promotions
+     * dashboard. Settlement item data is the source of truth for bundle vs.
+     * product discounts; income details remain a fallback for vouchers.
+     */
+    private function promotionBreakdownForOrder(MarketplaceOrder $order, array $liveData = []): array
+    {
+        $settlement = $order->settlement;
+        $settlementRaw = $this->decodePayload($settlement?->raw_json);
+        $income = $this->decodePayload($liveData['income_details'] ?? []);
+
+        $voucherStore = array_key_exists('voucher_from_seller', $settlementRaw)
+            ? (float) $settlementRaw['voucher_from_seller']
+            : (float) ($settlement?->seller_voucher
+                ?? $income['voucher_from_seller']
+                ?? $income['seller_voucher_rebate']
+                ?? 0);
+        $voucherPlatform = array_key_exists('voucher_from_shopee', $settlementRaw)
+            ? (float) $settlementRaw['voucher_from_shopee']
+            : (float) ($income['voucher_from_shopee']
+                ?? $income['voucher_from_platform']
+                ?? $income['platform_voucher']
+                ?? 0);
+
+        $productDiscount = 0.0;
+        $bundleDiscount = 0.0;
+        $promotionItems = (array) ($settlementRaw['items'] ?? []);
+        if ($promotionItems === []) {
+            $promotionItems = (array) ($liveData['item_list'] ?? []);
+        }
+
+        foreach ($promotionItems as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $discount = $this->normalizedPromotionItemDiscount($item);
+            if ($this->isBundlePromotionItem($item)) {
+                $bundleDiscount += $discount;
+            } else {
+                $productDiscount += $discount;
+            }
+        }
+
+        if ($productDiscount <= 0 && $bundleDiscount <= 0 && ! empty($settlementRaw['seller_discount'])) {
+            $productDiscount = (float) $settlementRaw['seller_discount'];
+        }
+
+        return [
+            'product_discount' => $productDiscount,
+            'voucher_store' => $voucherStore,
+            'voucher_platform' => $voucherPlatform,
+            'bundle_discount' => $bundleDiscount,
+            'coin' => (float) ($income['coin'] ?? 0),
+            'total_promotion' => $productDiscount + $voucherStore + $voucherPlatform + $bundleDiscount,
+        ];
+    }
+
+    private function isBundlePromotionItem(array $item): bool
+    {
+        if (in_array(strtolower((string) ($item['activity_type'] ?? '')), ['bundle_deal', 'bundle_deal_discount'], true)) {
+            return true;
+        }
+
+        if (strtolower((string) ($item['promotion_type'] ?? '')) === 'bundle_deal') {
+            return true;
+        }
+
+        $hasExplicitBundleAmount = collect([
+            $item['bundle_discount'] ?? null,
+            $item['bundle_deal_discount'] ?? null,
+            $item['bundle_discount_amount'] ?? null,
+        ])->contains(fn ($amount) => is_numeric($amount) && (float) $amount > 0);
+
+        return $hasExplicitBundleAmount && collect((array) ($item['promotion_list'] ?? []))
+            ->contains(fn ($promotion) => strtolower((string) ($promotion['promotion_type'] ?? '')) === 'bundle_deal');
+    }
+
+    private function normalizedPromotionItemDiscount(array $item): float
+    {
+        $reportedDiscount = max((float) ($item['seller_discount'] ?? 0), 0);
+        $originalPrice = max((float) ($item['original_price'] ?? $item['model_original_price'] ?? 0), 0);
+        $discountedPrice = max((float) ($item['discounted_price'] ?? $item['model_discounted_price'] ?? 0), 0);
+        $quantity = max((int) ($item['quantity_purchased'] ?? $item['model_quantity_purchased'] ?? $item['quantity'] ?? 1), 1);
+        $priceDifference = max($originalPrice - $discountedPrice, 0);
+
+        if ($reportedDiscount <= 0 && $priceDifference > 0) {
+            $reportedDiscount = $priceDifference * $quantity;
+        }
+
+        if ($reportedDiscount > 0 && $priceDifference > 0) {
+            $reportedDiscount = min($reportedDiscount, $priceDifference * $quantity);
+        }
+
+        return $reportedDiscount;
+    }
+
+    private function decodePayload(mixed $payload): array
+    {
+        if (is_array($payload)) {
+            return $payload;
+        }
+
+        if (is_string($payload)) {
+            $payload = json_decode($payload, true);
+        }
+
+        return is_array($payload) ? $payload : [];
     }
 
     public function updateSettlementTestFields(Request $request, MarketplaceOrder $order)

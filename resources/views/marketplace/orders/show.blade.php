@@ -65,6 +65,19 @@
     }
     $liveData = $raw['order_list'][0] ?? $raw['response']['order_list'][0] ?? (isset($raw['order_sn']) ? $raw : []);
     $pkg = $liveData['package_list'][0] ?? [];
+    $settlement = $order->settlement;
+    $settlementRaw = is_array($settlement?->raw_json ?? null) ? $settlement->raw_json : [];
+    $inc = array_replace($liveData['income_details'] ?? [], $settlementRaw);
+    $promotionBreakdown = $promotionBreakdown ?? [
+        'product_discount' => 0,
+        'voucher_store' => 0,
+        'voucher_platform' => 0,
+        'bundle_discount' => 0,
+        'coin' => 0,
+        'total_promotion' => 0,
+    ];
+    $settlementItems = (array) ($settlementRaw['items'] ?? []);
+    $displayItems = $settlementItems ?: (array) ($liveData['item_list'] ?? []);
 
     $normalizeDateTime = function ($value) {
         if ($value instanceof \Carbon\CarbonInterface) {
@@ -325,9 +338,11 @@
                 </div>
                 <div class="od-body od-list">
                     @php
-                        $promoVoucherPlatform = (float)($inc['voucher_from_shopee'] ?? $inc['voucher_from_platform'] ?? $inc['platform_voucher'] ?? 0);
-                        $promoVoucherToko = (float)($settlement->seller_voucher ?? $inc['voucher_from_seller'] ?? $inc['seller_voucher_rebate'] ?? 0);
-                        $promoKoinShopee = (float)($inc['coin'] ?? 0);
+                        $promoVoucherPlatform = (float) ($promotionBreakdown['voucher_platform'] ?? 0);
+                        $promoVoucherToko = (float) ($promotionBreakdown['voucher_store'] ?? 0);
+                        $promoDiskonProduk = (float) ($promotionBreakdown['product_discount'] ?? 0);
+                        $promoPaketDiskon = (float) ($promotionBreakdown['bundle_discount'] ?? 0);
+                        $promoKoinShopee = (float) ($promotionBreakdown['coin'] ?? $inc['coin'] ?? 0);
                         $promoSubtotal = (float)($inc['order_discounted_price'] ?? $order->subtotal_items ?? 0);
                         if ($promoSubtotal <= 0 && isset($liveData['item_list']) && is_array($liveData['item_list'])) {
                             foreach ($liveData['item_list'] as $it) {
@@ -357,11 +372,15 @@
                             $promoOngkir = $promoEstimasiOngkir - $promoShippingRebate;
                         }
                         $promoBiayaLayanan = (float)($inc['buyer_transaction_fee'] ?? max($promoBuyerPaid - $promoSubtotal - $promoOngkir - $promoVoucherPlatform - $promoVoucherToko - $promoKoinShopee, 0));
-                        $promoTotal = $promoVoucherPlatform + $promoVoucherToko + $promoKoinShopee;
+                        $promoTotal = (float) ($promotionBreakdown['total_promotion'] ?? ($promoDiskonProduk + $promoVoucherToko + $promoVoucherPlatform + $promoPaketDiskon));
                     @endphp
                     <div style="display:flex; justify-content:space-between">
                         <span class="od-muted">Buyer Paid</span>
                         <span class="od-code-cell" style="font-size:.85rem; font-weight:900; color:#111827">Rp{{ number_format($promoBuyerPaid, 0, ',', '.') }}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between">
+                        <span class="od-muted">Diskon Produk</span>
+                        <span class="od-code-cell" style="font-size:.85rem; color:#991b1b">-Rp{{ number_format($promoDiskonProduk, 0, ',', '.') }}</span>
                     </div>
                     <div style="display:flex; justify-content:space-between">
                         <span class="od-muted">Voucher Platform</span>
@@ -370,6 +389,10 @@
                     <div style="display:flex; justify-content:space-between">
                         <span class="od-muted">Voucher Toko</span>
                         <span class="od-code-cell" style="font-size:.85rem; color:#991b1b">-Rp{{ number_format($promoVoucherToko, 0, ',', '.') }}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between">
+                        <span class="od-muted">Paket Diskon</span>
+                        <span class="od-code-cell" style="font-size:.85rem; color:#991c1b">-Rp{{ number_format($promoPaketDiskon, 0, ',', '.') }}</span>
                     </div>
                     <div style="display:flex; justify-content:space-between">
                         <span class="od-muted">Koin Shopee</span>
@@ -384,7 +407,7 @@
                         <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($promoBiayaLayanan, 0, ',', '.') }}</span>
                     </div>
                     <div style="display:flex; justify-content:space-between; padding-top:.35rem; margin-top:.1rem; border-top:1px dashed rgba(148,163,184,.3)">
-                        <span class="od-muted">Total Promo Konsumen</span>
+                        <span class="od-muted">Total Promosi</span>
                         <span class="od-code-cell" style="font-size:.85rem; color:#b91c1c">-Rp{{ number_format($promoTotal, 0, ',', '.') }}</span>
                     </div>
                 </div>
@@ -395,7 +418,7 @@
     <div class="od-card">
         <div class="od-head">
             <div class="od-title">Rincian Produk</div>
-            <span class="od-pill">{{ count($liveData['item_list'] ?? $order->items ?? []) }} Item</span>
+            <span class="od-pill">{{ count($displayItems ?: ($order->items ?? [])) }} Item</span>
         </div>
         <div class="od-table-wrap">
             <table class="od-table">
@@ -410,7 +433,7 @@
                 </thead>
                 <tbody>
                     @php
-                        $items = $liveData['item_list'] ?? [];
+                        $items = $displayItems;
                         $fallbackItems = $order->items;
                         $subtotalItems = 0;
                     @endphp
@@ -418,9 +441,23 @@
                     @if(!empty($items))
                         @foreach($items as $item)
                         @php 
-                            $price = $item['model_discounted_price'] ?? $item['model_original_price'] ?? 0;
-                            $qty = $item['model_quantity_purchased'] ?? 1;
-                            $subtotalItems += $price * $qty;
+                            $qty = (float) ($item['quantity_purchased'] ?? $item['model_quantity_purchased'] ?? $item['quantity'] ?? 1);
+                            $qty = $qty > 0 ? $qty : 1;
+                            $lineTotal = (float) ($item['discounted_price'] ?? 0);
+                            $isSettlementItem = array_key_exists('discounted_price', $item) || array_key_exists('selling_price', $item);
+                            if ($isSettlementItem && $lineTotal <= 0) {
+                                $lineTotal = (float) ($item['selling_price'] ?? 0);
+                            }
+                            if ($isSettlementItem && $lineTotal > 0) {
+                                $price = $lineTotal / $qty;
+                            } else {
+                                $price = (float) ($item['model_discounted_price'] ?? 0);
+                                if ($price <= 0) {
+                                    $price = (float) ($item['model_original_price'] ?? $item['selling_price'] ?? 0);
+                                }
+                                $lineTotal = $price * $qty;
+                            }
+                            $subtotalItems += $lineTotal;
                         @endphp
                         <tr>
                             <td class="od-code-cell">{{ $item['model_sku'] ?? $item['item_sku'] ?? '-' }}</td>
@@ -430,7 +467,7 @@
                             </td>
                             <td class="od-c">{{ number_format($price, 0, ',', '.') }}</td>
                             <td class="od-c od-code-cell">{{ $qty }}</td>
-                            <td class="od-r od-code-cell">{{ number_format($price * $qty, 0, ',', '.') }}</td>
+                            <td class="od-r od-code-cell">{{ number_format($lineTotal, 0, ',', '.') }}</td>
                         </tr>
                         @endforeach
                     @elseif($fallbackItems && $fallbackItems->count() > 0)
@@ -465,10 +502,6 @@
     </div>
 
     @php
-        $settlement = $order->settlement;
-        $settlementIncome = is_array($settlement?->raw_json ?? null) ? $settlement->raw_json : [];
-        $inc = array_replace($liveData['income_details'] ?? [], $settlementIncome);
-        
         // Seller Income Data
         // Subtotal = Harga Produk Setelah Diskon (dari loop item_list atau fallback database)
         $subtotal = (float)($inc['order_discounted_price'] ?? $order->subtotal_items ?? ($subtotalItems > 0 ? $subtotalItems : 0));
@@ -551,7 +584,6 @@
         $voucherCodes = $inc['seller_voucher_code'] ?? [];
         $voucherCodeStr = !empty($voucherCodes) ? (is_array($voucherCodes) ? implode(', ', $voucherCodes) : $voucherCodes) : '';
 
-        $settlementRaw = is_array($settlement?->raw_json ?? null) ? $settlement->raw_json : [];
         $feeValue = function (string $key, $default = null) use ($settlementRaw, $inc) {
             $settlementVal = data_get($settlementRaw, $key);
             if ($settlementVal !== null && $settlementVal !== '') {

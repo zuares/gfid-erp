@@ -141,15 +141,10 @@ class MarketplaceSalesDashboardController extends Controller
                         continue;
                     }
 
-                    $promotionTypes = collect((array) ($item['promotion_list'] ?? []))
-                        ->map(fn ($promotion) => strtolower((string) ($promotion['promotion_type'] ?? '')))
-                        ->all();
-                    $isBundle = in_array('bundle_deal', $promotionTypes, true)
-                        || strtolower((string) ($item['activity_type'] ?? '')) === 'bundle_deal'
-                        || strtolower((string) ($item['promotion_type'] ?? '')) === 'bundle_deal';
+                    $isBundle = $this->isBundlePromotionItem($item);
 
                     if ($isBundle) {
-                        $bundleDiscount += (float) ($item['seller_discount'] ?? 0);
+                        $bundleDiscount += $this->normalizedPromotionItemDiscount($item);
                     }
                 }
                 $row->voucher_store = $voucherStore;
@@ -336,19 +331,12 @@ SQL;
             $settlementItems = (array) ($raw['items'] ?? []);
             $promotionItems = $settlementItems ?: (array) ($orderRaw['item_list'] ?? []);
             foreach ($promotionItems as $item) {
-                $itemDiscount = (float) ($item['seller_discount'] ?? 0);
-                $originalPrice = (float) ($item['original_price'] ?? $item['model_original_price'] ?? 0);
-                $discountedPrice = (float) ($item['discounted_price'] ?? $item['model_discounted_price'] ?? 0);
-                if ($itemDiscount <= 0 && $discountedPrice > 0) {
-                    $itemDiscount = max($originalPrice - $discountedPrice, 0);
+                if (! is_array($item)) {
+                    continue;
                 }
 
-                $promotionTypes = collect((array) ($item['promotion_list'] ?? []))
-                    ->map(fn ($promotion) => strtolower((string) ($promotion['promotion_type'] ?? '')))
-                    ->all();
-                $isBundle = in_array('bundle_deal', $promotionTypes, true)
-                    || strtolower((string) ($item['activity_type'] ?? '')) === 'bundle_deal'
-                    || strtolower((string) ($item['promotion_type'] ?? '')) === 'bundle_deal';
+                $itemDiscount = $this->normalizedPromotionItemDiscount($item);
+                $isBundle = $this->isBundlePromotionItem($item);
 
                 if ($isBundle) {
                     $bundleDiscount += $itemDiscount;
@@ -666,19 +654,8 @@ SQL;
                 continue;
             }
 
-            $itemDiscount = (float) ($item['seller_discount'] ?? 0);
-            $originalPrice = (float) ($item['original_price'] ?? $item['model_original_price'] ?? 0);
-            $discountedPrice = (float) ($item['discounted_price'] ?? $item['model_discounted_price'] ?? 0);
-            if ($itemDiscount <= 0 && $discountedPrice > 0) {
-                $itemDiscount = max($originalPrice - $discountedPrice, 0);
-            }
-
-            $promotionTypes = collect((array) ($item['promotion_list'] ?? []))
-                ->map(fn ($promotion) => strtolower((string) ($promotion['promotion_type'] ?? '')))
-                ->all();
-            $isBundle = in_array('bundle_deal', $promotionTypes, true)
-                || strtolower((string) ($item['activity_type'] ?? '')) === 'bundle_deal'
-                || strtolower((string) ($item['promotion_type'] ?? '')) === 'bundle_deal';
+            $itemDiscount = $this->normalizedPromotionItemDiscount($item);
+            $isBundle = $this->isBundlePromotionItem($item);
 
             if ($isBundle) {
                 $bundleDiscount += $itemDiscount;
@@ -697,6 +674,48 @@ SQL;
             'voucher_platform' => $voucherPlatform,
             'bundle_discount' => $bundleDiscount,
         ];
+    }
+
+    private function isBundlePromotionItem(array $item): bool
+    {
+        if (in_array(strtolower((string) ($item['activity_type'] ?? '')), ['bundle_deal', 'bundle_deal_discount'], true)) {
+            return true;
+        }
+
+        if (strtolower((string) ($item['promotion_type'] ?? '')) === 'bundle_deal') {
+            return true;
+        }
+
+        $hasExplicitBundleAmount = collect([
+            $item['bundle_discount'] ?? null,
+            $item['bundle_deal_discount'] ?? null,
+            $item['bundle_discount_amount'] ?? null,
+        ])->contains(fn ($amount) => is_numeric($amount) && (float) $amount > 0);
+
+        return $hasExplicitBundleAmount && collect((array) ($item['promotion_list'] ?? []))
+            ->contains(fn ($promotion) => strtolower((string) ($promotion['promotion_type'] ?? '')) === 'bundle_deal');
+    }
+
+    private function normalizedPromotionItemDiscount(array $item): float
+    {
+        $reportedDiscount = max((float) ($item['seller_discount'] ?? 0), 0);
+        $originalPrice = max((float) ($item['original_price'] ?? $item['model_original_price'] ?? 0), 0);
+        $discountedPrice = max((float) ($item['discounted_price'] ?? $item['model_discounted_price'] ?? 0), 0);
+        $quantity = max((int) ($item['quantity_purchased'] ?? $item['model_quantity_purchased'] ?? $item['quantity'] ?? 1), 1);
+        $priceDifference = max($originalPrice - $discountedPrice, 0);
+
+        if ($reportedDiscount <= 0 && $priceDifference > 0) {
+            $reportedDiscount = $priceDifference * $quantity;
+        }
+
+        // Settlement payloads can repeat an item-level seller discount. When
+        // both prices are available, never report more than the price gap for
+        // the purchased quantity.
+        if ($reportedDiscount > 0 && $priceDifference > 0) {
+            $reportedDiscount = min($reportedDiscount, $priceDifference * $quantity);
+        }
+
+        return $reportedDiscount;
     }
 
     private function decodePayload(mixed $payload): array
