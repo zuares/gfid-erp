@@ -604,6 +604,8 @@
                 ['label' => 'Siap Dikirim', 'value' => number_format($shippingOrders(['PENDING', 'INVOICE_PENDING', 'READY_TO_SHIP', 'MATCHED'])), 'note' => 'status operasional', 'icon' => 'bi-box-arrow-up', 'variant' => 'sales-kpi--success'],
                 ['label' => 'Dalam Pengiriman', 'value' => number_format($shippingOrders(['PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'TO_CONFIRM_RECEIVE'])), 'note' => 'status transit', 'icon' => 'bi-truck'],
                 ['label' => 'Selesai', 'value' => number_format($shippingOrders(['COMPLETED', 'SELESAI'])), 'note' => 'order selesai', 'icon' => 'bi-check2-circle', 'variant' => 'sales-kpi--warning'],
+                ['label' => 'Gagal', 'value' => number_format($shippingOrders(['FAILED_DELIVERY'])), 'note' => 'pengiriman gagal', 'icon' => 'bi-exclamation-triangle', 'variant' => 'sales-kpi--warning'],
+                ['label' => 'Return', 'value' => number_format($shippingOrders(['TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED'])), 'note' => 'return atau refund', 'icon' => 'bi-arrow-return-left', 'variant' => 'sales-kpi--warning'],
             ],
         ])
         <section class="card sales-card shadow-sm">
@@ -624,7 +626,8 @@
                                 <th class="text-end">Siap Dikirim</th>
                                 <th class="text-end">Dalam Pengiriman</th>
                                 <th class="text-end">Selesai</th>
-                                <th class="text-end">Gagal / Return</th>
+                                <th class="text-end">Gagal</th>
+                                <th class="text-end">Return</th>
                                 <th class="text-end pe-3">Status Lainnya</th>
                             </tr>
                         </thead>
@@ -636,7 +639,8 @@
                                     <td class="text-end">{{ number_format($row->ready_orders) }}</td>
                                     <td class="text-end">{{ number_format($row->transit_orders) }}</td>
                                     <td class="text-end">{{ number_format($row->completed_orders) }}</td>
-                                    <td class="text-end">{{ number_format($row->failed_return_orders) }}</td>
+                                    <td class="text-end">{{ number_format($row->failed_orders) }}</td>
+                                    <td class="text-end">{{ number_format($row->return_orders) }}</td>
                                     <td class="text-end pe-3">{{ number_format($row->other_orders) }}</td>
                                 </tr>
                             @endforeach

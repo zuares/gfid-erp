@@ -540,7 +540,7 @@ SQL;
             ->whereRaw("{$shippingStatusExpression} NOT IN ({$shippingExcludedPlaceholders})", self::SHIPPING_EXCLUDED_STATUSES)
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId));
-        $shippingFailedReturnStatusesSql = "'" . implode("', '", array_merge(['FAILED_DELIVERY'], self::SHIPPING_RETURN_STATUSES)) . "'";
+        $shippingReturnStatusesSql = "'" . implode("', '", self::SHIPPING_RETURN_STATUSES) . "'";
 
         $shipping = (clone $shippingBase)
             ->selectRaw("{$shippingStatusExpression} as status")
@@ -560,7 +560,8 @@ SQL;
             ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} IN ('PENDING', 'INVOICE_PENDING', 'READY_TO_SHIP', 'MATCHED') THEN o.id END) as ready_orders")
             ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} IN ('PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'TO_CONFIRM_RECEIVE') THEN o.id END) as transit_orders")
             ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} IN ('COMPLETED', 'SELESAI') THEN o.id END) as completed_orders")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} IN ({$shippingFailedReturnStatusesSql}) THEN o.id END) as failed_return_orders")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} = 'FAILED_DELIVERY' THEN o.id END) as failed_orders")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} IN ({$shippingReturnStatusesSql}) THEN o.id END) as return_orders")
             ->groupByRaw("DATE({$dateExpression})")
             ->orderByDesc('day')
             ->get()
@@ -569,10 +570,11 @@ SQL;
                 $row->ready_orders = (int) $row->ready_orders;
                 $row->transit_orders = (int) $row->transit_orders;
                 $row->completed_orders = (int) $row->completed_orders;
-                $row->failed_return_orders = (int) $row->failed_return_orders;
+                $row->failed_orders = (int) $row->failed_orders;
+                $row->return_orders = (int) $row->return_orders;
                 $row->other_orders = max(
                     0,
-                    $row->orders - $row->ready_orders - $row->transit_orders - $row->completed_orders - $row->failed_return_orders,
+                    $row->orders - $row->ready_orders - $row->transit_orders - $row->completed_orders - $row->failed_orders - $row->return_orders,
                 );
 
                 return $row;
@@ -919,7 +921,8 @@ SQL;
                     'PENDING', 'INVOICE_PENDING', 'READY_TO_SHIP', 'MATCHED' => 'ready',
                     'PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'TO_CONFIRM_RECEIVE' => 'transit',
                     'COMPLETED', 'SELESAI' => 'completed',
-                    'FAILED_DELIVERY', 'TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED' => 'failed-return',
+                    'FAILED_DELIVERY' => 'failed',
+                    'TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED' => 'return',
                     default => 'other',
                 };
 
@@ -931,11 +934,12 @@ SQL;
             'ready_orders' => $rows->where('status_group', 'ready')->count(),
             'transit_orders' => $rows->where('status_group', 'transit')->count(),
             'completed_orders' => $rows->where('status_group', 'completed')->count(),
-            'failed_return_orders' => $rows->where('status_group', 'failed-return')->count(),
+            'failed_orders' => $rows->where('status_group', 'failed')->count(),
+            'return_orders' => $rows->where('status_group', 'return')->count(),
         ];
         $summary['other_orders'] = max(
             0,
-            $summary['orders'] - $summary['ready_orders'] - $summary['transit_orders'] - $summary['completed_orders'] - $summary['failed_return_orders'],
+            $summary['orders'] - $summary['ready_orders'] - $summary['transit_orders'] - $summary['completed_orders'] - $summary['failed_orders'] - $summary['return_orders'],
         );
 
         return view('marketplace.dashboard.shipping-detail', [
