@@ -715,7 +715,21 @@
         ]];
     });
     $globalAov = (float) $summary['aov'];
-    $topProductCount = $products->count();
+    $marketplaceProductCount = function ($rows) {
+        return collect($rows)
+            ->map(function ($product) {
+                $externalItemId = trim((string) ($product->external_item_id ?? ''));
+                $marketplaceName = trim((string) ($product->marketplace_name ?? $product->name ?? ''));
+
+                return $externalItemId !== ''
+                    ? 'external:'.$externalItemId
+                    : ($marketplaceName !== '' ? 'name:'.$marketplaceName : null);
+            })
+            ->filter()
+            ->unique()
+            ->count();
+    };
+    $topProductCount = $marketplaceProductCount($products);
     $topProductQty = (int) $products->sum('qty');
     $topProductSales = (float) $products->sum('sales');
     $topProductBuyers = (int) $products->sum('buyers');
@@ -764,7 +778,7 @@
             : ($highContribution ? 'grow' : 'review');
         $productAnalysisMatrix[$matrixKey]['products']->push($product);
     }
-    $productAnalysisMatrixRows = $productAnalysisMatrix->map(function ($row) use ($productAnalysisNetSales, $productAnalysisAdSales) {
+    $productAnalysisMatrixRows = $productAnalysisMatrix->map(function ($row) use ($productAnalysisNetSales, $productAnalysisAdSales, $marketplaceProductCount) {
         $products = $row['products'];
         $sales = (float) $products->sum('net_sales');
         $adSpend = (float) $products->filter(fn ($product) => $product->ad_spend_matched ?? false)->sum('ad_spend');
@@ -787,7 +801,7 @@
             ->filter()
             ->unique()
             ->values();
-        $row['count'] = $products->count();
+        $row['count'] = $marketplaceProductCount($products);
         $row['variants_sold'] = $soldVariantKeys->count();
         $row['sales'] = $sales;
         $row['sales_share'] = $productAnalysisNetSales > 0 ? ($sales / $productAnalysisNetSales) * 100 : 0;
@@ -825,8 +839,8 @@
     $previousPeriodShippingKpi = data_get($comparisonPeriodData, 'shippingKpi', []);
     $previousMonthProducts = collect(data_get($comparisonMonthData, 'products', []));
     $previousPeriodProducts = collect(data_get($comparisonPeriodData, 'products', []));
-    $previousMonthTopProductCount = $previousMonthProducts->count();
-    $previousPeriodTopProductCount = $previousPeriodProducts->count();
+    $previousMonthTopProductCount = $marketplaceProductCount($previousMonthProducts);
+    $previousPeriodTopProductCount = $marketplaceProductCount($previousPeriodProducts);
     $previousMonthTopProductQty = (int) $previousMonthProducts->sum('qty');
     $previousPeriodTopProductQty = (int) $previousPeriodProducts->sum('qty');
     $previousMonthTopProductSales = (float) $previousMonthProducts->sum('sales');
@@ -845,7 +859,7 @@
     $currencyDisplay = fn ($value) => $fmt($value);
     $percentDisplay = fn ($value) => number_format((float) $value, 1, ',', '.').'%';
     $multipleDisplay = fn ($value) => number_format((float) $value, 2, ',', '.').'x';
-    $productComparisonMetrics = function ($rows, $periodSummary) {
+    $productComparisonMetrics = function ($rows, $periodSummary) use ($marketplaceProductCount) {
         $rows = collect($rows);
         $orders = (int) data_get($periodSummary, 'orders', 0);
         $sales = (float) $rows->sum('sales');
@@ -862,7 +876,7 @@
         $mappedProducts = $rows->filter(fn ($product) => (int) ($product->internal_item_id ?? 0) > 0)->count();
 
         return [
-            'products' => $rows->count(),
+            'products' => $marketplaceProductCount($rows),
             'qty' => (int) $rows->sum('qty'),
             'sales' => $sales,
             'net_sales' => $netSales,
@@ -1048,7 +1062,7 @@
         ->sortByDesc(fn ($row) => (float) ($row['periods']['active']['metrics']['net_sales'] ?? 0))
         ->values();
     $categoryProductComparisonRows = [
-        ['label' => 'Jumlah produk', 'key' => 'products', 'format' => $numberDisplay],
+        ['label' => 'Produk/Kode Marketplace', 'key' => 'products', 'format' => $numberDisplay],
         ['label' => 'Variant Master s.d. tanggal', 'key' => 'variants', 'format' => $numberDisplay],
         ['label' => 'Variant terjual unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
         ['label' => 'Order', 'key' => 'orders', 'format' => $numberDisplay],
@@ -1635,7 +1649,7 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Produk',
             'kpis' => [
-                ['label' => 'Produk Aktif', 'value' => number_format($topProductCount), 'note' => 'kode / variant terjual', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($topProductCount, $previousMonthTopProductCount, $previousPeriodTopProductCount, $numberDisplay)],
+                ['label' => 'Produk Aktif', 'value' => number_format($topProductCount), 'note' => 'produk/kode marketplace', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($topProductCount, $previousMonthTopProductCount, $previousPeriodTopProductCount, $numberDisplay)],
                 ['label' => 'Unit Terjual', 'value' => number_format($topProductQty), 'note' => 'seluruh produk', 'icon' => 'bi-stack', 'comparisons' => $kpiComparisons($topProductQty, $previousMonthTopProductQty, $previousPeriodTopProductQty, $numberDisplay)],
                 ['label' => 'Penjualan Produk', 'value' => $fmt($topProductSales), 'note' => 'seluruh produk', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($topProductSales, $previousMonthTopProductSales, $previousPeriodTopProductSales, $currencyDisplay)],
                 ['label' => 'Pembeli Produk', 'value' => number_format($topProductBuyers), 'note' => 'seluruh produk', 'icon' => 'bi-people', 'comparisons' => $kpiComparisons($topProductBuyers, $previousMonthTopProductBuyers, $previousPeriodTopProductBuyers, $numberDisplay)],
@@ -1697,7 +1711,7 @@
                             <tr>
                                 <th class="ps-3">No.</th>
                                 <th>Kategori Item</th>
-                                <th class="text-end">Produk</th>
+                                <th class="text-end">Produk/Kode MP</th>
                                 <th class="text-end">Variant Master</th>
                                 <th class="text-end">Varian Terjual</th>
                                 <th class="text-end">Order</th>
@@ -1868,7 +1882,7 @@
             </div>
             <div class="sales-product-analysis-matrix-wrap">
                 <table class="table table-sm align-middle sales-table sales-product-analysis-matrix">
-                    <thead><tr><th style="width: 16%">Matriks</th><th class="text-end">Produk</th><th class="text-end">Variant Terjual Unik</th><th class="text-end">Penjualan Netto</th><th class="text-end">Share</th><th class="text-end">Kontribusi</th><th class="text-end">Margin</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ROAS</th><th class="text-end">Biaya Iklan</th></tr></thead>
+                    <thead><tr><th style="width: 16%">Matriks</th><th class="text-end">Produk/Kode MP</th><th class="text-end">Variant Terjual Unik</th><th class="text-end">Penjualan Netto</th><th class="text-end">Share</th><th class="text-end">Kontribusi</th><th class="text-end">Margin</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ROAS</th><th class="text-end">Biaya Iklan</th></tr></thead>
                     <tbody>
                         @foreach ($productAnalysisMatrixRows as $matrixRow)
                             <tr>
