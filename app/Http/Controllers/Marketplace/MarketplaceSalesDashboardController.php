@@ -660,6 +660,8 @@ SQL;
 
         $comparisonMonth = null;
         $comparisonPeriod = null;
+        $comparisonPeriodPrevious = null;
+        $comparisonPeriodPreviousTwo = null;
         if (! $request->boolean('_sales_comparison')) {
             $loadComparison = function ($comparisonFrom, $comparisonTo) use ($request) {
                 $comparisonRequest = Request::create($request->url(), 'GET', array_merge($request->query(), [
@@ -681,6 +683,14 @@ SQL;
             $comparisonPeriodTo = (clone $from)->subDay();
             $comparisonPeriodFrom = (clone $comparisonPeriodTo)->subDays($periodDays - 1);
             $comparisonPeriod = $loadComparison($comparisonPeriodFrom, $comparisonPeriodTo);
+
+            $comparisonPeriodPreviousTo = (clone $comparisonPeriodFrom)->subDay();
+            $comparisonPeriodPreviousFrom = (clone $comparisonPeriodPreviousTo)->subDays($periodDays - 1);
+            $comparisonPeriodPrevious = $loadComparison($comparisonPeriodPreviousFrom, $comparisonPeriodPreviousTo);
+
+            $comparisonPeriodPreviousTwoTo = (clone $comparisonPeriodPreviousFrom)->subDay();
+            $comparisonPeriodPreviousTwoFrom = (clone $comparisonPeriodPreviousTwoTo)->subDays($periodDays - 1);
+            $comparisonPeriodPreviousTwo = $loadComparison($comparisonPeriodPreviousTwoFrom, $comparisonPeriodPreviousTwoTo);
         }
 
         return view('marketplace.dashboard.sales', [
@@ -700,6 +710,8 @@ SQL;
             'orderDetails' => $orderDetails,
             'comparisonMonth' => $comparisonMonth,
             'comparisonPeriod' => $comparisonPeriod,
+            'comparisonPeriodPrevious' => $comparisonPeriodPrevious,
+            'comparisonPeriodPreviousTwo' => $comparisonPeriodPreviousTwo,
             'stores' => $stores,
             'filters' => [
                 'date_from' => $from->toDateString(),

@@ -290,6 +290,7 @@
 @php
     $fmt = fn ($value) => 'Rp '.number_format((float) $value, 0, ',', '.');
     $dateLabel = fn ($date) => \Carbon\Carbon::parse($date)->format('d M Y');
+    $dateRangeLabel = fn ($from, $to) => $dateLabel($from).' – '.$dateLabel($to);
     $pct = fn ($value, $total) => $total > 0 ? number_format(((float) $value / (float) $total) * 100, 1, ',', '.') : '0,0';
     $salesTabs = ['sales', 'products', 'payments', 'promotions', 'shipping', 'income', 'orders'];
     $activeTab = in_array(request('tab'), $salesTabs, true) ? request('tab') : 'sales';
@@ -350,6 +351,8 @@
     $promotionRate = $summary['subtotal'] > 0 ? ($summary['promotion_total'] / $summary['subtotal']) * 100 : 0;
     $comparisonMonthData = $comparisonMonth['data'] ?? null;
     $comparisonPeriodData = $comparisonPeriod['data'] ?? null;
+    $comparisonPeriodPreviousData = $comparisonPeriodPrevious['data'] ?? null;
+    $comparisonPeriodPreviousTwoData = $comparisonPeriodPreviousTwo['data'] ?? null;
     $comparisonMonthLabel = $comparisonMonth
         ? $dateLabel($comparisonMonth['from']).' – '.$dateLabel($comparisonMonth['to'])
         : 'bulan lalu';
@@ -385,6 +388,59 @@
     $numberDisplay = fn ($value) => number_format((float) $value, 0, ',', '.');
     $currencyDisplay = fn ($value) => $fmt($value);
     $percentDisplay = fn ($value) => number_format((float) $value, 1, ',', '.').'%';
+    $platformPromotionMetrics = function ($rows, $periodSummary, $promotionOrders = null) {
+        $rows = collect($rows);
+        $voucherSeller = (float) $rows->sum('voucher_store');
+        $voucherPlatform = (float) $rows->sum('voucher_platform');
+        $bundleDiscount = (float) $rows->sum('bundle_discount');
+        $total = $voucherPlatform + $bundleDiscount;
+        $gmv = (float) data_get($periodSummary, 'subtotal', 0);
+
+        return [
+            'sales' => $gmv,
+            'voucher_seller' => $voucherSeller,
+            'voucher_platform' => $voucherPlatform,
+            'bundle_discount' => $bundleDiscount,
+            'total' => $total,
+            'rate' => $gmv > 0 ? ($total / $gmv) * 100 : 0,
+            'orders' => (int) ($promotionOrders ?? $rows->sum('promotion_orders')),
+        ];
+    };
+    $platformPromotionPeriods = [
+        [
+            'label' => 'Aktif',
+            'from' => $filters['date_from'],
+            'to' => $filters['date_to'],
+            'metrics' => $platformPromotionMetrics($promotionDaily, $summary, $promotionOrders),
+        ],
+        [
+            'label' => 'Periode -1',
+            'from' => $comparisonPeriod['from'] ?? null,
+            'to' => $comparisonPeriod['to'] ?? null,
+            'metrics' => $platformPromotionMetrics(data_get($comparisonPeriodData, 'promotionDaily', []), $previousPeriodSummary, data_get($comparisonPeriodData, 'promotionOrders', 0)),
+        ],
+        [
+            'label' => 'Periode -2',
+            'from' => $comparisonPeriodPrevious['from'] ?? null,
+            'to' => $comparisonPeriodPrevious['to'] ?? null,
+            'metrics' => $platformPromotionMetrics(data_get($comparisonPeriodPreviousData, 'promotionDaily', []), data_get($comparisonPeriodPreviousData, 'summary', []), data_get($comparisonPeriodPreviousData, 'promotionOrders', 0)),
+        ],
+        [
+            'label' => 'Periode -3',
+            'from' => $comparisonPeriodPreviousTwo['from'] ?? null,
+            'to' => $comparisonPeriodPreviousTwo['to'] ?? null,
+            'metrics' => $platformPromotionMetrics(data_get($comparisonPeriodPreviousTwoData, 'promotionDaily', []), data_get($comparisonPeriodPreviousTwoData, 'summary', []), data_get($comparisonPeriodPreviousTwoData, 'promotionOrders', 0)),
+        ],
+    ];
+    $platformPromotionRows = [
+        ['label' => 'Total Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
+        ['label' => 'Voucher Seller', 'key' => 'voucher_seller', 'format' => $currencyDisplay],
+        ['label' => 'Voucher Platform', 'key' => 'voucher_platform', 'format' => $currencyDisplay],
+        ['label' => 'Paket Diskon', 'key' => 'bundle_discount', 'format' => $currencyDisplay],
+        ['label' => 'Total Platform', 'key' => 'total', 'format' => $currencyDisplay],
+        ['label' => 'Platform / GMV', 'key' => 'rate', 'format' => $percentDisplay],
+        ['label' => 'Order dengan Promosi', 'key' => 'orders', 'format' => $numberDisplay],
+    ];
     $compareMetric = function ($current, $previous, callable $formatter, string $mode = 'relative', bool $higherIsBetter = true) {
         if ($previous === null) return null;
         $current = (float) $current;
@@ -857,6 +913,42 @@
                 ['label' => 'Order dengan Promo', 'value' => number_format($promotionOrders), 'note' => 'order terdampak promosi', 'icon' => 'bi-ticket-perforated', 'comparisons' => $kpiComparisons($promotionOrders, data_get($comparisonMonthData, 'promotionOrders'), data_get($comparisonPeriodData, 'promotionOrders'), $numberDisplay)],
             ],
         ])
+        <section class="card sales-card shadow-sm mb-3">
+            <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
+                <div>
+                    <div class="sales-kicker mb-1">Promotion funding mix</div>
+                    <h2 class="sales-section-title mb-1">Sumber pendanaan promosi</h2>
+                </div>
+                <span class="badge sales-badge rounded-pill px-3 py-2">4 periode</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle sales-table">
+                    <thead>
+                        <tr>
+                            <th class="ps-3">Metrik</th>
+                            @foreach ($platformPromotionPeriods as $period)
+                                <th class="text-end">
+                                    {{ $period['label'] }}
+                                    <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
+                                </th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($platformPromotionRows as $row)
+                            <tr>
+                                <td class="ps-3 fw-semibold">{{ $row['label'] }}</td>
+                                @foreach ($platformPromotionPeriods as $period)
+                                    <td class="text-end {{ $row['key'] === 'total' ? 'fw-semibold' : '' }}">
+                                        {{ $row['format']($period['metrics'][$row['key']]) }}
+                                    </td>
+                                @endforeach
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </section>
         <section class="card sales-card shadow-sm">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
