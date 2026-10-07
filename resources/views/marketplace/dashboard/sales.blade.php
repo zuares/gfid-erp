@@ -933,6 +933,23 @@
             ->filter()
             ->unique()
             ->values();
+        $soldVariantKeys = $rows
+            ->map(function ($product) {
+                $internalItemId = (int) ($product->internal_item_id ?? 0);
+                if ($internalItemId > 0) {
+                    return 'internal:'.$internalItemId;
+                }
+
+                $externalItemId = trim((string) ($product->external_item_id ?? ''));
+                $marketplaceName = trim((string) ($product->marketplace_name ?? $product->name ?? ''));
+
+                return $externalItemId !== ''
+                    ? 'external:'.$externalItemId
+                    : ($marketplaceName !== '' ? 'name:'.$marketplaceName : null);
+            })
+            ->filter()
+            ->unique()
+            ->values();
         $orderKeys = $rows
             ->flatMap(fn ($product) => preg_split('/,/', (string) ($product->order_keys ?? ''), -1, PREG_SPLIT_NO_EMPTY))
             ->map(fn ($key) => trim((string) $key))
@@ -955,6 +972,7 @@
         return [
             'products' => $marketplaceProductKeys->count(),
             'variants' => $rows->count(),
+            'variants_sold' => $soldVariantKeys->count(),
             'qty' => (int) $rows->sum('qty'),
             'orders' => $orders,
             'sales' => $sales,
@@ -1032,6 +1050,7 @@
     $categoryProductComparisonRows = [
         ['label' => 'Jumlah produk', 'key' => 'products', 'format' => $numberDisplay],
         ['label' => 'Jumlah variant', 'key' => 'variants', 'format' => $numberDisplay],
+        ['label' => 'Variant terjual unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
         ['label' => 'Order', 'key' => 'orders', 'format' => $numberDisplay],
         ['label' => 'Terjual', 'key' => 'qty', 'format' => $numberDisplay],
         ['label' => 'Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
@@ -1680,6 +1699,7 @@
                                 <th>Kategori Item</th>
                                 <th class="text-end">Produk</th>
                                 <th class="text-end">Variant</th>
+                                <th class="text-end">Varian Terjual</th>
                                 <th class="text-end">Order</th>
                                 <th class="text-end">Terjual</th>
                                 @foreach ($categoryComparisonPeriods as $period)
@@ -1715,6 +1735,7 @@
                                     </td>
                                     <td class="text-end">{{ number_format($activeCategoryMetrics['products']) }}</td>
                                     <td class="text-end">{{ number_format($activeCategoryMetrics['variants']) }}</td>
+                                    <td class="text-end">{{ number_format($activeCategoryMetrics['variants_sold']) }}</td>
                                     <td class="text-end">{{ number_format($activeCategoryMetrics['orders']) }}</td>
                                     <td class="text-end">{{ number_format($activeCategoryMetrics['qty']) }}</td>
                                     @foreach ($categoryComparisonPeriods as $period)
@@ -1733,7 +1754,7 @@
                                     <td class="text-end pe-3 fw-semibold">{{ $percentDisplay($categoryRow['share']) }}</td>
                                 </tr>
                                 <tr id="{{ $categoryKey }}-detail" class="sales-category-comparison-detail" data-sales-category-comparison-items="{{ $categoryKey }}" hidden>
-                                    <td colspan="{{ 6 + $categoryComparisonPeriods->count() + 2 }}">
+                                    <td colspan="{{ 7 + $categoryComparisonPeriods->count() + 2 }}">
                                         <div class="sales-category-comparison-detail-card">
                                             <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
                                                 <div>
@@ -1847,7 +1868,7 @@
             </div>
             <div class="sales-product-analysis-matrix-wrap">
                 <table class="table table-sm align-middle sales-table sales-product-analysis-matrix">
-                    <thead><tr><th style="width: 16%">Matriks</th><th class="text-end">Produk</th><th class="text-end">Variant Terjual</th><th class="text-end">Penjualan Netto</th><th class="text-end">Share</th><th class="text-end">Kontribusi</th><th class="text-end">Margin</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ROAS</th><th class="text-end">Biaya Iklan</th></tr></thead>
+                    <thead><tr><th style="width: 16%">Matriks</th><th class="text-end">Produk</th><th class="text-end">Variant Terjual Unik</th><th class="text-end">Penjualan Netto</th><th class="text-end">Share</th><th class="text-end">Kontribusi</th><th class="text-end">Margin</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ROAS</th><th class="text-end">Biaya Iklan</th></tr></thead>
                     <tbody>
                         @foreach ($productAnalysisMatrixRows as $matrixRow)
                             <tr>
