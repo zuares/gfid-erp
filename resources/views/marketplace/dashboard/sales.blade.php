@@ -1218,20 +1218,19 @@
                     <table class="table table-sm table-hover align-middle sales-table sales-product-table sales-promotion-table">
                         <colgroup>
                             <col style="width: 4%">
-                            <col style="width: 24%">
-                            <col style="width: 5%">
-                            <col style="width: 5%">
-                            <col style="width: 8%">
+                            <col style="width: 27%">
+                            <col style="width: 4%">
+                            <col style="width: 4%">
+                            <col style="width: 9%">
+                            <col style="width: 9%">
                             <col style="width: 10%">
                             <col style="width: 8%">
                             <col style="width: 8%">
                             <col style="width: 5%">
                             <col style="width: 5%">
-                            <col style="width: 8%">
-                            <col style="width: 5%">
-                            <col style="width: 5%">
+                            <col style="width: 7%">
                         </colgroup>
-                        <thead><tr><th scope="col" class="sales-index-column">No.</th><th>Produk</th><th class="text-end">Order</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Biaya Iklan</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ACOS</th><th class="text-end">ROAS</th><th class="text-end">Biaya/Konversi</th><th class="text-end">AOV Neto</th><th class="text-end pe-3">APC</th></tr></thead>
+                        <thead><tr><th scope="col" class="sales-index-column">No.</th><th>Produk</th><th class="text-end">Order</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Penjualan Netto</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Biaya Iklan</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ACOS</th><th class="text-end">ROAS</th><th class="text-end pe-3">CPA</th></tr></thead>
                         <tbody>
                             @php
                                 $productGroups = $products
@@ -1250,6 +1249,7 @@
                                     $categoryBuyers = (int) $categoryProducts->sum('buyers');
                                     $categoryQty = (int) $categoryProducts->sum('qty');
                                     $categorySales = (float) $categoryProducts->sum('sales');
+                                    $categoryNetSales = (float) $categoryProducts->sum('net_sales');
                                     $categoryBuyerPayment = (float) $categoryProducts->sum('buyer_payment');
                                     $categoryAdProducts = $categoryProducts->filter(fn ($product) => $product->ad_spend_matched ?? false);
                                     $categorySpend = (float) $categoryAdProducts->sum('ad_spend');
@@ -1269,15 +1269,14 @@
                                     </td>
                                     <td class="text-end">{{ number_format($categoryOrders) }}</td>
                                     <td class="text-end">{{ number_format($categoryQty) }}</td>
-                                    <td class="text-end fw-semibold">{{ $fmt($categorySales) }}</td>
-                                    <td class="text-end fw-semibold">{{ $fmt($categoryBuyerPayment) }}</td>
+                                    <td class="text-end fw-semibold"><div>{{ $fmt($categorySales) }}</div><div class="small text-muted">AOV {{ $categoryOrders > 0 ? $fmt($categorySales / $categoryOrders) : '—' }}</div></td>
+                                    <td class="text-end fw-semibold"><div>{{ $fmt($categoryNetSales) }}</div><div class="small text-muted">AOV {{ $categoryOrders > 0 ? $fmt($categoryNetSales / $categoryOrders) : '—' }}</div></td>
+                                    <td class="text-end fw-semibold"><div>{{ $fmt($categoryBuyerPayment) }}</div><div class="small text-muted">AOV {{ $categoryOrders > 0 ? $fmt($categoryBuyerPayment / $categoryOrders) : '—' }}</div></td>
                                     <td class="text-end text-danger fw-semibold">{{ $fmt($categorySpend) }}</td>
-                                    <td class="text-end text-danger fw-semibold">{{ $fmt($categoryAdSales) }}</td>
+                                    <td class="text-end text-danger fw-semibold"><div>{{ $fmt($categoryAdSales) }}</div><div class="small text-muted">AOV {{ $categoryAdConversions > 0 ? $fmt($categoryAdSales / $categoryAdConversions) : '—' }}</div></td>
                                     <td class="text-end">{{ $categoryAdSales > 0 ? $percentDisplay(($categorySpend / $categoryAdSales) * 100) : '—' }}</td>
                                     <td class="text-end">{{ $categorySpend > 0 ? $multipleDisplay($categoryAdSales / $categorySpend) : '—' }}</td>
-                                    <td class="text-end">{{ $categoryAdConversions > 0 ? $fmt($categorySpend / $categoryAdConversions) : '—' }}</td>
-                                    <td class="text-end">{{ $categoryOrders > 0 ? $fmt($categoryBuyerPayment / $categoryOrders) : '—' }}</td>
-                                    <td class="text-end">{{ $categoryBuyers > 0 ? $fmt($categoryBuyerPayment / $categoryBuyers) : '—' }}</td>
+                                    <td class="text-end pe-3">{{ $categoryAdConversions > 0 ? $fmt($categorySpend / $categoryAdConversions) : '—' }}</td>
                                 </tr>
                                 @foreach ($categoryProducts as $product)
                                     <tr id="{{ $categoryKey }}-items-{{ $loop->index }}" data-sales-product-category-items="{{ $categoryKey }}" hidden>
@@ -1292,15 +1291,14 @@
                                         </td>
                                         <td class="text-end">{{ number_format((int) $product->orders) }}</td>
                                         <td class="text-end">{{ number_format((int) $product->qty) }}</td>
-                                        <td class="text-end fw-semibold">{{ $fmt($product->sales) }}</td>
-                                        <td class="text-end fw-semibold">{{ $fmt($product->buyer_payment) }}</td>
+                                        <td class="text-end fw-semibold"><div>{{ $fmt($product->sales) }}</div><div class="small text-muted">AOV {{ $product->orders > 0 ? $fmt($product->sales / $product->orders) : '—' }}</div></td>
+                                        <td class="text-end fw-semibold"><div>{{ $fmt($product->net_sales) }}</div><div class="small text-muted">AOV {{ $product->orders > 0 ? $fmt($product->net_sales / $product->orders) : '—' }}</div></td>
+                                        <td class="text-end fw-semibold"><div>{{ $fmt($product->buyer_payment) }}</div><div class="small text-muted">AOV {{ $product->orders > 0 ? $fmt($product->buyer_payment / $product->orders) : '—' }}</div></td>
                                         <td class="text-end {{ ($product->ad_spend ?? 0) > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">{{ ($product->ad_spend_matched ?? false) ? $fmt($product->ad_spend) : '—' }}</td>
-                                        <td class="text-end text-danger {{ ($product->ad_sales ?? 0) > 0 ? 'fw-semibold' : 'text-muted' }}">{{ ($product->ad_spend_matched ?? false) ? $fmt($product->ad_sales) : '—' }}</td>
+                                        <td class="text-end text-danger {{ ($product->ad_sales ?? 0) > 0 ? 'fw-semibold' : 'text-muted' }}"><div>{{ ($product->ad_spend_matched ?? false) ? $fmt($product->ad_sales) : '—' }}</div><div class="small text-muted">AOV {{ ($product->ad_spend_matched ?? false) && ($product->ad_conversions ?? 0) > 0 ? $fmt($product->ad_sales / $product->ad_conversions) : '—' }}</div></td>
                                         <td class="text-end">{{ ($product->ad_spend_matched ?? false) && ($product->ad_sales ?? 0) > 0 ? $percentDisplay(($product->ad_spend / $product->ad_sales) * 100) : '—' }}</td>
                                         <td class="text-end">{{ ($product->ad_spend_matched ?? false) && ($product->ad_spend ?? 0) > 0 ? $multipleDisplay($product->ad_sales / $product->ad_spend) : '—' }}</td>
-                                        <td class="text-end">{{ ($product->ad_spend_matched ?? false) && ($product->ad_conversions ?? 0) > 0 ? $fmt($product->ad_spend / $product->ad_conversions) : '—' }}</td>
-                                        <td class="text-end">{{ $product->orders > 0 ? $fmt($product->buyer_payment / $product->orders) : '—' }}</td>
-                                        <td class="text-end" title="Average Payment per Customer: pembayaran pembeli dibagi pembeli unik">{{ $product->buyers > 0 ? $fmt($product->buyer_payment / $product->buyers) : '—' }}</td>
+                                        <td class="text-end pe-3">{{ ($product->ad_spend_matched ?? false) && ($product->ad_conversions ?? 0) > 0 ? $fmt($product->ad_spend / $product->ad_conversions) : '—' }}</td>
                                     </tr>
                                 @endforeach
                             @endforeach

@@ -312,6 +312,8 @@ class MarketplaceSalesDashboardController extends Controller
             ->groupByRaw('COALESCE(oi_total.marketplace_order_id, oi_total.order_id)');
         $productBuyerPaymentExpression = 'COALESCE(NULLIF(s.buyer_payment_amount, 0), NULLIF(o.total_paid_customer, 0), NULLIF(o.total_amount, 0), NULLIF(o.subtotal_items, 0), 0)';
         $productLineValueForRow = 'CASE WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount WHEN COALESCE(oi.price, 0) > 0 THEN oi.price * COALESCE(oi.qty, 0) WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount ELSE 0 END';
+        $productLineGrossValueExpression = 'CASE WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount WHEN COALESCE(oi.price, 0) > 0 THEN oi.price * COALESCE(oi.qty, 0) WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount ELSE 0 END';
+        $productLineNetValueExpression = 'CASE WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount WHEN COALESCE(oi.price_after_discount, 0) > 0 THEN oi.price_after_discount * COALESCE(oi.qty, 0) WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount ELSE 0 END';
         $marketplaceProductNameExpression = "COALESCE(NULLIF(oi.item_name, ''), NULLIF(oi.item_name_snapshot, ''), NULLIF(oi.variant_name, ''), NULLIF(oi.variant_snapshot, ''), 'Produk tanpa nama')";
         $marketplaceProductSkuExpression = "COALESCE(NULLIF(oi.item_sku, ''), NULLIF(oi.marketplace_sku, ''), NULLIF(oi.model_sku, ''), NULLIF(oi.external_sku, ''), NULLIF(oi.item_code_snapshot, ''), '-')";
 
@@ -341,7 +343,8 @@ class MarketplaceSalesDashboardController extends Controller
             ->selectRaw('COALESCE(SUM(CASE WHEN oi.qty > 0 THEN oi.qty ELSE 0 END), 0) as qty')
             ->selectRaw('COUNT(DISTINCT o.id) as orders')
             ->selectRaw("COUNT(DISTINCT COALESCE(NULLIF(o.buyer_username, ''), NULLIF(o.buyer_name, ''), o.id)) as buyers")
-            ->selectRaw('COALESCE(SUM(CASE WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount WHEN COALESCE(oi.price, 0) > 0 THEN oi.price * COALESCE(oi.qty, 0) WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount ELSE 0 END), 0) as sales')
+            ->selectRaw("COALESCE(SUM({$productLineGrossValueExpression}), 0) as sales")
+            ->selectRaw("COALESCE(SUM({$productLineNetValueExpression}), 0) as net_sales")
             ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(product_order_totals.order_item_value, 0) > 0 THEN ({$productBuyerPaymentExpression} * {$productLineValueForRow} / product_order_totals.order_item_value) ELSE 0 END), 0) as buyer_payment")
             ->groupByRaw('NULLIF(oi.internal_item_id, 0)')
             ->groupByRaw("CASE WHEN NULLIF(oi.internal_item_id, 0) IS NULL THEN {$marketplaceProductNameExpression} END")
