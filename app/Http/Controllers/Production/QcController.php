@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Production;
 use App\Http\Controllers\Controller;
 use App\Models\CuttingJob;
 use App\Models\CuttingJobBundle;
+use App\Models\CuttingQcCancellation;
 use App\Models\InventoryAdjustment;
 use App\Models\InventoryAdjustmentLine;
 use App\Models\QcResult;
@@ -149,6 +150,14 @@ class QcController extends Controller
             ->pluck('cutting_job_bundle_id')
             ->map(fn ($id) => (int) $id)
             ->all();
+        $partialCancelledBundleIds = CuttingQcCancellation::query()
+            ->where('cutting_job_id', $cuttingJob->id)
+            ->get(['cutting_job_bundle_id', 'metadata'])
+            ->filter(fn ($audit) => !($audit->metadata['closed_by_full_cancel'] ?? false))
+            ->pluck('cutting_job_bundle_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->all();
         $isOwner = (Auth::user()->role ?? null) === 'owner';
 
         $rows = [];
@@ -164,12 +173,18 @@ class QcController extends Controller
                 'lot_code' => $bundle->lot?->code,
                 'qty_pcs' => $bundle->qty_pcs,
                 'status' => $bundle->status,
+                'is_partial_cancelled' => in_array((int) $bundle->id, $partialCancelledBundleIds, true) && !$qc,
                 'qty_ok' => $qc?->qty_ok ?? $bundle->qty_pcs,
                 'qty_reject' => $qc?->qty_reject ?? 0,
                 'reject_reason' => $qc?->reject_reason ?? null,
                 'notes' => $qc?->notes ?? null,
                 'can_partial_cancel' => $isOwner
                     && $qc
+                    && !in_array((int) $bundle->id, $activePickedBundleIds, true)
+                    && (float) ($bundle->sewing_picked_qty ?? 0) <= 0.000001,
+                'can_update_item' => $isOwner
+                    && in_array((int) $bundle->id, $partialCancelledBundleIds, true)
+                    && !$qc
                     && !in_array((int) $bundle->id, $activePickedBundleIds, true)
                     && (float) ($bundle->sewing_picked_qty ?? 0) <= 0.000001,
             ];
@@ -699,6 +714,40 @@ class QcController extends Controller
         return redirect()
             ->route('production.qc.cutting.edit', $cuttingJob)
             ->with('success', "QC bundle {$bundle->bundle_code} dibatalkan. Bundle lain tetap berjalan.");
+    }
+
+    public function updateCuttingBundleItem(
+        Request $request,
+        CuttingJob $cuttingJob,
+        CuttingJobBundle $bundle,
+    ): RedirectResponse {
+        if ((Auth::user()->role ?? null) !== 'owner') {
+            return back()->with('error', 'Hanya OWNER yang boleh mengubah item bundle.');
+        }
+
+        if ((int) $bundle->cutting_job_id !== (int) $cuttingJob->id) {
+            return back()->with('error', 'Bundle tidak ditemukan di Cutting Job ini.');
+        }
+
+        $validated = $request->validate([
+            'item_code' => ['required', 'string', 'max:100'],
+        ]);
+
+        try {
+            $this->qc->updateCuttingBundleItem(
+                bundle: $bundle,
+                itemCode: $validated['item_code'],
+                actorId: Auth::id(),
+            );
+        } catch (\Throwable $e) {
+            return back()
+                ->withInput()
+                ->with('error', 'Update item bundle gagal: ' . $e->getMessage());
+        }
+
+        return redirect()
+            ->route('production.qc.cutting.edit', $cuttingJob)
+            ->with('success', "Item bundle {$bundle->bundle_code} berhasil diubah menjadi " . strtoupper(trim($validated['item_code'])) . '. Silakan QC ulang.');
     }
 
     /* ============================================================

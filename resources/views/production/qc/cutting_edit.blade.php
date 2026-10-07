@@ -576,6 +576,53 @@
         color: #fff;
         border-color: var(--gf-warn);
     }
+    .qcs-row-action {
+        width: auto;
+        min-width: 94px;
+        padding: 0 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        white-space: nowrap;
+        font-size: 11px;
+        font-weight: 800;
+    }
+    .qcs-row-action .qcs-action-icon {
+        font-size: 13px;
+        line-height: 1;
+    }
+    .qcs-row-action .qcs-action-text {
+        font-size: 10px;
+        line-height: 1;
+    }
+    .qcs-row-action-danger {
+        color: var(--gf-rej);
+        border-color: rgba(220,38,38,.22);
+        background: var(--gf-rej-soft);
+    }
+    .qcs-row-action-danger:hover {
+        background: var(--gf-rej);
+        color: #fff;
+        border-color: var(--gf-rej);
+    }
+    .qcs-row-action-primary {
+        color: var(--gf-blue);
+        border-color: rgba(37,99,235,.22);
+        background: var(--gf-blue-soft);
+    }
+    .qcs-row-action-primary:hover {
+        background: var(--gf-blue);
+        color: #fff;
+        border-color: var(--gf-blue);
+    }
+
+    .qcs-row-cancelled {
+        background: rgba(245,158,11,.055) !important;
+    }
+    .qcs-row-cancelled .qcs-item-code {
+        color: var(--gf-warn);
+    }
 
     /* ── Summary card ────────────────────────────────── */
     .qcs-summary {
@@ -1140,6 +1187,14 @@
             height: 34px;
             border-radius: 8px;
         }
+        .qcs-row-action {
+            min-width: 34px;
+            width: 34px;
+            padding: 0;
+        }
+        .qcs-row-action .qcs-action-text {
+            display: none;
+        }
         .qcs-lot-input { width: 80px; }
 
         .qcs-summary {
@@ -1462,7 +1517,7 @@
             @endif
             @if ($hasExistingQc && $isOwner)
                 <div class="qcs-alert qcs-alert-info">
-                    QC sudah tersimpan. Sebagai Owner, kamu bisa <strong>Batalkan QC</strong> atau <strong>Adjust</strong> per bundle.
+                    QC sudah tersimpan. Untuk mengganti item: <strong>Batalkan QC bundle</strong> → <strong>Ganti Item</strong> → <strong>Simpan QC ulang</strong>. Adjust dipakai hanya untuk koreksi qty.
                 </div>
             @endif
 
@@ -1536,7 +1591,7 @@
                                     <th style="text-align:right">Cut</th>
                                     <th style="text-align:right">OK</th>
                                     <th style="text-align:center;color:var(--gf-rej)">Reject</th>
-                                    <th></th>
+                                    <th>Aksi</th>
                                     <th class="qcs-hide-mobile" style="text-align:left">Catatan</th>
                                     <th></th>
                                 </tr>
@@ -1575,6 +1630,7 @@
                                         $notesError = $isErrorBag ? $errors->first($fieldNotes) : null;
 
                                         $st = $row['status'] ?: 'cut';
+                                        $isPartialCancelled = (bool) ($row['is_partial_cancelled'] ?? false);
                                         $stBadge = [
                                             'cut' => 'secondary',
                                             'qc_ok' => 'success',
@@ -1582,11 +1638,15 @@
                                             'qc_mixed' => 'warning',
                                             'qc_done' => 'success',
                                         ][$st] ?? 'secondary';
+                                        if ($isPartialCancelled) {
+                                            $stBadge = 'warning';
+                                        }
+                                        $stLabel = $isPartialCancelled ? 'Dibatalkan QC' : $st;
 
                                         $modalId = 'qcAdjustModal_' . $bundleId;
                                     @endphp
 
-                                    <tr class="{{ $qtyReject > 0 ? 'row-has-reject' : '' }}" data-bundle-id="{{ $bundleId }}">
+                                    <tr class="{{ $qtyReject > 0 ? 'row-has-reject ' : '' }}{{ $isPartialCancelled ? 'qcs-row-cancelled' : '' }}" data-bundle-id="{{ $bundleId }}">
                                         <td style="text-align:center; vertical-align:middle;">
                                             <input type="hidden" name="results[{{ $i }}][cutting_job_bundle_id]"
                                                 value="{{ $bundleId }}">
@@ -1605,6 +1665,9 @@
                                         <td>
                                             <div class="qcs-item-code">{{ $row['item_code'] }}</div>
                                             <div class="qcs-item-name qcs-hide-mobile">{{ $row['item_name'] ?? '' }}</div>
+                                            @if ($isPartialCancelled)
+                                                <div class="qcs-lot-ref" style="color:var(--gf-warn);font-weight:800;">Menunggu item pengganti</div>
+                                            @endif
                                             @if (!empty($row['lot_code']))
                                                 <div class="qcs-lot-ref">{{ $row['lot_code'] }}</div>
                                             @endif
@@ -1631,7 +1694,7 @@
                                         </td>
 
                                         <td>
-                                            <span class="qcs-badge qcs-badge-{{ $stBadge }}" style="font-size:8px;height:20px;padding:0 7px;">{{ $st }}</span>
+                                            <span class="qcs-badge qcs-badge-{{ $stBadge }}" style="font-size:8px;height:20px;padding:0 7px;">{{ $stLabel }}</span>
                                         </td>
 
                                         <td class="qcs-hide-mobile">
@@ -1649,10 +1712,11 @@
                                         <td>
                                             <div style="display:flex;gap:4px;justify-content:flex-end;align-items:center;">
                                                 @if ($canAdjustQc)
-                                                <button type="button" class="qcs-row-btn qcs-row-btn-adjust"
+                                                <button type="button" class="qcs-row-btn qcs-row-btn-adjust qcs-row-action"
                                                     title="Adjust"
                                                     data-bs-toggle="modal" data-bs-target="#{{ $modalId }}">
-                                                    ✏
+                                                    <span class="qcs-action-icon">✏</span>
+                                                    <span class="qcs-action-text">Adjust</span>
                                                 </button>
 
                                                 {{-- Adjust Modal --}}
@@ -1743,10 +1807,20 @@
                                                 @endif
 
                                                 @if (($row['can_partial_cancel'] ?? false) && Route::has('production.qc.cutting.bundle_cancel'))
-                                                    <button type="button" class="qcs-row-btn qcs-link-chip-danger"
-                                                        title="Batalkan QC bundle ini saja"
-                                                        onclick="return partialCancelBundle(@js(route('production.qc.cutting.bundle_cancel', [$cuttingJob, $bundleId])), @js($row['bundle_code'] ?? 'bundle ini'))">
-                                                        ↩
+                                                    <button type="button" class="qcs-row-btn qcs-row-action qcs-row-action-danger"
+                                                        title="Batalkan QC bundle ini"
+                                                        data-bs-toggle="modal" data-bs-target="#qcCancelModal_{{ $bundleId }}">
+                                                        <span class="qcs-action-icon">↩</span>
+                                                        <span class="qcs-action-text">Batal QC</span>
+                                                    </button>
+                                                @endif
+
+                                                @if (($row['can_update_item'] ?? false) && Route::has('production.qc.cutting.bundle_update_item'))
+                                                    <button type="button" class="qcs-row-btn qcs-row-action qcs-row-action-primary"
+                                                        title="Ganti item bundle"
+                                                        data-bs-toggle="modal" data-bs-target="#qcUpdateItemModal_{{ $bundleId }}">
+                                                        <span class="qcs-action-icon">⇄</span>
+                                                        <span class="qcs-action-text">Ganti Item</span>
                                                     </button>
                                                 @endif
                                             </div>
@@ -1915,7 +1989,89 @@
 
             </form>
 
+            {{-- Bundle actions live outside the main QC form to avoid nested forms. --}}
+            @foreach ($rows as $row)
+                @php
+                    $bundleId = (int) $row['cutting_job_bundle_id'];
+                    $bundleCode = $row['bundle_code'] ?? 'Bundle';
+                    $itemCode = $row['item_code'] ?? '-';
+                @endphp
 
+                @if (($row['can_partial_cancel'] ?? false) && Route::has('production.qc.cutting.bundle_cancel'))
+                    <div class="modal fade qcs-modal" id="qcCancelModal_{{ $bundleId }}" tabindex="-1"
+                        aria-labelledby="qcCancelModalLabel_{{ $bundleId }}" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <div>
+                                        <div class="modal-title-main" id="qcCancelModalLabel_{{ $bundleId }}">Batalkan QC Bundle</div>
+                                        <div class="modal-title-sub">{{ $bundleCode }} · Item {{ $itemCode }}</div>
+                                    </div>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                                </div>
+
+                                <form action="{{ route('production.qc.cutting.bundle_cancel', [$cuttingJob, $bundleId]) }}" method="post">
+                                    @csrf
+                                    <div class="modal-body">
+                                        <div class="qcs-hint-box" style="margin-bottom:14px;">
+                                            QC bundle ini akan dibatalkan dan stok WIP/reject-nya dibalik.
+                                            Bundle dikembalikan ke status <b>Cut</b>; bundle lain tidak ikut berubah.
+                                        </div>
+                                        <label class="qcs-field-label" for="qcCancelReason_{{ $bundleId }}">Alasan pembatalan</label>
+                                        <textarea id="qcCancelReason_{{ $bundleId }}" name="reason" class="qcs-modal-field"
+                                            style="height:88px;padding-top:10px;resize:vertical;" maxlength="500" required
+                                            placeholder="Contoh: Salah pilih item, perlu diganti ke size lain"></textarea>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="qcs-modal-btn qcs-modal-btn-outline" data-bs-dismiss="modal">Kembali</button>
+                                        <button type="submit" class="qcs-modal-btn qcs-modal-btn-warn">
+                                            <span>↩</span> Batalkan QC
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                @if (($row['can_update_item'] ?? false) && Route::has('production.qc.cutting.bundle_update_item'))
+                    <div class="modal fade qcs-modal" id="qcUpdateItemModal_{{ $bundleId }}" tabindex="-1"
+                        aria-labelledby="qcUpdateItemModalLabel_{{ $bundleId }}" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <div>
+                                        <div class="modal-title-main" id="qcUpdateItemModalLabel_{{ $bundleId }}">Ganti Item Bundle</div>
+                                        <div class="modal-title-sub">{{ $bundleCode }} · Item saat ini {{ $itemCode }}</div>
+                                    </div>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                                </div>
+
+                                <form action="{{ route('production.qc.cutting.bundle_update_item', [$cuttingJob, $bundleId]) }}" method="post">
+                                    @csrf
+                                    <div class="modal-body">
+                                        <div class="qcs-hint-box" style="margin-bottom:14px;">
+                                            Pilih kode item <b>finished good</b> yang memiliki BOM aktif.
+                                            Setelah berhasil, bundle harus menjalani QC ulang.
+                                        </div>
+                                        <label class="qcs-field-label" for="qcItemCode_{{ $bundleId }}">Kode item baru</label>
+                                        <input id="qcItemCode_{{ $bundleId }}" name="item_code" type="text"
+                                            class="qcs-modal-field" value="" maxlength="100" required
+                                            autocomplete="off" placeholder="Contoh: K3MST"
+                                            style="text-transform:uppercase;">
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="qcs-modal-btn qcs-modal-btn-outline" data-bs-dismiss="modal">Kembali</button>
+                                        <button type="submit" class="qcs-modal-btn qcs-modal-btn-ok">
+                                            <span>⇄</span> Ganti Item
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+            @endforeach
 
         </div>
     </div>
@@ -1923,43 +2079,6 @@
 
 @push('scripts')
     <script>
-        function partialCancelBundle(action, bundleCode) {
-            const reason = window.prompt(
-                'Alasan Partial Cancel QC untuk ' + bundleCode + ':'
-            );
-            if (!reason || reason.trim() === '') {
-                return false;
-            }
-
-            if (!window.confirm(
-                'Batalkan QC hanya untuk ' + bundleCode + '?\\n\\n'
-                + 'Bundle lain yang sudah diambil jahit tidak akan disentuh.'
-            )) {
-                return false;
-            }
-
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = action;
-            form.style.display = 'none';
-
-            const csrf = document.querySelector('input[name="_token"]');
-            const csrfInput = document.createElement('input');
-            csrfInput.type = 'hidden';
-            csrfInput.name = '_token';
-            csrfInput.value = csrf ? csrf.value : '';
-
-            const reasonInput = document.createElement('input');
-            reasonInput.type = 'hidden';
-            reasonInput.name = 'reason';
-            reasonInput.value = reason.trim();
-
-            form.append(csrfInput, reasonInput);
-            document.body.appendChild(form);
-            form.submit();
-            return false;
-        }
-
         document.addEventListener('DOMContentLoaded', function() {
             const inputsReject = document.querySelectorAll('.input-reject');
             const sumOkSpan = document.getElementById('sum-ok');

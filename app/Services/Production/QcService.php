@@ -1242,6 +1242,138 @@ class QcService
         }
     }
 
+    /**
+     * Ganti item finished good pada bundle yang sudah di-partial-cancel.
+     * Tidak mengubah qty atau konsumsi kain; bundle akan memakai item baru
+     * saat QC ulang dan posting WIP berikutnya.
+     */
+    public function updateCuttingBundleItem(
+        CuttingJobBundle $bundle,
+        string $itemCode,
+        ?int $actorId = null,
+    ): void {
+        $itemCode = strtoupper(trim($itemCode));
+        if ($itemCode === '') {
+            throw new \RuntimeException('Kode item baru wajib diisi.');
+        }
+
+        DB::transaction(function () use ($bundle, $itemCode, $actorId) {
+            $bundle = CuttingJobBundle::query()
+                ->whereKey($bundle->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $job = CuttingJob::query()
+                ->whereKey($bundle->cutting_job_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $activePickedQty = (float) SewingPickupLine::query()
+                ->where('cutting_job_bundle_id', $bundle->id)
+                ->where('status', '!=', 'void')
+                ->sum('qty_bundle');
+
+            if ($activePickedQty > 0.000001 || (float) ($bundle->sewing_picked_qty ?? 0) > 0.000001) {
+                throw new \RuntimeException(
+                    "Bundle {$bundle->bundle_code} tidak bisa diubah: sudah ada qty yang diambil jahit."
+                );
+            }
+
+            $cancellation = CuttingQcCancellation::query()
+                ->where('cutting_job_id', $job->id)
+                ->where('cutting_job_bundle_id', $bundle->id)
+                ->latest('id')
+                ->lockForUpdate()
+                ->first();
+
+            if (!$cancellation) {
+                throw new \RuntimeException(
+                    "Bundle {$bundle->bundle_code} harus di-Partial Cancel QC terlebih dahulu."
+                );
+            }
+
+            $activeQc = QcResult::query()
+                ->where('stage', QcResult::STAGE_CUTTING)
+                ->where('cutting_job_id', $job->id)
+                ->where('cutting_job_bundle_id', $bundle->id)
+                ->exists();
+
+            if ($activeQc || (float) ($bundle->cut_wip_qty ?? 0) > 0.000001) {
+                throw new \RuntimeException(
+                    "Bundle {$bundle->bundle_code} harus belum memiliki QC/WIP aktif saat item diubah."
+                );
+            }
+
+            $item = Item::query()
+                ->whereRaw('UPPER(code) = ?', [$itemCode])
+                ->where('type', 'finished_good')
+                ->canBeMade()
+                ->first();
+
+            if (!$item) {
+                throw new \RuntimeException(
+                    "Item {$itemCode} tidak ditemukan atau belum dikonfigurasi sebagai item produksi."
+                );
+            }
+
+            if (!DB::table('item_boms')
+                ->where('item_id', $item->id)
+                ->where('active', true)
+                ->exists()) {
+                throw new \RuntimeException("Item {$itemCode} belum memiliki BOM aktif.");
+            }
+
+            $oldItem = Item::query()->find($bundle->finished_item_id);
+            $oldItemId = (int) ($bundle->finished_item_id ?? 0);
+            if ($oldItemId === (int) $item->id) {
+                throw new \RuntimeException("Bundle {$bundle->bundle_code} sudah menggunakan item {$itemCode}.");
+            }
+
+            $metadata = $cancellation->metadata ?? [];
+            $itemChanges = $metadata['item_changes'] ?? [];
+            $itemChanges[] = [
+                'from_item_id' => $oldItemId ?: null,
+                'from_item_code' => $oldItem?->code,
+                'to_item_id' => (int) $item->id,
+                'to_item_code' => $item->code,
+                'changed_by' => $actorId ?: auth()->id(),
+                'changed_at' => now()->toISOString(),
+            ];
+
+            $cancellation->update([
+                'metadata' => array_merge($metadata, [
+                    'item_changes' => $itemChanges,
+                    'latest_item_id' => (int) $item->id,
+                ]),
+            ]);
+
+            $bundle->update([
+                'finished_item_id' => $item->id,
+                'item_category_id' => $item->item_category_id,
+                'status' => 'cut',
+                'qty_qc_ok' => 0,
+                'qty_qc_reject' => 0,
+            ]);
+
+            ProductionLog::record(
+                event: 'qc_bundle_item_changed',
+                summary: "Item bundle {$bundle->bundle_code}: " . ($oldItem?->code ?? '-') . " → {$item->code}",
+                meta: [
+                    'cutting_job_id' => (int) $job->id,
+                    'bundle_id' => (int) $bundle->id,
+                    'partial_cancel_id' => (int) $cancellation->id,
+                    'from_item_id' => $oldItemId ?: null,
+                    'from_item_code' => $oldItem?->code,
+                    'to_item_id' => (int) $item->id,
+                    'to_item_code' => $item->code,
+                ],
+                sourceType: CuttingJobBundle::class,
+                sourceId: (int) $bundle->id,
+                reference: $bundle->bundle_code,
+            );
+        });
+    }
+
     private function journalAccountId(string $code): int
     {
         return (int) DB::table('accounts')->where('code', $code)->value('id');

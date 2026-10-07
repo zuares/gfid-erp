@@ -145,6 +145,10 @@ Route::middleware(['web', 'auth', 'access:production'])
                 ->middleware('role:owner')
                 ->name('cutting.bundle_cancel');
 
+            Route::post('/cutting/{cuttingJob}/bundles/{bundle}/update-item', [QcController::class, 'updateCuttingBundleItem'])
+                ->middleware('role:owner')
+                ->name('cutting.bundle_update_item');
+
             // ===== QC Jahit (Sewing) =====
             Route::get('/sewing/{sewingReturn}/edit', [QcController::class, 'editSewing'])
                 ->name('sewing.edit');

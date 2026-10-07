@@ -109,6 +109,56 @@ class QcCuttingPartialCancelTest extends TestCase
         );
     }
 
+    public function test_partial_cancelled_bundle_can_change_finished_item_before_reqc(): void
+    {
+        [$owner, $job, $bundle, $oldItem] = $this->fixture();
+        $this->actingAs($owner);
+
+        $service = app(QcService::class);
+        $service->cancelCuttingBundleQc(
+            bundle: $bundle,
+            reason: 'Turun size karena kebutuhan stok',
+            actorId: $owner->id,
+        );
+
+        $newItem = Item::create([
+            'code' => 'K3MST',
+            'name' => 'Item K3MST',
+            'type' => 'finished_good',
+            'item_category_id' => $oldItem->item_category_id,
+            'can_make' => true,
+            'production_source' => 'in_house',
+            'active' => true,
+        ]);
+        DB::table('item_boms')->insert([
+            'item_id' => $newItem->id,
+            'name' => 'BOM K3MST',
+            'active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $service->updateCuttingBundleItem(
+            bundle: $bundle,
+            itemCode: 'k3mst',
+            actorId: $owner->id,
+        );
+
+        $this->assertDatabaseHas('cutting_job_bundles', [
+            'id' => $bundle->id,
+            'finished_item_id' => $newItem->id,
+            'status' => 'cut',
+        ]);
+        $this->assertDatabaseHas('production_logs', [
+            'event' => 'qc_bundle_item_changed',
+            'source_id' => $bundle->id,
+        ]);
+        $this->assertDatabaseHas('cutting_qc_cancellations', [
+            'cutting_job_id' => $job->id,
+            'cutting_job_bundle_id' => $bundle->id,
+        ]);
+    }
+
     private function fixture(): array
     {
         $ownerEmployee = Employee::create([
