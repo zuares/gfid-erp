@@ -315,6 +315,15 @@ class MarketplaceSalesDashboardController extends Controller
         $productLineNetValueExpression = 'CASE WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount WHEN COALESCE(oi.price_after_discount, 0) > 0 THEN oi.price_after_discount * COALESCE(oi.qty, 0) WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount ELSE 0 END';
         $marketplaceProductNameExpression = "COALESCE(NULLIF(oi.item_name, ''), NULLIF(oi.item_name_snapshot, ''), NULLIF(oi.variant_name, ''), NULLIF(oi.variant_snapshot, ''), 'Produk tanpa nama')";
         $marketplaceProductSkuExpression = "COALESCE(NULLIF(oi.item_sku, ''), NULLIF(oi.marketplace_sku, ''), NULLIF(oi.model_sku, ''), NULLIF(oi.external_sku, ''), NULLIF(oi.item_code_snapshot, ''), '-')";
+        $periodLastPurchasePriceExpression = "(SELECT period_prl.unit_price / COALESCE(NULLIF(period_prl.conversion_factor, 0), 1)
+            FROM purchase_receipt_lines as period_prl
+            JOIN purchase_receipts as period_pr ON period_pr.id = period_prl.purchase_receipt_id
+            WHERE period_prl.item_id = internal_item.id
+                AND period_pr.status = 'posted'
+                AND period_pr.date <= ?
+                AND period_prl.unit_price > 0
+            ORDER BY period_pr.date DESC, period_pr.id DESC, period_prl.id DESC
+            LIMIT 1)";
 
         $products = DB::table('marketplace_order_items as oi')
             ->join('marketplace_orders as o', function ($join) {
@@ -334,8 +343,9 @@ class MarketplaceSalesDashboardController extends Controller
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
             ->selectRaw("COALESCE(MAX(NULLIF(internal_item.name, '')), MAX({$marketplaceProductNameExpression}), 'Produk tanpa nama') as name")
             ->selectRaw("MAX({$marketplaceProductNameExpression}) as marketplace_name")
+            ->selectRaw("MAX(NULLIF(oi.image_url, '')) as image_url")
             ->selectRaw("COALESCE(MAX(NULLIF(internal_item.code, '')), MAX({$marketplaceProductSkuExpression}), '-') as sku")
-            ->selectRaw("COALESCE(MAX(NULLIF(internal_item.base_unit_cost, 0)), MAX(NULLIF(internal_item.hpp, 0)), 0) as hpp")
+            ->selectRaw("COALESCE(NULLIF({$periodLastPurchasePriceExpression}, 0), MAX(NULLIF(internal_item.last_purchase_price, 0)), MAX(NULLIF(internal_item.base_unit_cost, 0)), MAX(NULLIF(internal_item.hpp, 0)), 0) as hpp", [$to->toDateString()])
             ->selectRaw("MAX(NULLIF(internal_category.code, '')) as category_code")
             ->selectRaw("MAX(NULLIF(internal_category.name, '')) as category_name")
             ->selectRaw('MAX(NULLIF(oi.internal_item_id, 0)) as internal_item_id')

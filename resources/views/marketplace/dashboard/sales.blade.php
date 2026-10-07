@@ -396,12 +396,19 @@
     .sales-dashboard .sales-product-marketplace-row td { background: color-mix(in srgb, var(--sales-accent-soft) 24%, var(--sales-card) 76%); border-top: 1px solid color-mix(in srgb, var(--sales-accent) 18%, var(--sales-line) 82%); }
     .sales-dashboard .sales-product-marketplace-row .sales-product-marketplace-toggle { min-height: 2.15rem; }
     .sales-dashboard .sales-product-marketplace-title { display: flex; min-width: 0; align-items: center; gap: .4rem; }
+    .sales-dashboard .sales-product-marketplace-thumb { position: relative; display: inline-flex; flex: 0 0 2rem; width: 2rem; height: 2rem; align-items: center; justify-content: center; overflow: hidden; border: 1px solid color-mix(in srgb, var(--sales-accent) 18%, var(--sales-line) 82%); border-radius: 7px; background: var(--sales-soft); color: var(--sales-muted); }
+    .sales-dashboard .sales-product-marketplace-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .18s ease, box-shadow .18s ease; }
+    .sales-dashboard .sales-product-marketplace-thumb:hover img,
+    .sales-dashboard .sales-product-marketplace-thumb:focus-within img { position: relative; z-index: 2; transform: scale(2.8); border-radius: 7px; box-shadow: 0 8px 20px rgba(15, 23, 42, .22); }
+    .sales-dashboard .sales-product-marketplace-thumb .sales-product-image-fallback { display: inline-flex; align-items: center; justify-content: center; font-size: .85rem; }
     .sales-dashboard .sales-product-marketplace-code { flex: 0 0 auto; padding: .2rem .4rem; border: 1px solid color-mix(in srgb, var(--sales-accent) 20%, var(--sales-line) 80%); border-radius: 5px; background: var(--sales-accent-soft); color: var(--sales-accent); font-size: .58rem; font-weight: 800; letter-spacing: .025em; line-height: 1.1; }
     .sales-dashboard .sales-product-marketplace-title .sales-product-name { min-width: 0; font-weight: 750; }
     .sales-dashboard .sales-product-internal-row td { background: color-mix(in srgb, var(--sales-soft) 72%, var(--sales-card) 28%); }
-    .sales-dashboard .sales-product-internal-cell { padding-left: 1.85rem !important; }
+    .sales-dashboard .sales-product-internal-cell { position: relative; padding-left: 3rem !important; }
+    .sales-dashboard .sales-product-internal-cell::before { content: ''; position: absolute; left: 1.7rem; top: -.5rem; bottom: -.5rem; border-left: 1px solid color-mix(in srgb, var(--sales-accent) 24%, var(--sales-line) 76%); }
     .sales-dashboard .sales-product-internal-cell .sales-product-link { display: flex; align-items: center; gap: .45rem; }
-    .sales-dashboard .sales-product-internal-index { color: var(--sales-muted); }
+    .sales-dashboard .sales-product-internal-code { display: block; max-width: 100%; overflow: hidden; color: var(--sales-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .68rem; font-weight: 750; letter-spacing: .01em; text-overflow: ellipsis; white-space: nowrap; }
+    .sales-dashboard .sales-product-internal-index { padding-left: 1.45rem !important; color: var(--sales-muted); }
     .sales-dashboard .sales-product-group-title { font-size: .72rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
     .sales-dashboard .sales-product-group-meta { color: var(--sales-muted); font-size: .68rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
     .sales-dashboard .sales-product-analysis-section { overflow: hidden; }
@@ -1458,7 +1465,7 @@
                             <col style="width: 5%">
                             <col style="width: 7%">
                         </colgroup>
-                        <thead><tr><th scope="col" class="sales-index-column">No.</th><th>Produk</th><th class="text-end">HPP</th><th class="text-end">Order</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Penjualan Netto</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Biaya Iklan</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ACOS</th><th class="text-end">ROAS</th><th class="text-end pe-3">CPA</th></tr></thead>
+                        <thead><tr><th scope="col" class="sales-index-column">No.</th><th>Produk</th><th class="text-end" title="Variant: HPP terakhir per unit · Marketplace/kategori: total HPP berdasarkan qty">HPP / Total</th><th class="text-end">Order</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Penjualan Netto</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Biaya Iklan</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ACOS</th><th class="text-end">ROAS</th><th class="text-end pe-3">CPA</th></tr></thead>
                         <tbody>
                             @php
                                 $productGroups = $products
@@ -1493,9 +1500,7 @@
                                     $categorySpend = (float) $categoryAdProducts->sum('ad_spend');
                                     $categoryAdSales = (float) $categoryAdProducts->sum('ad_sales');
                                     $categoryAdConversions = (int) $categoryAdProducts->sum('ad_conversions');
-                                    $categoryHppQty = (float) $categoryProducts->filter(fn ($product) => (float) ($product->hpp ?? 0) > 0)->sum('qty');
-                                    $categoryHppValue = (float) $categoryProducts->sum(fn ($product) => (float) ($product->hpp ?? 0) * (int) ($product->qty ?? 0));
-                                    $categoryHpp = $categoryHppQty > 0 ? $categoryHppValue / $categoryHppQty : 0;
+                                    $categoryHppTotal = (float) $categoryProducts->sum(fn ($product) => (float) ($product->hpp ?? 0) * (int) ($product->qty ?? 0));
                                 @endphp
                                 <tr class="sales-product-group-row">
                                     <td class="sales-index-cell" aria-label="Kategori {{ $categoryNumber }}">{{ $categoryNumber }}</td>
@@ -1508,7 +1513,7 @@
                                             </span>
                                         </button>
                                     </td>
-                                    <td class="text-end fw-semibold">{{ $categoryHpp > 0 ? $fmt($categoryHpp) : '—' }}</td>
+                                    <td class="text-end fw-semibold"><div>{{ $categoryHppTotal > 0 ? $fmt($categoryHppTotal) : '—' }}</div><div class="small text-muted">Total HPP</div></td>
                                     <td class="text-end">{{ number_format($categoryOrders) }}</td>
                                     <td class="text-end">{{ number_format($categoryQty) }}</td>
                                     <td class="text-end fw-semibold"><div>{{ $fmt($categorySales) }}</div><div class="small text-muted">AOV {{ $categoryOrders > 0 ? $fmt($categorySales / $categoryOrders) : '—' }}</div></td>
@@ -1527,6 +1532,7 @@
                                         $marketplaceProducts = $marketplaceProducts->values();
                                         $marketplaceItemIds = $marketplaceProducts->keys()->map(fn ($index) => $marketplaceKey.'-items-'.$index)->implode(' ');
                                         $marketplace = $marketplaceProducts->first();
+                                        $marketplaceImage = trim((string) ($marketplace->image_url ?? ''));
                                         $marketplaceCode = trim((string) ($marketplace->external_item_id ?? ''));
                                         $marketplaceTitle = trim((string) ($marketplace->marketplace_name ?: $marketplace->name)) ?: 'Produk tanpa nama';
                                         $marketplaceOrders = (int) $marketplaceProducts->sum('orders');
@@ -1538,9 +1544,7 @@
                                         $marketplaceSpend = (float) $marketplaceAdProducts->sum('ad_spend');
                                         $marketplaceAdSales = (float) $marketplaceAdProducts->sum('ad_sales');
                                         $marketplaceAdConversions = (int) $marketplaceAdProducts->sum('ad_conversions');
-                                        $marketplaceHppQty = (float) $marketplaceProducts->filter(fn ($product) => (float) ($product->hpp ?? 0) > 0)->sum('qty');
-                                        $marketplaceHppValue = (float) $marketplaceProducts->sum(fn ($product) => (float) ($product->hpp ?? 0) * (int) ($product->qty ?? 0));
-                                        $marketplaceHpp = $marketplaceHppQty > 0 ? $marketplaceHppValue / $marketplaceHppQty : 0;
+                                        $marketplaceHppTotal = (float) $marketplaceProducts->sum(fn ($product) => (float) ($product->hpp ?? 0) * (int) ($product->qty ?? 0));
                                     @endphp
                                     <tr id="{{ $marketplaceKey }}" class="sales-product-marketplace-row" data-sales-product-category-items="{{ $categoryKey }}" hidden>
                                         <td class="sales-index-cell sales-product-item-index" aria-label="Marketplace {{ $categoryNumber }}.{{ $marketplaceNumber }}"><span class="sales-product-item-number">{{ $categoryNumber }}.{{ $marketplaceNumber }}</span></td>
@@ -1548,6 +1552,14 @@
                                             <button type="button" class="sales-product-marketplace-toggle" data-sales-product-marketplace-toggle="{{ $marketplaceKey }}" aria-expanded="false" aria-controls="{{ $marketplaceItemIds }}" title="{{ $marketplaceTitle }}">
                                                 <i class="bi bi-chevron-right" aria-hidden="true"></i>
                                                 <span class="sales-product-marketplace-title">
+                                                    <span class="sales-product-marketplace-thumb" title="{{ $marketplaceTitle }}">
+                                                        @if ($marketplaceImage !== '')
+                                                            <img src="{{ $marketplaceImage }}" alt="" loading="lazy" onerror="this.hidden=true; this.nextElementSibling.hidden=false;">
+                                                            <span class="sales-product-image-fallback" hidden><i class="bi bi-image" aria-hidden="true"></i></span>
+                                                        @else
+                                                            <span class="sales-product-image-fallback"><i class="bi bi-image" aria-hidden="true"></i></span>
+                                                        @endif
+                                                    </span>
                                                     @if ($marketplaceCode !== '')
                                                         <span class="sales-product-marketplace-code" title="Kode produk marketplace">{{ $marketplaceCode }}</span>
                                                     @endif
@@ -1556,7 +1568,7 @@
                                                 </span>
                                             </button>
                                         </td>
-                                        <td class="text-end fw-semibold">{{ $marketplaceHpp > 0 ? $fmt($marketplaceHpp) : '—' }}</td>
+                                        <td class="text-end fw-semibold"><div>{{ $marketplaceHppTotal > 0 ? $fmt($marketplaceHppTotal) : '—' }}</div><div class="small text-muted">Total HPP</div></td>
                                         <td class="text-end">{{ number_format($marketplaceOrders) }}</td>
                                         <td class="text-end">{{ number_format($marketplaceQty) }}</td>
                                         <td class="text-end fw-semibold"><div>{{ $fmt($marketplaceSales) }}</div><div class="small text-muted">AOV {{ $marketplaceOrders > 0 ? $fmt($marketplaceSales / $marketplaceOrders) : '—' }}</div></td>
@@ -1579,10 +1591,10 @@
                                                         : 'ID '.($product->internal_item_id ?? '—');
                                                 @endphp
                                                 <button type="button" class="sales-product-link" data-sales-product-name="{{ $product->name }}" data-sales-product-sku="{{ $product->sku }}" data-sales-product-internal-item-id="{{ $product->internal_item_id ?? '' }}" title="Lihat pesanan item internal: {{ $internalProductCode }}">
-                                                    <span class="sales-product-name" title="{{ $internalProductCode }}">{{ $internalProductCode }}</span>
+                                                    <span class="sales-product-internal-code" title="{{ $internalProductCode }}">{{ $internalProductCode }}</span>
                                                 </button>
                                             </td>
-                                            <td class="text-end fw-semibold">{{ (float) ($product->hpp ?? 0) > 0 ? $fmt($product->hpp) : '—' }}</td>
+                                            <td class="text-end fw-semibold"><div>{{ (float) ($product->hpp ?? 0) > 0 ? $fmt($product->hpp) : '—' }}</div><div class="small text-muted">HPP/unit</div></td>
                                             <td class="text-end">{{ number_format((int) $product->orders) }}</td>
                                             <td class="text-end">{{ number_format((int) $product->qty) }}</td>
                                             <td class="text-end fw-semibold"><div>{{ $fmt($product->sales) }}</div><div class="small text-muted">AOV {{ $product->orders > 0 ? $fmt($product->sales / $product->orders) : '—' }}</div></td>
