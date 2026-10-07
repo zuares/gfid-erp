@@ -164,6 +164,9 @@
     .sales-dashboard .sales-filter-comparison { min-width: 150px; }
     .sales-dashboard .sales-filter-comparison .form-label { margin-bottom: .28rem; }
     .sales-dashboard .sales-filter-comparison .form-select { min-height: 32px; font-size: .72rem; font-weight: 650; }
+    .sales-dashboard .sales-filter-platform { min-width: 145px; }
+    .sales-dashboard .sales-filter-platform .form-label { margin-bottom: .28rem; }
+    .sales-dashboard .sales-filter-platform .form-select { min-height: 32px; font-size: .72rem; font-weight: 650; }
     .sales-dashboard .sales-kpi--success .sales-kpi-icon { background: var(--success-soft, #dcfce7); color: var(--success, #16a34a); border-color: color-mix(in srgb, var(--success, #16a34a) 16%, var(--sales-line) 84%); }
     .sales-dashboard .sales-kpi--success::after { background: var(--success, #16a34a); }
     .sales-dashboard .sales-kpi--warning .sales-kpi-icon { background: var(--danger-soft, #fee2e2); color: var(--danger, #dc2626); border-color: color-mix(in srgb, var(--danger, #dc2626) 16%, var(--sales-line) 84%); }
@@ -360,7 +363,8 @@
         .sales-dashboard .sales-kpi { min-height: 118px; }
         .sales-dashboard .sales-kpi-value { font-size: 1.2rem; }
         .sales-dashboard .sales-period-filter { order: 1; width: 100%; margin-left: 0; }
-        .sales-dashboard .sales-filter-store { order: 2; }
+        .sales-dashboard .sales-filter-platform { order: 2; }
+        .sales-dashboard .sales-filter-store { order: 3; }
     }
 </style>
 @endpush
@@ -398,13 +402,19 @@
         $activeDateSummary = '30 hari terakhir';
     }
     $detailQuery = ['date_from' => $filters['date_from'], 'date_to' => $filters['date_to']];
+    if ($filters['platform']) $detailQuery['platform'] = $filters['platform'];
     if ($filters['store_id']) $detailQuery['store_id'] = $filters['store_id'];
+    $visibleStores = $filters['platform']
+        ? $stores->filter(fn ($store) => strtoupper((string) ($store->channel->code ?? '')) === $filters['platform'])
+        : $stores;
     $canImportMarketplace = auth()->check() && auth()->user()->canAccessModule('imports');
     $importOrderQuery = $filters['store_id'] ? ['store_id' => $filters['store_id']] : [];
     $paymentDetailQuery = ['tab' => 'payments'];
+    if ($filters['platform']) $paymentDetailQuery['platform'] = $filters['platform'];
     if ($filters['store_id']) $paymentDetailQuery['store_id'] = $filters['store_id'];
     if (!empty($filters['dummy'])) $paymentDetailQuery['dummy'] = 1;
     $shippingDetailQuery = ['tab' => 'shipping'];
+    if ($filters['platform']) $shippingDetailQuery['platform'] = $filters['platform'];
     if ($filters['store_id']) $shippingDetailQuery['store_id'] = $filters['store_id'];
     if (!empty($filters['dummy'])) $shippingDetailQuery['dummy'] = 1;
     $shippingPct = fn ($value) => $shippingKpi['total'] > 0
@@ -715,12 +725,23 @@
                     summary="{{ $activeDateSummary }}"
                     class="col-12 col-md-auto sales-period-filter"
                 />
-                @if ($stores->isNotEmpty())
+                @if ($platforms->isNotEmpty())
+                    <div class="col-12 col-md-auto sales-filter-platform">
+                        <label class="form-label" for="sales-platform">Platform</label>
+                        <select id="sales-platform" class="form-select form-select-sm" name="platform">
+                            <option value="">Semua platform</option>
+                            @foreach ($platforms as $platform)
+                                <option value="{{ $platform['code'] }}" @selected($filters['platform'] === $platform['code'])>{{ $platform['label'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+                @if ($visibleStores->isNotEmpty())
                     <div class="col-12 col-md-3 sales-filter-store">
                         <label class="form-label" for="sales-store">Toko</label>
                         <select id="sales-store" class="form-select form-select-sm" name="store_id">
                             <option value="">Semua toko</option>
-                            @foreach ($stores as $store)
+                            @foreach ($visibleStores as $store)
                                 <option value="{{ $store->id }}" @selected((string) $filters['store_id'] === (string) $store->id)>
                                     {{ $store->name }}{{ $store->channel?->code ? ' · '.ucfirst($store->channel->code) : '' }}
                                 </option>
@@ -1096,20 +1117,21 @@
                 <div class="sales-empty text-center"><i class="bi bi-wallet2 d-block fs-3 mb-2"></i>Belum ada data pembayaran pada periode ini.</div>
             @else
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle sales-table">
-                        <thead><tr><th class="ps-3">No.</th><th>Tanggal</th><th class="text-end">Orders</th><th class="text-end">COD</th><th class="text-end">Non-COD</th><th class="text-end">Pay Later</th><th class="text-end">Buyer Paid</th><th class="text-end">COD Exposure</th><th class="text-end pe-3">AOV Neto</th></tr></thead>
+                    <table class="table table-sm table-hover align-middle sales-table sales-promotion-table sales-payment-table">
+                        <thead><tr><th class="ps-3">Date</th><th class="text-end">Seller Net Sales</th><th class="text-end">Voucher Platform</th><th class="text-end">Buyer Shipping</th><th class="text-end">COD</th><th class="text-end">Non-COD</th><th class="text-end">Pay Later</th><th class="text-end">Protection</th><th class="text-end">Service Fee</th><th class="text-end">Buyer Paid</th></tr></thead>
                         <tbody>
                             @foreach ($paymentDaily as $payment)
                                 <tr class="sales-clickable-row" data-sales-payment-detail-url="{{ route('marketplace.dashboard.payments.detail', array_merge(['date' => $payment->day], $paymentDetailQuery)) }}" tabindex="0" role="button" aria-label="Lihat detail pembayaran {{ $dateLabel($payment->day) }}">
-                                    <td class="ps-3 text-muted">{{ $loop->iteration }}</td>
                                     <td class="fw-semibold">{{ $dateLabel($payment->day) }}</td>
-                                    <td class="text-end">{{ number_format($payment->orders) }}</td>
+                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->seller_net_sales) }}</div><div class="small text-muted">{{ number_format($payment->seller_net_sales_orders) }} order</div></td>
+                                    <td class="text-end"><div>{{ $fmt($payment->voucher_platform) }}</div><div class="small text-muted">{{ number_format($payment->voucher_platform_orders) }} order</div></td>
+                                    <td class="text-end"><div>{{ $fmt($payment->buyer_shipping) }}</div><div class="small text-muted">{{ number_format($payment->buyer_shipping_orders) }} order</div></td>
                                     <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->cod_amount) }}</div><div class="small text-muted">{{ number_format($payment->cod_orders) }} order</div></td>
                                     <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->non_cod_amount) }}</div><div class="small text-muted">{{ number_format($payment->non_cod_orders) }} order</div></td>
                                     <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->pay_later_amount) }}</div><div class="small text-muted">{{ number_format($payment->pay_later_orders) }} order</div></td>
-                                    <td class="text-end fw-semibold">{{ $fmt($payment->buyer_paid) }}</td>
-                                    <td class="text-end">{{ number_format($payment->cod_order_share, 1) }}%</td>
-                                    <td class="text-end pe-3">{{ $fmt($payment->aov) }}</td>
+                                    <td class="text-end"><div>{{ $fmt($payment->product_protection) }}</div><div class="small text-muted">{{ number_format($payment->product_protection_orders) }} order</div></td>
+                                    <td class="text-end"><div>{{ $fmt($payment->service_fee) }}</div><div class="small text-muted">{{ number_format($payment->service_fee_orders) }} order</div></td>
+                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->buyer_paid) }}</div><div class="small text-muted">{{ number_format($payment->orders) }} order</div></td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -1356,6 +1378,7 @@
         const filterForm = document.querySelector('.sales-filter-card');
         const activeTabInput = document.querySelector('#sales-active-tab');
         const storeInput = document.querySelector('#sales-store');
+        const platformInput = document.querySelector('#sales-platform');
         const comparisonModeInput = document.querySelector('#sales-comparison-mode');
         const orderRows = document.querySelectorAll('[data-sales-order-row]');
         const orderDate = document.querySelector('#sales-order-detail-date');
@@ -1428,6 +1451,12 @@
             });
         }
 
+        if (platformInput && filterForm) {
+            platformInput.addEventListener('change', function () {
+                filterForm.requestSubmit();
+            });
+        }
+
         if (comparisonModeInput && filterForm) {
             comparisonModeInput.addEventListener('change', function () {
                 filterForm.requestSubmit();
@@ -1458,6 +1487,7 @@
                 const currentQuery = new URLSearchParams(window.location.search);
                 const target = new URL(trigger.dataset.salesPromotionDetailUrl, window.location.origin);
                 if (currentQuery.get('dummy') === '1') target.searchParams.set('dummy', '1');
+                if (currentQuery.get('platform')) target.searchParams.set('platform', currentQuery.get('platform'));
                 if (currentQuery.get('store_id')) target.searchParams.set('store_id', currentQuery.get('store_id'));
                 window.location.href = target.toString();
             }
@@ -1513,6 +1543,9 @@
                 });
                 @if ($filters['store_id'])
                     query.set('store_id', @json($filters['store_id']));
+                @endif
+                @if ($filters['platform'])
+                    query.set('platform', @json($filters['platform']));
                 @endif
                 @if (!empty($filters['dummy']))
                     query.set('dummy', '1');

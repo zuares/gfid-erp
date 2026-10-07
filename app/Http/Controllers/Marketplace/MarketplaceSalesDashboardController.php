@@ -73,6 +73,7 @@ class MarketplaceSalesDashboardController extends Controller
         }
 
         $storeId = $request->integer('store_id') ?: null;
+        $platformCode = strtoupper(trim((string) $request->query('platform', '')));
         $comparisonMode = in_array($request->query('comparison_mode'), ['period', 'month'], true)
             ? $request->query('comparison_mode')
             : 'period';
@@ -82,15 +83,38 @@ class MarketplaceSalesDashboardController extends Controller
             ->orderBy('name')
             ->get();
 
-        if ($storeId && ! $stores->contains('id', $storeId)) {
+        $platforms = $stores
+            ->map(function ($store) {
+                $code = strtoupper(trim((string) ($store->channel->code ?? '')));
+                if ($code === '') {
+                    return null;
+                }
+
+                return [
+                    'code' => $code,
+                    'label' => $store->channel->name ?: ucfirst(strtolower($code)),
+                ];
+            })
+            ->filter()
+            ->unique('code')
+            ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        if ($platformCode !== '' && ! $platforms->contains('code', $platformCode)) {
+            $platformCode = null;
+        }
+
+        $selectedStore = $storeId ? $stores->firstWhere('id', $storeId) : null;
+        if ($storeId && (! $selectedStore || ($platformCode && strtoupper((string) ($selectedStore->channel->code ?? '')) !== $platformCode))) {
             $storeId = null;
         }
 
         $adStoreIds = $stores
-            ->filter(function ($store) {
+            ->filter(function ($store) use ($platformCode) {
                 $channelCode = strtoupper((string) ($store->channel->code ?? ''));
 
-                return in_array($channelCode, ['SHOPEE', 'SHP'], true);
+                return in_array($channelCode, ['SHOPEE', 'SHP'], true)
+                    && (! $platformCode || $channelCode === $platformCode);
             })
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
@@ -124,12 +148,14 @@ class MarketplaceSalesDashboardController extends Controller
         $base = DB::table('marketplace_orders as o')
             ->leftJoinSub($itemTotals, 'itot', 'itot.order_key', '=', 'o.id')
             ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
+            ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
             ->whereRaw("{$dateExpression} IS NOT NULL")
             ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
             ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
             ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
-            ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId));
+            ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
+            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]));
 
         $orderDetails = (clone $base)
             ->select([
@@ -286,12 +312,15 @@ class MarketplaceSalesDashboardController extends Controller
                 $join->on(DB::raw('COALESCE(oi.marketplace_order_id, oi.order_id)'), '=', 'o.id');
             })
             ->leftJoin('marketplace_order_settlements as s', 's.order_id', '=', 'o.id')
+            ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
+            ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
             ->leftJoinSub($productOrderTotals, 'product_order_totals', 'product_order_totals.order_key', '=', 'o.id')
             ->whereRaw("{$dateExpression} IS NOT NULL")
             ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
             ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
             ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
+            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]))
             ->selectRaw("COALESCE(NULLIF(oi.item_name, ''), NULLIF(oi.item_name_snapshot, ''), NULLIF(oi.variant_name, ''), NULLIF(oi.variant_snapshot, ''), 'Produk tanpa nama') as name")
             ->selectRaw("COALESCE(NULLIF(oi.item_sku, ''), NULLIF(oi.marketplace_sku, ''), NULLIF(oi.model_sku, ''), NULLIF(oi.external_sku, ''), NULLIF(oi.item_code_snapshot, ''), '-') as sku")
             ->selectRaw('COALESCE(SUM(CASE WHEN oi.qty > 0 THEN oi.qty ELSE 0 END), 0) as qty')
@@ -350,9 +379,11 @@ class MarketplaceSalesDashboardController extends Controller
             ->selectRaw("COUNT(DISTINCT CASE WHEN ({$paymentCategoryExpression}) = 'cod' THEN o.id END) as cod_orders")
             ->selectRaw("COUNT(DISTINCT CASE WHEN ({$paymentCategoryExpression}) = 'non_cod' THEN o.id END) as non_cod_orders")
             ->selectRaw("COUNT(DISTINCT CASE WHEN ({$paymentCategoryExpression}) = 'pay_later' THEN o.id END) as pay_later_orders")
+            ->selectRaw('COUNT(DISTINCT CASE WHEN COALESCE(o.shipping_fee_customer, 0) > 0 THEN o.id END) as buyer_shipping_orders')
             ->selectRaw("COALESCE(SUM(CASE WHEN ({$paymentCategoryExpression}) = 'cod' THEN {$buyerPaymentExpression} ELSE 0 END), 0) as cod_amount")
             ->selectRaw("COALESCE(SUM(CASE WHEN ({$paymentCategoryExpression}) = 'non_cod' THEN {$buyerPaymentExpression} ELSE 0 END), 0) as non_cod_amount")
             ->selectRaw("COALESCE(SUM(CASE WHEN ({$paymentCategoryExpression}) = 'pay_later' THEN {$buyerPaymentExpression} ELSE 0 END), 0) as pay_later_amount")
+            ->selectRaw('COALESCE(SUM(COALESCE(o.shipping_fee_customer, 0)), 0) as buyer_shipping')
             ->selectRaw("COALESCE(SUM(CASE WHEN {$paymentStatusExpression} IN ({$paidPaymentStatuses}) THEN {$buyerPaymentExpression} ELSE 0 END), 0) as paid_amount")
             ->selectRaw("COALESCE(SUM(CASE WHEN {$paymentStatusExpression} NOT IN ({$paidPaymentStatuses}) THEN {$buyerPaymentExpression} ELSE 0 END), 0) as pending_amount")
             ->groupByRaw("DATE({$dateExpression})")
@@ -366,9 +397,11 @@ class MarketplaceSalesDashboardController extends Controller
                 $row->cod_orders = (int) $row->cod_orders;
                 $row->non_cod_orders = (int) $row->non_cod_orders;
                 $row->pay_later_orders = (int) $row->pay_later_orders;
+                $row->buyer_shipping_orders = (int) $row->buyer_shipping_orders;
                 $row->cod_amount = (float) $row->cod_amount;
                 $row->non_cod_amount = (float) $row->non_cod_amount;
                 $row->pay_later_amount = (float) $row->pay_later_amount;
+                $row->buyer_shipping = (float) $row->buyer_shipping;
                 $row->paid_amount = (float) $row->paid_amount;
                 $row->pending_amount = (float) $row->pending_amount;
                 $row->aov = $row->orders > 0 ? $row->buyer_paid / $row->orders : 0;
@@ -377,6 +410,62 @@ class MarketplaceSalesDashboardController extends Controller
 
                 return $row;
             });
+
+        $paymentFeeByDay = (clone $paymentBase)
+            ->selectRaw("DATE({$dateExpression}) as day")
+            ->addSelect('payment_ms.service_fee', 'payment_ms.shipping_insurance_fee', 'payment_ms.raw_json')
+            ->get()
+            ->groupBy('day')
+            ->map(function ($rows) {
+                $serviceFee = 0.0;
+                $productProtection = 0.0;
+                $serviceFeeOrders = 0;
+                $productProtectionOrders = 0;
+                $rawValue = function ($raw, array $keys): float {
+                    $payload = is_array($raw) ? $raw : (json_decode((string) $raw, true) ?: []);
+                    foreach ($keys as $key) {
+                        $value = data_get($payload, $key);
+                        if ($value !== null && $value !== '' && is_numeric($value)) {
+                            return abs((float) $value);
+                        }
+                    }
+
+                    return 0.0;
+                };
+
+                foreach ($rows as $row) {
+                    $rowServiceFee = abs((float) ($row->service_fee ?? 0));
+                    if ($rowServiceFee <= 0) {
+                        $rowServiceFee = $rawValue($row->raw_json, ['service_fee']);
+                    }
+                    $rowProductProtection = abs((float) ($row->shipping_insurance_fee ?? 0));
+                    if ($rowProductProtection <= 0) {
+                        $rowProductProtection = $rawValue($row->raw_json, ['product_protection_fee', 'product_protection', 'insurance_fee', 'shipping_insurance', 'premi']);
+                    }
+                    $serviceFee += $rowServiceFee;
+                    $productProtection += $rowProductProtection;
+                    $serviceFeeOrders += $rowServiceFee > 0 ? 1 : 0;
+                    $productProtectionOrders += $rowProductProtection > 0 ? 1 : 0;
+                }
+
+                return (object) [
+                    'service_fee' => $serviceFee,
+                    'product_protection' => $productProtection,
+                    'service_fee_orders' => $serviceFeeOrders,
+                    'product_protection_orders' => $productProtectionOrders,
+                ];
+            });
+        $paymentDaily = $paymentDaily
+            ->map(function ($row) use ($paymentFeeByDay) {
+                $fees = $paymentFeeByDay->get((string) $row->day);
+                $row->service_fee = (float) data_get($fees, 'service_fee', 0);
+                $row->product_protection = (float) data_get($fees, 'product_protection', 0);
+                $row->service_fee_orders = (int) data_get($fees, 'service_fee_orders', 0);
+                $row->product_protection_orders = (int) data_get($fees, 'product_protection_orders', 0);
+
+                return $row;
+            })
+            ->values();
 
         $paymentSummary = [
             'orders' => (int) $paymentDaily->sum('orders'),
@@ -509,11 +598,14 @@ SQL;
 
         $settlementPromotionRows = DB::table('marketplace_order_settlements as ms')
             ->join('marketplace_orders as o', 'o.id', '=', 'ms.order_id')
+            ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
+            ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
             ->whereRaw("{$dateExpression} IS NOT NULL")
             ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
             ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
             ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
+            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]))
             ->select([
                 'ms.order_id',
                 'ms.seller_voucher',
@@ -639,13 +731,35 @@ SQL;
             })
             ->sortByDesc('day')
             ->values();
+        $promotionByDay = $promotionDaily->keyBy(fn ($row) => (string) $row->day);
+        $paymentDaily = $paymentDaily
+            ->map(function ($row) use ($promotionByDay) {
+                $promotion = $promotionByDay->get((string) $row->day);
+                $sellerGrossSales = (float) data_get($promotion, 'order_before_discount', 0);
+                $sellerDiscounts = (float) data_get($promotion, 'product_discount', 0)
+                    + (float) data_get($promotion, 'voucher_store', 0)
+                    + (float) data_get($promotion, 'combo_hemat', 0)
+                    + (float) data_get($promotion, 'bundle_discount', 0);
+                $row->voucher_store = (float) data_get($promotion, 'voucher_store', 0);
+                $row->voucher_platform = (float) data_get($promotion, 'voucher_platform', 0);
+                $row->voucher_store_orders = (int) data_get($promotion, 'voucher_store_orders', 0);
+                $row->voucher_platform_orders = (int) data_get($promotion, 'voucher_platform_orders', 0);
+                $row->promotion_orders = (int) data_get($promotion, 'promotion_orders', 0);
+                $row->total_promotion = (float) data_get($promotion, 'total_promotion', 0);
+                $row->seller_net_sales = max($sellerGrossSales - $sellerDiscounts, 0);
+                $row->seller_net_sales_orders = (int) data_get($promotion, 'order_count', $row->orders);
+
+                return $row;
+            })
+            ->values();
         $promotionOrders = (int) $promotionDaily->sum('promotion_orders');
         $summary['promotion_total'] = (float) $promotionDaily->sum('total_promotion');
         $summary['net_total'] = max($summary['subtotal'] - $summary['promotion_total'], 0);
+        $paymentSummary['buyer_shipping'] = (float) $paymentDaily->sum('buyer_shipping');
+        $paymentSummary['total_promotion'] = (float) $paymentDaily->sum('total_promotion');
 
         // AOV dashboard memakai nilai neto setelah promosi agar selaras dengan
         // nilai yang benar-benar direalisasikan per order.
-        $promotionByDay = $promotionDaily->keyBy(fn ($row) => (string) $row->day);
         $daily = $daily->map(function ($row) use ($promotionByDay) {
             $promotionTotal = (float) data_get($promotionByDay->get((string) $row->day), 'total_promotion', 0);
             $row->net_total = max((float) $row->subtotal - $promotionTotal, 0);
@@ -660,12 +774,14 @@ SQL;
         $shippingExcludedPlaceholders = implode(',', array_fill(0, count(self::SHIPPING_EXCLUDED_STATUSES), '?'));
         $shippingBase = DB::table('marketplace_orders as o')
             ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
+            ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
             ->whereRaw("{$dateExpression} IS NOT NULL")
             ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
             ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
             ->whereRaw("{$shippingStatusExpression} NOT IN ({$shippingExcludedPlaceholders})", self::SHIPPING_EXCLUDED_STATUSES)
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
-            ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId));
+            ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
+            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]));
         $shippingReturnStatusesSql = "'" . implode("', '", self::SHIPPING_RETURN_STATUSES) . "'";
 
         $shipping = (clone $shippingBase)
@@ -794,10 +910,12 @@ SQL;
             'comparisonPeriodPrevious' => $comparisonPeriodPrevious,
             'comparisonPeriodPreviousTwo' => $comparisonPeriodPreviousTwo,
             'stores' => $stores,
+            'platforms' => $platforms,
             'filters' => [
                 'date_from' => $from->toDateString(),
                 'date_to' => $to->toDateString(),
                 'store_id' => $storeId,
+                'platform' => $platformCode,
                 'comparison_mode' => $comparisonMode,
                 'dummy' => $isPromotionDummy,
             ],
@@ -826,6 +944,7 @@ SQL;
         }
 
         $storeId = $request->integer('store_id') ?: null;
+        $platformCode = strtoupper(trim((string) $request->query('platform', '')));
         $isPromotionDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
         $dateExpression = 'COALESCE(o.ordered_at, o.order_date)';
         $statusExpression = "UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), ''))";
@@ -837,12 +956,15 @@ SQL;
                 $join->on(DB::raw('COALESCE(oi.marketplace_order_id, oi.order_id)'), '=', 'o.id');
             })
             ->leftJoin('marketplace_order_settlements as s', 's.order_id', '=', 'o.id')
+            ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
+            ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
             ->whereRaw("{$dateExpression} IS NOT NULL")
             ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
             ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
             ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
+            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]))
             ->whereRaw("{$nameExpression} = ?", [$name])
             ->when($sku !== '' && $sku !== '-', fn ($query) => $query->whereRaw("{$skuExpression} = ?", [$sku]))
             ->select([
@@ -932,6 +1054,7 @@ SQL;
 
         $isDashboardDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
         $storeId = $request->integer('store_id') ?: null;
+        $platformCode = strtoupper(trim((string) $request->query('platform', '')));
         $stores = Store::query()
             ->where('is_active', true)
             ->with('channel')
@@ -958,6 +1081,7 @@ SQL;
             ->whereRaw("{$orderStatusExpression} NOT IN ({$nonRevenuePlaceholders})", self::NON_REVENUE_STATUSES)
             ->when($isDashboardDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
+            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]))
             ->select([
                 'o.id',
                 'o.channel_order_id',
@@ -1030,6 +1154,7 @@ SQL;
             'stores' => $stores,
             'filters' => [
                 'store_id' => $storeId,
+                'platform' => $platformCode,
                 'dummy' => $isDashboardDummy,
             ],
         ]);
@@ -1048,6 +1173,7 @@ SQL;
 
         $isDashboardDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
         $storeId = $request->integer('store_id') ?: null;
+        $platformCode = strtoupper(trim((string) $request->query('platform', '')));
         $stores = Store::query()
             ->where('is_active', true)
             ->with('channel')
@@ -1071,6 +1197,7 @@ SQL;
             ->whereRaw("{$statusExpression} NOT IN ({$shippingExcludedPlaceholders})", self::SHIPPING_EXCLUDED_STATUSES)
             ->when($isDashboardDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
+            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]))
             ->select([
                 'o.id',
                 'o.channel_order_id',
@@ -1155,6 +1282,7 @@ SQL;
             'stores' => $stores,
             'filters' => [
                 'store_id' => $storeId,
+                'platform' => $platformCode,
                 'dummy' => $isDashboardDummy,
             ],
         ]);
@@ -1173,6 +1301,7 @@ SQL;
 
         $isPromotionDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
         $storeId = $request->integer('store_id') ?: null;
+        $platformCode = strtoupper(trim((string) $request->query('platform', '')));
         $stores = Store::query()
             ->where('is_active', true)
             ->with('channel')
@@ -1210,11 +1339,13 @@ SQL;
             ->leftJoin('marketplace_order_settlements as ms', 'ms.order_id', '=', 'o.id')
             ->leftJoinSub($promotionItemTotals, 'ipromo', 'ipromo.order_key', '=', 'o.id')
             ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
+            ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
             ->whereRaw("{$dateExpression} IS NOT NULL")
             ->whereDate(DB::raw($dateExpression), $selectedDate->toDateString())
             ->whereRaw("{$statusExpression} NOT IN ({$nonRevenuePlaceholders})", self::NON_REVENUE_STATUSES)
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
+            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]))
             ->select([
                 'o.id',
                 'o.channel_order_id',
@@ -1299,6 +1430,7 @@ SQL;
             'stores' => $stores,
             'filters' => [
                 'store_id' => $storeId,
+                'platform' => $platformCode,
                 'dummy' => $isPromotionDummy,
             ],
         ]);
