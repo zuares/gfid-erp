@@ -411,6 +411,10 @@
         $voucherPlatformSales = (float) $rows->sum('voucher_platform_sales');
         $bundleDiscountSales = (float) $rows->sum('bundle_discount_sales');
         $comboHematSales = (float) $rows->sum('combo_hemat_sales');
+        $voucherSellerOrders = (int) $rows->sum('voucher_store_orders');
+        $voucherPlatformOrders = (int) $rows->sum('voucher_platform_orders');
+        $bundleDiscountOrders = (int) $rows->sum('bundle_discount_orders');
+        $comboHematOrders = (int) $rows->sum('combo_hemat_orders');
         $total = $voucherPlatform;
         $gmv = (float) data_get($periodSummary, 'subtotal', 0);
 
@@ -418,12 +422,20 @@
             'sales' => $gmv,
             'voucher_seller' => $voucherSeller,
             'voucher_seller_sales' => $voucherSellerSales,
+            'voucher_seller_orders' => $voucherSellerOrders,
+            'voucher_seller_average' => $voucherSellerOrders > 0 ? $voucherSeller / $voucherSellerOrders : 0,
             'voucher_platform' => $voucherPlatform,
             'voucher_platform_sales' => $voucherPlatformSales,
+            'voucher_platform_orders' => $voucherPlatformOrders,
+            'voucher_platform_average' => $voucherPlatformOrders > 0 ? $voucherPlatform / $voucherPlatformOrders : 0,
             'bundle_discount' => $bundleDiscount,
             'bundle_discount_sales' => $bundleDiscountSales,
+            'bundle_discount_orders' => $bundleDiscountOrders,
+            'bundle_discount_average' => $bundleDiscountOrders > 0 ? $bundleDiscount / $bundleDiscountOrders : 0,
             'combo_hemat' => $comboHemat,
             'combo_hemat_sales' => $comboHematSales,
+            'combo_hemat_orders' => $comboHematOrders,
+            'combo_hemat_average' => $comboHematOrders > 0 ? $comboHemat / $comboHematOrders : 0,
             'platform_total' => $total,
             'platform_rate' => $gmv > 0 ? ($voucherPlatformSales / $gmv) * 100 : 0,
             'voucher_seller_rate' => $gmv > 0 ? ($voucherSellerSales / $gmv) * 100 : 0,
@@ -491,36 +503,44 @@
             'kicker' => 'Platform promotion',
             'title' => 'Promosi Platform',
             'rows' => [
-                ['label' => 'Voucher Platform', 'key' => 'voucher_platform', 'format' => $currencyDisplay],
-                ['label' => 'Kontribusi Sales', 'key' => 'platform_rate', 'format' => $percentDisplay],
                 ['label' => 'Sales Promo', 'key' => 'voucher_platform_sales', 'format' => $currencyDisplay],
+                ['label' => 'Order Promo', 'key' => 'voucher_platform_orders', 'format' => $numberDisplay],
+                ['label' => 'Voucher Platform', 'key' => 'voucher_platform', 'format' => $currencyDisplay],
+                ['label' => 'Rata-rata Promo', 'key' => 'voucher_platform_average', 'format' => $currencyDisplay],
+                ['label' => 'Kontribusi Sales', 'key' => 'platform_rate', 'format' => $percentDisplay],
             ],
         ],
         [
             'kicker' => 'Seller voucher',
             'title' => 'Voucher Seller',
             'rows' => [
-                ['label' => 'Voucher Seller', 'key' => 'voucher_seller', 'format' => $currencyDisplay],
-                ['label' => 'Kontribusi Sales', 'key' => 'voucher_seller_rate', 'format' => $percentDisplay],
                 ['label' => 'Sales Promo', 'key' => 'voucher_seller_sales', 'format' => $currencyDisplay],
+                ['label' => 'Order Promo', 'key' => 'voucher_seller_orders', 'format' => $numberDisplay],
+                ['label' => 'Voucher Seller', 'key' => 'voucher_seller', 'format' => $currencyDisplay],
+                ['label' => 'Rata-rata Promo', 'key' => 'voucher_seller_average', 'format' => $currencyDisplay],
+                ['label' => 'Kontribusi Sales', 'key' => 'voucher_seller_rate', 'format' => $percentDisplay],
             ],
         ],
         [
             'kicker' => 'Seller package promotion',
             'title' => 'Paket Diskon',
             'rows' => [
-                ['label' => 'Paket Diskon', 'key' => 'bundle_discount', 'format' => $currencyDisplay],
-                ['label' => 'Kontribusi Sales', 'key' => 'bundle_discount_rate', 'format' => $percentDisplay],
                 ['label' => 'Sales Promo', 'key' => 'bundle_discount_sales', 'format' => $currencyDisplay],
+                ['label' => 'Order Promo', 'key' => 'bundle_discount_orders', 'format' => $numberDisplay],
+                ['label' => 'Paket Diskon', 'key' => 'bundle_discount', 'format' => $currencyDisplay],
+                ['label' => 'Rata-rata Promo', 'key' => 'bundle_discount_average', 'format' => $currencyDisplay],
+                ['label' => 'Kontribusi Sales', 'key' => 'bundle_discount_rate', 'format' => $percentDisplay],
             ],
         ],
         [
             'kicker' => 'Seller combo promotion',
             'title' => 'Kombo Hemat',
             'rows' => [
-                ['label' => 'Kombo Hemat', 'key' => 'combo_hemat', 'format' => $currencyDisplay],
-                ['label' => 'Kontribusi Sales', 'key' => 'combo_hemat_rate', 'format' => $percentDisplay],
                 ['label' => 'Sales Promo', 'key' => 'combo_hemat_sales', 'format' => $currencyDisplay],
+                ['label' => 'Order Promo', 'key' => 'combo_hemat_orders', 'format' => $numberDisplay],
+                ['label' => 'Kombo Hemat', 'key' => 'combo_hemat', 'format' => $currencyDisplay],
+                ['label' => 'Rata-rata Promo', 'key' => 'combo_hemat_average', 'format' => $currencyDisplay],
+                ['label' => 'Kontribusi Sales', 'key' => 'combo_hemat_rate', 'format' => $percentDisplay],
             ],
         ],
     ];
