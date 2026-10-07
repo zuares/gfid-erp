@@ -161,6 +161,9 @@
         font-size: .7rem;
         font-weight: 650;
     }
+    .sales-dashboard .sales-filter-comparison { min-width: 150px; }
+    .sales-dashboard .sales-filter-comparison .form-label { margin-bottom: .28rem; }
+    .sales-dashboard .sales-filter-comparison .form-select { min-height: 32px; font-size: .72rem; font-weight: 650; }
     .sales-dashboard .sales-kpi--success .sales-kpi-icon { background: var(--success-soft, #dcfce7); color: var(--success, #16a34a); border-color: color-mix(in srgb, var(--success, #16a34a) 16%, var(--sales-line) 84%); }
     .sales-dashboard .sales-kpi--success::after { background: var(--success, #16a34a); }
     .sales-dashboard .sales-kpi--warning .sales-kpi-icon { background: var(--danger-soft, #fee2e2); color: var(--danger, #dc2626); border-color: color-mix(in srgb, var(--danger, #dc2626) 16%, var(--sales-line) 84%); }
@@ -294,6 +297,8 @@
     $pct = fn ($value, $total) => $total > 0 ? number_format(((float) $value / (float) $total) * 100, 1, ',', '.') : '0,0';
     $salesTabs = ['sales', 'products', 'payments', 'promotions', 'shipping', 'income', 'orders'];
     $activeTab = in_array(request('tab'), $salesTabs, true) ? request('tab') : 'sales';
+    $comparisonMode = $filters['comparison_mode'] ?? 'period';
+    $comparisonModeLabel = $comparisonMode === 'month' ? 'Bln sama' : 'Periode';
     $todayDate = now()->toDateString();
     $yesterdayDate = now()->subDay()->toDateString();
     $activeDatePreset = 'custom';
@@ -359,6 +364,10 @@
     $comparisonPeriodLabel = $comparisonPeriod
         ? $dateLabel($comparisonPeriod['from']).' – '.$dateLabel($comparisonPeriod['to'])
         : 'periode lalu';
+    $activeComparison = $comparisonMode === 'month' ? $comparisonMonth : $comparisonPeriod;
+    $activeComparisonLabel = $activeComparison
+        ? $dateLabel($activeComparison['from']).' – '.$dateLabel($activeComparison['to'])
+        : ($comparisonMode === 'month' ? 'bulan yang sama, tanggal sama' : 'periode lalu');
     $previousMonthSummary = data_get($comparisonMonthData, 'summary', []);
     $previousPeriodSummary = data_get($comparisonPeriodData, 'summary', []);
     $previousMonthPaymentSummary = data_get($comparisonMonthData, 'paymentSummary', []);
@@ -393,7 +402,8 @@
         $voucherSeller = (float) $rows->sum('voucher_store');
         $voucherPlatform = (float) $rows->sum('voucher_platform');
         $bundleDiscount = (float) $rows->sum('bundle_discount');
-        $total = $voucherPlatform + $bundleDiscount;
+        $comboHemat = (float) $rows->sum('combo_hemat');
+        $total = $voucherPlatform;
         $gmv = (float) data_get($periodSummary, 'subtotal', 0);
 
         return [
@@ -401,8 +411,12 @@
             'voucher_seller' => $voucherSeller,
             'voucher_platform' => $voucherPlatform,
             'bundle_discount' => $bundleDiscount,
-            'total' => $total,
-            'rate' => $gmv > 0 ? ($total / $gmv) * 100 : 0,
+            'combo_hemat' => $comboHemat,
+            'platform_total' => $total,
+            'platform_rate' => $gmv > 0 ? ($total / $gmv) * 100 : 0,
+            'voucher_seller_rate' => $gmv > 0 ? ($voucherSeller / $gmv) * 100 : 0,
+            'bundle_discount_rate' => $gmv > 0 ? ($bundleDiscount / $gmv) * 100 : 0,
+            'combo_hemat_rate' => $gmv > 0 ? ($comboHemat / $gmv) * 100 : 0,
             'orders' => (int) ($promotionOrders ?? $rows->sum('promotion_orders')),
         ];
     };
@@ -432,14 +446,43 @@
             'metrics' => $platformPromotionMetrics(data_get($comparisonPeriodPreviousTwoData, 'promotionDaily', []), data_get($comparisonPeriodPreviousTwoData, 'summary', []), data_get($comparisonPeriodPreviousTwoData, 'promotionOrders', 0)),
         ],
     ];
-    $platformPromotionRows = [
-        ['label' => 'Total Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
-        ['label' => 'Voucher Seller', 'key' => 'voucher_seller', 'format' => $currencyDisplay],
-        ['label' => 'Voucher Platform', 'key' => 'voucher_platform', 'format' => $currencyDisplay],
-        ['label' => 'Paket Diskon', 'key' => 'bundle_discount', 'format' => $currencyDisplay],
-        ['label' => 'Total Platform', 'key' => 'total', 'format' => $currencyDisplay],
-        ['label' => 'Platform / GMV', 'key' => 'rate', 'format' => $percentDisplay],
-        ['label' => 'Order dengan Promosi', 'key' => 'orders', 'format' => $numberDisplay],
+    $promotionFundingSections = [
+        [
+            'kicker' => 'Platform promotion',
+            'title' => 'Promosi Platform',
+            'rows' => [
+                ['label' => 'Total Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
+                ['label' => 'Voucher Platform', 'key' => 'voucher_platform', 'format' => $currencyDisplay],
+                ['label' => 'Kontribusi Sales', 'key' => 'platform_rate', 'format' => $percentDisplay],
+            ],
+        ],
+        [
+            'kicker' => 'Seller voucher',
+            'title' => 'Voucher Seller',
+            'rows' => [
+                ['label' => 'Total Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
+                ['label' => 'Voucher Seller', 'key' => 'voucher_seller', 'format' => $currencyDisplay],
+                ['label' => 'Kontribusi Sales', 'key' => 'voucher_seller_rate', 'format' => $percentDisplay],
+            ],
+        ],
+        [
+            'kicker' => 'Seller package promotion',
+            'title' => 'Paket Diskon',
+            'rows' => [
+                ['label' => 'Total Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
+                ['label' => 'Paket Diskon', 'key' => 'bundle_discount', 'format' => $currencyDisplay],
+                ['label' => 'Kontribusi Sales', 'key' => 'bundle_discount_rate', 'format' => $percentDisplay],
+            ],
+        ],
+        [
+            'kicker' => 'Seller combo promotion',
+            'title' => 'Kombo Hemat',
+            'rows' => [
+                ['label' => 'Total Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
+                ['label' => 'Kombo Hemat', 'key' => 'combo_hemat', 'format' => $currencyDisplay],
+                ['label' => 'Kontribusi Sales', 'key' => 'combo_hemat_rate', 'format' => $percentDisplay],
+            ],
+        ],
     ];
     $compareMetric = function ($current, $previous, callable $formatter, string $mode = 'relative', bool $higherIsBetter = true) {
         if ($previous === null) return null;
@@ -465,10 +508,11 @@
             'tone' => $tone,
         ];
     };
-    $kpiComparisons = function ($current, $monthPrevious, $periodPrevious, callable $formatter, string $mode = 'relative', bool $higherIsBetter = true) use ($compareMetric) {
+    $kpiComparisons = function ($current, $monthPrevious, $periodPrevious, callable $formatter, string $mode = 'relative', bool $higherIsBetter = true) use ($compareMetric, $comparisonMode, $comparisonModeLabel) {
+        $previous = $comparisonMode === 'month' ? $monthPrevious : $periodPrevious;
+
         return [
-            ['label' => 'Bln lalu', 'value' => $compareMetric($current, $monthPrevious, $formatter, $mode, $higherIsBetter)],
-            ['label' => 'Periode', 'value' => $compareMetric($current, $periodPrevious, $formatter, $mode, $higherIsBetter)],
+            ['label' => $comparisonModeLabel, 'value' => $compareMetric($current, $previous, $formatter, $mode, $higherIsBetter)],
         ];
     };
 @endphp
@@ -507,8 +551,8 @@
                     summary="{{ $activeDateSummary }}"
                     class="col-12 col-md-auto sales-period-filter"
                 />
-               @if ($stores->isNotEmpty())
-                <div class="col-12 col-md-3 sales-filter-store">
+                @if ($stores->isNotEmpty())
+                    <div class="col-12 col-md-3 sales-filter-store">
                         <label class="form-label" for="sales-store">Toko</label>
                         <select id="sales-store" class="form-select form-select-sm" name="store_id">
                             <option value="">Semua toko</option>
@@ -520,14 +564,21 @@
                         </select>
                     </div>
                 @endif
+                <div class="col-12 col-md-auto sales-filter-comparison">
+                    <label class="form-label" for="sales-comparison-mode">Bandingkan</label>
+                    <select id="sales-comparison-mode" class="form-select form-select-sm" name="comparison_mode">
+                        <option value="period" @selected($comparisonMode === 'period')>Periode lalu</option>
+                        <option value="month" @selected($comparisonMode === 'month')>Bln sama · tanggal sama</option>
+                    </select>
+                </div>
             </div>
         </div>
     </form>
 
     @if ($comparisonMonth || $comparisonPeriod)
-        <div class="sales-compare-period-note mb-3" title="Bln lalu: {{ $comparisonMonthLabel }} · Periode: {{ $comparisonPeriodLabel }}">
+        <div class="sales-compare-period-note mb-3" title="{{ $comparisonModeLabel }}: {{ $activeComparisonLabel }}">
             <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
-            Perbandingan: <span>Bln lalu</span> · <span>Periode</span>
+            Perbandingan: <span>{{ $comparisonModeLabel }}</span>
         </div>
     @endif
 
@@ -730,6 +781,7 @@
                                         <div class="small text-muted">Voucher toko: {{ $fmt($order->voucher_store) }}</div>
                                         <div class="small text-muted">Voucher platform: {{ $fmt($order->voucher_platform) }}</div>
                                         <div class="small text-muted">Paket: {{ $fmt($order->bundle_discount) }}</div>
+                                        <div class="small text-muted">Kombo: {{ $fmt($order->combo_hemat ?? 0) }}</div>
                                     </td>
                                     <td class="text-end pe-3 sales-order-total">
                                         <div class="fw-semibold">{{ $fmt($order->total_payment) }}</div>
@@ -913,42 +965,44 @@
                 ['label' => 'Order dengan Promo', 'value' => number_format($promotionOrders), 'note' => 'order terdampak promosi', 'icon' => 'bi-ticket-perforated', 'comparisons' => $kpiComparisons($promotionOrders, data_get($comparisonMonthData, 'promotionOrders'), data_get($comparisonPeriodData, 'promotionOrders'), $numberDisplay)],
             ],
         ])
-        <section class="card sales-card shadow-sm mb-3">
-            <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
-                <div>
-                    <div class="sales-kicker mb-1">Promotion funding mix</div>
-                    <h2 class="sales-section-title mb-1">Sumber pendanaan promosi</h2>
+        @foreach ($promotionFundingSections as $fundingSection)
+            <section class="card sales-card shadow-sm mb-3">
+                <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
+                    <div>
+                        <div class="sales-kicker mb-1">{{ $fundingSection['kicker'] }}</div>
+                        <h2 class="sales-section-title mb-1">{{ $fundingSection['title'] }}</h2>
+                    </div>
+                    <span class="badge sales-badge rounded-pill px-3 py-2">4 periode</span>
                 </div>
-                <span class="badge sales-badge rounded-pill px-3 py-2">4 periode</span>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-sm table-hover align-middle sales-table">
-                    <thead>
-                        <tr>
-                            <th class="ps-3">Metrik</th>
-                            @foreach ($platformPromotionPeriods as $period)
-                                <th class="text-end">
-                                    {{ $period['label'] }}
-                                    <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
-                                </th>
-                            @endforeach
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($platformPromotionRows as $row)
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle sales-table">
+                        <thead>
                             <tr>
-                                <td class="ps-3 fw-semibold">{{ $row['label'] }}</td>
+                                <th class="ps-3">Metrik</th>
                                 @foreach ($platformPromotionPeriods as $period)
-                                    <td class="text-end {{ $row['key'] === 'total' ? 'fw-semibold' : '' }}">
-                                        {{ $row['format']($period['metrics'][$row['key']]) }}
-                                    </td>
+                                    <th class="text-end">
+                                        {{ $period['label'] }}
+                                        <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
+                                    </th>
                                 @endforeach
                             </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </section>
+                        </thead>
+                        <tbody>
+                            @foreach ($fundingSection['rows'] as $row)
+                                <tr>
+                                    <td class="ps-3 fw-semibold">{{ $row['label'] }}</td>
+                                    @foreach ($platformPromotionPeriods as $period)
+                                        <td class="text-end {{ str_contains($row['label'], 'Total') ? 'fw-semibold' : '' }}">
+                                            {{ $row['format']($period['metrics'][$row['key']]) }}
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        @endforeach
         <section class="card sales-card shadow-sm">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
@@ -969,6 +1023,7 @@
                                 <th class="text-end">Voucher Toko</th>
                                 <th class="text-end">Voucher Platform</th>
                                 <th class="text-end">Paket Diskon</th>
+                                <th class="text-end">Kombo Hemat</th>
                                 <th class="text-end pe-3">Total Promosi</th>
                             </tr>
                         </thead>
@@ -993,6 +1048,10 @@
                                     <td class="text-end">
                                         <div>{{ $fmt($row->bundle_discount) }}</div>
                                         <div class="small text-muted">{{ number_format((int) ($row->bundle_discount_orders ?? 0)) }} order</div>
+                                    </td>
+                                    <td class="text-end">
+                                        <div>{{ $fmt($row->combo_hemat ?? 0) }}</div>
+                                        <div class="small text-muted">{{ number_format((int) ($row->combo_hemat_orders ?? 0)) }} order</div>
                                     </td>
                                     <td class="text-end pe-3 fw-semibold">{{ $fmt($row->total_promotion) }}</td>
                                 </tr>
@@ -1093,6 +1152,7 @@
         const filterForm = document.querySelector('.sales-filter-card');
         const activeTabInput = document.querySelector('#sales-active-tab');
         const storeInput = document.querySelector('#sales-store');
+        const comparisonModeInput = document.querySelector('#sales-comparison-mode');
         const orderRows = document.querySelectorAll('[data-sales-order-row]');
         const orderDate = document.querySelector('#sales-order-detail-date');
         const orderCount = document.querySelector('[data-sales-order-count]');
@@ -1160,6 +1220,12 @@
 
         if (storeInput && filterForm) {
             storeInput.addEventListener('change', function () {
+                filterForm.requestSubmit();
+            });
+        }
+
+        if (comparisonModeInput && filterForm) {
+            comparisonModeInput.addEventListener('change', function () {
                 filterForm.requestSubmit();
             });
         }

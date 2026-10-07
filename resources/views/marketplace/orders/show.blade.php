@@ -73,6 +73,7 @@
         'voucher_store' => 0,
         'voucher_platform' => 0,
         'bundle_discount' => 0,
+        'combo_hemat' => 0,
         'coin' => 0,
         'total_promotion' => 0,
     ];
@@ -342,6 +343,7 @@
                         $promoVoucherToko = (float) ($promotionBreakdown['voucher_store'] ?? 0);
                         $promoDiskonProduk = (float) ($promotionBreakdown['product_discount'] ?? 0);
                         $promoPaketDiskon = (float) ($promotionBreakdown['bundle_discount'] ?? 0);
+                        $promoKomboHemat = (float) ($promotionBreakdown['combo_hemat'] ?? 0);
                         $promoKoinShopee = (float) ($promotionBreakdown['coin'] ?? $inc['coin'] ?? 0);
                         $promoSubtotal = (float)($inc['order_discounted_price'] ?? $order->subtotal_items ?? 0);
                         if ($promoSubtotal <= 0 && isset($liveData['item_list']) && is_array($liveData['item_list'])) {
@@ -372,7 +374,7 @@
                             $promoOngkir = $promoEstimasiOngkir - $promoShippingRebate;
                         }
                         $promoBiayaLayanan = (float)($inc['buyer_transaction_fee'] ?? max($promoBuyerPaid - $promoSubtotal - $promoOngkir - $promoVoucherPlatform - $promoVoucherToko - $promoKoinShopee, 0));
-                        $promoTotal = (float) ($promotionBreakdown['total_promotion'] ?? ($promoDiskonProduk + $promoVoucherToko + $promoVoucherPlatform + $promoPaketDiskon));
+                        $promoTotal = (float) ($promotionBreakdown['total_promotion'] ?? ($promoDiskonProduk + $promoVoucherToko + $promoVoucherPlatform + $promoPaketDiskon + $promoKomboHemat));
                     @endphp
                     <div style="display:flex; justify-content:space-between">
                         <span class="od-muted">Buyer Paid</span>
@@ -393,6 +395,10 @@
                     <div style="display:flex; justify-content:space-between">
                         <span class="od-muted">Paket Diskon</span>
                         <span class="od-code-cell" style="font-size:.85rem; color:#991c1b">-Rp{{ number_format($promoPaketDiskon, 0, ',', '.') }}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between">
+                        <span class="od-muted">Kombo Hemat</span>
+                        <span class="od-code-cell" style="font-size:.85rem; color:#991c1b">-Rp{{ number_format($promoKomboHemat, 0, ',', '.') }}</span>
                     </div>
                     <div style="display:flex; justify-content:space-between">
                         <span class="od-muted">Koin Shopee</span>

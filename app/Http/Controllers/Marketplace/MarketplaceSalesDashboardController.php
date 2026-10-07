@@ -72,6 +72,9 @@ class MarketplaceSalesDashboardController extends Controller
         }
 
         $storeId = $request->integer('store_id') ?: null;
+        $comparisonMode = in_array($request->query('comparison_mode'), ['period', 'month'], true)
+            ? $request->query('comparison_mode')
+            : 'period';
         $stores = Store::query()
             ->where('is_active', true)
             ->with('channel')
@@ -173,17 +176,21 @@ class MarketplaceSalesDashboardController extends Controller
                     : 0.0;
                 $promotionItems = (array) ($settlementRaw['items'] ?? ($orderRaw['item_list'] ?? []));
                 $bundleDiscount = 0.0;
+                $comboHemat = 0.0;
                 foreach ($promotionItems as $item) {
                     if (! is_array($item)) {
                         continue;
                     }
 
-                    $bundleDiscount += $this->promotionDiscountSplit($item)['bundle_discount'];
+                    $split = $this->promotionDiscountSplit($item);
+                    $bundleDiscount += $split['bundle_discount'];
+                    $comboHemat += $split['combo_hemat'];
                 }
                 $row->voucher_store = $voucherStore;
                 $row->voucher_platform = $voucherPlatform;
                 $row->bundle_discount = $bundleDiscount;
-                $row->promotion_total = $voucherStore + $voucherPlatform + $bundleDiscount;
+                $row->combo_hemat = $comboHemat;
+                $row->promotion_total = $voucherStore + $voucherPlatform + $bundleDiscount + $comboHemat;
 
                 unset($row->raw_json, $row->raw_payload_json, $row->settlement_raw_json, $row->seller_voucher, $row->item_qty, $row->total_paid_customer, $row->buyer_payment_amount, $row->total_amount);
 
@@ -459,6 +466,8 @@ SQL;
             ->selectRaw('0 as voucher_platform_orders')
             ->selectRaw('0 as bundle_discount')
             ->selectRaw('0 as bundle_discount_orders')
+            ->selectRaw('0 as combo_hemat')
+            ->selectRaw('0 as combo_hemat_orders')
             ->selectRaw('COALESCE(SUM(o.other_discount), 0) as other_discount')
             ->selectRaw('COALESCE(SUM(o.shipping_discount_platform), 0) as shipping_discount')
             ->selectRaw("COALESCE(SUM({$visiblePromotionAmountExpression}), 0) as total_promotion")
@@ -503,6 +512,7 @@ SQL;
 
             $productDiscount = 0.0;
             $bundleDiscount = 0.0;
+            $comboHemat = 0.0;
             $settlementItems = (array) ($raw['items'] ?? []);
             $promotionItems = $settlementItems ?: (array) ($orderRaw['item_list'] ?? []);
             foreach ($promotionItems as $item) {
@@ -513,6 +523,7 @@ SQL;
                 $split = $this->promotionDiscountSplit($item);
                 $productDiscount += $split['product_discount'];
                 $bundleDiscount += $split['bundle_discount'];
+                $comboHemat += $split['combo_hemat'];
             }
 
             // Some settlement payloads do not include item details. Preserve
@@ -535,6 +546,8 @@ SQL;
                     'voucher_platform_orders' => 0,
                     'bundle_discount' => 0,
                     'bundle_discount_orders' => 0,
+                    'combo_hemat' => 0,
+                    'combo_hemat_orders' => 0,
                     'other_discount' => 0,
                     'shipping_discount' => 0,
                     'total_promotion' => 0,
@@ -542,7 +555,7 @@ SQL;
             }
 
             $row = $promotionDaily[$day];
-            $promotionTotal = $productDiscount + $voucherStore + $voucherPlatform + $bundleDiscount;
+            $promotionTotal = $productDiscount + $voucherStore + $voucherPlatform + $bundleDiscount + $comboHemat;
             if ($promotionTotal > 0) {
                 $row->promotion_orders++;
             }
@@ -561,6 +574,10 @@ SQL;
             $row->bundle_discount += $bundleDiscount;
             if ($bundleDiscount > 0) {
                 $row->bundle_discount_orders++;
+            }
+            $row->combo_hemat += $comboHemat;
+            if ($comboHemat > 0) {
+                $row->combo_hemat_orders++;
             }
             $row->shipping_discount += $shippingDiscount;
             $row->total_promotion += $promotionTotal;
@@ -717,6 +734,7 @@ SQL;
                 'date_from' => $from->toDateString(),
                 'date_to' => $to->toDateString(),
                 'store_id' => $storeId,
+                'comparison_mode' => $comparisonMode,
                 'dummy' => $isPromotionDummy,
             ],
         ]);
@@ -1170,6 +1188,7 @@ SQL;
                         'voucher_store' => (float) ($row->voucher_discount ?? 0),
                         'voucher_platform' => 0.0,
                         'bundle_discount' => 0.0,
+                        'combo_hemat' => 0.0,
                     ];
 
                 $amounts['total_promotion'] = array_sum($amounts);
@@ -1191,6 +1210,7 @@ SQL;
                     'voucher_store' => $amounts['voucher_store'],
                     'voucher_platform' => $amounts['voucher_platform'],
                     'bundle_discount' => $amounts['bundle_discount'],
+                    'combo_hemat' => $amounts['combo_hemat'],
                     'total_promotion' => $amounts['total_promotion'],
                 ];
             })
@@ -1203,6 +1223,7 @@ SQL;
             'voucher_store' => (float) $rows->sum('voucher_store'),
             'voucher_platform' => (float) $rows->sum('voucher_platform'),
             'bundle_discount' => (float) $rows->sum('bundle_discount'),
+            'combo_hemat' => (float) $rows->sum('combo_hemat'),
             'promotion_total' => (float) $rows->sum('total_promotion'),
         ];
         $summary['net_total'] = max($summary['subtotal'] - $summary['promotion_total'], 0);
@@ -1278,6 +1299,7 @@ SQL;
             : 0.0;
         $productDiscount = 0.0;
         $bundleDiscount = 0.0;
+        $comboHemat = 0.0;
         $promotionItems = (array) ($settlementRaw['items'] ?? ($orderRaw['item_list'] ?? []));
 
         foreach ($promotionItems as $item) {
@@ -1288,9 +1310,10 @@ SQL;
             $split = $this->promotionDiscountSplit($item);
             $productDiscount += $split['product_discount'];
             $bundleDiscount += $split['bundle_discount'];
+            $comboHemat += $split['combo_hemat'];
         }
 
-        if ($productDiscount <= 0 && $bundleDiscount <= 0 && ! empty($settlementRaw['seller_discount'])) {
+        if ($productDiscount <= 0 && $bundleDiscount <= 0 && $comboHemat <= 0 && ! empty($settlementRaw['seller_discount'])) {
             $productDiscount = (float) $settlementRaw['seller_discount'];
         }
 
@@ -1299,6 +1322,7 @@ SQL;
             'voucher_store' => $voucherStore,
             'voucher_platform' => $voucherPlatform,
             'bundle_discount' => $bundleDiscount,
+            'combo_hemat' => $comboHemat,
         ];
     }
 
@@ -1320,6 +1344,21 @@ SQL;
 
         return $hasExplicitBundleAmount && collect((array) ($item['promotion_list'] ?? []))
             ->contains(fn ($promotion) => strtolower((string) ($promotion['promotion_type'] ?? '')) === 'bundle_deal');
+    }
+
+    private function isComboHematPromotionItem(array $item): bool
+    {
+        $promotionTypes = ['add_on_deal', 'add_on_deal_main', 'add_on_deal_sub'];
+        if (in_array(strtolower((string) ($item['activity_type'] ?? '')), $promotionTypes, true)) {
+            return true;
+        }
+
+        if (in_array(strtolower((string) ($item['promotion_type'] ?? '')), $promotionTypes, true)) {
+            return true;
+        }
+
+        return collect((array) ($item['promotion_list'] ?? []))
+            ->contains(fn ($promotion) => in_array(strtolower((string) ($promotion['promotion_type'] ?? '')), $promotionTypes, true));
     }
 
     private function normalizedPromotionItemDiscount(array $item): float
@@ -1353,11 +1392,13 @@ SQL;
     {
         $totalDiscount = $this->normalizedPromotionItemDiscount($item);
         if ($totalDiscount <= 0) {
-            return ['product_discount' => 0.0, 'bundle_discount' => 0.0];
+            return ['product_discount' => 0.0, 'bundle_discount' => 0.0, 'combo_hemat' => 0.0];
         }
 
-        if (! $this->isBundlePromotionItem($item)) {
-            return ['product_discount' => $totalDiscount, 'bundle_discount' => 0.0];
+        $isBundle = $this->isBundlePromotionItem($item);
+        $isComboHemat = ! $isBundle && $this->isComboHematPromotionItem($item);
+        if (! $isBundle && ! $isComboHemat) {
+            return ['product_discount' => $totalDiscount, 'bundle_discount' => 0.0, 'combo_hemat' => 0.0];
         }
 
         $originalPrice = max((float) ($item['original_price'] ?? $item['model_original_price'] ?? 0), 0);
@@ -1378,11 +1419,16 @@ SQL;
 
             return [
                 'product_discount' => $productDiscount,
-                'bundle_discount' => $bundleDiscount,
+                'bundle_discount' => $isBundle ? $bundleDiscount : 0.0,
+                'combo_hemat' => $isComboHemat ? $bundleDiscount : 0.0,
             ];
         }
 
-        return ['product_discount' => 0.0, 'bundle_discount' => $totalDiscount];
+        return [
+            'product_discount' => 0.0,
+            'bundle_discount' => $isBundle ? $totalDiscount : 0.0,
+            'combo_hemat' => $isComboHemat ? $totalDiscount : 0.0,
+        ];
     }
 
     private function decodePayload(mixed $payload): array

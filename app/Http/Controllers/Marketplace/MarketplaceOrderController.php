@@ -210,6 +210,7 @@ class MarketplaceOrderController extends Controller
 
         $productDiscount = 0.0;
         $bundleDiscount = 0.0;
+        $comboHemat = 0.0;
         $promotionItems = (array) ($settlementRaw['items'] ?? []);
         if ($promotionItems === []) {
             $promotionItems = (array) ($liveData['item_list'] ?? []);
@@ -223,9 +224,10 @@ class MarketplaceOrderController extends Controller
             $split = $this->promotionDiscountSplit($item);
             $productDiscount += $split['product_discount'];
             $bundleDiscount += $split['bundle_discount'];
+            $comboHemat += $split['combo_hemat'];
         }
 
-        if ($productDiscount <= 0 && $bundleDiscount <= 0 && ! empty($settlementRaw['seller_discount'])) {
+        if ($productDiscount <= 0 && $bundleDiscount <= 0 && $comboHemat <= 0 && ! empty($settlementRaw['seller_discount'])) {
             $productDiscount = (float) $settlementRaw['seller_discount'];
         }
 
@@ -234,8 +236,9 @@ class MarketplaceOrderController extends Controller
             'voucher_store' => $voucherStore,
             'voucher_platform' => $voucherPlatform,
             'bundle_discount' => $bundleDiscount,
+            'combo_hemat' => $comboHemat,
             'coin' => (float) ($income['coin'] ?? 0),
-            'total_promotion' => $productDiscount + $voucherStore + $voucherPlatform + $bundleDiscount,
+            'total_promotion' => $productDiscount + $voucherStore + $voucherPlatform + $bundleDiscount + $comboHemat,
         ];
     }
 
@@ -257,6 +260,21 @@ class MarketplaceOrderController extends Controller
 
         return $hasExplicitBundleAmount && collect((array) ($item['promotion_list'] ?? []))
             ->contains(fn ($promotion) => strtolower((string) ($promotion['promotion_type'] ?? '')) === 'bundle_deal');
+    }
+
+    private function isComboHematPromotionItem(array $item): bool
+    {
+        $promotionTypes = ['add_on_deal', 'add_on_deal_main', 'add_on_deal_sub'];
+        if (in_array(strtolower((string) ($item['activity_type'] ?? '')), $promotionTypes, true)) {
+            return true;
+        }
+
+        if (in_array(strtolower((string) ($item['promotion_type'] ?? '')), $promotionTypes, true)) {
+            return true;
+        }
+
+        return collect((array) ($item['promotion_list'] ?? []))
+            ->contains(fn ($promotion) => in_array(strtolower((string) ($promotion['promotion_type'] ?? '')), $promotionTypes, true));
     }
 
     private function normalizedPromotionItemDiscount(array $item): float
@@ -286,11 +304,13 @@ class MarketplaceOrderController extends Controller
     {
         $totalDiscount = $this->normalizedPromotionItemDiscount($item);
         if ($totalDiscount <= 0) {
-            return ['product_discount' => 0.0, 'bundle_discount' => 0.0];
+            return ['product_discount' => 0.0, 'bundle_discount' => 0.0, 'combo_hemat' => 0.0];
         }
 
-        if (! $this->isBundlePromotionItem($item)) {
-            return ['product_discount' => $totalDiscount, 'bundle_discount' => 0.0];
+        $isBundle = $this->isBundlePromotionItem($item);
+        $isComboHemat = ! $isBundle && $this->isComboHematPromotionItem($item);
+        if (! $isBundle && ! $isComboHemat) {
+            return ['product_discount' => $totalDiscount, 'bundle_discount' => 0.0, 'combo_hemat' => 0.0];
         }
 
         $originalPrice = max((float) ($item['original_price'] ?? $item['model_original_price'] ?? 0), 0);
@@ -307,11 +327,16 @@ class MarketplaceOrderController extends Controller
 
             return [
                 'product_discount' => $productDiscount,
-                'bundle_discount' => $bundleDiscount,
+                'bundle_discount' => $isBundle ? $bundleDiscount : 0.0,
+                'combo_hemat' => $isComboHemat ? $bundleDiscount : 0.0,
             ];
         }
 
-        return ['product_discount' => 0.0, 'bundle_discount' => $totalDiscount];
+        return [
+            'product_discount' => 0.0,
+            'bundle_discount' => $isBundle ? $totalDiscount : 0.0,
+            'combo_hemat' => $isComboHemat ? $totalDiscount : 0.0,
+        ];
     }
 
     private function decodePayload(mixed $payload): array

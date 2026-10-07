@@ -188,6 +188,7 @@
             ['label' => 'Voucher Toko', 'value' => $fmt($summary['voucher_store']), 'icon' => 'bi-ticket-perforated'],
             ['label' => 'Voucher Platform', 'value' => $fmt($summary['voucher_platform']), 'icon' => 'bi-shop'],
             ['label' => 'Paket Diskon', 'value' => $fmt($summary['bundle_discount']), 'icon' => 'bi-gift'],
+            ['label' => 'Kombo Hemat', 'value' => $fmt($summary['combo_hemat']), 'icon' => 'bi-boxes'],
         ],
     ])
 
@@ -213,6 +214,7 @@
                                 <th class="text-end">Diskon Produk</th>
                                 <th class="text-end">Voucher</th>
                                 <th class="text-end">Paket Diskon</th>
+                                <th class="text-end">Kombo Hemat</th>
                                 <th class="text-end pe-3">Total Promosi</th>
                             </tr>
                         </thead>
@@ -239,6 +241,7 @@
                                         <div class="promotion-voucher-breakdown">Toko {{ $fmt($row->voucher_store) }} · Platform {{ $fmt($row->voucher_platform) }}</div>
                                     </td>
                                     <td class="text-end"><span class="promotion-amount">{{ $fmt($row->bundle_discount) }}</span></td>
+                                    <td class="text-end"><span class="promotion-amount">{{ $fmt($row->combo_hemat ?? 0) }}</span></td>
                                     <td class="text-end pe-3"><span class="promotion-amount">{{ $fmt($row->total_promotion) }}</span></td>
                                 </tr>
                             @endforeach
