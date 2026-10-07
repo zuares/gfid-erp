@@ -379,6 +379,9 @@
     .sales-dashboard .sales-product-table th,
     .sales-dashboard .sales-product-table td { white-space: nowrap; }
     .sales-dashboard .sales-product-table .sales-product-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sales-dashboard .sales-product-group-row td { background: var(--sales-soft); border-top: 2px solid var(--sales-line); color: var(--sales-ink); padding-block: .62rem; }
+    .sales-dashboard .sales-product-group-title { font-size: .72rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
+    .sales-dashboard .sales-product-group-meta { color: var(--sales-muted); font-size: .68rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
     .sales-dashboard .sales-income-table { min-width: 1080px; }
     .sales-dashboard .sales-income-table th,
     .sales-dashboard .sales-income-table td { white-space: nowrap; }
@@ -1218,24 +1221,44 @@
                         </colgroup>
                         <thead><tr><th scope="col" class="sales-index-column">No.</th><th>Produk</th><th>SKU</th><th class="text-end">Order</th><th class="text-end">Pembeli</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Biaya Iklan</th><th class="text-end">AOV Neto</th><th class="text-end pe-3">APC</th></tr></thead>
                         <tbody>
-                            @foreach ($products as $product)
-                                <tr>
-                                    <td class="sales-index-cell" aria-label="Urutan {{ $loop->iteration }}">{{ $loop->iteration }}</td>
-                                    <td class="fw-semibold">
-                                        <button type="button" class="sales-product-link" data-sales-product-name="{{ $product->name }}" data-sales-product-sku="{{ $product->sku }}" data-sales-product-internal-item-id="{{ $product->internal_item_id ?? '' }}" title="Lihat pesanan produk: {{ $product->name }}">
-                                            <span class="sales-product-name">{{ $product->name }}</span>
-                                        </button>
+                            @php
+                                $productGroups = $products
+                                    ->groupBy(fn ($product) => $product->category_name ?: 'Tanpa kategori')
+                                    ->sortByDesc(fn ($group) => (float) $group->sum('sales'));
+                                $productNumber = 0;
+                            @endphp
+                            @foreach ($productGroups as $categoryName => $categoryProducts)
+                                @php
+                                    $category = $categoryProducts->first();
+                                    $categoryCode = trim((string) ($category->category_code ?? ''));
+                                    $categorySpend = $categoryProducts->filter(fn ($product) => $product->ad_spend_matched ?? false)->sum('ad_spend');
+                                @endphp
+                                <tr class="sales-product-group-row">
+                                    <td colspan="11">
+                                        <span class="sales-product-group-title">{{ $categoryCode !== '' ? $categoryCode.' · ' : '' }}{{ $categoryName }}</span>
+                                        <span class="sales-product-group-meta ms-2">{{ number_format($categoryProducts->count()) }} produk · {{ $fmt($categoryProducts->sum('sales')) }} penjualan · {{ $fmt($categorySpend) }} iklan</span>
                                     </td>
-                                    <td class="text-muted small">{{ $product->sku }}</td>
-                                    <td class="text-end">{{ number_format((int) $product->orders) }}</td>
-                                    <td class="text-end">{{ number_format((int) $product->buyers) }}</td>
-                                    <td class="text-end">{{ number_format((int) $product->qty) }}</td>
-                                    <td class="text-end fw-semibold">{{ $fmt($product->sales) }}</td>
-                                    <td class="text-end fw-semibold">{{ $fmt($product->buyer_payment) }}</td>
-                                    <td class="text-end {{ ($product->ad_spend ?? 0) > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">{{ ($product->ad_spend_matched ?? false) ? $fmt($product->ad_spend) : '—' }}</td>
-                                    <td class="text-end">{{ $product->orders > 0 ? $fmt($product->buyer_payment / $product->orders) : '—' }}</td>
-                                    <td class="text-end" title="Average Payment per Customer: pembayaran pembeli dibagi pembeli unik">{{ $product->buyers > 0 ? $fmt($product->buyer_payment / $product->buyers) : '—' }}</td>
                                 </tr>
+                                @foreach ($categoryProducts as $product)
+                                    @php $productNumber++; @endphp
+                                    <tr>
+                                        <td class="sales-index-cell" aria-label="Urutan {{ $productNumber }}">{{ $productNumber }}</td>
+                                        <td class="fw-semibold">
+                                            <button type="button" class="sales-product-link" data-sales-product-name="{{ $product->name }}" data-sales-product-sku="{{ $product->sku }}" data-sales-product-internal-item-id="{{ $product->internal_item_id ?? '' }}" title="Lihat pesanan produk: {{ $product->name }}">
+                                                <span class="sales-product-name">{{ $product->name }}</span>
+                                            </button>
+                                        </td>
+                                        <td class="text-muted small">{{ $product->sku }}</td>
+                                        <td class="text-end">{{ number_format((int) $product->orders) }}</td>
+                                        <td class="text-end">{{ number_format((int) $product->buyers) }}</td>
+                                        <td class="text-end">{{ number_format((int) $product->qty) }}</td>
+                                        <td class="text-end fw-semibold">{{ $fmt($product->sales) }}</td>
+                                        <td class="text-end fw-semibold">{{ $fmt($product->buyer_payment) }}</td>
+                                        <td class="text-end {{ ($product->ad_spend ?? 0) > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">{{ ($product->ad_spend_matched ?? false) ? $fmt($product->ad_spend) : '—' }}</td>
+                                        <td class="text-end">{{ $product->orders > 0 ? $fmt($product->buyer_payment / $product->orders) : '—' }}</td>
+                                        <td class="text-end" title="Average Payment per Customer: pembayaran pembeli dibagi pembeli unik">{{ $product->buyers > 0 ? $fmt($product->buyer_payment / $product->buyers) : '—' }}</td>
+                                    </tr>
+                                @endforeach
                             @endforeach
                         </tbody>
                     </table>
