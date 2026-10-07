@@ -532,24 +532,43 @@
         letter-spacing: .1em;
         text-transform: uppercase;
     }
-    .sales-dashboard .sales-category-comparison-table { min-width: 1120px; }
-    .sales-dashboard .sales-category-comparison-table th,
-    .sales-dashboard .sales-category-comparison-table td { white-space: nowrap; }
-    .sales-dashboard .sales-category-comparison-table th { font-size: .61rem; }
-    .sales-dashboard .sales-category-comparison-table td { font-size: .7rem; }
-    .sales-dashboard .sales-category-comparison-table .sales-category-name { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; }
-    .sales-dashboard .sales-category-comparison-table .sales-category-delta.is-positive { color: var(--success, #16a34a); }
-    .sales-dashboard .sales-category-comparison-table .sales-category-delta.is-negative { color: var(--danger, #dc2626); }
-    .sales-dashboard .sales-category-comparison-table .sales-category-delta.is-neutral { color: var(--sales-muted); }
-    .sales-dashboard .sales-category-comparison-toggle { display: flex; width: 100%; align-items: center; gap: .45rem; border: 0; background: transparent; color: inherit; padding: 0; text-align: left; }
-    .sales-dashboard .sales-category-comparison-toggle:hover { color: var(--accent, #2563eb); }
-    .sales-dashboard .sales-category-comparison-toggle i { color: var(--accent, #2563eb); transition: transform .18s ease; }
+    .sales-dashboard .sales-category-table-wrap { width: 100%; overflow: hidden; }
+    .sales-dashboard .sales-category-summary-table { width: 100%; min-width: 0; table-layout: fixed; }
+    .sales-dashboard .sales-category-summary-table th,
+    .sales-dashboard .sales-category-summary-table td { white-space: normal; overflow-wrap: anywhere; }
+    .sales-dashboard .sales-category-summary-table th { padding: .65rem .55rem; color: var(--sales-muted); font-size: .61rem; font-weight: 800; letter-spacing: .025em; vertical-align: middle; }
+    .sales-dashboard .sales-category-summary-table td { padding: .62rem .55rem; font-size: .7rem; vertical-align: middle; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(1) { width: 5%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(2) { width: 29%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(3),
+    .sales-dashboard .sales-category-summary-table th:nth-child(4),
+    .sales-dashboard .sales-category-summary-table th:nth-child(5),
+    .sales-dashboard .sales-category-summary-table th:nth-child(6) { width: 16.5%; }
+    .sales-dashboard .sales-category-summary-table th,
+    .sales-dashboard .sales-category-summary-table td { text-align: start; }
+    .sales-dashboard .sales-category-summary-table tbody td:nth-child(n+3) { color: var(--sales-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
+    .sales-dashboard .sales-category-summary-table tbody td:first-child { color: var(--sales-muted); font-variant-numeric: tabular-nums; text-align: start; }
+    .sales-dashboard .sales-category-summary-table .sales-category-name { overflow: hidden; text-overflow: ellipsis; }
+    .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row { transition: background-color .16s ease, box-shadow .16s ease; }
+    .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row:hover > td,
+    .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row.is-expanded > td { background: color-mix(in srgb, var(--sales-accent-soft) 38%, var(--sales-card) 62%); }
+    .sales-dashboard .sales-category-comparison-toggle { display: flex; width: 100%; min-height: 2.2rem; align-items: center; gap: .45rem; border: 0; border-radius: .45rem; background: transparent; color: inherit; padding: .35rem .45rem; text-align: left; transition: background-color .16s ease, color .16s ease; }
+    .sales-dashboard .sales-category-comparison-toggle span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .sales-dashboard .sales-category-comparison-toggle:hover { background: color-mix(in srgb, var(--sales-accent-soft) 70%, transparent); color: var(--accent, #2563eb); }
+    .sales-dashboard .sales-category-comparison-toggle:focus-visible { outline: 2px solid color-mix(in srgb, var(--sales-accent) 55%, transparent); outline-offset: 2px; }
+    .sales-dashboard .sales-category-comparison-toggle i { flex: 0 0 1rem; width: 1rem; color: var(--accent, #2563eb); transition: transform .18s ease; }
     .sales-dashboard .sales-category-comparison-toggle[aria-expanded="true"] i { transform: rotate(90deg); }
     .sales-dashboard .sales-category-comparison-detail > td { padding: 0 !important; background: color-mix(in srgb, var(--sales-accent-soft) 14%, var(--sales-card) 86%); }
     .sales-dashboard .sales-category-comparison-detail-card { padding: .85rem 1rem 1rem; border-top: 1px solid color-mix(in srgb, var(--sales-accent) 18%, var(--sales-line) 82%); }
+    .sales-dashboard .sales-category-detail-header { flex-wrap: nowrap !important; }
+    .sales-dashboard .sales-category-detail-header > div:first-child { min-width: 0; }
+    .sales-dashboard .sales-category-detail-header .sales-section-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sales-dashboard .sales-category-detail-badge { max-width: 42%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .sales-dashboard .sales-category-comparison-detail-card .sales-kicker { font-size: .6rem; }
     .sales-dashboard .sales-category-comparison-detail-card .sales-section-title { font-size: .9rem; }
     .sales-dashboard .sales-category-comparison-detail-card .sales-product-comparison-table { min-width: 760px; }
+    .sales-dashboard .sales-category-comparison-detail-card .sales-product-comparison-table th,
+    .sales-dashboard .sales-category-comparison-detail-card .sales-product-comparison-table td { white-space: nowrap; }
     .sales-dashboard .sales-product-analysis-matrix-wrap { padding: 0 1.15rem 1.15rem; }
     .sales-dashboard .sales-product-analysis-matrix { width: 100%; table-layout: fixed; }
     .sales-dashboard .sales-product-analysis-matrix th,
@@ -686,6 +705,18 @@
             white-space: nowrap;
         }
         .sales-dashboard .sales-order-table { min-width: 0; }
+        .sales-dashboard .sales-category-table-wrap { overflow: visible; }
+        .sales-dashboard .sales-category-summary-table { display: block; min-width: 0 !important; }
+        .sales-dashboard .sales-category-summary-table thead { display: none; }
+        .sales-dashboard .sales-category-summary-table tbody { display: block; }
+        .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .35rem .8rem; margin-bottom: .55rem; padding: .7rem .75rem; border: 1px solid var(--sales-line); border-radius: .7rem; background: var(--sales-card); }
+        .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row > td { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; padding: .25rem 0 !important; border: 0; text-align: left !important; }
+        .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row > td:first-child { display: none; }
+        .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row > td[data-label]::before { content: attr(data-label); margin-bottom: .2rem; color: var(--sales-muted); font-size: .58rem; font-weight: 750; letter-spacing: .02em; }
+        .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row > td:nth-child(2) { grid-column: 1 / -1; }
+        .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-detail { display: block; }
+        .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-detail[hidden] { display: none !important; }
+        .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-detail > td { display: block; width: 100%; }
         .sales-dashboard .sales-kpi { min-height: 142px; }
         .sales-dashboard .sales-kpi-value { font-size: 1.2rem; }
         .sales-dashboard .sales-period-filter { order: 1; width: 100%; margin-left: 0; }
@@ -1008,11 +1039,11 @@
         return $period;
     })->all();
     $productComparisonRows = [
-        ['group' => 'Katalog & volume', 'label' => 'Produk Marketplace', 'key' => 'products', 'format' => $numberDisplay],
-        ['group' => 'Katalog & volume', 'label' => 'Variant Marketplace', 'key' => 'variants', 'format' => $numberDisplay],
-        ['group' => 'Katalog & volume', 'label' => 'Variant Terjual Unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
-        ['group' => 'Katalog & volume', 'label' => 'Order Produk', 'key' => 'orders', 'format' => $numberDisplay],
-        ['group' => 'Katalog & volume', 'label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
+        ['group' => 'Volume transaksi', 'label' => 'Produk Terjual Marketplace', 'key' => 'products', 'format' => $numberDisplay],
+        ['group' => 'Volume transaksi', 'label' => 'Variant Terjual Marketplace', 'key' => 'variants', 'format' => $numberDisplay],
+        ['group' => 'Volume transaksi', 'label' => 'Variant Terjual Unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
+        ['group' => 'Volume transaksi', 'label' => 'Order Produk', 'key' => 'orders', 'format' => $numberDisplay],
+        ['group' => 'Volume transaksi', 'label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
         ['group' => 'Pendapatan', 'label' => 'Penjualan Produk', 'key' => 'sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'Penjualan Netto', 'key' => 'net_sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'AOV Penjualan', 'key' => 'aov_sales', 'format' => $currencyDisplay],
@@ -1156,11 +1187,11 @@
         ->sortByDesc(fn ($row) => (float) ($row['periods']['active']['metrics']['net_sales'] ?? 0))
         ->values();
     $categoryProductComparisonRows = [
-        ['group' => 'Katalog & volume', 'label' => 'Produk Marketplace', 'key' => 'products', 'format' => $numberDisplay],
-        ['group' => 'Katalog & volume', 'label' => 'Variant Marketplace', 'key' => 'variants', 'format' => $numberDisplay],
-        ['group' => 'Katalog & volume', 'label' => 'Variant Terjual Unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
-        ['group' => 'Katalog & volume', 'label' => 'Order Unik', 'key' => 'orders', 'format' => $numberDisplay],
-        ['group' => 'Katalog & volume', 'label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
+        ['group' => 'Volume transaksi', 'label' => 'Produk Terjual Marketplace', 'key' => 'products', 'format' => $numberDisplay],
+        ['group' => 'Volume transaksi', 'label' => 'Variant Terjual Marketplace', 'key' => 'variants', 'format' => $numberDisplay],
+        ['group' => 'Volume transaksi', 'label' => 'Variant Terjual Unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
+        ['group' => 'Volume transaksi', 'label' => 'Order Produk', 'key' => 'orders', 'format' => $numberDisplay],
+        ['group' => 'Volume transaksi', 'label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
         ['group' => 'Pendapatan', 'label' => 'Penjualan Produk', 'key' => 'sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'Penjualan Netto', 'key' => 'net_sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'AOV Penjualan', 'key' => 'aov_sales', 'format' => $currencyDisplay],
@@ -1743,22 +1774,13 @@
     <div class="sales-tab-pane {{ $activeTab === 'products' ? '' : 'is-hidden' }}" data-sales-pane="products" role="tabpanel" aria-hidden="{{ $activeTab === 'products' ? 'false' : 'true' }}">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Produk',
-            'kpiColumnClass' => 'col-xl-3',
+            'kpiColumnClass' => 'col-xl',
             'kpis' => [
-                ['group' => 'Katalog & volume', 'label' => 'Produk Marketplace', 'value' => number_format($activeProductKpi['products']), 'note' => 'kode produk unik', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($activeProductKpi['products'], $previousMonthProductKpi['products'], $previousPeriodProductKpi['products'], $numberDisplay)],
-                ['group' => 'Katalog & volume', 'label' => 'Variant Marketplace', 'value' => number_format($activeProductKpi['variants']), 'note' => 'variant pada kode produk', 'icon' => 'bi-diagram-3', 'comparisons' => $kpiComparisons($activeProductKpi['variants'], $previousMonthProductKpi['variants'], $previousPeriodProductKpi['variants'], $numberDisplay)],
-                ['group' => 'Katalog & volume', 'label' => 'Order Produk', 'value' => number_format($activeProductKpi['orders']), 'note' => 'order unik', 'icon' => 'bi-receipt', 'comparisons' => $kpiComparisons($activeProductKpi['orders'], $previousMonthProductKpi['orders'], $previousPeriodProductKpi['orders'], $numberDisplay)],
-                ['group' => 'Katalog & volume', 'label' => 'Unit Terjual', 'value' => number_format($activeProductKpi['qty']), 'note' => 'unit pada periode', 'icon' => 'bi-stack', 'comparisons' => $kpiComparisons($activeProductKpi['qty'], $previousMonthProductKpi['qty'], $previousPeriodProductKpi['qty'], $numberDisplay)],
-                ['group' => 'Pendapatan', 'label' => 'Penjualan Netto', 'value' => $currencyDisplay($activeProductKpi['net_sales']), 'note' => 'setelah diskon & promo seller', 'icon' => 'bi-graph-down-arrow', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($activeProductKpi['net_sales'], $previousMonthProductKpi['net_sales'], $previousPeriodProductKpi['net_sales'], $currencyDisplay)],
-                ['group' => 'Pendapatan', 'label' => 'Pembayaran Pembeli', 'value' => $currencyDisplay($activeProductKpi['buyer_payment']), 'note' => 'nilai dibayar pembeli', 'icon' => 'bi-wallet2', 'comparisons' => $kpiComparisons($activeProductKpi['buyer_payment'], $previousMonthProductKpi['buyer_payment'], $previousPeriodProductKpi['buyer_payment'], $currencyDisplay)],
-                ['group' => 'Pendapatan', 'label' => 'AOV Penjualan', 'value' => $currencyDisplay($activeProductKpi['aov_sales']), 'note' => 'penjualan per order produk', 'icon' => 'bi-bar-chart-line', 'comparisons' => $kpiComparisons($activeProductKpi['aov_sales'], $previousMonthProductKpi['aov_sales'], $previousPeriodProductKpi['aov_sales'], $currencyDisplay)],
-                ['group' => 'Pendapatan', 'label' => 'AOV Pembayaran', 'value' => $currencyDisplay($activeProductKpi['aov_payment']), 'note' => 'pembayaran per order produk', 'icon' => 'bi-wallet2', 'comparisons' => $kpiComparisons($activeProductKpi['aov_payment'], $previousMonthProductKpi['aov_payment'], $previousPeriodProductKpi['aov_payment'], $currencyDisplay)],
-                ['group' => 'Profitabilitas & iklan', 'label' => 'Margin Kontribusi', 'value' => $activeProductKpi['contribution_margin'] === null ? '—' : $percentDisplay($activeProductKpi['contribution_margin']), 'note' => 'setelah HPP dan iklan', 'icon' => 'bi-pie-chart', 'comparisons' => $kpiComparisons($activeProductKpi['contribution_margin'] ?? 0, $previousMonthProductKpi['contribution_margin'] ?? null, $previousPeriodProductKpi['contribution_margin'] ?? null, $percentDisplay, 'points')],
-                ['group' => 'Profitabilitas & iklan', 'label' => 'Biaya Iklan', 'value' => $currencyDisplay($activeProductKpi['ad_spend']), 'note' => 'termasuk GMV Max', 'icon' => 'bi-megaphone', 'variant' => 'sales-kpi--warning', 'comparisons' => $kpiComparisons($activeProductKpi['ad_spend'], $previousMonthProductKpi['ad_spend'], $previousPeriodProductKpi['ad_spend'], $currencyDisplay, 'relative', false)],
-                ['group' => 'Profitabilitas & iklan', 'label' => 'ROAS Blended', 'value' => $activeProductKpi['roas'] === null ? '—' : $multipleDisplay($activeProductKpi['roas']), 'note' => 'penjualan atribusi / iklan', 'icon' => 'bi-graph-up-arrow', 'comparisons' => $kpiComparisons($activeProductKpi['roas'] ?? 0, $previousMonthProductKpi['roas'] ?? null, $previousPeriodProductKpi['roas'] ?? null, $multipleDisplay)],
-                ['group' => 'Profitabilitas & iklan', 'label' => 'CPA', 'value' => $activeProductKpi['cpa'] === null ? '—' : $currencyDisplay($activeProductKpi['cpa']), 'note' => 'biaya per konversi iklan', 'icon' => 'bi-currency-dollar', 'comparisons' => $kpiComparisons($activeProductKpi['cpa'] ?? 0, $previousMonthProductKpi['cpa'] ?? null, $previousPeriodProductKpi['cpa'] ?? null, $currencyDisplay, 'relative', false)],
-                ['group' => 'Kualitas data', 'label' => 'Coverage Mapping Internal', 'value' => $percentDisplay($activeProductKpi['mapping_rate']), 'note' => 'baris terpetakan', 'icon' => 'bi-link-45deg', 'variant' => $activeProductKpi['mapping_rate'] < 100 ? 'sales-kpi--warning' : '', 'comparisons' => $kpiComparisons($activeProductKpi['mapping_rate'], $previousMonthProductKpi['mapping_rate'], $previousPeriodProductKpi['mapping_rate'], $percentDisplay, 'points')],
-                ['group' => 'Kualitas data', 'label' => 'Coverage HPP', 'value' => $percentDisplay($activeProductKpi['hpp_coverage']), 'note' => 'baris dengan HPP tersedia', 'icon' => 'bi-check2-square', 'variant' => $activeProductKpi['hpp_coverage'] < 100 ? 'sales-kpi--warning' : '', 'comparisons' => $kpiComparisons($activeProductKpi['hpp_coverage'], $previousMonthProductKpi['hpp_coverage'], $previousPeriodProductKpi['hpp_coverage'], $percentDisplay, 'points')],
+                ['label' => 'Penjualan Netto', 'value' => $currencyDisplay($activeProductKpi['net_sales']), 'note' => 'setelah diskon & promo seller', 'icon' => 'bi-graph-down-arrow', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($activeProductKpi['net_sales'], $previousMonthProductKpi['net_sales'], $previousPeriodProductKpi['net_sales'], $currencyDisplay)],
+                ['label' => 'Pembayaran Pembeli', 'value' => $currencyDisplay($activeProductKpi['buyer_payment']), 'note' => 'nilai dibayar pembeli', 'icon' => 'bi-wallet2', 'comparisons' => $kpiComparisons($activeProductKpi['buyer_payment'], $previousMonthProductKpi['buyer_payment'], $previousPeriodProductKpi['buyer_payment'], $currencyDisplay)],
+                ['label' => 'Order Produk', 'value' => number_format($activeProductKpi['orders']), 'note' => 'order unik', 'icon' => 'bi-receipt', 'comparisons' => $kpiComparisons($activeProductKpi['orders'], $previousMonthProductKpi['orders'], $previousPeriodProductKpi['orders'], $numberDisplay)],
+                ['label' => 'Unit Terjual', 'value' => number_format($activeProductKpi['qty']), 'note' => 'unit pada periode', 'icon' => 'bi-stack', 'comparisons' => $kpiComparisons($activeProductKpi['qty'], $previousMonthProductKpi['qty'], $previousPeriodProductKpi['qty'], $numberDisplay)],
+                ['label' => 'Margin Kontribusi', 'value' => $activeProductKpi['contribution_margin'] === null ? '—' : $percentDisplay($activeProductKpi['contribution_margin']), 'note' => 'setelah HPP dan iklan', 'icon' => 'bi-pie-chart', 'comparisons' => $kpiComparisons($activeProductKpi['contribution_margin'] ?? 0, $previousMonthProductKpi['contribution_margin'] ?? null, $previousPeriodProductKpi['contribution_margin'] ?? null, $percentDisplay, 'points')],
             ],
         ])
         @if ($activeComparison)
@@ -1817,31 +1839,21 @@
                     <div class="sales-kicker mb-1">Kinerja kategori</div>
                     <h2 class="sales-section-title mb-1">Kinerja Penjualan per Kategori Item</h2>
                 </div>
-                <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($categoryComparisonRows->count()) }} kategori · {{ number_format($activeProductKpi['products']) }} produk</span>
+                <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($categoryComparisonRows->count()) }} kategori · {{ number_format($activeProductKpi['products']) }} produk terjual</span>
             </div>
             @if ($categoryComparisonRows->isEmpty())
                 <div class="sales-empty text-center">Belum ada penjualan per kategori pada periode ini.</div>
             @else
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle sales-table sales-category-comparison-table mb-0">
+                <div class="sales-category-table-wrap">
+                    <table class="table table-sm table-hover align-middle sales-table sales-category-summary-table mb-0">
                         <thead>
                             <tr>
                                 <th class="ps-3">No.</th>
                                 <th>Kategori Item</th>
-                                <th class="text-end">Produk Marketplace</th>
-                                <th class="text-end">Variant Marketplace</th>
-                                <th class="text-end">Variant Terjual Unik</th>
-                                <th class="text-end">Order Unik</th>
-                                <th class="text-end">Unit Terjual</th>
-                                @foreach ($categoryComparisonPeriods as $period)
-                                    <th class="text-end">
-                                        {{ $period['label'] }}
-                                        <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
-                                        <div class="small fw-normal text-muted">Penjualan Netto · AOV Penjualan</div>
-                                    </th>
-                                @endforeach
-                                <th class="text-end">Perubahan vs -1</th>
-                                <th class="text-end pe-3">Pangsa Netto</th>
+                                <th>Produk</th>
+                                <th>Variant</th>
+                                <th>Order</th>
+                                <th class="pe-3">Unit</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1849,50 +1861,29 @@
                                 @php
                                     $categoryKey = 'sales-category-comparison-'.$loop->index;
                                     $activeCategoryMetrics = $categoryRow['periods']['active']['metrics'];
-                                    $categoryDelta = (float) $categoryRow['delta'];
-                                    $categoryDeltaPercent = $categoryRow['delta_percent'];
-                                    $categoryDeltaClass = $categoryDelta > 0.005 ? 'is-positive' : ($categoryDelta < -0.005 ? 'is-negative' : 'is-neutral');
-                                    $categoryDeltaLabel = $categoryDeltaPercent === null
-                                        ? ($activeCategoryMetrics['net_sales'] > 0 ? 'baru' : '—')
-                                        : (($categoryDeltaPercent > 0 ? '+' : '').$percentDisplay($categoryDeltaPercent));
                                 @endphp
-                                <tr class="sales-category-comparison-row">
-                                    <td class="ps-3 text-muted">{{ $loop->iteration }}</td>
-                                    <td class="fw-semibold sales-category-name" title="{{ $categoryRow['name'] }}">
-                                        <button type="button" class="sales-category-comparison-toggle" data-sales-category-comparison-toggle="{{ $categoryKey }}" aria-expanded="false" aria-controls="{{ $categoryKey }}-detail">
+                                <tr class="sales-category-comparison-row" data-sales-category-comparison-row="{{ $categoryKey }}">
+                                    <td class="ps-3 text-muted" data-label="No.">{{ $loop->iteration }}</td>
+                                    <td class="fw-semibold sales-category-name" data-label="Kategori Item" title="{{ $categoryRow['name'] }}">
+                                        <button type="button" class="sales-category-comparison-toggle" data-sales-category-comparison-toggle="{{ $categoryKey }}" aria-expanded="false" aria-controls="{{ $categoryKey }}-detail" aria-label="Buka detail kategori {{ $categoryRow['name'] }}">
                                             <i class="bi bi-chevron-right" aria-hidden="true"></i>
                                             <span>{{ $categoryRow['name'] }}</span>
                                         </button>
                                     </td>
-                                    <td class="text-end">{{ number_format($activeCategoryMetrics['products']) }}</td>
-                                    <td class="text-end">{{ number_format($activeCategoryMetrics['variants']) }}</td>
-                                    <td class="text-end">{{ number_format($activeCategoryMetrics['variants_sold']) }}</td>
-                                    <td class="text-end">{{ number_format($activeCategoryMetrics['orders']) }}</td>
-                                    <td class="text-end">{{ number_format($activeCategoryMetrics['qty']) }}</td>
-                                    @foreach ($categoryComparisonPeriods as $period)
-                                        @php $categoryMetrics = $categoryRow['periods'][$period['key']]['metrics']; @endphp
-                                        <td class="text-end">
-                                            <div class="fw-semibold">{{ $fmt($categoryMetrics['net_sales']) }}</div>
-                                            <div class="small text-muted">{{ $categoryMetrics['orders'] > 0 ? $fmt($categoryMetrics['aov_sales']) : '—' }}</div>
-                                        </td>
-                                    @endforeach
-                                    <td class="text-end sales-category-delta {{ $categoryDeltaClass }}">
-                                        <div class="fw-semibold">{{ $categoryDeltaLabel }}</div>
-                                        @if ($categoryDeltaPercent !== null)
-                                            <div class="small text-muted">{{ $categoryDelta >= 0 ? '+' : '' }}{{ $fmt($categoryDelta) }}</div>
-                                        @endif
-                                    </td>
-                                    <td class="text-end pe-3 fw-semibold">{{ $percentDisplay($categoryRow['share']) }}</td>
+                                    <td data-label="Produk">{{ number_format($activeCategoryMetrics['products']) }}</td>
+                                    <td data-label="Variant">{{ number_format($activeCategoryMetrics['variants']) }}</td>
+                                    <td data-label="Order">{{ number_format($activeCategoryMetrics['orders']) }}</td>
+                                    <td class="pe-3" data-label="Unit">{{ number_format($activeCategoryMetrics['qty']) }}</td>
                                 </tr>
                                 <tr id="{{ $categoryKey }}-detail" class="sales-category-comparison-detail" data-sales-category-comparison-items="{{ $categoryKey }}" hidden>
-                                    <td colspan="{{ 7 + $categoryComparisonPeriods->count() + 2 }}">
+                                    <td colspan="6">
                                         <div class="sales-category-comparison-detail-card">
-                                            <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+                                            <div class="sales-category-detail-header d-flex align-items-start justify-content-between gap-2 mb-2">
                                                 <div>
-                                                    <div class="sales-kicker mb-1">Kinerja produk dalam kategori</div>
+                                                    <div class="sales-kicker mb-1">Product comparison</div>
                                                     <h3 class="sales-section-title mb-0">Perbandingan kinerja produk</h3>
                                                 </div>
-                                                <span class="badge sales-badge rounded-pill px-3 py-2">{{ $categoryRow['name'] }}</span>
+                                                <span class="badge sales-badge sales-category-detail-badge rounded-pill px-3 py-2" title="{{ $categoryRow['name'] }}">{{ $categoryRow['name'] }}</span>
                                             </div>
                                             <div class="table-responsive">
                                                 <table class="table table-sm table-hover align-middle sales-table sales-product-comparison-table mb-0">
@@ -2022,7 +2013,7 @@
             </div>
             <div class="sales-product-analysis-matrix-wrap">
                 <table class="table table-sm align-middle sales-table sales-product-analysis-matrix">
-                    <thead><tr><th style="width: 16%">Segmentasi</th><th class="text-end">Produk Marketplace</th><th class="text-end">Variant Terjual Unik</th><th class="text-end">Penjualan Netto</th><th class="text-end">Share</th><th class="text-end">Kontribusi</th><th class="text-end">Margin</th><th class="text-end">Penjualan Atribusi Iklan</th><th class="text-end">ROAS</th><th class="text-end">Biaya Iklan</th></tr></thead>
+                    <thead><tr><th style="width: 16%">Segmentasi</th><th class="text-end">Produk Terjual Marketplace</th><th class="text-end">Variant Terjual Unik</th><th class="text-end">Penjualan Netto</th><th class="text-end">Share</th><th class="text-end">Kontribusi</th><th class="text-end">Margin</th><th class="text-end">Penjualan Atribusi Iklan</th><th class="text-end">ROAS</th><th class="text-end">Biaya Iklan</th></tr></thead>
                     <tbody>
                         @foreach ($productAnalysisMatrixRows as $matrixRow)
                             <tr>
@@ -2046,9 +2037,9 @@
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
                     <div class="sales-kicker mb-1">Daftar kinerja produk</div>
-                    <h2 class="sales-section-title mb-1">Analisis Produk Marketplace</h2>
+                    <h2 class="sales-section-title mb-1">Analisis Produk Terjual Marketplace</h2>
                 </div>
-                <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($topProductCount) }} kode · {{ number_format($activeProductKpi['variants']) }} variant</span>
+                <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($topProductCount) }} produk terjual · {{ number_format($activeProductKpi['variants']) }} variant terjual</span>
             </div>
             <div class="sales-product-hierarchy" aria-label="Hierarki detail produk">
                 <span><i class="bi bi-collection" aria-hidden="true"></i>Kategori item</span>
@@ -2075,7 +2066,7 @@
                             <col style="width: 5%">
                             <col style="width: 7%">
                         </colgroup>
-                        <thead><tr><th scope="col" class="sales-index-column">No.</th><th>Produk Marketplace / Variant</th><th class="text-end" title="Variant: HPP terakhir per unit · Marketplace/kategori: total HPP berdasarkan unit">HPP Unit / Total HPP</th><th class="text-end">Order Unik</th><th class="text-end">Unit</th><th class="text-end">Penjualan</th><th class="text-end">Penjualan Netto</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Biaya Iklan</th><th class="text-end">Penjualan Atribusi Iklan</th><th class="text-end">ACOS</th><th class="text-end">ROAS</th><th class="text-end pe-3">CPA</th></tr></thead>
+                        <thead><tr><th scope="col" class="sales-index-column">No.</th><th>Produk Terjual Marketplace / Variant Terjual</th><th class="text-end" title="Variant: HPP terakhir per unit · Marketplace/kategori: total HPP berdasarkan unit">HPP Unit / Total HPP</th><th class="text-end">Order Unik</th><th class="text-end">Unit</th><th class="text-end">Penjualan</th><th class="text-end">Penjualan Netto</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Biaya Iklan</th><th class="text-end">Penjualan Atribusi Iklan</th><th class="text-end">ACOS</th><th class="text-end">ROAS</th><th class="text-end pe-3">CPA</th></tr></thead>
                         <tbody>
                             @php
                                 $productGroups = $products
@@ -2812,9 +2803,14 @@
             trigger.addEventListener('click', function () {
                 const key = trigger.dataset.salesCategoryComparisonToggle || '';
                 const expanded = trigger.getAttribute('aria-expanded') === 'true';
-                trigger.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                const nextExpanded = !expanded;
+                const categoryRow = trigger.closest('[data-sales-category-comparison-row]');
+                const categoryName = trigger.querySelector('span')?.textContent?.trim() || 'kategori';
+                trigger.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false');
+                trigger.setAttribute('aria-label', (nextExpanded ? 'Tutup' : 'Buka') + ' detail kategori ' + categoryName);
+                if (categoryRow) categoryRow.classList.toggle('is-expanded', nextExpanded);
                 document.querySelectorAll('[data-sales-category-comparison-items="' + key + '"]').forEach(function (row) {
-                    row.hidden = expanded;
+                    row.hidden = !nextExpanded;
                 });
             });
         });
