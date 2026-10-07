@@ -122,6 +122,68 @@ class AdsDashboardService
         return "CASE WHEN COALESCE({$alias}.line_net_amount, 0) > 0 THEN {$alias}.line_net_amount WHEN COALESCE({$alias}.line_gross_amount, 0) > 0 THEN {$alias}.line_gross_amount WHEN COALESCE({$alias}.price_after_discount, 0) > 0 THEN {$alias}.price_after_discount * ({$qty}) ELSE COALESCE({$alias}.price, 0) * ({$qty}) END";
     }
 
+    /**
+     * Biaya iklan harian dengan sumber yang sama seperti ringkasan Ads
+     * Dashboard: data level toko menjadi sumber utama, lalu rincian regular
+     * dan GMS menjadi fallback ketika data level toko belum tersedia.
+     *
+     * @param  array<int>  $storeIds
+     * @return Collection<string, float>
+     */
+    public function getDailySpend(array $storeIds, int|string|null $storeId, string $dateFrom, string $dateTo): Collection
+    {
+        $storeIds = array_values(array_filter(array_map('intval', $storeIds)));
+        if ($storeId !== null && $storeId !== 'all') {
+            $selectedStoreId = (int) $storeId;
+            $storeIds = in_array($selectedStoreId, $storeIds, true) ? [$selectedStoreId] : [];
+        }
+
+        if ($storeIds === []) {
+            return collect();
+        }
+
+        $shop = DB::table('marketplace_ads_dailies')
+            ->whereIn('store_id', $storeIds)
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->selectRaw('date, SUM(spend) as spend')
+            ->groupBy('date')
+            ->get()
+            ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
+
+        $campaign = DB::table('marketplace_ad_campaign_dailies')
+            ->whereIn('store_id', $storeIds)
+            ->whereNotLike('channel_campaign_id', 'GMS-%')
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->selectRaw('date, SUM(expense) as spend')
+            ->groupBy('date')
+            ->get()
+            ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
+
+        $gms = DB::table('marketplace_ad_campaign_dailies')
+            ->whereIn('store_id', $storeIds)
+            ->whereLike('channel_campaign_id', 'GMS-%')
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->selectRaw('date, SUM(expense) as spend')
+            ->groupBy('date')
+            ->get()
+            ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
+
+        return $shop->keys()
+            ->merge($campaign->keys())
+            ->merge($gms->keys())
+            ->unique()
+            ->sort()
+            ->mapWithKeys(function (string $date) use ($shop, $campaign, $gms) {
+                $shopRow = $shop->get($date);
+                $spend = $shopRow
+                    ? (float) ($shopRow->spend ?? 0)
+                    : (float) ($campaign->get($date)->spend ?? 0)
+                        + (float) ($gms->get($date)->spend ?? 0);
+
+                return [$date => $spend];
+            });
+    }
+
     public function buildDashboardData(
         Collection $stores,
         int|string|null $storeId,

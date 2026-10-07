@@ -354,6 +354,8 @@
     $topProductBuyers = (int) $products->sum('buyers');
     $incomeSettlementRate = $incomeSummary['orders'] > 0 ? ($incomeSummary['settled_orders'] / $incomeSummary['orders']) * 100 : 0;
     $promotionRate = $summary['subtotal'] > 0 ? ($summary['promotion_total'] / $summary['subtotal']) * 100 : 0;
+    $adSpendDaily = collect($adSpendDaily ?? []);
+    $adSpendTotal = (float) ($adSpendTotal ?? $adSpendDaily->sum());
     $comparisonMonthData = $comparisonMonth['data'] ?? null;
     $comparisonMonthPreviousData = $comparisonMonthPrevious['data'] ?? null;
     $comparisonMonthPreviousTwoData = $comparisonMonthPreviousTwo['data'] ?? null;
@@ -405,58 +407,70 @@
         $voucherPlatform = (float) $rows->sum('voucher_platform');
         $bundleDiscount = (float) $rows->sum('bundle_discount');
         $comboHemat = (float) $rows->sum('combo_hemat');
+        $voucherSellerSales = (float) $rows->sum('voucher_store_sales');
+        $voucherPlatformSales = (float) $rows->sum('voucher_platform_sales');
+        $bundleDiscountSales = (float) $rows->sum('bundle_discount_sales');
+        $comboHematSales = (float) $rows->sum('combo_hemat_sales');
         $total = $voucherPlatform;
         $gmv = (float) data_get($periodSummary, 'subtotal', 0);
 
         return [
             'sales' => $gmv,
             'voucher_seller' => $voucherSeller,
+            'voucher_seller_sales' => $voucherSellerSales,
             'voucher_platform' => $voucherPlatform,
+            'voucher_platform_sales' => $voucherPlatformSales,
             'bundle_discount' => $bundleDiscount,
+            'bundle_discount_sales' => $bundleDiscountSales,
             'combo_hemat' => $comboHemat,
+            'combo_hemat_sales' => $comboHematSales,
             'platform_total' => $total,
-            'platform_rate' => $gmv > 0 ? ($total / $gmv) * 100 : 0,
-            'voucher_seller_rate' => $gmv > 0 ? ($voucherSeller / $gmv) * 100 : 0,
-            'bundle_discount_rate' => $gmv > 0 ? ($bundleDiscount / $gmv) * 100 : 0,
-            'combo_hemat_rate' => $gmv > 0 ? ($comboHemat / $gmv) * 100 : 0,
+            'platform_rate' => $gmv > 0 ? ($voucherPlatformSales / $gmv) * 100 : 0,
+            'voucher_seller_rate' => $gmv > 0 ? ($voucherSellerSales / $gmv) * 100 : 0,
+            'bundle_discount_rate' => $gmv > 0 ? ($bundleDiscountSales / $gmv) * 100 : 0,
+            'combo_hemat_rate' => $gmv > 0 ? ($comboHematSales / $gmv) * 100 : 0,
             'orders' => (int) ($promotionOrders ?? $rows->sum('promotion_orders')),
         ];
     };
     $promotionComparisonPeriods = $comparisonMode === 'month'
         ? [
-            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'data' => ['daily' => $promotionDaily, 'summary' => $summary, 'orders' => $promotionOrders]],
-            ['label' => 'Bln -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthData, 'summary', []), 'orders' => data_get($comparisonMonthData, 'promotionOrders', 0)]],
-            ['label' => 'Bln -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthPreviousData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthPreviousData, 'summary', []), 'orders' => data_get($comparisonMonthPreviousData, 'promotionOrders', 0)]],
-            ['label' => 'Bln -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthPreviousTwoData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthPreviousTwoData, 'summary', []), 'orders' => data_get($comparisonMonthPreviousTwoData, 'promotionOrders', 0)]],
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'data' => ['daily' => $promotionDaily, 'summary' => $summary, 'orders' => $promotionOrders, 'ad_spend' => $adSpendTotal]],
+            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthData, 'summary', []), 'orders' => data_get($comparisonMonthData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonMonthData, 'adSpendTotal', 0)]],
+            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthPreviousData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthPreviousData, 'summary', []), 'orders' => data_get($comparisonMonthPreviousData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonMonthPreviousData, 'adSpendTotal', 0)]],
+            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthPreviousTwoData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthPreviousTwoData, 'summary', []), 'orders' => data_get($comparisonMonthPreviousTwoData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonMonthPreviousTwoData, 'adSpendTotal', 0)]],
         ]
         : [
         [
             'label' => 'Aktif',
             'from' => $filters['date_from'],
             'to' => $filters['date_to'],
-            'data' => ['daily' => $promotionDaily, 'summary' => $summary, 'orders' => $promotionOrders],
+            'data' => ['daily' => $promotionDaily, 'summary' => $summary, 'orders' => $promotionOrders, 'ad_spend' => $adSpendTotal],
         ],
         [
             'label' => 'Periode -1',
             'from' => $comparisonPeriod['from'] ?? null,
             'to' => $comparisonPeriod['to'] ?? null,
-            'data' => ['daily' => data_get($comparisonPeriodData, 'promotionDaily', []), 'summary' => $previousPeriodSummary, 'orders' => data_get($comparisonPeriodData, 'promotionOrders', 0)],
+            'data' => ['daily' => data_get($comparisonPeriodData, 'promotionDaily', []), 'summary' => $previousPeriodSummary, 'orders' => data_get($comparisonPeriodData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonPeriodData, 'adSpendTotal', 0)],
         ],
         [
             'label' => 'Periode -2',
             'from' => $comparisonPeriodPrevious['from'] ?? null,
             'to' => $comparisonPeriodPrevious['to'] ?? null,
-            'data' => ['daily' => data_get($comparisonPeriodPreviousData, 'promotionDaily', []), 'summary' => data_get($comparisonPeriodPreviousData, 'summary', []), 'orders' => data_get($comparisonPeriodPreviousData, 'promotionOrders', 0)],
+            'data' => ['daily' => data_get($comparisonPeriodPreviousData, 'promotionDaily', []), 'summary' => data_get($comparisonPeriodPreviousData, 'summary', []), 'orders' => data_get($comparisonPeriodPreviousData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonPeriodPreviousData, 'adSpendTotal', 0)],
         ],
         [
             'label' => 'Periode -3',
             'from' => $comparisonPeriodPreviousTwo['from'] ?? null,
             'to' => $comparisonPeriodPreviousTwo['to'] ?? null,
-            'data' => ['daily' => data_get($comparisonPeriodPreviousTwoData, 'promotionDaily', []), 'summary' => data_get($comparisonPeriodPreviousTwoData, 'summary', []), 'orders' => data_get($comparisonPeriodPreviousTwoData, 'promotionOrders', 0)],
+            'data' => ['daily' => data_get($comparisonPeriodPreviousTwoData, 'promotionDaily', []), 'summary' => data_get($comparisonPeriodPreviousTwoData, 'summary', []), 'orders' => data_get($comparisonPeriodPreviousTwoData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonPeriodPreviousTwoData, 'adSpendTotal', 0)],
         ],
     ];
     $platformPromotionPeriods = collect($promotionComparisonPeriods)->map(function ($period) use ($platformPromotionMetrics) {
         $period['metrics'] = $platformPromotionMetrics($period['data']['daily'], $period['data']['summary'], $period['data']['orders']);
+        $period['metrics']['ad_spend'] = (float) ($period['data']['ad_spend'] ?? 0);
+        $period['metrics']['ad_rate'] = (float) ($period['metrics']['sales'] ?? 0) > 0
+            ? ($period['metrics']['ad_spend'] / (float) $period['metrics']['sales']) * 100
+            : 0;
         unset($period['data']);
 
         return $period;
@@ -477,37 +491,45 @@
             'kicker' => 'Platform promotion',
             'title' => 'Promosi Platform',
             'rows' => [
-                ['label' => 'Total Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
                 ['label' => 'Voucher Platform', 'key' => 'voucher_platform', 'format' => $currencyDisplay],
                 ['label' => 'Kontribusi Sales', 'key' => 'platform_rate', 'format' => $percentDisplay],
+                ['label' => 'Sales Promo', 'key' => 'voucher_platform_sales', 'format' => $currencyDisplay],
             ],
         ],
         [
             'kicker' => 'Seller voucher',
             'title' => 'Voucher Seller',
             'rows' => [
-                ['label' => 'Total Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
                 ['label' => 'Voucher Seller', 'key' => 'voucher_seller', 'format' => $currencyDisplay],
                 ['label' => 'Kontribusi Sales', 'key' => 'voucher_seller_rate', 'format' => $percentDisplay],
+                ['label' => 'Sales Promo', 'key' => 'voucher_seller_sales', 'format' => $currencyDisplay],
             ],
         ],
         [
             'kicker' => 'Seller package promotion',
             'title' => 'Paket Diskon',
             'rows' => [
-                ['label' => 'Total Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
                 ['label' => 'Paket Diskon', 'key' => 'bundle_discount', 'format' => $currencyDisplay],
                 ['label' => 'Kontribusi Sales', 'key' => 'bundle_discount_rate', 'format' => $percentDisplay],
+                ['label' => 'Sales Promo', 'key' => 'bundle_discount_sales', 'format' => $currencyDisplay],
             ],
         ],
         [
             'kicker' => 'Seller combo promotion',
             'title' => 'Kombo Hemat',
             'rows' => [
-                ['label' => 'Total Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
                 ['label' => 'Kombo Hemat', 'key' => 'combo_hemat', 'format' => $currencyDisplay],
                 ['label' => 'Kontribusi Sales', 'key' => 'combo_hemat_rate', 'format' => $percentDisplay],
+                ['label' => 'Sales Promo', 'key' => 'combo_hemat_sales', 'format' => $currencyDisplay],
             ],
+        ],
+    ];
+    $promotionFundingSections[] = [
+        'kicker' => 'Paid media efficiency',
+        'title' => 'Biaya Iklan',
+        'rows' => [
+            ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
+            ['label' => 'Rasio Iklan / GMV', 'key' => 'ad_rate', 'format' => $percentDisplay],
         ],
     ];
     $compareMetric = function ($current, $previous, callable $formatter, string $mode = 'relative', bool $higherIsBetter = true) {

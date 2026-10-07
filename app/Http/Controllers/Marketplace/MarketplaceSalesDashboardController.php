@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Marketplace;
 
 use App\Http\Controllers\Controller;
 use App\Models\Store;
+use App\Services\Marketplace\Ads\AdsDashboardService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -84,6 +85,24 @@ class MarketplaceSalesDashboardController extends Controller
         if ($storeId && ! $stores->contains('id', $storeId)) {
             $storeId = null;
         }
+
+        $adStoreIds = $stores
+            ->filter(function ($store) {
+                $channelCode = strtoupper((string) ($store->channel->code ?? ''));
+
+                return in_array($channelCode, ['SHOPEE', 'SHP'], true);
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+        $adSpendDaily = app(AdsDashboardService::class)->getDailySpend(
+            $adStoreIds,
+            $storeId,
+            $from->toDateString(),
+            $to->toDateString(),
+        );
+        $adSpendTotal = (float) $adSpendDaily->sum();
 
         $itemTotals = DB::table('marketplace_order_items as oi')
             ->selectRaw('COALESCE(oi.marketplace_order_id, oi.order_id) as order_key')
@@ -462,12 +481,16 @@ SQL;
             ->selectRaw('COUNT(DISTINCT CASE WHEN COALESCE(ipromo.product_discount, 0) > 0 THEN o.id END) as product_discount_orders')
             ->selectRaw('COALESCE(SUM(o.voucher_discount), 0) as voucher_store')
             ->selectRaw('COUNT(DISTINCT CASE WHEN COALESCE(o.voucher_discount, 0) > 0 THEN o.id END) as voucher_store_orders')
+            ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(o.voucher_discount, 0) > 0 THEN ({$subtotalExpression}) ELSE 0 END), 0) as voucher_store_sales")
             ->selectRaw('0 as voucher_platform')
             ->selectRaw('0 as voucher_platform_orders')
+            ->selectRaw('0 as voucher_platform_sales')
             ->selectRaw('0 as bundle_discount')
             ->selectRaw('0 as bundle_discount_orders')
+            ->selectRaw('0 as bundle_discount_sales')
             ->selectRaw('0 as combo_hemat')
             ->selectRaw('0 as combo_hemat_orders')
+            ->selectRaw('0 as combo_hemat_sales')
             ->selectRaw('COALESCE(SUM(o.other_discount), 0) as other_discount')
             ->selectRaw('COALESCE(SUM(o.shipping_discount_platform), 0) as shipping_discount')
             ->selectRaw("COALESCE(SUM({$visiblePromotionAmountExpression}), 0) as total_promotion")
@@ -491,6 +514,7 @@ SQL;
                 'o.raw_json as order_raw_json',
             ])
             ->selectRaw("DATE({$dateExpression}) as day")
+            ->selectRaw("{$subtotalExpression} as order_subtotal")
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->get();
 
@@ -542,12 +566,16 @@ SQL;
                     'product_discount_orders' => 0,
                     'voucher_store' => 0,
                     'voucher_store_orders' => 0,
+                    'voucher_store_sales' => 0,
                     'voucher_platform' => 0,
                     'voucher_platform_orders' => 0,
+                    'voucher_platform_sales' => 0,
                     'bundle_discount' => 0,
                     'bundle_discount_orders' => 0,
+                    'bundle_discount_sales' => 0,
                     'combo_hemat' => 0,
                     'combo_hemat_orders' => 0,
+                    'combo_hemat_sales' => 0,
                     'other_discount' => 0,
                     'shipping_discount' => 0,
                     'total_promotion' => 0,
@@ -566,18 +594,22 @@ SQL;
             $row->voucher_store += $voucherStore;
             if ($voucherStore > 0) {
                 $row->voucher_store_orders++;
+                $row->voucher_store_sales += (float) $settlementRow->order_subtotal;
             }
             $row->voucher_platform += $voucherPlatform;
             if ($voucherPlatform > 0) {
                 $row->voucher_platform_orders++;
+                $row->voucher_platform_sales += (float) $settlementRow->order_subtotal;
             }
             $row->bundle_discount += $bundleDiscount;
             if ($bundleDiscount > 0) {
                 $row->bundle_discount_orders++;
+                $row->bundle_discount_sales += (float) $settlementRow->order_subtotal;
             }
             $row->combo_hemat += $comboHemat;
             if ($comboHemat > 0) {
                 $row->combo_hemat_orders++;
+                $row->combo_hemat_sales += (float) $settlementRow->order_subtotal;
             }
             $row->shipping_discount += $shippingDiscount;
             $row->total_promotion += $promotionTotal;
@@ -730,6 +762,8 @@ SQL;
             'incomeSummary' => $incomeSummary,
             'promotionDaily' => $promotionDaily,
             'promotionOrders' => $promotionOrders,
+            'adSpendDaily' => $adSpendDaily,
+            'adSpendTotal' => $adSpendTotal,
             'shipping' => $shipping,
             'shippingDaily' => $shippingDaily,
             'shippingKpi' => $shippingKpi,
