@@ -770,7 +770,25 @@
         $adSpend = (float) $products->filter(fn ($product) => $product->ad_spend_matched ?? false)->sum('ad_spend');
         $adSales = (float) $products->filter(fn ($product) => $product->ad_spend_matched ?? false)->sum('ad_sales');
         $contributionProfit = (float) $products->filter(fn ($product) => $product->contribution_profit !== null)->sum('contribution_profit');
+        $soldVariantKeys = $products
+            ->map(function ($product) {
+                $internalItemId = (int) ($product->internal_item_id ?? 0);
+                if ($internalItemId > 0) {
+                    return 'internal:'.$internalItemId;
+                }
+
+                $externalItemId = trim((string) ($product->external_item_id ?? ''));
+                $marketplaceName = trim((string) ($product->marketplace_name ?? $product->name ?? ''));
+
+                return $externalItemId !== ''
+                    ? 'external:'.$externalItemId
+                    : ($marketplaceName !== '' ? 'name:'.$marketplaceName : null);
+            })
+            ->filter()
+            ->unique()
+            ->values();
         $row['count'] = $products->count();
+        $row['variants_sold'] = $soldVariantKeys->count();
         $row['sales'] = $sales;
         $row['sales_share'] = $productAnalysisNetSales > 0 ? ($sales / $productAnalysisNetSales) * 100 : 0;
         $row['ad_spend'] = $adSpend;
@@ -924,6 +942,15 @@
         $sales = (float) $rows->sum('sales');
         $netSales = (float) $rows->sum(fn ($product) => (float) ($product->net_sales ?? $product->sales ?? 0));
         $orders = $orderKeys->count();
+        $costedProducts = $rows->filter(fn ($product) => $product->gross_profit !== null);
+        $adProducts = $rows->filter(fn ($product) => $product->ad_spend_matched ?? false);
+        $hpp = (float) $costedProducts->sum(fn ($product) => (float) ($product->hpp_total ?? ((float) ($product->hpp ?? 0) * (int) ($product->qty ?? 0))));
+        $grossProfit = (float) $costedProducts->sum('gross_profit');
+        $adSpend = (float) $adProducts->sum('ad_spend');
+        $adSales = (float) $adProducts->sum('ad_sales');
+        $adConversions = (int) $adProducts->sum('ad_conversions');
+        $contributionProfit = (float) $costedProducts->sum(fn ($product) => (float) ($product->contribution_profit ?? ((float) ($product->gross_profit ?? 0) - (float) ($product->ad_spend ?? 0))));
+        $mappedProducts = $rows->filter(fn ($product) => (int) ($product->internal_item_id ?? 0) > 0)->count();
 
         return [
             'products' => $marketplaceProductKeys->count(),
@@ -935,6 +962,17 @@
             'buyer_payment' => (float) $rows->sum('buyer_payment'),
             'aov_sales' => $orders > 0 ? $sales / $orders : 0,
             'aov_payment' => $orders > 0 ? ((float) $rows->sum('buyer_payment')) / $orders : 0,
+            'hpp' => $hpp,
+            'gross_profit' => $grossProfit,
+            'gross_margin' => $netSales > 0 ? ($grossProfit / $netSales) * 100 : null,
+            'contribution_profit' => $contributionProfit,
+            'contribution_margin' => $netSales > 0 ? ($contributionProfit / $netSales) * 100 : null,
+            'ad_spend' => $adSpend,
+            'ad_sales' => $adSales,
+            'acos' => $adSales > 0 ? ($adSpend / $adSales) * 100 : null,
+            'roas' => $adSpend > 0 ? $adSales / $adSpend : null,
+            'cpa' => $adConversions > 0 ? $adSpend / $adConversions : null,
+            'mapping_rate' => $rows->count() > 0 ? ($mappedProducts / $rows->count()) * 100 : 0,
         ];
     };
     $categoryComparisonSourcePeriods = $comparisonMode === 'month'
@@ -1001,6 +1039,15 @@
         ['label' => 'AOV Penjualan', 'key' => 'aov_sales', 'format' => $currencyDisplay],
         ['label' => 'Pembayaran Pembeli', 'key' => 'buyer_payment', 'format' => $currencyDisplay],
         ['label' => 'AOV Pembayaran', 'key' => 'aov_payment', 'format' => $currencyDisplay],
+        ['label' => 'Total HPP', 'key' => 'hpp', 'format' => $fmtHpp],
+        ['label' => 'Kontribusi Setelah Iklan', 'key' => 'contribution_profit', 'format' => $currencyDisplay],
+        ['label' => 'Margin Kontribusi', 'key' => 'contribution_margin', 'format' => $percentDisplay],
+        ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
+        ['label' => 'Penjualan Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
+        ['label' => 'ACOS', 'key' => 'acos', 'format' => $percentDisplay],
+        ['label' => 'ROAS', 'key' => 'roas', 'format' => $multipleDisplay],
+        ['label' => 'CPA', 'key' => 'cpa', 'format' => $currencyDisplay],
+        ['label' => 'Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
     ];
     $platformPromotionMetrics = function ($rows, $periodSummary, $promotionOrders = null) {
         $rows = collect($rows);
@@ -1800,12 +1847,13 @@
             </div>
             <div class="sales-product-analysis-matrix-wrap">
                 <table class="table table-sm align-middle sales-table sales-product-analysis-matrix">
-                    <thead><tr><th style="width: 16%">Matriks</th><th class="text-end">Produk</th><th class="text-end">Penjualan Netto</th><th class="text-end">Share</th><th class="text-end">Kontribusi</th><th class="text-end">Margin</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ROAS</th><th class="text-end">Biaya Iklan</th></tr></thead>
+                    <thead><tr><th style="width: 16%">Matriks</th><th class="text-end">Produk</th><th class="text-end">Variant Terjual</th><th class="text-end">Penjualan Netto</th><th class="text-end">Share</th><th class="text-end">Kontribusi</th><th class="text-end">Margin</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ROAS</th><th class="text-end">Biaya Iklan</th></tr></thead>
                     <tbody>
                         @foreach ($productAnalysisMatrixRows as $matrixRow)
                             <tr>
                                 <td class="analysis-status"><span class="analysis-status-badge analysis-status-badge--{{ $matrixRow['class'] }}">{{ $matrixRow['label'] }}</span></td>
                                 <td class="text-end analysis-number">{{ number_format($matrixRow['count']) }}</td>
+                                <td class="text-end analysis-number">{{ number_format($matrixRow['variants_sold']) }}</td>
                                 <td class="text-end analysis-number">{{ $fmt($matrixRow['sales']) }}</td>
                                 <td class="text-end analysis-share">{{ $percentDisplay($matrixRow['sales_share']) }}</td>
                                 <td class="text-end analysis-number">{{ $fmt($matrixRow['contribution_profit']) }}</td>
