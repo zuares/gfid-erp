@@ -50,6 +50,95 @@
         color: var(--sales-ink);
         font-size: .8rem;
     }
+    .sales-dashboard .sales-filter-card .sales-date-range,
+    .sales-dashboard .sales-filter-card .sales-date-range-display {
+        min-width: 220px;
+        border-color: var(--sales-line);
+        background-color: var(--sales-card);
+        color: var(--sales-ink);
+        font-size: .8rem;
+        cursor: pointer;
+    }
+    .sales-dashboard .sales-filter-card .sales-date-range,
+    .sales-dashboard .sales-filter-card .sales-date-range-display,
+    .sales-dashboard .sales-filter-card input[type="date"],
+    .sales-dashboard .sales-filter-card input[name="date_from"],
+    .sales-dashboard .sales-filter-card input[name="date_to"] { display: none !important; }
+    .sales-dashboard .sales-period-filter { position: relative; width: min(100%, 560px); z-index: 20; }
+    .sales-dashboard .sales-period-filter { order: 3; margin-left: auto; }
+    .sales-dashboard .sales-filter-store { order: 2; }
+    .sales-dashboard #sales-date-from,
+    .sales-dashboard #sales-date-to { display: none !important; }
+    .sales-dashboard .sales-period-trigger {
+        display: flex; align-items: center; gap: .7rem; width: 100%; min-height: 48px;
+        padding: .7rem .85rem; border: 1px solid rgba(148,163,184,.38); border-radius: 12px;
+        background: var(--sales-card); color: var(--sales-ink); text-align: left; cursor: pointer;
+        transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+    }
+    .sales-dashboard .sales-period-trigger:hover,
+    .sales-dashboard .sales-period-trigger[aria-expanded="true"] {
+        border-color: rgba(234,88,12,.55); box-shadow: 0 7px 18px rgba(15,23,42,.09); transform: translateY(-1px);
+    }
+    .sales-dashboard .sales-period-trigger-label { color: var(--sales-muted); font-size: .78rem; white-space: nowrap; }
+    .sales-dashboard .sales-period-trigger-preset { color: #ea580c; font-size: .82rem; font-weight: 800; white-space: nowrap; }
+    .sales-dashboard .sales-period-trigger-summary { color: var(--sales-muted); font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sales-dashboard .sales-period-trigger-icon { margin-left: auto; color: #64748b; font-size: 1.05rem; flex: 0 0 auto; }
+    .sales-dashboard .sales-period-popover {
+        position: absolute; left: 0; top: calc(100% + .55rem); width: min(100vw - 2rem, 680px);
+        overflow: hidden; border: 1px solid rgba(148,163,184,.20); border-radius: 16px;
+        background: var(--sales-card); box-shadow: 0 18px 44px rgba(15,23,42,.16); z-index: 3000;
+    }
+    .sales-dashboard .sales-period-popover[hidden] { display: none; }
+    .sales-dashboard .sales-period-layout { display: grid; grid-template-columns: 190px minmax(0, 1fr); min-height: 320px; }
+    .sales-dashboard .sales-period-menu { padding: .65rem; border-right: 1px solid rgba(148,163,184,.17); background: var(--sales-card); }
+    .sales-dashboard .sales-period-option {
+        display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 38px;
+        padding: .55rem .65rem; border: 0; border-radius: 9px; background: transparent; color: var(--sales-ink);
+        font-size: .78rem; font-weight: 650; text-align: left; cursor: pointer; transition: background .14s ease, color .14s ease, transform .14s ease;
+    }
+    .sales-dashboard .sales-period-option:hover,
+    .sales-dashboard .sales-period-option.is-selected { background: rgba(234,88,12,.09); color: #c2410c; transform: translateX(2px); }
+    .sales-dashboard .sales-period-option .arrow { color: #94a3b8; font-size: 1.1rem; line-height: 1; }
+    .sales-dashboard .sales-period-divider { height: 1px; margin: .5rem .25rem; background: rgba(148,163,184,.19); }
+    .sales-dashboard .sales-period-panel { min-width: 0; padding: 1.15rem 1.25rem; background: color-mix(in srgb, var(--sales-soft) 60%, transparent); }
+    .sales-dashboard .sales-period-panel[hidden] { display: none; }
+    .sales-dashboard .sales-period-eyebrow { color: #ea580c; font-size: .68rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+    .sales-dashboard .sales-period-title { margin: .5rem 0 0; color: var(--sales-ink); font-size: 1.2rem; font-weight: 850; letter-spacing: -.02em; }
+    .sales-dashboard .sales-period-help { margin: .35rem 0 1.1rem; color: var(--sales-muted); font-size: .82rem; line-height: 1.55; }
+    .sales-dashboard .sales-period-input-label { display: block; margin-bottom: .35rem; color: var(--sales-muted); font-size: .75rem; font-weight: 750; }
+    .sales-dashboard .sales-period-range-input { width: 100%; min-height: 42px; border: 1px solid rgba(148,163,184,.25); border-radius: 10px; background: var(--sales-card); color: var(--sales-ink); padding: .55rem .7rem; box-shadow: 0 4px 12px rgba(15,23,42,.06); cursor: pointer; }
+    .sales-dashboard #sales-date-range { display: none !important; }
+    .sales-dashboard .sales-period-filter input.form-control.input.active,
+    .sales-dashboard .sales-period-filter input.input.active,
+    .sales-dashboard .sales-period-calendar-wrap > input {
+        display: none !important;
+    }
+    .sales-dashboard .sales-period-range-input:focus { outline: 0; border-color: rgba(234,88,12,.6); box-shadow: 0 0 0 .2rem rgba(234,88,12,.13); }
+    .sales-dashboard .sales-period-calendar-wrap { margin-top: .65rem; }
+    .sales-dashboard .sales-period-calendar-wrap .flatpickr-calendar { box-shadow: none !important; border: 0 !important; width: 100%; }
+    .sales-dashboard .sales-period-calendar-wrap .flatpickr-calendar.inline { display: block; }
+    .sales-dashboard .sales-period-nav { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+    .sales-dashboard .sales-period-nav button { width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--sales-muted); cursor: pointer; }
+    .sales-dashboard .sales-period-nav button:hover { background: rgba(148,163,184,.15); color: var(--sales-ink); }
+    .sales-dashboard .sales-period-nav strong { color: var(--sales-ink); font-size: .9rem; }
+    .sales-dashboard .sales-period-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin-top: 1rem; }
+    .sales-dashboard .sales-period-grid button { min-height: 42px; border: 1px solid rgba(148,163,184,.19); border-radius: 9px; background: var(--sales-card); color: var(--sales-ink); font-size: .76rem; font-weight: 650; cursor: pointer; transition: all .14s ease; }
+    .sales-dashboard .sales-period-grid button:hover,
+    .sales-dashboard .sales-period-grid button.is-selected { border-color: rgba(234,88,12,.42); background: rgba(234,88,12,.08); color: #c2410c; transform: translateY(-1px); }
+    .sales-dashboard .sales-period-grid button:disabled { cursor: not-allowed; color: #cbd5e1; background: rgba(148,163,184,.07); }
+    body[data-theme="dark"] .sales-dashboard .sales-period-panel { background: rgba(15,23,42,.38); }
+    body[data-theme="dark"] .sales-dashboard .sales-period-option:hover,
+    body[data-theme="dark"] .sales-dashboard .sales-period-option.is-selected,
+    body[data-theme="dark"] .sales-dashboard .sales-period-grid button:hover,
+    body[data-theme="dark"] .sales-dashboard .sales-period-grid button.is-selected { color: #fdba74; background: rgba(234,88,12,.14); }
+    @media (max-width: 640px) {
+        .sales-dashboard .sales-period-filter { order: 1; margin-left: 0; }
+        .sales-dashboard .sales-filter-store { order: 2; }
+        .sales-dashboard .sales-period-popover { width: min(100vw - 1.5rem, 680px); left: 50%; transform: translateX(-50%); }
+        .sales-dashboard .sales-period-layout { grid-template-columns: 1fr; }
+        .sales-dashboard .sales-period-menu { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .2rem; border-right: 0; border-bottom: 1px solid rgba(148,163,184,.17); }
+        .sales-dashboard .sales-period-divider { grid-column: 1 / -1; }
+    }
     .sales-dashboard .sales-filter-card .form-control:focus,
     .sales-dashboard .sales-filter-card .form-select:focus {
         border-color: var(--accent, #2563eb);
@@ -193,6 +282,30 @@
 @php
     $fmt = fn ($value) => 'Rp '.number_format((float) $value, 0, ',', '.');
     $dateLabel = fn ($date) => \Carbon\Carbon::parse($date)->format('d M Y');
+    $salesTabs = ['sales', 'products', 'payments', 'promotions', 'shipping', 'income', 'orders'];
+    $activeTab = in_array(request('tab'), $salesTabs, true) ? request('tab') : 'sales';
+    $todayDate = now()->toDateString();
+    $yesterdayDate = now()->subDay()->toDateString();
+    $activeDatePreset = 'custom';
+    $activeDatePresetLabel = 'Rentang tanggal';
+    $activeDateSummary = $filters['date_from'].' – '.$filters['date_to'];
+    if ($filters['date_from'] === $todayDate && $filters['date_to'] === $todayDate) {
+        $activeDatePreset = 'today';
+        $activeDatePresetLabel = 'Real-time';
+        $activeDateSummary = 'Hari ini';
+    } elseif ($filters['date_from'] === $yesterdayDate && $filters['date_to'] === $yesterdayDate) {
+        $activeDatePreset = 'yesterday';
+        $activeDatePresetLabel = 'Kemarin';
+        $activeDateSummary = 'Kemarin';
+    } elseif ($filters['date_from'] === now()->subDays(6)->toDateString() && $filters['date_to'] === $todayDate) {
+        $activeDatePreset = 'last-7-days';
+        $activeDatePresetLabel = '7 hari sebelumnya';
+        $activeDateSummary = '7 hari terakhir';
+    } elseif ($filters['date_from'] === now()->subDays(29)->toDateString() && $filters['date_to'] === $todayDate) {
+        $activeDatePreset = 'last-30-days';
+        $activeDatePresetLabel = '30 hari sebelumnya';
+        $activeDateSummary = '30 hari terakhir';
+    }
     $detailQuery = ['date_from' => $filters['date_from'], 'date_to' => $filters['date_to']];
     if ($filters['store_id']) $detailQuery['store_id'] = $filters['store_id'];
     $promotionTotals = [
@@ -238,24 +351,70 @@
 
     <form class="card sales-card sales-filter-card shadow-sm mb-4" method="GET" action="{{ route('marketplace.dashboard.sales') }}">
         <div class="card-body p-3">
-            <div class="row g-2 align-items-end">
-                <div class="col-12 col-md-auto me-md-2">
-                    <div class="sales-kicker mb-1">Periode data</div>
-                    <div class="small text-muted">Filter angka dashboard</div>
-                </div>
+            <div class="row g-2 align-items-end justify-content-end">
                 @if (!empty($filters['dummy']))
                     <input type="hidden" name="dummy" value="1">
                 @endif
-                <div class="col-6 col-md-2">
-                    <label class="form-label" for="sales-date-from">Tanggal mulai</label>
-                    <input id="sales-date-from" class="form-control form-control-sm" type="date" name="date_from" value="{{ $filters['date_from'] }}">
-                </div>
-                <div class="col-6 col-md-2">
-                    <label class="form-label" for="sales-date-to">Tanggal akhir</label>
-                    <input id="sales-date-to" class="form-control form-control-sm" type="date" name="date_to" value="{{ $filters['date_to'] }}">
+                <input type="hidden" name="tab" id="sales-active-tab" value="{{ $activeTab }}">
+                <input type="hidden" name="date_from" id="sales-date-from" value="{{ $filters['date_from'] }}" data-gf-date="off">
+                <input type="hidden" name="date_to" id="sales-date-to" value="{{ $filters['date_to'] }}" data-gf-date="off">
+                <div class="col-12 col-md-auto sales-period-filter" data-sales-period-filter>
+                    <button type="button" class="sales-period-trigger" data-sales-period-trigger aria-expanded="false" aria-controls="sales-period-popover">
+                        <span class="sales-period-trigger-label">Periode Data</span>
+                        <span class="sales-period-trigger-preset" data-sales-period-trigger-label>{{ $activeDatePresetLabel }}</span>
+                        <span class="sales-period-trigger-summary" data-sales-period-trigger-summary>{{ $activeDateSummary }}</span>
+                        <i class="bi bi-calendar3 sales-period-trigger-icon" aria-hidden="true"></i>
+                    </button>
+
+                    <div id="sales-period-popover" class="sales-period-popover" data-sales-period-popover hidden>
+                        <div class="sales-period-layout">
+                            <div class="sales-period-menu" role="menu" aria-label="Pilihan periode">
+                                <button type="button" class="sales-period-option {{ $activeDatePreset === 'today' ? 'is-selected' : '' }}" data-sales-period-preset="today" data-sales-period-label="Real-time">Real-time</button>
+                                <button type="button" class="sales-period-option {{ $activeDatePreset === 'yesterday' ? 'is-selected' : '' }}" data-sales-period-preset="yesterday" data-sales-period-label="Kemarin">Kemarin</button>
+                                <button type="button" class="sales-period-option {{ $activeDatePreset === 'last-7-days' ? 'is-selected' : '' }}" data-sales-period-preset="last-7-days" data-sales-period-label="7 hari sebelumnya">7 hari sebelumnya</button>
+                                <button type="button" class="sales-period-option {{ $activeDatePreset === 'last-30-days' ? 'is-selected' : '' }}" data-sales-period-preset="last-30-days" data-sales-period-label="30 hari sebelumnya">30 hari sebelumnya</button>
+                                <div class="sales-period-divider"></div>
+                                <button type="button" class="sales-period-option" data-sales-period-view="day">Per Hari <span class="arrow">›</span></button>
+                                <button type="button" class="sales-period-option" data-sales-period-view="week">Per Minggu <span class="arrow">›</span></button>
+                                <button type="button" class="sales-period-option" data-sales-period-view="month">Per Bulan <span class="arrow">›</span></button>
+                                <button type="button" class="sales-period-option" data-sales-period-view="year">Berdasarkan Tahun <span class="arrow">›</span></button>
+                            </div>
+
+                            <div class="sales-period-panel" data-sales-period-panel="default">
+                                <div class="sales-period-eyebrow">Periode terpilih</div>
+                                <div class="sales-period-title" data-sales-period-detail-label>{{ $activeDateSummary }}</div>
+                                <p class="sales-period-help" data-sales-period-detail-help>Pilih preset di sebelah kiri atau klik area filter untuk membuka kalender.</p>
+                                <input id="sales-date-range" class="sales-period-range-input" type="text" value="{{ $filters['date_from'] }} to {{ $filters['date_to'] }}" aria-hidden="true" tabindex="-1">
+                            </div>
+
+                            <div class="sales-period-panel" data-sales-period-panel="day" hidden>
+                                <div class="sales-period-eyebrow">Per Hari</div>
+                                <div class="sales-period-title">Pilih hari</div>
+                                <p class="sales-period-help">Klik satu tanggal untuk melihat data harian.</p>
+                                <div class="sales-period-calendar-wrap"><input id="sales-date-day" type="text" aria-label="Pilih hari"></div>
+                            </div>
+
+                            <div class="sales-period-panel" data-sales-period-panel="week" hidden>
+                                <div class="sales-period-eyebrow">Per Minggu</div>
+                                <div class="sales-period-title">Pilih minggu</div>
+                                <p class="sales-period-help">Arahkan kursor ke tanggal, lalu klik salah satu hari.</p>
+                                <div class="sales-period-calendar-wrap"><input id="sales-date-week" type="text" aria-label="Pilih minggu"></div>
+                            </div>
+
+                            <div class="sales-period-panel" data-sales-period-panel="month" hidden>
+                                <div class="sales-period-nav"><button type="button" data-sales-period-month-prev aria-label="Tahun sebelumnya">‹</button><strong data-sales-period-month-year></strong><button type="button" data-sales-period-month-next aria-label="Tahun berikutnya">›</button></div>
+                                <div class="sales-period-grid" data-sales-period-month-grid></div>
+                            </div>
+
+                            <div class="sales-period-panel" data-sales-period-panel="year" hidden>
+                                <div class="sales-period-nav"><button type="button" data-sales-period-year-prev aria-label="Dekade sebelumnya">‹</button><strong data-sales-period-year-range></strong><button type="button" data-sales-period-year-next aria-label="Dekade berikutnya">›</button></div>
+                                <div class="sales-period-grid" data-sales-period-year-grid></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 @if ($stores->isNotEmpty())
-                    <div class="col-12 col-md-3">
+                <div class="col-12 col-md-3 sales-filter-store">
                         <label class="form-label" for="sales-store">Toko</label>
                         <select id="sales-store" class="form-select form-select-sm" name="store_id">
                             <option value="">Semua toko</option>
@@ -267,24 +426,21 @@
                         </select>
                     </div>
                 @endif
-                <div class="col-12 col-md-auto">
-                    <button class="btn btn-primary btn-sm w-100" type="submit"><i class="bi bi-funnel me-1"></i>Terapkan</button>
-                </div>
             </div>
         </div>
     </form>
 
     <nav class="sales-nav nav nav-pills gap-2 mb-4" aria-label="Dashboard operasional" role="tablist">
-        <button class="nav-link active" type="button" role="tab" aria-selected="true" data-sales-tab="sales"><i class="bi bi-graph-up-arrow me-1"></i>Penjualan</button>
-        <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="products"><i class="bi bi-box-seam me-1"></i>Produk</button>
-        <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="payments"><i class="bi bi-wallet2 me-1"></i>Pembayaran</button>
-        <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="promotions"><i class="bi bi-percent me-1"></i>Promosi</button>
-        <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="shipping"><i class="bi bi-truck me-1"></i>Pengiriman</button>
-        <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="income"><i class="bi bi-cash-coin me-1"></i>Penghasilan</button>
-        <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="orders"><i class="bi bi-list-ul me-1"></i>Detail Pesanan</button>
+        <button class="nav-link {{ $activeTab === 'sales' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'sales' ? 'true' : 'false' }}" data-sales-tab="sales"><i class="bi bi-graph-up-arrow me-1"></i>Penjualan</button>
+        <button class="nav-link {{ $activeTab === 'products' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'products' ? 'true' : 'false' }}" data-sales-tab="products"><i class="bi bi-box-seam me-1"></i>Produk</button>
+        <button class="nav-link {{ $activeTab === 'payments' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'payments' ? 'true' : 'false' }}" data-sales-tab="payments"><i class="bi bi-wallet2 me-1"></i>Pembayaran</button>
+        <button class="nav-link {{ $activeTab === 'promotions' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'promotions' ? 'true' : 'false' }}" data-sales-tab="promotions"><i class="bi bi-percent me-1"></i>Promosi</button>
+        <button class="nav-link {{ $activeTab === 'shipping' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'shipping' ? 'true' : 'false' }}" data-sales-tab="shipping"><i class="bi bi-truck me-1"></i>Pengiriman</button>
+        <button class="nav-link {{ $activeTab === 'income' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'income' ? 'true' : 'false' }}" data-sales-tab="income"><i class="bi bi-cash-coin me-1"></i>Penghasilan</button>
+        <button class="nav-link {{ $activeTab === 'orders' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'orders' ? 'true' : 'false' }}" data-sales-tab="orders"><i class="bi bi-list-ul me-1"></i>Detail Pesanan</button>
     </nav>
 
-    <div class="sales-tab-pane" data-sales-pane="sales" role="tabpanel">
+    <div class="sales-tab-pane {{ $activeTab === 'sales' ? '' : 'is-hidden' }}" data-sales-pane="sales" role="tabpanel" aria-hidden="{{ $activeTab === 'sales' ? 'false' : 'true' }}">
     @include('marketplace.dashboard.partials._kpis', [
         'kpiTitle' => 'Penjualan',
         'kpis' => [
@@ -337,7 +493,7 @@
     </section>
     </div>
 
-    <div class="sales-tab-pane is-hidden" data-sales-pane="income" role="tabpanel" aria-hidden="true">
+    <div class="sales-tab-pane {{ $activeTab === 'income' ? '' : 'is-hidden' }}" data-sales-pane="income" role="tabpanel" aria-hidden="{{ $activeTab === 'income' ? 'false' : 'true' }}">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Penghasilan',
             'kpis' => [
@@ -388,7 +544,8 @@
             @endif
         </section>
     </div>
-    <div class="sales-tab-pane is-hidden" data-sales-pane="orders" role="tabpanel" aria-hidden="true">
+
+    <div class="sales-tab-pane {{ $activeTab === 'orders' ? '' : 'is-hidden' }}" data-sales-pane="orders" role="tabpanel" aria-hidden="{{ $activeTab === 'orders' ? 'false' : 'true' }}">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Detail Order',
             'kpis' => [
@@ -464,7 +621,7 @@
         </section>
     </div>
 
-    <div class="sales-tab-pane is-hidden" data-sales-pane="products" role="tabpanel" aria-hidden="true">
+    <div class="sales-tab-pane {{ $activeTab === 'products' ? '' : 'is-hidden' }}" data-sales-pane="products" role="tabpanel" aria-hidden="{{ $activeTab === 'products' ? 'false' : 'true' }}">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Produk',
             'kpis' => [
@@ -513,7 +670,7 @@
         </section>
     </div>
 
-    <div class="sales-tab-pane is-hidden" data-sales-pane="payments" role="tabpanel" aria-hidden="true">
+    <div class="sales-tab-pane {{ $activeTab === 'payments' ? '' : 'is-hidden' }}" data-sales-pane="payments" role="tabpanel" aria-hidden="{{ $activeTab === 'payments' ? 'false' : 'true' }}">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Pembayaran',
             'kpis' => [
@@ -612,7 +769,7 @@
         </div>
     </div>
 
-    <div class="sales-tab-pane is-hidden" data-sales-pane="promotions" role="tabpanel" aria-hidden="true">
+    <div class="sales-tab-pane {{ $activeTab === 'promotions' ? '' : 'is-hidden' }}" data-sales-pane="promotions" role="tabpanel" aria-hidden="{{ $activeTab === 'promotions' ? 'false' : 'true' }}">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Promosi',
             'kpis' => [
@@ -681,7 +838,7 @@
         </section>
     </div>
 
-    <div class="sales-tab-pane is-hidden" data-sales-pane="shipping" role="tabpanel" aria-hidden="true">
+    <div class="sales-tab-pane {{ $activeTab === 'shipping' ? '' : 'is-hidden' }}" data-sales-pane="shipping" role="tabpanel" aria-hidden="{{ $activeTab === 'shipping' ? 'false' : 'true' }}">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Pengiriman',
             'kpis' => [
@@ -743,12 +900,21 @@
     document.addEventListener('DOMContentLoaded', function () {
         const tabs = document.querySelectorAll('[data-sales-tab]');
         const panes = document.querySelectorAll('[data-sales-pane]');
+        const filterForm = document.querySelector('.sales-filter-card');
+        const activeTabInput = document.querySelector('#sales-active-tab');
+        const dateFromInput = document.querySelector('#sales-date-from');
+        const dateToInput = document.querySelector('#sales-date-to');
+        const storeInput = document.querySelector('#sales-store');
         const orderRows = document.querySelectorAll('[data-sales-order-row]');
         const orderDate = document.querySelector('#sales-order-detail-date');
         const orderCount = document.querySelector('[data-sales-order-count]');
         const orderEmpty = document.querySelector('[data-sales-order-empty]');
 
         function activateTab(target) {
+            if (!document.querySelector('[data-sales-tab="' + target + '"]')) {
+                target = 'sales';
+            }
+
             tabs.forEach(function (item) {
                 const active = item.dataset.salesTab === target;
                 item.classList.toggle('active', active);
@@ -760,6 +926,10 @@
                 pane.classList.toggle('is-hidden', !active);
                 pane.setAttribute('aria-hidden', active ? 'false' : 'true');
             });
+
+            if (activeTabInput) {
+                activeTabInput.value = target;
+            }
 
             const url = new URL(window.location.href);
             if (url.searchParams.get('tab') !== target) {
@@ -798,6 +968,199 @@
                 activateTab(tab.dataset.salesTab);
             });
         });
+
+        // Filter periode ala MarketLens: preset + pilihan hari/minggu/bulan/tahun
+        // dalam satu popover, dengan submit otomatis setelah pilihan selesai.
+        const periodFilter = document.querySelector('[data-sales-period-filter]');
+        const periodTrigger = periodFilter?.querySelector('[data-sales-period-trigger]');
+        const periodPopover = periodFilter?.querySelector('[data-sales-period-popover]');
+        const periodPanels = periodFilter ? periodFilter.querySelectorAll('[data-sales-period-panel]') : [];
+        const periodTriggerLabel = periodFilter?.querySelector('[data-sales-period-trigger-label]');
+        const periodTriggerSummary = periodFilter?.querySelector('[data-sales-period-trigger-summary]');
+        const periodDetailLabel = periodFilter?.querySelector('[data-sales-period-detail-label]');
+        const periodDetailHelp = periodFilter?.querySelector('[data-sales-period-detail-help]');
+        const monthGrid = periodFilter?.querySelector('[data-sales-period-month-grid]');
+        const monthYear = periodFilter?.querySelector('[data-sales-period-month-year]');
+        const yearGrid = periodFilter?.querySelector('[data-sales-period-year-grid]');
+        const yearRange = periodFilter?.querySelector('[data-sales-period-year-range]');
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+        let monthViewYear = new Date().getFullYear();
+        let yearViewStart = Math.floor(new Date().getFullYear() / 10) * 10;
+
+        const dateToYmd = function (date) {
+            return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+        };
+        const parseYmd = function (value) {
+            if (!value) return null;
+            const parts = value.split('-').map(Number);
+            return parts.length === 3 ? new Date(parts[0], parts[1] - 1, parts[2]) : null;
+        };
+        const displayRange = function (from, to) {
+            return from && to ? (from === to ? from : from + ' – ' + to) : 'Pilih rentang tanggal';
+        };
+        const closePeriodPopover = function () {
+            if (!periodPopover || !periodTrigger) return;
+            periodPopover.hidden = true;
+            periodTrigger.setAttribute('aria-expanded', 'false');
+        };
+        const setPeriodView = function (view) {
+            if (!periodFilter) return;
+            periodPanels.forEach(function (panel) {
+                panel.hidden = panel.dataset.salesPeriodPanel !== view;
+            });
+            periodFilter.querySelectorAll('[data-sales-period-view]').forEach(function (option) {
+                option.classList.toggle('is-selected', option.dataset.salesPeriodView === view);
+            });
+            if (periodDetailHelp && view === 'default') {
+                periodDetailHelp.textContent = 'Pilih preset di sebelah kiri atau tentukan rentang tanggal.';
+            }
+        };
+        const syncPeriodSummary = function (label, from, to) {
+            const summary = displayRange(from, to);
+            if (periodTriggerLabel) periodTriggerLabel.textContent = label;
+            if (periodTriggerSummary) periodTriggerSummary.textContent = summary;
+            if (periodDetailLabel) periodDetailLabel.textContent = summary;
+            periodFilter?.querySelectorAll('[data-sales-period-preset]').forEach(function (option) {
+                option.classList.toggle('is-selected', option.dataset.salesPeriodLabel === label);
+            });
+        };
+        const submitPeriod = function (from, to, label, view) {
+            dateFromInput.value = from;
+            dateToInput.value = to;
+            syncPeriodSummary(label, from, to);
+            setPeriodView(view || 'default');
+            closePeriodPopover();
+            filterForm?.requestSubmit();
+        };
+        const rangeForPreset = function (preset) {
+            const end = new Date();
+            const start = new Date(end);
+            if (preset === 'yesterday') {
+                start.setDate(start.getDate() - 1);
+                end.setDate(end.getDate() - 1);
+            } else if (preset === 'last-7-days') {
+                start.setDate(start.getDate() - 6);
+            } else if (preset === 'last-30-days') {
+                start.setDate(start.getDate() - 29);
+            }
+            return [dateToYmd(start), dateToYmd(end)];
+        };
+
+        if (periodFilter && filterForm && window.flatpickr) {
+            const dateRangePicker = document.querySelector('#sales-date-range');
+            const dayPicker = document.querySelector('#sales-date-day');
+            const weekPicker = document.querySelector('#sales-date-week');
+            const flatpickrLocale = window.flatpickr.l10ns?.id || 'default';
+
+            window.flatpickr(dateRangePicker, {
+                mode: 'range', dateFormat: 'Y-m-d', altInput: false,
+                locale: flatpickrLocale, disableMobile: true, positionElement: periodTrigger,
+                defaultDate: [dateFromInput.value, dateToInput.value].filter(Boolean),
+                onChange: function (dates, value, instance) {
+                    dateFromInput.value = dates[0] ? instance.formatDate(dates[0], 'Y-m-d') : '';
+                    dateToInput.value = dates[1] ? instance.formatDate(dates[1], 'Y-m-d') : '';
+                    if (dates.length === 2) submitPeriod(dateFromInput.value, dateToInput.value, 'Rentang tanggal');
+                },
+            });
+
+            window.flatpickr(dayPicker, {
+                inline: true, dateFormat: 'Y-m-d', locale: flatpickrLocale, disableMobile: true,
+                defaultDate: dateFromInput.value,
+                onChange: function (dates, value, instance) {
+                    if (dates.length) submitPeriod(instance.formatDate(dates[0], 'Y-m-d'), instance.formatDate(dates[0], 'Y-m-d'), 'Per Hari', 'day');
+                },
+            });
+
+            let settingWeek = false;
+            window.flatpickr(weekPicker, {
+                mode: 'range', inline: true, dateFormat: 'Y-m-d', locale: flatpickrLocale, disableMobile: true,
+                defaultDate: [dateFromInput.value, dateToInput.value].filter(Boolean),
+                onChange: function (dates, value, instance) {
+                    if (!dates.length || settingWeek) return;
+                    const start = new Date(dates[dates.length - 1]);
+                    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+                    const end = new Date(start);
+                    end.setDate(end.getDate() + 6);
+                    settingWeek = true;
+                    instance.setDate([start, end], false);
+                    settingWeek = false;
+                    submitPeriod(dateToYmd(start), dateToYmd(end), 'Per Minggu', 'week');
+                },
+            });
+
+            periodFilter.querySelectorAll('[data-sales-period-preset]').forEach(function (option) {
+                option.addEventListener('mouseenter', function () { setPeriodView('default'); });
+                option.addEventListener('click', function () {
+                    const range = rangeForPreset(option.dataset.salesPeriodPreset);
+                    submitPeriod(range[0], range[1], option.dataset.salesPeriodLabel);
+                });
+            });
+            periodFilter.querySelectorAll('[data-sales-period-view]').forEach(function (option) {
+                option.addEventListener('mouseenter', function () { setPeriodView(option.dataset.salesPeriodView); });
+                option.addEventListener('click', function () { setPeriodView(option.dataset.salesPeriodView); });
+            });
+
+            const applyMonth = function (year, month) {
+                submitPeriod(dateToYmd(new Date(year, month, 1)), dateToYmd(new Date(year, month + 1, 0)), 'Per Bulan', 'month');
+            };
+            const renderMonths = function (year) {
+                if (!monthGrid || !monthYear) return;
+                monthViewYear = year;
+                monthYear.textContent = String(year);
+                monthGrid.replaceChildren();
+                monthNames.forEach(function (name, month) {
+                    const button = document.createElement('button');
+                    button.type = 'button'; button.textContent = name;
+                    button.className = dateFromInput.value === dateToYmd(new Date(year, month, 1)) ? 'is-selected' : '';
+                    button.addEventListener('click', function () { applyMonth(year, month); });
+                    monthGrid.appendChild(button);
+                });
+            };
+            const renderYears = function (start) {
+                if (!yearGrid || !yearRange) return;
+                yearViewStart = start;
+                yearRange.textContent = start + ' – ' + (start + 9);
+                yearGrid.replaceChildren();
+                const currentYear = new Date().getFullYear();
+                for (let year = start; year <= start + 9; year += 1) {
+                    const button = document.createElement('button');
+                    button.type = 'button'; button.textContent = String(year); button.disabled = year > currentYear;
+                    button.className = dateFromInput.value === dateToYmd(new Date(year, 0, 1)) ? 'is-selected' : '';
+                    if (!button.disabled) button.addEventListener('click', function () { submitPeriod(dateToYmd(new Date(year, 0, 1)), dateToYmd(new Date(year, 11, 31)), 'Berdasarkan Tahun', 'year'); });
+                    yearGrid.appendChild(button);
+                }
+            };
+            periodFilter.querySelector('[data-sales-period-month-prev]')?.addEventListener('click', function () { renderMonths(monthViewYear - 1); });
+            periodFilter.querySelector('[data-sales-period-month-next]')?.addEventListener('click', function () { renderMonths(monthViewYear + 1); });
+            periodFilter.querySelector('[data-sales-period-year-prev]')?.addEventListener('click', function () { renderYears(yearViewStart - 10); });
+            periodFilter.querySelector('[data-sales-period-year-next]')?.addEventListener('click', function () { renderYears(yearViewStart + 10); });
+            renderMonths(parseYmd(dateFromInput.value)?.getFullYear() || new Date().getFullYear());
+            renderYears(Math.floor((parseYmd(dateFromInput.value)?.getFullYear() || new Date().getFullYear()) / 10) * 10);
+
+            periodTrigger?.addEventListener('click', function () {
+                const willOpen = periodPopover.hidden;
+                periodPopover.hidden = !willOpen;
+                periodTrigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+                if (willOpen) {
+                    setPeriodView('default');
+                    dateRangePicker._flatpickr?.open();
+                } else {
+                    dateRangePicker._flatpickr?.close();
+                }
+            });
+            document.addEventListener('click', function (event) {
+                if (!periodFilter.contains(event.target) && !event.target.closest('.flatpickr-calendar')) closePeriodPopover();
+            });
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') closePeriodPopover();
+            });
+        }
+
+        if (storeInput && filterForm) {
+            storeInput.addEventListener('change', function () {
+                filterForm.requestSubmit();
+            });
+        }
 
         document.querySelectorAll('[data-sales-order-detail-date]').forEach(function (trigger) {
             function openOrderDetail() {
@@ -945,6 +1308,8 @@
         const initialTab = new URLSearchParams(window.location.search).get('tab');
         if (initialTab && document.querySelector('[data-sales-tab="' + initialTab + '"]')) {
             activateTab(initialTab);
+        } else {
+            activateTab(activeTabInput?.value || 'sales');
         }
 
         if (orderDate) {
