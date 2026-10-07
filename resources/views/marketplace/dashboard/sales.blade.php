@@ -771,6 +771,7 @@
         $summary = (array) ($period['summary'] ?? []);
         $daily = collect($period['daily'] ?? []);
         $period['metrics'] = [
+            'orders' => (int) data_get($summary, 'orders', 0),
             'buyer_paid' => (float) data_get($summary, 'buyer_paid', 0),
             'aov' => (float) data_get($summary, 'aov', 0),
             'cod_order_share' => (float) data_get($summary, 'cod_order_share', 0),
@@ -798,6 +799,7 @@
         return $period;
     })->all();
     $paymentComparisonRows = [
+        ['label' => 'Orders', 'key' => 'orders', 'formatter' => $numberDisplay],
         ['label' => 'Buyer Paid', 'key' => 'buyer_paid', 'formatter' => $currencyDisplay],
         ['label' => 'AOV Buyer Paid', 'key' => 'aov', 'formatter' => $currencyDisplay],
         ['label' => 'COD Exposure', 'key' => 'cod_order_share', 'formatter' => $percentDisplay],
