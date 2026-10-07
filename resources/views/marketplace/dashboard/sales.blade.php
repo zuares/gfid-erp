@@ -355,6 +355,8 @@
     $incomeSettlementRate = $incomeSummary['orders'] > 0 ? ($incomeSummary['settled_orders'] / $incomeSummary['orders']) * 100 : 0;
     $promotionRate = $summary['subtotal'] > 0 ? ($summary['promotion_total'] / $summary['subtotal']) * 100 : 0;
     $comparisonMonthData = $comparisonMonth['data'] ?? null;
+    $comparisonMonthPreviousData = $comparisonMonthPrevious['data'] ?? null;
+    $comparisonMonthPreviousTwoData = $comparisonMonthPreviousTwo['data'] ?? null;
     $comparisonPeriodData = $comparisonPeriod['data'] ?? null;
     $comparisonPeriodPreviousData = $comparisonPeriodPrevious['data'] ?? null;
     $comparisonPeriodPreviousTwoData = $comparisonPeriodPreviousTwo['data'] ?? null;
@@ -420,32 +422,56 @@
             'orders' => (int) ($promotionOrders ?? $rows->sum('promotion_orders')),
         ];
     };
-    $platformPromotionPeriods = [
+    $promotionComparisonPeriods = $comparisonMode === 'month'
+        ? [
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'data' => ['daily' => $promotionDaily, 'summary' => $summary, 'orders' => $promotionOrders]],
+            ['label' => 'Bln -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthData, 'summary', []), 'orders' => data_get($comparisonMonthData, 'promotionOrders', 0)]],
+            ['label' => 'Bln -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthPreviousData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthPreviousData, 'summary', []), 'orders' => data_get($comparisonMonthPreviousData, 'promotionOrders', 0)]],
+            ['label' => 'Bln -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthPreviousTwoData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthPreviousTwoData, 'summary', []), 'orders' => data_get($comparisonMonthPreviousTwoData, 'promotionOrders', 0)]],
+        ]
+        : [
         [
             'label' => 'Aktif',
             'from' => $filters['date_from'],
             'to' => $filters['date_to'],
-            'metrics' => $platformPromotionMetrics($promotionDaily, $summary, $promotionOrders),
+            'data' => ['daily' => $promotionDaily, 'summary' => $summary, 'orders' => $promotionOrders],
         ],
         [
             'label' => 'Periode -1',
             'from' => $comparisonPeriod['from'] ?? null,
             'to' => $comparisonPeriod['to'] ?? null,
-            'metrics' => $platformPromotionMetrics(data_get($comparisonPeriodData, 'promotionDaily', []), $previousPeriodSummary, data_get($comparisonPeriodData, 'promotionOrders', 0)),
+            'data' => ['daily' => data_get($comparisonPeriodData, 'promotionDaily', []), 'summary' => $previousPeriodSummary, 'orders' => data_get($comparisonPeriodData, 'promotionOrders', 0)],
         ],
         [
             'label' => 'Periode -2',
             'from' => $comparisonPeriodPrevious['from'] ?? null,
             'to' => $comparisonPeriodPrevious['to'] ?? null,
-            'metrics' => $platformPromotionMetrics(data_get($comparisonPeriodPreviousData, 'promotionDaily', []), data_get($comparisonPeriodPreviousData, 'summary', []), data_get($comparisonPeriodPreviousData, 'promotionOrders', 0)),
+            'data' => ['daily' => data_get($comparisonPeriodPreviousData, 'promotionDaily', []), 'summary' => data_get($comparisonPeriodPreviousData, 'summary', []), 'orders' => data_get($comparisonPeriodPreviousData, 'promotionOrders', 0)],
         ],
         [
             'label' => 'Periode -3',
             'from' => $comparisonPeriodPreviousTwo['from'] ?? null,
             'to' => $comparisonPeriodPreviousTwo['to'] ?? null,
-            'metrics' => $platformPromotionMetrics(data_get($comparisonPeriodPreviousTwoData, 'promotionDaily', []), data_get($comparisonPeriodPreviousTwoData, 'summary', []), data_get($comparisonPeriodPreviousTwoData, 'promotionOrders', 0)),
+            'data' => ['daily' => data_get($comparisonPeriodPreviousTwoData, 'promotionDaily', []), 'summary' => data_get($comparisonPeriodPreviousTwoData, 'summary', []), 'orders' => data_get($comparisonPeriodPreviousTwoData, 'promotionOrders', 0)],
         ],
     ];
+    $platformPromotionPeriods = collect($promotionComparisonPeriods)->map(function ($period) use ($platformPromotionMetrics) {
+        $period['metrics'] = $platformPromotionMetrics($period['data']['daily'], $period['data']['summary'], $period['data']['orders']);
+        unset($period['data']);
+
+        return $period;
+    })->all();
+    $currentPromotionMetrics = $platformPromotionPeriods[0]['metrics'];
+    $previousMonthPromotionMetrics = $platformPromotionMetrics(
+        data_get($comparisonMonthData, 'promotionDaily', []),
+        $previousMonthSummary,
+        data_get($comparisonMonthData, 'promotionOrders', 0),
+    );
+    $previousPeriodPromotionMetrics = $platformPromotionMetrics(
+        data_get($comparisonPeriodData, 'promotionDaily', []),
+        $previousPeriodSummary,
+        data_get($comparisonPeriodData, 'promotionOrders', 0),
+    );
     $promotionFundingSections = [
         [
             'kicker' => 'Platform promotion',
@@ -959,10 +985,10 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Promosi',
             'kpis' => [
-                ['label' => 'GMV', 'value' => $fmt($summary['subtotal']), 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($summary['subtotal'], $previousMonthSummary['subtotal'] ?? null, $previousPeriodSummary['subtotal'] ?? null, $currencyDisplay)],
-                ['label' => 'Total Promosi', 'value' => $fmt($summary['promotion_total']), 'icon' => 'bi-percent', 'variant' => 'sales-kpi--warning', 'comparisons' => $kpiComparisons($summary['promotion_total'], $previousMonthSummary['promotion_total'] ?? null, $previousPeriodSummary['promotion_total'] ?? null, $currencyDisplay, 'relative', false)],
-                ['label' => 'Promo Rate', 'value' => number_format($promotionRate, 1).'%','note' => 'promosi dibanding GMV', 'icon' => 'bi-graph-down-arrow', 'comparisons' => $kpiComparisons($promotionRate, $previousMonthPromotionRate, $previousPeriodPromotionRate, $percentDisplay, 'points', false)],
-                ['label' => 'Order dengan Promo', 'value' => number_format($promotionOrders), 'note' => 'order terdampak promosi', 'icon' => 'bi-ticket-perforated', 'comparisons' => $kpiComparisons($promotionOrders, data_get($comparisonMonthData, 'promotionOrders'), data_get($comparisonPeriodData, 'promotionOrders'), $numberDisplay)],
+                ['label' => 'Voucher Platform', 'value' => $fmt($currentPromotionMetrics['voucher_platform']), 'icon' => 'bi-shop', 'comparisons' => $kpiComparisons($currentPromotionMetrics['voucher_platform'], $previousMonthPromotionMetrics['voucher_platform'], $previousPeriodPromotionMetrics['voucher_platform'], $currencyDisplay, 'relative', false)],
+                ['label' => 'Voucher Seller', 'value' => $fmt($currentPromotionMetrics['voucher_seller']), 'icon' => 'bi-ticket-perforated', 'comparisons' => $kpiComparisons($currentPromotionMetrics['voucher_seller'], $previousMonthPromotionMetrics['voucher_seller'], $previousPeriodPromotionMetrics['voucher_seller'], $currencyDisplay, 'relative', false)],
+                ['label' => 'Paket Diskon', 'value' => $fmt($currentPromotionMetrics['bundle_discount']), 'icon' => 'bi-gift', 'comparisons' => $kpiComparisons($currentPromotionMetrics['bundle_discount'], $previousMonthPromotionMetrics['bundle_discount'], $previousPeriodPromotionMetrics['bundle_discount'], $currencyDisplay, 'relative', false)],
+                ['label' => 'Kombo Hemat', 'value' => $fmt($currentPromotionMetrics['combo_hemat']), 'icon' => 'bi-boxes', 'comparisons' => $kpiComparisons($currentPromotionMetrics['combo_hemat'], $previousMonthPromotionMetrics['combo_hemat'], $previousPeriodPromotionMetrics['combo_hemat'], $currencyDisplay, 'relative', false)],
             ],
         ])
         @foreach ($promotionFundingSections as $fundingSection)

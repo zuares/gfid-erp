@@ -676,6 +676,8 @@ SQL;
             : 0;
 
         $comparisonMonth = null;
+        $comparisonMonthPrevious = null;
+        $comparisonMonthPreviousTwo = null;
         $comparisonPeriod = null;
         $comparisonPeriodPrevious = null;
         $comparisonPeriodPreviousTwo = null;
@@ -696,6 +698,13 @@ SQL;
             };
 
             $comparisonMonth = $loadComparison((clone $from)->subMonthNoOverflow(), (clone $to)->subMonthNoOverflow());
+            $comparisonMonthPreviousFrom = (clone $from)->subMonthsNoOverflow(2);
+            $comparisonMonthPreviousTo = (clone $to)->subMonthsNoOverflow(2);
+            $comparisonMonthPrevious = $loadComparison($comparisonMonthPreviousFrom, $comparisonMonthPreviousTo);
+
+            $comparisonMonthPreviousTwoFrom = (clone $from)->subMonthsNoOverflow(3);
+            $comparisonMonthPreviousTwoTo = (clone $to)->subMonthsNoOverflow(3);
+            $comparisonMonthPreviousTwo = $loadComparison($comparisonMonthPreviousTwoFrom, $comparisonMonthPreviousTwoTo);
             $periodDays = $from->diffInDays($to) + 1;
             $comparisonPeriodTo = (clone $from)->subDay();
             $comparisonPeriodFrom = (clone $comparisonPeriodTo)->subDays($periodDays - 1);
@@ -726,6 +735,8 @@ SQL;
             'shippingKpi' => $shippingKpi,
             'orderDetails' => $orderDetails,
             'comparisonMonth' => $comparisonMonth,
+            'comparisonMonthPrevious' => $comparisonMonthPrevious,
+            'comparisonMonthPreviousTwo' => $comparisonMonthPreviousTwo,
             'comparisonPeriod' => $comparisonPeriod,
             'comparisonPeriodPrevious' => $comparisonPeriodPrevious,
             'comparisonPeriodPreviousTwo' => $comparisonPeriodPreviousTwo,
