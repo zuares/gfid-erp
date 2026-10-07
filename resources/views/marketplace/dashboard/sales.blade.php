@@ -6,6 +6,10 @@
 
 @push('head')
 <style>
+    @media (min-width: 768px) {
+        .app-main .page-wrap:has(.sales-dashboard) { max-width: none; }
+    }
+
     .sales-dashboard {
         --sales-line: var(--line, #d4d7e3);
         --sales-muted: var(--muted, #6b7280);
@@ -14,7 +18,7 @@
         --sales-ink: var(--text, #111827);
         --sales-accent: var(--accent, #2563eb);
         --sales-accent-soft: var(--accent-soft, #dbeafe);
-        max-width: 1680px;
+        max-width: 1840px;
         margin-inline: auto;
         color: var(--sales-ink);
     }
