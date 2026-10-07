@@ -118,6 +118,30 @@
         white-space: nowrap;
     }
     .sales-dashboard .sales-table td { border-color: color-mix(in srgb, var(--sales-line) 65%, transparent); font-size: .78rem; }
+    .sales-dashboard .sales-order-table { width: 100%; min-width: 0; table-layout: fixed; }
+    .sales-dashboard .sales-order-table th,
+    .sales-dashboard .sales-order-table td { padding: .62rem .55rem; overflow-wrap: anywhere; }
+    .sales-dashboard .sales-order-table th:nth-child(1),
+    .sales-dashboard .sales-order-table td:nth-child(1) { width: 20%; }
+    .sales-dashboard .sales-order-table th:nth-child(2),
+    .sales-dashboard .sales-order-table td:nth-child(2) { width: 16%; }
+    .sales-dashboard .sales-order-table th:nth-child(3),
+    .sales-dashboard .sales-order-table th:nth-child(4),
+    .sales-dashboard .sales-order-table td:nth-child(3),
+    .sales-dashboard .sales-order-table td:nth-child(4) { width: 11%; }
+    .sales-dashboard .sales-order-table th:nth-child(5),
+    .sales-dashboard .sales-order-table td:nth-child(5) { width: 12%; }
+    .sales-dashboard .sales-order-table th:nth-child(6),
+    .sales-dashboard .sales-order-table td:nth-child(6) { width: 18%; }
+    .sales-dashboard .sales-order-table th:nth-child(7),
+    .sales-dashboard .sales-order-table td:nth-child(7) { width: 12%; }
+    .sales-dashboard .sales-order-table .sales-order-cell { min-width: 0; }
+    .sales-dashboard .sales-order-table .sales-order-number { color: var(--sales-ink); font-weight: 750; letter-spacing: -.01em; }
+    .sales-dashboard .sales-order-table .sales-order-meta { color: var(--sales-muted); font-size: .68rem; line-height: 1.35; }
+    .sales-dashboard .sales-order-table .sales-order-buyer { min-width: 0; font-weight: 600; }
+    .sales-dashboard .sales-order-table .sales-order-location { min-width: 0; color: var(--sales-muted); }
+    .sales-dashboard .sales-order-table .sales-order-promotion { min-width: 0; line-height: 1.4; }
+    .sales-dashboard .sales-order-table .sales-order-total { min-width: 0; }
     .sales-dashboard .sales-product-name {
         display: block;
         max-width: 300px;
@@ -158,6 +182,7 @@
     @media (max-width: 767.98px) {
         .sales-dashboard { padding-inline: .75rem !important; }
         .sales-dashboard .sales-table { min-width: 720px; }
+        .sales-dashboard .sales-order-table { min-width: 0; }
         .sales-dashboard .sales-kpi { min-height: 118px; }
         .sales-dashboard .sales-kpi-value { font-size: 1.2rem; }
     }
@@ -326,7 +351,6 @@
                 <div>
                     <div class="sales-kicker mb-1">Order operations</div>
                     <h2 class="sales-section-title mb-1">Detail pesanan</h2>
-                    <div class="sales-section-subtitle">Detail order ditampilkan di dashboard ini tanpa membuka halaman lain.</div>
                 </div>
                 <span class="badge sales-badge rounded-pill px-3 py-2"><span data-sales-order-count>{{ $orderDetails->count() }}</span> order dimuat</span>
             </div>
@@ -335,7 +359,7 @@
                 <div class="sales-empty text-center"><i class="bi bi-receipt d-block fs-3 mb-2"></i>Belum ada detail pesanan pada periode ini.</div>
             @else
                 <div class="px-3 pb-3">
-                    <label class="form-label small text-muted mb-1" for="sales-order-detail-date">Filter tanggal detail</label>
+                    <label class="visually-hidden" for="sales-order-detail-date">Filter tanggal</label>
                     <select id="sales-order-detail-date" class="form-select form-select-sm" style="max-width:260px">
                         <option value="">Semua tanggal pada periode</option>
                         @foreach ($daily as $row)
@@ -344,31 +368,40 @@
                     </select>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle sales-table">
+                    <table class="table table-sm table-hover align-middle sales-table sales-order-table">
                         <thead>
                             <tr>
-                                <th class="ps-3">No. Pesanan</th>
-                                <th>Tanggal</th>
+                                <th class="ps-3 sales-order-cell">No. Pesanan</th>
                                 <th>Pelanggan</th>
-                                <th>Toko</th>
+                                <th>Kota</th>
+                                <th>Provinsi</th>
                                 <th>Pembayaran</th>
-                                <th class="text-end">Voucher</th>
-                                <th class="text-end pe-3">Paket Diskon</th>
+                                <th class="text-end sales-order-promotion">Promosi</th>
+                                <th class="text-end pe-3 sales-order-total">Total Pembayaran</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach ($orderDetails as $order)
                                 <tr data-sales-order-row data-order-day="{{ $order->day }}">
-                                    <td class="ps-3 fw-semibold text-nowrap">{{ $order->order_number }}</td>
-                                    <td class="text-nowrap">{{ \Carbon\Carbon::parse($order->order_at)->format('d M Y H:i') }}</td>
-                                    <td>{{ $order->buyer }}</td>
-                                    <td class="text-muted">{{ $order->store_name ?: '-' }}</td>
-                                    <td class="text-muted">{{ ucwords(str_replace('_', ' ', strtolower($order->payment))) }}</td>
-                                    <td class="text-end">
-                                        <div>Toko: {{ $fmt($order->voucher_store) }}</div>
-                                        <div class="small text-muted">Platform: {{ $fmt($order->voucher_platform) }}</div>
+                                    <td class="ps-3 sales-order-cell">
+                                        <div class="sales-order-number">{{ $order->order_number }}</div>
+                                        <div class="sales-order-meta">
+                                            {{ $order->store_name ?: '-' }} · {{ \Carbon\Carbon::parse($order->order_at)->format('d M Y H:i') }}
+                                        </div>
                                     </td>
-                                    <td class="text-end pe-3">{{ $fmt($order->bundle_discount) }}</td>
+                                    <td class="sales-order-buyer">{{ $order->buyer }}</td>
+                                    <td class="sales-order-location">{{ $order->shipping_city ?: '-' }}</td>
+                                    <td class="sales-order-location">{{ $order->shipping_province ?: '-' }}</td>
+                                    <td class="text-muted">{{ ucwords(str_replace('_', ' ', strtolower($order->payment))) }}</td>
+                                    <td class="text-end sales-order-promotion">
+                                        <div>Voucher toko: {{ $fmt($order->voucher_store) }}</div>
+                                        <div class="small text-muted">Voucher platform: {{ $fmt($order->voucher_platform) }}</div>
+                                        <div class="small text-muted">Paket diskon: {{ $fmt($order->bundle_discount) }}</div>
+                                    </td>
+                                    <td class="text-end pe-3 sales-order-total">
+                                        <div class="fw-semibold">{{ $fmt($order->total_payment) }}</div>
+                                        <div class="small text-muted">Subtotal pesanan: {{ $fmt($order->subtotal) }}</div>
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -675,6 +708,12 @@
                 pane.classList.toggle('is-hidden', !active);
                 pane.setAttribute('aria-hidden', active ? 'false' : 'true');
             });
+
+            const url = new URL(window.location.href);
+            if (url.searchParams.get('tab') !== target) {
+                url.searchParams.set('tab', target);
+                window.history.replaceState(null, '', url.toString());
+            }
         }
 
         function filterOrderRows(day) {

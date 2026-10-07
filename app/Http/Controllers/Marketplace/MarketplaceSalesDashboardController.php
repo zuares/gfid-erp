@@ -108,12 +108,17 @@ class MarketplaceSalesDashboardController extends Controller
                 'o.external_order_id',
                 'o.buyer_username',
                 'o.buyer_name',
+                'o.shipping_city',
+                'o.shipping_province',
                 'o.payment_method',
                 'o.payment_status',
                 'o.shipping_fee_customer',
+                'o.total_paid_customer',
+                'o.total_amount',
                 'o.raw_json',
                 'o.raw_payload_json',
                 'ms.raw_json as settlement_raw_json',
+                'ms.buyer_payment_amount',
                 'ms.seller_voucher',
                 'st.name as store_name',
             ])
@@ -147,6 +152,12 @@ class MarketplaceSalesDashboardController extends Controller
                 $row->buyer = $row->buyer_username ?: ($row->buyer_name ?: 'Pelanggan marketplace');
                 $row->payment = $row->payment_method ?: ($row->payment_status ?: 'Belum ditentukan');
                 $row->shipping_fee = (float) ($row->shipping_fee_customer ?? 0);
+                $row->total_payment = (float) collect([
+                    $row->buyer_payment_amount,
+                    $row->total_paid_customer,
+                    $row->total_amount,
+                    $row->subtotal,
+                ])->map(fn ($value) => (float) $value)->first(fn (float $value) => $value > 0) ?? 0;
 
                 $settlementRaw = is_array($row->settlement_raw_json)
                     ? $row->settlement_raw_json
@@ -173,7 +184,7 @@ class MarketplaceSalesDashboardController extends Controller
                 $row->voucher_platform = $voucherPlatform;
                 $row->bundle_discount = $bundleDiscount;
 
-                unset($row->raw_json, $row->raw_payload_json, $row->settlement_raw_json, $row->seller_voucher, $row->item_qty);
+                unset($row->raw_json, $row->raw_payload_json, $row->settlement_raw_json, $row->seller_voucher, $row->item_qty, $row->total_paid_customer, $row->buyer_payment_amount, $row->total_amount);
 
                 return $row;
             });
