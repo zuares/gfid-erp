@@ -650,6 +650,10 @@ class MarketplaceSalesDashboardController extends Controller
         // periode dashboard.
         $masterVariantCountsByCategory = DB::table('items as master_item')
             ->leftJoin('item_categories as master_category', 'master_category.id', '=', 'master_item.item_category_id')
+            ->where(function ($query) use ($to) {
+                $query->whereNull('master_item.created_at')
+                    ->orWhereDate('master_item.created_at', '<=', $to->toDateString());
+            })
             ->selectRaw("COALESCE(NULLIF(master_category.name, ''), 'Tanpa kategori') as category_name")
             ->selectRaw('COUNT(master_item.id) as variant_count')
             ->groupByRaw("COALESCE(NULLIF(master_category.name, ''), 'Tanpa kategori')")

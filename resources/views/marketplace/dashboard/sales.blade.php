@@ -1049,7 +1049,7 @@
         ->values();
     $categoryProductComparisonRows = [
         ['label' => 'Jumlah produk', 'key' => 'products', 'format' => $numberDisplay],
-        ['label' => 'Jumlah variant', 'key' => 'variants', 'format' => $numberDisplay],
+        ['label' => 'Variant Master s.d. tanggal', 'key' => 'variants', 'format' => $numberDisplay],
         ['label' => 'Variant terjual unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
         ['label' => 'Order', 'key' => 'orders', 'format' => $numberDisplay],
         ['label' => 'Terjual', 'key' => 'qty', 'format' => $numberDisplay],
@@ -1698,7 +1698,7 @@
                                 <th class="ps-3">No.</th>
                                 <th>Kategori Item</th>
                                 <th class="text-end">Produk</th>
-                                <th class="text-end">Variant</th>
+                                <th class="text-end">Variant Master</th>
                                 <th class="text-end">Varian Terjual</th>
                                 <th class="text-end">Order</th>
                                 <th class="text-end">Terjual</th>
