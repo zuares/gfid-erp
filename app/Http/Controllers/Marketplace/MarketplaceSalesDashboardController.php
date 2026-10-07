@@ -521,37 +521,62 @@ class MarketplaceSalesDashboardController extends Controller
                 ->map(fn ($rows) => $rows->pluck('external_item_id')->map(fn ($id) => (string) $id)->unique()->values());
         }
 
-        $products = $products->map(function ($product) use ($adMetricsByInternalItem, $adMetricsByChannelItem, $productExternalIdsByInternal) {
+        // Satu item marketplace dapat berisi banyak varian internal. Metrik
+        // iklan pada level item marketplace harus dialokasikan ke varian,
+        // bukan ditempel penuh ke setiap baris produk.
+        $productExternalIds = $products->mapWithKeys(function ($product, $productIndex) use ($productExternalIdsByInternal) {
             $internalItemId = (int) ($product->internal_item_id ?? 0);
             $externalItemId = trim((string) ($product->external_item_id ?? ''));
-            $hasInternalMapping = $internalItemId > 0 && $adMetricsByInternalItem->has($internalItemId);
-            $internalExternalIds = $productExternalIdsByInternal->get($internalItemId, collect());
-            $mappedExternalMetrics = $internalExternalIds
-                ->filter(fn ($itemId) => $adMetricsByChannelItem->has($itemId))
-                ->reduce(function (array $carry, string $itemId) use ($adMetricsByChannelItem) {
-                    $metrics = $adMetricsByChannelItem->get($itemId);
-                    $carry['spend'] += (float) ($metrics['spend'] ?? 0);
-                    $carry['sales'] += (float) ($metrics['sales'] ?? 0);
-                    $carry['conversions'] += (int) ($metrics['conversions'] ?? 0);
-                    return $carry;
-                }, ['spend' => 0.0, 'sales' => 0.0, 'conversions' => 0]);
-            $hasMappedExternalMetrics = $internalExternalIds->contains(fn ($itemId) => $adMetricsByChannelItem->has($itemId));
-            $hasExternalMapping = $externalItemId !== '' && $adMetricsByChannelItem->has($externalItemId);
-
-            if ($hasInternalMapping) {
-                $productAdMetrics = $adMetricsByInternalItem->get($internalItemId);
-                $product->ad_spend_matched = true;
-            } elseif ($hasMappedExternalMetrics) {
-                $productAdMetrics = $mappedExternalMetrics;
-                $product->ad_spend_matched = true;
-            } elseif ($hasExternalMapping) {
-                $productAdMetrics = $adMetricsByChannelItem->get($externalItemId);
-                $product->ad_spend_matched = true;
-            } else {
-                $productAdMetrics = ['spend' => 0.0, 'sales' => 0.0, 'conversions' => 0];
-                $product->ad_spend_matched = false;
+            $externalIds = $internalItemId > 0
+                ? collect($productExternalIdsByInternal->get($internalItemId, collect()))
+                : collect();
+            if ($externalItemId !== '') {
+                $externalIds->push($externalItemId);
             }
 
+            return [$productIndex => $externalIds->map(fn ($itemId) => (string) $itemId)->filter()->unique()->values()];
+        });
+        $productsByExternalId = collect();
+        foreach ($productExternalIds as $productIndex => $externalIds) {
+            foreach ($externalIds as $externalId) {
+                $productsByExternalId[$externalId] = collect($productsByExternalId->get($externalId, []))
+                    ->push($productIndex)
+                    ->unique()
+                    ->values();
+            }
+        }
+
+        $products = $products->map(function ($product, $productIndex) use ($adMetricsByInternalItem, $adMetricsByChannelItem, $productExternalIds, $productsByExternalId, $products) {
+            $internalItemId = (int) ($product->internal_item_id ?? 0);
+            $externalIds = collect($productExternalIds->get($productIndex, collect()));
+            $productAdMetrics = ['spend' => 0.0, 'sales' => 0.0, 'conversions' => 0];
+            $hasExternalMetrics = false;
+
+            foreach ($externalIds as $externalId) {
+                if (! $adMetricsByChannelItem->has($externalId)) {
+                    continue;
+                }
+
+                $sameExternalProducts = collect($productsByExternalId->get($externalId, []));
+                $sameExternalSales = (float) $sameExternalProducts
+                    ->map(fn ($sameProductIndex) => (float) ($products->get($sameProductIndex)->sales ?? 0))
+                    ->sum();
+                $productSales = (float) ($product->sales ?? 0);
+                $allocationShare = $sameExternalSales > 0
+                    ? $productSales / $sameExternalSales
+                    : ($sameExternalProducts->count() > 0 ? 1 / $sameExternalProducts->count() : 0);
+                $metrics = $adMetricsByChannelItem->get($externalId);
+                $productAdMetrics['spend'] += (float) ($metrics['spend'] ?? 0) * $allocationShare;
+                $productAdMetrics['sales'] += (float) ($metrics['sales'] ?? 0) * $allocationShare;
+                $productAdMetrics['conversions'] += (int) round((int) ($metrics['conversions'] ?? 0) * $allocationShare);
+                $hasExternalMetrics = true;
+            }
+
+            if (! $hasExternalMetrics && $internalItemId > 0 && $adMetricsByInternalItem->has($internalItemId)) {
+                $productAdMetrics = $adMetricsByInternalItem->get($internalItemId);
+            }
+
+            $product->ad_spend_matched = $hasExternalMetrics || ($internalItemId > 0 && $adMetricsByInternalItem->has($internalItemId));
             $product->ad_spend = (float) ($productAdMetrics['spend'] ?? 0);
             $product->ad_sales = (float) ($productAdMetrics['sales'] ?? 0);
             $product->ad_conversions = (int) ($productAdMetrics['conversions'] ?? 0);
