@@ -549,10 +549,11 @@
     .sales-dashboard .sales-category-summary-table tbody td:nth-child(n+3) { color: var(--sales-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
     .sales-dashboard .sales-category-summary-table tbody td:first-child { color: var(--sales-muted); font-variant-numeric: tabular-nums; text-align: start; }
     .sales-dashboard .sales-category-summary-table .sales-category-name { overflow: hidden; text-overflow: ellipsis; }
-    .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row { cursor: pointer; transition: background-color .16s ease, box-shadow .16s ease; }
-    .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row:hover > td { background-color: var(--bs-table-hover-bg) !important; }
-    .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row.is-expanded > td,
-    .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row:focus-visible > td { background-color: color-mix(in srgb, var(--sales-accent-soft) 55%, var(--sales-card) 45%) !important; }
+    .sales-dashboard .sales-category-summary-table > tbody > tr.sales-category-comparison-row { cursor: pointer; transition: background-color .16s ease, box-shadow .16s ease; }
+    .sales-dashboard .sales-category-summary-table > tbody > tr.sales-category-comparison-row:hover > td { background-color: var(--bs-table-hover-bg) !important; }
+    .sales-dashboard .sales-category-summary-table > tbody > tr.sales-category-comparison-row.is-expanded > td,
+    .sales-dashboard .sales-category-summary-table > tbody > tr.sales-category-comparison-row:focus-visible > td { background-color: color-mix(in srgb, var(--sales-accent-soft) 55%, var(--sales-card) 45%) !important; }
+    .sales-dashboard .sales-category-summary-table > tbody > tr.sales-category-comparison-detail:hover > td { background: color-mix(in srgb, var(--sales-accent-soft) 14%, var(--sales-card) 86%) !important; }
     .sales-dashboard .sales-category-comparison-toggle { display: flex; width: 100%; min-height: 2.2rem; align-items: center; gap: .45rem; border: 0; border-radius: .45rem; background: transparent; color: inherit; padding: .35rem .45rem; text-align: left; transition: background-color .16s ease, color .16s ease; }
     .sales-dashboard .sales-category-comparison-toggle span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .sales-dashboard .sales-category-comparison-toggle:hover { background: color-mix(in srgb, var(--sales-accent-soft) 70%, transparent); color: var(--accent, #2563eb); }
@@ -1887,7 +1888,7 @@
                 <div class="sales-empty text-center">Belum ada penjualan per kategori pada periode ini.</div>
             @else
                 <div class="sales-category-table-wrap">
-                    <table class="table table-sm table-hover align-middle sales-table sales-category-summary-table mb-0">
+                    <table class="table table-sm align-middle sales-table sales-category-summary-table mb-0">
                         <thead>
                             <tr>
                                 <th class="ps-3">No.</th>
