@@ -1102,38 +1102,40 @@
                             <tr>
                                 <th>Tanggal</th>
                                 <th class="text-end">GMV</th>
-                                <th class="text-end">Biaya Iklan</th>
                                 <th class="text-end">Diskon Produk</th>
-                                <th class="text-end">Penjualan Neto</th>
                                 <th class="text-end">Voucher Toko</th>
                                 <th class="text-end">Voucher Platform</th>
                                 <th class="text-end">Paket Diskon</th>
                                 <th class="text-end">Kombo Hemat</th>
-                                <th class="text-end pe-3">Total Promosi</th>
+                                <th class="text-end">Total Promosi</th>
+                                <th class="text-end">Penjualan Neto</th>
+                                <th class="text-end pe-3">Biaya Iklan</th>
+                                <th class="text-end">ROAS</th>
+                                <th class="text-end pe-3">ACOS</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach ($promotionDaily as $row)
+                                @php
+                                    $dailyAdSpend = (float) $adSpendDaily->get((string) $row->day, 0);
+                                    $dailyNetSales = max(
+                                        (float) ($row->order_before_discount ?? 0)
+                                            - (float) ($row->product_discount ?? 0)
+                                            - (float) ($row->voucher_store ?? 0)
+                                            - (float) ($row->bundle_discount ?? 0)
+                                            - (float) ($row->combo_hemat ?? 0),
+                                        0,
+                                    );
+                                    $dailyRoas = $dailyAdSpend > 0 ? $dailyNetSales / $dailyAdSpend : 0;
+                                    $dailyAcos = $dailyNetSales > 0 ? ($dailyAdSpend / $dailyNetSales) * 100 : 0;
+                                @endphp
                                 <tr class="sales-clickable-row" data-sales-promotion-detail-url="{{ route('marketplace.dashboard.promotions.detail', ['date' => $row->day]) }}" tabindex="0" role="button" aria-label="Lihat detail promosi {{ $dateLabel($row->day) }}">
                                     <td class="ps-3 fw-semibold">{{ $dateLabel($row->day) }}</td>
                                     <td class="text-end">
                                         <div>{{ $fmt($row->order_before_discount ?? 0) }}</div>
                                     </td>
                                     <td class="text-end">
-                                        <div>{{ $fmt($adSpendDaily->get((string) $row->day, 0)) }}</div>
-                                    </td>
-                                    <td class="text-end">
                                         <div>{{ $fmt($row->product_discount) }}</div>
-                                    </td>
-                                    <td class="text-end fw-semibold">
-                                        <div>{{ $fmt(max(
-                                            (float) ($row->order_before_discount ?? 0)
-                                                - (float) ($row->product_discount ?? 0)
-                                                - (float) ($row->voucher_store ?? 0)
-                                                - (float) ($row->bundle_discount ?? 0)
-                                                - (float) ($row->combo_hemat ?? 0),
-                                            0,
-                                        )) }}</div>
                                     </td>
                                     <td class="text-end">
                                         <div>{{ $fmt($row->voucher_store) }}</div>
@@ -1151,7 +1153,19 @@
                                         <div>{{ $fmt($row->combo_hemat ?? 0) }}</div>
                                         <div class="small text-muted">{{ number_format((int) ($row->combo_hemat_orders ?? 0)) }} order</div>
                                     </td>
-                                    <td class="text-end pe-3 fw-semibold">{{ $fmt($row->total_promotion) }}</td>
+                                    <td class="text-end fw-semibold">{{ $fmt($row->total_promotion) }}</td>
+                                    <td class="text-end fw-semibold">
+                                        <div>{{ $fmt($dailyNetSales) }}</div>
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <div>{{ $fmt($dailyAdSpend) }}</div>
+                                    </td>
+                                    <td class="text-end">
+                                        <div>{{ $multipleDisplay($dailyRoas) }}</div>
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <div>{{ $percentDisplay($dailyAcos) }}</div>
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
