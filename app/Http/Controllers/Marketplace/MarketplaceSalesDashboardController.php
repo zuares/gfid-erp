@@ -57,7 +57,7 @@ class MarketplaceSalesDashboardController extends Controller
     {
         $isPromotionDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
         $today = now()->startOfDay();
-        $defaultFrom = (clone $today)->subDays(30);
+        $defaultFrom = (clone $today)->startOfMonth();
 
         $from = $this->dateOrDefault($request->query('date_from'), $defaultFrom);
         $to = $this->dateOrDefault($request->query('date_to'), $today);
