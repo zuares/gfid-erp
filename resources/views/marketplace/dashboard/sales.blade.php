@@ -764,9 +764,6 @@
             ->count();
     };
     $topProductCount = $marketplaceProductCount($products);
-    $topProductQty = (int) $products->sum('qty');
-    $topProductSales = (float) $products->sum('sales');
-    $topProductBuyers = (int) $products->sum('buyers');
     $productAnalysisProducts = $products->values();
     $productAnalysisSales = (float) $productAnalysisProducts->sum('sales');
     $productAnalysisNetSales = (float) $productAnalysisProducts->sum('net_sales');
@@ -873,14 +870,6 @@
     $previousPeriodShippingKpi = data_get($comparisonPeriodData, 'shippingKpi', []);
     $previousMonthProducts = collect(data_get($comparisonMonthData, 'products', []));
     $previousPeriodProducts = collect(data_get($comparisonPeriodData, 'products', []));
-    $previousMonthTopProductCount = $marketplaceProductCount($previousMonthProducts);
-    $previousPeriodTopProductCount = $marketplaceProductCount($previousPeriodProducts);
-    $previousMonthTopProductQty = (int) $previousMonthProducts->sum('qty');
-    $previousPeriodTopProductQty = (int) $previousPeriodProducts->sum('qty');
-    $previousMonthTopProductSales = (float) $previousMonthProducts->sum('sales');
-    $previousPeriodTopProductSales = (float) $previousPeriodProducts->sum('sales');
-    $previousMonthTopProductBuyers = (int) $previousMonthProducts->sum('buyers');
-    $previousPeriodTopProductBuyers = (int) $previousPeriodProducts->sum('buyers');
     $previousMonthIncomeSettlementRate = ($previousMonthIncomeSummary['orders'] ?? 0) > 0
         ? (($previousMonthIncomeSummary['settled_orders'] ?? 0) / $previousMonthIncomeSummary['orders']) * 100 : 0;
     $previousPeriodIncomeSettlementRate = ($previousPeriodIncomeSummary['orders'] ?? 0) > 0
@@ -893,9 +882,15 @@
     $currencyDisplay = fn ($value) => $fmt($value);
     $percentDisplay = fn ($value) => number_format((float) $value, 1, ',', '.').'%';
     $multipleDisplay = fn ($value) => number_format((float) $value, 2, ',', '.').'x';
-    $productComparisonMetrics = function ($rows, $periodSummary) use ($marketplaceProductCount, $marketplaceVariantCount, $soldVariantCount) {
+    $productComparisonMetrics = function ($rows) use ($marketplaceProductCount, $marketplaceVariantCount, $soldVariantCount) {
         $rows = collect($rows);
-        $orders = (int) data_get($periodSummary, 'orders', 0);
+        $orderKeys = $rows
+            ->flatMap(fn ($product) => preg_split('/,/', (string) ($product->order_keys ?? ''), -1, PREG_SPLIT_NO_EMPTY))
+            ->map(fn ($key) => trim((string) $key))
+            ->filter()
+            ->unique()
+            ->values();
+        $orders = $orderKeys->count();
         $sales = (float) $rows->sum('sales');
         $netSales = (float) $rows->sum(fn ($product) => (float) ($product->net_sales ?? $product->sales ?? 0));
         $buyerPayment = (float) $rows->sum('buyer_payment');
@@ -913,6 +908,7 @@
             'products' => $marketplaceProductCount($rows),
             'variants' => $marketplaceVariantCount($rows),
             'variants_sold' => $soldVariantCount($rows),
+            'orders' => $orders,
             'qty' => (int) $rows->sum('qty'),
             'sales' => $sales,
             'net_sales' => $netSales,
@@ -934,29 +930,30 @@
     };
     $productComparisonPeriods = $comparisonMode === 'month'
         ? [
-            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products, 'summary' => $summary],
-            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'products' => $previousMonthProducts, 'summary' => $previousMonthSummary],
-            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousData, 'products', [])), 'summary' => data_get($comparisonMonthPreviousData, 'summary', [])],
-            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousTwoData, 'products', [])), 'summary' => data_get($comparisonMonthPreviousTwoData, 'summary', [])],
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products],
+            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'products' => $previousMonthProducts],
+            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousData, 'products', []))],
+            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousTwoData, 'products', []))],
         ]
         : [
-            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products, 'summary' => $summary],
-            ['label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'products' => $previousPeriodProducts, 'summary' => $previousPeriodSummary],
-            ['label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousData, 'products', [])), 'summary' => data_get($comparisonPeriodPreviousData, 'summary', [])],
-            ['label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousTwoData, 'products', [])), 'summary' => data_get($comparisonPeriodPreviousTwoData, 'summary', [])],
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products],
+            ['label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'products' => $previousPeriodProducts],
+            ['label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousData, 'products', []))],
+            ['label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousTwoData, 'products', []))],
         ];
     $productComparisonPeriods = collect($productComparisonPeriods)->map(function ($period) use ($productComparisonMetrics) {
-        $period['metrics'] = $productComparisonMetrics($period['products'], $period['summary']);
-        unset($period['products'], $period['summary']);
+        $period['metrics'] = $productComparisonMetrics($period['products']);
+        unset($period['products']);
 
         return $period;
     })->all();
     $productComparisonRows = [
+        ['label' => 'Order Produk', 'key' => 'orders', 'format' => $numberDisplay],
         ['label' => 'Produk Marketplace', 'key' => 'products', 'format' => $numberDisplay],
         ['label' => 'Variant Marketplace', 'key' => 'variants', 'format' => $numberDisplay],
         ['label' => 'Variant Terjual Unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
         ['label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
-        ['label' => 'Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
+        ['label' => 'Penjualan Produk', 'key' => 'sales', 'format' => $currencyDisplay],
         ['label' => 'Penjualan Netto', 'key' => 'net_sales', 'format' => $currencyDisplay],
         ['label' => 'AOV Penjualan', 'key' => 'aov_sales', 'format' => $currencyDisplay],
         ['label' => 'Pembayaran Pembeli', 'key' => 'buyer_payment', 'format' => $currencyDisplay],
@@ -971,6 +968,9 @@
         ['label' => 'CPA', 'key' => 'cpa', 'format' => $currencyDisplay],
         ['label' => 'Coverage Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
     ];
+    $activeProductKpi = $productComparisonMetrics($products);
+    $previousMonthProductKpi = $productComparisonMetrics($previousMonthProducts);
+    $previousPeriodProductKpi = $productComparisonMetrics($previousPeriodProducts);
     $categoryProductMetrics = function ($rows) {
         $rows = collect($rows);
         $marketplaceProductKeys = $rows
@@ -1680,11 +1680,20 @@
     <div class="sales-tab-pane {{ $activeTab === 'products' ? '' : 'is-hidden' }}" data-sales-pane="products" role="tabpanel" aria-hidden="{{ $activeTab === 'products' ? 'false' : 'true' }}">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Produk',
+            'kpiColumnClass' => 'col-xl-2',
             'kpis' => [
-                ['label' => 'Produk Marketplace', 'value' => number_format($topProductCount), 'note' => 'kode produk unik', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($topProductCount, $previousMonthTopProductCount, $previousPeriodTopProductCount, $numberDisplay)],
-                ['label' => 'Unit Terjual', 'value' => number_format($topProductQty), 'note' => 'periode terpilih', 'icon' => 'bi-stack', 'comparisons' => $kpiComparisons($topProductQty, $previousMonthTopProductQty, $previousPeriodTopProductQty, $numberDisplay)],
-                ['label' => 'GMV Produk', 'value' => $fmt($topProductSales), 'note' => 'sebelum promosi order-level', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($topProductSales, $previousMonthTopProductSales, $previousPeriodTopProductSales, $currencyDisplay)],
-                ['label' => 'Pembeli Produk', 'value' => number_format($topProductBuyers), 'note' => 'buyer pada produk', 'icon' => 'bi-people', 'comparisons' => $kpiComparisons($topProductBuyers, $previousMonthTopProductBuyers, $previousPeriodTopProductBuyers, $numberDisplay)],
+                ['label' => 'Produk Marketplace', 'value' => number_format($activeProductKpi['products']), 'note' => 'kode produk unik', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($activeProductKpi['products'], $previousMonthProductKpi['products'], $previousPeriodProductKpi['products'], $numberDisplay)],
+                ['label' => 'Variant Marketplace', 'value' => number_format($activeProductKpi['variants']), 'note' => 'variant pada kode produk', 'icon' => 'bi-diagram-3', 'comparisons' => $kpiComparisons($activeProductKpi['variants'], $previousMonthProductKpi['variants'], $previousPeriodProductKpi['variants'], $numberDisplay)],
+                ['label' => 'Variant Terjual Unik', 'value' => number_format($activeProductKpi['variants_sold']), 'note' => 'variant dengan transaksi', 'icon' => 'bi-check2-square', 'comparisons' => $kpiComparisons($activeProductKpi['variants_sold'], $previousMonthProductKpi['variants_sold'], $previousPeriodProductKpi['variants_sold'], $numberDisplay)],
+                ['label' => 'Order Produk', 'value' => number_format($activeProductKpi['orders']), 'note' => 'order unik', 'icon' => 'bi-receipt', 'comparisons' => $kpiComparisons($activeProductKpi['orders'], $previousMonthProductKpi['orders'], $previousPeriodProductKpi['orders'], $numberDisplay)],
+                ['label' => 'Unit Terjual', 'value' => number_format($activeProductKpi['qty']), 'note' => 'unit pada periode', 'icon' => 'bi-stack', 'comparisons' => $kpiComparisons($activeProductKpi['qty'], $previousMonthProductKpi['qty'], $previousPeriodProductKpi['qty'], $numberDisplay)],
+                ['label' => 'Penjualan Produk', 'value' => $currencyDisplay($activeProductKpi['sales']), 'note' => 'setelah diskon item', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($activeProductKpi['sales'], $previousMonthProductKpi['sales'], $previousPeriodProductKpi['sales'], $currencyDisplay)],
+                ['label' => 'Penjualan Netto', 'value' => $currencyDisplay($activeProductKpi['net_sales']), 'note' => 'setelah diskon & promo seller', 'icon' => 'bi-graph-down-arrow', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($activeProductKpi['net_sales'], $previousMonthProductKpi['net_sales'], $previousPeriodProductKpi['net_sales'], $currencyDisplay)],
+                ['label' => 'Pembayaran Pembeli', 'value' => $currencyDisplay($activeProductKpi['buyer_payment']), 'note' => 'nilai dibayar pembeli', 'icon' => 'bi-wallet2', 'comparisons' => $kpiComparisons($activeProductKpi['buyer_payment'], $previousMonthProductKpi['buyer_payment'], $previousPeriodProductKpi['buyer_payment'], $currencyDisplay)],
+                ['label' => 'AOV Penjualan', 'value' => $currencyDisplay($activeProductKpi['aov_sales']), 'note' => 'penjualan per order produk', 'icon' => 'bi-bar-chart-line', 'comparisons' => $kpiComparisons($activeProductKpi['aov_sales'], $previousMonthProductKpi['aov_sales'], $previousPeriodProductKpi['aov_sales'], $currencyDisplay)],
+                ['label' => 'Margin Kontribusi', 'value' => $activeProductKpi['contribution_margin'] === null ? '—' : $percentDisplay($activeProductKpi['contribution_margin']), 'note' => 'setelah HPP dan iklan', 'icon' => 'bi-pie-chart', 'comparisons' => $kpiComparisons($activeProductKpi['contribution_margin'] ?? 0, $previousMonthProductKpi['contribution_margin'] ?? null, $previousPeriodProductKpi['contribution_margin'] ?? null, $percentDisplay, 'points')],
+                ['label' => 'Biaya Iklan', 'value' => $currencyDisplay($activeProductKpi['ad_spend']), 'note' => 'termasuk GMV Max', 'icon' => 'bi-megaphone', 'variant' => 'sales-kpi--warning', 'comparisons' => $kpiComparisons($activeProductKpi['ad_spend'], $previousMonthProductKpi['ad_spend'], $previousPeriodProductKpi['ad_spend'], $currencyDisplay, 'relative', false)],
+                ['label' => 'ROAS Blended', 'value' => $activeProductKpi['roas'] === null ? '—' : $multipleDisplay($activeProductKpi['roas']), 'note' => 'penjualan atribusi / iklan', 'icon' => 'bi-graph-up-arrow', 'comparisons' => $kpiComparisons($activeProductKpi['roas'] ?? 0, $previousMonthProductKpi['roas'] ?? null, $previousPeriodProductKpi['roas'] ?? null, $multipleDisplay)],
             ],
         ])
         @if ($activeComparison)
@@ -1854,7 +1863,7 @@
             </div>
             <div class="sales-product-analysis-grid">
                 <div class="sales-product-analysis-kpi">
-                    <span class="sales-product-analysis-kpi-label">GMV Produk</span>
+                    <span class="sales-product-analysis-kpi-label">Penjualan Produk</span>
                     <span class="sales-product-analysis-kpi-value">{{ $fmt($productAnalysisSales) }}</span>
                 </div>
                 <div class="sales-product-analysis-kpi">
@@ -1886,10 +1895,10 @@
                             <tr><td class="analysis-label" colspan="2">Baris produk aktif</td><td class="text-end analysis-value">{{ number_format($productAnalysisProducts->count()) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Kategori aktif</td><td class="text-end analysis-value">{{ number_format($productAnalysisCategoryCount) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Top 20% kontribusi</td><td class="text-end analysis-value">{{ $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisTop20Sales / $productAnalysisNetSales) * 100) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Pembayaran Pembeli / GMV</td><td class="text-end analysis-value">{{ $productAnalysisSales > 0 ? $percentDisplay(($productAnalysisBuyerPayment / $productAnalysisSales) * 100) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Unit per Order</td><td class="text-end analysis-value">{{ $summary['orders'] > 0 ? number_format($topProductQty / $summary['orders'], 2, ',', '.') : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">AOV penjualan</td><td class="text-end analysis-value">{{ $summary['orders'] > 0 ? $fmt($productAnalysisSales / $summary['orders']) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">AOV pembayaran</td><td class="text-end analysis-value">{{ $summary['orders'] > 0 ? $fmt($productAnalysisBuyerPayment / $summary['orders']) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Pembayaran Pembeli / Penjualan</td><td class="text-end analysis-value">{{ $productAnalysisSales > 0 ? $percentDisplay(($productAnalysisBuyerPayment / $productAnalysisSales) * 100) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Unit per Order</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? number_format($activeProductKpi['qty'] / $activeProductKpi['orders'], 2, ',', '.') : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">AOV penjualan</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_sales']) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">AOV pembayaran</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_payment']) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Produk dengan HPP</td><td class="text-end analysis-value">{{ number_format($productAnalysisCostedProducts->count()) }} / {{ number_format($productAnalysisProducts->count()) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Total HPP</td><td class="text-end analysis-value">{{ $productAnalysisHpp > 0 ? $fmtHpp($productAnalysisHpp) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Margin kotor</td><td class="text-end analysis-value {{ $productAnalysisGrossMargin >= 25 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisGrossMargin !== 0 ? $percentDisplay($productAnalysisGrossMargin) : '—' }}</td></tr>

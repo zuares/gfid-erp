@@ -1,4 +1,4 @@
-@php($kpiColumnClass = count($kpis) >= 5 ? 'col-xl' : 'col-xl-3')
+@php($kpiColumnClass = $kpiColumnClass ?? (count($kpis) >= 5 ? 'col-xl' : 'col-xl-3'))
 <section class="row g-3 mb-4" aria-label="KPI {{ $kpiTitle }}">
     @foreach ($kpis as $kpi)
         <div class="col-12 col-sm-6 {{ $kpiColumnClass }}">
