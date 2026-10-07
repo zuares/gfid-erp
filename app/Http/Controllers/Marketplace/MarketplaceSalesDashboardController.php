@@ -626,10 +626,14 @@ SQL;
         $orderBeforeDiscountByDay = $orderRows
             ->groupBy('day')
             ->map(fn ($rows) => (float) $rows->sum('subtotal'));
+        $orderCountByDay = $orderRows
+            ->groupBy('day')
+            ->map(fn ($rows) => $rows->count());
 
         $promotionDaily = $promotionDaily
-            ->map(function ($row) use ($orderBeforeDiscountByDay) {
+            ->map(function ($row) use ($orderBeforeDiscountByDay, $orderCountByDay) {
                 $row->order_before_discount = (float) ($orderBeforeDiscountByDay[(string) $row->day] ?? 0);
+                $row->order_count = (int) ($orderCountByDay[(string) $row->day] ?? 0);
 
                 return $row;
             })

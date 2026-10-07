@@ -1217,9 +1217,11 @@
                                     <td class="ps-3 fw-semibold">{{ $dateLabel($row->day) }}</td>
                                     <td class="text-end">
                                         <div>{{ $fmt($row->order_before_discount ?? 0) }}</div>
+                                        <div class="small text-muted">{{ number_format((int) ($row->order_count ?? 0)) }} order</div>
                                     </td>
                                     <td class="text-end">
                                         <div>{{ $fmt($row->product_discount) }}</div>
+                                        <div class="small text-muted">{{ number_format((int) ($row->product_discount_orders ?? 0)) }} order</div>
                                     </td>
                                     <td class="text-end">
                                         <div>{{ $fmt($row->voucher_store) }}</div>
@@ -1237,7 +1239,10 @@
                                         <div>{{ $fmt($row->combo_hemat ?? 0) }}</div>
                                         <div class="small text-muted">{{ number_format((int) ($row->combo_hemat_orders ?? 0)) }} order</div>
                                     </td>
-                                    <td class="text-end fw-semibold">{{ $fmt($row->total_promotion) }}</td>
+                                    <td class="text-end fw-semibold">
+                                        <div>{{ $fmt($row->total_promotion) }}</div>
+                                        <div class="small text-muted">{{ number_format((int) ($row->promotion_orders ?? 0)) }} order</div>
+                                    </td>
                                     <td class="text-end fw-semibold">
                                         <div>{{ $fmt($dailyNetSales) }}</div>
                                     </td>
