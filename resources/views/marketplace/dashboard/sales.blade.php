@@ -382,7 +382,7 @@
                         </thead>
                         <tbody>
                             @foreach ($orderDetails as $order)
-                                <tr data-sales-order-row data-order-day="{{ $order->day }}">
+                                <tr class="sales-clickable-row" data-sales-order-row data-order-day="{{ $order->day }}" data-sales-order-detail-url="{{ route('marketplace.orders.show', ['order' => $order->id]) }}" tabindex="0" role="link" aria-label="Lihat detail pesanan {{ $order->order_number }}">
                                     <td class="ps-3 sales-order-cell">
                                         <div class="sales-order-number">{{ $order->order_number }}</div>
                                         <div class="sales-order-meta">
@@ -726,6 +726,20 @@
             if (orderCount) orderCount.textContent = visible;
             if (orderEmpty) orderEmpty.classList.toggle('d-none', visible > 0);
         }
+
+        document.querySelectorAll('[data-sales-order-detail-url]').forEach(function (trigger) {
+            function openOrderDetail() {
+                window.location.href = trigger.dataset.salesOrderDetailUrl;
+            }
+
+            trigger.addEventListener('click', openOrderDetail);
+            trigger.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openOrderDetail();
+                }
+            });
+        });
 
         tabs.forEach(function (tab) {
             tab.addEventListener('click', function () {
