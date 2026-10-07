@@ -171,6 +171,32 @@
 
     .sales-dashboard .sales-section-header { padding: 1rem 1.15rem .85rem; }
     .sales-dashboard .sales-section-title { color: var(--sales-ink); font-size: 1rem; font-weight: 750; }
+    .sales-dashboard .sales-funding-section {
+        margin-bottom: 1rem !important;
+        overflow: hidden;
+    }
+    .sales-dashboard .sales-funding-section .sales-section-header {
+        min-height: 5.25rem;
+    }
+    .sales-dashboard .sales-funding-section .sales-table th,
+    .sales-dashboard .sales-funding-section .sales-table td {
+        padding: .68rem .7rem;
+    }
+    .sales-dashboard .sales-funding-section .sales-table tbody tr:last-child td {
+        border-bottom: 0;
+    }
+    .sales-dashboard .sales-funding-table {
+        width: 100%;
+        table-layout: fixed;
+    }
+    .sales-dashboard .sales-funding-table th:first-child,
+    .sales-dashboard .sales-funding-table td:first-child {
+        width: 30%;
+    }
+    .sales-dashboard .sales-funding-table th:not(:first-child),
+    .sales-dashboard .sales-funding-table td:not(:first-child) {
+        width: 17.5%;
+    }
     .sales-dashboard .sales-detail-link { color: var(--accent, #2563eb); font-size: .75rem; font-weight: 700; text-decoration: none; }
     .sales-dashboard .sales-detail-link:hover { text-decoration: underline; }
     .sales-dashboard .sales-table { --bs-table-bg: var(--sales-card); --bs-table-color: var(--sales-ink); --bs-table-hover-bg: color-mix(in srgb, var(--accent-soft, #dbeafe) 35%, var(--sales-card)); margin-bottom: 0; }
@@ -185,6 +211,27 @@
         white-space: nowrap;
     }
     .sales-dashboard .sales-table td { border-color: color-mix(in srgb, var(--sales-line) 65%, transparent); font-size: .78rem; }
+    .sales-dashboard .sales-promotion-table th {
+        font-size: clamp(.56rem, .1vw + .53rem, .64rem);
+        letter-spacing: .025em;
+        padding: .5rem .3rem;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+    .sales-dashboard .sales-promotion-table td {
+        font-size: clamp(.62rem, .14vw + .58rem, .7rem);
+        padding: .5rem .3rem;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+    .sales-dashboard .sales-promotion-table td .small {
+        font-size: clamp(.52rem, .1vw + .48rem, .62rem);
+        }
+    .sales-dashboard .sales-promotion-table {
+        width: 100%;
+        min-width: 0;
+        table-layout: fixed;
+    }
     .sales-dashboard .sales-index-column,
     .sales-dashboard .sales-index-cell { width: 3.5rem; min-width: 3.5rem; text-align: center; }
     .sales-dashboard .sales-index-cell { color: var(--sales-muted); font-variant-numeric: tabular-nums; font-weight: 650; }
@@ -280,6 +327,26 @@
     @media (max-width: 767.98px) {
         .sales-dashboard { padding-inline: .75rem !important; }
         .sales-dashboard .sales-table { min-width: 720px; }
+        .sales-dashboard .sales-promotion-table {
+            min-width: 0;
+            width: 100%;
+            table-layout: fixed;
+        }
+        .sales-dashboard .sales-promotion-table th,
+        .sales-dashboard .sales-promotion-table td {
+            padding: .38rem .22rem;
+            font-size: .58rem;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+        .sales-dashboard .sales-promotion-table th:first-child,
+        .sales-dashboard .sales-promotion-table td:first-child {
+            width: 10%;
+        }
+        .sales-dashboard .sales-promotion-table td .small {
+            font-size: .48rem;
+            white-space: nowrap;
+        }
         .sales-dashboard .sales-order-table { min-width: 0; }
         .sales-dashboard .sales-kpi { min-height: 118px; }
         .sales-dashboard .sales-kpi-value { font-size: 1.2rem; }
@@ -355,6 +422,7 @@
     $incomeSettlementRate = $incomeSummary['orders'] > 0 ? ($incomeSummary['settled_orders'] / $incomeSummary['orders']) * 100 : 0;
     $promotionRate = $summary['subtotal'] > 0 ? ($summary['promotion_total'] / $summary['subtotal']) * 100 : 0;
     $adSpendDaily = collect($adSpendDaily ?? []);
+    $adOrdersDaily = collect($adOrdersDaily ?? []);
     $adSpendTotal = (float) ($adSpendTotal ?? $adSpendDaily->sum());
     $comparisonMonthData = $comparisonMonth['data'] ?? null;
     $comparisonMonthPreviousData = $comparisonMonthPrevious['data'] ?? null;
@@ -487,6 +555,9 @@
         $period['metrics']['ad_sales'] = (float) ($period['data']['ad_sales'] ?? 0);
         $period['metrics']['ad_ctr'] = (float) ($period['data']['ad_ctr'] ?? 0);
         $period['metrics']['ad_cvr'] = (float) ($period['data']['ad_cvr'] ?? 0);
+        $period['metrics']['ad_cpa'] = $period['metrics']['ad_orders'] > 0
+            ? $period['metrics']['ad_spend'] / $period['metrics']['ad_orders']
+            : 0;
         $period['metrics']['ad_roas'] = $period['metrics']['ad_spend'] > 0
             ? $period['metrics']['ad_sales'] / $period['metrics']['ad_spend']
             : 0;
@@ -517,9 +588,10 @@
                 ['label' => 'Order Iklan', 'key' => 'ad_orders', 'format' => $numberDisplay],
                 ['label' => 'ROAS', 'key' => 'ad_roas', 'format' => $multipleDisplay],
                 ['label' => 'CTR', 'key' => 'ad_ctr', 'format' => $percentDisplay],
-                ['label' => 'CVR', 'key' => 'ad_cvr', 'format' => $percentDisplay],
-                ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
-                ['label' => 'Rasio Iklan / Sales Iklan', 'key' => 'ad_sales_rate', 'format' => $percentDisplay],
+            ['label' => 'CVR', 'key' => 'ad_cvr', 'format' => $percentDisplay],
+            ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
+            ['label' => 'Biaya / Konversi', 'key' => 'ad_cpa', 'format' => $currencyDisplay],
+            ['label' => 'Rasio Iklan / Sales Iklan', 'key' => 'ad_sales_rate', 'format' => $percentDisplay],
             ],
         ],
         [
@@ -1049,7 +1121,7 @@
             ],
         ])
         @foreach ($promotionFundingSections as $fundingSection)
-            <section class="card sales-card shadow-sm mb-3">
+            <section class="card sales-card sales-funding-section shadow-sm">
                 <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                     <div>
                         <div class="sales-kicker mb-1">{{ $fundingSection['kicker'] }}</div>
@@ -1058,7 +1130,7 @@
                     <span class="badge sales-badge rounded-pill px-3 py-2">4 periode</span>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle sales-table">
+                    <table class="table table-sm table-hover align-middle sales-table sales-funding-table">
                         <thead>
                             <tr>
                                 <th class="ps-3">Metrik</th>
@@ -1097,7 +1169,7 @@
                 <div class="sales-empty text-center"><i class="bi bi-percent d-block fs-3 mb-2"></i>Belum ada order pada periode ini.</div>
             @else
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle sales-table">
+                    <table class="table table-sm table-hover align-middle sales-table sales-promotion-table">
                         <thead>
                             <tr>
                                 <th>Tanggal</th>
@@ -1110,14 +1182,16 @@
                                 <th class="text-end">Total Promosi</th>
                                 <th class="text-end">Penjualan Neto</th>
                                 <th class="text-end pe-3">Biaya Iklan</th>
-                                <th class="text-end">ROAS</th>
-                                <th class="text-end pe-3">ACOS</th>
+                                <th class="text-end">ROAS Neto</th>
+                                <th class="text-end">ACOS Neto</th>
+                                <th class="text-end pe-3">Biaya / Konversi</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach ($promotionDaily as $row)
                                 @php
                                     $dailyAdSpend = (float) $adSpendDaily->get((string) $row->day, 0);
+                                    $dailyAdOrders = (int) $adOrdersDaily->get((string) $row->day, 0);
                                     $dailyNetSales = max(
                                         (float) ($row->order_before_discount ?? 0)
                                             - (float) ($row->product_discount ?? 0)
@@ -1128,6 +1202,7 @@
                                     );
                                     $dailyRoas = $dailyAdSpend > 0 ? $dailyNetSales / $dailyAdSpend : 0;
                                     $dailyAcos = $dailyNetSales > 0 ? ($dailyAdSpend / $dailyNetSales) * 100 : 0;
+                                    $dailyCpa = $dailyAdOrders > 0 ? $dailyAdSpend / $dailyAdOrders : 0;
                                 @endphp
                                 <tr class="sales-clickable-row" data-sales-promotion-detail-url="{{ route('marketplace.dashboard.promotions.detail', ['date' => $row->day]) }}" tabindex="0" role="button" aria-label="Lihat detail promosi {{ $dateLabel($row->day) }}">
                                     <td class="ps-3 fw-semibold">{{ $dateLabel($row->day) }}</td>
@@ -1165,6 +1240,9 @@
                                     </td>
                                     <td class="text-end pe-3">
                                         <div>{{ $percentDisplay($dailyAcos) }}</div>
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <div>{{ $fmt($dailyCpa) }}</div>
                                     </td>
                                 </tr>
                             @endforeach

@@ -103,6 +103,7 @@ class MarketplaceSalesDashboardController extends Controller
             $to->toDateString(),
         );
         $adSpendDaily = $adDailyMetrics->map(fn (array $metrics) => (float) $metrics['spend']);
+        $adOrdersDaily = $adDailyMetrics->map(fn (array $metrics) => (int) $metrics['orders']);
         $adSpendTotal = (float) $adSpendDaily->sum();
         $adImpressionsTotal = (int) $adDailyMetrics->sum('impressions');
         $adClicksTotal = (int) $adDailyMetrics->sum('clicks');
@@ -770,6 +771,7 @@ SQL;
             'promotionDaily' => $promotionDaily,
             'promotionOrders' => $promotionOrders,
             'adSpendDaily' => $adSpendDaily,
+            'adOrdersDaily' => $adOrdersDaily,
             'adSpendTotal' => $adSpendTotal,
             'adImpressionsTotal' => $adImpressionsTotal,
             'adClicksTotal' => $adClicksTotal,
