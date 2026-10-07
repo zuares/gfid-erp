@@ -549,6 +549,8 @@
     $previousPeriodSummary = data_get($comparisonPeriodData, 'summary', []);
     $previousMonthPaymentSummary = data_get($comparisonMonthData, 'paymentSummary', []);
     $previousPeriodPaymentSummary = data_get($comparisonPeriodData, 'paymentSummary', []);
+    $previousMonthPaymentDaily = collect(data_get($comparisonMonthData, 'paymentDaily', []));
+    $previousPeriodPaymentDaily = collect(data_get($comparisonPeriodData, 'paymentDaily', []));
     $previousMonthIncomeSummary = data_get($comparisonMonthData, 'incomeSummary', []);
     $previousPeriodIncomeSummary = data_get($comparisonPeriodData, 'incomeSummary', []);
     $previousMonthShippingKpi = data_get($comparisonMonthData, 'shippingKpi', []);
@@ -1178,9 +1180,10 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Pembayaran',
             'kpis' => [
+                ['label' => 'Orders', 'value' => number_format($paymentSummary['orders']), 'note' => 'total order pembayaran', 'icon' => 'bi-receipt', 'comparisons' => $kpiComparisons($paymentSummary['orders'], $previousMonthPaymentSummary['orders'] ?? null, $previousPeriodPaymentSummary['orders'] ?? null, $numberDisplay)],
                 ['label' => 'Total Dibayar Pembeli', 'value' => $fmt($paymentSummary['buyer_paid']), 'note' => number_format($paymentSummary['orders']).' orders', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($paymentSummary['buyer_paid'], $previousMonthPaymentSummary['buyer_paid'] ?? null, $previousPeriodPaymentSummary['buyer_paid'] ?? null, $currencyDisplay)],
                 ['label' => 'AOV Buyer Paid', 'value' => $fmt($paymentSummary['aov']), 'note' => 'Buyer Paid per order', 'icon' => 'bi-graph-up-arrow', 'comparisons' => $kpiComparisons($paymentSummary['aov'], $previousMonthPaymentSummary['aov'] ?? null, $previousPeriodPaymentSummary['aov'] ?? null, $currencyDisplay)],
-                ['label' => 'Median Ticket', 'value' => $fmt($paymentSummary['median_ticket']), 'note' => 'nilai tengah order', 'icon' => 'bi-bar-chart-line', 'comparisons' => $kpiComparisons($paymentSummary['median_ticket'], $previousMonthPaymentSummary['median_ticket'] ?? null, $previousPeriodPaymentSummary['median_ticket'] ?? null, $currencyDisplay)],
+                ['label' => 'Seller Net Sales', 'value' => $fmt($paymentDaily->sum('seller_net_sales')), 'note' => 'setelah diskon seller', 'icon' => 'bi-graph-down-arrow', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($paymentDaily->sum('seller_net_sales'), $previousMonthPaymentDaily->sum('seller_net_sales'), $previousPeriodPaymentDaily->sum('seller_net_sales'), $currencyDisplay)],
                 ['label' => 'COD Exposure', 'value' => number_format($paymentSummary['cod_order_share'], 1).'%', 'note' => number_format($paymentDaily->sum('cod_orders')).' COD orders', 'icon' => 'bi-shield-exclamation', 'variant' => 'sales-kpi--warning', 'comparisons' => $kpiComparisons($paymentSummary['cod_order_share'], $previousMonthPaymentSummary['cod_order_share'] ?? null, $previousPeriodPaymentSummary['cod_order_share'] ?? null, $percentDisplay, 'points', false)],
             ],
         ])
