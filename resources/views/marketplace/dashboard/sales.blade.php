@@ -596,6 +596,20 @@
     .sales-dashboard .analysis-status-badge--review { color: #b91c1c; background: #fee2e2; }
     .sales-dashboard .sales-product-analysis-matrix .analysis-number { color: var(--sales-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
     .sales-dashboard .sales-product-analysis-matrix .analysis-share { color: var(--sales-muted); font-size: .65rem; font-variant-numeric: tabular-nums; }
+    .sales-dashboard .sales-product-analysis-matrix tr[data-sales-analysis-row] { cursor: pointer; transition: background-color .16s ease; }
+    .sales-dashboard .sales-product-analysis-matrix tr[data-sales-analysis-row]:hover > td,
+    .sales-dashboard .sales-product-analysis-matrix tr[data-sales-analysis-row].is-expanded > td { background-color: var(--bs-table-hover-bg) !important; }
+    .sales-dashboard .sales-product-analysis-matrix-toggle { display: inline-flex; align-items: center; gap: .35rem; border: 0; background: transparent; color: inherit; padding: .2rem .3rem; text-align: left; }
+    .sales-dashboard .sales-product-analysis-matrix-toggle i { color: var(--sales-accent); transition: transform .18s ease; }
+    .sales-dashboard .sales-product-analysis-matrix-toggle[aria-expanded="true"] i { transform: rotate(90deg); }
+    .sales-dashboard .sales-product-analysis-matrix-toggle:focus-visible { outline: 2px solid color-mix(in srgb, var(--sales-accent) 55%, transparent); outline-offset: 2px; border-radius: 5px; }
+    .sales-dashboard .sales-product-analysis-detail > td { padding: 0 !important; background: color-mix(in srgb, var(--sales-accent-soft) 12%, var(--sales-card) 88%); }
+    .sales-dashboard .sales-product-analysis-detail-card { padding: .8rem 1rem 1rem; border-top: 1px solid color-mix(in srgb, var(--sales-accent) 18%, var(--sales-line) 82%); }
+    .sales-dashboard .sales-product-analysis-detail-table { min-width: 1120px; }
+    .sales-dashboard .sales-product-analysis-detail-table th { font-size: .58rem; }
+    .sales-dashboard .sales-product-analysis-detail-table td { font-size: .67rem; }
+    .sales-dashboard .sales-product-analysis-detail-title { display: block; max-width: 220px; overflow: hidden; color: var(--sales-ink); font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+    .sales-dashboard .sales-product-analysis-detail-code { display: inline-block; max-width: 150px; overflow: hidden; padding: .18rem .35rem; border: 1px solid color-mix(in srgb, var(--sales-line) 90%, transparent); border-radius: 5px; background: var(--sales-card); color: var(--sales-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .58rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
     .sales-dashboard .sales-income-table { min-width: 1080px; }
     .sales-dashboard .sales-income-table th,
     .sales-dashboard .sales-income-table td { white-space: nowrap; }
@@ -938,7 +952,7 @@
         $row['contribution_profit'] = $contributionProfit;
         $row['contribution_margin'] = $sales > 0 ? ($contributionProfit / $sales) * 100 : null;
         $row['ad_share'] = $productAnalysisAdSales > 0 ? ($adSales / $productAnalysisAdSales) * 100 : 0;
-        unset($row['products']);
+        $row['products'] = $products->sortByDesc('net_sales')->values();
 
         return $row;
     })->values();
@@ -2048,8 +2062,17 @@
                     <thead><tr><th style="width: 16%">Segmentasi</th><th class="text-end">Produk Terjual Marketplace</th><th class="text-end">Variant Terjual Unik</th><th class="text-end">Penjualan Netto</th><th class="text-end">Share</th><th class="text-end">Kontribusi</th><th class="text-end">Margin</th><th class="text-end">Penjualan Atribusi Iklan</th><th class="text-end">ROAS</th><th class="text-end">Biaya Iklan</th></tr></thead>
                     <tbody>
                         @foreach ($productAnalysisMatrixRows as $matrixRow)
-                            <tr>
-                                <td class="analysis-status"><span class="analysis-status-badge analysis-status-badge--{{ $matrixRow['class'] }}">{{ $matrixRow['label'] }}</span></td>
+                            @php
+                                $matrixKey = 'sales-product-analysis-'.$loop->index;
+                                $matrixProducts = collect($matrixRow['products'] ?? []);
+                            @endphp
+                            <tr class="sales-product-analysis-matrix-row" data-sales-analysis-row="{{ $matrixKey }}" tabindex="0" aria-controls="{{ $matrixKey }}-detail">
+                                <td class="analysis-status">
+                                    <button type="button" class="sales-product-analysis-matrix-toggle" data-sales-analysis-toggle="{{ $matrixKey }}" aria-expanded="false" aria-controls="{{ $matrixKey }}-detail" aria-label="Buka detail produk segmentasi {{ $matrixRow['label'] }}">
+                                        <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                        <span class="analysis-status-badge analysis-status-badge--{{ $matrixRow['class'] }}">{{ $matrixRow['label'] }}</span>
+                                    </button>
+                                </td>
                                 <td class="text-end analysis-number">{{ number_format($matrixRow['count']) }}</td>
                                 <td class="text-end analysis-number">{{ number_format($matrixRow['variants_sold']) }}</td>
                                 <td class="text-end analysis-number">{{ $fmt($matrixRow['sales']) }}</td>
@@ -2059,6 +2082,88 @@
                                 <td class="text-end analysis-number">{{ $fmt($matrixRow['ad_sales']) }}</td>
                                 <td class="text-end analysis-number">{{ $matrixRow['ad_spend'] > 0 ? $multipleDisplay($matrixRow['roas']) : '—' }}</td>
                                 <td class="text-end analysis-number">{{ $fmt($matrixRow['ad_spend']) }}</td>
+                            </tr>
+                            <tr id="{{ $matrixKey }}-detail" class="sales-product-analysis-detail" data-sales-analysis-items="{{ $matrixKey }}" hidden>
+                                <td colspan="10">
+                                    <div class="sales-product-analysis-detail-card">
+                                        <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                                            <div>
+                                                <div class="sales-kicker mb-1">Detail segmentasi</div>
+                                                <h3 class="sales-section-title mb-0">Produk {{ $matrixRow['label'] }}</h3>
+                                            </div>
+                                            <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($matrixProducts->count()) }} produk</span>
+                                        </div>
+                                        @if ($matrixProducts->isEmpty())
+                                            <div class="sales-empty text-center py-3">Belum ada produk pada segmentasi ini.</div>
+                                        @else
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-hover align-middle sales-table sales-product-analysis-detail-table mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th class="ps-3">Produk</th>
+                                                            <th>Kode Produk</th>
+                                                            <th>Kode Marketplace</th>
+                                                            <th class="text-end">HPP / Unit</th>
+                                                            <th class="text-end">Order</th>
+                                                            <th class="text-end">Unit</th>
+                                                            <th class="text-end">Penjualan Netto</th>
+                                                            <th class="text-end">Pembayaran</th>
+                                                            <th class="text-end">Kontribusi</th>
+                                                            <th class="text-end">Margin</th>
+                                                            <th class="text-end">Biaya Iklan</th>
+                                                            <th class="text-end pe-3">ROAS</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach ($matrixProducts as $product)
+                                                            @php
+                                                                $analysisProductTitle = trim((string) ($product->marketplace_name ?: $product->name)) ?: 'Produk tanpa nama';
+                                                                $analysisProductImage = trim((string) ($product->image_url ?? ''));
+                                                                $analysisInternalCode = trim((string) ($product->sku ?? ''));
+                                                                $analysisInternalCode = $analysisInternalCode !== '' && $analysisInternalCode !== '-'
+                                                                    ? $analysisInternalCode
+                                                                    : 'ID '.($product->internal_item_id ?? '—');
+                                                                $analysisMarketplaceCode = trim((string) ($product->external_item_id ?? '')) ?: '—';
+                                                                $analysisAdSpend = (float) ($product->ad_spend ?? 0);
+                                                                $analysisAdSales = (float) ($product->ad_sales ?? 0);
+                                                            @endphp
+                                                            <tr>
+                                                                <td class="ps-3">
+                                                                    <div class="d-flex align-items-center gap-2 min-w-0">
+                                                                        <span class="sales-product-marketplace-thumb" tabindex="0" aria-label="{{ $analysisProductTitle }}">
+                                                                            @if ($analysisProductImage !== '')
+                                                                                <img src="{{ $analysisProductImage }}" alt="{{ $analysisProductTitle }}" loading="lazy" onerror="this.hidden=true; this.nextElementSibling.hidden=false;">
+                                                                                <span class="sales-product-image-fallback" hidden><i class="bi bi-image" aria-hidden="true"></i></span>
+                                                                            @else
+                                                                                <span class="sales-product-image-fallback"><i class="bi bi-image" aria-hidden="true"></i></span>
+                                                                            @endif
+                                                                            <span class="sales-product-image-preview-title">{{ $analysisProductTitle }}</span>
+                                                                        </span>
+                                                                        <span class="min-w-0">
+                                                                            <span class="sales-product-analysis-detail-title" title="{{ $analysisProductTitle }}">{{ $analysisProductTitle }}</span>
+                                                                            <span class="small text-muted">{{ $product->category_name ?: 'Tanpa kategori' }}</span>
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                                <td><span class="sales-product-analysis-detail-code" title="{{ $analysisInternalCode }}">{{ $analysisInternalCode }}</span></td>
+                                                                <td><span class="sales-product-analysis-detail-code" title="{{ $analysisMarketplaceCode }}">{{ $analysisMarketplaceCode }}</span></td>
+                                                                <td class="text-end">{{ (float) ($product->hpp ?? 0) > 0 ? $fmtHpp($product->hpp) : '—' }}</td>
+                                                                <td class="text-end">{{ number_format((int) ($product->orders ?? 0)) }}</td>
+                                                                <td class="text-end">{{ number_format((int) ($product->qty ?? 0)) }}</td>
+                                                                <td class="text-end fw-semibold">{{ $fmt($product->net_sales ?? 0) }}</td>
+                                                                <td class="text-end fw-semibold">{{ $fmt($product->buyer_payment ?? 0) }}</td>
+                                                                <td class="text-end">{{ $fmt($product->contribution_profit ?? 0) }}</td>
+                                                                <td class="text-end">{{ $product->contribution_margin !== null ? $percentDisplay($product->contribution_margin) : '—' }}</td>
+                                                                <td class="text-end">{{ ($product->ad_spend_matched ?? false) ? $fmt($analysisAdSpend) : '—' }}</td>
+                                                                <td class="text-end pe-3">{{ ($product->ad_spend_matched ?? false) && $analysisAdSpend > 0 ? $multipleDisplay($analysisAdSales / $analysisAdSpend) : '—' }}</td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -2849,6 +2954,36 @@
 
         document.querySelectorAll('[data-sales-category-comparison-row]').forEach(function (row) {
             const trigger = row.querySelector('[data-sales-category-comparison-toggle]');
+            if (!trigger) return;
+            row.addEventListener('click', function (event) {
+                if (event.target.closest('button, a')) return;
+                trigger.click();
+            });
+            row.addEventListener('keydown', function (event) {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                trigger.click();
+            });
+        });
+
+        document.querySelectorAll('[data-sales-analysis-toggle]').forEach(function (trigger) {
+            trigger.addEventListener('click', function () {
+                const key = trigger.dataset.salesAnalysisToggle || '';
+                const expanded = trigger.getAttribute('aria-expanded') === 'true';
+                const nextExpanded = !expanded;
+                const matrixRow = trigger.closest('[data-sales-analysis-row]');
+                const segment = trigger.querySelector('.analysis-status-badge')?.textContent?.trim() || 'segmentasi';
+                trigger.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false');
+                trigger.setAttribute('aria-label', (nextExpanded ? 'Tutup' : 'Buka') + ' detail produk segmentasi ' + segment);
+                if (matrixRow) matrixRow.classList.toggle('is-expanded', nextExpanded);
+                document.querySelectorAll('[data-sales-analysis-items="' + key + '"]').forEach(function (row) {
+                    row.hidden = !nextExpanded;
+                });
+            });
+        });
+
+        document.querySelectorAll('[data-sales-analysis-row]').forEach(function (row) {
+            const trigger = row.querySelector('[data-sales-analysis-toggle]');
             if (!trigger) return;
             row.addEventListener('click', function (event) {
                 if (event.target.closest('button, a')) return;
