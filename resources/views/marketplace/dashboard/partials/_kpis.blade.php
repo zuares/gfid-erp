@@ -1,6 +1,13 @@
 @php($kpiColumnClass = $kpiColumnClass ?? (count($kpis) >= 5 ? 'col-xl' : 'col-xl-3'))
+@php($lastKpiGroup = null)
 <section class="row g-3 mb-4" aria-label="KPI {{ $kpiTitle }}">
     @foreach ($kpis as $kpi)
+        @if (!empty($kpi['group']) && $kpi['group'] !== $lastKpiGroup)
+            <div class="col-12 sales-kpi-group-divider" role="presentation">
+                <span class="sales-kpi-group-label">{{ $kpi['group'] }}</span>
+            </div>
+            @php($lastKpiGroup = $kpi['group'])
+        @endif
         <div class="col-12 col-sm-6 {{ $kpiColumnClass }}">
             <div class="card sales-card sales-kpi {{ $kpi['variant'] ?? '' }} h-100 shadow-sm">
                 <div class="card-body p-3">
