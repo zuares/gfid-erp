@@ -370,6 +370,8 @@
     .sales-dashboard .sales-index-column,
     .sales-dashboard .sales-index-cell { width: 3.5rem; min-width: 3.5rem; text-align: center; }
     .sales-dashboard .sales-index-cell { color: var(--sales-muted); font-variant-numeric: tabular-nums; font-weight: 650; }
+    .sales-dashboard .sales-product-item-index { padding-left: .5rem !important; text-align: center; }
+    .sales-dashboard .sales-product-item-number { display: inline-block; transform: translateX(.65rem); }
     .sales-dashboard .sales-daily-table { min-width: 980px; }
     .sales-dashboard .sales-daily-table .sales-table-metric { white-space: nowrap; }
     .sales-dashboard .sales-daily-table .sales-compare-line { margin-top: .18rem; gap: .2rem; font-size: .52rem; }
@@ -379,7 +381,12 @@
     .sales-dashboard .sales-product-table th,
     .sales-dashboard .sales-product-table td { white-space: nowrap; }
     .sales-dashboard .sales-product-table .sales-product-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sales-dashboard .sales-product-table .sales-product-marketplace-name { display: block; max-width: 100%; overflow: hidden; color: var(--sales-muted); font-size: .68rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
     .sales-dashboard .sales-product-group-row td { background: var(--sales-soft); border-top: 2px solid var(--sales-line); color: var(--sales-ink); padding-block: .62rem; }
+    .sales-dashboard .sales-product-category-toggle { display: flex; width: 100%; align-items: center; gap: .55rem; border: 0; background: transparent; color: inherit; padding: 0; text-align: left; }
+    .sales-dashboard .sales-product-category-toggle:hover { color: var(--accent, #2563eb); }
+    .sales-dashboard .sales-product-category-toggle i { color: var(--accent, #2563eb); transition: transform .18s ease; }
+    .sales-dashboard .sales-product-category-toggle[aria-expanded="true"] i { transform: rotate(90deg); }
     .sales-dashboard .sales-product-group-title { font-size: .72rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
     .sales-dashboard .sales-product-group-meta { color: var(--sales-muted); font-size: .68rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
     .sales-dashboard .sales-income-table { min-width: 1080px; }
@@ -1225,27 +1232,52 @@
                                 $productGroups = $products
                                     ->groupBy(fn ($product) => $product->category_name ?: 'Tanpa kategori')
                                     ->sortByDesc(fn ($group) => (float) $group->sum('sales'));
-                                $productNumber = 0;
                             @endphp
                             @foreach ($productGroups as $categoryName => $categoryProducts)
                                 @php
+                                    $categoryNumber = $loop->iteration;
+                                    $categoryKey = 'sales-product-category-'.$loop->index;
+                                    $categoryProducts = $categoryProducts->values();
+                                    $categoryItemIds = $categoryProducts->keys()->map(fn ($index) => $categoryKey.'-items-'.$index)->implode(' ');
                                     $category = $categoryProducts->first();
                                     $categoryCode = trim((string) ($category->category_code ?? ''));
+                                    $categoryOrders = (int) $categoryProducts->sum('orders');
+                                    $categoryBuyers = (int) $categoryProducts->sum('buyers');
+                                    $categoryQty = (int) $categoryProducts->sum('qty');
+                                    $categorySales = (float) $categoryProducts->sum('sales');
+                                    $categoryBuyerPayment = (float) $categoryProducts->sum('buyer_payment');
                                     $categorySpend = $categoryProducts->filter(fn ($product) => $product->ad_spend_matched ?? false)->sum('ad_spend');
                                 @endphp
                                 <tr class="sales-product-group-row">
-                                    <td colspan="11">
-                                        <span class="sales-product-group-title">{{ $categoryCode !== '' ? $categoryCode.' · ' : '' }}{{ $categoryName }}</span>
-                                        <span class="sales-product-group-meta ms-2">{{ number_format($categoryProducts->count()) }} produk · {{ $fmt($categoryProducts->sum('sales')) }} penjualan · {{ $fmt($categorySpend) }} iklan</span>
+                                    <td class="sales-index-cell" aria-label="Kategori {{ $categoryNumber }}">{{ $categoryNumber }}</td>
+                                    <td>
+                                        <button type="button" class="sales-product-category-toggle" data-sales-product-category-toggle="{{ $categoryKey }}" aria-expanded="false" aria-controls="{{ $categoryItemIds }}">
+                                            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                            <span>
+                                                <span class="sales-product-group-title">{{ $categoryCode !== '' ? $categoryCode.' · ' : '' }}{{ $categoryName }}</span>
+                                                <span class="sales-product-group-meta">{{ number_format($categoryProducts->count()) }} produk</span>
+                                            </span>
+                                        </button>
                                     </td>
+                                    <td class="text-muted small">—</td>
+                                    <td class="text-end">{{ number_format($categoryOrders) }}</td>
+                                    <td class="text-end">{{ number_format($categoryBuyers) }}</td>
+                                    <td class="text-end">{{ number_format($categoryQty) }}</td>
+                                    <td class="text-end fw-semibold">{{ $fmt($categorySales) }}</td>
+                                    <td class="text-end fw-semibold">{{ $fmt($categoryBuyerPayment) }}</td>
+                                    <td class="text-end text-danger fw-semibold">{{ $fmt($categorySpend) }}</td>
+                                    <td class="text-end">{{ $categoryOrders > 0 ? $fmt($categoryBuyerPayment / $categoryOrders) : '—' }}</td>
+                                    <td class="text-end">{{ $categoryBuyers > 0 ? $fmt($categoryBuyerPayment / $categoryBuyers) : '—' }}</td>
                                 </tr>
                                 @foreach ($categoryProducts as $product)
-                                    @php $productNumber++; @endphp
-                                    <tr>
-                                        <td class="sales-index-cell" aria-label="Urutan {{ $productNumber }}">{{ $productNumber }}</td>
+                                    <tr id="{{ $categoryKey }}-items-{{ $loop->index }}" data-sales-product-category-items="{{ $categoryKey }}" hidden>
+                                        <td class="sales-index-cell sales-product-item-index" aria-label="Item {{ $categoryNumber }}.{{ $loop->iteration }}"><span class="sales-product-item-number">{{ $categoryNumber }}.{{ $loop->iteration }}</span></td>
                                         <td class="fw-semibold">
                                             <button type="button" class="sales-product-link" data-sales-product-name="{{ $product->name }}" data-sales-product-sku="{{ $product->sku }}" data-sales-product-internal-item-id="{{ $product->internal_item_id ?? '' }}" title="Lihat pesanan produk: {{ $product->name }}">
                                                 <span class="sales-product-name">{{ $product->name }}</span>
+                                                @if (($product->marketplace_name ?? '') !== '' && $product->marketplace_name !== $product->name)
+                                                    <span class="sales-product-marketplace-name" title="{{ $product->marketplace_name }}">{{ $product->marketplace_name }}</span>
+                                                @endif
                                             </button>
                                         </td>
                                         <td class="text-muted small">{{ $product->sku }}</td>
@@ -1815,6 +1847,17 @@
                     event.preventDefault();
                     openShippingDetail();
                 }
+            });
+        });
+
+        document.querySelectorAll('[data-sales-product-category-toggle]').forEach(function (trigger) {
+            trigger.addEventListener('click', function () {
+                const key = trigger.dataset.salesProductCategoryToggle || '';
+                const expanded = trigger.getAttribute('aria-expanded') === 'true';
+                trigger.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                document.querySelectorAll('[data-sales-product-category-items="' + key + '"]').forEach(function (row) {
+                    row.hidden = expanded;
+                });
             });
         });
 

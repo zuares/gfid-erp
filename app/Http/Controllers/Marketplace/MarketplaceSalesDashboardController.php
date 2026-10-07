@@ -332,6 +332,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
             ->selectRaw("COALESCE(MAX(NULLIF(internal_item.name, '')), MAX({$marketplaceProductNameExpression}), 'Produk tanpa nama') as name")
+            ->selectRaw("MAX({$marketplaceProductNameExpression}) as marketplace_name")
             ->selectRaw("COALESCE(MAX(NULLIF(internal_item.code, '')), MAX({$marketplaceProductSkuExpression}), '-') as sku")
             ->selectRaw("MAX(NULLIF(internal_category.code, '')) as category_code")
             ->selectRaw("MAX(NULLIF(internal_category.name, '')) as category_name")
@@ -357,15 +358,45 @@ class MarketplaceSalesDashboardController extends Controller
         );
         $adSpendByInternalItem = $productAdSpend['internal'];
         $adSpendByChannelItem = $productAdSpend['external'];
+        $productExternalIdsByInternal = collect();
+        $internalProductIds = $products
+            ->pluck('internal_item_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        if ($internalProductIds->isNotEmpty()) {
+            $productExternalIdsByInternal = DB::table('marketplace_order_items as mapped_oi')
+                ->join('marketplace_orders as mapped_o', function ($join) {
+                    $join->on(DB::raw('COALESCE(mapped_oi.marketplace_order_id, mapped_oi.order_id)'), '=', 'mapped_o.id');
+                })
+                ->whereIn('mapped_oi.internal_item_id', $internalProductIds->all())
+                ->whereNotNull('mapped_oi.external_item_id')
+                ->where('mapped_oi.external_item_id', '<>', '')
+                ->when($storeId, fn ($query) => $query->where('mapped_o.store_id', $storeId))
+                ->select('mapped_oi.internal_item_id', 'mapped_oi.external_item_id')
+                ->distinct()
+                ->get()
+                ->groupBy('internal_item_id')
+                ->map(fn ($rows) => $rows->pluck('external_item_id')->map(fn ($id) => (string) $id)->unique()->values());
+        }
 
-        $products = $products->map(function ($product) use ($adSpendByInternalItem, $adSpendByChannelItem) {
+        $products = $products->map(function ($product) use ($adSpendByInternalItem, $adSpendByChannelItem, $productExternalIdsByInternal) {
             $internalItemId = (int) ($product->internal_item_id ?? 0);
             $externalItemId = trim((string) ($product->external_item_id ?? ''));
             $hasInternalMapping = $internalItemId > 0 && $adSpendByInternalItem->has($internalItemId);
+            $internalExternalIds = $productExternalIdsByInternal->get($internalItemId, collect());
+            $mappedExternalSpend = (float) $internalExternalIds
+                ->filter(fn ($itemId) => $adSpendByChannelItem->has($itemId))
+                ->sum(fn ($itemId) => (float) $adSpendByChannelItem->get($itemId));
+            $hasMappedExternalSpend = $internalExternalIds->contains(fn ($itemId) => $adSpendByChannelItem->has($itemId));
             $hasExternalMapping = $externalItemId !== '' && $adSpendByChannelItem->has($externalItemId);
 
             if ($hasInternalMapping) {
                 $product->ad_spend = (float) $adSpendByInternalItem->get($internalItemId);
+                $product->ad_spend_matched = true;
+            } elseif ($hasMappedExternalSpend) {
+                $product->ad_spend = $mappedExternalSpend;
                 $product->ad_spend_matched = true;
             } elseif ($hasExternalMapping) {
                 $product->ad_spend = (float) $adSpendByChannelItem->get($externalItemId);
