@@ -533,12 +533,12 @@
     /* Enterprise command-center pass: stronger hierarchy, denser context, and clearer executive scanning. */
     .an-page { max-width:1280px; }
     .an-shell { gap:1rem; }
-    .an-hero { position:relative; min-height:132px; margin-inline:-.75rem; padding:1.15rem 1.25rem; border:1px solid #1e3a5f; border-radius:18px; background:linear-gradient(135deg,#0b1220 0%,#10233f 62%,#12395a 100%); box-shadow:0 18px 34px rgba(15,23,42,.16); align-items:flex-end; }
+    .an-hero { position:relative; min-height:96px; margin-inline:-.75rem; padding:1rem 1.25rem; border:1px solid #1e3a5f; border-radius:18px; background:linear-gradient(135deg,#0b1220 0%,#10233f 62%,#12395a 100%); box-shadow:0 18px 34px rgba(15,23,42,.16); align-items:center; }
     .an-hero::after { content:''; position:absolute; inset:auto 1.2rem 0 auto; width:210px; height:76px; border-radius:100% 0 0 0; background:radial-gradient(ellipse at bottom right,rgba(56,189,248,.2),transparent 68%); pointer-events:none; }
     .an-hero-copy { position:relative; z-index:1; }
     .an-hero-eyebrow { display:flex; align-items:center; gap:.4rem; color:#93c5fd; font-size:.61rem; font-weight:850; letter-spacing:.11em; text-transform:uppercase; }
     .an-hero-eyebrow::before { content:''; width:7px; height:7px; border-radius:99px; background:#38bdf8; box-shadow:0 0 0 4px rgba(56,189,248,.16); }
-    .an-hero-title { margin-top:.4rem; color:#fff; font-size:1.35rem; font-weight:850; letter-spacing:-.04em; }
+    .an-hero-title { margin-top:.25rem; color:#fff; font-size:1.35rem; font-weight:850; letter-spacing:-.04em; }
     .an-hero-title i { color:#7dd3fc; }
     .an-hero-sub { margin-top:.25rem; color:#cbd5e1; font-size:.7rem; font-weight:600; }
     .an-hero .an-sync-note { color:#94a3b8 !important; font-size:.63rem; }
@@ -692,11 +692,9 @@
             <div class="an-hero-copy">
                 <div class="an-hero-eyebrow">Marketplace · Analytics</div>
                 <div class="an-hero-title"><i class="bi bi-bar-chart-line me-1"></i>Analytics Marketplace</div>
-                <div class="an-hero-sub">Executive command center untuk omzet, pencairan, biaya, dan profit.</div>
-                <div class="an-sync-note" id="anSyncNote">Memuat data marketplace…</div>
             </div>
             <div class="an-hero-controls">
-                <div class="an-field"><label for="anStore">Toko</label><select id="anStore"><option value="">Semua toko</option></select></div>
+                <div class="an-field"><label for="anStore">Filter toko</label><select id="anStore" aria-label="Filter toko"><option value="">Semua toko</option></select></div>
                 <div class="an-field"><label for="anDateRange">Periode</label><input type="text" id="anDateRange" autocomplete="off" value="{{ $filters['date_from'] }} — {{ $filters['date_to'] }}"></div>
                 <div class="an-field"><label for="anCompare">Bandingkan</label><select id="anCompare"><option value="prev_period" @selected(($filters['compare_mode'] ?? 'prev_period') === 'prev_period')>Periode lalu</option><option value="prev_month" @selected(($filters['compare_mode'] ?? '') === 'prev_month')>Tanggal sama bulan lalu</option><option value="prev_quarter" @selected(($filters['compare_mode'] ?? '') === 'prev_quarter')>Tanggal sama 3 bulan lalu</option><option value="prev_year" @selected(($filters['compare_mode'] ?? '') === 'prev_year')>Tanggal sama tahun lalu</option></select></div>
                 <input type="hidden" id="anDateFrom" value="{{ $filters['date_from'] }}"><input type="hidden" id="anDateTo" value="{{ $filters['date_to'] }}">
@@ -845,7 +843,6 @@
         renderStores();
         renderCosts();
         $('anControlPeriod').textContent = `${from()} — ${to()}`;
-        $('anSyncNote').textContent = `${Number(current.order_total || 0).toLocaleString('id-ID')} order · ${from()} sampai ${to()} · ${Number(current.order_count || 0).toLocaleString('id-ID')} siap profit`;
     }
     const normalize = payload => {
         const source = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
@@ -926,7 +923,6 @@
         } catch (e) {
             console.error('Analytics summary load failed', e);
             summary = null;
-            $('anSyncNote').textContent = 'Data gagal dimuat';
             $('storeBody').innerHTML = '<tr><td colspan="6"><div class="an-error">Tidak dapat memuat ringkasan analytics.</div></td></tr>';
             $('bestProductBody').innerHTML = '<tr><td colspan="9"><div class="an-error">Tidak dapat memuat data analytics.</div></td></tr>';
         } finally {
@@ -952,7 +948,7 @@
         if (button.dataset.anTab === 'cohort') loadCohort();
     }));
     const syncUrl = () => { const params = new URLSearchParams({date_from:from(),date_to:to(),compare_mode:$('anCompare').value}); if (selectedStore()) params.set('store_id', selectedStore()); const activeTab = document.querySelector('[data-an-tab].active')?.dataset.anTab; if (activeTab) params.set('view', activeTab); history.replaceState(null,'',location.pathname+'?'+params.toString()); };
-    $('anRefresh').addEventListener('click',load); $('anStore').addEventListener('change',load); $('anCompare').addEventListener('change',()=>{syncUrl();load();});
+    $('anRefresh').addEventListener('click',load); $('anStore').addEventListener('change',()=>{syncUrl();load();}); $('anCompare').addEventListener('change',()=>{syncUrl();load();});
     const focusPulse = card => {
         if (!card) return;
         selectedPulseMetric = card?.dataset?.pulseMetric || null;

@@ -18,7 +18,7 @@
         --sales-ink: var(--text, #111827);
         --sales-accent: var(--accent, #2563eb);
         --sales-accent-soft: var(--accent-soft, #dbeafe);
-        max-width: 1840px;
+        max-width: 1280px;
         margin-inline: auto;
         color: var(--sales-ink);
     }

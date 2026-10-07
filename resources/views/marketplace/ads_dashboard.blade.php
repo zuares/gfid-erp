@@ -1584,6 +1584,11 @@ body[data-theme="dark"] .dash-sec{
 
 .ads-dashboard .ads-hero .title .text-primary { color: var(--accent, #2563eb) !important; }
 
+/* Ringkas untuk mode enterprise: judul dan nilai jadi fokus utama. */
+.ads-dashboard .ads-hero .sub,
+.ads-dashboard .ads-tab-panel-head .ads-tab-panel-note { display: none; }
+.ads-dashboard .ads-integration-description { display: none; }
+
 .ads-dashboard .ads-hero::before,
 .ads-dashboard .ads-hero::after { display: none !important; }
 
@@ -2452,7 +2457,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <i class="bi bi-shield-lock-fill"></i> Integrasi API Ads · Read-only
                     <span style="font-size:.58rem; padding:.18rem .42rem; border-radius:999px; background:#dcfce7; color:#166534; letter-spacing:.05em;">AMAN</span>
                 </div>
-                <div style="font-size:.72rem; color:#475569; margin-top:.28rem; max-width:720px;">
+                <div class="ads-integration-description" style="font-size:.72rem; color:#475569; margin-top:.28rem; max-width:720px;">
                     Token hanya diperoleh melalui OAuth resmi provider, disimpan terenkripsi, memiliki masa berlaku, dan tidak pernah diterima sebagai input manual.
                     Profil izin minimum: <b>ads.read</b> · <b>shop.read</b>.
                     Endpoint perubahan kampanye/produk diblokir untuk koneksi ini.
@@ -3287,9 +3292,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <th onclick="sortTrafficTable('campaign_name')" style="cursor:pointer">Kategori / Campaign <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th>Sinyal</th>
                                 <th class="text-end" onclick="sortTrafficTable('impressions')" style="cursor:pointer">Jangkauan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('clicks')" style="cursor:pointer">Clicks <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('clicks')" style="cursor:pointer">Klik <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('ctr')" style="cursor:pointer">CTR <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('orders')" style="cursor:pointer">Orders <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('orders')" style="cursor:pointer">Pesanan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('cvr')" style="cursor:pointer">CVR <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('spend')" style="cursor:pointer">Biaya Iklan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('cpc')" style="cursor:pointer">CPC <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
@@ -3322,7 +3327,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                             <div class="table-responsive">
                                                 <table class="table table-sm table-hover align-middle mb-0" style="font-size:.72rem;">
                                                     <thead>
-                                                        <tr><th>Campaign</th><th>Sinyal</th><th class="text-end">Jangkauan</th><th class="text-end">Klik</th><th class="text-end">CTR</th><th class="text-end">Orders</th><th class="text-end">CVR</th><th class="text-end">Biaya</th><th class="text-end">CPC</th><th class="text-end">CPM</th></tr>
+                                                        <tr><th>Campaign</th><th>Sinyal</th><th class="text-end">Impresi</th><th class="text-end">Klik</th><th class="text-end">CTR</th><th class="text-end">Pesanan</th><th class="text-end">CVR</th><th class="text-end">Belanja Iklan</th><th class="text-end">CPC</th><th class="text-end">CPM</th></tr>
                                                     </thead>
                                                     <tbody>
                                                         @foreach($trafficCategoryCampaignRows->get($categoryRow['category'], collect()) as $campaignRow)
@@ -3971,12 +3976,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     // within AdsDashboardService and passed precisely via $kpi.
 
                     $metrics = [
-                        ['title' => 'Omzet', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'revenue', 'icon' => 'bi-wallet2'],
+                        ['title' => 'GMV', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'revenue', 'icon' => 'bi-wallet2'],
                         ['title' => 'Biaya Iklan', 'key' => 'spend', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'spend', 'icon' => 'bi-cash-stack'],
-                        ['title' => 'Net Profit', 'key' => 'net_profit', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'profit', 'icon' => 'bi-piggy-bank'],
+                        ['title' => 'Profit Bersih', 'key' => 'net_profit', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'profit', 'icon' => 'bi-piggy-bank'],
                         ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => '', 'cls' => 'profit', 'icon' => 'bi-box-seam'],
                         ['title' => 'ROAS', 'key' => 'roas', 'prefix' => '', 'suffix' => 'x', 'cls' => 'roas', 'icon' => 'bi-lightning-charge'],
-                        ['title' => 'Jangkauan', 'key' => 'impressions', 'prefix' => '', 'suffix' => '', 'cls' => 'revenue', 'icon' => 'bi-eye'],
+                        ['title' => 'Impresi', 'key' => 'impressions', 'prefix' => '', 'suffix' => '', 'cls' => 'revenue', 'icon' => 'bi-eye'],
                         ['title' => 'Klik', 'key' => 'clicks', 'prefix' => '', 'suffix' => '', 'cls' => 'spend', 'icon' => 'bi-cursor'],
                         ['title' => 'CTR', 'key' => 'ctr', 'prefix' => '', 'suffix' => '%', 'cls' => 'roas', 'icon' => 'bi-hand-index-thumb'],
                         ['title' => 'CVR', 'key' => 'cvr', 'prefix' => '', 'suffix' => '%', 'cls' => 'profit', 'icon' => 'bi-funnel'],
@@ -4841,7 +4846,7 @@ document.addEventListener("DOMContentLoaded", function() {
             dailyDataTableEl.innerHTML = rows.length
                 ? `<div style="font-size:.68rem; color:var(--dsh-muted); font-weight:700; margin-bottom:.35rem;">Data per tanggal</div>
                     <table class="table table-sm table-hover align-middle mb-0" style="font-size:.67rem;">
-                        <thead><tr>${dailyHeader('date', 'Tanggal')}${dailyHeader('roas', 'ROAS', 'text-end')}${dailyHeader('impressions', 'Impresi', 'text-end')}${dailyHeader('clicks', 'Klik', 'text-end')}${dailyHeader('ctr', 'CTR', 'text-end')}${dailyHeader('orders', 'Orders', 'text-end')}${dailyHeader('spend', 'Biaya', 'text-end')}${dailyHeader('gmv', 'GMV', 'text-end')}${dailyHeader('grossProfit', 'Gross Profit', 'text-end')}${dailyHeader('aov', 'AOV', 'text-end')}</tr></thead>
+                        <thead><tr>${dailyHeader('date', 'Tanggal')}${dailyHeader('roas', 'ROAS', 'text-end')}${dailyHeader('impressions', 'Impresi', 'text-end')}${dailyHeader('clicks', 'Klik', 'text-end')}${dailyHeader('ctr', 'CTR', 'text-end')}${dailyHeader('orders', 'Pesanan', 'text-end')}${dailyHeader('spend', 'Belanja Iklan', 'text-end')}${dailyHeader('gmv', 'GMV', 'text-end')}${dailyHeader('grossProfit', 'Profit Kotor', 'text-end')}${dailyHeader('aov', 'AOV', 'text-end')}</tr></thead>
                         <tbody>${rows.map(row => `<tr>
                             <td class="fw-semibold">${formatIndoDate(row.date)}</td>
                             <td class="text-end fw-bold" style="background:rgba(245,158,11,.05);">${row.roas.toFixed(2)}x</td>
@@ -4914,7 +4919,7 @@ document.addEventListener("DOMContentLoaded", function() {
             trafficDataTableEl.innerHTML = rows.length
                 ? `<div style="font-size:.68rem; color:var(--dsh-muted); font-weight:700; margin-bottom:.35rem;">Data trafik per tanggal</div>
                     <table class="table table-sm table-hover align-middle mb-0" style="font-size:.67rem;">
-                        <thead><tr>${trafficHeader('date', 'Tanggal')}${trafficHeader('impressions', 'Impresi', 'text-end')}${trafficHeader('clicks', 'Klik', 'text-end')}${trafficHeader('ctr', 'CTR', 'text-end')}${trafficHeader('orders', 'Orders', 'text-end')}${trafficHeader('cvr', 'CVR', 'text-end')}${trafficHeader('aov', 'AOV', 'text-end')}</tr></thead>
+                        <thead><tr>${trafficHeader('date', 'Tanggal')}${trafficHeader('impressions', 'Impresi', 'text-end')}${trafficHeader('clicks', 'Klik', 'text-end')}${trafficHeader('ctr', 'CTR', 'text-end')}${trafficHeader('orders', 'Pesanan', 'text-end')}${trafficHeader('cvr', 'CVR', 'text-end')}${trafficHeader('aov', 'AOV', 'text-end')}</tr></thead>
                         <tbody>${rows.map(row => `<tr>
                             <td class="fw-semibold">${formatIndoDate(row.date)}</td>
                             <td class="text-end">${row.impressions.toLocaleString('id-ID')}</td>
@@ -5063,7 +5068,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
             hourlyBreakdownEl.innerHTML = breakdownRows.length
                 ? `<table class="table table-sm table-hover align-middle mb-0" style="font-size:.68rem;">
-                    <thead><tr>${sortableHeader('hour', 'Jam')}${sortableHeader('roas', 'ROAS', 'text-end')}${sortableHeader('impressions', 'Impresi', 'text-end')}${sortableHeader('clicks', 'Klik', 'text-end')}${sortableHeader('ctr', 'CTR', 'text-end')}${sortableHeader('cvr', 'CVR', 'text-end')}${sortableHeader('orders', 'Orders', 'text-end')}${sortableHeader('spend', 'Biaya', 'text-end')}${sortableHeader('gmv', 'GMV', 'text-end')}${sortableHeader('aov', 'AOV', 'text-end')}${sortableHeader('grossProfit', 'Gross Profit', 'text-end')}</tr></thead>
+                    <thead><tr>${sortableHeader('hour', 'Jam')}${sortableHeader('roas', 'ROAS', 'text-end')}${sortableHeader('impressions', 'Impresi', 'text-end')}${sortableHeader('clicks', 'Klik', 'text-end')}${sortableHeader('ctr', 'CTR', 'text-end')}${sortableHeader('cvr', 'CVR', 'text-end')}${sortableHeader('orders', 'Pesanan', 'text-end')}${sortableHeader('spend', 'Belanja Iklan', 'text-end')}${sortableHeader('gmv', 'GMV', 'text-end')}${sortableHeader('aov', 'AOV', 'text-end')}${sortableHeader('grossProfit', 'Profit Kotor', 'text-end')}</tr></thead>
                     <tbody>${breakdownRows.map((row, index) => {
                         const isWorst = tableWorstHour && row.hour === tableWorstHour.hour;
                         const isLoss = row.grossProfit < 0;
