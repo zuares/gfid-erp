@@ -381,7 +381,6 @@
     .sales-dashboard .sales-product-table th,
     .sales-dashboard .sales-product-table td { white-space: nowrap; }
     .sales-dashboard .sales-product-table .sales-product-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .sales-dashboard .sales-product-table .sales-product-marketplace-name { display: block; max-width: 100%; overflow: hidden; color: var(--sales-muted); font-size: .68rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
     .sales-dashboard .sales-product-table.sales-promotion-table { width: 100%; min-width: 0; table-layout: fixed; }
     .sales-dashboard .sales-product-table.sales-promotion-table th { font-size: clamp(.42rem, .08vw + .4rem, .52rem); line-height: 1.1; padding: .34rem .18rem; white-space: normal; overflow-wrap: anywhere; }
     .sales-dashboard .sales-product-table.sales-promotion-table td { font-size: clamp(.58rem, .12vw + .54rem, .66rem); padding: .42rem .18rem; }
@@ -390,6 +389,12 @@
     .sales-dashboard .sales-product-category-toggle:hover { color: var(--accent, #2563eb); }
     .sales-dashboard .sales-product-category-toggle i { color: var(--accent, #2563eb); transition: transform .18s ease; }
     .sales-dashboard .sales-product-category-toggle[aria-expanded="true"] i { transform: rotate(90deg); }
+    .sales-dashboard .sales-product-marketplace-toggle { display: flex; width: 100%; align-items: center; gap: .5rem; border: 0; background: transparent; color: inherit; padding: 0; text-align: left; }
+    .sales-dashboard .sales-product-marketplace-toggle:hover { color: var(--accent, #2563eb); }
+    .sales-dashboard .sales-product-marketplace-toggle i { color: var(--accent, #2563eb); transition: transform .18s ease; }
+    .sales-dashboard .sales-product-marketplace-toggle[aria-expanded="true"] i { transform: rotate(90deg); }
+    .sales-dashboard .sales-product-internal-cell { padding-left: 1.35rem !important; }
+    .sales-dashboard .sales-product-internal-index { color: var(--sales-muted); }
     .sales-dashboard .sales-product-group-title { font-size: .72rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
     .sales-dashboard .sales-product-group-meta { color: var(--sales-muted); font-size: .68rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
     .sales-dashboard .sales-product-analysis-section { overflow: hidden; }
@@ -1457,7 +1462,11 @@
                                     $categoryNumber = $loop->iteration;
                                     $categoryKey = 'sales-product-category-'.$loop->index;
                                     $categoryProducts = $categoryProducts->values();
-                                    $categoryItemIds = $categoryProducts->keys()->map(fn ($index) => $categoryKey.'-items-'.$index)->implode(' ');
+                                    $marketplaceGroups = $categoryProducts
+                                        ->groupBy(fn ($product) => trim((string) ($product->marketplace_name ?: $product->name)) ?: 'Produk tanpa nama')
+                                        ->sortByDesc(fn ($group) => (float) $group->sum('sales'))
+                                        ->values();
+                                    $categoryItemIds = $marketplaceGroups->keys()->map(fn ($index) => $categoryKey.'-marketplace-'.$index)->implode(' ');
                                     $category = $categoryProducts->first();
                                     $categoryCode = trim((string) ($category->category_code ?? ''));
                                     $categoryOrders = (int) $categoryProducts->sum('orders');
@@ -1478,7 +1487,7 @@
                                             <i class="bi bi-chevron-right" aria-hidden="true"></i>
                                             <span>
                                                 <span class="sales-product-group-title">{{ $categoryCode !== '' ? $categoryCode.' · ' : '' }}{{ $categoryName }}</span>
-                                                <span class="sales-product-group-meta">{{ number_format($categoryProducts->count()) }} produk</span>
+                                                <span class="sales-product-group-meta">{{ number_format($marketplaceGroups->count()) }} marketplace · {{ number_format($categoryProducts->count()) }} item</span>
                                             </span>
                                         </button>
                                     </td>
@@ -1493,28 +1502,66 @@
                                     <td class="text-end">{{ $categorySpend > 0 ? $multipleDisplay($categoryAdSales / $categorySpend) : '—' }}</td>
                                     <td class="text-end pe-3">{{ $categoryAdConversions > 0 ? $fmt($categorySpend / $categoryAdConversions) : '—' }}</td>
                                 </tr>
-                                @foreach ($categoryProducts as $product)
-                                    <tr id="{{ $categoryKey }}-items-{{ $loop->index }}" data-sales-product-category-items="{{ $categoryKey }}" hidden>
-                                        <td class="sales-index-cell sales-product-item-index" aria-label="Item {{ $categoryNumber }}.{{ $loop->iteration }}"><span class="sales-product-item-number">{{ $categoryNumber }}.{{ $loop->iteration }}</span></td>
+                                @foreach ($marketplaceGroups as $marketplaceProducts)
+                                    @php
+                                        $marketplaceNumber = $loop->iteration;
+                                        $marketplaceKey = $categoryKey.'-marketplace-'.$loop->index;
+                                        $marketplaceProducts = $marketplaceProducts->values();
+                                        $marketplaceItemIds = $marketplaceProducts->keys()->map(fn ($index) => $marketplaceKey.'-items-'.$index)->implode(' ');
+                                        $marketplace = $marketplaceProducts->first();
+                                        $marketplaceTitle = trim((string) ($marketplace->marketplace_name ?: $marketplace->name)) ?: 'Produk tanpa nama';
+                                        $marketplaceOrders = (int) $marketplaceProducts->sum('orders');
+                                        $marketplaceQty = (int) $marketplaceProducts->sum('qty');
+                                        $marketplaceSales = (float) $marketplaceProducts->sum('sales');
+                                        $marketplaceNetSales = (float) $marketplaceProducts->sum('net_sales');
+                                        $marketplaceBuyerPayment = (float) $marketplaceProducts->sum('buyer_payment');
+                                        $marketplaceAdProducts = $marketplaceProducts->filter(fn ($product) => $product->ad_spend_matched ?? false);
+                                        $marketplaceSpend = (float) $marketplaceAdProducts->sum('ad_spend');
+                                        $marketplaceAdSales = (float) $marketplaceAdProducts->sum('ad_sales');
+                                        $marketplaceAdConversions = (int) $marketplaceAdProducts->sum('ad_conversions');
+                                    @endphp
+                                    <tr id="{{ $marketplaceKey }}" data-sales-product-category-items="{{ $categoryKey }}" hidden>
+                                        <td class="sales-index-cell sales-product-item-index" aria-label="Marketplace {{ $categoryNumber }}.{{ $marketplaceNumber }}"><span class="sales-product-item-number">{{ $categoryNumber }}.{{ $marketplaceNumber }}</span></td>
                                         <td class="fw-semibold">
-                                            <button type="button" class="sales-product-link" data-sales-product-name="{{ $product->name }}" data-sales-product-sku="{{ $product->sku }}" data-sales-product-internal-item-id="{{ $product->internal_item_id ?? '' }}" title="Lihat pesanan produk: {{ $product->name }}">
-                                                <span class="sales-product-name">{{ $product->name }}</span>
-                                                @if (($product->marketplace_name ?? '') !== '' && $product->marketplace_name !== $product->name)
-                                                    <span class="sales-product-marketplace-name" title="{{ $product->marketplace_name }}">{{ $product->marketplace_name }}</span>
-                                                @endif
+                                            <button type="button" class="sales-product-marketplace-toggle" data-sales-product-marketplace-toggle="{{ $marketplaceKey }}" aria-expanded="false" aria-controls="{{ $marketplaceItemIds }}" title="{{ $marketplaceTitle }}">
+                                                <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                                <span>
+                                                    <span class="sales-product-name" title="{{ $marketplaceTitle }}">{{ $marketplaceTitle }}</span>
+                                                    <span class="sales-product-group-meta">{{ number_format($marketplaceProducts->count()) }} item internal</span>
+                                                </span>
                                             </button>
                                         </td>
-                                        <td class="text-end">{{ number_format((int) $product->orders) }}</td>
-                                        <td class="text-end">{{ number_format((int) $product->qty) }}</td>
-                                        <td class="text-end fw-semibold"><div>{{ $fmt($product->sales) }}</div><div class="small text-muted">AOV {{ $product->orders > 0 ? $fmt($product->sales / $product->orders) : '—' }}</div></td>
-                                        <td class="text-end fw-semibold"><div>{{ $fmt($product->net_sales) }}</div><div class="small text-muted">AOV {{ $product->orders > 0 ? $fmt($product->net_sales / $product->orders) : '—' }}</div></td>
-                                        <td class="text-end fw-semibold"><div>{{ $fmt($product->buyer_payment) }}</div><div class="small text-muted">AOV {{ $product->orders > 0 ? $fmt($product->buyer_payment / $product->orders) : '—' }}</div></td>
-                                        <td class="text-end {{ ($product->ad_spend ?? 0) > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">{{ ($product->ad_spend_matched ?? false) ? $fmt($product->ad_spend) : '—' }}</td>
-                                        <td class="text-end text-danger {{ ($product->ad_sales ?? 0) > 0 ? 'fw-semibold' : 'text-muted' }}"><div>{{ ($product->ad_spend_matched ?? false) ? $fmt($product->ad_sales) : '—' }}</div><div class="small text-muted">AOV {{ ($product->ad_spend_matched ?? false) && ($product->ad_conversions ?? 0) > 0 ? $fmt($product->ad_sales / $product->ad_conversions) : '—' }}</div></td>
-                                        <td class="text-end">{{ ($product->ad_spend_matched ?? false) && ($product->ad_sales ?? 0) > 0 ? $percentDisplay(($product->ad_spend / $product->ad_sales) * 100) : '—' }}</td>
-                                        <td class="text-end">{{ ($product->ad_spend_matched ?? false) && ($product->ad_spend ?? 0) > 0 ? $multipleDisplay($product->ad_sales / $product->ad_spend) : '—' }}</td>
-                                        <td class="text-end pe-3">{{ ($product->ad_spend_matched ?? false) && ($product->ad_conversions ?? 0) > 0 ? $fmt($product->ad_spend / $product->ad_conversions) : '—' }}</td>
+                                        <td class="text-end">{{ number_format($marketplaceOrders) }}</td>
+                                        <td class="text-end">{{ number_format($marketplaceQty) }}</td>
+                                        <td class="text-end fw-semibold"><div>{{ $fmt($marketplaceSales) }}</div><div class="small text-muted">AOV {{ $marketplaceOrders > 0 ? $fmt($marketplaceSales / $marketplaceOrders) : '—' }}</div></td>
+                                        <td class="text-end fw-semibold"><div>{{ $fmt($marketplaceNetSales) }}</div><div class="small text-muted">AOV {{ $marketplaceOrders > 0 ? $fmt($marketplaceNetSales / $marketplaceOrders) : '—' }}</div></td>
+                                        <td class="text-end fw-semibold"><div>{{ $fmt($marketplaceBuyerPayment) }}</div><div class="small text-muted">AOV {{ $marketplaceOrders > 0 ? $fmt($marketplaceBuyerPayment / $marketplaceOrders) : '—' }}</div></td>
+                                        <td class="text-end text-danger fw-semibold">{{ $fmt($marketplaceSpend) }}</td>
+                                        <td class="text-end text-danger fw-semibold"><div>{{ $fmt($marketplaceAdSales) }}</div><div class="small text-muted">AOV {{ $marketplaceAdConversions > 0 ? $fmt($marketplaceAdSales / $marketplaceAdConversions) : '—' }}</div></td>
+                                        <td class="text-end">{{ $marketplaceAdSales > 0 ? $percentDisplay(($marketplaceSpend / $marketplaceAdSales) * 100) : '—' }}</td>
+                                        <td class="text-end">{{ $marketplaceSpend > 0 ? $multipleDisplay($marketplaceAdSales / $marketplaceSpend) : '—' }}</td>
+                                        <td class="text-end pe-3">{{ $marketplaceAdConversions > 0 ? $fmt($marketplaceSpend / $marketplaceAdConversions) : '—' }}</td>
                                     </tr>
+                                    @foreach ($marketplaceProducts as $product)
+                                        <tr id="{{ $marketplaceKey }}-items-{{ $loop->index }}" data-sales-product-category-items="{{ $categoryKey }}" data-sales-product-marketplace-items="{{ $marketplaceKey }}" hidden>
+                                            <td class="sales-index-cell sales-product-item-index sales-product-internal-index" aria-label="Item internal {{ $categoryNumber }}.{{ $marketplaceNumber }}.{{ $loop->iteration }}"><span class="sales-product-item-number">{{ $categoryNumber }}.{{ $marketplaceNumber }}.{{ $loop->iteration }}</span></td>
+                                            <td class="fw-semibold sales-product-internal-cell">
+                                                <button type="button" class="sales-product-link" data-sales-product-name="{{ $product->name }}" data-sales-product-sku="{{ $product->sku }}" data-sales-product-internal-item-id="{{ $product->internal_item_id ?? '' }}" title="Lihat pesanan item internal: {{ $product->name }}">
+                                                    <span class="sales-product-name" title="{{ $product->name }}">{{ $product->name }}</span>
+                                                </button>
+                                            </td>
+                                            <td class="text-end">{{ number_format((int) $product->orders) }}</td>
+                                            <td class="text-end">{{ number_format((int) $product->qty) }}</td>
+                                            <td class="text-end fw-semibold"><div>{{ $fmt($product->sales) }}</div><div class="small text-muted">AOV {{ $product->orders > 0 ? $fmt($product->sales / $product->orders) : '—' }}</div></td>
+                                            <td class="text-end fw-semibold"><div>{{ $fmt($product->net_sales) }}</div><div class="small text-muted">AOV {{ $product->orders > 0 ? $fmt($product->net_sales / $product->orders) : '—' }}</div></td>
+                                            <td class="text-end fw-semibold"><div>{{ $fmt($product->buyer_payment) }}</div><div class="small text-muted">AOV {{ $product->orders > 0 ? $fmt($product->buyer_payment / $product->orders) : '—' }}</div></td>
+                                            <td class="text-end {{ ($product->ad_spend ?? 0) > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">{{ ($product->ad_spend_matched ?? false) ? $fmt($product->ad_spend) : '—' }}</td>
+                                            <td class="text-end text-danger {{ ($product->ad_sales ?? 0) > 0 ? 'fw-semibold' : 'text-muted' }}"><div>{{ ($product->ad_spend_matched ?? false) ? $fmt($product->ad_sales) : '—' }}</div><div class="small text-muted">AOV {{ ($product->ad_spend_matched ?? false) && ($product->ad_conversions ?? 0) > 0 ? $fmt($product->ad_sales / $product->ad_conversions) : '—' }}</div></td>
+                                            <td class="text-end">{{ ($product->ad_spend_matched ?? false) && ($product->ad_sales ?? 0) > 0 ? $percentDisplay(($product->ad_spend / $product->ad_sales) * 100) : '—' }}</td>
+                                            <td class="text-end">{{ ($product->ad_spend_matched ?? false) && ($product->ad_spend ?? 0) > 0 ? $multipleDisplay($product->ad_sales / $product->ad_spend) : '—' }}</td>
+                                            <td class="text-end pe-3">{{ ($product->ad_spend_matched ?? false) && ($product->ad_conversions ?? 0) > 0 ? $fmt($product->ad_spend / $product->ad_conversions) : '—' }}</td>
+                                        </tr>
+                                    @endforeach
                                 @endforeach
                             @endforeach
                         </tbody>
@@ -2081,6 +2128,26 @@
                 const expanded = trigger.getAttribute('aria-expanded') === 'true';
                 trigger.setAttribute('aria-expanded', expanded ? 'false' : 'true');
                 document.querySelectorAll('[data-sales-product-category-items="' + key + '"]').forEach(function (row) {
+                    row.hidden = expanded;
+                });
+                if (expanded) {
+                    document.querySelectorAll('[data-sales-product-marketplace-items]').forEach(function (row) {
+                        if (row.dataset.salesProductCategoryItems === key) row.hidden = true;
+                    });
+                    document.querySelectorAll('[data-sales-product-marketplace-toggle]').forEach(function (marketplaceTrigger) {
+                        const marketplaceKey = marketplaceTrigger.dataset.salesProductMarketplaceToggle || '';
+                        if (marketplaceKey.indexOf(key + '-') === 0) marketplaceTrigger.setAttribute('aria-expanded', 'false');
+                    });
+                }
+            });
+        });
+
+        document.querySelectorAll('[data-sales-product-marketplace-toggle]').forEach(function (trigger) {
+            trigger.addEventListener('click', function () {
+                const key = trigger.dataset.salesProductMarketplaceToggle || '';
+                const expanded = trigger.getAttribute('aria-expanded') === 'true';
+                trigger.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                document.querySelectorAll('[data-sales-product-marketplace-items="' + key + '"]').forEach(function (row) {
                     row.hidden = expanded;
                 });
             });
