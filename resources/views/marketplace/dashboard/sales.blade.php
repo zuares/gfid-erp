@@ -476,7 +476,7 @@
     .sales-dashboard .sales-product-comparison-table td { white-space: nowrap; }
     .sales-dashboard .sales-product-comparison-table th { font-size: .61rem; }
     .sales-dashboard .sales-product-comparison-table td { font-size: .72rem; }
-    .sales-dashboard .sales-category-comparison-table { min-width: 980px; }
+    .sales-dashboard .sales-category-comparison-table { min-width: 1120px; }
     .sales-dashboard .sales-category-comparison-table th,
     .sales-dashboard .sales-category-comparison-table td { white-space: nowrap; }
     .sales-dashboard .sales-category-comparison-table th { font-size: .61rem; }
@@ -485,6 +485,15 @@
     .sales-dashboard .sales-category-comparison-table .sales-category-delta.is-positive { color: var(--success, #16a34a); }
     .sales-dashboard .sales-category-comparison-table .sales-category-delta.is-negative { color: var(--danger, #dc2626); }
     .sales-dashboard .sales-category-comparison-table .sales-category-delta.is-neutral { color: var(--sales-muted); }
+    .sales-dashboard .sales-category-comparison-toggle { display: flex; width: 100%; align-items: center; gap: .45rem; border: 0; background: transparent; color: inherit; padding: 0; text-align: left; }
+    .sales-dashboard .sales-category-comparison-toggle:hover { color: var(--accent, #2563eb); }
+    .sales-dashboard .sales-category-comparison-toggle i { color: var(--accent, #2563eb); transition: transform .18s ease; }
+    .sales-dashboard .sales-category-comparison-toggle[aria-expanded="true"] i { transform: rotate(90deg); }
+    .sales-dashboard .sales-category-comparison-detail > td { padding: 0 !important; background: color-mix(in srgb, var(--sales-accent-soft) 14%, var(--sales-card) 86%); }
+    .sales-dashboard .sales-category-comparison-detail-card { padding: .85rem 1rem 1rem; border-top: 1px solid color-mix(in srgb, var(--sales-accent) 18%, var(--sales-line) 82%); }
+    .sales-dashboard .sales-category-comparison-detail-card .sales-kicker { font-size: .6rem; }
+    .sales-dashboard .sales-category-comparison-detail-card .sales-section-title { font-size: .9rem; }
+    .sales-dashboard .sales-category-comparison-detail-card .sales-product-comparison-table { min-width: 760px; }
     .sales-dashboard .sales-product-analysis-matrix-wrap { padding: 0 1.15rem 1.15rem; }
     .sales-dashboard .sales-product-analysis-matrix { width: 100%; table-layout: fixed; }
     .sales-dashboard .sales-product-analysis-matrix th,
@@ -894,6 +903,18 @@
     ];
     $categoryProductMetrics = function ($rows) {
         $rows = collect($rows);
+        $marketplaceProductKeys = $rows
+            ->map(function ($product) {
+                $externalItemId = trim((string) ($product->external_item_id ?? ''));
+                $marketplaceName = trim((string) ($product->marketplace_name ?? $product->name ?? ''));
+
+                return $externalItemId !== ''
+                    ? 'external:'.$externalItemId
+                    : ($marketplaceName !== '' ? 'name:'.$marketplaceName : null);
+            })
+            ->filter()
+            ->unique()
+            ->values();
         $orderKeys = $rows
             ->flatMap(fn ($product) => preg_split('/,/', (string) ($product->order_keys ?? ''), -1, PREG_SPLIT_NO_EMPTY))
             ->map(fn ($key) => trim((string) $key))
@@ -905,7 +926,8 @@
         $orders = $orderKeys->count();
 
         return [
-            'products' => $rows->count(),
+            'products' => $marketplaceProductKeys->count(),
+            'variants' => $rows->count(),
             'qty' => (int) $rows->sum('qty'),
             'orders' => $orders,
             'sales' => $sales,
@@ -963,6 +985,17 @@
         })
         ->sortByDesc(fn ($row) => (float) ($row['periods']['active']['metrics']['net_sales'] ?? 0))
         ->values();
+    $categoryProductComparisonRows = [
+        ['label' => 'Jumlah produk', 'key' => 'products', 'format' => $numberDisplay],
+        ['label' => 'Jumlah variant', 'key' => 'variants', 'format' => $numberDisplay],
+        ['label' => 'Order', 'key' => 'orders', 'format' => $numberDisplay],
+        ['label' => 'Terjual', 'key' => 'qty', 'format' => $numberDisplay],
+        ['label' => 'Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
+        ['label' => 'Penjualan Netto', 'key' => 'net_sales', 'format' => $currencyDisplay],
+        ['label' => 'AOV Penjualan', 'key' => 'aov_sales', 'format' => $currencyDisplay],
+        ['label' => 'Pembayaran Pembeli', 'key' => 'buyer_payment', 'format' => $currencyDisplay],
+        ['label' => 'AOV Pembayaran', 'key' => 'aov_payment', 'format' => $currencyDisplay],
+    ];
     $platformPromotionMetrics = function ($rows, $periodSummary, $promotionOrders = null) {
         $rows = collect($rows);
         $voucherSeller = (float) $rows->sum('voucher_store');
@@ -1593,7 +1626,9 @@
                                 <th class="ps-3">No.</th>
                                 <th>Kategori Item</th>
                                 <th class="text-end">Produk</th>
-                                <th class="text-end">Unit</th>
+                                <th class="text-end">Variant</th>
+                                <th class="text-end">Order</th>
+                                <th class="text-end">Terjual</th>
                                 @foreach ($categoryComparisonPeriods as $period)
                                     <th class="text-end">
                                         {{ $period['label'] }}
@@ -1608,6 +1643,7 @@
                         <tbody>
                             @foreach ($categoryComparisonRows as $categoryRow)
                                 @php
+                                    $categoryKey = 'sales-category-comparison-'.$loop->index;
                                     $activeCategoryMetrics = $categoryRow['periods']['active']['metrics'];
                                     $categoryDelta = (float) $categoryRow['delta'];
                                     $categoryDeltaPercent = $categoryRow['delta_percent'];
@@ -1616,10 +1652,17 @@
                                         ? ($activeCategoryMetrics['net_sales'] > 0 ? 'baru' : '—')
                                         : (($categoryDeltaPercent > 0 ? '+' : '').$percentDisplay($categoryDeltaPercent));
                                 @endphp
-                                <tr>
+                                <tr class="sales-category-comparison-row">
                                     <td class="ps-3 text-muted">{{ $loop->iteration }}</td>
-                                    <td class="fw-semibold sales-category-name" title="{{ $categoryRow['name'] }}">{{ $categoryRow['name'] }}</td>
+                                    <td class="fw-semibold sales-category-name" title="{{ $categoryRow['name'] }}">
+                                        <button type="button" class="sales-category-comparison-toggle" data-sales-category-comparison-toggle="{{ $categoryKey }}" aria-expanded="false" aria-controls="{{ $categoryKey }}-detail">
+                                            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                            <span>{{ $categoryRow['name'] }}</span>
+                                        </button>
+                                    </td>
                                     <td class="text-end">{{ number_format($activeCategoryMetrics['products']) }}</td>
+                                    <td class="text-end">{{ number_format($activeCategoryMetrics['variants']) }}</td>
+                                    <td class="text-end">{{ number_format($activeCategoryMetrics['orders']) }}</td>
                                     <td class="text-end">{{ number_format($activeCategoryMetrics['qty']) }}</td>
                                     @foreach ($categoryComparisonPeriods as $period)
                                         @php $categoryMetrics = $categoryRow['periods'][$period['key']]['metrics']; @endphp
@@ -1635,6 +1678,45 @@
                                         @endif
                                     </td>
                                     <td class="text-end pe-3 fw-semibold">{{ $percentDisplay($categoryRow['share']) }}</td>
+                                </tr>
+                                <tr id="{{ $categoryKey }}-detail" class="sales-category-comparison-detail" data-sales-category-comparison-items="{{ $categoryKey }}" hidden>
+                                    <td colspan="{{ 6 + $categoryComparisonPeriods->count() + 2 }}">
+                                        <div class="sales-category-comparison-detail-card">
+                                            <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+                                                <div>
+                                                    <div class="sales-kicker mb-1">Product comparison</div>
+                                                    <h3 class="sales-section-title mb-0">Perbandingan kinerja produk</h3>
+                                                </div>
+                                                <span class="badge sales-badge rounded-pill px-3 py-2">{{ $categoryRow['name'] }}</span>
+                                            </div>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-hover align-middle sales-table sales-product-comparison-table mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th class="ps-3">Metrik</th>
+                                                            @foreach ($categoryComparisonPeriods as $period)
+                                                                <th class="text-end">
+                                                                    {{ $period['label'] }}
+                                                                    <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
+                                                                </th>
+                                                            @endforeach
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach ($categoryProductComparisonRows as $comparisonRow)
+                                                            <tr>
+                                                                <td class="ps-3 fw-semibold">{{ $comparisonRow['label'] }}</td>
+                                                                @foreach ($categoryComparisonPeriods as $period)
+                                                                    @php $categoryComparisonValue = $categoryRow['periods'][$period['key']]['metrics'][$comparisonRow['key']] ?? null; @endphp
+                                                                    <td class="text-end">{{ $categoryComparisonValue === null ? '—' : $comparisonRow['format']($categoryComparisonValue) }}</td>
+                                                                @endforeach
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -2490,6 +2572,17 @@
                         if (marketplaceKey.indexOf(key + '-') === 0) marketplaceTrigger.setAttribute('aria-expanded', 'false');
                     });
                 }
+            });
+        });
+
+        document.querySelectorAll('[data-sales-category-comparison-toggle]').forEach(function (trigger) {
+            trigger.addEventListener('click', function () {
+                const key = trigger.dataset.salesCategoryComparisonToggle || '';
+                const expanded = trigger.getAttribute('aria-expanded') === 'true';
+                trigger.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                document.querySelectorAll('[data-sales-category-comparison-items="' + key + '"]').forEach(function (row) {
+                    row.hidden = expanded;
+                });
             });
         });
 
