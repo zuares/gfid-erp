@@ -401,6 +401,7 @@
     $numberDisplay = fn ($value) => number_format((float) $value, 0, ',', '.');
     $currencyDisplay = fn ($value) => $fmt($value);
     $percentDisplay = fn ($value) => number_format((float) $value, 1, ',', '.').'%';
+    $multipleDisplay = fn ($value) => number_format((float) $value, 2, ',', '.').'x';
     $platformPromotionMetrics = function ($rows, $periodSummary, $promotionOrders = null) {
         $rows = collect($rows);
         $voucherSeller = (float) $rows->sum('voucher_store');
@@ -486,8 +487,11 @@
         $period['metrics']['ad_sales'] = (float) ($period['data']['ad_sales'] ?? 0);
         $period['metrics']['ad_ctr'] = (float) ($period['data']['ad_ctr'] ?? 0);
         $period['metrics']['ad_cvr'] = (float) ($period['data']['ad_cvr'] ?? 0);
-        $period['metrics']['ad_rate'] = (float) ($period['metrics']['sales'] ?? 0) > 0
-            ? ($period['metrics']['ad_spend'] / (float) $period['metrics']['sales']) * 100
+        $period['metrics']['ad_roas'] = $period['metrics']['ad_spend'] > 0
+            ? $period['metrics']['ad_sales'] / $period['metrics']['ad_spend']
+            : 0;
+        $period['metrics']['ad_sales_rate'] = $period['metrics']['ad_sales'] > 0
+            ? ($period['metrics']['ad_spend'] / $period['metrics']['ad_sales']) * 100
             : 0;
         unset($period['data']);
 
@@ -505,6 +509,19 @@
         data_get($comparisonPeriodData, 'promotionOrders', 0),
     );
     $promotionFundingSections = [
+        [
+            'kicker' => 'Paid media efficiency',
+            'title' => 'Biaya Iklan',
+            'rows' => [
+                ['label' => 'Sales Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
+                ['label' => 'Order Iklan', 'key' => 'ad_orders', 'format' => $numberDisplay],
+                ['label' => 'ROAS', 'key' => 'ad_roas', 'format' => $multipleDisplay],
+                ['label' => 'CTR', 'key' => 'ad_ctr', 'format' => $percentDisplay],
+                ['label' => 'CVR', 'key' => 'ad_cvr', 'format' => $percentDisplay],
+                ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
+                ['label' => 'Rasio Iklan / Sales Iklan', 'key' => 'ad_sales_rate', 'format' => $percentDisplay],
+            ],
+        ],
         [
             'kicker' => 'Platform promotion',
             'title' => 'Promosi Platform',
@@ -548,20 +565,6 @@
                 ['label' => 'Rata-rata Promo', 'key' => 'combo_hemat_average', 'format' => $currencyDisplay],
                 ['label' => 'Kontribusi Sales', 'key' => 'combo_hemat_rate', 'format' => $percentDisplay],
             ],
-        ],
-    ];
-    $promotionFundingSections[] = [
-        'kicker' => 'Paid media efficiency',
-        'title' => 'Biaya Iklan',
-        'rows' => [
-            ['label' => 'Sales Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
-            ['label' => 'Order Iklan', 'key' => 'ad_orders', 'format' => $numberDisplay],
-            ['label' => 'Impression', 'key' => 'ad_impressions', 'format' => $numberDisplay],
-            ['label' => 'Klik', 'key' => 'ad_clicks', 'format' => $numberDisplay],
-            ['label' => 'CTR', 'key' => 'ad_ctr', 'format' => $percentDisplay],
-            ['label' => 'CVR', 'key' => 'ad_cvr', 'format' => $percentDisplay],
-            ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
-            ['label' => 'Rasio Iklan / GMV', 'key' => 'ad_rate', 'format' => $percentDisplay],
         ],
     ];
     $compareMetric = function ($current, $previous, callable $formatter, string $mode = 'relative', bool $higherIsBetter = true) {
