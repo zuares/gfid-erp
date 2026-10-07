@@ -393,7 +393,15 @@
     .sales-dashboard .sales-product-marketplace-toggle:hover { color: var(--accent, #2563eb); }
     .sales-dashboard .sales-product-marketplace-toggle i { color: var(--accent, #2563eb); transition: transform .18s ease; }
     .sales-dashboard .sales-product-marketplace-toggle[aria-expanded="true"] i { transform: rotate(90deg); }
-    .sales-dashboard .sales-product-internal-cell { padding-left: 1.35rem !important; }
+    .sales-dashboard .sales-product-marketplace-row td { background: color-mix(in srgb, var(--sales-accent-soft) 24%, var(--sales-card) 76%); border-top: 1px solid color-mix(in srgb, var(--sales-accent) 18%, var(--sales-line) 82%); }
+    .sales-dashboard .sales-product-marketplace-row .sales-product-marketplace-toggle { min-height: 2.15rem; }
+    .sales-dashboard .sales-product-marketplace-title { display: flex; min-width: 0; align-items: center; gap: .4rem; }
+    .sales-dashboard .sales-product-marketplace-code { flex: 0 0 auto; padding: .2rem .4rem; border: 1px solid color-mix(in srgb, var(--sales-accent) 20%, var(--sales-line) 80%); border-radius: 5px; background: var(--sales-accent-soft); color: var(--sales-accent); font-size: .58rem; font-weight: 800; letter-spacing: .025em; line-height: 1.1; }
+    .sales-dashboard .sales-product-marketplace-title .sales-product-name { min-width: 0; font-weight: 750; }
+    .sales-dashboard .sales-product-internal-row td { background: color-mix(in srgb, var(--sales-soft) 72%, var(--sales-card) 28%); }
+    .sales-dashboard .sales-product-internal-cell { padding-left: 1.85rem !important; }
+    .sales-dashboard .sales-product-internal-cell .sales-product-link { display: flex; align-items: center; gap: .45rem; }
+    .sales-dashboard .sales-product-internal-label { flex: 0 0 auto; color: var(--sales-muted); font-size: .56rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
     .sales-dashboard .sales-product-internal-index { color: var(--sales-muted); }
     .sales-dashboard .sales-product-group-title { font-size: .72rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
     .sales-dashboard .sales-product-group-meta { color: var(--sales-muted); font-size: .68rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
@@ -1463,7 +1471,13 @@
                                     $categoryKey = 'sales-product-category-'.$loop->index;
                                     $categoryProducts = $categoryProducts->values();
                                     $marketplaceGroups = $categoryProducts
-                                        ->groupBy(fn ($product) => trim((string) ($product->marketplace_name ?: $product->name)) ?: 'Produk tanpa nama')
+                                        ->groupBy(function ($product) {
+                                            $productCode = trim((string) ($product->external_item_id ?? ''));
+
+                                            return $productCode !== ''
+                                                ? 'code:'.$productCode
+                                                : 'title:'.(trim((string) ($product->marketplace_name ?: $product->name)) ?: 'Produk tanpa nama');
+                                        })
                                         ->sortByDesc(fn ($group) => (float) $group->sum('sales'))
                                         ->values();
                                     $categoryItemIds = $marketplaceGroups->keys()->map(fn ($index) => $categoryKey.'-marketplace-'.$index)->implode(' ');
@@ -1509,6 +1523,7 @@
                                         $marketplaceProducts = $marketplaceProducts->values();
                                         $marketplaceItemIds = $marketplaceProducts->keys()->map(fn ($index) => $marketplaceKey.'-items-'.$index)->implode(' ');
                                         $marketplace = $marketplaceProducts->first();
+                                        $marketplaceCode = trim((string) ($marketplace->external_item_id ?? ''));
                                         $marketplaceTitle = trim((string) ($marketplace->marketplace_name ?: $marketplace->name)) ?: 'Produk tanpa nama';
                                         $marketplaceOrders = (int) $marketplaceProducts->sum('orders');
                                         $marketplaceQty = (int) $marketplaceProducts->sum('qty');
@@ -1520,12 +1535,15 @@
                                         $marketplaceAdSales = (float) $marketplaceAdProducts->sum('ad_sales');
                                         $marketplaceAdConversions = (int) $marketplaceAdProducts->sum('ad_conversions');
                                     @endphp
-                                    <tr id="{{ $marketplaceKey }}" data-sales-product-category-items="{{ $categoryKey }}" hidden>
+                                    <tr id="{{ $marketplaceKey }}" class="sales-product-marketplace-row" data-sales-product-category-items="{{ $categoryKey }}" hidden>
                                         <td class="sales-index-cell sales-product-item-index" aria-label="Marketplace {{ $categoryNumber }}.{{ $marketplaceNumber }}"><span class="sales-product-item-number">{{ $categoryNumber }}.{{ $marketplaceNumber }}</span></td>
                                         <td class="fw-semibold">
                                             <button type="button" class="sales-product-marketplace-toggle" data-sales-product-marketplace-toggle="{{ $marketplaceKey }}" aria-expanded="false" aria-controls="{{ $marketplaceItemIds }}" title="{{ $marketplaceTitle }}">
                                                 <i class="bi bi-chevron-right" aria-hidden="true"></i>
-                                                <span>
+                                                <span class="sales-product-marketplace-title">
+                                                    @if ($marketplaceCode !== '')
+                                                        <span class="sales-product-marketplace-code" title="Kode produk marketplace">{{ $marketplaceCode }}</span>
+                                                    @endif
                                                     <span class="sales-product-name" title="{{ $marketplaceTitle }}">{{ $marketplaceTitle }}</span>
                                                     <span class="sales-product-group-meta">{{ number_format($marketplaceProducts->count()) }} item internal</span>
                                                 </span>
@@ -1543,10 +1561,11 @@
                                         <td class="text-end pe-3">{{ $marketplaceAdConversions > 0 ? $fmt($marketplaceSpend / $marketplaceAdConversions) : '—' }}</td>
                                     </tr>
                                     @foreach ($marketplaceProducts as $product)
-                                        <tr id="{{ $marketplaceKey }}-items-{{ $loop->index }}" data-sales-product-category-items="{{ $categoryKey }}" data-sales-product-marketplace-items="{{ $marketplaceKey }}" hidden>
+                                        <tr id="{{ $marketplaceKey }}-items-{{ $loop->index }}" class="sales-product-internal-row" data-sales-product-category-items="{{ $categoryKey }}" data-sales-product-marketplace-items="{{ $marketplaceKey }}" hidden>
                                             <td class="sales-index-cell sales-product-item-index sales-product-internal-index" aria-label="Item internal {{ $categoryNumber }}.{{ $marketplaceNumber }}.{{ $loop->iteration }}"><span class="sales-product-item-number">{{ $categoryNumber }}.{{ $marketplaceNumber }}.{{ $loop->iteration }}</span></td>
                                             <td class="fw-semibold sales-product-internal-cell">
                                                 <button type="button" class="sales-product-link" data-sales-product-name="{{ $product->name }}" data-sales-product-sku="{{ $product->sku }}" data-sales-product-internal-item-id="{{ $product->internal_item_id ?? '' }}" title="Lihat pesanan item internal: {{ $product->name }}">
+                                                    <span class="sales-product-internal-label">Internal</span>
                                                     <span class="sales-product-name" title="{{ $product->name }}">{{ $product->name }}</span>
                                                 </button>
                                             </td>
