@@ -1102,7 +1102,9 @@
                             <tr>
                                 <th>Tanggal</th>
                                 <th class="text-end">GMV</th>
+                                <th class="text-end">Biaya Iklan</th>
                                 <th class="text-end">Diskon Produk</th>
+                                <th class="text-end">Penjualan Neto</th>
                                 <th class="text-end">Voucher Toko</th>
                                 <th class="text-end">Voucher Platform</th>
                                 <th class="text-end">Paket Diskon</th>
@@ -1118,7 +1120,19 @@
                                         <div>{{ $fmt($row->order_before_discount ?? 0) }}</div>
                                     </td>
                                     <td class="text-end">
+                                        <div>{{ $fmt($adSpendDaily->get((string) $row->day, 0)) }}</div>
+                                    </td>
+                                    <td class="text-end">
                                         <div>{{ $fmt($row->product_discount) }}</div>
+                                    </td>
+                                    <td class="text-end fw-semibold">
+                                        <div>{{ $fmt(max(
+                                            (float) ($row->order_before_discount ?? 0)
+                                                - (float) ($row->voucher_store ?? 0)
+                                                - (float) ($row->bundle_discount ?? 0)
+                                                - (float) ($row->combo_hemat ?? 0),
+                                            0,
+                                        )) }}</div>
                                     </td>
                                     <td class="text-end">
                                         <div>{{ $fmt($row->voucher_store) }}</div>
