@@ -78,6 +78,7 @@
     $fmt = fn ($value) => 'Rp '.number_format((float) $value, 0, ',', '.');
     $dateLabel = $selectedDate->translatedFormat('d M Y');
     $dashboardQuery = ['date_from' => $selectedDate->toDateString(), 'date_to' => $selectedDate->toDateString(), 'tab' => 'payments'];
+    if (!empty($filters['platform'])) $dashboardQuery['platform'] = $filters['platform'];
     if ($filters['store_id']) $dashboardQuery['store_id'] = $filters['store_id'];
     if (!empty($filters['dummy'])) $dashboardQuery['dummy'] = 1;
 @endphp
@@ -89,7 +90,7 @@
             <div>
                 <div class="payment-kicker mb-2"><i class="bi bi-wallet2 me-1"></i>Detail pembayaran</div>
                 <h1 class="h3 payment-title mb-2">Pembayaran {{ $dateLabel }}</h1>
-                <p class="payment-muted mb-0">Audit status, metode, dan nilai setiap transaksi pada tanggal terpilih.</p>
+                <p class="payment-muted mb-0">Rincian nilai setiap transaksi pada tanggal terpilih.</p>
             </div>
             <div class="payment-period">
                 <span class="payment-period-icon"><i class="bi bi-calendar3"></i></span>
@@ -107,6 +108,9 @@
                 </div>
                 @if (!empty($filters['dummy']))
                     <input type="hidden" name="dummy" value="1">
+                @endif
+                @if (!empty($filters['platform']))
+                    <input type="hidden" name="platform" value="{{ $filters['platform'] }}">
                 @endif
                 @if ($stores->isNotEmpty())
                     <div class="col-12 col-md-3">
@@ -139,7 +143,7 @@
             <div>
                 <div class="payment-kicker mb-1">Transaction ledger</div>
                 <div class="payment-table-title">Daftar transaksi pembayaran</div>
-                <div class="payment-table-subtitle">Maksimal 500 transaksi terbaru pada tanggal ini.</div>
+                <div class="payment-table-subtitle">Maksimal 500 transaksi terbaru dengan rincian pembayaran.</div>
             </div>
             <span class="payment-count">{{ number_format($rows->count()) }} transaksi</span>
         </div>
@@ -149,7 +153,7 @@
             @else
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle payment-table">
-                        <thead><tr><th class="ps-3">Order</th><th>Tanggal Order</th><th>Toko / Channel</th><th>Pembeli</th><th>Metode</th><th>Paid At</th><th>Status</th><th class="text-end">Subtotal Produk</th><th class="text-end pe-3">Dibayar Pembeli</th></tr></thead>
+                        <thead><tr><th class="ps-3">Order</th><th>Tanggal Order</th><th>Toko / Channel</th><th>Pembeli</th><th>Metode</th><th class="text-end">Subtotal Pesanan</th><th class="text-end">Ongkos Kirim</th><th class="text-end">Voucher Shopee</th><th class="text-end">Voucher Toko</th><th class="text-end">Biaya Layanan</th><th class="text-end pe-3">Dibayar Pembeli</th></tr></thead>
                         <tbody>
                             @foreach ($rows as $row)
                                 <tr>
@@ -158,9 +162,11 @@
                                     <td><div class="fw-semibold">{{ $row->store }}</div><div class="small payment-muted">{{ $row->channel }}</div></td>
                                     <td>{{ $row->customer }}</td>
                                     <td><span class="payment-method">{{ ucwords(str_replace('_', ' ', strtolower($row->payment))) }}</span></td>
-                                    <td>{!! $row->paid_at ? '<div class="payment-date">'.\Carbon\Carbon::parse($row->paid_at)->format('d M Y').'</div><div class="payment-time">'.\Carbon\Carbon::parse($row->paid_at)->format('H:i').'</div>' : '<span class="payment-muted">Belum dibayar</span>' !!}</td>
-                                    <td><span class="payment-status {{ $row->is_paid ? 'paid' : 'pending' }}">{{ ucwords(str_replace('_', ' ', strtolower($row->payment_state))) }}</span></td>
                                     <td class="text-end">{{ $fmt($row->product_subtotal) }}</td>
+                                    <td class="text-end">{{ $fmt($row->shipping_fee) }}</td>
+                                    <td class="text-end">{{ $row->voucher_platform > 0 ? '-'.$fmt($row->voucher_platform) : $fmt(0) }}</td>
+                                    <td class="text-end">{{ $row->voucher_store > 0 ? '-'.$fmt($row->voucher_store) : $fmt(0) }}</td>
+                                    <td class="text-end">{{ $fmt($row->buyer_service_fee) }}</td>
                                     <td class="text-end pe-3"><span class="payment-amount">{{ $fmt($row->total_paid) }}</span></td>
                                 </tr>
                             @endforeach

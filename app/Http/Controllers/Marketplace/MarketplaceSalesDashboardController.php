@@ -1101,6 +1101,12 @@ SQL;
                 'o.payment_method',
                 'o.payment_status',
                 'o.shipping_fee_customer',
+                'o.raw_json as order_raw_json',
+                'o.raw_payload_json',
+                'o.voucher_discount',
+                'payment_ms.id as settlement_id',
+                'payment_ms.raw_json as settlement_raw_json',
+                'payment_ms.seller_voucher',
                 'st.name as store_name',
                 'ch.code as channel_code',
             ])
@@ -1127,6 +1133,28 @@ SQL;
                 $row->product_subtotal = (float) $row->product_subtotal;
                 $row->buyer_paid_amount = (float) $row->buyer_paid_amount;
                 $row->shipping_fee = (float) ($row->shipping_fee_customer ?? 0);
+                $isSettlementBacked = $row->settlement_id !== null;
+                $promotionAmounts = $isSettlementBacked
+                    ? $this->promotionAmountsFromSettlement(
+                        $row->settlement_raw_json,
+                        $row->order_raw_json ?? $row->raw_payload_json,
+                        (float) ($row->seller_voucher ?? 0),
+                    )
+                    : [
+                        'voucher_store' => (float) ($row->voucher_discount ?? 0),
+                        'voucher_platform' => 0.0,
+                    ];
+                $row->voucher_store = (float) ($promotionAmounts['voucher_store'] ?? 0);
+                $row->voucher_platform = (float) ($promotionAmounts['voucher_platform'] ?? 0);
+                $row->buyer_service_fee = $this->firstPayloadAmount(
+                    [$row->settlement_raw_json, $row->order_raw_json, $row->raw_payload_json],
+                    [
+                        'buyer_service_fee',
+                        'Buyer Service Fee',
+                        'promotion_breakdown.buyer_service_fee',
+                        'promotion_breakdown.Buyer Service Fee',
+                    ],
+                );
                 $row->total_paid = $row->buyer_paid_amount;
                 $row->is_paid = in_array((string) $row->payment_state, ['PAID', 'COMPLETED', 'SELESAI', 'LUNAS'], true);
 
@@ -1648,5 +1676,20 @@ SQL;
         }
 
         return is_array($payload) ? $payload : [];
+    }
+
+    private function firstPayloadAmount(array $payloads, array $keys): float
+    {
+        foreach ($payloads as $payload) {
+            $decoded = $this->decodePayload($payload);
+            foreach ($keys as $key) {
+                $value = data_get($decoded, $key);
+                if ($value !== null && $value !== '' && is_numeric($value)) {
+                    return abs((float) $value);
+                }
+            }
+        }
+
+        return 0.0;
     }
 }
