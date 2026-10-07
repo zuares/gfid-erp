@@ -229,6 +229,10 @@
     .sales-dashboard .sales-phase-dot--early { background: #60a5fa; }
     .sales-dashboard .sales-phase-dot--mid { background: #f59e0b; }
     .sales-dashboard .sales-phase-dot--late { background: #f87171; }
+    .sales-dashboard .sales-period-phase-badge { display: inline-flex; align-items: center; margin-top: .18rem; padding: .12rem .35rem; border-radius: 999px; font-size: .58rem; font-weight: 750; line-height: 1.1; }
+    .sales-dashboard .sales-period-phase-badge--early { color: #1d4ed8; background: #dbeafe; }
+    .sales-dashboard .sales-period-phase-badge--mid { color: #b45309; background: #fef3c7; }
+    .sales-dashboard .sales-period-phase-badge--late { color: #b91c1c; background: #fee2e2; }
     .sales-dashboard .sales-payment-table tr.sales-payment-phase--early > td:first-child { border-left: 3px solid #60a5fa; background: color-mix(in srgb, #60a5fa 7%, transparent); }
     .sales-dashboard .sales-payment-table tr.sales-payment-phase--mid > td:first-child { border-left: 3px solid #f59e0b; background: color-mix(in srgb, #f59e0b 7%, transparent); }
     .sales-dashboard .sales-payment-table tr.sales-payment-phase--late > td:first-child { border-left: 3px solid #f87171; background: color-mix(in srgb, #f87171 7%, transparent); }
@@ -811,6 +815,24 @@
             ['label' => $comparisonModeLabel, 'value' => $compareMetric($current, $previous, $formatter, $mode, $higherIsBetter)],
         ];
     };
+    $paymentDatePhase = function ($date): string {
+        $day = (int) \Carbon\Carbon::parse($date)->day;
+
+        return $day <= 10 ? 'early' : ($day <= 20 ? 'mid' : 'late');
+    };
+    $paymentPeriodPhases = function ($from, $to) use ($paymentDatePhase): array {
+        if (!$from || !$to) return [];
+        $phases = [];
+        $cursor = \Carbon\Carbon::parse($from)->startOfDay();
+        $end = \Carbon\Carbon::parse($to)->startOfDay();
+        while ($cursor->lte($end)) {
+            $phases[$paymentDatePhase($cursor)] = true;
+            $cursor->addDay();
+        }
+        $labels = ['early' => 'Awal', 'mid' => 'Tengah', 'late' => 'Akhir'];
+
+        return collect(array_keys($phases))->map(fn ($key) => ['key' => $key, 'label' => $labels[$key]])->all();
+    };
     $paymentComparisonPeriods = $comparisonMode === 'month'
         ? [
             ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'summary' => $paymentSummary, 'daily' => $paymentDaily],
@@ -824,9 +846,10 @@
             ['label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'summary' => data_get($comparisonPeriodPreviousData, 'paymentSummary', []), 'daily' => data_get($comparisonPeriodPreviousData, 'paymentDaily', [])],
             ['label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'summary' => data_get($comparisonPeriodPreviousTwoData, 'paymentSummary', []), 'daily' => data_get($comparisonPeriodPreviousTwoData, 'paymentDaily', [])],
         ];
-    $paymentComparisonPeriods = collect($paymentComparisonPeriods)->map(function ($period) {
+    $paymentComparisonPeriods = collect($paymentComparisonPeriods)->map(function ($period) use ($paymentPeriodPhases) {
         $summary = (array) ($period['summary'] ?? []);
         $daily = collect($period['daily'] ?? []);
+        $period['phases'] = $paymentPeriodPhases($period['from'] ?? null, $period['to'] ?? null);
         $period['metrics'] = [
             'orders' => (int) data_get($summary, 'orders', 0),
             'buyer_paid' => (float) data_get($summary, 'buyer_paid', 0),
@@ -861,11 +884,6 @@
         $orders = (int) data_get($summary, 'orders', 0);
 
         return $orders > 0 ? ((float) collect($daily)->sum($field) / $orders) * 100 : 0;
-    };
-    $paymentDatePhase = function ($date): string {
-        $day = (int) \Carbon\Carbon::parse($date)->day;
-
-        return $day <= 10 ? 'early' : ($day <= 20 ? 'mid' : 'late');
     };
 @endphp
 
@@ -1241,7 +1259,7 @@
                     <span class="badge sales-badge rounded-pill px-3 py-2">4 periode</span>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle sales-table mb-0">
+                    <table class="table table-sm table-hover align-middle sales-table sales-payment-comparison-table mb-0">
                         <thead>
                             <tr>
                                 <th class="ps-3">Metrik</th>
@@ -1249,6 +1267,9 @@
                                     <th class="text-end">
                                         {{ $period['label'] }}
                                         <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
+                                        @foreach ($period['phases'] as $phase)
+                                            <span class="sales-period-phase-badge sales-period-phase-badge--{{ $phase['key'] }}">{{ $phase['label'] }}</span>
+                                        @endforeach
                                     </th>
                                 @endforeach
                             </tr>
