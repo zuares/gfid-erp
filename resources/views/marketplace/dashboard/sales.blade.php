@@ -799,7 +799,7 @@
     })->all();
     $paymentComparisonRows = [
         ['label' => 'Buyer Paid', 'key' => 'buyer_paid', 'formatter' => $currencyDisplay],
-        ['label' => 'AOV Neto', 'key' => 'aov', 'formatter' => $currencyDisplay],
+        ['label' => 'AOV Buyer Paid', 'key' => 'aov', 'formatter' => $currencyDisplay],
         ['label' => 'COD Exposure', 'key' => 'cod_order_share', 'formatter' => $percentDisplay],
         ['label' => 'COD Nominal Share', 'key' => 'cod_amount_share', 'formatter' => $percentDisplay],
         ['label' => 'Non-COD Exposure', 'key' => 'non_cod_order_share', 'formatter' => $percentDisplay],
@@ -1174,7 +1174,7 @@
             'kpiTitle' => 'Pembayaran',
             'kpis' => [
                 ['label' => 'Total Dibayar Pembeli', 'value' => $fmt($paymentSummary['buyer_paid']), 'note' => number_format($paymentSummary['orders']).' orders', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($paymentSummary['buyer_paid'], $previousMonthPaymentSummary['buyer_paid'] ?? null, $previousPeriodPaymentSummary['buyer_paid'] ?? null, $currencyDisplay)],
-                ['label' => 'AOV Neto', 'value' => $fmt($paymentSummary['aov']), 'note' => 'per order', 'icon' => 'bi-graph-up-arrow', 'comparisons' => $kpiComparisons($paymentSummary['aov'], $previousMonthPaymentSummary['aov'] ?? null, $previousPeriodPaymentSummary['aov'] ?? null, $currencyDisplay)],
+                ['label' => 'AOV Buyer Paid', 'value' => $fmt($paymentSummary['aov']), 'note' => 'Buyer Paid per order', 'icon' => 'bi-graph-up-arrow', 'comparisons' => $kpiComparisons($paymentSummary['aov'], $previousMonthPaymentSummary['aov'] ?? null, $previousPeriodPaymentSummary['aov'] ?? null, $currencyDisplay)],
                 ['label' => 'Median Ticket', 'value' => $fmt($paymentSummary['median_ticket']), 'note' => 'nilai tengah order', 'icon' => 'bi-bar-chart-line', 'comparisons' => $kpiComparisons($paymentSummary['median_ticket'], $previousMonthPaymentSummary['median_ticket'] ?? null, $previousPeriodPaymentSummary['median_ticket'] ?? null, $currencyDisplay)],
                 ['label' => 'COD Exposure', 'value' => number_format($paymentSummary['cod_order_share'], 1).'%', 'note' => number_format($paymentDaily->sum('cod_orders')).' COD orders', 'icon' => 'bi-shield-exclamation', 'variant' => 'sales-kpi--warning', 'comparisons' => $kpiComparisons($paymentSummary['cod_order_share'], $previousMonthPaymentSummary['cod_order_share'] ?? null, $previousPeriodPaymentSummary['cod_order_share'] ?? null, $percentDisplay, 'points', false)],
             ],
@@ -1232,7 +1232,7 @@
                                     <tr><td class="ps-3 fw-semibold">Order</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ number_format((int) $payment->orders) }}</td>@endforeach</tr>
                                     <tr><td class="ps-3 fw-semibold">Dibayar Pembeli</td>@foreach ($paymentMix as $payment)<td class="text-end fw-semibold">{{ $fmt($payment->buyer_paid) }}</td>@endforeach</tr>
                                     <tr><td class="ps-3 fw-semibold">Share Nominal</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ number_format($paymentSummary['buyer_paid'] > 0 ? ($payment->buyer_paid / $paymentSummary['buyer_paid']) * 100 : 0, 1) }}%</td>@endforeach</tr>
-                                    <tr><td class="ps-3 fw-semibold">AOV Neto</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ $fmt($payment->avg_ticket) }}</td>@endforeach</tr>
+                                    <tr><td class="ps-3 fw-semibold">AOV Buyer Paid</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ $fmt($payment->avg_ticket) }}</td>@endforeach</tr>
                                     <tr><td class="ps-3 fw-semibold">Order Share</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ number_format($paymentSummary['orders'] > 0 ? ($payment->orders / $paymentSummary['orders']) * 100 : 0, 1) }}%</td>@endforeach</tr>
                                 </tbody>
                             </table>
@@ -1263,7 +1263,7 @@
                             <div class="small text-muted">{{ $topPaymentMethod ? $fmt($topPaymentMethod->buyer_paid) : 'Belum ada data' }}</div>
                         </div>
                         @if ($peakPaymentDay)
-                            <div class="small text-muted mt-3">Peak AOV Neto: <strong>{{ $fmt($peakPaymentDay->aov) }}</strong> · {{ $dateLabel($peakPaymentDay->day) }}</div>
+                            <div class="small text-muted mt-3">Peak AOV Buyer Paid: <strong>{{ $fmt($peakPaymentDay->aov) }}</strong> · {{ $dateLabel($peakPaymentDay->day) }}</div>
                         @endif
                     </div>
                 </section>
