@@ -315,21 +315,34 @@ class MarketplaceSalesDashboardController extends Controller
         $productLineNetValueExpression = 'CASE WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount WHEN COALESCE(oi.price_after_discount, 0) > 0 THEN oi.price_after_discount * COALESCE(oi.qty, 0) WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount ELSE 0 END';
         $marketplaceProductNameExpression = "COALESCE(NULLIF(oi.item_name, ''), NULLIF(oi.item_name_snapshot, ''), NULLIF(oi.variant_name, ''), NULLIF(oi.variant_snapshot, ''), 'Produk tanpa nama')";
         $marketplaceProductSkuExpression = "COALESCE(NULLIF(oi.item_sku, ''), NULLIF(oi.marketplace_sku, ''), NULLIF(oi.model_sku, ''), NULLIF(oi.external_sku, ''), NULLIF(oi.item_code_snapshot, ''), '-')";
-        $periodLastPurchaseOrderPriceExpression = "(SELECT period_pol.unit_price / COALESCE(NULLIF(period_pol.conversion_factor, 0), 1)
+        $periodPurchaseOrderConversionExpression = 'COALESCE(NULLIF(period_pol.conversion_factor, 0), NULLIF(internal_item.purchase_conversion_factor, 0), 1)';
+        $periodReceiptConversionExpression = 'COALESCE(NULLIF(period_prl.conversion_factor, 0), NULLIF(internal_item.purchase_conversion_factor, 0), 1)';
+        $periodLastPurchaseOrderPriceExpression = "(SELECT CASE
+                WHEN COALESCE(period_pol.line_total, 0) > 0 AND COALESCE(period_pol.qty, 0) > 0
+                    THEN 1.0 * period_pol.line_total / NULLIF(period_pol.qty * ({$periodPurchaseOrderConversionExpression}), 0)
+                ELSE 1.0 * period_pol.unit_price / NULLIF(({$periodPurchaseOrderConversionExpression}), 0)
+            END
             FROM purchase_order_lines as period_pol
             JOIN purchase_orders as period_po ON period_po.id = period_pol.purchase_order_id
             WHERE period_pol.item_id = internal_item.id
                 AND period_po.date <= ?
                 AND period_po.status NOT IN ('draft', 'cancelled', 'canceled', 'rejected')
+                AND COALESCE(period_pol.allocation, 'hpp') = 'hpp'
                 AND period_pol.unit_price > 0
             ORDER BY period_po.date DESC, period_po.id DESC, period_pol.id DESC
             LIMIT 1)";
-        $periodLastReceiptPriceExpression = "(SELECT period_prl.unit_price / COALESCE(NULLIF(period_prl.conversion_factor, 0), 1)
+        $periodLastReceiptPriceExpression = "(SELECT CASE
+                WHEN COALESCE(period_prl.line_total, 0) > 0
+                    AND COALESCE(NULLIF(period_prl.stock_qty_received, 0), period_prl.qty_received * ({$periodReceiptConversionExpression}), 0) > 0
+                    THEN 1.0 * period_prl.line_total / NULLIF(COALESCE(NULLIF(period_prl.stock_qty_received, 0), period_prl.qty_received * ({$periodReceiptConversionExpression})), 0)
+                ELSE 1.0 * period_prl.unit_price / NULLIF(({$periodReceiptConversionExpression}), 0)
+            END
             FROM purchase_receipt_lines as period_prl
             JOIN purchase_receipts as period_pr ON period_pr.id = period_prl.purchase_receipt_id
             WHERE period_prl.item_id = internal_item.id
                 AND period_pr.status = 'posted'
                 AND period_pr.date <= ?
+                AND COALESCE(period_prl.allocation, 'hpp') = 'hpp'
                 AND period_prl.unit_price > 0
             ORDER BY period_pr.date DESC, period_pr.id DESC, period_prl.id DESC
             LIMIT 1)";

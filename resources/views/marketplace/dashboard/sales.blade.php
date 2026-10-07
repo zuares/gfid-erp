@@ -471,6 +471,11 @@
     .sales-dashboard .sales-product-analysis-table .analysis-value.is-warning { color: var(--warning, #d97706); }
     .sales-dashboard .sales-product-analysis-table .analysis-value.is-danger { color: var(--danger, #dc2626); }
     .sales-dashboard .sales-product-analysis-table .analysis-value.is-muted { color: var(--sales-muted); }
+    .sales-dashboard .sales-product-comparison-table { min-width: 980px; }
+    .sales-dashboard .sales-product-comparison-table th,
+    .sales-dashboard .sales-product-comparison-table td { white-space: nowrap; }
+    .sales-dashboard .sales-product-comparison-table th { font-size: .61rem; }
+    .sales-dashboard .sales-product-comparison-table td { font-size: .72rem; }
     .sales-dashboard .sales-product-analysis-matrix-wrap { padding: 0 1.15rem 1.15rem; }
     .sales-dashboard .sales-product-analysis-matrix { width: 100%; table-layout: fixed; }
     .sales-dashboard .sales-product-analysis-matrix th,
@@ -628,6 +633,7 @@
 @section('content')
 @php
     $fmt = fn ($value) => 'Rp '.number_format((float) $value, 0, ',', '.');
+    $fmtHpp = fn ($value) => 'Rp '.number_format((float) $value, 2, ',', '.');
     $dateLabel = fn ($date) => \Carbon\Carbon::parse($date)->format('d M Y');
     $dateRangeLabel = fn ($from, $to) => $dateLabel($from).' – '.$dateLabel($to);
     $pct = fn ($value, $total) => $total > 0 ? number_format(((float) $value / (float) $total) * 100, 1, ',', '.') : '0,0';
@@ -803,6 +809,80 @@
     $currencyDisplay = fn ($value) => $fmt($value);
     $percentDisplay = fn ($value) => number_format((float) $value, 1, ',', '.').'%';
     $multipleDisplay = fn ($value) => number_format((float) $value, 2, ',', '.').'x';
+    $productComparisonMetrics = function ($rows, $periodSummary) {
+        $rows = collect($rows);
+        $orders = (int) data_get($periodSummary, 'orders', 0);
+        $sales = (float) $rows->sum('sales');
+        $netSales = (float) $rows->sum(fn ($product) => (float) ($product->net_sales ?? $product->sales ?? 0));
+        $buyerPayment = (float) $rows->sum('buyer_payment');
+        $costedProducts = $rows->filter(fn ($product) => $product->gross_profit !== null);
+        $hpp = (float) $costedProducts->sum(fn ($product) => (float) ($product->hpp_total ?? ((float) ($product->hpp ?? 0) * (int) ($product->qty ?? 0))));
+        $grossProfit = (float) $costedProducts->sum('gross_profit');
+        $adProducts = $rows->filter(fn ($product) => $product->ad_spend_matched ?? false);
+        $adSpend = (float) $adProducts->sum('ad_spend');
+        $adSales = (float) $adProducts->sum('ad_sales');
+        $adConversions = (int) $adProducts->sum('ad_conversions');
+        $contributionProfit = (float) $costedProducts->sum(fn ($product) => (float) ($product->contribution_profit ?? ((float) ($product->gross_profit ?? 0) - (float) ($product->ad_spend ?? 0))));
+        $mappedProducts = $rows->filter(fn ($product) => (int) ($product->internal_item_id ?? 0) > 0)->count();
+
+        return [
+            'products' => $rows->count(),
+            'qty' => (int) $rows->sum('qty'),
+            'sales' => $sales,
+            'net_sales' => $netSales,
+            'buyer_payment' => $buyerPayment,
+            'aov_sales' => $orders > 0 ? $sales / $orders : 0,
+            'aov_payment' => $orders > 0 ? $buyerPayment / $orders : 0,
+            'hpp' => $hpp,
+            'gross_profit' => $grossProfit,
+            'gross_margin' => $netSales > 0 ? ($grossProfit / $netSales) * 100 : null,
+            'contribution_profit' => $contributionProfit,
+            'contribution_margin' => $netSales > 0 ? ($contributionProfit / $netSales) * 100 : null,
+            'ad_spend' => $adSpend,
+            'ad_sales' => $adSales,
+            'acos' => $adSales > 0 ? ($adSpend / $adSales) * 100 : null,
+            'roas' => $adSpend > 0 ? $adSales / $adSpend : null,
+            'cpa' => $adConversions > 0 ? $adSpend / $adConversions : null,
+            'mapping_rate' => $rows->count() > 0 ? ($mappedProducts / $rows->count()) * 100 : 0,
+        ];
+    };
+    $productComparisonPeriods = $comparisonMode === 'month'
+        ? [
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products, 'summary' => $summary],
+            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'products' => $previousMonthProducts, 'summary' => $previousMonthSummary],
+            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousData, 'products', [])), 'summary' => data_get($comparisonMonthPreviousData, 'summary', [])],
+            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousTwoData, 'products', [])), 'summary' => data_get($comparisonMonthPreviousTwoData, 'summary', [])],
+        ]
+        : [
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products, 'summary' => $summary],
+            ['label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'products' => $previousPeriodProducts, 'summary' => $previousPeriodSummary],
+            ['label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousData, 'products', [])), 'summary' => data_get($comparisonPeriodPreviousData, 'summary', [])],
+            ['label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousTwoData, 'products', [])), 'summary' => data_get($comparisonPeriodPreviousTwoData, 'summary', [])],
+        ];
+    $productComparisonPeriods = collect($productComparisonPeriods)->map(function ($period) use ($productComparisonMetrics) {
+        $period['metrics'] = $productComparisonMetrics($period['products'], $period['summary']);
+        unset($period['products'], $period['summary']);
+
+        return $period;
+    })->all();
+    $productComparisonRows = [
+        ['label' => 'Produk aktif', 'key' => 'products', 'format' => $numberDisplay],
+        ['label' => 'Unit terjual', 'key' => 'qty', 'format' => $numberDisplay],
+        ['label' => 'Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
+        ['label' => 'Penjualan Netto', 'key' => 'net_sales', 'format' => $currencyDisplay],
+        ['label' => 'AOV Penjualan', 'key' => 'aov_sales', 'format' => $currencyDisplay],
+        ['label' => 'Pembayaran Pembeli', 'key' => 'buyer_payment', 'format' => $currencyDisplay],
+        ['label' => 'AOV Pembayaran', 'key' => 'aov_payment', 'format' => $currencyDisplay],
+        ['label' => 'Total HPP', 'key' => 'hpp', 'format' => $fmtHpp],
+        ['label' => 'Kontribusi Setelah Iklan', 'key' => 'contribution_profit', 'format' => $currencyDisplay],
+        ['label' => 'Margin Kontribusi', 'key' => 'contribution_margin', 'format' => $percentDisplay],
+        ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
+        ['label' => 'Penjualan Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
+        ['label' => 'ACOS', 'key' => 'acos', 'format' => $percentDisplay],
+        ['label' => 'ROAS', 'key' => 'roas', 'format' => $multipleDisplay],
+        ['label' => 'CPA', 'key' => 'cpa', 'format' => $currencyDisplay],
+        ['label' => 'Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
+    ];
     $platformPromotionMetrics = function ($rows, $periodSummary, $promotionOrders = null) {
         $rows = collect($rows);
         $voucherSeller = (float) $rows->sum('voucher_store');
@@ -1376,6 +1456,45 @@
                 ['label' => 'Pembeli Produk', 'value' => number_format($topProductBuyers), 'note' => 'seluruh produk', 'icon' => 'bi-people', 'comparisons' => $kpiComparisons($topProductBuyers, $previousMonthTopProductBuyers, $previousPeriodTopProductBuyers, $numberDisplay)],
             ],
         ])
+        @if ($activeComparison)
+            <section class="card sales-card shadow-sm mb-3">
+                <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-2">
+                    <div>
+                        <div class="sales-kicker mb-1">Product comparison</div>
+                        <h2 class="sales-section-title mb-1">Perbandingan kinerja produk</h2>
+                    </div>
+                    <span class="badge sales-badge rounded-pill px-3 py-2">4 periode</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle sales-table sales-product-comparison-table mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">Metrik</th>
+                                @foreach ($productComparisonPeriods as $period)
+                                    <th class="text-end">
+                                        {{ $period['label'] }}
+                                        <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
+                                    </th>
+                                @endforeach
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($productComparisonRows as $row)
+                                <tr>
+                                    <td class="ps-3 fw-semibold">{{ $row['label'] }}</td>
+                                    @foreach ($productComparisonPeriods as $period)
+                                        @php
+                                            $comparisonValue = $period['metrics'][$row['key']] ?? null;
+                                        @endphp
+                                        <td class="text-end">{{ $comparisonValue === null ? '—' : $row['format']($comparisonValue) }}</td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        @endif
         <section class="card sales-card sales-product-analysis-section shadow-sm mb-3">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
@@ -1399,7 +1518,7 @@
                 </div>
                 <div class="sales-product-analysis-kpi">
                     <span class="sales-product-analysis-kpi-label">Top 10 Konsentrasi</span>
-                    <span class="sales-product-analysis-kpi-value {{ ($productAnalysisSales > 0 ? ($productAnalysisTop10Sales / $productAnalysisSales) : 0) <= .6 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisSales > 0 ? $percentDisplay(($productAnalysisTop10Sales / $productAnalysisSales) * 100) : '—' }}</span>
+                    <span class="sales-product-analysis-kpi-value {{ ($productAnalysisNetSales > 0 ? ($productAnalysisTop10Sales / $productAnalysisNetSales) : 0) <= .6 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisTop10Sales / $productAnalysisNetSales) * 100) : '—' }}</span>
                 </div>
                 <div class="sales-product-analysis-kpi">
                     <span class="sales-product-analysis-kpi-label">Mapping Internal</span>
@@ -1423,7 +1542,7 @@
                             <tr><td class="analysis-label" colspan="2">AOV penjualan</td><td class="text-end analysis-value">{{ $summary['orders'] > 0 ? $fmt($productAnalysisSales / $summary['orders']) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">AOV pembayaran</td><td class="text-end analysis-value">{{ $summary['orders'] > 0 ? $fmt($productAnalysisBuyerPayment / $summary['orders']) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">HPP terukur</td><td class="text-end analysis-value">{{ number_format($productAnalysisCostedProducts->count()) }} / {{ number_format($productAnalysisProducts->count()) }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Total HPP</td><td class="text-end analysis-value">{{ $productAnalysisHpp > 0 ? $fmt($productAnalysisHpp) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Total HPP</td><td class="text-end analysis-value">{{ $productAnalysisHpp > 0 ? $fmtHpp($productAnalysisHpp) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Margin kotor</td><td class="text-end analysis-value {{ $productAnalysisGrossMargin >= 25 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisGrossMargin !== 0 ? $percentDisplay($productAnalysisGrossMargin) : '—' }}</td></tr>
                         </tbody>
                     </table>
@@ -1551,7 +1670,7 @@
                                             </span>
                                         </button>
                                     </td>
-                                    <td class="text-end fw-semibold"><div>{{ $categoryHppTotal > 0 ? $fmt($categoryHppTotal) : '—' }}</div><div class="small text-muted">Total HPP</div></td>
+                                    <td class="text-end fw-semibold"><div>{{ $categoryHppTotal > 0 ? $fmtHpp($categoryHppTotal) : '—' }}</div><div class="small text-muted">Total HPP</div></td>
                                     <td class="text-end">{{ number_format($categoryOrders) }}</td>
                                     <td class="text-end">{{ number_format($categoryQty) }}</td>
                                     <td class="text-end fw-semibold"><div>{{ $fmt($categorySales) }}</div><div class="small text-muted">AOV {{ $categoryOrders > 0 ? $fmt($categorySales / $categoryOrders) : '—' }}</div></td>
@@ -1608,7 +1727,7 @@
                                                 </span>
                                             </button>
                                         </td>
-                                        <td class="text-end fw-semibold"><div>{{ $marketplaceHppTotal > 0 ? $fmt($marketplaceHppTotal) : '—' }}</div><div class="small text-muted">Total HPP</div></td>
+                                        <td class="text-end fw-semibold"><div>{{ $marketplaceHppTotal > 0 ? $fmtHpp($marketplaceHppTotal) : '—' }}</div><div class="small text-muted">Total HPP</div></td>
                                         <td class="text-end">{{ number_format($marketplaceOrders) }}</td>
                                         <td class="text-end">{{ number_format($marketplaceQty) }}</td>
                                         <td class="text-end fw-semibold"><div>{{ $fmt($marketplaceSales) }}</div><div class="small text-muted">AOV {{ $marketplaceOrders > 0 ? $fmt($marketplaceSales / $marketplaceOrders) : '—' }}</div></td>
@@ -1634,7 +1753,7 @@
                                                     <span class="sales-product-internal-code" title="{{ $internalProductCode }}">{{ $internalProductCode }}</span>
                                                 </button>
                                             </td>
-                                            <td class="text-end fw-semibold"><div>{{ (float) ($product->hpp ?? 0) > 0 ? $fmt($product->hpp) : '—' }}</div><div class="small text-muted">HPP/unit</div></td>
+                                            <td class="text-end fw-semibold"><div>{{ (float) ($product->hpp ?? 0) > 0 ? $fmtHpp($product->hpp) : '—' }}</div><div class="small text-muted">HPP/unit</div></td>
                                             <td class="text-end">{{ number_format((int) $product->orders) }}</td>
                                             <td class="text-end">{{ number_format((int) $product->qty) }}</td>
                                             <td class="text-end fw-semibold"><div>{{ $fmt($product->sales) }}</div><div class="small text-muted">AOV {{ $product->orders > 0 ? $fmt($product->sales / $product->orders) : '—' }}</div></td>
