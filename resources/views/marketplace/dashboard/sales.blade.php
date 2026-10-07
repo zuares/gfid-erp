@@ -43,7 +43,10 @@
     .sales-dashboard .sales-subtitle,
     .sales-dashboard .sales-section-subtitle { display: none; }
 
-    .sales-dashboard .sales-filter-card { background: color-mix(in srgb, var(--sales-card) 92%, var(--sales-bg) 8%); }
+    .sales-dashboard .sales-filter-card {
+        background: color-mix(in srgb, var(--sales-card) 92%, var(--sales-bg) 8%);
+        box-shadow: 0 6px 18px rgba(15, 23, 42, .07);
+    }
     .sales-dashboard .sales-filter-card .form-label {
         color: var(--sales-muted);
         font-size: .74rem;
@@ -83,17 +86,45 @@
     }
     .sales-dashboard .sales-nav-comparison {
         flex: 0 0 auto;
-        display: flex;
+        display: inline-flex;
         align-items: center;
-        gap: .45rem;
-        padding: .25rem .5rem .25rem .75rem;
-        border: 1px solid var(--sales-line);
-        border-radius: 12px;
-        background: var(--sales-card);
+        gap: .2rem;
+        margin-left: auto;
+        padding: .2rem;
+        border-left: 1px solid var(--sales-line);
     }
-    .sales-dashboard .sales-nav-comparison .sales-filter-label { margin: 0; white-space: nowrap; }
-    .sales-dashboard .sales-nav-comparison .form-select { min-width: 170px; }
-    .sales-dashboard .sales-nav-comparison-date { white-space: nowrap; font-size: .72rem; }
+    .sales-dashboard .sales-nav-comparison-label {
+        display: inline-flex;
+        align-items: center;
+        gap: .3rem;
+        padding: .45rem .5rem .45rem .65rem;
+        color: var(--sales-muted);
+        font-size: .61rem;
+        font-weight: 800;
+        letter-spacing: .055em;
+        line-height: 1;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+    .sales-dashboard .sales-nav-comparison-label i { color: var(--sales-accent); font-size: .7rem; }
+    .sales-dashboard .sales-comparison-tab {
+        border: 0;
+        border-radius: 7px;
+        padding: .45rem .65rem;
+        color: var(--sales-muted);
+        background: transparent;
+        font-size: .72rem;
+        font-weight: 700;
+        line-height: 1;
+        white-space: nowrap;
+        transition: background .16s ease, color .16s ease, box-shadow .16s ease;
+    }
+    .sales-dashboard .sales-comparison-tab:hover { color: var(--sales-accent); background: var(--sales-accent-soft); }
+    .sales-dashboard .sales-comparison-tab.active {
+        color: var(--sales-accent);
+        background: var(--sales-accent-soft);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sales-accent) 12%, var(--sales-line) 88%);
+    }
     .sales-dashboard .sales-nav .nav-link {
         border: 0;
         color: var(--sales-muted);
@@ -451,8 +482,8 @@
         .sales-dashboard .sales-filter-store,
         .sales-dashboard .sales-filter-comparison { width: auto; }
         .sales-dashboard .sales-nav-shell { align-items: stretch; flex-direction: column; }
-        .sales-dashboard .sales-nav-comparison { justify-content: space-between; }
-        .sales-dashboard .sales-nav-comparison .form-select { min-width: 0; flex: 1 1 auto; }
+        .sales-dashboard .sales-nav-comparison { margin-left: .25rem; }
+        .sales-dashboard .sales-nav-comparison-label { padding-left: .35rem; }
     }
 </style>
 @endpush
@@ -538,12 +569,6 @@
     $comparisonPeriodData = $comparisonPeriod['data'] ?? null;
     $comparisonPeriodPreviousData = $comparisonPeriodPrevious['data'] ?? null;
     $comparisonPeriodPreviousTwoData = $comparisonPeriodPreviousTwo['data'] ?? null;
-    $comparisonMonthLabel = $comparisonMonth
-        ? $dateLabel($comparisonMonth['from']).' – '.$dateLabel($comparisonMonth['to'])
-        : 'bulan lalu';
-    $comparisonPeriodLabel = $comparisonPeriod
-        ? $dateLabel($comparisonPeriod['from']).' – '.$dateLabel($comparisonPeriod['to'])
-        : 'periode lalu';
     $activeComparison = $comparisonMode === 'month' ? $comparisonMonth : $comparisonPeriod;
     $previousMonthSummary = data_get($comparisonMonthData, 'summary', []);
     $previousPeriodSummary = data_get($comparisonPeriodData, 'summary', []);
@@ -823,6 +848,11 @@
         ['label' => 'Non-COD %', 'key' => 'non_cod_order_share', 'formatter' => $percentDisplay],
         ['label' => 'Pay Later %', 'key' => 'pay_later_order_share', 'formatter' => $percentDisplay],
     ];
+    $paymentOrderShare = function ($summary, $daily, string $field): float {
+        $orders = (int) data_get($summary, 'orders', 0);
+
+        return $orders > 0 ? ((float) collect($daily)->sum($field) / $orders) * 100 : 0;
+    };
 @endphp
 
 <div class="container-fluid py-4 sales-dashboard">
@@ -848,6 +878,7 @@
                     <input type="hidden" name="dummy" value="1">
                 @endif
                 <input type="hidden" name="tab" id="sales-active-tab" value="{{ $activeTab }}">
+                <input type="hidden" name="comparison_mode" id="sales-comparison-mode" value="{{ $comparisonMode }}">
                 <div class="col-12 col-md-auto sales-filter-scope" role="group" aria-label="Filter analitik">
                     @if ($platforms->isNotEmpty())
                         <div class="sales-filter-field sales-filter-platform">
@@ -898,15 +929,12 @@
         <button class="nav-link {{ $activeTab === 'shipping' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'shipping' ? 'true' : 'false' }}" data-sales-tab="shipping"><i class="bi bi-truck me-1"></i>Pengiriman</button>
         <button class="nav-link {{ $activeTab === 'income' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'income' ? 'true' : 'false' }}" data-sales-tab="income"><i class="bi bi-cash-coin me-1"></i>Penghasilan</button>
         <button class="nav-link {{ $activeTab === 'orders' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'orders' ? 'true' : 'false' }}" data-sales-tab="orders"><i class="bi bi-list-ul me-1"></i>Detail Pesanan</button>
-        </nav>
         <div class="sales-nav-comparison" role="group" aria-label="Perbandingan periode">
-            <label class="sales-filter-label" for="sales-comparison-mode"><i class="bi bi-arrow-left-right" aria-hidden="true"></i>Bandingkan</label>
-            <select id="sales-comparison-mode" class="form-select form-select-sm" name="comparison_mode" form="sales-filter-form">
-                <option value="period" @selected($comparisonMode === 'period')>Periode lalu</option>
-                <option value="month" @selected($comparisonMode === 'month')>Bln sama · tanggal sama</option>
-            </select>
-            <span class="sales-nav-comparison-date text-muted" title="Periode pembanding">{{ $comparisonMode === 'month' ? $comparisonMonthLabel : $comparisonPeriodLabel }}</span>
+            <span class="sales-nav-comparison-label"><i class="bi bi-arrow-left-right" aria-hidden="true"></i>Bandingkan</span>
+            <button type="button" class="sales-comparison-tab {{ $comparisonMode === 'period' ? 'active' : '' }}" data-comparison-mode="period" aria-pressed="{{ $comparisonMode === 'period' ? 'true' : 'false' }}">Periode lalu</button>
+            <button type="button" class="sales-comparison-tab {{ $comparisonMode === 'month' ? 'active' : '' }}" data-comparison-mode="month" aria-pressed="{{ $comparisonMode === 'month' ? 'true' : 'false' }}">Bulan lalu</button>
         </div>
+        </nav>
     </div>
 
     <div class="sales-tab-pane {{ $activeTab === 'sales' ? '' : 'is-hidden' }}" data-sales-pane="sales" role="tabpanel" aria-hidden="{{ $activeTab === 'sales' ? 'false' : 'true' }}">
@@ -1185,6 +1213,8 @@
                 ['label' => 'AOV Buyer Paid', 'value' => $fmt($paymentSummary['aov']), 'note' => 'Buyer Paid per order', 'icon' => 'bi-graph-up-arrow', 'comparisons' => $kpiComparisons($paymentSummary['aov'], $previousMonthPaymentSummary['aov'] ?? null, $previousPeriodPaymentSummary['aov'] ?? null, $currencyDisplay)],
                 ['label' => 'Seller Net Sales', 'value' => $fmt($paymentDaily->sum('seller_net_sales')), 'note' => 'setelah diskon seller', 'icon' => 'bi-graph-down-arrow', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($paymentDaily->sum('seller_net_sales'), $previousMonthPaymentDaily->sum('seller_net_sales'), $previousPeriodPaymentDaily->sum('seller_net_sales'), $currencyDisplay)],
                 ['label' => 'COD Exposure', 'value' => number_format($paymentSummary['cod_order_share'], 1).'%', 'note' => number_format($paymentDaily->sum('cod_orders')).' COD orders', 'icon' => 'bi-shield-exclamation', 'variant' => 'sales-kpi--warning', 'comparisons' => $kpiComparisons($paymentSummary['cod_order_share'], $previousMonthPaymentSummary['cod_order_share'] ?? null, $previousPeriodPaymentSummary['cod_order_share'] ?? null, $percentDisplay, 'points', false)],
+                ['label' => 'Non-COD %', 'value' => $percentDisplay($paymentOrderShare($paymentSummary, $paymentDaily, 'non_cod_orders')), 'note' => number_format($paymentDaily->sum('non_cod_orders')).' orders', 'icon' => 'bi-credit-card-2-front', 'comparisons' => $kpiComparisons($paymentOrderShare($paymentSummary, $paymentDaily, 'non_cod_orders'), $paymentOrderShare($previousMonthPaymentSummary, $previousMonthPaymentDaily, 'non_cod_orders'), $paymentOrderShare($previousPeriodPaymentSummary, $previousPeriodPaymentDaily, 'non_cod_orders'), $percentDisplay, 'points')],
+                ['label' => 'Pay Later %', 'value' => $percentDisplay($paymentOrderShare($paymentSummary, $paymentDaily, 'pay_later_orders')), 'note' => number_format($paymentDaily->sum('pay_later_orders')).' orders', 'icon' => 'bi-clock-history', 'comparisons' => $kpiComparisons($paymentOrderShare($paymentSummary, $paymentDaily, 'pay_later_orders'), $paymentOrderShare($previousMonthPaymentSummary, $previousMonthPaymentDaily, 'pay_later_orders'), $paymentOrderShare($previousPeriodPaymentSummary, $previousPeriodPaymentDaily, 'pay_later_orders'), $percentDisplay, 'points')],
             ],
         ])
         @if ($activeComparison)
@@ -1555,8 +1585,8 @@
         const activeTabInput = document.querySelector('#sales-active-tab');
         const storeInput = document.querySelector('#sales-store');
         const platformInput = document.querySelector('#sales-platform');
-        const comparisonModeInput = document.querySelector('#sales-comparison-mode');
         const orderRows = document.querySelectorAll('[data-sales-order-row]');
+        const comparisonModeInput = document.querySelector('#sales-comparison-mode');
         const orderDate = document.querySelector('#sales-order-detail-date');
         const orderCount = document.querySelector('[data-sales-order-count]');
         const orderEmpty = document.querySelector('[data-sales-order-empty]');
@@ -1633,11 +1663,14 @@
             });
         }
 
-        if (comparisonModeInput && filterForm) {
-            comparisonModeInput.addEventListener('change', function () {
+        document.querySelectorAll('[data-comparison-mode]').forEach(function (comparisonTab) {
+            comparisonTab.addEventListener('click', function () {
+                if (!comparisonModeInput || !filterForm) return;
+
+                comparisonModeInput.value = comparisonTab.dataset.comparisonMode;
                 filterForm.requestSubmit();
             });
-        }
+        });
 
         document.querySelectorAll('[data-sales-order-detail-date]').forEach(function (trigger) {
             function openOrderDetail() {
