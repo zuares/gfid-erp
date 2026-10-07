@@ -229,7 +229,9 @@
     .sales-dashboard .sales-phase-dot--early { background: #60a5fa; }
     .sales-dashboard .sales-phase-dot--mid { background: #f59e0b; }
     .sales-dashboard .sales-phase-dot--late { background: #f87171; }
-    .sales-dashboard .sales-period-phase-badge { display: inline-flex; align-items: center; margin-top: .18rem; padding: .12rem .35rem; border-radius: 999px; font-size: .58rem; font-weight: 750; line-height: 1.1; }
+    .sales-dashboard .sales-period-phase-badge { display: inline-flex; align-items: center; gap: .2rem; margin-top: .18rem; padding: .14rem .4rem; border-radius: 999px; font-size: .58rem; font-weight: 750; line-height: 1.1; white-space: nowrap; }
+    .sales-dashboard .sales-period-phase-badge .sales-phase-dot { width: .4rem; height: .4rem; }
+    .sales-dashboard .sales-period-phase-range { opacity: .78; font-weight: 650; }
     .sales-dashboard .sales-period-phase-badge--early { color: #1d4ed8; background: #dbeafe; }
     .sales-dashboard .sales-period-phase-badge--mid { color: #b45309; background: #fef3c7; }
     .sales-dashboard .sales-period-phase-badge--late { color: #b91c1c; background: #fee2e2; }
@@ -829,9 +831,13 @@
             $phases[$paymentDatePhase($cursor)] = true;
             $cursor->addDay();
         }
-        $labels = ['early' => 'Awal', 'mid' => 'Tengah', 'late' => 'Akhir'];
+        $labels = [
+            'early' => ['label' => 'Awal bulan', 'range' => '1–10'],
+            'mid' => ['label' => 'Pertengahan', 'range' => '11–20'],
+            'late' => ['label' => 'Akhir bulan', 'range' => '21+'],
+        ];
 
-        return collect(array_keys($phases))->map(fn ($key) => ['key' => $key, 'label' => $labels[$key]])->all();
+        return collect(array_keys($phases))->map(fn ($key) => ['key' => $key, ...$labels[$key]])->all();
     };
     $paymentComparisonPeriods = $comparisonMode === 'month'
         ? [
@@ -1268,7 +1274,11 @@
                                         {{ $period['label'] }}
                                         <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
                                         @foreach ($period['phases'] as $phase)
-                                            <span class="sales-period-phase-badge sales-period-phase-badge--{{ $phase['key'] }}">{{ $phase['label'] }}</span>
+                                            <span class="sales-period-phase-badge sales-period-phase-badge--{{ $phase['key'] }}" title="{{ $phase['label'] }}: tanggal {{ $phase['range'] }}">
+                                                <i class="sales-phase-dot sales-phase-dot--{{ $phase['key'] }}"></i>
+                                                {{ $phase['label'] }}
+                                                <span class="sales-period-phase-range">{{ $phase['range'] }}</span>
+                                            </span>
                                         @endforeach
                                     </th>
                                 @endforeach
@@ -1349,9 +1359,9 @@
                     <h2 class="sales-section-title mb-1">Daya beli per tanggal</h2>
                 </div>
                 <div class="sales-phase-legend" aria-label="Fase periode">
-                    <span><i class="sales-phase-dot sales-phase-dot--early"></i>Awal 1–10</span>
-                    <span><i class="sales-phase-dot sales-phase-dot--mid"></i>Tengah 11–20</span>
-                    <span><i class="sales-phase-dot sales-phase-dot--late"></i>Akhir 21+</span>
+                    <span><i class="sales-phase-dot sales-phase-dot--early"></i>Awal bulan · 1–10</span>
+                    <span><i class="sales-phase-dot sales-phase-dot--mid"></i>Pertengahan · 11–20</span>
+                    <span><i class="sales-phase-dot sales-phase-dot--late"></i>Akhir bulan · 21+</span>
                 </div>
             </div>
             @if ($paymentDaily->isEmpty())
