@@ -412,43 +412,6 @@
             ['label' => 'Periode', 'value' => $compareMetric($current, $periodPrevious, $formatter, $mode, $higherIsBetter)],
         ];
     };
-    $dailyMonthRows = collect(data_get($comparisonMonthData, 'daily', []))->keyBy(fn ($row) => (string) data_get($row, 'day'));
-    $dailyPeriodRows = collect(data_get($comparisonPeriodData, 'daily', []))->keyBy(fn ($row) => (string) data_get($row, 'day'));
-    $currentPeriodStart = \Carbon\Carbon::parse($filters['date_from']);
-    $dailyComparisons = function ($row) use ($comparisonMonth, $comparisonPeriod, $currentPeriodStart, $dailyMonthRows, $dailyPeriodRows, $compareMetric, $numberDisplay, $currencyDisplay) {
-        $rowOffset = $currentPeriodStart->diffInDays(\Carbon\Carbon::parse((string) $row->day));
-        $comparisonRow = function ($comparison, $rows) use ($rowOffset) {
-            if (! $comparison) {
-                return null;
-            }
-
-            $comparisonDate = \Carbon\Carbon::parse($comparison['from'])->addDays($rowOffset)->toDateString();
-
-            return $rows->get($comparisonDate, (object) [
-                'orders' => 0,
-                'qty' => 0,
-                'avg_units_per_order' => 0,
-                'subtotal' => 0,
-                'aov' => 0,
-            ]);
-        };
-        $monthRow = $comparisonRow($comparisonMonth, $dailyMonthRows);
-        $periodRow = $comparisonRow($comparisonPeriod, $dailyPeriodRows);
-        $metric = function ($field, callable $formatter, string $mode = 'relative', bool $higherIsBetter = true) use ($row, $monthRow, $periodRow, $compareMetric) {
-            return [
-                ['label' => 'Bln lalu', 'value' => $compareMetric(data_get($row, $field, 0), $monthRow ? data_get($monthRow, $field, 0) : null, $formatter, $mode, $higherIsBetter)],
-                ['label' => 'Periode', 'value' => $compareMetric(data_get($row, $field, 0), $periodRow ? data_get($periodRow, $field, 0) : null, $formatter, $mode, $higherIsBetter)],
-            ];
-        };
-
-        return [
-            'orders' => $metric('orders', $numberDisplay),
-            'qty' => $metric('qty', $numberDisplay),
-            'avg_units_per_order' => $metric('avg_units_per_order', fn ($value) => number_format((float) $value, 2, ',', '.')),
-            'subtotal' => $metric('subtotal', $currencyDisplay),
-            'aov' => $metric('aov', $currencyDisplay),
-        ];
-    };
 @endphp
 
 <div class="container-fluid py-4 sales-dashboard">
@@ -556,42 +519,14 @@
                     </thead>
                     <tbody>
                         @foreach ($daily as $row)
-                            @php
-                                $dailyComparison = $dailyComparisons($row);
-                            @endphp
                             <tr class="sales-clickable-row" data-sales-order-detail-date="{{ $row->day }}" tabindex="0" role="button">
                                 <td class="ps-3 text-muted">{{ $loop->iteration }}</td>
                                 <td><button class="sales-date-link" type="button" data-sales-order-detail-date="{{ $row->day }}">{{ $dateLabel($row->day) }}</button></td>
-                                <td class="text-end sales-table-metric">
-                                    <div>{{ number_format($row->orders) }}</div>
-                                    @foreach ($dailyComparison['orders'] as $comparisonItem)
-                                        @include('marketplace.dashboard.partials._comparison', ['comparison' => $comparisonItem['value'], 'class' => 'sales-table-comparison', 'context_label' => $comparisonItem['label'], 'period_label' => str_contains(strtolower($comparisonItem['label']), 'bln') ? ($comparisonMonthLabel ?? 'bulan lalu') : ($comparisonPeriodLabel ?? 'periode lalu')])
-                                    @endforeach
-                                </td>
-                                <td class="text-end sales-table-metric">
-                                    <div>{{ number_format($row->qty) }}</div>
-                                    @foreach ($dailyComparison['qty'] as $comparisonItem)
-                                        @include('marketplace.dashboard.partials._comparison', ['comparison' => $comparisonItem['value'], 'class' => 'sales-table-comparison', 'context_label' => $comparisonItem['label'], 'period_label' => str_contains(strtolower($comparisonItem['label']), 'bln') ? ($comparisonMonthLabel ?? 'bulan lalu') : ($comparisonPeriodLabel ?? 'periode lalu')])
-                                    @endforeach
-                                </td>
-                                <td class="text-end sales-table-metric">
-                                    <div>{{ number_format($row->avg_units_per_order, 2, ',', '.') }}</div>
-                                    @foreach ($dailyComparison['avg_units_per_order'] as $comparisonItem)
-                                        @include('marketplace.dashboard.partials._comparison', ['comparison' => $comparisonItem['value'], 'class' => 'sales-table-comparison', 'context_label' => $comparisonItem['label'], 'period_label' => str_contains(strtolower($comparisonItem['label']), 'bln') ? ($comparisonMonthLabel ?? 'bulan lalu') : ($comparisonPeriodLabel ?? 'periode lalu')])
-                                    @endforeach
-                                </td>
-                                <td class="text-end sales-table-metric">
-                                    <div>{{ $fmt($row->subtotal) }}</div>
-                                    @foreach ($dailyComparison['subtotal'] as $comparisonItem)
-                                        @include('marketplace.dashboard.partials._comparison', ['comparison' => $comparisonItem['value'], 'class' => 'sales-table-comparison', 'context_label' => $comparisonItem['label'], 'period_label' => str_contains(strtolower($comparisonItem['label']), 'bln') ? ($comparisonMonthLabel ?? 'bulan lalu') : ($comparisonPeriodLabel ?? 'periode lalu')])
-                                    @endforeach
-                                </td>
-                                <td class="text-end sales-table-metric">
-                                    <div>{{ $fmt($row->aov) }}</div>
-                                    @foreach ($dailyComparison['aov'] as $comparisonItem)
-                                        @include('marketplace.dashboard.partials._comparison', ['comparison' => $comparisonItem['value'], 'class' => 'sales-table-comparison', 'context_label' => $comparisonItem['label'], 'period_label' => str_contains(strtolower($comparisonItem['label']), 'bln') ? ($comparisonMonthLabel ?? 'bulan lalu') : ($comparisonPeriodLabel ?? 'periode lalu')])
-                                    @endforeach
-                                </td>
+                                <td class="text-end">{{ number_format($row->orders) }}</td>
+                                <td class="text-end">{{ number_format($row->qty) }}</td>
+                                <td class="text-end">{{ number_format($row->avg_units_per_order, 2, ',', '.') }}</td>
+                                <td class="text-end">{{ $fmt($row->subtotal) }}</td>
+                                <td class="text-end">{{ $fmt($row->aov) }}</td>
                             </tr>
                         @endforeach
                     </tbody>
