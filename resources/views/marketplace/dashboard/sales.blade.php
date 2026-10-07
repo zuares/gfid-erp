@@ -223,6 +223,15 @@
     .sales-dashboard .sales-compare-value.is-good { color: var(--success, #16a34a); }
     .sales-dashboard .sales-compare-value.is-bad { color: var(--danger, #dc2626); }
     .sales-dashboard .sales-compare-value.is-neutral { color: var(--sales-muted); }
+    .sales-dashboard .sales-phase-legend { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; color: var(--sales-muted); font-size: .68rem; font-weight: 650; }
+    .sales-dashboard .sales-phase-legend span { display: inline-flex; align-items: center; gap: .25rem; white-space: nowrap; }
+    .sales-dashboard .sales-phase-dot { width: .48rem; height: .48rem; border-radius: 50%; display: inline-block; }
+    .sales-dashboard .sales-phase-dot--early { background: #60a5fa; }
+    .sales-dashboard .sales-phase-dot--mid { background: #f59e0b; }
+    .sales-dashboard .sales-phase-dot--late { background: #f87171; }
+    .sales-dashboard .sales-payment-table tr.sales-payment-phase--early > td:first-child { border-left: 3px solid #60a5fa; background: color-mix(in srgb, #60a5fa 7%, transparent); }
+    .sales-dashboard .sales-payment-table tr.sales-payment-phase--mid > td:first-child { border-left: 3px solid #f59e0b; background: color-mix(in srgb, #f59e0b 7%, transparent); }
+    .sales-dashboard .sales-payment-table tr.sales-payment-phase--late > td:first-child { border-left: 3px solid #f87171; background: color-mix(in srgb, #f87171 7%, transparent); }
     .sales-dashboard .sales-filter-scope {
         display: flex;
         align-items: flex-end;
@@ -853,6 +862,11 @@
 
         return $orders > 0 ? ((float) collect($daily)->sum($field) / $orders) * 100 : 0;
     };
+    $paymentDatePhase = function ($date): string {
+        $day = (int) \Carbon\Carbon::parse($date)->day;
+
+        return $day <= 10 ? 'early' : ($day <= 20 ? 'mid' : 'late');
+    };
 @endphp
 
 <div class="container-fluid py-4 sales-dashboard">
@@ -1308,9 +1322,16 @@
             </div>
         </div>
         <section class="card sales-card shadow-sm mb-3">
-            <div class="sales-section-header">
-                <div class="sales-kicker mb-1">Purchasing power trend</div>
-                <h2 class="sales-section-title mb-1">Daya beli per tanggal</h2>
+            <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-2">
+                <div>
+                    <div class="sales-kicker mb-1">Purchasing power trend</div>
+                    <h2 class="sales-section-title mb-1">Daya beli per tanggal</h2>
+                </div>
+                <div class="sales-phase-legend" aria-label="Fase periode">
+                    <span><i class="sales-phase-dot sales-phase-dot--early"></i>Awal 1–10</span>
+                    <span><i class="sales-phase-dot sales-phase-dot--mid"></i>Tengah 11–20</span>
+                    <span><i class="sales-phase-dot sales-phase-dot--late"></i>Akhir 21+</span>
+                </div>
             </div>
             @if ($paymentDaily->isEmpty())
                 <div class="sales-empty text-center"><i class="bi bi-wallet2 d-block fs-3 mb-2"></i>Belum ada data pembayaran pada periode ini.</div>
@@ -1326,8 +1347,9 @@
 
                                         return '<div class="fw-semibold">'.$fmt($amount).'</div><div class="small text-muted">'.number_format($nominalPct, 1, ',', '.').'%</div>';
                                     };
+                                    $paymentPhase = $paymentDatePhase($payment->day);
                                 @endphp
-                                <tr class="sales-clickable-row" data-sales-payment-detail-url="{{ route('marketplace.dashboard.payments.detail', array_merge(['date' => $payment->day], $paymentDetailQuery)) }}" tabindex="0" role="button" aria-label="Lihat detail pembayaran {{ $dateLabel($payment->day) }}">
+                                <tr class="sales-clickable-row sales-payment-phase--{{ $paymentPhase }}" data-sales-payment-detail-url="{{ route('marketplace.dashboard.payments.detail', array_merge(['date' => $payment->day], $paymentDetailQuery)) }}" tabindex="0" role="button" aria-label="Lihat detail pembayaran {{ $dateLabel($payment->day) }}">
                                     <td class="fw-semibold">{{ $dateLabel($payment->day) }}</td>
                                     <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->buyer_paid) }}</div><div class="small text-muted">{{ number_format($payment->orders) }} order</div></td>
                                     <td class="text-end">{!! $paymentCell($payment->cod_amount) !!}</td>
