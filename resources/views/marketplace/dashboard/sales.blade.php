@@ -43,7 +43,7 @@
     .sales-dashboard .sales-subtitle,
     .sales-dashboard .sales-section-subtitle { display: none; }
 
-    .sales-dashboard .sales-filter-card { background: color-mix(in srgb, var(--sales-card) 85%, var(--sales-bg) 15%); }
+    .sales-dashboard .sales-filter-card { background: color-mix(in srgb, var(--sales-card) 92%, var(--sales-bg) 8%); }
     .sales-dashboard .sales-filter-card .form-label {
         color: var(--sales-muted);
         font-size: .74rem;
@@ -161,12 +161,64 @@
         font-size: .7rem;
         font-weight: 650;
     }
-    .sales-dashboard .sales-filter-comparison { min-width: 150px; }
-    .sales-dashboard .sales-filter-comparison .form-label { margin-bottom: .28rem; }
-    .sales-dashboard .sales-filter-comparison .form-select { min-height: 32px; font-size: .72rem; font-weight: 650; }
-    .sales-dashboard .sales-filter-platform { min-width: 145px; }
-    .sales-dashboard .sales-filter-platform .form-label { margin-bottom: .28rem; }
-    .sales-dashboard .sales-filter-platform .form-select { min-height: 32px; font-size: .72rem; font-weight: 650; }
+    .sales-dashboard .sales-filter-scope {
+        display: flex;
+        align-items: flex-end;
+        gap: .45rem;
+        padding: .5rem;
+        border: 1px solid color-mix(in srgb, var(--sales-line) 82%, transparent);
+        border-radius: 12px;
+        background: color-mix(in srgb, var(--sales-soft) 76%, var(--sales-card) 24%);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.42);
+    }
+    .sales-dashboard .sales-filter-field { min-width: 0; }
+    .sales-dashboard .sales-filter-platform { width: 145px; }
+    .sales-dashboard .sales-filter-store { width: 235px; }
+    .sales-dashboard .sales-filter-comparison { width: 175px; }
+    .sales-dashboard .sales-filter-label {
+        display: flex;
+        align-items: center;
+        gap: .3rem;
+        margin: 0 0 .28rem .1rem;
+        color: var(--sales-muted);
+        font-size: .61rem;
+        font-weight: 800;
+        letter-spacing: .055em;
+        line-height: 1;
+        text-transform: uppercase;
+    }
+    .sales-dashboard .sales-filter-label i { color: var(--sales-accent); font-size: .7rem; }
+    .sales-dashboard .sales-filter-field .form-select {
+        min-height: 34px;
+        border-color: color-mix(in srgb, var(--sales-line) 88%, transparent);
+        border-radius: 8px;
+        background-color: var(--sales-card);
+        color: var(--sales-ink);
+        font-size: .72rem;
+        font-weight: 650;
+        box-shadow: none;
+        transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+    }
+    .sales-dashboard .sales-filter-field .form-select:hover { border-color: color-mix(in srgb, var(--sales-accent) 42%, var(--sales-line) 58%); }
+    .sales-dashboard .sales-filter-field .form-select:focus {
+        border-color: var(--sales-accent);
+        background-color: var(--sales-card);
+        box-shadow: 0 0 0 .18rem color-mix(in srgb, var(--sales-accent) 14%, transparent);
+    }
+    .sales-dashboard .sales-period-filter .gf-period-trigger {
+        min-height: 58px;
+        padding: .55rem .75rem;
+        border-color: var(--sales-line);
+        border-radius: 12px;
+        background: var(--sales-card);
+        box-shadow: 0 6px 16px rgba(15, 23, 42, .06);
+    }
+    .sales-dashboard .sales-period-filter .gf-period-trigger:hover,
+    .sales-dashboard .sales-period-filter .gf-period-trigger[aria-expanded="true"] {
+        border-color: color-mix(in srgb, var(--sales-accent) 48%, var(--sales-line) 52%);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, .1);
+        transform: translateY(-1px);
+    }
     .sales-dashboard .sales-kpi--success .sales-kpi-icon { background: var(--success-soft, #dcfce7); color: var(--success, #16a34a); border-color: color-mix(in srgb, var(--success, #16a34a) 16%, var(--sales-line) 84%); }
     .sales-dashboard .sales-kpi--success::after { background: var(--success, #16a34a); }
     .sales-dashboard .sales-kpi--warning .sales-kpi-icon { background: var(--danger-soft, #fee2e2); color: var(--danger, #dc2626); border-color: color-mix(in srgb, var(--danger, #dc2626) 16%, var(--sales-line) 84%); }
@@ -363,8 +415,10 @@
         .sales-dashboard .sales-kpi { min-height: 118px; }
         .sales-dashboard .sales-kpi-value { font-size: 1.2rem; }
         .sales-dashboard .sales-period-filter { order: 1; width: 100%; margin-left: 0; }
-        .sales-dashboard .sales-filter-platform { order: 2; }
-        .sales-dashboard .sales-filter-store { order: 3; }
+        .sales-dashboard .sales-filter-scope { order: 2; width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; }
+        .sales-dashboard .sales-filter-platform,
+        .sales-dashboard .sales-filter-store,
+        .sales-dashboard .sales-filter-comparison { width: auto; }
     }
 </style>
 @endpush
@@ -404,8 +458,9 @@
     $detailQuery = ['date_from' => $filters['date_from'], 'date_to' => $filters['date_to']];
     if ($filters['platform']) $detailQuery['platform'] = $filters['platform'];
     if ($filters['store_id']) $detailQuery['store_id'] = $filters['store_id'];
+    $platformCodes = $filters['platform_codes'] ?? ($filters['platform'] ? [$filters['platform']] : []);
     $visibleStores = $filters['platform']
-        ? $stores->filter(fn ($store) => strtoupper((string) ($store->channel->code ?? '')) === $filters['platform'])
+        ? $stores->filter(fn ($store) => in_array(strtoupper((string) ($store->channel->code ?? '')), $platformCodes, true))
         : $stores;
     $canImportMarketplace = auth()->check() && auth()->user()->canAccessModule('imports');
     $importOrderQuery = $filters['store_id'] ? ['store_id' => $filters['store_id']] : [];
@@ -709,11 +764,44 @@
 
     <form id="sales-filter-form" class="card sales-card sales-filter-card shadow-sm mb-4" method="GET" action="{{ route('marketplace.dashboard.sales') }}">
         <div class="card-body p-3">
-            <div class="row g-2 align-items-end justify-content-end">
+            <div class="row g-2 align-items-end justify-content-between">
                 @if (!empty($filters['dummy']))
                     <input type="hidden" name="dummy" value="1">
                 @endif
                 <input type="hidden" name="tab" id="sales-active-tab" value="{{ $activeTab }}">
+                <div class="col-12 col-md-auto sales-filter-scope" role="group" aria-label="Filter analitik">
+                    @if ($platforms->isNotEmpty())
+                        <div class="sales-filter-field sales-filter-platform">
+                            <label class="sales-filter-label" for="sales-platform"><i class="bi bi-layers" aria-hidden="true"></i>Platform</label>
+                            <select id="sales-platform" class="form-select form-select-sm" name="platform">
+                                <option value="">Semua platform</option>
+                                @foreach ($platforms as $platform)
+                                    <option value="{{ $platform['code'] }}" @selected($filters['platform'] === $platform['code'])>{{ $platform['label'] }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+                    @if ($visibleStores->isNotEmpty())
+                        <div class="sales-filter-field sales-filter-store">
+                            <label class="sales-filter-label" for="sales-store"><i class="bi bi-shop" aria-hidden="true"></i>Toko</label>
+                            <select id="sales-store" class="form-select form-select-sm" name="store_id">
+                                <option value="">Semua toko</option>
+                                @foreach ($visibleStores as $store)
+                                    <option value="{{ $store->id }}" @selected((string) $filters['store_id'] === (string) $store->id)>
+                                        {{ $store->name }}{{ $store->channel?->code ? ' · '.ucfirst($store->channel->code) : '' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+                    <div class="sales-filter-field sales-filter-comparison">
+                        <label class="sales-filter-label" for="sales-comparison-mode"><i class="bi bi-arrow-left-right" aria-hidden="true"></i>Bandingkan</label>
+                        <select id="sales-comparison-mode" class="form-select form-select-sm" name="comparison_mode">
+                            <option value="period" @selected($comparisonMode === 'period')>Periode lalu</option>
+                            <option value="month" @selected($comparisonMode === 'month')>Bln sama · tanggal sama</option>
+                        </select>
+                    </div>
+                </div>
                 <x-gf.period-picker
                     id="sales-period-picker"
                     form-id="sales-filter-form"
@@ -725,37 +813,6 @@
                     summary="{{ $activeDateSummary }}"
                     class="col-12 col-md-auto sales-period-filter"
                 />
-                @if ($platforms->isNotEmpty())
-                    <div class="col-12 col-md-auto sales-filter-platform">
-                        <label class="form-label" for="sales-platform">Platform</label>
-                        <select id="sales-platform" class="form-select form-select-sm" name="platform">
-                            <option value="">Semua platform</option>
-                            @foreach ($platforms as $platform)
-                                <option value="{{ $platform['code'] }}" @selected($filters['platform'] === $platform['code'])>{{ $platform['label'] }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                @endif
-                @if ($visibleStores->isNotEmpty())
-                    <div class="col-12 col-md-3 sales-filter-store">
-                        <label class="form-label" for="sales-store">Toko</label>
-                        <select id="sales-store" class="form-select form-select-sm" name="store_id">
-                            <option value="">Semua toko</option>
-                            @foreach ($visibleStores as $store)
-                                <option value="{{ $store->id }}" @selected((string) $filters['store_id'] === (string) $store->id)>
-                                    {{ $store->name }}{{ $store->channel?->code ? ' · '.ucfirst($store->channel->code) : '' }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                @endif
-                <div class="col-12 col-md-auto sales-filter-comparison">
-                    <label class="form-label" for="sales-comparison-mode">Bandingkan</label>
-                    <select id="sales-comparison-mode" class="form-select form-select-sm" name="comparison_mode">
-                        <option value="period" @selected($comparisonMode === 'period')>Periode lalu</option>
-                        <option value="month" @selected($comparisonMode === 'month')>Bln sama · tanggal sama</option>
-                    </select>
-                </div>
             </div>
         </div>
     </form>

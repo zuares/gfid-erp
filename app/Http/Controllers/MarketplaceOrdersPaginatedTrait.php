@@ -247,6 +247,7 @@ trait MarketplaceOrdersPaginatedTrait
             $arr['tracking_status'] = $o->tracking_status;
             $arr['tracking_description'] = $o->tracking_description;
             $arr['tracking_checked_at'] = $o->tracking_checked_at?->toIso8601String();
+            $arr['payment_breakdown'] = $this->paymentBreakdownForIndex($o);
 
             if (isset($arr['items']) && is_array($arr['items'])) {
                 foreach ($arr['items'] as &$orderItem) {
@@ -601,5 +602,217 @@ trait MarketplaceOrdersPaginatedTrait
     private function isDummyOrdersRequest(): bool
     {
         return request()->boolean('dummy') && app()->environment(['local', 'testing']);
+    }
+
+    /**
+     * Rincian pembayaran pembeli untuk tabel index. Sumber dan prioritasnya
+     * sengaja sama dengan halaman detail pembayaran agar angka tidak berbeda
+     * antara /marketplace/orders dan /marketplace/dashboard/payments.
+     */
+    private function paymentBreakdownForIndex(MarketplaceOrder $order): array
+    {
+        $orderRaw = $this->paymentDecodePayload($order->raw_json);
+        $liveData = $orderRaw['order_list'][0]
+            ?? $orderRaw['response']['order_list'][0]
+            ?? (isset($orderRaw['order_sn']) ? $orderRaw : []);
+        $settlementRaw = $this->paymentDecodePayload($order->settlement?->raw_json);
+        $income = array_replace((array) ($liveData['income_details'] ?? []), $settlementRaw);
+        $promotion = $this->paymentPromotionAmountsForIndex($settlementRaw, $liveData, $income, (float) ($order->settlement?->seller_voucher ?? 0), (float) ($order->voucher_discount ?? 0));
+
+        $subtotal = (float) ($income['order_discounted_price'] ?? 0);
+        if ($subtotal <= 0) {
+            $subtotal = (float) ($order->subtotal_items ?? 0);
+        }
+        if ($subtotal <= 0) {
+            $items = (array) ($settlementRaw['items'] ?? []);
+            if ($items === []) {
+                $items = (array) ($liveData['item_list'] ?? []);
+            }
+            $subtotal = $this->paymentItemsSubtotalForIndex($items);
+        }
+        if ($subtotal <= 0 && $order->relationLoaded('items')) {
+            $subtotal = (float) $order->items->sum(function ($item): float {
+                $raw = $this->paymentDecodePayload($item->raw_json);
+                $price = (float) ($raw['model_discounted_price']
+                    ?? $raw['discounted_price']
+                    ?? $item->price
+                    ?? $item->price_original
+                    ?? 0);
+                $qty = max((float) ($raw['model_quantity_purchased'] ?? $item->qty ?? 1), 1);
+
+                return $price * $qty;
+            });
+        }
+
+        $shipping = (float) ($income['buyer_paid_shipping_fee'] ?? $order->shipping_fee_customer ?? 0);
+        $shippingRebate = (float) ($income['shopee_shipping_rebate'] ?? 0);
+        $estimatedShipping = (float) ($liveData['estimated_shipping_fee']
+            ?? $income['estimated_shipping_fee']
+            ?? $liveData['actual_shipping_fee']
+            ?? $order->shipping_fee_customer
+            ?? 0);
+        if ($shipping == 0.0 && $estimatedShipping > $shippingRebate) {
+            $shipping = $estimatedShipping - $shippingRebate;
+        }
+
+        $buyerPaid = $income['buyer_total_amount'] ?? $income['buyer_paid_amount'] ?? null;
+        if ($buyerPaid === null || $buyerPaid === '') {
+            $buyerPaid = (float) ($order->total_paid_customer ?? 0);
+        }
+        if ((float) $buyerPaid <= 0) {
+            $buyerPaid = (float) ($order->settlement?->buyer_payment_amount
+                ?? $liveData['total_amount']
+                ?? $order->total_amount
+                ?? 0);
+        }
+
+        $voucherPlatform = max((float) ($promotion['voucher_platform'] ?? 0), 0);
+        $voucherStore = max((float) ($promotion['voucher_store'] ?? 0), 0);
+        $coins = max((float) ($promotion['coin'] ?? 0), 0);
+        $buyerServiceFee = (float) ($income['buyer_transaction_fee']
+            ?? $income['buyer_service_fee']
+            ?? 0);
+        if ((float) $buyerPaid > 0) {
+            $buyerServiceFee = (float) $buyerPaid - ((float) $subtotal + (float) $shipping - $voucherPlatform - $voucherStore - $coins);
+            if ($buyerServiceFee < 0) {
+                $buyerServiceFee = (float) ($income['buyer_transaction_fee'] ?? 0);
+            }
+        } elseif ($buyerServiceFee <= 0) {
+            $buyerServiceFee = 2000.0;
+        }
+
+        return [
+            'subtotal' => max((float) $subtotal, 0),
+            'shipping' => max((float) $shipping, 0),
+            'voucher_platform' => $voucherPlatform,
+            'voucher_store' => $voucherStore,
+            'buyer_service_fee' => max($buyerServiceFee, 0),
+            'buyer_paid' => max((float) $buyerPaid, 0),
+        ];
+    }
+
+    private function paymentDecodePayload(mixed $payload): array
+    {
+        if (is_array($payload)) {
+            return $payload;
+        }
+
+        if (is_string($payload)) {
+            $payload = json_decode($payload, true);
+        }
+
+        return is_array($payload) ? $payload : [];
+    }
+
+    private function paymentItemsSubtotalForIndex(array $items): float
+    {
+        $subtotal = 0.0;
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $qty = max((float) ($item['quantity_purchased'] ?? $item['model_quantity_purchased'] ?? $item['quantity'] ?? 1), 1);
+            $discountedPrice = (float) ($item['discounted_price'] ?? 0);
+            $isSettlementItem = array_key_exists('discounted_price', $item) || array_key_exists('selling_price', $item);
+            if ($isSettlementItem) {
+                $subtotal += ($discountedPrice > 0 ? $discountedPrice : (float) ($item['selling_price'] ?? 0));
+                continue;
+            }
+
+            $price = (float) ($item['model_discounted_price'] ?? $item['model_original_price'] ?? $item['selling_price'] ?? 0);
+            $subtotal += $price * $qty;
+        }
+
+        return $subtotal;
+    }
+
+    private function paymentPromotionAmountsForIndex(array $settlementRaw, array $liveData, array $income, float $sellerVoucher, float $legacyVoucher): array
+    {
+        $voucherStore = array_key_exists('voucher_from_seller', $settlementRaw)
+            ? (float) $settlementRaw['voucher_from_seller']
+            : ($sellerVoucher ?: (float) ($income['voucher_from_seller'] ?? $income['seller_voucher_rebate'] ?? $legacyVoucher));
+        $voucherPlatform = array_key_exists('voucher_from_shopee', $settlementRaw)
+            ? (float) $settlementRaw['voucher_from_shopee']
+            : (float) ($income['voucher_from_shopee'] ?? $income['voucher_from_platform'] ?? $income['platform_voucher'] ?? 0);
+
+        $productDiscount = 0.0;
+        $bundleDiscount = 0.0;
+        $comboHemat = 0.0;
+        $items = (array) ($settlementRaw['items'] ?? []);
+        if ($items === []) {
+            $items = (array) ($liveData['item_list'] ?? []);
+        }
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $split = $this->paymentPromotionDiscountSplitForIndex($item);
+            $productDiscount += $split['product_discount'];
+            $bundleDiscount += $split['bundle_discount'];
+            $comboHemat += $split['combo_hemat'];
+        }
+        if ($productDiscount <= 0 && $bundleDiscount <= 0 && $comboHemat <= 0 && ! empty($settlementRaw['seller_discount'])) {
+            $productDiscount = (float) $settlementRaw['seller_discount'];
+        }
+
+        return [
+            'product_discount' => $productDiscount,
+            'voucher_store' => $voucherStore,
+            'voucher_platform' => $voucherPlatform,
+            'bundle_discount' => $bundleDiscount,
+            'combo_hemat' => $comboHemat,
+            'coin' => (float) ($income['coin'] ?? 0),
+        ];
+    }
+
+    private function paymentPromotionDiscountSplitForIndex(array $item): array
+    {
+        $reportedDiscount = max((float) ($item['seller_discount'] ?? 0), 0);
+        $originalPrice = max((float) ($item['original_price'] ?? $item['model_original_price'] ?? 0), 0);
+        $discountedPrice = max((float) ($item['discounted_price'] ?? $item['model_discounted_price'] ?? 0), 0);
+        $quantity = max((int) ($item['quantity_purchased'] ?? $item['model_quantity_purchased'] ?? $item['quantity'] ?? 1), 1);
+        $priceDifference = max($originalPrice - $discountedPrice, 0);
+        if ($reportedDiscount <= 0 && $priceDifference > 0) {
+            $reportedDiscount = $priceDifference * $quantity;
+        }
+        if ($reportedDiscount > 0 && $priceDifference > 0) {
+            $reportedDiscount = min($reportedDiscount, $priceDifference * $quantity);
+        }
+        if ($reportedDiscount <= 0) {
+            return ['product_discount' => 0.0, 'bundle_discount' => 0.0, 'combo_hemat' => 0.0];
+        }
+
+        $activityType = strtolower((string) ($item['activity_type'] ?? ''));
+        $promotionType = strtolower((string) ($item['promotion_type'] ?? ''));
+        $promotionTypes = collect((array) ($item['promotion_list'] ?? []))->pluck('promotion_type')->map(fn ($type) => strtolower((string) $type));
+        $isBundle = in_array($activityType, ['bundle_deal', 'bundle_deal_discount'], true)
+            || $promotionType === 'bundle_deal'
+            || ($promotionTypes->contains('bundle_deal') && collect([$item['bundle_discount'] ?? null, $item['bundle_deal_discount'] ?? null, $item['bundle_discount_amount'] ?? null])->contains(fn ($amount) => is_numeric($amount) && (float) $amount > 0));
+        $isComboHemat = ! $isBundle && (in_array($activityType, ['add_on_deal', 'add_on_deal_main', 'add_on_deal_sub'], true)
+            || in_array($promotionType, ['add_on_deal', 'add_on_deal_main', 'add_on_deal_sub'], true)
+            || $promotionTypes->intersect(['add_on_deal', 'add_on_deal_main', 'add_on_deal_sub'])->isNotEmpty());
+        if (! $isBundle && ! $isComboHemat) {
+            return ['product_discount' => $reportedDiscount, 'bundle_discount' => 0.0, 'combo_hemat' => 0.0];
+        }
+
+        $sellingPrice = max((float) ($item['selling_price'] ?? 0), 0);
+        $productGap = max($originalPrice - $sellingPrice, 0);
+        $bundleGap = max($sellingPrice - $discountedPrice, 0);
+        if ($productGap > 0 && $bundleGap > 0) {
+            $productDiscount = min($reportedDiscount, $productGap);
+            $bundle = min(max($reportedDiscount - $productDiscount, 0), $bundleGap);
+            $productDiscount += max($reportedDiscount - $productDiscount - $bundle, 0);
+        } else {
+            $productDiscount = 0.0;
+            $bundle = $reportedDiscount;
+        }
+
+        return [
+            'product_discount' => $productDiscount,
+            'bundle_discount' => $isBundle ? $bundle : 0.0,
+            'combo_hemat' => $isComboHemat ? $bundle : 0.0,
+        ];
     }
 }

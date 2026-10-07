@@ -1230,6 +1230,51 @@ body[data-theme="dark"] .ord-subtab.active .ord-badge {
 .ord-payment-summary .ord-payment-line {
     align-items: flex-end;
 }
+.ord-payment-breakdown {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: .12rem .5rem;
+    padding: .35rem .45rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+}
+.ord-payment-breakdown-line {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .5rem;
+    color: #64748b;
+    font-size: .57rem;
+    line-height: 1.35;
+}
+.ord-payment-breakdown-line strong {
+    color: #334155;
+    font-size: .59rem;
+    font-weight: 750;
+    text-align: right;
+    white-space: nowrap;
+}
+.ord-payment-breakdown-line.emphasis {
+    border-top: 1px solid #cbd5e1;
+    color: #047857;
+    font-weight: 800;
+    margin-top: .12rem;
+    padding-top: .22rem;
+}
+.ord-payment-breakdown-line.emphasis strong {
+    color: #047857;
+    font-size: .68rem;
+}
+body[data-theme="dark"] .ord-payment-breakdown {
+    border-color: rgba(148,163,184,.3);
+    background: rgba(30,41,59,.55);
+}
+body[data-theme="dark"] .ord-payment-breakdown-line { color: #94a3b8; }
+body[data-theme="dark"] .ord-payment-breakdown-line strong { color: #cbd5e1; }
+body[data-theme="dark"] .ord-payment-breakdown-line.emphasis,
+body[data-theme="dark"] .ord-payment-breakdown-line.emphasis strong { color: #a7f3d0; }
 .ord-payment-income {
     display: flex;
     flex-direction: column;

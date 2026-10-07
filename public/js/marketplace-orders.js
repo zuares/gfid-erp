@@ -94,6 +94,9 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     };
 
     function buyerPaidAmount(o) {
+        const indexedPaid = Number(o.payment_breakdown?.buyer_paid);
+        if (Number.isFinite(indexedPaid) && indexedPaid >= 0) return indexedPaid;
+
         const escrowPaid = Number(o.settlement?.buyer_payment_amount);
         return Number.isFinite(escrowPaid) && escrowPaid >= 0 ? escrowPaid : null;
     }
@@ -150,9 +153,33 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         </div>`;
     }
 
+    function paymentBreakdownHtml(o) {
+        const breakdown = o.payment_breakdown;
+        if (!breakdown) return buyerPaidHtml(o);
+
+        const amount = (value, negative = false) => {
+            const number = Number(value || 0);
+            const formatted = fmtRp(Math.abs(Number.isFinite(number) ? number : 0));
+            return negative && number > 0 ? `-${formatted}` : formatted;
+        };
+        const line = (label, value, options = {}) => `<div class="ord-payment-breakdown-line ${options.emphasis ? 'emphasis' : ''}">
+            <span>${label}</span><strong>${amount(value, options.negative)}</strong>
+        </div>`;
+
+        return `<div class="ord-payment-breakdown" title="Rincian nominal yang dibayar pembeli">
+            ${line('Subtotal', breakdown.subtotal)}
+            ${line('Ongkir', breakdown.shipping)}
+            ${line('V Shopee', breakdown.voucher_platform, { negative: true })}
+            ${line('V Toko', breakdown.voucher_store, { negative: true })}
+            ${line('Layanan', breakdown.buyer_service_fee)}
+            ${line('Buyer Paid', breakdown.buyer_paid, { emphasis: true })}
+        </div>`;
+    }
+
     function paymentMethodLabel(o) {
         const raw = o.settlement?.raw_json?.buyer_payment_method
             || o.settlement?.raw_json?.payment_method
+            || o.payment_method
             || '';
         const value = String(raw).trim();
         if (!value) return 'Belum tercatat';
@@ -2940,7 +2967,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
             const paymentCell = `<td class="ord-payment-cell">
                 <div class="ord-payment-summary">
                     ${buyerPaymentMethodHtml(o)}
-                    ${buyerPaidHtml(o)}
+                    ${paymentBreakdownHtml(o)}
                     <div class="ord-payment-income">
                         <span class="ord-payment-income-label">Penghasilan</span>
                         ${escrowHtml(o)}
@@ -3007,7 +3034,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <th>Item Produk</th>
                 ${hasResolveCol ? '<th>✅ Item Pengganti</th>' : ''}
                 ${hasScanCol    ? '<th>📦 Item Scan</th>'    : ''}
-                <th>Pembayaran &amp; Penghasilan</th>
+                <th>Pembayaran Pembeli &amp; Penghasilan</th>
                 <th>Voucher &amp; Diskon</th>
                 <th>AMS</th>
                 <th>Pengiriman / Lacak / Cetak</th>

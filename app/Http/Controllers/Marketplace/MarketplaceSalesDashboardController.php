@@ -13,6 +13,11 @@ class MarketplaceSalesDashboardController extends Controller
 {
     private const PROMOTION_DUMMY_SOURCE = 'promotion_dashboard_v1';
 
+    private const PLATFORM_ALIASES = [
+        'SHOPEE' => ['SHP'],
+        'TIKTOK' => ['TTK'],
+    ];
+
     private const NON_REVENUE_STATUSES = [
         'UNPAID',
         'INVOICE_PENDING',
@@ -73,7 +78,8 @@ class MarketplaceSalesDashboardController extends Controller
         }
 
         $storeId = $request->integer('store_id') ?: null;
-        $platformCode = strtoupper(trim((string) $request->query('platform', '')));
+        $platformCode = $this->normalizePlatformCode($request->query('platform'));
+        $platformCodes = $this->platformCodes($platformCode);
         $comparisonMode = in_array($request->query('comparison_mode'), ['period', 'month'], true)
             ? $request->query('comparison_mode')
             : 'period';
@@ -85,8 +91,8 @@ class MarketplaceSalesDashboardController extends Controller
 
         $platforms = $stores
             ->map(function ($store) {
-                $code = strtoupper(trim((string) ($store->channel->code ?? '')));
-                if ($code === '') {
+                $code = $this->normalizePlatformCode($store->channel->code ?? null);
+                if (! $code) {
                     return null;
                 }
 
@@ -100,20 +106,20 @@ class MarketplaceSalesDashboardController extends Controller
             ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)
             ->values();
 
-        if ($platformCode !== '' && ! $platforms->contains('code', $platformCode)) {
+        if ($platformCode && ! $platforms->contains('code', $platformCode)) {
             $platformCode = null;
         }
 
         $selectedStore = $storeId ? $stores->firstWhere('id', $storeId) : null;
-        if ($storeId && (! $selectedStore || ($platformCode && strtoupper((string) ($selectedStore->channel->code ?? '')) !== $platformCode))) {
+        if ($storeId && (! $selectedStore || ($platformCode && $this->normalizePlatformCode($selectedStore->channel->code ?? null) !== $platformCode))) {
             $storeId = null;
         }
 
         $adStoreIds = $stores
             ->filter(function ($store) use ($platformCode) {
-                $channelCode = strtoupper((string) ($store->channel->code ?? ''));
+                $channelCode = $this->normalizePlatformCode($store->channel->code ?? null);
 
-                return in_array($channelCode, ['SHOPEE', 'SHP'], true)
+                return $channelCode === 'SHOPEE'
                     && (! $platformCode || $channelCode === $platformCode);
             })
             ->pluck('id')
@@ -155,7 +161,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
-            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]));
+            ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes));
 
         $orderDetails = (clone $base)
             ->select([
@@ -320,7 +326,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
             ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
-            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]))
+            ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
             ->selectRaw("COALESCE(NULLIF(oi.item_name, ''), NULLIF(oi.item_name_snapshot, ''), NULLIF(oi.variant_name, ''), NULLIF(oi.variant_snapshot, ''), 'Produk tanpa nama') as name")
             ->selectRaw("COALESCE(NULLIF(oi.item_sku, ''), NULLIF(oi.marketplace_sku, ''), NULLIF(oi.model_sku, ''), NULLIF(oi.external_sku, ''), NULLIF(oi.item_code_snapshot, ''), '-') as sku")
             ->selectRaw('COALESCE(SUM(CASE WHEN oi.qty > 0 THEN oi.qty ELSE 0 END), 0) as qty')
@@ -349,6 +355,26 @@ class MarketplaceSalesDashboardController extends Controller
         $buyerPaymentExpression = 'COALESCE(NULLIF(payment_ms.buyer_payment_amount, 0), NULLIF(o.total_paid_customer, 0), NULLIF(o.total_amount, 0), NULLIF(o.subtotal_items, 0), 0)';
         $paymentBase = (clone $base)
             ->leftJoin('marketplace_order_settlements as payment_ms', 'payment_ms.order_id', '=', 'o.id');
+        $paymentSnapshotRows = (clone $paymentBase)
+            ->select([
+                'o.id',
+                'o.payment_method',
+                'o.payment_status',
+                'o.subtotal_items',
+                'o.shipping_fee_customer',
+                'o.total_paid_customer',
+                'o.total_amount',
+                'o.raw_json',
+                'o.raw_payload_json',
+                'o.voucher_discount',
+                'payment_ms.buyer_payment_amount',
+                'payment_ms.seller_voucher',
+                'payment_ms.raw_json as settlement_raw_json',
+                'payment_ms.shipping_insurance_fee',
+            ])
+            ->selectRaw("DATE({$dateExpression}) as day")
+            ->get()
+            ->map(fn ($row) => $this->paymentSnapshotForDashboard($row));
         $payments = (clone $paymentBase)
             ->selectRaw("{$paymentCategoryExpression} as category")
             ->selectRaw('COUNT(DISTINCT o.id) as orders')
@@ -465,6 +491,69 @@ class MarketplaceSalesDashboardController extends Controller
                     'product_protection_orders' => $productProtectionOrders,
                 ];
             });
+
+        // Gunakan snapshot yang sama dengan detail pembayaran untuk index:
+        // buyer paid, ongkir, subtotal, voucher, dan biaya layanan tidak lagi
+        // bergantung pada fallback SQL yang berbeda antar halaman.
+        $payments = $paymentSnapshotRows
+            ->groupBy('category')
+            ->map(function ($rows, $category) {
+                $orders = $rows->count();
+
+                return (object) [
+                    'category' => (string) $category,
+                    'orders' => $orders,
+                    'buyer_paid' => (float) $rows->sum('buyer_paid'),
+                    'avg_ticket' => $orders > 0 ? (float) $rows->sum('buyer_paid') / $orders : 0,
+                    'paid_orders' => $rows->where('is_paid', true)->count(),
+                    'order_share' => 0,
+                ];
+            })
+            ->sortByDesc('orders')
+            ->values();
+
+        $paymentDaily = $paymentSnapshotRows
+            ->groupBy('day')
+            ->map(function ($rows, $day) {
+                $orders = $rows->count();
+                $buyerPaid = (float) $rows->sum('buyer_paid');
+                $codRows = $rows->where('category', 'cod');
+                $nonCodRows = $rows->where('category', 'non_cod');
+                $payLaterRows = $rows->where('category', 'pay_later');
+
+                return (object) [
+                    'day' => (string) $day,
+                    'orders' => $orders,
+                    'paid_orders' => $rows->where('is_paid', true)->count(),
+                    'pending_orders' => $rows->where('is_paid', false)->count(),
+                    'buyer_paid' => $buyerPaid,
+                    'cod_orders' => $codRows->count(),
+                    'non_cod_orders' => $nonCodRows->count(),
+                    'pay_later_orders' => $payLaterRows->count(),
+                    'buyer_shipping_orders' => $rows->where('buyer_shipping', '>', 0)->count(),
+                    'cod_amount' => (float) $codRows->sum('buyer_paid'),
+                    'non_cod_amount' => (float) $nonCodRows->sum('buyer_paid'),
+                    'pay_later_amount' => (float) $payLaterRows->sum('buyer_paid'),
+                    'buyer_shipping' => (float) $rows->sum('buyer_shipping'),
+                    'paid_amount' => (float) $rows->where('is_paid', true)->sum('buyer_paid'),
+                    'pending_amount' => (float) $rows->where('is_paid', false)->sum('buyer_paid'),
+                    'aov' => $orders > 0 ? $buyerPaid / $orders : 0,
+                    'cod_order_share' => $orders > 0 ? ($codRows->count() / $orders) * 100 : 0,
+                    'cod_amount_share' => $buyerPaid > 0 ? ((float) $codRows->sum('buyer_paid') / $buyerPaid) * 100 : 0,
+                ];
+            })
+            ->sortByDesc('day')
+            ->values();
+
+        $paymentFeeByDay = $paymentSnapshotRows
+            ->groupBy('day')
+            ->map(fn ($rows) => (object) [
+                'buyer_service_fee' => (float) $rows->sum('buyer_service_fee'),
+                'product_protection' => (float) $rows->sum('product_protection'),
+                'buyer_service_fee_orders' => $rows->where('buyer_service_fee', '>', 0)->count(),
+                'product_protection_orders' => $rows->where('product_protection', '>', 0)->count(),
+            ]);
+
         $paymentDaily = $paymentDaily
             ->map(function ($row) use ($paymentFeeByDay) {
                 $fees = $paymentFeeByDay->get((string) $row->day);
@@ -615,7 +704,7 @@ SQL;
             ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
             ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
-            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]))
+            ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
             ->select([
                 'ms.order_id',
                 'ms.seller_voucher',
@@ -791,7 +880,7 @@ SQL;
             ->whereRaw("{$shippingStatusExpression} NOT IN ({$shippingExcludedPlaceholders})", self::SHIPPING_EXCLUDED_STATUSES)
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
-            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]));
+            ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes));
         $shippingReturnStatusesSql = "'" . implode("', '", self::SHIPPING_RETURN_STATUSES) . "'";
 
         $shipping = (clone $shippingBase)
@@ -926,6 +1015,7 @@ SQL;
                 'date_to' => $to->toDateString(),
                 'store_id' => $storeId,
                 'platform' => $platformCode,
+                'platform_codes' => $platformCodes,
                 'comparison_mode' => $comparisonMode,
                 'dummy' => $isPromotionDummy,
             ],
@@ -954,7 +1044,8 @@ SQL;
         }
 
         $storeId = $request->integer('store_id') ?: null;
-        $platformCode = strtoupper(trim((string) $request->query('platform', '')));
+        $platformCode = $this->normalizePlatformCode($request->query('platform'));
+        $platformCodes = $this->platformCodes($platformCode);
         $isPromotionDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
         $dateExpression = 'COALESCE(o.ordered_at, o.order_date)';
         $statusExpression = "UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), ''))";
@@ -974,7 +1065,7 @@ SQL;
             ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
-            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]))
+            ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
             ->whereRaw("{$nameExpression} = ?", [$name])
             ->when($sku !== '' && $sku !== '-', fn ($query) => $query->whereRaw("{$skuExpression} = ?", [$sku]))
             ->select([
@@ -1064,7 +1155,8 @@ SQL;
 
         $isDashboardDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
         $storeId = $request->integer('store_id') ?: null;
-        $platformCode = strtoupper(trim((string) $request->query('platform', '')));
+        $platformCode = $this->normalizePlatformCode($request->query('platform'));
+        $platformCodes = $this->platformCodes($platformCode);
         $stores = Store::query()
             ->where('is_active', true)
             ->with('channel')
@@ -1091,7 +1183,7 @@ SQL;
             ->whereRaw("{$orderStatusExpression} NOT IN ({$nonRevenuePlaceholders})", self::NON_REVENUE_STATUSES)
             ->when($isDashboardDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
-            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]))
+            ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
             ->select([
                 'o.id',
                 'o.channel_order_id',
@@ -1101,10 +1193,14 @@ SQL;
                 'o.payment_method',
                 'o.payment_status',
                 'o.shipping_fee_customer',
+                'o.subtotal_items',
+                'o.total_paid_customer',
+                'o.total_amount',
                 'o.raw_json as order_raw_json',
                 'o.raw_payload_json',
                 'o.voucher_discount',
                 'payment_ms.id as settlement_id',
+                'payment_ms.buyer_payment_amount',
                 'payment_ms.raw_json as settlement_raw_json',
                 'payment_ms.seller_voucher',
                 'st.name as store_name',
@@ -1130,32 +1226,40 @@ SQL;
                 $row->store = $row->store_name ?: 'Toko marketplace';
                 $row->channel = $row->channel_code ? ucfirst((string) $row->channel_code) : 'Marketplace';
                 $row->payment = $row->payment_method ?: 'Belum ditentukan';
-                $row->product_subtotal = (float) $row->product_subtotal;
-                $row->buyer_paid_amount = (float) $row->buyer_paid_amount;
-                $row->shipping_fee = (float) ($row->shipping_fee_customer ?? 0);
-                $isSettlementBacked = $row->settlement_id !== null;
                 $settlementRaw = $this->decodePayload($row->settlement_raw_json);
                 $orderRaw = $this->decodePayload($row->order_raw_json ?? $row->raw_payload_json);
-                $incomeRaw = array_replace((array) ($orderRaw['income_details'] ?? []), $settlementRaw);
-                $promotionAmounts = $isSettlementBacked
-                    ? $this->promotionAmountsFromSettlement(
-                        $row->settlement_raw_json,
-                        $orderRaw,
-                        (float) ($row->seller_voucher ?? 0),
-                    )
-                    : [
-                        'voucher_store' => (float) ($row->voucher_discount ?? 0),
-                        'voucher_platform' => 0.0,
-                    ];
+                $liveData = $orderRaw['order_list'][0]
+                    ?? $orderRaw['response']['order_list'][0]
+                    ?? (isset($orderRaw['order_sn']) ? $orderRaw : []);
+                $incomeRaw = array_replace((array) ($liveData['income_details'] ?? []), $settlementRaw);
+                $promotionAmounts = $this->paymentPromotionAmounts(
+                    $settlementRaw,
+                    $liveData,
+                    $incomeRaw,
+                    (float) ($row->seller_voucher ?? 0),
+                    (float) ($row->voucher_discount ?? 0),
+                );
+                $row->product_subtotal = $this->paymentSubtotal(
+                    $incomeRaw,
+                    $row->subtotal_items,
+                    $row->product_subtotal,
+                    $settlementRaw,
+                    $liveData,
+                );
+                $row->buyer_paid_amount = $this->paymentBuyerPaid(
+                    $incomeRaw,
+                    $row->total_paid_customer,
+                    $row->total_amount,
+                    $row->buyer_payment_amount,
+                    $liveData,
+                );
+                $row->shipping_fee = $this->paymentBuyerShipping(
+                    $incomeRaw,
+                    $row->shipping_fee_customer,
+                    $liveData,
+                );
                 $row->voucher_store = (float) ($promotionAmounts['voucher_store'] ?? 0);
                 $row->voucher_platform = (float) ($promotionAmounts['voucher_platform'] ?? 0);
-                $buyerShippingFromPayload = $this->firstPayloadAmount(
-                    [$incomeRaw, $orderRaw],
-                    ['buyer_paid_shipping_fee'],
-                );
-                if ($buyerShippingFromPayload > 0) {
-                    $row->shipping_fee = $buyerShippingFromPayload;
-                }
                 $buyerCoins = $this->firstPayloadAmount(
                     [$incomeRaw, $orderRaw, $orderRaw['promotion_breakdown'] ?? []],
                     ['coin', 'coins', 'coin_discount', 'cashback_coin'],
@@ -1231,7 +1335,8 @@ SQL;
 
         $isDashboardDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
         $storeId = $request->integer('store_id') ?: null;
-        $platformCode = strtoupper(trim((string) $request->query('platform', '')));
+        $platformCode = $this->normalizePlatformCode($request->query('platform'));
+        $platformCodes = $this->platformCodes($platformCode);
         $stores = Store::query()
             ->where('is_active', true)
             ->with('channel')
@@ -1255,7 +1360,7 @@ SQL;
             ->whereRaw("{$statusExpression} NOT IN ({$shippingExcludedPlaceholders})", self::SHIPPING_EXCLUDED_STATUSES)
             ->when($isDashboardDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
-            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]))
+            ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
             ->select([
                 'o.id',
                 'o.channel_order_id',
@@ -1359,7 +1464,8 @@ SQL;
 
         $isPromotionDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
         $storeId = $request->integer('store_id') ?: null;
-        $platformCode = strtoupper(trim((string) $request->query('platform', '')));
+        $platformCode = $this->normalizePlatformCode($request->query('platform'));
+        $platformCodes = $this->platformCodes($platformCode);
         $stores = Store::query()
             ->where('is_active', true)
             ->with('channel')
@@ -1403,7 +1509,7 @@ SQL;
             ->whereRaw("{$statusExpression} NOT IN ({$nonRevenuePlaceholders})", self::NON_REVENUE_STATUSES)
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
-            ->when($platformCode, fn ($query) => $query->whereRaw('UPPER(ch.code) = ?', [$platformCode]))
+            ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
             ->select([
                 'o.id',
                 'o.channel_order_id',
@@ -1501,6 +1607,37 @@ SQL;
         } catch (\Throwable) {
             return $default;
         }
+    }
+
+    private function normalizePlatformCode(?string $code): ?string
+    {
+        $code = strtoupper(trim((string) $code));
+        if ($code === '') {
+            return null;
+        }
+
+        foreach (self::PLATFORM_ALIASES as $canonical => $aliases) {
+            if ($code === $canonical || in_array($code, $aliases, true)) {
+                return $canonical;
+            }
+        }
+
+        return $code;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function platformCodes(?string $platformCode): array
+    {
+        if (! $platformCode) {
+            return [];
+        }
+
+        return array_values(array_unique(array_merge(
+            [$platformCode],
+            self::PLATFORM_ALIASES[$platformCode] ?? [],
+        )));
     }
 
     private function orderNumberForDisplay(?string $channelOrderId, ?string $externalOrderId, int $internalId): string
@@ -1696,6 +1833,227 @@ SQL;
         }
 
         return is_array($payload) ? $payload : [];
+    }
+
+    private function paymentSnapshotForDashboard(object $row): object
+    {
+        $orderRaw = $this->decodePayload($row->raw_json ?? $row->raw_payload_json);
+        $liveData = $orderRaw['order_list'][0]
+            ?? $orderRaw['response']['order_list'][0]
+            ?? (isset($orderRaw['order_sn']) ? $orderRaw : []);
+        $settlementRaw = $this->decodePayload($row->settlement_raw_json);
+        $income = array_replace((array) ($liveData['income_details'] ?? []), $settlementRaw);
+        $promotion = $this->paymentPromotionAmounts(
+            $settlementRaw,
+            $liveData,
+            $income,
+            (float) ($row->seller_voucher ?? 0),
+            (float) ($row->voucher_discount ?? 0),
+        );
+        $subtotal = $this->paymentSubtotal(
+            $income,
+            $row->subtotal_items,
+            0,
+            $settlementRaw,
+            $liveData,
+        );
+        $buyerPaid = $this->paymentBuyerPaid(
+            $income,
+            $row->total_paid_customer,
+            $row->total_amount,
+            $row->buyer_payment_amount,
+            $liveData,
+        );
+        $shipping = $this->paymentBuyerShipping($income, $row->shipping_fee_customer, $liveData);
+        $voucherStore = (float) ($promotion['voucher_store'] ?? 0);
+        $voucherPlatform = (float) ($promotion['voucher_platform'] ?? 0);
+        $buyerCoins = $this->firstPayloadAmount(
+            [$income, $orderRaw, $orderRaw['promotion_breakdown'] ?? []],
+            ['coin', 'coins', 'coin_discount', 'cashback_coin'],
+        );
+        $explicitServiceFee = $this->firstPayloadAmount(
+            [$income, $orderRaw, $orderRaw['promotion_breakdown'] ?? []],
+            ['buyer_transaction_fee', 'buyer_service_fee'],
+        );
+        $buyerServiceFee = $explicitServiceFee > 0
+            ? $explicitServiceFee
+            : ($buyerPaid > 0
+                ? max($buyerPaid - $subtotal - $shipping + $voucherPlatform + $voucherStore + $buyerCoins, 0)
+                : 2000.0);
+        $productProtection = abs((float) ($row->shipping_insurance_fee ?? 0));
+        if ($productProtection <= 0) {
+            $productProtection = $this->firstPayloadAmount(
+                [$settlementRaw, $income, $orderRaw],
+                ['product_protection_fee', 'product_protection', 'insurance_fee', 'shipping_insurance', 'premi'],
+            );
+        }
+
+        return (object) [
+            'day' => (string) $row->day,
+            'category' => $this->paymentCategoryForDashboard($row->payment_method, $row->payment_status),
+            'is_paid' => in_array(strtoupper((string) $row->payment_status), ['PAID', 'COMPLETED', 'SELESAI', 'LUNAS'], true),
+            'buyer_paid' => max($buyerPaid, 0),
+            'buyer_shipping' => max($shipping, 0),
+            'buyer_service_fee' => max($buyerServiceFee, 0),
+            'product_protection' => max($productProtection, 0),
+        ];
+    }
+
+    private function paymentCategoryForDashboard(mixed $paymentMethod, mixed $paymentStatus): string
+    {
+        $source = strtolower((string) ($paymentMethod ?: $paymentStatus ?: ''));
+        if (str_contains($source, 'paylater')
+            || str_contains($source, 'pay later')
+            || str_contains($source, 'cicilan')
+            || str_contains($source, 'installment')) {
+            return 'pay_later';
+        }
+        if (str_contains($source, 'cod')
+            || str_contains($source, 'cash on delivery')
+            || str_contains($source, 'bayar di tempat')) {
+            return 'cod';
+        }
+
+        return 'non_cod';
+    }
+
+    private function paymentBuyerPaid(
+        array $income,
+        mixed $totalPaidCustomer,
+        mixed $totalAmount,
+        mixed $settlementBuyerPayment,
+        array $liveData,
+    ): float {
+        $incomeBuyerPaid = $income['buyer_total_amount'] ?? $income['buyer_paid_amount'] ?? null;
+        if ($incomeBuyerPaid !== null && $incomeBuyerPaid !== '' && is_numeric($incomeBuyerPaid)) {
+            return (float) $incomeBuyerPaid;
+        }
+
+        if ((float) $totalPaidCustomer > 0) {
+            return (float) $totalPaidCustomer;
+        }
+
+        if ((float) $settlementBuyerPayment > 0) {
+            return (float) $settlementBuyerPayment;
+        }
+
+        return (float) ($liveData['total_amount'] ?? $totalAmount ?? 0);
+    }
+
+    private function paymentBuyerShipping(array $income, mixed $storedShipping, array $liveData): float
+    {
+        $shipping = $income['buyer_paid_shipping_fee'] ?? $storedShipping ?? 0;
+        $shipping = is_numeric($shipping) ? (float) $shipping : 0.0;
+        $shippingRebate = (float) ($income['shopee_shipping_rebate'] ?? 0);
+        $estimatedShipping = (float) ($liveData['estimated_shipping_fee']
+            ?? $income['estimated_shipping_fee']
+            ?? $liveData['actual_shipping_fee']
+            ?? $storedShipping
+            ?? 0);
+
+        if ($shipping == 0.0 && $estimatedShipping > $shippingRebate) {
+            return $estimatedShipping - $shippingRebate;
+        }
+
+        return $shipping;
+    }
+
+    private function paymentSubtotal(
+        array $income,
+        mixed $storedSubtotal,
+        mixed $fallbackSubtotal,
+        array $settlementRaw,
+        array $liveData,
+    ): float {
+        $subtotal = (float) ($income['order_discounted_price'] ?? $storedSubtotal ?? 0);
+        if ($subtotal > 0) {
+            return $subtotal;
+        }
+
+        $items = (array) ($settlementRaw['items'] ?? []);
+        if ($items === []) {
+            $items = (array) ($liveData['item_list'] ?? []);
+        }
+
+        $itemSubtotal = $this->paymentItemsSubtotal($items);
+
+        return $itemSubtotal > 0 ? $itemSubtotal : (float) $fallbackSubtotal;
+    }
+
+    private function paymentItemsSubtotal(array $items): float
+    {
+        $subtotal = 0.0;
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $qty = (float) ($item['quantity_purchased'] ?? $item['model_quantity_purchased'] ?? $item['quantity'] ?? 1);
+            $qty = $qty > 0 ? $qty : 1;
+            $lineTotal = (float) ($item['discounted_price'] ?? 0);
+            $isSettlementItem = array_key_exists('discounted_price', $item) || array_key_exists('selling_price', $item);
+
+            if ($isSettlementItem && $lineTotal <= 0) {
+                $lineTotal = (float) ($item['selling_price'] ?? 0);
+            }
+            if ($isSettlementItem && $lineTotal > 0) {
+                $subtotal += $lineTotal;
+                continue;
+            }
+
+            $price = (float) ($item['model_discounted_price'] ?? 0);
+            if ($price <= 0) {
+                $price = (float) ($item['model_original_price'] ?? $item['selling_price'] ?? 0);
+            }
+            $subtotal += $price * $qty;
+        }
+
+        return $subtotal;
+    }
+
+    private function paymentPromotionAmounts(
+        array $settlementRaw,
+        array $liveData,
+        array $income,
+        float $sellerVoucher,
+        float $legacyVoucher,
+    ): array {
+        $voucherStore = array_key_exists('voucher_from_seller', $settlementRaw)
+            ? (float) $settlementRaw['voucher_from_seller']
+            : ($sellerVoucher ?: (float) ($income['voucher_from_seller'] ?? $income['seller_voucher_rebate'] ?? $legacyVoucher));
+        $voucherPlatform = array_key_exists('voucher_from_shopee', $settlementRaw)
+            ? (float) $settlementRaw['voucher_from_shopee']
+            : (float) ($income['voucher_from_shopee'] ?? $income['voucher_from_platform'] ?? $income['platform_voucher'] ?? 0);
+        $productDiscount = 0.0;
+        $bundleDiscount = 0.0;
+        $comboHemat = 0.0;
+        $items = (array) ($settlementRaw['items'] ?? []);
+        if ($items === []) {
+            $items = (array) ($liveData['item_list'] ?? []);
+        }
+
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $split = $this->promotionDiscountSplit($item);
+            $productDiscount += $split['product_discount'];
+            $bundleDiscount += $split['bundle_discount'];
+            $comboHemat += $split['combo_hemat'];
+        }
+
+        if ($productDiscount <= 0 && $bundleDiscount <= 0 && $comboHemat <= 0 && ! empty($settlementRaw['seller_discount'])) {
+            $productDiscount = (float) $settlementRaw['seller_discount'];
+        }
+
+        return [
+            'product_discount' => $productDiscount,
+            'voucher_store' => $voucherStore,
+            'voucher_platform' => $voucherPlatform,
+            'bundle_discount' => $bundleDiscount,
+            'combo_hemat' => $comboHemat,
+        ];
     }
 
     private function firstPayloadAmount(array $payloads, array $keys): float
