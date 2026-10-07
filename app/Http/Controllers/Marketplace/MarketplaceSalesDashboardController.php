@@ -413,13 +413,13 @@ class MarketplaceSalesDashboardController extends Controller
 
         $paymentFeeByDay = (clone $paymentBase)
             ->selectRaw("DATE({$dateExpression}) as day")
-            ->addSelect('payment_ms.service_fee', 'payment_ms.shipping_insurance_fee', 'payment_ms.raw_json')
+            ->addSelect('payment_ms.shipping_insurance_fee', 'payment_ms.raw_json', 'o.raw_json as order_raw_json')
             ->get()
             ->groupBy('day')
             ->map(function ($rows) {
-                $serviceFee = 0.0;
+                $buyerServiceFee = 0.0;
                 $productProtection = 0.0;
-                $serviceFeeOrders = 0;
+                $buyerServiceFeeOrders = 0;
                 $productProtectionOrders = 0;
                 $rawValue = function ($raw, array $keys): float {
                     $payload = is_array($raw) ? $raw : (json_decode((string) $raw, true) ?: []);
@@ -434,33 +434,43 @@ class MarketplaceSalesDashboardController extends Controller
                 };
 
                 foreach ($rows as $row) {
-                    $rowServiceFee = abs((float) ($row->service_fee ?? 0));
-                    if ($rowServiceFee <= 0) {
-                        $rowServiceFee = $rawValue($row->raw_json, ['service_fee']);
+                    $rowBuyerServiceFee = $rawValue($row->raw_json, [
+                        'buyer_service_fee',
+                        'Buyer Service Fee',
+                        'promotion_breakdown.buyer_service_fee',
+                        'promotion_breakdown.Buyer Service Fee',
+                    ]);
+                    if ($rowBuyerServiceFee <= 0) {
+                        $rowBuyerServiceFee = $rawValue($row->order_raw_json, [
+                            'buyer_service_fee',
+                            'Buyer Service Fee',
+                            'promotion_breakdown.buyer_service_fee',
+                            'promotion_breakdown.Buyer Service Fee',
+                        ]);
                     }
                     $rowProductProtection = abs((float) ($row->shipping_insurance_fee ?? 0));
                     if ($rowProductProtection <= 0) {
                         $rowProductProtection = $rawValue($row->raw_json, ['product_protection_fee', 'product_protection', 'insurance_fee', 'shipping_insurance', 'premi']);
                     }
-                    $serviceFee += $rowServiceFee;
+                    $buyerServiceFee += $rowBuyerServiceFee;
                     $productProtection += $rowProductProtection;
-                    $serviceFeeOrders += $rowServiceFee > 0 ? 1 : 0;
+                    $buyerServiceFeeOrders += $rowBuyerServiceFee > 0 ? 1 : 0;
                     $productProtectionOrders += $rowProductProtection > 0 ? 1 : 0;
                 }
 
                 return (object) [
-                    'service_fee' => $serviceFee,
+                    'buyer_service_fee' => $buyerServiceFee,
                     'product_protection' => $productProtection,
-                    'service_fee_orders' => $serviceFeeOrders,
+                    'buyer_service_fee_orders' => $buyerServiceFeeOrders,
                     'product_protection_orders' => $productProtectionOrders,
                 ];
             });
         $paymentDaily = $paymentDaily
             ->map(function ($row) use ($paymentFeeByDay) {
                 $fees = $paymentFeeByDay->get((string) $row->day);
-                $row->service_fee = (float) data_get($fees, 'service_fee', 0);
+                $row->buyer_service_fee = (float) data_get($fees, 'buyer_service_fee', 0);
                 $row->product_protection = (float) data_get($fees, 'product_protection', 0);
-                $row->service_fee_orders = (int) data_get($fees, 'service_fee_orders', 0);
+                $row->buyer_service_fee_orders = (int) data_get($fees, 'buyer_service_fee_orders', 0);
                 $row->product_protection_orders = (int) data_get($fees, 'product_protection_orders', 0);
 
                 return $row;

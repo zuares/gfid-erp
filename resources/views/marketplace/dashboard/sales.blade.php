@@ -1118,7 +1118,7 @@
             @else
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle sales-table sales-promotion-table sales-payment-table">
-                        <thead><tr><th class="ps-3">Date</th><th class="text-end">Seller Net Sales</th><th class="text-end">Voucher Platform</th><th class="text-end">Buyer Shipping</th><th class="text-end">COD</th><th class="text-end">Non-COD</th><th class="text-end">Pay Later</th><th class="text-end">Protection</th><th class="text-end">Service Fee</th><th class="text-end">Buyer Paid</th></tr></thead>
+                        <thead><tr><th class="ps-3">Date</th><th class="text-end">Seller Net Sales</th><th class="text-end">Voucher Platform</th><th class="text-end">Buyer Shipping</th><th class="text-end">COD</th><th class="text-end">Non-COD</th><th class="text-end">Pay Later</th><th class="text-end">Protection</th><th class="text-end">Buyer Service Fee</th><th class="text-end">Buyer Paid</th></tr></thead>
                         <tbody>
                             @foreach ($paymentDaily as $payment)
                                 <tr class="sales-clickable-row" data-sales-payment-detail-url="{{ route('marketplace.dashboard.payments.detail', array_merge(['date' => $payment->day], $paymentDetailQuery)) }}" tabindex="0" role="button" aria-label="Lihat detail pembayaran {{ $dateLabel($payment->day) }}">
@@ -1130,7 +1130,7 @@
                                     <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->non_cod_amount) }}</div><div class="small text-muted">{{ number_format($payment->non_cod_orders) }} order</div></td>
                                     <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->pay_later_amount) }}</div><div class="small text-muted">{{ number_format($payment->pay_later_orders) }} order</div></td>
                                     <td class="text-end"><div>{{ $fmt($payment->product_protection) }}</div><div class="small text-muted">{{ number_format($payment->product_protection_orders) }} order</div></td>
-                                    <td class="text-end"><div>{{ $fmt($payment->service_fee) }}</div><div class="small text-muted">{{ number_format($payment->service_fee_orders) }} order</div></td>
+                                    <td class="text-end"><div>{{ $fmt($payment->buyer_service_fee) }}</div><div class="small text-muted">{{ number_format($payment->buyer_service_fee_orders) }} order</div></td>
                                     <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->buyer_paid) }}</div><div class="small text-muted">{{ number_format($payment->orders) }} order</div></td>
                                 </tr>
                             @endforeach
