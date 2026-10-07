@@ -79,6 +79,34 @@
     ];
     $settlementItems = (array) ($settlementRaw['items'] ?? []);
     $displayItems = $settlementItems ?: (array) ($liveData['item_list'] ?? []);
+    $buyerShippingAmount = function (array $income, array $orderData, mixed $storedShipping): float {
+        foreach ([$income, $orderData] as $source) {
+            if (array_key_exists('buyer_paid_shipping_fee', $source)
+                && $source['buyer_paid_shipping_fee'] !== ''
+                && is_numeric($source['buyer_paid_shipping_fee'])) {
+                return max((float) $source['buyer_paid_shipping_fee'], 0);
+            }
+        }
+
+        if (array_key_exists('actual_shipping_fee', $orderData)
+            && $orderData['actual_shipping_fee'] !== ''
+            && is_numeric($orderData['actual_shipping_fee'])) {
+            return max((float) $orderData['actual_shipping_fee'], 0);
+        }
+
+        $stored = is_numeric($storedShipping) ? (float) $storedShipping : 0.0;
+        if ($stored > 0) {
+            return $stored;
+        }
+
+        $rebate = (float) ($income['shopee_shipping_rebate'] ?? 0);
+        $estimated = (float) ($orderData['estimated_shipping_fee']
+            ?? $income['estimated_shipping_fee']
+            ?? $storedShipping
+            ?? 0);
+
+        return $estimated > 0 ? max($estimated - $rebate, 0) : max($stored, 0);
+    };
 
     $normalizeDateTime = function ($value) {
         if ($value instanceof \Carbon\CarbonInterface) {
@@ -367,12 +395,7 @@
                         $promoBuyerPaid = (float)($inc['buyer_total_amount'] ?? $inc['buyer_paid_amount'] ?? ($order->total_paid_customer > 0
                             ? $order->total_paid_customer
                             : ($liveData['total_amount'] ?? $order->total_amount ?? 0)));
-                        $promoOngkir = (float)($inc['buyer_paid_shipping_fee'] ?? $order->shipping_fee_customer ?? 0);
-                        $promoShippingRebate = (float)($inc['shopee_shipping_rebate'] ?? 0);
-                        $promoEstimasiOngkir = (float)($liveData['estimated_shipping_fee'] ?? $inc['estimated_shipping_fee'] ?? $liveData['actual_shipping_fee'] ?? $order->shipping_fee_customer ?? 0);
-                        if ($promoOngkir == 0 && $promoEstimasiOngkir > $promoShippingRebate) {
-                            $promoOngkir = $promoEstimasiOngkir - $promoShippingRebate;
-                        }
+                        $promoOngkir = $buyerShippingAmount($inc, $liveData, $order->shipping_fee_customer);
                         $promoBiayaLayanan = (float)($inc['buyer_transaction_fee'] ?? max($promoBuyerPaid - $promoSubtotal - $promoOngkir - $promoVoucherPlatform - $promoVoucherToko - $promoKoinShopee, 0));
                         $promoTotal = (float) ($promotionBreakdown['total_promotion'] ?? ($promoDiskonProduk + $promoVoucherToko + $promoVoucherPlatform + $promoPaketDiskon + $promoKomboHemat));
                     @endphp
@@ -512,14 +535,8 @@
         // Subtotal = Harga Produk Setelah Diskon (dari loop item_list atau fallback database)
         $subtotal = (float)($inc['order_discounted_price'] ?? $order->subtotal_items ?? ($subtotalItems > 0 ? $subtotalItems : 0));
         
-        $estimasiOngkir = (float)($liveData['estimated_shipping_fee'] ?? $inc['estimated_shipping_fee'] ?? 0);
         $ongkirRebate = (float)($inc['shopee_shipping_rebate'] ?? 0);
-        $ongkirDibayarPembeli = (float)($inc['buyer_paid_shipping_fee'] ?? $order->shipping_fee_customer ?? 0);
-        
-        // Terkadang Shopee mengisi 0 pada buyer_paid_shipping_fee meski pembeli bayar ongkir. Kita hitung manual selisihnya jika begitu.
-        if ($ongkirDibayarPembeli == 0 && $estimasiOngkir > $ongkirRebate) {
-            $ongkirDibayarPembeli = $estimasiOngkir - $ongkirRebate;
-        }
+        $ongkirDibayarPembeli = $buyerShippingAmount($inc, $liveData, $order->shipping_fee_customer);
         
         $ongkosJasaKirim = (float)($settlement->actual_shipping_fee ?? $inc['actual_shipping_fee'] ?? ($inc['estimated_shipping_fee'] ?? ($liveData['actual_shipping_fee'] ?? ($liveData['estimated_shipping_fee'] ?? 0))));
         $potonganOngkir = (float)($settlement->shipping_fee_subsidy ?? $inc['shopee_shipping_rebate'] ?? $order->shipping_discount_platform ?? 0);

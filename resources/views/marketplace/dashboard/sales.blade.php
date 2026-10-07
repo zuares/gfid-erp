@@ -1178,14 +1178,21 @@
                         <thead><tr><th class="ps-3">Date</th><th class="text-end">Seller Net Sales</th><th class="text-end">Voucher Platform</th><th class="text-end">Buyer Shipping</th><th class="text-end">COD</th><th class="text-end">Non-COD</th><th class="text-end">Pay Later</th><th class="text-end">Protection</th><th class="text-end">Buyer Service Fee</th><th class="text-end">Buyer Paid</th></tr></thead>
                         <tbody>
                             @foreach ($paymentDaily as $payment)
+                                @php
+                                    $paymentCell = function ($amount) use ($payment, $fmt) {
+                                        $nominalPct = $payment->buyer_paid > 0 ? ($amount / $payment->buyer_paid) * 100 : 0;
+
+                                        return '<div class="fw-semibold">'.$fmt($amount).'</div><div class="small text-muted">'.number_format($nominalPct, 1, ',', '.').'%</div>';
+                                    };
+                                @endphp
                                 <tr class="sales-clickable-row" data-sales-payment-detail-url="{{ route('marketplace.dashboard.payments.detail', array_merge(['date' => $payment->day], $paymentDetailQuery)) }}" tabindex="0" role="button" aria-label="Lihat detail pembayaran {{ $dateLabel($payment->day) }}">
                                     <td class="fw-semibold">{{ $dateLabel($payment->day) }}</td>
                                     <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->seller_net_sales) }}</div><div class="small text-muted">{{ number_format($payment->seller_net_sales_orders) }} order</div></td>
                                     <td class="text-end"><div>{{ $fmt($payment->voucher_platform) }}</div><div class="small text-muted">{{ number_format($payment->voucher_platform_orders) }} order</div></td>
                                     <td class="text-end"><div>{{ $fmt($payment->buyer_shipping) }}</div><div class="small text-muted">{{ number_format($payment->buyer_shipping_orders) }} order</div></td>
-                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->cod_amount) }}</div><div class="small text-muted">{{ number_format($payment->cod_orders) }} order</div></td>
-                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->non_cod_amount) }}</div><div class="small text-muted">{{ number_format($payment->non_cod_orders) }} order</div></td>
-                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->pay_later_amount) }}</div><div class="small text-muted">{{ number_format($payment->pay_later_orders) }} order</div></td>
+                                    <td class="text-end">{!! $paymentCell($payment->cod_amount) !!}</td>
+                                    <td class="text-end">{!! $paymentCell($payment->non_cod_amount) !!}</td>
+                                    <td class="text-end">{!! $paymentCell($payment->pay_later_amount) !!}</td>
                                     <td class="text-end"><div>{{ $fmt($payment->product_protection) }}</div><div class="small text-muted">{{ number_format($payment->product_protection_orders) }} order</div></td>
                                     <td class="text-end"><div>{{ $fmt($payment->buyer_service_fee) }}</div><div class="small text-muted">{{ number_format($payment->buyer_service_fee_orders) }} order</div></td>
                                     <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->buyer_paid) }}</div><div class="small text-muted">{{ number_format($payment->orders) }} order</div></td>

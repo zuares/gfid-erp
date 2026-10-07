@@ -474,10 +474,14 @@ class MarketplaceSalesDashboardController extends Controller
                             'promotion_breakdown.Buyer Service Fee',
                         ]);
                     }
-                    $rowProductProtection = abs((float) ($row->shipping_insurance_fee ?? 0));
-                    if ($rowProductProtection <= 0) {
-                        $rowProductProtection = $rawValue($row->raw_json, ['product_protection_fee', 'product_protection', 'insurance_fee', 'shipping_insurance', 'premi']);
-                    }
+                    $rowProductProtection = $rawValue($row->raw_json, [
+                        'final_product_protection',
+                        'buyer_paid_extended_warranty',
+                        'product_protection_fee',
+                        'product_protection',
+                        'insurance_premium',
+                        'premi',
+                    ]);
                     $buyerServiceFee += $rowBuyerServiceFee;
                     $productProtection += $rowProductProtection;
                     $buyerServiceFeeOrders += $rowBuyerServiceFee > 0 ? 1 : 0;
@@ -1268,17 +1272,15 @@ SQL;
                     [$incomeRaw, $orderRaw, $orderRaw['promotion_breakdown'] ?? []],
                     ['buyer_transaction_fee', 'buyer_service_fee'],
                 );
-                $row->buyer_service_fee = $buyerTransactionFee > 0
-                    ? $buyerTransactionFee
-                    : max(
-                        $row->buyer_paid_amount
-                            - $row->product_subtotal
-                            - $row->shipping_fee
-                            + $row->voucher_platform
-                            + $row->voucher_store
-                            + $buyerCoins,
-                        0,
-                    );
+                $buyerServiceBalance = $row->buyer_paid_amount
+                    - $row->product_subtotal
+                    - $row->shipping_fee
+                    + $row->voucher_platform
+                    + $row->voucher_store
+                    + $buyerCoins;
+                $row->buyer_service_fee = $row->buyer_paid_amount > 0
+                    ? ($buyerServiceBalance >= 0 ? $buyerServiceBalance : $buyerTransactionFee)
+                    : ($buyerTransactionFee > 0 ? $buyerTransactionFee : 2000);
                 $row->total_paid = $row->buyer_paid_amount;
                 $row->is_paid = in_array((string) $row->payment_state, ['PAID', 'COMPLETED', 'SELESAI', 'LUNAS'], true);
 
@@ -1875,18 +1877,21 @@ SQL;
             [$income, $orderRaw, $orderRaw['promotion_breakdown'] ?? []],
             ['buyer_transaction_fee', 'buyer_service_fee'],
         );
-        $buyerServiceFee = $explicitServiceFee > 0
-            ? $explicitServiceFee
-            : ($buyerPaid > 0
-                ? max($buyerPaid - $subtotal - $shipping + $voucherPlatform + $voucherStore + $buyerCoins, 0)
-                : 2000.0);
-        $productProtection = abs((float) ($row->shipping_insurance_fee ?? 0));
-        if ($productProtection <= 0) {
-            $productProtection = $this->firstPayloadAmount(
-                [$settlementRaw, $income, $orderRaw],
-                ['product_protection_fee', 'product_protection', 'insurance_fee', 'shipping_insurance', 'premi'],
-            );
-        }
+        $buyerServiceBalance = $buyerPaid - $subtotal - $shipping + $voucherPlatform + $voucherStore + $buyerCoins;
+        $buyerServiceFee = $buyerPaid > 0
+            ? ($buyerServiceBalance >= 0 ? $buyerServiceBalance : $explicitServiceFee)
+            : ($explicitServiceFee > 0 ? $explicitServiceFee : 2000.0);
+        $productProtection = $this->firstPayloadAmount(
+            [$settlementRaw, $income, $orderRaw],
+            [
+                'final_product_protection',
+                'buyer_paid_extended_warranty',
+                'product_protection_fee',
+                'product_protection',
+                'insurance_premium',
+                'premi',
+            ],
+        );
 
         return (object) [
             'day' => (string) $row->day,
@@ -1942,20 +1947,39 @@ SQL;
 
     private function paymentBuyerShipping(array $income, mixed $storedShipping, array $liveData): float
     {
-        $shipping = $income['buyer_paid_shipping_fee'] ?? $storedShipping ?? 0;
-        $shipping = is_numeric($shipping) ? (float) $shipping : 0.0;
+        foreach ([$income, $liveData] as $source) {
+            if (array_key_exists('buyer_paid_shipping_fee', $source)
+                && $source['buyer_paid_shipping_fee'] !== ''
+                && is_numeric($source['buyer_paid_shipping_fee'])) {
+                return max((float) $source['buyer_paid_shipping_fee'], 0);
+            }
+        }
+
+        // actual_shipping_fee dari order API adalah fallback operasional saat
+        // escrow belum tersedia. Nilai 0 tetap valid dan tidak boleh diganti
+        // dengan estimated_shipping_fee.
+        if (array_key_exists('actual_shipping_fee', $liveData)
+            && $liveData['actual_shipping_fee'] !== ''
+            && is_numeric($liveData['actual_shipping_fee'])) {
+            return max((float) $liveData['actual_shipping_fee'], 0);
+        }
+
+        $stored = is_numeric($storedShipping) ? (float) $storedShipping : 0.0;
+        if ($stored > 0) {
+            return $stored;
+        }
+
         $shippingRebate = (float) ($income['shopee_shipping_rebate'] ?? 0);
         $estimatedShipping = (float) ($liveData['estimated_shipping_fee']
             ?? $income['estimated_shipping_fee']
-            ?? $liveData['actual_shipping_fee']
             ?? $storedShipping
             ?? 0);
 
-        if ($shipping == 0.0 && $estimatedShipping > $shippingRebate) {
-            return $estimatedShipping - $shippingRebate;
+        if ($estimatedShipping > 0) {
+            return max($estimatedShipping - $shippingRebate, 0);
         }
 
-        return $shipping;
+        return max($stored, 0);
     }
 
     private function paymentSubtotal(

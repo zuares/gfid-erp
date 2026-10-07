@@ -644,16 +644,7 @@ trait MarketplaceOrdersPaginatedTrait
             });
         }
 
-        $shipping = (float) ($income['buyer_paid_shipping_fee'] ?? $order->shipping_fee_customer ?? 0);
-        $shippingRebate = (float) ($income['shopee_shipping_rebate'] ?? 0);
-        $estimatedShipping = (float) ($liveData['estimated_shipping_fee']
-            ?? $income['estimated_shipping_fee']
-            ?? $liveData['actual_shipping_fee']
-            ?? $order->shipping_fee_customer
-            ?? 0);
-        if ($shipping == 0.0 && $estimatedShipping > $shippingRebate) {
-            $shipping = $estimatedShipping - $shippingRebate;
-        }
+        $shipping = $this->paymentBuyerShippingForIndex($income, $order->shipping_fee_customer, $liveData);
 
         $buyerPaid = $income['buyer_total_amount'] ?? $income['buyer_paid_amount'] ?? null;
         if ($buyerPaid === null || $buyerPaid === '') {
@@ -672,11 +663,11 @@ trait MarketplaceOrdersPaginatedTrait
         $buyerServiceFee = (float) ($income['buyer_transaction_fee']
             ?? $income['buyer_service_fee']
             ?? 0);
+        $buyerServiceBalance = (float) $buyerPaid - ((float) $subtotal + (float) $shipping - $voucherPlatform - $voucherStore - $coins);
         if ((float) $buyerPaid > 0) {
-            $buyerServiceFee = (float) $buyerPaid - ((float) $subtotal + (float) $shipping - $voucherPlatform - $voucherStore - $coins);
-            if ($buyerServiceFee < 0) {
-                $buyerServiceFee = (float) ($income['buyer_transaction_fee'] ?? 0);
-            }
+            $buyerServiceFee = $buyerServiceBalance >= 0
+                ? $buyerServiceBalance
+                : (float) ($income['buyer_transaction_fee'] ?? 0);
         } elseif ($buyerServiceFee <= 0) {
             $buyerServiceFee = 2000.0;
         }
@@ -702,6 +693,38 @@ trait MarketplaceOrdersPaginatedTrait
         }
 
         return is_array($payload) ? $payload : [];
+    }
+
+    private function paymentBuyerShippingForIndex(array $income, mixed $storedShipping, array $liveData): float
+    {
+        foreach ([$income, $liveData] as $source) {
+            if (array_key_exists('buyer_paid_shipping_fee', $source)
+                && $source['buyer_paid_shipping_fee'] !== ''
+                && is_numeric($source['buyer_paid_shipping_fee'])) {
+                return max((float) $source['buyer_paid_shipping_fee'], 0);
+            }
+        }
+
+        if (array_key_exists('actual_shipping_fee', $liveData)
+            && $liveData['actual_shipping_fee'] !== ''
+            && is_numeric($liveData['actual_shipping_fee'])) {
+            return max((float) $liveData['actual_shipping_fee'], 0);
+        }
+
+        $stored = is_numeric($storedShipping) ? (float) $storedShipping : 0.0;
+        if ($stored > 0) {
+            return $stored;
+        }
+
+        $shippingRebate = (float) ($income['shopee_shipping_rebate'] ?? 0);
+        $estimatedShipping = (float) ($liveData['estimated_shipping_fee']
+            ?? $income['estimated_shipping_fee']
+            ?? $storedShipping
+            ?? 0);
+
+        return $estimatedShipping > 0
+            ? max($estimatedShipping - $shippingRebate, 0)
+            : max($stored, 0);
     }
 
     private function paymentItemsSubtotalForIndex(array $items): float
