@@ -986,6 +986,7 @@
             'gross_margin' => $netSales > 0 ? ($grossProfit / $netSales) * 100 : null,
             'contribution_profit' => $contributionProfit,
             'contribution_margin' => $netSales > 0 ? ($contributionProfit / $netSales) * 100 : null,
+            'hpp_coverage' => $rows->count() > 0 ? ($costedProducts->count() / $rows->count()) * 100 : 0,
             'ad_spend' => $adSpend,
             'ad_sales' => $adSales,
             'acos' => $adSales > 0 ? ($adSpend / $adSales) * 100 : null,
@@ -1030,9 +1031,10 @@
         ['group' => 'Profitabilitas & iklan', 'label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Penjualan Atribusi Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'ACOS', 'key' => 'acos', 'format' => $percentDisplay],
-        ['group' => 'Profitabilitas & iklan', 'label' => 'ROAS', 'key' => 'roas', 'format' => $multipleDisplay],
+        ['group' => 'Profitabilitas & iklan', 'label' => 'ROAS Blended', 'key' => 'roas', 'format' => $multipleDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'CPA', 'key' => 'cpa', 'format' => $currencyDisplay],
-        ['group' => 'Profitabilitas & iklan', 'label' => 'Coverage Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
+        ['group' => 'Kualitas data', 'label' => 'Coverage Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
+        ['group' => 'Kualitas data', 'label' => 'Coverage HPP', 'key' => 'hpp_coverage', 'format' => $percentDisplay],
     ];
     $activeProductKpi = $productComparisonMetrics($products);
     $previousMonthProductKpi = $productComparisonMetrics($previousMonthProducts);
@@ -1103,6 +1105,7 @@
             'gross_margin' => $netSales > 0 ? ($grossProfit / $netSales) * 100 : null,
             'contribution_profit' => $contributionProfit,
             'contribution_margin' => $netSales > 0 ? ($contributionProfit / $netSales) * 100 : null,
+            'hpp_coverage' => $rows->count() > 0 ? ($costedProducts->count() / $rows->count()) * 100 : 0,
             'ad_spend' => $adSpend,
             'ad_sales' => $adSales,
             'acos' => $adSales > 0 ? ($adSpend / $adSales) * 100 : null,
@@ -1176,9 +1179,10 @@
         ['group' => 'Profitabilitas & iklan', 'label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Penjualan Atribusi Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'ACOS', 'key' => 'acos', 'format' => $percentDisplay],
-        ['group' => 'Profitabilitas & iklan', 'label' => 'ROAS', 'key' => 'roas', 'format' => $multipleDisplay],
+        ['group' => 'Profitabilitas & iklan', 'label' => 'ROAS Blended', 'key' => 'roas', 'format' => $multipleDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'CPA', 'key' => 'cpa', 'format' => $currencyDisplay],
-        ['group' => 'Profitabilitas & iklan', 'label' => 'Coverage Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
+        ['group' => 'Kualitas data', 'label' => 'Coverage Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
+        ['group' => 'Kualitas data', 'label' => 'Coverage HPP', 'key' => 'hpp_coverage', 'format' => $percentDisplay],
     ];
     $platformPromotionMetrics = function ($rows, $periodSummary, $promotionOrders = null) {
         $rows = collect($rows);
@@ -1757,9 +1761,16 @@
                 ['group' => 'Pendapatan', 'label' => 'Penjualan Netto', 'value' => $currencyDisplay($activeProductKpi['net_sales']), 'note' => 'setelah diskon & promo seller', 'icon' => 'bi-graph-down-arrow', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($activeProductKpi['net_sales'], $previousMonthProductKpi['net_sales'], $previousPeriodProductKpi['net_sales'], $currencyDisplay)],
                 ['group' => 'Pendapatan', 'label' => 'Pembayaran Pembeli', 'value' => $currencyDisplay($activeProductKpi['buyer_payment']), 'note' => 'nilai dibayar pembeli', 'icon' => 'bi-wallet2', 'comparisons' => $kpiComparisons($activeProductKpi['buyer_payment'], $previousMonthProductKpi['buyer_payment'], $previousPeriodProductKpi['buyer_payment'], $currencyDisplay)],
                 ['group' => 'Pendapatan', 'label' => 'AOV Penjualan', 'value' => $currencyDisplay($activeProductKpi['aov_sales']), 'note' => 'penjualan per order produk', 'icon' => 'bi-bar-chart-line', 'comparisons' => $kpiComparisons($activeProductKpi['aov_sales'], $previousMonthProductKpi['aov_sales'], $previousPeriodProductKpi['aov_sales'], $currencyDisplay)],
+                ['group' => 'Pendapatan', 'label' => 'AOV Pembayaran', 'value' => $currencyDisplay($activeProductKpi['aov_payment']), 'note' => 'pembayaran per order produk', 'icon' => 'bi-wallet2', 'comparisons' => $kpiComparisons($activeProductKpi['aov_payment'], $previousMonthProductKpi['aov_payment'], $previousPeriodProductKpi['aov_payment'], $currencyDisplay)],
+                ['group' => 'Profitabilitas & iklan', 'label' => 'Total HPP', 'value' => $fmtHpp($activeProductKpi['hpp']), 'note' => 'HPP unit terjual', 'icon' => 'bi-boxes', 'comparisons' => $kpiComparisons($activeProductKpi['hpp'], $previousMonthProductKpi['hpp'], $previousPeriodProductKpi['hpp'], $fmtHpp, 'relative', false)],
                 ['group' => 'Profitabilitas & iklan', 'label' => 'Margin Kontribusi', 'value' => $activeProductKpi['contribution_margin'] === null ? '—' : $percentDisplay($activeProductKpi['contribution_margin']), 'note' => 'setelah HPP dan iklan', 'icon' => 'bi-pie-chart', 'comparisons' => $kpiComparisons($activeProductKpi['contribution_margin'] ?? 0, $previousMonthProductKpi['contribution_margin'] ?? null, $previousPeriodProductKpi['contribution_margin'] ?? null, $percentDisplay, 'points')],
                 ['group' => 'Profitabilitas & iklan', 'label' => 'Biaya Iklan', 'value' => $currencyDisplay($activeProductKpi['ad_spend']), 'note' => 'termasuk GMV Max', 'icon' => 'bi-megaphone', 'variant' => 'sales-kpi--warning', 'comparisons' => $kpiComparisons($activeProductKpi['ad_spend'], $previousMonthProductKpi['ad_spend'], $previousPeriodProductKpi['ad_spend'], $currencyDisplay, 'relative', false)],
+                ['group' => 'Profitabilitas & iklan', 'label' => 'Penjualan Atribusi Iklan', 'value' => $currencyDisplay($activeProductKpi['ad_sales']), 'note' => 'penjualan dari iklan', 'icon' => 'bi-bullseye', 'comparisons' => $kpiComparisons($activeProductKpi['ad_sales'], $previousMonthProductKpi['ad_sales'], $previousPeriodProductKpi['ad_sales'], $currencyDisplay)],
+                ['group' => 'Profitabilitas & iklan', 'label' => 'ACOS', 'value' => $activeProductKpi['acos'] === null ? '—' : $percentDisplay($activeProductKpi['acos']), 'note' => 'biaya iklan / penjualan iklan', 'icon' => 'bi-percent', 'comparisons' => $kpiComparisons($activeProductKpi['acos'] ?? 0, $previousMonthProductKpi['acos'] ?? null, $previousPeriodProductKpi['acos'] ?? null, $percentDisplay, 'points', false)],
                 ['group' => 'Profitabilitas & iklan', 'label' => 'ROAS Blended', 'value' => $activeProductKpi['roas'] === null ? '—' : $multipleDisplay($activeProductKpi['roas']), 'note' => 'penjualan atribusi / iklan', 'icon' => 'bi-graph-up-arrow', 'comparisons' => $kpiComparisons($activeProductKpi['roas'] ?? 0, $previousMonthProductKpi['roas'] ?? null, $previousPeriodProductKpi['roas'] ?? null, $multipleDisplay)],
+                ['group' => 'Profitabilitas & iklan', 'label' => 'CPA', 'value' => $activeProductKpi['cpa'] === null ? '—' : $currencyDisplay($activeProductKpi['cpa']), 'note' => 'biaya per konversi iklan', 'icon' => 'bi-currency-dollar', 'comparisons' => $kpiComparisons($activeProductKpi['cpa'] ?? 0, $previousMonthProductKpi['cpa'] ?? null, $previousPeriodProductKpi['cpa'] ?? null, $currencyDisplay, 'relative', false)],
+                ['group' => 'Kualitas data', 'label' => 'Coverage Mapping Internal', 'value' => $percentDisplay($activeProductKpi['mapping_rate']), 'note' => 'baris terpetakan', 'icon' => 'bi-link-45deg', 'variant' => $activeProductKpi['mapping_rate'] < 100 ? 'sales-kpi--warning' : '', 'comparisons' => $kpiComparisons($activeProductKpi['mapping_rate'], $previousMonthProductKpi['mapping_rate'], $previousPeriodProductKpi['mapping_rate'], $percentDisplay, 'points')],
+                ['group' => 'Kualitas data', 'label' => 'Coverage HPP', 'value' => $percentDisplay($activeProductKpi['hpp_coverage']), 'note' => 'baris dengan HPP tersedia', 'icon' => 'bi-check2-square', 'variant' => $activeProductKpi['hpp_coverage'] < 100 ? 'sales-kpi--warning' : '', 'comparisons' => $kpiComparisons($activeProductKpi['hpp_coverage'], $previousMonthProductKpi['hpp_coverage'], $previousPeriodProductKpi['hpp_coverage'], $percentDisplay, 'points')],
             ],
         ])
         @if ($activeComparison)
@@ -1971,7 +1982,7 @@
                     <span class="sales-product-analysis-kpi-value {{ $productAnalysisMappedCount === $productAnalysisProducts->count() ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisProducts->count() > 0 ? $percentDisplay(($productAnalysisMappedCount / $productAnalysisProducts->count()) * 100) : '—' }}</span>
                 </div>
                 <div class="sales-product-analysis-kpi">
-                    <span class="sales-product-analysis-kpi-label">Blended ROAS</span>
+                    <span class="sales-product-analysis-kpi-label">ROAS Blended</span>
                     <span class="sales-product-analysis-kpi-value {{ $productAnalysisAdSpend > 0 ? ($productAnalysisAdSales / $productAnalysisAdSpend >= 2 ? 'is-positive' : 'is-warning') : 'is-muted' }}">{{ $productAnalysisAdSpend > 0 ? $multipleDisplay($productAnalysisAdSales / $productAnalysisAdSpend) : '—' }}</span>
                 </div>
             </div>
@@ -1985,11 +1996,11 @@
                             <tr><td class="analysis-label" colspan="2">Top 20% kontribusi</td><td class="text-end analysis-value">{{ $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisTop20Sales / $productAnalysisNetSales) * 100) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Pembayaran Pembeli / Penjualan</td><td class="text-end analysis-value">{{ $productAnalysisSales > 0 ? $percentDisplay(($productAnalysisBuyerPayment / $productAnalysisSales) * 100) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Unit per Order</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? number_format($activeProductKpi['qty'] / $activeProductKpi['orders'], 2, ',', '.') : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">AOV penjualan</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_sales']) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">AOV pembayaran</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_payment']) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">AOV Penjualan</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_sales']) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">AOV Pembayaran</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_payment']) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Produk dengan HPP</td><td class="text-end analysis-value">{{ number_format($productAnalysisCostedProducts->count()) }} / {{ number_format($productAnalysisProducts->count()) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Total HPP</td><td class="text-end analysis-value">{{ $productAnalysisHpp > 0 ? $fmtHpp($productAnalysisHpp) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Margin kotor</td><td class="text-end analysis-value {{ $productAnalysisGrossMargin >= 25 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisGrossMargin !== 0 ? $percentDisplay($productAnalysisGrossMargin) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Margin Kotor</td><td class="text-end analysis-value {{ $productAnalysisGrossMargin >= 25 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisGrossMargin !== 0 ? $percentDisplay($productAnalysisGrossMargin) : '—' }}</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1999,11 +2010,11 @@
                         <tbody>
                             <tr><td class="analysis-label" colspan="2">Produk Teratribusi Iklan</td><td class="text-end analysis-value">{{ number_format($productAnalysisAdProducts->count()) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Penjualan Atribusi Iklan</td><td class="text-end analysis-value">{{ $fmt($productAnalysisAdSales) }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Biaya iklan</td><td class="text-end analysis-value is-danger">{{ $fmt($productAnalysisAdSpend) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Biaya Iklan</td><td class="text-end analysis-value is-danger">{{ $fmt($productAnalysisAdSpend) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">ACOS Blended</td><td class="text-end analysis-value">{{ $productAnalysisAdSales > 0 ? $percentDisplay(($productAnalysisAdSpend / $productAnalysisAdSales) * 100) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">CPA Blended</td><td class="text-end analysis-value">{{ $productAnalysisAdConversions > 0 ? $fmt($productAnalysisAdSpend / $productAnalysisAdConversions) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Kontribusi setelah iklan</td><td class="text-end analysis-value {{ $productAnalysisContributionProfit >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisContributionProfit) }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Margin kontribusi</td><td class="text-end analysis-value {{ $productAnalysisContributionMargin >= 20 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisContributionMargin !== 0 ? $percentDisplay($productAnalysisContributionMargin) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Kontribusi Pasca Iklan</td><td class="text-end analysis-value {{ $productAnalysisContributionProfit >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisContributionProfit) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Margin Kontribusi</td><td class="text-end analysis-value {{ $productAnalysisContributionMargin >= 20 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisContributionMargin !== 0 ? $percentDisplay($productAnalysisContributionMargin) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Coverage Penjualan Atribusi</td><td class="text-end analysis-value">{{ $productAnalysisAdSalesCoverage > 0 ? $percentDisplay($productAnalysisAdSalesCoverage) : '—' }}</td></tr>
                         </tbody>
                     </table>
