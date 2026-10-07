@@ -182,6 +182,9 @@
         white-space: nowrap;
     }
     .sales-dashboard .sales-table td { border-color: color-mix(in srgb, var(--sales-line) 65%, transparent); font-size: .78rem; }
+    .sales-dashboard .sales-index-column,
+    .sales-dashboard .sales-index-cell { width: 3.5rem; min-width: 3.5rem; text-align: center; }
+    .sales-dashboard .sales-index-cell { color: var(--sales-muted); font-variant-numeric: tabular-nums; font-weight: 650; }
     .sales-dashboard .sales-daily-table { min-width: 980px; }
     .sales-dashboard .sales-daily-table .sales-table-metric { white-space: nowrap; }
     .sales-dashboard .sales-daily-table .sales-compare-line { margin-top: .18rem; gap: .2rem; font-size: .52rem; }
@@ -508,7 +511,7 @@
                 <table class="table table-sm table-hover align-middle sales-table sales-daily-table">
                     <thead>
                         <tr>
-                            <th class="ps-3">No.</th>
+                            <th scope="col" class="sales-index-column">No.</th>
                             <th>Tanggal</th>
                             <th class="text-end">Jumlah Pesanan</th>
                             <th class="text-end">Jumlah Unit Terjual</th>
@@ -520,7 +523,7 @@
                     <tbody>
                         @foreach ($daily as $row)
                             <tr class="sales-clickable-row" data-sales-order-detail-date="{{ $row->day }}" tabindex="0" role="button">
-                                <td class="ps-3 text-muted">{{ $loop->iteration }}</td>
+                                <td class="sales-index-cell" aria-label="Urutan {{ $loop->iteration }}">{{ $loop->iteration }}</td>
                                 <td><button class="sales-date-link" type="button" data-sales-order-detail-date="{{ $row->day }}">{{ $dateLabel($row->day) }}</button></td>
                                 <td class="text-end">{{ number_format($row->orders) }}</td>
                                 <td class="text-end">{{ number_format($row->qty) }}</td>
@@ -561,7 +564,7 @@
                     <table class="table table-sm table-hover align-middle sales-table sales-income-table">
                         <thead>
                             <tr>
-                                <th class="ps-3" rowspan="2">No.</th>
+                                <th scope="col" class="sales-index-column" rowspan="2">No.</th>
                                 <th rowspan="2">Tanggal</th>
                                 <th class="text-end" colspan="3">Order</th>
                                 <th class="text-end income-group-start" colspan="3">Sudah Cair</th>
@@ -585,7 +588,7 @@
                         <tbody>
                             @foreach ($incomeDaily as $income)
                                 <tr>
-                                    <td class="ps-3 text-muted">{{ $loop->iteration }}</td>
+                                    <td class="sales-index-cell" aria-label="Urutan {{ $loop->iteration }}">{{ $loop->iteration }}</td>
                                     <td class="fw-semibold">{{ $dateLabel($income->day) }}</td>
                                     <td class="text-end income-value">{{ number_format($income->orders) }}</td>
                                     <td class="text-end income-value">{{ $fmt($income->buyer_paid) }}</td>
@@ -721,11 +724,11 @@
                             <col style="width: 9.5rem">
                             <col style="width: 9.5rem">
                         </colgroup>
-                        <thead><tr><th class="ps-3">No.</th><th>Produk</th><th>SKU</th><th class="text-end">Order</th><th class="text-end">Pembeli</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">AOV Neto</th><th class="text-end pe-3">APC</th></tr></thead>
+                        <thead><tr><th scope="col" class="sales-index-column">No.</th><th>Produk</th><th>SKU</th><th class="text-end">Order</th><th class="text-end">Pembeli</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">AOV Neto</th><th class="text-end pe-3">APC</th></tr></thead>
                         <tbody>
                             @foreach ($products as $product)
                                 <tr>
-                                    <td class="ps-3 text-muted fw-semibold">{{ $loop->iteration }}</td>
+                                    <td class="sales-index-cell" aria-label="Urutan {{ $loop->iteration }}">{{ $loop->iteration }}</td>
                                     <td class="fw-semibold">
                                         <button type="button" class="sales-product-link" data-sales-product-name="{{ $product->name }}" data-sales-product-sku="{{ $product->sku }}" title="Lihat pesanan produk: {{ $product->name }}">
                                             <span class="sales-product-name">{{ $product->name }}</span>
@@ -931,7 +934,7 @@
                     <table class="table table-sm table-hover align-middle sales-table">
                         <thead>
                             <tr>
-                                <th class="ps-3">No.</th>
+                                <th scope="col" class="sales-index-column">No.</th>
                                 <th>Tanggal</th>
                                 <th class="text-end">Total Order</th>
                                 <th class="text-end">Siap Dikirim</th>
@@ -948,7 +951,7 @@
                                     $exceptionCount = (int) $row->failed_orders + (int) $row->return_orders;
                                 @endphp
                                 <tr class="sales-clickable-row" data-sales-shipping-detail-url="{{ route('marketplace.dashboard.shipping.detail', array_merge(['date' => $row->day], $shippingDetailQuery)) }}" tabindex="0" role="button" aria-label="Lihat detail pengiriman {{ $dateLabel($row->day) }}">
-                                    <td class="ps-3 text-muted">{{ $loop->iteration }}</td>
+                                    <td class="sales-index-cell" aria-label="Urutan {{ $loop->iteration }}">{{ $loop->iteration }}</td>
                                     <td class="fw-semibold">{{ $dateLabel($row->day) }}</td>
                                     <td class="text-end">{{ number_format($row->orders) }}</td>
                                     <td class="text-end">{{ number_format($row->ready_orders) }}</td>
