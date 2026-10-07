@@ -161,6 +161,16 @@
         font-size: .7rem;
         font-weight: 650;
     }
+    .sales-dashboard .sales-compare-value {
+        display: inline-flex;
+        align-items: center;
+        font-size: .72rem;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+    }
+    .sales-dashboard .sales-compare-value.is-good { color: var(--success, #16a34a); }
+    .sales-dashboard .sales-compare-value.is-bad { color: var(--danger, #dc2626); }
+    .sales-dashboard .sales-compare-value.is-neutral { color: var(--sales-muted); }
     .sales-dashboard .sales-filter-scope {
         display: flex;
         align-items: flex-end;
@@ -744,6 +754,64 @@
             ['label' => $comparisonModeLabel, 'value' => $compareMetric($current, $previous, $formatter, $mode, $higherIsBetter)],
         ];
     };
+    $paymentComparisonPeriods = $comparisonMode === 'month'
+        ? [
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'summary' => $paymentSummary, 'daily' => $paymentDaily],
+            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'summary' => data_get($comparisonMonthData, 'paymentSummary', []), 'daily' => data_get($comparisonMonthData, 'paymentDaily', [])],
+            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'summary' => data_get($comparisonMonthPreviousData, 'paymentSummary', []), 'daily' => data_get($comparisonMonthPreviousData, 'paymentDaily', [])],
+            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'summary' => data_get($comparisonMonthPreviousTwoData, 'paymentSummary', []), 'daily' => data_get($comparisonMonthPreviousTwoData, 'paymentDaily', [])],
+        ]
+        : [
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'summary' => $paymentSummary, 'daily' => $paymentDaily],
+            ['label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'summary' => data_get($comparisonPeriodData, 'paymentSummary', []), 'daily' => data_get($comparisonPeriodData, 'paymentDaily', [])],
+            ['label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'summary' => data_get($comparisonPeriodPreviousData, 'paymentSummary', []), 'daily' => data_get($comparisonPeriodPreviousData, 'paymentDaily', [])],
+            ['label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'summary' => data_get($comparisonPeriodPreviousTwoData, 'paymentSummary', []), 'daily' => data_get($comparisonPeriodPreviousTwoData, 'paymentDaily', [])],
+        ];
+    $paymentComparisonPeriods = collect($paymentComparisonPeriods)->map(function ($period) {
+        $summary = (array) ($period['summary'] ?? []);
+        $daily = collect($period['daily'] ?? []);
+        $period['metrics'] = [
+            'buyer_paid' => (float) data_get($summary, 'buyer_paid', 0),
+            'aov' => (float) data_get($summary, 'aov', 0),
+            'cod_order_share' => (float) data_get($summary, 'cod_order_share', 0),
+            'cod_amount_share' => (float) data_get($summary, 'cod_amount_share', 0),
+            'non_cod_order_share' => (float) data_get($summary, 'orders', 0) > 0
+                ? ((float) $daily->sum('non_cod_orders') / (float) data_get($summary, 'orders', 0)) * 100
+                : 0,
+            'non_cod_amount_share' => (float) data_get($summary, 'buyer_paid', 0) > 0
+                ? ((float) $daily->sum('non_cod_amount') / (float) data_get($summary, 'buyer_paid', 0)) * 100
+                : 0,
+            'pay_later_order_share' => (float) data_get($summary, 'orders', 0) > 0
+                ? ((float) $daily->sum('pay_later_orders') / (float) data_get($summary, 'orders', 0)) * 100
+                : 0,
+            'pay_later_amount_share' => (float) data_get($summary, 'buyer_paid', 0) > 0
+                ? ((float) $daily->sum('pay_later_amount') / (float) data_get($summary, 'buyer_paid', 0)) * 100
+                : 0,
+            'buyer_shipping' => (float) $daily->sum('buyer_shipping'),
+            'buyer_service_fee' => (float) $daily->sum('buyer_service_fee'),
+            'product_protection' => (float) $daily->sum('product_protection'),
+            'seller_net_sales' => (float) $daily->sum('seller_net_sales'),
+            'voucher_platform' => (float) $daily->sum('voucher_platform'),
+        ];
+        unset($period['summary'], $period['daily']);
+
+        return $period;
+    })->all();
+    $paymentComparisonRows = [
+        ['label' => 'Buyer Paid', 'key' => 'buyer_paid', 'formatter' => $currencyDisplay],
+        ['label' => 'AOV Neto', 'key' => 'aov', 'formatter' => $currencyDisplay],
+        ['label' => 'COD Exposure', 'key' => 'cod_order_share', 'formatter' => $percentDisplay],
+        ['label' => 'COD Nominal Share', 'key' => 'cod_amount_share', 'formatter' => $percentDisplay],
+        ['label' => 'Non-COD Exposure', 'key' => 'non_cod_order_share', 'formatter' => $percentDisplay],
+        ['label' => 'Non-COD Nominal Share', 'key' => 'non_cod_amount_share', 'formatter' => $percentDisplay],
+        ['label' => 'Pay Later Exposure', 'key' => 'pay_later_order_share', 'formatter' => $percentDisplay],
+        ['label' => 'Pay Later Nominal Share', 'key' => 'pay_later_amount_share', 'formatter' => $percentDisplay],
+        ['label' => 'Buyer Shipping', 'key' => 'buyer_shipping', 'formatter' => $currencyDisplay],
+        ['label' => 'Service Fee', 'key' => 'buyer_service_fee', 'formatter' => $currencyDisplay],
+        ['label' => 'Protection', 'key' => 'product_protection', 'formatter' => $currencyDisplay],
+        ['label' => 'Seller Net Sales', 'key' => 'seller_net_sales', 'formatter' => $currencyDisplay],
+        ['label' => 'Voucher Platform', 'key' => 'voucher_platform', 'formatter' => $currencyDisplay],
+    ];
 @endphp
 
 <div class="container-fluid py-4 sales-dashboard">
@@ -1111,6 +1179,42 @@
                 ['label' => 'COD Exposure', 'value' => number_format($paymentSummary['cod_order_share'], 1).'%', 'note' => number_format($paymentDaily->sum('cod_orders')).' COD orders', 'icon' => 'bi-shield-exclamation', 'variant' => 'sales-kpi--warning', 'comparisons' => $kpiComparisons($paymentSummary['cod_order_share'], $previousMonthPaymentSummary['cod_order_share'] ?? null, $previousPeriodPaymentSummary['cod_order_share'] ?? null, $percentDisplay, 'points', false)],
             ],
         ])
+        @if ($activeComparison)
+            <section class="card sales-card shadow-sm mb-3">
+                <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-2">
+                    <div>
+                        <div class="sales-kicker mb-1">Period comparison</div>
+                        <h2 class="sales-section-title mb-1">Perbandingan pembayaran</h2>
+                    </div>
+                    <span class="badge sales-badge rounded-pill px-3 py-2">4 periode</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle sales-table mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">Metrik</th>
+                                @foreach ($paymentComparisonPeriods as $period)
+                                    <th class="text-end">
+                                        {{ $period['label'] }}
+                                        <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
+                                    </th>
+                                @endforeach
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($paymentComparisonRows as $row)
+                                <tr>
+                                    <td class="ps-3 fw-semibold">{{ $row['label'] }}</td>
+                                    @foreach ($paymentComparisonPeriods as $period)
+                                        <td class="text-end">{{ $row['formatter']($period['metrics'][$row['key']] ?? 0) }}</td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        @endif
         <div class="row g-3 mb-3">
             <div class="col-12 col-xl-8">
                 <section class="card sales-card shadow-sm h-100">
@@ -1175,7 +1279,7 @@
             @else
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle sales-table sales-promotion-table sales-payment-table">
-                        <thead><tr><th class="ps-3">Date</th><th class="text-end">Seller Net Sales</th><th class="text-end">Voucher Platform</th><th class="text-end">Buyer Shipping</th><th class="text-end">COD</th><th class="text-end">Non-COD</th><th class="text-end">Pay Later</th><th class="text-end">Protection</th><th class="text-end">Buyer Service Fee</th><th class="text-end">Buyer Paid</th></tr></thead>
+                        <thead><tr><th class="ps-3">Date</th><th class="text-end">Buyer Paid</th><th class="text-end">COD</th><th class="text-end">Non-COD</th><th class="text-end">Pay Later</th><th class="text-end">Buyer Shipping</th><th class="text-end">Service Fee</th><th class="text-end">Protection</th><th class="text-end">Seller Net Sales</th><th class="text-end">Voucher Platform</th></tr></thead>
                         <tbody>
                             @foreach ($paymentDaily as $payment)
                                 @php
@@ -1187,15 +1291,15 @@
                                 @endphp
                                 <tr class="sales-clickable-row" data-sales-payment-detail-url="{{ route('marketplace.dashboard.payments.detail', array_merge(['date' => $payment->day], $paymentDetailQuery)) }}" tabindex="0" role="button" aria-label="Lihat detail pembayaran {{ $dateLabel($payment->day) }}">
                                     <td class="fw-semibold">{{ $dateLabel($payment->day) }}</td>
-                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->seller_net_sales) }}</div><div class="small text-muted">{{ number_format($payment->seller_net_sales_orders) }} order</div></td>
-                                    <td class="text-end"><div>{{ $fmt($payment->voucher_platform) }}</div><div class="small text-muted">{{ number_format($payment->voucher_platform_orders) }} order</div></td>
-                                    <td class="text-end"><div>{{ $fmt($payment->buyer_shipping) }}</div><div class="small text-muted">{{ number_format($payment->buyer_shipping_orders) }} order</div></td>
+                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->buyer_paid) }}</div><div class="small text-muted">{{ number_format($payment->orders) }} order</div></td>
                                     <td class="text-end">{!! $paymentCell($payment->cod_amount) !!}</td>
                                     <td class="text-end">{!! $paymentCell($payment->non_cod_amount) !!}</td>
                                     <td class="text-end">{!! $paymentCell($payment->pay_later_amount) !!}</td>
-                                    <td class="text-end"><div>{{ $fmt($payment->product_protection) }}</div><div class="small text-muted">{{ number_format($payment->product_protection_orders) }} order</div></td>
+                                    <td class="text-end"><div>{{ $fmt($payment->buyer_shipping) }}</div><div class="small text-muted">{{ number_format($payment->buyer_shipping_orders) }} order</div></td>
                                     <td class="text-end"><div>{{ $fmt($payment->buyer_service_fee) }}</div><div class="small text-muted">{{ number_format($payment->buyer_service_fee_orders) }} order</div></td>
-                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->buyer_paid) }}</div><div class="small text-muted">{{ number_format($payment->orders) }} order</div></td>
+                                    <td class="text-end"><div>{{ $fmt($payment->product_protection) }}</div><div class="small text-muted">{{ number_format($payment->product_protection_orders) }} order</div></td>
+                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->seller_net_sales) }}</div><div class="small text-muted">{{ number_format($payment->seller_net_sales_orders) }} order</div></td>
+                                    <td class="text-end"><div>{{ $fmt($payment->voucher_platform) }}</div><div class="small text-muted">{{ number_format($payment->voucher_platform_orders) }} order</div></td>
                                 </tr>
                             @endforeach
                         </tbody>
