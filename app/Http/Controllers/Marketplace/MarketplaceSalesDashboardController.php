@@ -312,7 +312,6 @@ class MarketplaceSalesDashboardController extends Controller
             ->groupByRaw('COALESCE(oi_total.marketplace_order_id, oi_total.order_id)');
         $productBuyerPaymentExpression = 'COALESCE(NULLIF(s.buyer_payment_amount, 0), NULLIF(o.total_paid_customer, 0), NULLIF(o.total_amount, 0), NULLIF(o.subtotal_items, 0), 0)';
         $productLineValueForRow = 'CASE WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount WHEN COALESCE(oi.price, 0) > 0 THEN oi.price * COALESCE(oi.qty, 0) WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount ELSE 0 END';
-        $productLineGrossValueExpression = 'CASE WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount WHEN COALESCE(oi.price, 0) > 0 THEN oi.price * COALESCE(oi.qty, 0) WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount ELSE 0 END';
         $productLineNetValueExpression = 'CASE WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount WHEN COALESCE(oi.price_after_discount, 0) > 0 THEN oi.price_after_discount * COALESCE(oi.qty, 0) WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount ELSE 0 END';
         $marketplaceProductNameExpression = "COALESCE(NULLIF(oi.item_name, ''), NULLIF(oi.item_name_snapshot, ''), NULLIF(oi.variant_name, ''), NULLIF(oi.variant_snapshot, ''), 'Produk tanpa nama')";
         $marketplaceProductSkuExpression = "COALESCE(NULLIF(oi.item_sku, ''), NULLIF(oi.marketplace_sku, ''), NULLIF(oi.model_sku, ''), NULLIF(oi.external_sku, ''), NULLIF(oi.item_code_snapshot, ''), '-')";
@@ -343,15 +342,153 @@ class MarketplaceSalesDashboardController extends Controller
             ->selectRaw('COALESCE(SUM(CASE WHEN oi.qty > 0 THEN oi.qty ELSE 0 END), 0) as qty')
             ->selectRaw('COUNT(DISTINCT o.id) as orders')
             ->selectRaw("COUNT(DISTINCT COALESCE(NULLIF(o.buyer_username, ''), NULLIF(o.buyer_name, ''), o.id)) as buyers")
-            ->selectRaw("COALESCE(SUM({$productLineGrossValueExpression}), 0) as sales")
+            ->selectRaw("COALESCE(SUM({$productLineNetValueExpression}), 0) as sales")
             ->selectRaw("COALESCE(SUM({$productLineNetValueExpression}), 0) as net_sales")
             ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(product_order_totals.order_item_value, 0) > 0 THEN ({$productBuyerPaymentExpression} * {$productLineValueForRow} / product_order_totals.order_item_value) ELSE 0 END), 0) as buyer_payment")
             ->groupByRaw('NULLIF(oi.internal_item_id, 0)')
             ->groupByRaw("CASE WHEN NULLIF(oi.internal_item_id, 0) IS NULL THEN {$marketplaceProductNameExpression} END")
             ->groupByRaw("CASE WHEN NULLIF(oi.internal_item_id, 0) IS NULL THEN {$marketplaceProductSkuExpression} END")
             ->orderByDesc('sales')
-            ->limit(8)
             ->get();
+
+        // Penjualan item sudah memakai harga setelah diskon item. Promosi
+        // order-level tetap dialokasikan ke produk berdasarkan proporsi nilai
+        // item agar Penjualan Netto tidak melewatkan voucher seller, paket,
+        // dan combo hemat tanpa mengurangi diskon item dua kali.
+        $productExtraPromotionByKey = collect();
+        $internalProductIds = $products
+            ->pluck('internal_item_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        $unmappedProducts = $products->filter(fn ($product) => ! (int) ($product->internal_item_id ?? 0))->values();
+        if ($internalProductIds->isNotEmpty() || $unmappedProducts->isNotEmpty()) {
+            $promotionProductNameExpression = "COALESCE(NULLIF(promo_oi.item_name, ''), NULLIF(promo_oi.item_name_snapshot, ''), NULLIF(promo_oi.variant_name, ''), NULLIF(promo_oi.variant_snapshot, ''), 'Produk tanpa nama')";
+            $promotionProductSkuExpression = "COALESCE(NULLIF(promo_oi.item_sku, ''), NULLIF(promo_oi.marketplace_sku, ''), NULLIF(promo_oi.model_sku, ''), NULLIF(promo_oi.external_sku, ''), NULLIF(promo_oi.item_code_snapshot, ''), '-')";
+            $promotionRows = DB::table('marketplace_order_items as promo_oi')
+                ->join('marketplace_orders as promo_o', function ($join) {
+                    $join->on(DB::raw('COALESCE(promo_oi.marketplace_order_id, promo_oi.order_id)'), '=', 'promo_o.id');
+                })
+                ->leftJoin('marketplace_order_settlements as promo_s', 'promo_s.order_id', '=', 'promo_o.id')
+                ->leftJoin('stores as promo_st', 'promo_st.id', '=', 'promo_o.store_id')
+                ->leftJoin('channels as promo_ch', 'promo_ch.id', '=', 'promo_st.channel_id')
+                ->leftJoinSub($productOrderTotals, 'promo_order_totals', 'promo_order_totals.order_key', '=', 'promo_o.id')
+                ->whereRaw('COALESCE(promo_o.ordered_at, promo_o.order_date) IS NOT NULL')
+                ->whereDate(DB::raw("COALESCE(promo_o.ordered_at, promo_o.order_date)"), '>=', $from->toDateString())
+                ->whereDate(DB::raw("COALESCE(promo_o.ordered_at, promo_o.order_date)"), '<=', $to->toDateString())
+                ->whereRaw("UPPER(COALESCE(NULLIF(promo_o.order_status, ''), NULLIF(promo_o.status, ''), '')) NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
+                ->when($storeId, fn ($query) => $query->where('promo_o.store_id', $storeId))
+                ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(promo_ch.code)'), $platformCodes))
+                ->where(function ($query) use ($internalProductIds, $unmappedProducts, $promotionProductNameExpression, $promotionProductSkuExpression) {
+                    if ($internalProductIds->isNotEmpty()) {
+                        $query->whereIn('promo_oi.internal_item_id', $internalProductIds->all());
+                    }
+                    foreach ($unmappedProducts as $unmappedProduct) {
+                        $query->orWhere(function ($productQuery) use ($promotionProductNameExpression, $promotionProductSkuExpression, $unmappedProduct) {
+                            $productQuery
+                                ->whereRaw('NULLIF(promo_oi.internal_item_id, 0) IS NULL')
+                                ->whereRaw("{$promotionProductNameExpression} = ?", [(string) ($unmappedProduct->marketplace_name ?: $unmappedProduct->name)])
+                                ->whereRaw("{$promotionProductSkuExpression} = ?", [(string) $unmappedProduct->sku]);
+                        });
+                    }
+                })
+                ->select([
+                    'promo_o.id as order_id',
+                    'promo_o.voucher_discount',
+                    'promo_o.raw_json as order_raw_json',
+                    'promo_o.raw_payload_json',
+                    'promo_s.id as settlement_id',
+                    'promo_s.seller_voucher',
+                    'promo_s.raw_json as settlement_raw_json',
+                    'promo_oi.id as item_id',
+                    'promo_oi.internal_item_id',
+                    'promo_oi.qty',
+                    'promo_oi.price',
+                    'promo_oi.price_after_discount',
+                    'promo_oi.line_net_amount',
+                    'promo_oi.line_gross_amount',
+                    'promo_order_totals.order_item_value',
+                ])
+                ->selectRaw("{$promotionProductNameExpression} as marketplace_name")
+                ->selectRaw("{$promotionProductSkuExpression} as marketplace_sku")
+                ->get();
+
+            $promotionRows
+                ->groupBy('order_id')
+                ->each(function ($orderItems) use (&$productExtraPromotionByKey) {
+                    $first = $orderItems->first();
+                    if (! $first) {
+                        return;
+                    }
+
+                    $settlementRaw = $this->decodePayload($first->settlement_raw_json);
+                    $orderRaw = $this->decodePayload($first->order_raw_json ?: $first->raw_payload_json);
+                    $sellerVoucher = $first->settlement_id !== null
+                        ? (array_key_exists('voucher_from_seller', $settlementRaw)
+                            ? (float) $settlementRaw['voucher_from_seller']
+                            : (float) ($first->seller_voucher ?? 0))
+                        : (float) ($first->voucher_discount ?? 0);
+                    $bundleDiscount = 0.0;
+                    $comboHemat = 0.0;
+                    $promotionItems = (array) ($settlementRaw['items'] ?? ($orderRaw['item_list'] ?? []));
+                    foreach ($promotionItems as $promotionItem) {
+                        if (! is_array($promotionItem)) {
+                            continue;
+                        }
+                        $split = $this->promotionDiscountSplit($promotionItem);
+                        $bundleDiscount += (float) $split['bundle_discount'];
+                        $comboHemat += (float) $split['combo_hemat'];
+                    }
+                    $extraPromotion = max($sellerVoucher + $bundleDiscount + $comboHemat, 0);
+                    if ($extraPromotion <= 0) {
+                        return;
+                    }
+
+                    $lineValue = static function ($item): float {
+                        $qty = max(0, (float) ($item->qty ?? 0));
+                        foreach ([
+                            (float) ($item->line_net_amount ?? 0),
+                            (float) ($item->price_after_discount ?? 0) * $qty,
+                            (float) ($item->line_gross_amount ?? 0),
+                            (float) ($item->price ?? 0) * $qty,
+                        ] as $value) {
+                            if ($value > 0) {
+                                return $value;
+                            }
+                        }
+
+                        return 0.0;
+                    };
+                    $orderLineValue = (float) ($first->order_item_value ?? 0);
+                    if ($orderLineValue <= 0) {
+                        $orderLineValue = (float) $orderItems->sum(fn ($item) => $lineValue($item));
+                    }
+                    if ($orderLineValue <= 0) {
+                        return;
+                    }
+
+                    foreach ($orderItems as $item) {
+                        $internalItemId = (int) ($item->internal_item_id ?? 0);
+                        $productKey = $internalItemId > 0
+                            ? 'internal:'.$internalItemId
+                            : 'external:'.mb_strtolower(trim((string) $item->marketplace_name)).'|'.trim((string) $item->marketplace_sku);
+                        $productExtraPromotionByKey[$productKey] = (float) ($productExtraPromotionByKey->get($productKey, 0))
+                            + ($extraPromotion * $lineValue($item) / $orderLineValue);
+                    }
+                });
+        }
+
+        $products = $products->map(function ($product) use ($productExtraPromotionByKey) {
+            $internalItemId = (int) ($product->internal_item_id ?? 0);
+            $productKey = $internalItemId > 0
+                ? 'internal:'.$internalItemId
+                : 'external:'.mb_strtolower(trim((string) ($product->marketplace_name ?: $product->name))).'|'.trim((string) $product->sku);
+            $extraPromotion = (float) $productExtraPromotionByKey->get($productKey, 0);
+            $product->net_sales = max((float) $product->sales - $extraPromotion, 0);
+
+            return $product;
+        });
 
         $productAdMetrics = app(AdsDashboardService::class)->getProductAdMetrics(
             $adStoreIds,

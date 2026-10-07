@@ -392,6 +392,84 @@
     .sales-dashboard .sales-product-category-toggle[aria-expanded="true"] i { transform: rotate(90deg); }
     .sales-dashboard .sales-product-group-title { font-size: .72rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
     .sales-dashboard .sales-product-group-meta { color: var(--sales-muted); font-size: .68rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
+    .sales-dashboard .sales-product-analysis-section { overflow: hidden; }
+    .sales-dashboard .sales-product-analysis-grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: .65rem;
+        padding: 0 1.15rem 1rem;
+    }
+    .sales-dashboard .sales-product-analysis-kpi {
+        min-width: 0;
+        padding: .72rem .78rem;
+        border: 1px solid color-mix(in srgb, var(--sales-line) 72%, transparent);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--sales-soft) 68%, var(--sales-card) 32%);
+    }
+    .sales-dashboard .sales-product-analysis-kpi-label {
+        display: block;
+        overflow: hidden;
+        color: var(--sales-muted);
+        font-size: .58rem;
+        font-weight: 800;
+        letter-spacing: .045em;
+        line-height: 1.2;
+        text-overflow: ellipsis;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+    .sales-dashboard .sales-product-analysis-kpi-value {
+        display: block;
+        margin-top: .35rem;
+        overflow: hidden;
+        color: var(--sales-ink);
+        font-size: .95rem;
+        font-weight: 800;
+        letter-spacing: -.02em;
+        line-height: 1.15;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .sales-dashboard .sales-product-analysis-kpi-value.is-positive { color: var(--success, #16a34a); }
+    .sales-dashboard .sales-product-analysis-kpi-value.is-warning { color: var(--warning, #d97706); }
+    .sales-dashboard .sales-product-analysis-kpi-value.is-danger { color: var(--danger, #dc2626); }
+    .sales-dashboard .sales-product-analysis-tables { padding: 0 1.15rem 1rem; }
+    .sales-dashboard .sales-product-analysis-table { width: 100%; table-layout: fixed; }
+    .sales-dashboard .sales-product-analysis-table th,
+    .sales-dashboard .sales-product-analysis-table td { padding: .55rem .62rem; }
+    .sales-dashboard .sales-product-analysis-table th { font-size: .61rem; }
+    .sales-dashboard .sales-product-analysis-table td { font-size: .72rem; }
+    .sales-dashboard .sales-product-analysis-table .analysis-label { color: var(--sales-muted); font-weight: 650; }
+    .sales-dashboard .sales-product-analysis-table .analysis-value { color: var(--sales-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
+    .sales-dashboard .sales-product-analysis-table .analysis-value.is-positive { color: var(--success, #16a34a); }
+    .sales-dashboard .sales-product-analysis-table .analysis-value.is-warning { color: var(--warning, #d97706); }
+    .sales-dashboard .sales-product-analysis-table .analysis-value.is-danger { color: var(--danger, #dc2626); }
+    .sales-dashboard .sales-product-analysis-table .analysis-value.is-muted { color: var(--sales-muted); }
+    .sales-dashboard .sales-product-analysis-matrix-wrap { padding: 0 1.15rem 1.15rem; }
+    .sales-dashboard .sales-product-analysis-matrix { width: 100%; table-layout: fixed; }
+    .sales-dashboard .sales-product-analysis-matrix th,
+    .sales-dashboard .sales-product-analysis-matrix td { padding: .58rem .62rem; }
+    .sales-dashboard .sales-product-analysis-matrix th { font-size: .61rem; }
+    .sales-dashboard .sales-product-analysis-matrix td { font-size: .72rem; }
+    .sales-dashboard .sales-product-analysis-matrix .analysis-status { font-weight: 800; }
+    .sales-dashboard .sales-product-analysis-matrix .analysis-status-badge {
+        display: inline-flex;
+        align-items: center;
+        min-width: 4.8rem;
+        justify-content: center;
+        padding: .23rem .45rem;
+        border-radius: 999px;
+        font-size: .6rem;
+        font-weight: 800;
+        letter-spacing: .02em;
+        text-transform: uppercase;
+    }
+    .sales-dashboard .analysis-status-badge--scale { color: #166534; background: #dcfce7; }
+    .sales-dashboard .analysis-status-badge--protect { color: #1d4ed8; background: #dbeafe; }
+    .sales-dashboard .analysis-status-badge--grow { color: #a16207; background: #fef3c7; }
+    .sales-dashboard .analysis-status-badge--review { color: #b91c1c; background: #fee2e2; }
+    .sales-dashboard .sales-product-analysis-matrix .analysis-number { color: var(--sales-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
+    .sales-dashboard .sales-product-analysis-matrix .analysis-share { color: var(--sales-muted); font-size: .65rem; font-variant-numeric: tabular-nums; }
     .sales-dashboard .sales-income-table { min-width: 1080px; }
     .sales-dashboard .sales-income-table th,
     .sales-dashboard .sales-income-table td { white-space: nowrap; }
@@ -512,6 +590,11 @@
         .sales-dashboard .sales-nav-shell { align-items: stretch; flex-direction: column; }
         .sales-dashboard .sales-nav-comparison { margin-left: .25rem; }
         .sales-dashboard .sales-nav-comparison-label { padding-left: .35rem; }
+        .sales-dashboard .sales-product-analysis-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-inline: .75rem; }
+        .sales-dashboard .sales-product-analysis-tables,
+        .sales-dashboard .sales-product-analysis-matrix-wrap { padding-inline: .75rem; overflow-x: auto; }
+        .sales-dashboard .sales-product-analysis-table,
+        .sales-dashboard .sales-product-analysis-matrix { min-width: 650px; }
     }
 </style>
 @endpush
@@ -586,6 +669,59 @@
     $topProductQty = (int) $products->sum('qty');
     $topProductSales = (float) $products->sum('sales');
     $topProductBuyers = (int) $products->sum('buyers');
+    $productAnalysisProducts = $products->values();
+    $productAnalysisSales = (float) $productAnalysisProducts->sum('sales');
+    $productAnalysisNetSales = (float) $productAnalysisProducts->sum('net_sales');
+    $productAnalysisBuyerPayment = (float) $productAnalysisProducts->sum('buyer_payment');
+    $productAnalysisAdProducts = $productAnalysisProducts->filter(fn ($product) => $product->ad_spend_matched ?? false);
+    $productAnalysisAdSpend = (float) $productAnalysisAdProducts->sum('ad_spend');
+    $productAnalysisAdSales = (float) $productAnalysisAdProducts->sum('ad_sales');
+    $productAnalysisAdConversions = (int) $productAnalysisAdProducts->sum('ad_conversions');
+    $productAnalysisMappedCount = $productAnalysisProducts->filter(fn ($product) => (int) ($product->internal_item_id ?? 0) > 0)->count();
+    $productAnalysisCategoryCount = $productAnalysisProducts->map(fn ($product) => trim((string) ($product->category_name ?? '')) ?: 'Tanpa kategori')->unique()->count();
+    $productAnalysisTop10Sales = (float) $productAnalysisProducts->sortByDesc('sales')->take(10)->sum('sales');
+    $productAnalysisTop20Count = max(1, (int) ceil($productAnalysisProducts->count() * .2));
+    $productAnalysisTop20Sales = (float) $productAnalysisProducts->sortByDesc('sales')->take($productAnalysisTop20Count)->sum('sales');
+    $productAnalysisSalesMedian = (float) ($productAnalysisProducts->pluck('sales')->median() ?? 0);
+    $productAnalysisRoasValues = $productAnalysisAdProducts
+        ->filter(fn ($product) => (float) ($product->ad_spend ?? 0) > 0)
+        ->map(fn ($product) => (float) ($product->ad_sales ?? 0) / (float) $product->ad_spend)
+        ->values();
+    $productAnalysisRoasMedian = (float) ($productAnalysisRoasValues->median() ?? 0);
+    $productAnalysisMatrix = collect([
+        ['key' => 'scale', 'label' => 'Scale', 'class' => 'scale'],
+        ['key' => 'protect', 'label' => 'Protect', 'class' => 'protect'],
+        ['key' => 'grow', 'label' => 'Grow', 'class' => 'grow'],
+        ['key' => 'review', 'label' => 'Review', 'class' => 'review'],
+    ])->mapWithKeys(fn ($row) => [$row['key'] => $row + ['products' => collect()] ]);
+    foreach ($productAnalysisProducts as $product) {
+        $productSales = (float) ($product->sales ?? 0);
+        $productRoas = (float) ($product->ad_spend ?? 0) > 0
+            ? (float) ($product->ad_sales ?? 0) / (float) $product->ad_spend
+            : 0;
+        $highSales = $productSales >= $productAnalysisSalesMedian;
+        $highRoas = (float) ($product->ad_spend ?? 0) > 0 && $productRoas >= $productAnalysisRoasMedian && $productAnalysisRoasMedian > 0;
+        $matrixKey = $highSales
+            ? ($highRoas ? 'scale' : 'protect')
+            : ($highRoas ? 'grow' : 'review');
+        $productAnalysisMatrix[$matrixKey]['products']->push($product);
+    }
+    $productAnalysisMatrixRows = $productAnalysisMatrix->map(function ($row) use ($productAnalysisSales, $productAnalysisAdSpend, $productAnalysisAdSales) {
+        $products = $row['products'];
+        $sales = (float) $products->sum('sales');
+        $adSpend = (float) $products->filter(fn ($product) => $product->ad_spend_matched ?? false)->sum('ad_spend');
+        $adSales = (float) $products->filter(fn ($product) => $product->ad_spend_matched ?? false)->sum('ad_sales');
+        $row['count'] = $products->count();
+        $row['sales'] = $sales;
+        $row['sales_share'] = $productAnalysisSales > 0 ? ($sales / $productAnalysisSales) * 100 : 0;
+        $row['ad_spend'] = $adSpend;
+        $row['ad_sales'] = $adSales;
+        $row['roas'] = $adSpend > 0 ? $adSales / $adSpend : 0;
+        $row['ad_share'] = $productAnalysisAdSales > 0 ? ($adSales / $productAnalysisAdSales) * 100 : 0;
+        unset($row['products']);
+
+        return $row;
+    })->values();
     $incomeSettlementRate = $incomeSummary['orders'] > 0 ? ($incomeSummary['settled_orders'] / $incomeSummary['orders']) * 100 : 0;
     $promotionRate = $summary['subtotal'] > 0 ? ($summary['promotion_total'] / $summary['subtotal']) * 100 : 0;
     $adSpendDaily = collect($adSpendDaily ?? []);
@@ -1197,12 +1333,91 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Produk',
             'kpis' => [
-                ['label' => 'Produk Teratas', 'value' => number_format($topProductCount), 'note' => 'produk pada daftar Top 8', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($topProductCount, $previousMonthTopProductCount, $previousPeriodTopProductCount, $numberDisplay)],
-                ['label' => 'Unit Terjual', 'value' => number_format($topProductQty), 'note' => 'dari produk teratas', 'icon' => 'bi-stack', 'comparisons' => $kpiComparisons($topProductQty, $previousMonthTopProductQty, $previousPeriodTopProductQty, $numberDisplay)],
-                ['label' => 'Penjualan Produk', 'value' => $fmt($topProductSales), 'note' => 'kontribusi Top 8', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($topProductSales, $previousMonthTopProductSales, $previousPeriodTopProductSales, $currencyDisplay)],
-                ['label' => 'Pembeli Produk', 'value' => number_format($topProductBuyers), 'note' => 'akumulasi produk teratas', 'icon' => 'bi-people', 'comparisons' => $kpiComparisons($topProductBuyers, $previousMonthTopProductBuyers, $previousPeriodTopProductBuyers, $numberDisplay)],
+                ['label' => 'Produk Terjual', 'value' => number_format($topProductCount), 'note' => 'produk aktif', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($topProductCount, $previousMonthTopProductCount, $previousPeriodTopProductCount, $numberDisplay)],
+                ['label' => 'Unit Terjual', 'value' => number_format($topProductQty), 'note' => 'seluruh produk', 'icon' => 'bi-stack', 'comparisons' => $kpiComparisons($topProductQty, $previousMonthTopProductQty, $previousPeriodTopProductQty, $numberDisplay)],
+                ['label' => 'Penjualan Produk', 'value' => $fmt($topProductSales), 'note' => 'seluruh produk', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($topProductSales, $previousMonthTopProductSales, $previousPeriodTopProductSales, $currencyDisplay)],
+                ['label' => 'Pembeli Produk', 'value' => number_format($topProductBuyers), 'note' => 'seluruh produk', 'icon' => 'bi-people', 'comparisons' => $kpiComparisons($topProductBuyers, $previousMonthTopProductBuyers, $previousPeriodTopProductBuyers, $numberDisplay)],
             ],
         ])
+        <section class="card sales-card sales-product-analysis-section shadow-sm mb-3">
+            <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
+                <div>
+                    <div class="sales-kicker mb-1">Product intelligence</div>
+                    <h2 class="sales-section-title mb-1">Analitik portofolio produk</h2>
+                </div>
+                <span class="badge sales-badge rounded-pill px-3 py-2">{{ $productAnalysisCategoryCount }} kategori</span>
+            </div>
+            <div class="sales-product-analysis-grid">
+                <div class="sales-product-analysis-kpi">
+                    <span class="sales-product-analysis-kpi-label">GMV Produk</span>
+                    <span class="sales-product-analysis-kpi-value">{{ $fmt($productAnalysisSales) }}</span>
+                </div>
+                <div class="sales-product-analysis-kpi">
+                    <span class="sales-product-analysis-kpi-label">Penjualan Netto</span>
+                    <span class="sales-product-analysis-kpi-value is-positive">{{ $fmt($productAnalysisNetSales) }}</span>
+                </div>
+                <div class="sales-product-analysis-kpi">
+                    <span class="sales-product-analysis-kpi-label">Realisasi Netto</span>
+                    <span class="sales-product-analysis-kpi-value {{ $productAnalysisSales > 0 && ($productAnalysisNetSales / $productAnalysisSales) >= .85 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisSales > 0 ? $percentDisplay(($productAnalysisNetSales / $productAnalysisSales) * 100) : '—' }}</span>
+                </div>
+                <div class="sales-product-analysis-kpi">
+                    <span class="sales-product-analysis-kpi-label">Top 10 Konsentrasi</span>
+                    <span class="sales-product-analysis-kpi-value {{ ($productAnalysisSales > 0 ? ($productAnalysisTop10Sales / $productAnalysisSales) : 0) <= .6 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisSales > 0 ? $percentDisplay(($productAnalysisTop10Sales / $productAnalysisSales) * 100) : '—' }}</span>
+                </div>
+                <div class="sales-product-analysis-kpi">
+                    <span class="sales-product-analysis-kpi-label">Mapping Internal</span>
+                    <span class="sales-product-analysis-kpi-value {{ $productAnalysisMappedCount === $productAnalysisProducts->count() ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisProducts->count() > 0 ? $percentDisplay(($productAnalysisMappedCount / $productAnalysisProducts->count()) * 100) : '—' }}</span>
+                </div>
+                <div class="sales-product-analysis-kpi">
+                    <span class="sales-product-analysis-kpi-label">Blended ROAS</span>
+                    <span class="sales-product-analysis-kpi-value {{ $productAnalysisAdSpend > 0 ? ($productAnalysisAdSales / $productAnalysisAdSpend >= 2 ? 'is-positive' : 'is-warning') : 'is-muted' }}">{{ $productAnalysisAdSpend > 0 ? $multipleDisplay($productAnalysisAdSales / $productAnalysisAdSpend) : '—' }}</span>
+                </div>
+            </div>
+            <div class="row g-3 sales-product-analysis-tables">
+                <div class="col-lg-6">
+                    <table class="table table-sm align-middle sales-table sales-product-analysis-table">
+                        <thead><tr><th colspan="2">Portofolio</th><th class="text-end">Nilai</th></tr></thead>
+                        <tbody>
+                            <tr><td class="analysis-label" colspan="2">Produk terjual</td><td class="text-end analysis-value">{{ number_format($productAnalysisProducts->count()) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Kategori aktif</td><td class="text-end analysis-value">{{ number_format($productAnalysisCategoryCount) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Top 20% kontribusi</td><td class="text-end analysis-value">{{ $productAnalysisSales > 0 ? $percentDisplay(($productAnalysisTop20Sales / $productAnalysisSales) * 100) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Pembayaran / GMV</td><td class="text-end analysis-value">{{ $productAnalysisSales > 0 ? $percentDisplay(($productAnalysisBuyerPayment / $productAnalysisSales) * 100) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Unit / order</td><td class="text-end analysis-value">{{ $summary['orders'] > 0 ? number_format($topProductQty / $summary['orders'], 2, ',', '.') : '—' }}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="col-lg-6">
+                    <table class="table table-sm align-middle sales-table sales-product-analysis-table">
+                        <thead><tr><th colspan="2">Paid media</th><th class="text-end">Nilai</th></tr></thead>
+                        <tbody>
+                            <tr><td class="analysis-label" colspan="2">Produk dengan iklan</td><td class="text-end analysis-value">{{ number_format($productAnalysisAdProducts->count()) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Penjualan iklan</td><td class="text-end analysis-value">{{ $fmt($productAnalysisAdSales) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Biaya iklan</td><td class="text-end analysis-value is-danger">{{ $fmt($productAnalysisAdSpend) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">ACOS blended</td><td class="text-end analysis-value">{{ $productAnalysisAdSales > 0 ? $percentDisplay(($productAnalysisAdSpend / $productAnalysisAdSales) * 100) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">CPA blended</td><td class="text-end analysis-value">{{ $productAnalysisAdConversions > 0 ? $fmt($productAnalysisAdSpend / $productAnalysisAdConversions) : '—' }}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="sales-product-analysis-matrix-wrap">
+                <table class="table table-sm align-middle sales-table sales-product-analysis-matrix">
+                    <thead><tr><th style="width: 16%">Matriks</th><th class="text-end">Produk</th><th class="text-end">Penjualan</th><th class="text-end">Kontribusi</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ROAS</th><th class="text-end">Biaya Iklan</th></tr></thead>
+                    <tbody>
+                        @foreach ($productAnalysisMatrixRows as $matrixRow)
+                            <tr>
+                                <td class="analysis-status"><span class="analysis-status-badge analysis-status-badge--{{ $matrixRow['class'] }}">{{ $matrixRow['label'] }}</span></td>
+                                <td class="text-end analysis-number">{{ number_format($matrixRow['count']) }}</td>
+                                <td class="text-end analysis-number">{{ $fmt($matrixRow['sales']) }}</td>
+                                <td class="text-end analysis-share">{{ $percentDisplay($matrixRow['sales_share']) }}</td>
+                                <td class="text-end analysis-number">{{ $fmt($matrixRow['ad_sales']) }}</td>
+                                <td class="text-end analysis-number">{{ $matrixRow['ad_spend'] > 0 ? $multipleDisplay($matrixRow['roas']) : '—' }}</td>
+                                <td class="text-end analysis-number">{{ $fmt($matrixRow['ad_spend']) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </section>
         <section class="card sales-card shadow-sm">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
