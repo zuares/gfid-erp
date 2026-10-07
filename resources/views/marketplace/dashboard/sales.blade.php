@@ -476,6 +476,15 @@
     .sales-dashboard .sales-product-comparison-table td { white-space: nowrap; }
     .sales-dashboard .sales-product-comparison-table th { font-size: .61rem; }
     .sales-dashboard .sales-product-comparison-table td { font-size: .72rem; }
+    .sales-dashboard .sales-category-comparison-table { min-width: 980px; }
+    .sales-dashboard .sales-category-comparison-table th,
+    .sales-dashboard .sales-category-comparison-table td { white-space: nowrap; }
+    .sales-dashboard .sales-category-comparison-table th { font-size: .61rem; }
+    .sales-dashboard .sales-category-comparison-table td { font-size: .7rem; }
+    .sales-dashboard .sales-category-comparison-table .sales-category-name { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; }
+    .sales-dashboard .sales-category-comparison-table .sales-category-delta.is-positive { color: var(--success, #16a34a); }
+    .sales-dashboard .sales-category-comparison-table .sales-category-delta.is-negative { color: var(--danger, #dc2626); }
+    .sales-dashboard .sales-category-comparison-table .sales-category-delta.is-neutral { color: var(--sales-muted); }
     .sales-dashboard .sales-product-analysis-matrix-wrap { padding: 0 1.15rem 1.15rem; }
     .sales-dashboard .sales-product-analysis-matrix { width: 100%; table-layout: fixed; }
     .sales-dashboard .sales-product-analysis-matrix th,
@@ -883,6 +892,77 @@
         ['label' => 'CPA', 'key' => 'cpa', 'format' => $currencyDisplay],
         ['label' => 'Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
     ];
+    $categoryProductMetrics = function ($rows) {
+        $rows = collect($rows);
+        $orderKeys = $rows
+            ->flatMap(fn ($product) => preg_split('/,/', (string) ($product->order_keys ?? ''), -1, PREG_SPLIT_NO_EMPTY))
+            ->map(fn ($key) => trim((string) $key))
+            ->filter()
+            ->unique()
+            ->values();
+        $sales = (float) $rows->sum('sales');
+        $netSales = (float) $rows->sum(fn ($product) => (float) ($product->net_sales ?? $product->sales ?? 0));
+        $orders = $orderKeys->count();
+
+        return [
+            'products' => $rows->count(),
+            'qty' => (int) $rows->sum('qty'),
+            'orders' => $orders,
+            'sales' => $sales,
+            'net_sales' => $netSales,
+            'buyer_payment' => (float) $rows->sum('buyer_payment'),
+            'aov_sales' => $orders > 0 ? $sales / $orders : 0,
+            'aov_payment' => $orders > 0 ? ((float) $rows->sum('buyer_payment')) / $orders : 0,
+        ];
+    };
+    $categoryComparisonSourcePeriods = $comparisonMode === 'month'
+        ? [
+            ['key' => 'active', 'label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products],
+            ['key' => 'previous', 'label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'products' => $previousMonthProducts],
+            ['key' => 'previous_2', 'label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousData, 'products', []))],
+            ['key' => 'previous_3', 'label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousTwoData, 'products', []))],
+        ]
+        : [
+            ['key' => 'active', 'label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products],
+            ['key' => 'previous', 'label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'products' => $previousPeriodProducts],
+            ['key' => 'previous_2', 'label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousData, 'products', []))],
+            ['key' => 'previous_3', 'label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousTwoData, 'products', []))],
+        ];
+    $categoryComparisonPeriods = collect($categoryComparisonSourcePeriods)
+        ->map(fn ($period) => collect($period)->except('products')->all())
+        ->values();
+    $categoryNames = collect($categoryComparisonSourcePeriods)
+        ->flatMap(fn ($period) => collect($period['products'])->map(fn ($product) => trim((string) ($product->category_name ?? '')) ?: 'Tanpa kategori'))
+        ->unique()
+        ->values();
+    $categoryComparisonRows = $categoryNames
+        ->map(function ($categoryName) use ($categoryComparisonSourcePeriods, $categoryProductMetrics, $productAnalysisNetSales) {
+            $periods = collect($categoryComparisonSourcePeriods)->mapWithKeys(function ($period) use ($categoryName, $categoryProductMetrics) {
+                $categoryProducts = collect($period['products'])->filter(fn ($product) => (trim((string) ($product->category_name ?? '')) ?: 'Tanpa kategori') === $categoryName);
+
+                return [$period['key'] => [
+                    'label' => $period['label'],
+                    'from' => $period['from'],
+                    'to' => $period['to'],
+                    'metrics' => $categoryProductMetrics($categoryProducts),
+                ]];
+            });
+            $activeMetrics = $periods->get('active')['metrics'];
+            $previousMetrics = $periods->get('previous')['metrics'];
+            $activeNetSales = (float) $activeMetrics['net_sales'];
+            $previousNetSales = (float) $previousMetrics['net_sales'];
+            $delta = $activeNetSales - $previousNetSales;
+
+            return [
+                'name' => $categoryName,
+                'periods' => $periods->all(),
+                'delta' => $delta,
+                'delta_percent' => $previousNetSales > 0 ? ($delta / $previousNetSales) * 100 : null,
+                'share' => $productAnalysisNetSales > 0 ? ($activeNetSales / $productAnalysisNetSales) * 100 : 0,
+            ];
+        })
+        ->sortByDesc(fn ($row) => (float) ($row['periods']['active']['metrics']['net_sales'] ?? 0))
+        ->values();
     $platformPromotionMetrics = function ($rows, $periodSummary, $promotionOrders = null) {
         $rows = collect($rows);
         $voucherSeller = (float) $rows->sum('voucher_store');
@@ -1495,6 +1575,73 @@
                 </div>
             </section>
         @endif
+        <section class="card sales-card shadow-sm mb-3">
+            <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-2">
+                <div>
+                    <div class="sales-kicker mb-1">Category performance</div>
+                    <h2 class="sales-section-title mb-1">Penjualan per kategori item</h2>
+                </div>
+                <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($categoryComparisonRows->count()) }} kategori</span>
+            </div>
+            @if ($categoryComparisonRows->isEmpty())
+                <div class="sales-empty text-center">Belum ada penjualan per kategori pada periode ini.</div>
+            @else
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle sales-table sales-category-comparison-table mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">No.</th>
+                                <th>Kategori Item</th>
+                                <th class="text-end">Produk</th>
+                                <th class="text-end">Unit</th>
+                                @foreach ($categoryComparisonPeriods as $period)
+                                    <th class="text-end">
+                                        {{ $period['label'] }}
+                                        <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
+                                        <div class="small fw-normal text-muted">Penjualan Netto · AOV</div>
+                                    </th>
+                                @endforeach
+                                <th class="text-end">Δ vs -1</th>
+                                <th class="text-end pe-3">Share</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($categoryComparisonRows as $categoryRow)
+                                @php
+                                    $activeCategoryMetrics = $categoryRow['periods']['active']['metrics'];
+                                    $categoryDelta = (float) $categoryRow['delta'];
+                                    $categoryDeltaPercent = $categoryRow['delta_percent'];
+                                    $categoryDeltaClass = $categoryDelta > 0.005 ? 'is-positive' : ($categoryDelta < -0.005 ? 'is-negative' : 'is-neutral');
+                                    $categoryDeltaLabel = $categoryDeltaPercent === null
+                                        ? ($activeCategoryMetrics['net_sales'] > 0 ? 'baru' : '—')
+                                        : (($categoryDeltaPercent > 0 ? '+' : '').$percentDisplay($categoryDeltaPercent));
+                                @endphp
+                                <tr>
+                                    <td class="ps-3 text-muted">{{ $loop->iteration }}</td>
+                                    <td class="fw-semibold sales-category-name" title="{{ $categoryRow['name'] }}">{{ $categoryRow['name'] }}</td>
+                                    <td class="text-end">{{ number_format($activeCategoryMetrics['products']) }}</td>
+                                    <td class="text-end">{{ number_format($activeCategoryMetrics['qty']) }}</td>
+                                    @foreach ($categoryComparisonPeriods as $period)
+                                        @php $categoryMetrics = $categoryRow['periods'][$period['key']]['metrics']; @endphp
+                                        <td class="text-end">
+                                            <div class="fw-semibold">{{ $fmt($categoryMetrics['net_sales']) }}</div>
+                                            <div class="small text-muted">{{ $categoryMetrics['orders'] > 0 ? $fmt($categoryMetrics['aov_sales']) : '—' }}</div>
+                                        </td>
+                                    @endforeach
+                                    <td class="text-end sales-category-delta {{ $categoryDeltaClass }}">
+                                        <div class="fw-semibold">{{ $categoryDeltaLabel }}</div>
+                                        @if ($categoryDeltaPercent !== null)
+                                            <div class="small text-muted">{{ $categoryDelta >= 0 ? '+' : '' }}{{ $fmt($categoryDelta) }}</div>
+                                        @endif
+                                    </td>
+                                    <td class="text-end pe-3 fw-semibold">{{ $percentDisplay($categoryRow['share']) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </section>
         <section class="card sales-card sales-product-analysis-section shadow-sm mb-3">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
