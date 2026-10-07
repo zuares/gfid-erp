@@ -2066,6 +2066,16 @@
                             @php
                                 $matrixKey = 'sales-product-analysis-'.$loop->index;
                                 $matrixProducts = collect($matrixRow['products'] ?? []);
+                                $matrixMarketplaceGroups = $matrixProducts
+                                    ->groupBy(function ($product) {
+                                        $marketplaceCode = trim((string) ($product->external_item_id ?? ''));
+
+                                        return $marketplaceCode !== ''
+                                            ? 'code:'.$marketplaceCode
+                                            : 'title:'.(trim((string) ($product->marketplace_name ?: $product->name)) ?: 'Produk tanpa nama');
+                                    })
+                                    ->sortByDesc(fn ($group) => (float) $group->sum('net_sales'))
+                                    ->values();
                             @endphp
                             <tr class="sales-product-analysis-matrix-row" data-sales-analysis-row="{{ $matrixKey }}" tabindex="0" aria-controls="{{ $matrixKey }}-detail">
                                 <td class="analysis-status">
@@ -2092,7 +2102,7 @@
                                                 <div class="sales-kicker mb-1">Detail segmentasi</div>
                                                 <h3 class="sales-section-title mb-0">Produk {{ $matrixRow['label'] }}</h3>
                                             </div>
-                                            <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($matrixProducts->count()) }} produk</span>
+                                            <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($matrixMarketplaceGroups->count()) }} kode marketplace · {{ number_format($matrixProducts->count()) }} variant</span>
                                         </div>
                                         @if ($matrixProducts->isEmpty())
                                             <div class="sales-empty text-center py-3">Belum ada produk pada segmentasi ini.</div>
@@ -2116,17 +2126,40 @@
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        @foreach ($matrixProducts as $product)
+                                                        @foreach ($matrixMarketplaceGroups as $marketplaceProducts)
                                                             @php
-                                                                $analysisProductTitle = trim((string) ($product->marketplace_name ?: $product->name)) ?: 'Produk tanpa nama';
-                                                                $analysisProductImage = trim((string) ($product->image_url ?? ''));
-                                                                $analysisInternalCode = trim((string) ($product->sku ?? ''));
-                                                                $analysisInternalCode = $analysisInternalCode !== '' && $analysisInternalCode !== '-'
-                                                                    ? $analysisInternalCode
-                                                                    : 'ID '.($product->internal_item_id ?? '—');
-                                                                $analysisMarketplaceCode = trim((string) ($product->external_item_id ?? '')) ?: '—';
-                                                                $analysisAdSpend = (float) ($product->ad_spend ?? 0);
-                                                                $analysisAdSales = (float) ($product->ad_sales ?? 0);
+                                                                $marketplaceProducts = $marketplaceProducts->values();
+                                                                $marketplaceProduct = $marketplaceProducts->first();
+                                                                $analysisProductTitle = trim((string) ($marketplaceProduct->marketplace_name ?: $marketplaceProduct->name)) ?: 'Produk tanpa nama';
+                                                                $analysisProductImage = trim((string) ($marketplaceProduct->image_url ?? ''));
+                                                                $analysisInternalCodes = $marketplaceProducts
+                                                                    ->map(function ($product) {
+                                                                        $code = trim((string) ($product->sku ?? ''));
+
+                                                                        return $code !== '' && $code !== '-'
+                                                                            ? $code
+                                                                            : 'ID '.($product->internal_item_id ?? '—');
+                                                                    })
+                                                                    ->unique()
+                                                                    ->values();
+                                                                $analysisInternalCode = $analysisInternalCodes->count() > 1
+                                                                    ? $analysisInternalCodes->count().' kode internal'
+                                                                    : ($analysisInternalCodes->first() ?: '—');
+                                                                $analysisInternalCodeTitle = $analysisInternalCodes->implode(', ');
+                                                                $analysisMarketplaceCode = trim((string) ($marketplaceProduct->external_item_id ?? '')) ?: '—';
+                                                                $analysisOrderKeys = $marketplaceProducts
+                                                                    ->flatMap(fn ($product) => preg_split('/,/', (string) ($product->order_keys ?? ''), -1, PREG_SPLIT_NO_EMPTY))
+                                                                    ->map(fn ($key) => trim((string) $key))
+                                                                    ->filter()
+                                                                    ->unique();
+                                                                $analysisQty = (int) $marketplaceProducts->sum('qty');
+                                                                $analysisHppTotal = (float) $marketplaceProducts->sum(fn ($product) => (float) ($product->hpp ?? 0) * (int) ($product->qty ?? 0));
+                                                                $analysisNetSales = (float) $marketplaceProducts->sum('net_sales');
+                                                                $analysisBuyerPayment = (float) $marketplaceProducts->sum('buyer_payment');
+                                                                $analysisContributionProfit = (float) $marketplaceProducts->filter(fn ($product) => $product->contribution_profit !== null)->sum('contribution_profit');
+                                                                $analysisAdProducts = $marketplaceProducts->filter(fn ($product) => $product->ad_spend_matched ?? false);
+                                                                $analysisAdSpend = (float) $analysisAdProducts->sum('ad_spend');
+                                                                $analysisAdSales = (float) $analysisAdProducts->sum('ad_sales');
                                                             @endphp
                                                             <tr>
                                                                 <td class="ps-3">
@@ -2142,21 +2175,21 @@
                                                                         </span>
                                                                         <span class="min-w-0">
                                                                             <span class="sales-product-analysis-detail-title" title="{{ $analysisProductTitle }}">{{ $analysisProductTitle }}</span>
-                                                                            <span class="small text-muted">{{ $product->category_name ?: 'Tanpa kategori' }}</span>
+                                                                            <span class="small text-muted">{{ number_format($marketplaceProducts->count()) }} variant internal</span>
                                                                         </span>
                                                                     </div>
                                                                 </td>
-                                                                <td><span class="sales-product-analysis-detail-code" title="{{ $analysisInternalCode }}">{{ $analysisInternalCode }}</span></td>
+                                                                <td><span class="sales-product-analysis-detail-code" title="{{ $analysisInternalCodeTitle }}">{{ $analysisInternalCode }}</span></td>
                                                                 <td><span class="sales-product-analysis-detail-code" title="{{ $analysisMarketplaceCode }}">{{ $analysisMarketplaceCode }}</span></td>
-                                                                <td class="text-end">{{ (float) ($product->hpp ?? 0) > 0 ? $fmtHpp($product->hpp) : '—' }}</td>
-                                                                <td class="text-end">{{ number_format((int) ($product->orders ?? 0)) }}</td>
-                                                                <td class="text-end">{{ number_format((int) ($product->qty ?? 0)) }}</td>
-                                                                <td class="text-end fw-semibold">{{ $fmt($product->net_sales ?? 0) }}</td>
-                                                                <td class="text-end fw-semibold">{{ $fmt($product->buyer_payment ?? 0) }}</td>
-                                                                <td class="text-end">{{ $fmt($product->contribution_profit ?? 0) }}</td>
-                                                                <td class="text-end">{{ $product->contribution_margin !== null ? $percentDisplay($product->contribution_margin) : '—' }}</td>
-                                                                <td class="text-end">{{ ($product->ad_spend_matched ?? false) ? $fmt($analysisAdSpend) : '—' }}</td>
-                                                                <td class="text-end pe-3">{{ ($product->ad_spend_matched ?? false) && $analysisAdSpend > 0 ? $multipleDisplay($analysisAdSales / $analysisAdSpend) : '—' }}</td>
+                                                                <td class="text-end">{{ $analysisHppTotal > 0 && $analysisQty > 0 ? $fmtHpp($analysisHppTotal / $analysisQty) : '—' }}</td>
+                                                                <td class="text-end">{{ number_format($analysisOrderKeys->count()) }}</td>
+                                                                <td class="text-end">{{ number_format($analysisQty) }}</td>
+                                                                <td class="text-end fw-semibold">{{ $fmt($analysisNetSales) }}</td>
+                                                                <td class="text-end fw-semibold">{{ $fmt($analysisBuyerPayment) }}</td>
+                                                                <td class="text-end">{{ $fmt($analysisContributionProfit) }}</td>
+                                                                <td class="text-end">{{ $analysisNetSales > 0 ? $percentDisplay(($analysisContributionProfit / $analysisNetSales) * 100) : '—' }}</td>
+                                                                <td class="text-end">{{ $analysisAdProducts->isNotEmpty() ? $fmt($analysisAdSpend) : '—' }}</td>
+                                                                <td class="text-end pe-3">{{ $analysisAdSpend > 0 ? $multipleDisplay($analysisAdSales / $analysisAdSpend) : '—' }}</td>
                                                             </tr>
                                                         @endforeach
                                                     </tbody>
