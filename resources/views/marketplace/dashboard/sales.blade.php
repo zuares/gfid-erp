@@ -144,7 +144,7 @@
     }
     .sales-dashboard .sales-tab-pane.is-hidden { display: none; }
 
-    .sales-dashboard .sales-kpi { min-height: 124px; position: relative; overflow: hidden; }
+    .sales-dashboard .sales-kpi { min-height: 148px; position: relative; overflow: hidden; }
     .sales-dashboard .sales-kpi::after {
         content: '';
         position: absolute;
@@ -156,7 +156,7 @@
         background: var(--accent, #2563eb);
         opacity: .06;
     }
-    .sales-dashboard .sales-kpi-label { color: var(--sales-muted); font-size: .7rem; font-weight: 750; }
+    .sales-dashboard .sales-kpi-label { max-width: calc(100% - 2.5rem); color: var(--sales-muted); font-size: .7rem; font-weight: 750; line-height: 1.2; }
     .sales-dashboard .sales-kpi-icon {
         width: 2rem;
         height: 2rem;
@@ -168,7 +168,8 @@
         color: var(--sales-accent);
         border: 1px solid color-mix(in srgb, var(--sales-accent) 12%, var(--sales-line) 88%);
     }
-    .sales-dashboard .sales-kpi-value { color: var(--sales-ink); font-size: clamp(1rem, 1.2vw, 1.2rem); font-weight: 800; letter-spacing: -.025em; line-height: 1.15; white-space: nowrap; }
+    .sales-dashboard .sales-kpi-primary { min-width: 0; }
+    .sales-dashboard .sales-kpi-value { overflow: hidden; color: var(--sales-ink); font-size: clamp(1rem, 1.2vw, 1.2rem); font-weight: 800; letter-spacing: -.025em; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
     .sales-dashboard .sales-kpi-group-divider {
         display: flex;
         align-items: center;
@@ -202,16 +203,8 @@
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
     }
-    .sales-dashboard .sales-kpi-comparison {
-        width: 7.4rem;
-        flex-shrink: 0;
-        padding: .18rem 0 .18rem .55rem;
-        border: 0;
-        border-left: 1px solid var(--sales-line);
-        background: transparent;
-        font-size: .56rem;
-    }
-    .sales-dashboard .sales-kpi-comparisons { display: flex; flex-direction: column; align-items: stretch; gap: .12rem; flex-shrink: 0; }
+    .sales-dashboard .sales-kpi-comparison { min-width: 0; justify-content: flex-start; padding: .22rem 0 0; border: 0; border-top: 1px solid var(--sales-line); background: transparent; font-size: .56rem; }
+    .sales-dashboard .sales-kpi-comparisons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: .35rem .65rem; }
     .sales-dashboard .sales-compare-line i { font-size: .58rem; }
     .sales-dashboard .sales-compare-context { font-weight: 600; }
     .sales-dashboard .sales-kpi-comparison strong,
@@ -693,7 +686,7 @@
             white-space: nowrap;
         }
         .sales-dashboard .sales-order-table { min-width: 0; }
-        .sales-dashboard .sales-kpi { min-height: 118px; }
+        .sales-dashboard .sales-kpi { min-height: 142px; }
         .sales-dashboard .sales-kpi-value { font-size: 1.2rem; }
         .sales-dashboard .sales-period-filter { order: 1; width: 100%; margin-left: 0; }
         .sales-dashboard .sales-filter-scope { order: 2; width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; }
@@ -1750,23 +1743,18 @@
     <div class="sales-tab-pane {{ $activeTab === 'products' ? '' : 'is-hidden' }}" data-sales-pane="products" role="tabpanel" aria-hidden="{{ $activeTab === 'products' ? 'false' : 'true' }}">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Produk',
-            'kpiColumnClass' => 'col-xl-2',
+            'kpiColumnClass' => 'col-xl-3',
             'kpis' => [
                 ['group' => 'Katalog & volume', 'label' => 'Produk Marketplace', 'value' => number_format($activeProductKpi['products']), 'note' => 'kode produk unik', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($activeProductKpi['products'], $previousMonthProductKpi['products'], $previousPeriodProductKpi['products'], $numberDisplay)],
                 ['group' => 'Katalog & volume', 'label' => 'Variant Marketplace', 'value' => number_format($activeProductKpi['variants']), 'note' => 'variant pada kode produk', 'icon' => 'bi-diagram-3', 'comparisons' => $kpiComparisons($activeProductKpi['variants'], $previousMonthProductKpi['variants'], $previousPeriodProductKpi['variants'], $numberDisplay)],
-                ['group' => 'Katalog & volume', 'label' => 'Variant Terjual Unik', 'value' => number_format($activeProductKpi['variants_sold']), 'note' => 'variant dengan transaksi', 'icon' => 'bi-check2-square', 'comparisons' => $kpiComparisons($activeProductKpi['variants_sold'], $previousMonthProductKpi['variants_sold'], $previousPeriodProductKpi['variants_sold'], $numberDisplay)],
                 ['group' => 'Katalog & volume', 'label' => 'Order Produk', 'value' => number_format($activeProductKpi['orders']), 'note' => 'order unik', 'icon' => 'bi-receipt', 'comparisons' => $kpiComparisons($activeProductKpi['orders'], $previousMonthProductKpi['orders'], $previousPeriodProductKpi['orders'], $numberDisplay)],
                 ['group' => 'Katalog & volume', 'label' => 'Unit Terjual', 'value' => number_format($activeProductKpi['qty']), 'note' => 'unit pada periode', 'icon' => 'bi-stack', 'comparisons' => $kpiComparisons($activeProductKpi['qty'], $previousMonthProductKpi['qty'], $previousPeriodProductKpi['qty'], $numberDisplay)],
-                ['group' => 'Pendapatan', 'label' => 'Penjualan Produk', 'value' => $currencyDisplay($activeProductKpi['sales']), 'note' => 'setelah diskon item', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($activeProductKpi['sales'], $previousMonthProductKpi['sales'], $previousPeriodProductKpi['sales'], $currencyDisplay)],
                 ['group' => 'Pendapatan', 'label' => 'Penjualan Netto', 'value' => $currencyDisplay($activeProductKpi['net_sales']), 'note' => 'setelah diskon & promo seller', 'icon' => 'bi-graph-down-arrow', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($activeProductKpi['net_sales'], $previousMonthProductKpi['net_sales'], $previousPeriodProductKpi['net_sales'], $currencyDisplay)],
                 ['group' => 'Pendapatan', 'label' => 'Pembayaran Pembeli', 'value' => $currencyDisplay($activeProductKpi['buyer_payment']), 'note' => 'nilai dibayar pembeli', 'icon' => 'bi-wallet2', 'comparisons' => $kpiComparisons($activeProductKpi['buyer_payment'], $previousMonthProductKpi['buyer_payment'], $previousPeriodProductKpi['buyer_payment'], $currencyDisplay)],
                 ['group' => 'Pendapatan', 'label' => 'AOV Penjualan', 'value' => $currencyDisplay($activeProductKpi['aov_sales']), 'note' => 'penjualan per order produk', 'icon' => 'bi-bar-chart-line', 'comparisons' => $kpiComparisons($activeProductKpi['aov_sales'], $previousMonthProductKpi['aov_sales'], $previousPeriodProductKpi['aov_sales'], $currencyDisplay)],
                 ['group' => 'Pendapatan', 'label' => 'AOV Pembayaran', 'value' => $currencyDisplay($activeProductKpi['aov_payment']), 'note' => 'pembayaran per order produk', 'icon' => 'bi-wallet2', 'comparisons' => $kpiComparisons($activeProductKpi['aov_payment'], $previousMonthProductKpi['aov_payment'], $previousPeriodProductKpi['aov_payment'], $currencyDisplay)],
-                ['group' => 'Profitabilitas & iklan', 'label' => 'Total HPP', 'value' => $fmtHpp($activeProductKpi['hpp']), 'note' => 'HPP unit terjual', 'icon' => 'bi-boxes', 'comparisons' => $kpiComparisons($activeProductKpi['hpp'], $previousMonthProductKpi['hpp'], $previousPeriodProductKpi['hpp'], $fmtHpp, 'relative', false)],
                 ['group' => 'Profitabilitas & iklan', 'label' => 'Margin Kontribusi', 'value' => $activeProductKpi['contribution_margin'] === null ? '—' : $percentDisplay($activeProductKpi['contribution_margin']), 'note' => 'setelah HPP dan iklan', 'icon' => 'bi-pie-chart', 'comparisons' => $kpiComparisons($activeProductKpi['contribution_margin'] ?? 0, $previousMonthProductKpi['contribution_margin'] ?? null, $previousPeriodProductKpi['contribution_margin'] ?? null, $percentDisplay, 'points')],
                 ['group' => 'Profitabilitas & iklan', 'label' => 'Biaya Iklan', 'value' => $currencyDisplay($activeProductKpi['ad_spend']), 'note' => 'termasuk GMV Max', 'icon' => 'bi-megaphone', 'variant' => 'sales-kpi--warning', 'comparisons' => $kpiComparisons($activeProductKpi['ad_spend'], $previousMonthProductKpi['ad_spend'], $previousPeriodProductKpi['ad_spend'], $currencyDisplay, 'relative', false)],
-                ['group' => 'Profitabilitas & iklan', 'label' => 'Penjualan Atribusi Iklan', 'value' => $currencyDisplay($activeProductKpi['ad_sales']), 'note' => 'penjualan dari iklan', 'icon' => 'bi-bullseye', 'comparisons' => $kpiComparisons($activeProductKpi['ad_sales'], $previousMonthProductKpi['ad_sales'], $previousPeriodProductKpi['ad_sales'], $currencyDisplay)],
-                ['group' => 'Profitabilitas & iklan', 'label' => 'ACOS', 'value' => $activeProductKpi['acos'] === null ? '—' : $percentDisplay($activeProductKpi['acos']), 'note' => 'biaya iklan / penjualan iklan', 'icon' => 'bi-percent', 'comparisons' => $kpiComparisons($activeProductKpi['acos'] ?? 0, $previousMonthProductKpi['acos'] ?? null, $previousPeriodProductKpi['acos'] ?? null, $percentDisplay, 'points', false)],
                 ['group' => 'Profitabilitas & iklan', 'label' => 'ROAS Blended', 'value' => $activeProductKpi['roas'] === null ? '—' : $multipleDisplay($activeProductKpi['roas']), 'note' => 'penjualan atribusi / iklan', 'icon' => 'bi-graph-up-arrow', 'comparisons' => $kpiComparisons($activeProductKpi['roas'] ?? 0, $previousMonthProductKpi['roas'] ?? null, $previousPeriodProductKpi['roas'] ?? null, $multipleDisplay)],
                 ['group' => 'Profitabilitas & iklan', 'label' => 'CPA', 'value' => $activeProductKpi['cpa'] === null ? '—' : $currencyDisplay($activeProductKpi['cpa']), 'note' => 'biaya per konversi iklan', 'icon' => 'bi-currency-dollar', 'comparisons' => $kpiComparisons($activeProductKpi['cpa'] ?? 0, $previousMonthProductKpi['cpa'] ?? null, $previousPeriodProductKpi['cpa'] ?? null, $currencyDisplay, 'relative', false)],
                 ['group' => 'Kualitas data', 'label' => 'Coverage Mapping Internal', 'value' => $percentDisplay($activeProductKpi['mapping_rate']), 'note' => 'baris terpetakan', 'icon' => 'bi-link-45deg', 'variant' => $activeProductKpi['mapping_rate'] < 100 ? 'sales-kpi--warning' : '', 'comparisons' => $kpiComparisons($activeProductKpi['mapping_rate'], $previousMonthProductKpi['mapping_rate'], $previousPeriodProductKpi['mapping_rate'], $percentDisplay, 'points')],

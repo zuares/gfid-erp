@@ -15,16 +15,16 @@
                         <span class="sales-kpi-label">{{ $kpi['label'] }}</span>
                         <span class="sales-kpi-icon"><i class="bi {{ $kpi['icon'] }}"></i></span>
                     </div>
-                    <div class="d-flex align-items-baseline justify-content-between gap-2">
+                    <div class="sales-kpi-primary">
                         <div class="sales-kpi-value">{{ is_numeric($kpi['value']) ? number_format($kpi['value']) : $kpi['value'] }}</div>
-                        @if (!empty($kpi['comparisons']))
-                            <div class="sales-kpi-comparisons">
-                                @foreach ($kpi['comparisons'] as $comparisonItem)
-                                    @include('marketplace.dashboard.partials._comparison', ['comparison' => $comparisonItem['value'], 'class' => 'sales-kpi-comparison', 'context_label' => $comparisonItem['label'], 'period_label' => str_contains(strtolower($comparisonItem['label']), 'bln') ? ($comparisonMonthLabel ?? 'bulan lalu') : ($comparisonPeriodLabel ?? 'periode lalu')])
-                                @endforeach
-                            </div>
-                        @endif
                     </div>
+                    @if (!empty($kpi['comparisons']))
+                        <div class="sales-kpi-comparisons mt-2">
+                            @foreach ($kpi['comparisons'] as $comparisonItem)
+                                @include('marketplace.dashboard.partials._comparison', ['comparison' => $comparisonItem['value'], 'class' => 'sales-kpi-comparison', 'context_label' => $comparisonItem['label'], 'period_label' => str_contains(strtolower($comparisonItem['label']), 'bln') ? ($comparisonMonthLabel ?? 'bulan lalu') : ($comparisonPeriodLabel ?? 'periode lalu')])
+                            @endforeach
+                        </div>
+                    @endif
                     @if (filled($kpi['note'] ?? null))
                         <div class="sales-kpi-note mt-1">{{ $kpi['note'] }}</div>
                     @endif
