@@ -501,7 +501,6 @@
 @php
     $fmt = fn ($value) => 'Rp '.number_format((float) $value, 0, ',', '.');
     $dateLabel = fn ($date) => \Carbon\Carbon::parse($date)->format('d M Y');
-    $dateRangeLabel = fn ($from, $to) => $dateLabel($from).' – '.$dateLabel($to);
     $pct = fn ($value, $total) => $total > 0 ? number_format(((float) $value / (float) $total) * 100, 1, ',', '.') : '0,0';
     $salesTabs = ['sales', 'products', 'payments', 'promotions', 'shipping', 'income', 'orders'];
     $activeTab = in_array(request('tab'), $salesTabs, true) ? request('tab') : 'sales';
@@ -1248,7 +1247,6 @@
                                 @foreach ($paymentComparisonPeriods as $period)
                                     <th class="text-end">
                                         {{ $period['label'] }}
-                                        <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
                                     </th>
                                 @endforeach
                             </tr>
@@ -1396,7 +1394,6 @@
                                 @foreach ($platformPromotionPeriods as $period)
                                     <th class="text-end">
                                         {{ $period['label'] }}
-                                        <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
                                     </th>
                                 @endforeach
                             </tr>
