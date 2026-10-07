@@ -67,12 +67,33 @@
 
     .sales-dashboard .sales-nav { overflow-x: auto; scrollbar-width: none; }
     .sales-dashboard .sales-nav::-webkit-scrollbar { display: none; }
+    .sales-dashboard .sales-nav-shell {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        margin-bottom: 1.5rem;
+    }
     .sales-dashboard .sales-nav {
+        flex: 1 1 auto;
+        min-width: 0;
         padding: .25rem;
         border: 1px solid var(--sales-line);
         border-radius: 12px;
         background: color-mix(in srgb, var(--sales-card) 90%, var(--sales-bg) 10%);
     }
+    .sales-dashboard .sales-nav-comparison {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: .45rem;
+        padding: .25rem .5rem .25rem .75rem;
+        border: 1px solid var(--sales-line);
+        border-radius: 12px;
+        background: var(--sales-card);
+    }
+    .sales-dashboard .sales-nav-comparison .sales-filter-label { margin: 0; white-space: nowrap; }
+    .sales-dashboard .sales-nav-comparison .form-select { min-width: 170px; }
+    .sales-dashboard .sales-nav-comparison-date { white-space: nowrap; font-size: .72rem; }
     .sales-dashboard .sales-nav .nav-link {
         border: 0;
         color: var(--sales-muted);
@@ -429,6 +450,9 @@
         .sales-dashboard .sales-filter-platform,
         .sales-dashboard .sales-filter-store,
         .sales-dashboard .sales-filter-comparison { width: auto; }
+        .sales-dashboard .sales-nav-shell { align-items: stretch; flex-direction: column; }
+        .sales-dashboard .sales-nav-comparison { justify-content: space-between; }
+        .sales-dashboard .sales-nav-comparison .form-select { min-width: 0; flex: 1 1 auto; }
     }
 </style>
 @endpush
@@ -521,9 +545,6 @@
         ? $dateLabel($comparisonPeriod['from']).' – '.$dateLabel($comparisonPeriod['to'])
         : 'periode lalu';
     $activeComparison = $comparisonMode === 'month' ? $comparisonMonth : $comparisonPeriod;
-    $activeComparisonLabel = $activeComparison
-        ? $dateLabel($activeComparison['from']).' – '.$dateLabel($activeComparison['to'])
-        : ($comparisonMode === 'month' ? 'bulan yang sama, tanggal sama' : 'periode lalu');
     $previousMonthSummary = data_get($comparisonMonthData, 'summary', []);
     $previousPeriodSummary = data_get($comparisonPeriodData, 'summary', []);
     $previousMonthPaymentSummary = data_get($comparisonMonthData, 'paymentSummary', []);
@@ -774,6 +795,10 @@
             'orders' => (int) data_get($summary, 'orders', 0),
             'buyer_paid' => (float) data_get($summary, 'buyer_paid', 0),
             'aov' => (float) data_get($summary, 'aov', 0),
+            'seller_net_sales' => (float) $daily->sum('seller_net_sales'),
+            'seller_aov' => (float) data_get($summary, 'orders', 0) > 0
+                ? ((float) $daily->sum('seller_net_sales') / (float) data_get($summary, 'orders', 0))
+                : 0,
             'cod_order_share' => (float) data_get($summary, 'cod_order_share', 0),
             'non_cod_order_share' => (float) data_get($summary, 'orders', 0) > 0
                 ? ((float) $daily->sum('non_cod_orders') / (float) data_get($summary, 'orders', 0)) * 100
@@ -790,6 +815,8 @@
         ['label' => 'Orders', 'key' => 'orders', 'formatter' => $numberDisplay],
         ['label' => 'Buyer Paid', 'key' => 'buyer_paid', 'formatter' => $currencyDisplay],
         ['label' => 'AOV Buyer Paid', 'key' => 'aov', 'formatter' => $currencyDisplay],
+        ['label' => 'Seller Net Sales', 'key' => 'seller_net_sales', 'formatter' => $currencyDisplay],
+        ['label' => 'AOV Seller Net', 'key' => 'seller_aov', 'formatter' => $currencyDisplay],
         ['label' => 'COD %', 'key' => 'cod_order_share', 'formatter' => $percentDisplay],
         ['label' => 'Non-COD %', 'key' => 'non_cod_order_share', 'formatter' => $percentDisplay],
         ['label' => 'Pay Later %', 'key' => 'pay_later_order_share', 'formatter' => $percentDisplay],
@@ -844,13 +871,6 @@
                             </select>
                         </div>
                     @endif
-                    <div class="sales-filter-field sales-filter-comparison">
-                        <label class="sales-filter-label" for="sales-comparison-mode"><i class="bi bi-arrow-left-right" aria-hidden="true"></i>Bandingkan</label>
-                        <select id="sales-comparison-mode" class="form-select form-select-sm" name="comparison_mode">
-                            <option value="period" @selected($comparisonMode === 'period')>Periode lalu</option>
-                            <option value="month" @selected($comparisonMode === 'month')>Bln sama · tanggal sama</option>
-                        </select>
-                    </div>
                 </div>
                 <x-gf.period-picker
                     id="sales-period-picker"
@@ -867,14 +887,8 @@
         </div>
     </form>
 
-    @if ($comparisonMonth || $comparisonPeriod)
-        <div class="sales-compare-period-note mb-3" title="{{ $comparisonModeLabel }}: {{ $activeComparisonLabel }}">
-            <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
-            Perbandingan: <span>{{ $comparisonModeLabel }}</span>
-        </div>
-    @endif
-
-    <nav class="sales-nav nav nav-pills gap-2 mb-4" aria-label="Dashboard operasional" role="tablist">
+    <div class="sales-nav-shell">
+        <nav class="sales-nav nav nav-pills gap-2" aria-label="Dashboard operasional" role="tablist">
         <button class="nav-link {{ $activeTab === 'sales' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'sales' ? 'true' : 'false' }}" data-sales-tab="sales"><i class="bi bi-graph-up-arrow me-1"></i>Penjualan</button>
         <button class="nav-link {{ $activeTab === 'products' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'products' ? 'true' : 'false' }}" data-sales-tab="products"><i class="bi bi-box-seam me-1"></i>Produk</button>
         <button class="nav-link {{ $activeTab === 'payments' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'payments' ? 'true' : 'false' }}" data-sales-tab="payments"><i class="bi bi-wallet2 me-1"></i>Pembayaran</button>
@@ -882,7 +896,16 @@
         <button class="nav-link {{ $activeTab === 'shipping' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'shipping' ? 'true' : 'false' }}" data-sales-tab="shipping"><i class="bi bi-truck me-1"></i>Pengiriman</button>
         <button class="nav-link {{ $activeTab === 'income' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'income' ? 'true' : 'false' }}" data-sales-tab="income"><i class="bi bi-cash-coin me-1"></i>Penghasilan</button>
         <button class="nav-link {{ $activeTab === 'orders' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'orders' ? 'true' : 'false' }}" data-sales-tab="orders"><i class="bi bi-list-ul me-1"></i>Detail Pesanan</button>
-    </nav>
+        </nav>
+        <div class="sales-nav-comparison" role="group" aria-label="Perbandingan periode">
+            <label class="sales-filter-label" for="sales-comparison-mode"><i class="bi bi-arrow-left-right" aria-hidden="true"></i>Bandingkan</label>
+            <select id="sales-comparison-mode" class="form-select form-select-sm" name="comparison_mode" form="sales-filter-form">
+                <option value="period" @selected($comparisonMode === 'period')>Periode lalu</option>
+                <option value="month" @selected($comparisonMode === 'month')>Bln sama · tanggal sama</option>
+            </select>
+            <span class="sales-nav-comparison-date text-muted" title="Periode pembanding">{{ $comparisonMode === 'month' ? $comparisonMonthLabel : $comparisonPeriodLabel }}</span>
+        </div>
+    </div>
 
     <div class="sales-tab-pane {{ $activeTab === 'sales' ? '' : 'is-hidden' }}" data-sales-pane="sales" role="tabpanel" aria-hidden="{{ $activeTab === 'sales' ? 'false' : 'true' }}">
     @include('marketplace.dashboard.partials._kpis', [
