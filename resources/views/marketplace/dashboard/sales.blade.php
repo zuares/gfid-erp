@@ -549,9 +549,10 @@
     .sales-dashboard .sales-category-summary-table tbody td:nth-child(n+3) { color: var(--sales-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
     .sales-dashboard .sales-category-summary-table tbody td:first-child { color: var(--sales-muted); font-variant-numeric: tabular-nums; text-align: start; }
     .sales-dashboard .sales-category-summary-table .sales-category-name { overflow: hidden; text-overflow: ellipsis; }
-    .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row { transition: background-color .16s ease, box-shadow .16s ease; }
-    .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row:hover > td,
-    .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row.is-expanded > td { background: color-mix(in srgb, var(--sales-accent-soft) 38%, var(--sales-card) 62%); }
+    .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row { cursor: pointer; transition: background-color .16s ease, box-shadow .16s ease; }
+    .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row:hover > td { background-color: var(--bs-table-hover-bg) !important; }
+    .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row.is-expanded > td,
+    .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row:focus-visible > td { background-color: color-mix(in srgb, var(--sales-accent-soft) 55%, var(--sales-card) 45%) !important; }
     .sales-dashboard .sales-category-comparison-toggle { display: flex; width: 100%; min-height: 2.2rem; align-items: center; gap: .45rem; border: 0; border-radius: .45rem; background: transparent; color: inherit; padding: .35rem .45rem; text-align: left; transition: background-color .16s ease, color .16s ease; }
     .sales-dashboard .sales-category-comparison-toggle span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .sales-dashboard .sales-category-comparison-toggle:hover { background: color-mix(in srgb, var(--sales-accent-soft) 70%, transparent); color: var(--accent, #2563eb); }
@@ -741,7 +742,12 @@
 @section('content')
 @php
     $fmt = fn ($value) => 'Rp '.number_format((float) $value, 0, ',', '.');
-    $fmtHpp = fn ($value) => 'Rp '.number_format((float) $value, 2, ',', '.');
+    $fmtHpp = function ($value) {
+        $formatted = number_format((float) $value, 2, ',', '.');
+        $formatted = rtrim(rtrim($formatted, '0'), ',');
+
+        return 'Rp '.$formatted;
+    };
     $dateLabel = fn ($date) => \Carbon\Carbon::parse($date)->format('d M Y');
     $dateRangeLabel = fn ($from, $to) => $dateLabel($from).' – '.$dateLabel($to);
     $pct = fn ($value, $total) => $total > 0 ? number_format(((float) $value / (float) $total) * 100, 1, ',', '.') : '0,0';
@@ -960,6 +966,12 @@
     $previousPeriodShippingKpi = data_get($comparisonPeriodData, 'shippingKpi', []);
     $previousMonthProducts = collect(data_get($comparisonMonthData, 'products', []));
     $previousPeriodProducts = collect(data_get($comparisonPeriodData, 'products', []));
+    $previousMonthActiveCatalog = data_get($comparisonMonthData, 'activeMarketplaceCatalog', []);
+    $previousPeriodActiveCatalog = data_get($comparisonPeriodData, 'activeMarketplaceCatalog', []);
+    $previousMonthPreviousActiveCatalog = data_get($comparisonMonthPreviousData, 'activeMarketplaceCatalog', []);
+    $previousPeriodPreviousActiveCatalog = data_get($comparisonPeriodPreviousData, 'activeMarketplaceCatalog', []);
+    $previousMonthPreviousTwoActiveCatalog = data_get($comparisonMonthPreviousTwoData, 'activeMarketplaceCatalog', []);
+    $previousPeriodPreviousTwoActiveCatalog = data_get($comparisonPeriodPreviousTwoData, 'activeMarketplaceCatalog', []);
     $previousMonthIncomeSettlementRate = ($previousMonthIncomeSummary['orders'] ?? 0) > 0
         ? (($previousMonthIncomeSummary['settled_orders'] ?? 0) / $previousMonthIncomeSummary['orders']) * 100 : 0;
     $previousPeriodIncomeSettlementRate = ($previousPeriodIncomeSummary['orders'] ?? 0) > 0
@@ -972,7 +984,7 @@
     $currencyDisplay = fn ($value) => $fmt($value);
     $percentDisplay = fn ($value) => number_format((float) $value, 1, ',', '.').'%';
     $multipleDisplay = fn ($value) => number_format((float) $value, 2, ',', '.').'x';
-    $productComparisonMetrics = function ($rows) use ($marketplaceProductCount, $marketplaceVariantCount, $soldVariantCount) {
+    $productComparisonMetrics = function ($rows, $activeCatalog = []) use ($marketplaceProductCount, $marketplaceVariantCount, $soldVariantCount) {
         $rows = collect($rows);
         $orderKeys = $rows
             ->flatMap(fn ($product) => preg_split('/,/', (string) ($product->order_keys ?? ''), -1, PREG_SPLIT_NO_EMPTY))
@@ -995,6 +1007,8 @@
         $mappedProducts = $rows->filter(fn ($product) => (int) ($product->internal_item_id ?? 0) > 0)->count();
 
         return [
+            'active_products' => (int) data_get($activeCatalog, 'products', 0),
+            'active_variants' => (int) data_get($activeCatalog, 'variants', 0),
             'products' => $marketplaceProductCount($rows),
             'variants' => $marketplaceVariantCount($rows),
             'variants_sold' => $soldVariantCount($rows),
@@ -1021,24 +1035,26 @@
     };
     $productComparisonPeriods = $comparisonMode === 'month'
         ? [
-            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products],
-            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'products' => $previousMonthProducts],
-            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousData, 'products', []))],
-            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousTwoData, 'products', []))],
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products, 'catalog' => $activeMarketplaceCatalog],
+            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'products' => $previousMonthProducts, 'catalog' => $previousMonthActiveCatalog],
+            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousData, 'products', [])), 'catalog' => $previousMonthPreviousActiveCatalog],
+            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousTwoData, 'products', [])), 'catalog' => $previousMonthPreviousTwoActiveCatalog],
         ]
         : [
-            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products],
-            ['label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'products' => $previousPeriodProducts],
-            ['label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousData, 'products', []))],
-            ['label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousTwoData, 'products', []))],
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products, 'catalog' => $activeMarketplaceCatalog],
+            ['label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'products' => $previousPeriodProducts, 'catalog' => $previousPeriodActiveCatalog],
+            ['label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousData, 'products', [])), 'catalog' => $previousPeriodPreviousActiveCatalog],
+            ['label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousTwoData, 'products', [])), 'catalog' => $previousPeriodPreviousTwoActiveCatalog],
         ];
     $productComparisonPeriods = collect($productComparisonPeriods)->map(function ($period) use ($productComparisonMetrics) {
-        $period['metrics'] = $productComparisonMetrics($period['products']);
+        $period['metrics'] = $productComparisonMetrics($period['products'], $period['catalog'] ?? []);
         unset($period['products']);
 
         return $period;
     })->all();
     $productComparisonRows = [
+        ['group' => 'Katalog aktif', 'label' => 'Produk Aktif Marketplace', 'key' => 'active_products', 'format' => $numberDisplay],
+        ['group' => 'Katalog aktif', 'label' => 'Variant Aktif Marketplace', 'key' => 'active_variants', 'format' => $numberDisplay],
         ['group' => 'Volume transaksi', 'label' => 'Produk Terjual Marketplace', 'key' => 'products', 'format' => $numberDisplay],
         ['group' => 'Volume transaksi', 'label' => 'Variant Terjual Marketplace', 'key' => 'variants', 'format' => $numberDisplay],
         ['group' => 'Volume transaksi', 'label' => 'Variant Terjual Unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
@@ -1060,10 +1076,10 @@
         ['group' => 'Kualitas data', 'label' => 'Coverage Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
         ['group' => 'Kualitas data', 'label' => 'Coverage HPP', 'key' => 'hpp_coverage', 'format' => $percentDisplay],
     ];
-    $activeProductKpi = $productComparisonMetrics($products);
-    $previousMonthProductKpi = $productComparisonMetrics($previousMonthProducts);
-    $previousPeriodProductKpi = $productComparisonMetrics($previousPeriodProducts);
-    $categoryProductMetrics = function ($rows) {
+    $activeProductKpi = $productComparisonMetrics($products, $activeMarketplaceCatalog);
+    $previousMonthProductKpi = $productComparisonMetrics($previousMonthProducts, $previousMonthActiveCatalog);
+    $previousPeriodProductKpi = $productComparisonMetrics($previousPeriodProducts, $previousPeriodActiveCatalog);
+    $categoryProductMetrics = function ($rows, $activeCatalog = []) {
         $rows = collect($rows);
         $marketplaceProductKeys = $rows
             ->map(function ($product) {
@@ -1114,6 +1130,8 @@
         $mappedProducts = $rows->filter(fn ($product) => (int) ($product->internal_item_id ?? 0) > 0)->count();
 
         return [
+            'active_products' => (int) data_get($activeCatalog, 'products', 0),
+            'active_variants' => (int) data_get($activeCatalog, 'variants', 0),
             'products' => $marketplaceProductKeys->count(),
             'variants' => $rows->count(),
             'variants_sold' => $soldVariantKeys->count(),
@@ -1140,34 +1158,37 @@
     };
     $categoryComparisonSourcePeriods = $comparisonMode === 'month'
         ? [
-            ['key' => 'active', 'label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products],
-            ['key' => 'previous', 'label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'products' => $previousMonthProducts],
-            ['key' => 'previous_2', 'label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousData, 'products', []))],
-            ['key' => 'previous_3', 'label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousTwoData, 'products', []))],
+            ['key' => 'active', 'label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products, 'catalog' => $activeMarketplaceCatalog],
+            ['key' => 'previous', 'label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'products' => $previousMonthProducts, 'catalog' => $previousMonthActiveCatalog],
+            ['key' => 'previous_2', 'label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousData, 'products', [])), 'catalog' => $previousMonthPreviousActiveCatalog],
+            ['key' => 'previous_3', 'label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousTwoData, 'products', [])), 'catalog' => $previousMonthPreviousTwoActiveCatalog],
         ]
         : [
-            ['key' => 'active', 'label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products],
-            ['key' => 'previous', 'label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'products' => $previousPeriodProducts],
-            ['key' => 'previous_2', 'label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousData, 'products', []))],
-            ['key' => 'previous_3', 'label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousTwoData, 'products', []))],
+            ['key' => 'active', 'label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products, 'catalog' => $activeMarketplaceCatalog],
+            ['key' => 'previous', 'label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'products' => $previousPeriodProducts, 'catalog' => $previousPeriodActiveCatalog],
+            ['key' => 'previous_2', 'label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousData, 'products', [])), 'catalog' => $previousPeriodPreviousActiveCatalog],
+            ['key' => 'previous_3', 'label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousTwoData, 'products', [])), 'catalog' => $previousPeriodPreviousTwoActiveCatalog],
         ];
     $categoryComparisonPeriods = collect($categoryComparisonSourcePeriods)
         ->map(fn ($period) => collect($period)->except('products')->all())
         ->values();
     $categoryNames = collect($categoryComparisonSourcePeriods)
         ->flatMap(fn ($period) => collect($period['products'])->map(fn ($product) => trim((string) ($product->category_name ?? '')) ?: 'Tanpa kategori'))
+        ->merge(collect($categoryComparisonSourcePeriods)
+            ->flatMap(fn ($period) => array_keys((array) data_get($period, 'catalog.by_category', []))))
         ->unique()
         ->values();
     $categoryComparisonRows = $categoryNames
         ->map(function ($categoryName) use ($categoryComparisonSourcePeriods, $categoryProductMetrics, $productAnalysisNetSales) {
             $periods = collect($categoryComparisonSourcePeriods)->mapWithKeys(function ($period) use ($categoryName, $categoryProductMetrics) {
                 $categoryProducts = collect($period['products'])->filter(fn ($product) => (trim((string) ($product->category_name ?? '')) ?: 'Tanpa kategori') === $categoryName);
+                $categoryCatalog = collect(data_get($period, 'catalog.by_category', []))->get($categoryName, []);
 
                 return [$period['key'] => [
                     'label' => $period['label'],
                     'from' => $period['from'],
                     'to' => $period['to'],
-                    'metrics' => $categoryProductMetrics($categoryProducts),
+                    'metrics' => $categoryProductMetrics($categoryProducts, $categoryCatalog),
                 ]];
             });
             $activeMetrics = $periods->get('active')['metrics'];
@@ -1187,6 +1208,8 @@
         ->sortByDesc(fn ($row) => (float) ($row['periods']['active']['metrics']['net_sales'] ?? 0))
         ->values();
     $categoryProductComparisonRows = [
+        ['group' => 'Katalog aktif', 'label' => 'Produk Aktif Marketplace', 'key' => 'active_products', 'format' => $numberDisplay],
+        ['group' => 'Katalog aktif', 'label' => 'Variant Aktif Marketplace', 'key' => 'active_variants', 'format' => $numberDisplay],
         ['group' => 'Volume transaksi', 'label' => 'Produk Terjual Marketplace', 'key' => 'products', 'format' => $numberDisplay],
         ['group' => 'Volume transaksi', 'label' => 'Variant Terjual Marketplace', 'key' => 'variants', 'format' => $numberDisplay],
         ['group' => 'Volume transaksi', 'label' => 'Variant Terjual Unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
@@ -1839,7 +1862,12 @@
                     <div class="sales-kicker mb-1">Kinerja kategori</div>
                     <h2 class="sales-section-title mb-1">Kinerja Penjualan per Kategori Item</h2>
                 </div>
-                <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($categoryComparisonRows->count()) }} kategori · {{ number_format($activeProductKpi['products']) }} produk terjual</span>
+                <div class="d-flex flex-wrap gap-2 justify-content-end">
+                    <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($categoryComparisonRows->count()) }} kategori</span>
+                    <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($activeProductKpi['products']) }} produk terjual</span>
+                    <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format(data_get($activeMarketplaceCatalog, 'products', 0)) }} produk aktif</span>
+                    <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format(data_get($activeMarketplaceCatalog, 'variants', 0)) }} variant aktif</span>
+                </div>
             </div>
             @if ($categoryComparisonRows->isEmpty())
                 <div class="sales-empty text-center">Belum ada penjualan per kategori pada periode ini.</div>
@@ -1850,8 +1878,10 @@
                             <tr>
                                 <th class="ps-3">No.</th>
                                 <th>Kategori Item</th>
-                                <th>Produk</th>
-                                <th>Variant</th>
+                                <th>Produk Terjual</th>
+                                <th>Variant Terjual</th>
+                                <th>Produk Aktif</th>
+                                <th>Variant Aktif</th>
                                 <th>Order</th>
                                 <th class="pe-3">Unit</th>
                             </tr>
@@ -1862,7 +1892,7 @@
                                     $categoryKey = 'sales-category-comparison-'.$loop->index;
                                     $activeCategoryMetrics = $categoryRow['periods']['active']['metrics'];
                                 @endphp
-                                <tr class="sales-category-comparison-row" data-sales-category-comparison-row="{{ $categoryKey }}">
+                                <tr class="sales-category-comparison-row" data-sales-category-comparison-row="{{ $categoryKey }}" tabindex="0" aria-controls="{{ $categoryKey }}-detail">
                                     <td class="ps-3 text-muted" data-label="No.">{{ $loop->iteration }}</td>
                                     <td class="fw-semibold sales-category-name" data-label="Kategori Item" title="{{ $categoryRow['name'] }}">
                                         <button type="button" class="sales-category-comparison-toggle" data-sales-category-comparison-toggle="{{ $categoryKey }}" aria-expanded="false" aria-controls="{{ $categoryKey }}-detail" aria-label="Buka detail kategori {{ $categoryRow['name'] }}">
@@ -1870,13 +1900,15 @@
                                             <span>{{ $categoryRow['name'] }}</span>
                                         </button>
                                     </td>
-                                    <td data-label="Produk">{{ number_format($activeCategoryMetrics['products']) }}</td>
-                                    <td data-label="Variant">{{ number_format($activeCategoryMetrics['variants']) }}</td>
+                                    <td data-label="Produk Terjual">{{ number_format($activeCategoryMetrics['products']) }}</td>
+                                    <td data-label="Variant Terjual">{{ number_format($activeCategoryMetrics['variants']) }}</td>
+                                    <td data-label="Produk Aktif">{{ number_format($activeCategoryMetrics['active_products']) }}</td>
+                                    <td data-label="Variant Aktif">{{ number_format($activeCategoryMetrics['active_variants']) }}</td>
                                     <td data-label="Order">{{ number_format($activeCategoryMetrics['orders']) }}</td>
                                     <td class="pe-3" data-label="Unit">{{ number_format($activeCategoryMetrics['qty']) }}</td>
                                 </tr>
                                 <tr id="{{ $categoryKey }}-detail" class="sales-category-comparison-detail" data-sales-category-comparison-items="{{ $categoryKey }}" hidden>
-                                    <td colspan="6">
+                                    <td colspan="8">
                                         <div class="sales-category-comparison-detail-card">
                                             <div class="sales-category-detail-header d-flex align-items-start justify-content-between gap-2 mb-2">
                                                 <div>
@@ -2812,6 +2844,20 @@
                 document.querySelectorAll('[data-sales-category-comparison-items="' + key + '"]').forEach(function (row) {
                     row.hidden = !nextExpanded;
                 });
+            });
+        });
+
+        document.querySelectorAll('[data-sales-category-comparison-row]').forEach(function (row) {
+            const trigger = row.querySelector('[data-sales-category-comparison-toggle]');
+            if (!trigger) return;
+            row.addEventListener('click', function (event) {
+                if (event.target.closest('button, a')) return;
+                trigger.click();
+            });
+            row.addEventListener('keydown', function (event) {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                trigger.click();
             });
         });
 

@@ -1243,6 +1243,11 @@ SQL;
             ? ($shippingKpi['exception'] / $shippingKpi['total']) * 100
             : 0;
 
+        // Katalog aktif berasal dari sinkronisasi marketplace, bukan dari
+        // order pada periode. Dengan begitu produk tanpa transaksi tetap
+        // masuk sebagai produk aktif marketplace.
+        $activeMarketplaceCatalog = $this->activeMarketplaceCatalog($storeId, $platformCode);
+
         $comparisonMonth = null;
         $comparisonMonthPrevious = null;
         $comparisonMonthPreviousTwo = null;
@@ -1310,6 +1315,7 @@ SQL;
             'shipping' => $shipping,
             'shippingDaily' => $shippingDaily,
             'shippingKpi' => $shippingKpi,
+            'activeMarketplaceCatalog' => $activeMarketplaceCatalog,
             'orderDetails' => $orderDetails,
             'comparisonMonth' => $comparisonMonth,
             'comparisonMonthPrevious' => $comparisonMonthPrevious,
@@ -1329,6 +1335,104 @@ SQL;
                 'dummy' => $isPromotionDummy,
             ],
         ]);
+    }
+
+    /**
+     * Ringkasan katalog marketplace yang masih aktif pada scope filter toko
+     * dan channel. Variant tanpa model tetap dihitung sebagai satu variant.
+     * Mapping kategori memakai mapping item marketplace yang paling baru.
+     */
+    private function activeMarketplaceCatalog(?int $storeId, ?string $platformCode): array
+    {
+        $platformCodes = $this->platformCodes($platformCode);
+        $activeProducts = DB::table('marketplace_products as mp')
+            ->join('stores as st', 'st.id', '=', 'mp.store_id')
+            ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
+            ->where('mp.item_status', 'NORMAL')
+            ->where('st.is_active', true)
+            ->when($storeId, fn ($query) => $query->where('mp.store_id', $storeId))
+            ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
+            ->select('mp.id', 'mp.store_id', 'mp.item_id')
+            ->get();
+
+        if ($activeProducts->isEmpty()) {
+            return [
+                'products' => 0,
+                'variants' => 0,
+                'by_category' => [],
+                'as_of' => now()->toDateString(),
+            ];
+        }
+
+        $activeProductIds = $activeProducts->pluck('id')->map(fn ($id) => (int) $id)->values();
+        $modelsByProduct = DB::table('marketplace_product_models')
+            ->whereIn('marketplace_product_id', $activeProductIds->all())
+            ->select('marketplace_product_id', 'model_id')
+            ->get()
+            ->groupBy('marketplace_product_id');
+
+        $variantCount = $activeProducts->sum(function ($product) use ($modelsByProduct) {
+            $models = collect($modelsByProduct->get($product->id, []))
+                ->map(fn ($model) => trim((string) ($model->model_id ?? '')))
+                ->filter(fn ($modelId) => $modelId !== '')
+                ->unique();
+
+            return $models->isNotEmpty() ? $models->count() : 1;
+        });
+
+        $itemIds = $activeProducts
+            ->pluck('item_id')
+            ->map(fn ($itemId) => trim((string) $itemId))
+            ->filter()
+            ->unique()
+            ->values();
+        $mappingByListing = collect();
+        if ($itemIds->isNotEmpty()) {
+            $mappings = DB::table('marketplace_order_items as oi')
+                ->join('marketplace_orders as o', function ($join) {
+                    $join->on(DB::raw('COALESCE(oi.marketplace_order_id, oi.order_id)'), '=', 'o.id');
+                })
+                ->leftJoin('items as internal_item', 'internal_item.id', '=', 'oi.internal_item_id')
+                ->leftJoin('item_categories as internal_category', 'internal_category.id', '=', 'internal_item.item_category_id')
+                ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
+                ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
+                ->whereIn('oi.external_item_id', $itemIds->all())
+                ->where('st.is_active', true)
+                ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
+                ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
+                ->select('o.store_id', 'oi.external_item_id', 'internal_category.name as category_name', 'oi.id')
+                ->orderByDesc('oi.id')
+                ->get();
+
+            $mappingByListing = $mappings
+                ->groupBy(fn ($mapping) => (int) $mapping->store_id.'|'.trim((string) $mapping->external_item_id))
+                ->map(function ($rows) {
+                    return $rows
+                        ->map(fn ($row) => trim((string) ($row->category_name ?? '')))
+                        ->first(fn ($category) => $category !== '') ?: 'Tanpa kategori';
+                });
+        }
+
+        $byCategory = [];
+        foreach ($activeProducts as $product) {
+            $listingKey = (int) $product->store_id.'|'.trim((string) $product->item_id);
+            $category = (string) ($mappingByListing->get($listingKey) ?: 'Tanpa kategori');
+            $models = collect($modelsByProduct->get($product->id, []))
+                ->map(fn ($model) => trim((string) ($model->model_id ?? '')))
+                ->filter(fn ($modelId) => $modelId !== '')
+                ->unique();
+            $variants = $models->isNotEmpty() ? $models->count() : 1;
+
+            $byCategory[$category]['products'] = (int) ($byCategory[$category]['products'] ?? 0) + 1;
+            $byCategory[$category]['variants'] = (int) ($byCategory[$category]['variants'] ?? 0) + $variants;
+        }
+
+        return [
+            'products' => $activeProducts->count(),
+            'variants' => (int) $variantCount,
+            'by_category' => $byCategory,
+            'as_of' => now()->toDateString(),
+        ];
     }
 
     public function productOrders(Request $request)
