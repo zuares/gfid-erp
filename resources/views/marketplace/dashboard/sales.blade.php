@@ -729,6 +729,40 @@
             ->unique()
             ->count();
     };
+    $marketplaceVariantCount = function ($rows) {
+        return collect($rows)
+            ->map(function ($product) {
+                $externalItemId = trim((string) ($product->external_item_id ?? ''));
+                $internalItemId = (int) ($product->internal_item_id ?? 0);
+                $sku = trim((string) ($product->sku ?? ''));
+                $marketplaceName = trim((string) ($product->marketplace_name ?? $product->name ?? ''));
+
+                return $internalItemId > 0
+                    ? 'marketplace:'.$externalItemId.'|internal:'.$internalItemId
+                    : 'marketplace:'.$externalItemId.'|sku:'.$sku.'|name:'.$marketplaceName;
+            })
+            ->filter(fn ($key) => trim((string) $key) !== 'marketplace:|sku:|name:')
+            ->unique()
+            ->count();
+    };
+    $soldVariantCount = function ($rows) {
+        return collect($rows)
+            ->map(function ($product) {
+                $internalItemId = (int) ($product->internal_item_id ?? 0);
+                if ($internalItemId > 0) {
+                    return 'internal:'.$internalItemId;
+                }
+
+                $externalItemId = trim((string) ($product->external_item_id ?? ''));
+                $sku = trim((string) ($product->sku ?? ''));
+                $marketplaceName = trim((string) ($product->marketplace_name ?? $product->name ?? ''));
+
+                return 'marketplace:'.$externalItemId.'|sku:'.$sku.'|name:'.$marketplaceName;
+            })
+            ->filter(fn ($key) => trim((string) $key) !== 'marketplace:|sku:|name:')
+            ->unique()
+            ->count();
+    };
     $topProductCount = $marketplaceProductCount($products);
     $topProductQty = (int) $products->sum('qty');
     $topProductSales = (float) $products->sum('sales');
@@ -859,7 +893,7 @@
     $currencyDisplay = fn ($value) => $fmt($value);
     $percentDisplay = fn ($value) => number_format((float) $value, 1, ',', '.').'%';
     $multipleDisplay = fn ($value) => number_format((float) $value, 2, ',', '.').'x';
-    $productComparisonMetrics = function ($rows, $periodSummary) use ($marketplaceProductCount) {
+    $productComparisonMetrics = function ($rows, $periodSummary) use ($marketplaceProductCount, $marketplaceVariantCount, $soldVariantCount) {
         $rows = collect($rows);
         $orders = (int) data_get($periodSummary, 'orders', 0);
         $sales = (float) $rows->sum('sales');
@@ -877,6 +911,8 @@
 
         return [
             'products' => $marketplaceProductCount($rows),
+            'variants' => $marketplaceVariantCount($rows),
+            'variants_sold' => $soldVariantCount($rows),
             'qty' => (int) $rows->sum('qty'),
             'sales' => $sales,
             'net_sales' => $netSales,
@@ -916,22 +952,24 @@
         return $period;
     })->all();
     $productComparisonRows = [
-        ['label' => 'Produk aktif', 'key' => 'products', 'format' => $numberDisplay],
-        ['label' => 'Unit terjual', 'key' => 'qty', 'format' => $numberDisplay],
+        ['label' => 'Produk Marketplace', 'key' => 'products', 'format' => $numberDisplay],
+        ['label' => 'Variant Marketplace', 'key' => 'variants', 'format' => $numberDisplay],
+        ['label' => 'Variant Terjual Unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
+        ['label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
         ['label' => 'Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
         ['label' => 'Penjualan Netto', 'key' => 'net_sales', 'format' => $currencyDisplay],
         ['label' => 'AOV Penjualan', 'key' => 'aov_sales', 'format' => $currencyDisplay],
         ['label' => 'Pembayaran Pembeli', 'key' => 'buyer_payment', 'format' => $currencyDisplay],
         ['label' => 'AOV Pembayaran', 'key' => 'aov_payment', 'format' => $currencyDisplay],
         ['label' => 'Total HPP', 'key' => 'hpp', 'format' => $fmtHpp],
-        ['label' => 'Kontribusi Setelah Iklan', 'key' => 'contribution_profit', 'format' => $currencyDisplay],
+        ['label' => 'Kontribusi Pasca Iklan', 'key' => 'contribution_profit', 'format' => $currencyDisplay],
         ['label' => 'Margin Kontribusi', 'key' => 'contribution_margin', 'format' => $percentDisplay],
         ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
-        ['label' => 'Penjualan Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
+        ['label' => 'Penjualan Atribusi Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
         ['label' => 'ACOS', 'key' => 'acos', 'format' => $percentDisplay],
         ['label' => 'ROAS', 'key' => 'roas', 'format' => $multipleDisplay],
         ['label' => 'CPA', 'key' => 'cpa', 'format' => $currencyDisplay],
-        ['label' => 'Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
+        ['label' => 'Coverage Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
     ];
     $categoryProductMetrics = function ($rows) {
         $rows = collect($rows);
@@ -1056,25 +1094,25 @@
         ->sortByDesc(fn ($row) => (float) ($row['periods']['active']['metrics']['net_sales'] ?? 0))
         ->values();
     $categoryProductComparisonRows = [
-        ['label' => 'Produk/Kode Marketplace', 'key' => 'products', 'format' => $numberDisplay],
-        ['label' => 'Variant pada Kode Marketplace', 'key' => 'variants', 'format' => $numberDisplay],
-        ['label' => 'Variant terjual unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
-        ['label' => 'Order', 'key' => 'orders', 'format' => $numberDisplay],
-        ['label' => 'Terjual', 'key' => 'qty', 'format' => $numberDisplay],
+        ['label' => 'Produk Marketplace', 'key' => 'products', 'format' => $numberDisplay],
+        ['label' => 'Variant Marketplace', 'key' => 'variants', 'format' => $numberDisplay],
+        ['label' => 'Variant Terjual Unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
+        ['label' => 'Order Unik', 'key' => 'orders', 'format' => $numberDisplay],
+        ['label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
         ['label' => 'Penjualan', 'key' => 'sales', 'format' => $currencyDisplay],
         ['label' => 'Penjualan Netto', 'key' => 'net_sales', 'format' => $currencyDisplay],
         ['label' => 'AOV Penjualan', 'key' => 'aov_sales', 'format' => $currencyDisplay],
         ['label' => 'Pembayaran Pembeli', 'key' => 'buyer_payment', 'format' => $currencyDisplay],
         ['label' => 'AOV Pembayaran', 'key' => 'aov_payment', 'format' => $currencyDisplay],
         ['label' => 'Total HPP', 'key' => 'hpp', 'format' => $fmtHpp],
-        ['label' => 'Kontribusi Setelah Iklan', 'key' => 'contribution_profit', 'format' => $currencyDisplay],
+        ['label' => 'Kontribusi Pasca Iklan', 'key' => 'contribution_profit', 'format' => $currencyDisplay],
         ['label' => 'Margin Kontribusi', 'key' => 'contribution_margin', 'format' => $percentDisplay],
         ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
-        ['label' => 'Penjualan Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
+        ['label' => 'Penjualan Atribusi Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
         ['label' => 'ACOS', 'key' => 'acos', 'format' => $percentDisplay],
         ['label' => 'ROAS', 'key' => 'roas', 'format' => $multipleDisplay],
         ['label' => 'CPA', 'key' => 'cpa', 'format' => $currencyDisplay],
-        ['label' => 'Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
+        ['label' => 'Coverage Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
     ];
     $platformPromotionMetrics = function ($rows, $periodSummary, $promotionOrders = null) {
         $rows = collect($rows);
@@ -1643,17 +1681,17 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Produk',
             'kpis' => [
-                ['label' => 'Produk Aktif', 'value' => number_format($topProductCount), 'note' => 'produk/kode marketplace', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($topProductCount, $previousMonthTopProductCount, $previousPeriodTopProductCount, $numberDisplay)],
-                ['label' => 'Unit Terjual', 'value' => number_format($topProductQty), 'note' => 'seluruh produk', 'icon' => 'bi-stack', 'comparisons' => $kpiComparisons($topProductQty, $previousMonthTopProductQty, $previousPeriodTopProductQty, $numberDisplay)],
-                ['label' => 'Penjualan Produk', 'value' => $fmt($topProductSales), 'note' => 'seluruh produk', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($topProductSales, $previousMonthTopProductSales, $previousPeriodTopProductSales, $currencyDisplay)],
-                ['label' => 'Pembeli Produk', 'value' => number_format($topProductBuyers), 'note' => 'seluruh produk', 'icon' => 'bi-people', 'comparisons' => $kpiComparisons($topProductBuyers, $previousMonthTopProductBuyers, $previousPeriodTopProductBuyers, $numberDisplay)],
+                ['label' => 'Produk Marketplace', 'value' => number_format($topProductCount), 'note' => 'kode produk unik', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($topProductCount, $previousMonthTopProductCount, $previousPeriodTopProductCount, $numberDisplay)],
+                ['label' => 'Unit Terjual', 'value' => number_format($topProductQty), 'note' => 'periode terpilih', 'icon' => 'bi-stack', 'comparisons' => $kpiComparisons($topProductQty, $previousMonthTopProductQty, $previousPeriodTopProductQty, $numberDisplay)],
+                ['label' => 'GMV Produk', 'value' => $fmt($topProductSales), 'note' => 'sebelum promosi order-level', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($topProductSales, $previousMonthTopProductSales, $previousPeriodTopProductSales, $currencyDisplay)],
+                ['label' => 'Pembeli Produk', 'value' => number_format($topProductBuyers), 'note' => 'buyer pada produk', 'icon' => 'bi-people', 'comparisons' => $kpiComparisons($topProductBuyers, $previousMonthTopProductBuyers, $previousPeriodTopProductBuyers, $numberDisplay)],
             ],
         ])
         @if ($activeComparison)
             <section class="card sales-card shadow-sm mb-3">
                 <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-2">
                     <div>
-                        <div class="sales-kicker mb-1">Product comparison</div>
+                        <div class="sales-kicker mb-1">Period comparison</div>
                         <h2 class="sales-section-title mb-1">Perbandingan kinerja produk</h2>
                     </div>
                     <span class="badge sales-badge rounded-pill px-3 py-2">4 periode</span>
@@ -1692,7 +1730,7 @@
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-2">
                 <div>
                     <div class="sales-kicker mb-1">Category performance</div>
-                    <h2 class="sales-section-title mb-1">Penjualan per kategori item</h2>
+                    <h2 class="sales-section-title mb-1">Kinerja Penjualan per Kategori Item</h2>
                 </div>
                 <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($categoryComparisonRows->count()) }} kategori</span>
             </div>
@@ -1705,16 +1743,16 @@
                             <tr>
                                 <th class="ps-3">No.</th>
                                 <th>Kategori Item</th>
-                                <th class="text-end">Produk/Kode MP</th>
-                                <th class="text-end">Variant pada Kode MP</th>
-                                <th class="text-end">Varian Terjual</th>
-                                <th class="text-end">Order</th>
-                                <th class="text-end">Terjual</th>
+                                <th class="text-end">Produk Marketplace</th>
+                                <th class="text-end">Variant Marketplace</th>
+                                <th class="text-end">Variant Terjual Unik</th>
+                                <th class="text-end">Order Unik</th>
+                                <th class="text-end">Unit Terjual</th>
                                 @foreach ($categoryComparisonPeriods as $period)
                                     <th class="text-end">
                                         {{ $period['label'] }}
                                         <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
-                                        <div class="small fw-normal text-muted">Penjualan Netto · AOV</div>
+                                        <div class="small fw-normal text-muted">Penjualan Netto · AOV Penjualan</div>
                                     </th>
                                 @endforeach
                                 <th class="text-end">Δ vs -1</th>
@@ -1766,7 +1804,7 @@
                                         <div class="sales-category-comparison-detail-card">
                                             <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
                                                 <div>
-                                                    <div class="sales-kicker mb-1">Product comparison</div>
+                                                    <div class="sales-kicker mb-1">Category product performance</div>
                                                     <h3 class="sales-section-title mb-0">Perbandingan kinerja produk</h3>
                                                 </div>
                                                 <span class="badge sales-badge rounded-pill px-3 py-2">{{ $categoryRow['name'] }}</span>
@@ -1809,8 +1847,8 @@
         <section class="card sales-card sales-product-analysis-section shadow-sm mb-3">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
-                    <div class="sales-kicker mb-1">Product intelligence</div>
-                    <h2 class="sales-section-title mb-1">Analitik portofolio produk</h2>
+                    <div class="sales-kicker mb-1">Portfolio intelligence</div>
+                    <h2 class="sales-section-title mb-1">Analitik Portofolio Produk</h2>
                 </div>
                 <span class="badge sales-badge rounded-pill px-3 py-2">{{ $productAnalysisCategoryCount }} kategori</span>
             </div>
@@ -1832,7 +1870,7 @@
                     <span class="sales-product-analysis-kpi-value {{ ($productAnalysisNetSales > 0 ? ($productAnalysisTop10Sales / $productAnalysisNetSales) : 0) <= .6 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisTop10Sales / $productAnalysisNetSales) * 100) : '—' }}</span>
                 </div>
                 <div class="sales-product-analysis-kpi">
-                    <span class="sales-product-analysis-kpi-label">Mapping Internal</span>
+                    <span class="sales-product-analysis-kpi-label">Coverage Mapping Internal</span>
                     <span class="sales-product-analysis-kpi-value {{ $productAnalysisMappedCount === $productAnalysisProducts->count() ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisProducts->count() > 0 ? $percentDisplay(($productAnalysisMappedCount / $productAnalysisProducts->count()) * 100) : '—' }}</span>
                 </div>
                 <div class="sales-product-analysis-kpi">
@@ -1848,11 +1886,11 @@
                             <tr><td class="analysis-label" colspan="2">Baris produk aktif</td><td class="text-end analysis-value">{{ number_format($productAnalysisProducts->count()) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Kategori aktif</td><td class="text-end analysis-value">{{ number_format($productAnalysisCategoryCount) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Top 20% kontribusi</td><td class="text-end analysis-value">{{ $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisTop20Sales / $productAnalysisNetSales) * 100) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Pembayaran / GMV</td><td class="text-end analysis-value">{{ $productAnalysisSales > 0 ? $percentDisplay(($productAnalysisBuyerPayment / $productAnalysisSales) * 100) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Unit / order</td><td class="text-end analysis-value">{{ $summary['orders'] > 0 ? number_format($topProductQty / $summary['orders'], 2, ',', '.') : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Pembayaran Pembeli / GMV</td><td class="text-end analysis-value">{{ $productAnalysisSales > 0 ? $percentDisplay(($productAnalysisBuyerPayment / $productAnalysisSales) * 100) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Unit per Order</td><td class="text-end analysis-value">{{ $summary['orders'] > 0 ? number_format($topProductQty / $summary['orders'], 2, ',', '.') : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">AOV penjualan</td><td class="text-end analysis-value">{{ $summary['orders'] > 0 ? $fmt($productAnalysisSales / $summary['orders']) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">AOV pembayaran</td><td class="text-end analysis-value">{{ $summary['orders'] > 0 ? $fmt($productAnalysisBuyerPayment / $summary['orders']) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">HPP terukur</td><td class="text-end analysis-value">{{ number_format($productAnalysisCostedProducts->count()) }} / {{ number_format($productAnalysisProducts->count()) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Produk dengan HPP</td><td class="text-end analysis-value">{{ number_format($productAnalysisCostedProducts->count()) }} / {{ number_format($productAnalysisProducts->count()) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Total HPP</td><td class="text-end analysis-value">{{ $productAnalysisHpp > 0 ? $fmtHpp($productAnalysisHpp) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Margin kotor</td><td class="text-end analysis-value {{ $productAnalysisGrossMargin >= 25 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisGrossMargin !== 0 ? $percentDisplay($productAnalysisGrossMargin) : '—' }}</td></tr>
                         </tbody>
@@ -1860,23 +1898,23 @@
                 </div>
                 <div class="col-lg-6">
                     <table class="table table-sm align-middle sales-table sales-product-analysis-table">
-                        <thead><tr><th colspan="2">Paid media</th><th class="text-end">Nilai</th></tr></thead>
+                        <thead><tr><th colspan="2">Kinerja Iklan</th><th class="text-end">Nilai</th></tr></thead>
                         <tbody>
-                            <tr><td class="analysis-label" colspan="2">Produk dengan iklan</td><td class="text-end analysis-value">{{ number_format($productAnalysisAdProducts->count()) }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Penjualan iklan</td><td class="text-end analysis-value">{{ $fmt($productAnalysisAdSales) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Produk Teratribusi Iklan</td><td class="text-end analysis-value">{{ number_format($productAnalysisAdProducts->count()) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Penjualan Atribusi Iklan</td><td class="text-end analysis-value">{{ $fmt($productAnalysisAdSales) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Biaya iklan</td><td class="text-end analysis-value is-danger">{{ $fmt($productAnalysisAdSpend) }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">ACOS blended</td><td class="text-end analysis-value">{{ $productAnalysisAdSales > 0 ? $percentDisplay(($productAnalysisAdSpend / $productAnalysisAdSales) * 100) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">CPA blended</td><td class="text-end analysis-value">{{ $productAnalysisAdConversions > 0 ? $fmt($productAnalysisAdSpend / $productAnalysisAdConversions) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">ACOS Blended</td><td class="text-end analysis-value">{{ $productAnalysisAdSales > 0 ? $percentDisplay(($productAnalysisAdSpend / $productAnalysisAdSales) * 100) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">CPA Blended</td><td class="text-end analysis-value">{{ $productAnalysisAdConversions > 0 ? $fmt($productAnalysisAdSpend / $productAnalysisAdConversions) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Kontribusi setelah iklan</td><td class="text-end analysis-value {{ $productAnalysisContributionProfit >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisContributionProfit) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Margin kontribusi</td><td class="text-end analysis-value {{ $productAnalysisContributionMargin >= 20 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisContributionMargin !== 0 ? $percentDisplay($productAnalysisContributionMargin) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Coverage penjualan iklan</td><td class="text-end analysis-value">{{ $productAnalysisAdSalesCoverage > 0 ? $percentDisplay($productAnalysisAdSalesCoverage) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Coverage Penjualan Atribusi</td><td class="text-end analysis-value">{{ $productAnalysisAdSalesCoverage > 0 ? $percentDisplay($productAnalysisAdSalesCoverage) : '—' }}</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
             <div class="sales-product-analysis-matrix-wrap">
                 <table class="table table-sm align-middle sales-table sales-product-analysis-matrix">
-                    <thead><tr><th style="width: 16%">Matriks</th><th class="text-end">Produk/Kode MP</th><th class="text-end">Variant Terjual Unik</th><th class="text-end">Penjualan Netto</th><th class="text-end">Share</th><th class="text-end">Kontribusi</th><th class="text-end">Margin</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ROAS</th><th class="text-end">Biaya Iklan</th></tr></thead>
+                    <thead><tr><th style="width: 16%">Segmentasi</th><th class="text-end">Produk Marketplace</th><th class="text-end">Variant Terjual Unik</th><th class="text-end">Penjualan Netto</th><th class="text-end">Share</th><th class="text-end">Kontribusi</th><th class="text-end">Margin</th><th class="text-end">Penjualan Atribusi Iklan</th><th class="text-end">ROAS</th><th class="text-end">Biaya Iklan</th></tr></thead>
                     <tbody>
                         @foreach ($productAnalysisMatrixRows as $matrixRow)
                             <tr>
@@ -1899,10 +1937,10 @@
         <section class="card sales-card shadow-sm">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
-                    <div class="sales-kicker mb-1">Kinerja seluruh produk</div>
-                    <h2 class="sales-section-title mb-1">Analisis produk</h2>
+                    <div class="sales-kicker mb-1">Portfolio performance</div>
+                    <h2 class="sales-section-title mb-1">Analisis Produk Marketplace</h2>
                 </div>
-                <span class="badge sales-badge rounded-pill px-3 py-2">{{ $products->count() }} produk</span>
+                <span class="badge sales-badge rounded-pill px-3 py-2">{{ $topProductCount }} produk marketplace</span>
             </div>
             @if ($products->isEmpty())
                 <div class="sales-empty text-center"><i class="bi bi-box-seam d-block fs-3 mb-2"></i>Belum ada detail produk pada periode ini.</div>
@@ -1924,7 +1962,7 @@
                             <col style="width: 5%">
                             <col style="width: 7%">
                         </colgroup>
-                        <thead><tr><th scope="col" class="sales-index-column">No.</th><th>Produk</th><th class="text-end" title="Variant: HPP terakhir per unit · Marketplace/kategori: total HPP berdasarkan qty">HPP / Total</th><th class="text-end">Order</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Penjualan Netto</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Biaya Iklan</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ACOS</th><th class="text-end">ROAS</th><th class="text-end pe-3">CPA</th></tr></thead>
+                        <thead><tr><th scope="col" class="sales-index-column">No.</th><th>Produk Marketplace / Variant</th><th class="text-end" title="Variant: HPP terakhir per unit · Marketplace/kategori: total HPP berdasarkan unit">HPP Unit / Total HPP</th><th class="text-end">Order Unik</th><th class="text-end">Unit</th><th class="text-end">Penjualan</th><th class="text-end">Penjualan Netto</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Biaya Iklan</th><th class="text-end">Penjualan Atribusi Iklan</th><th class="text-end">ACOS</th><th class="text-end">ROAS</th><th class="text-end pe-3">CPA</th></tr></thead>
                         <tbody>
                             @php
                                 $productGroups = $products
