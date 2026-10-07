@@ -1028,7 +1028,7 @@
         ->unique()
         ->values();
     $categoryComparisonRows = $categoryNames
-        ->map(function ($categoryName) use ($categoryComparisonSourcePeriods, $categoryProductMetrics, $productAnalysisNetSales, $masterVariantCountsByCategory) {
+        ->map(function ($categoryName) use ($categoryComparisonSourcePeriods, $categoryProductMetrics, $productAnalysisNetSales) {
             $periods = collect($categoryComparisonSourcePeriods)->mapWithKeys(function ($period) use ($categoryName, $categoryProductMetrics) {
                 $categoryProducts = collect($period['products'])->filter(fn ($product) => (trim((string) ($product->category_name ?? '')) ?: 'Tanpa kategori') === $categoryName);
 
@@ -1038,12 +1038,6 @@
                     'to' => $period['to'],
                     'metrics' => $categoryProductMetrics($categoryProducts),
                 ]];
-            });
-            $masterVariantCount = (int) collect($masterVariantCountsByCategory ?? [])->get($categoryName, 0);
-            $periods = $periods->map(function ($period) use ($masterVariantCount) {
-                $period['metrics']['variants'] = $masterVariantCount;
-
-                return $period;
             });
             $activeMetrics = $periods->get('active')['metrics'];
             $previousMetrics = $periods->get('previous')['metrics'];
@@ -1063,7 +1057,7 @@
         ->values();
     $categoryProductComparisonRows = [
         ['label' => 'Produk/Kode Marketplace', 'key' => 'products', 'format' => $numberDisplay],
-        ['label' => 'Variant Master s.d. tanggal', 'key' => 'variants', 'format' => $numberDisplay],
+        ['label' => 'Variant pada Kode Marketplace', 'key' => 'variants', 'format' => $numberDisplay],
         ['label' => 'Variant terjual unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
         ['label' => 'Order', 'key' => 'orders', 'format' => $numberDisplay],
         ['label' => 'Terjual', 'key' => 'qty', 'format' => $numberDisplay],
@@ -1712,7 +1706,7 @@
                                 <th class="ps-3">No.</th>
                                 <th>Kategori Item</th>
                                 <th class="text-end">Produk/Kode MP</th>
-                                <th class="text-end">Variant Master</th>
+                                <th class="text-end">Variant pada Kode MP</th>
                                 <th class="text-end">Varian Terjual</th>
                                 <th class="text-end">Order</th>
                                 <th class="text-end">Terjual</th>
