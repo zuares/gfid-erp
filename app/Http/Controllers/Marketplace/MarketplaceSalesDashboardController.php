@@ -329,6 +329,8 @@ class MarketplaceSalesDashboardController extends Controller
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
             ->selectRaw("COALESCE(NULLIF(oi.item_name, ''), NULLIF(oi.item_name_snapshot, ''), NULLIF(oi.variant_name, ''), NULLIF(oi.variant_snapshot, ''), 'Produk tanpa nama') as name")
             ->selectRaw("COALESCE(NULLIF(oi.item_sku, ''), NULLIF(oi.marketplace_sku, ''), NULLIF(oi.model_sku, ''), NULLIF(oi.external_sku, ''), NULLIF(oi.item_code_snapshot, ''), '-') as sku")
+            ->selectRaw('MAX(NULLIF(oi.internal_item_id, 0)) as internal_item_id')
+            ->selectRaw("MAX(NULLIF(oi.external_item_id, '')) as external_item_id")
             ->selectRaw('COALESCE(SUM(CASE WHEN oi.qty > 0 THEN oi.qty ELSE 0 END), 0) as qty')
             ->selectRaw('COUNT(DISTINCT o.id) as orders')
             ->selectRaw("COUNT(DISTINCT COALESCE(NULLIF(o.buyer_username, ''), NULLIF(o.buyer_name, ''), o.id)) as buyers")
@@ -339,6 +341,64 @@ class MarketplaceSalesDashboardController extends Controller
             ->orderByDesc('sales')
             ->limit(8)
             ->get();
+
+        $adItemSpendRows = DB::table('marketplace_ads_item_dailies as ad')
+            ->whereBetween('ad.date', [$from->toDateString(), $to->toDateString()])
+            ->when($storeId, fn ($query) => $query->where('ad.store_id', $storeId))
+            ->select('ad.store_id', 'ad.channel_item_id')
+            ->selectRaw('COALESCE(SUM(ad.expense), 0) as ad_spend')
+            ->groupBy('ad.store_id', 'ad.channel_item_id')
+            ->get();
+        $adSpendByChannel = $adItemSpendRows->mapWithKeys(fn ($row) => [
+            $row->store_id.'|'.(string) $row->channel_item_id => (float) $row->ad_spend,
+        ]);
+        $adSpendByChannelItem = $adItemSpendRows
+            ->groupBy(fn ($row) => (string) $row->channel_item_id)
+            ->map(fn ($rows) => (float) $rows->sum('ad_spend'));
+
+        $campaignInternalByChannel = DB::table('marketplace_ad_campaigns')
+            ->whereNotNull('channel_item_id')
+            ->whereNotNull('internal_item_id')
+            ->when($storeId, fn ($query) => $query->where('store_id', $storeId))
+            ->select('store_id', 'channel_item_id', 'internal_item_id')
+            ->get()
+            ->mapWithKeys(fn ($row) => [$row->store_id.'|'.(string) $row->channel_item_id => (int) $row->internal_item_id]);
+        $manualInternalByChannel = DB::table('marketplace_ad_item_maps')
+            ->whereNotNull('channel_item_id')
+            ->whereNotNull('internal_item_id')
+            ->when($storeId, fn ($query) => $query->where('store_id', $storeId))
+            ->select('store_id', 'channel_item_id', 'internal_item_id')
+            ->get()
+            ->mapWithKeys(fn ($row) => [$row->store_id.'|'.(string) $row->channel_item_id => (int) $row->internal_item_id]);
+
+        $adSpendByInternalItem = collect();
+        foreach ($adSpendByChannel as $channelKey => $spend) {
+            $internalItemId = $campaignInternalByChannel->get($channelKey)
+                ?? $manualInternalByChannel->get($channelKey);
+            if ($internalItemId) {
+                $adSpendByInternalItem[$internalItemId] = (float) ($adSpendByInternalItem[$internalItemId] ?? 0) + (float) $spend;
+            }
+        }
+
+        $products = $products->map(function ($product) use ($adSpendByInternalItem, $adSpendByChannelItem) {
+            $internalItemId = (int) ($product->internal_item_id ?? 0);
+            $externalItemId = trim((string) ($product->external_item_id ?? ''));
+            $hasInternalMapping = $internalItemId > 0 && $adSpendByInternalItem->has($internalItemId);
+            $hasExternalMapping = $externalItemId !== '' && $adSpendByChannelItem->has($externalItemId);
+
+            if ($hasInternalMapping) {
+                $product->ad_spend = (float) $adSpendByInternalItem->get($internalItemId);
+                $product->ad_spend_matched = true;
+            } elseif ($hasExternalMapping) {
+                $product->ad_spend = (float) $adSpendByChannelItem->get($externalItemId);
+                $product->ad_spend_matched = true;
+            } else {
+                $product->ad_spend = 0.0;
+                $product->ad_spend_matched = false;
+            }
+
+            return $product;
+        });
 
         $paymentStatusExpression = "UPPER(COALESCE(NULLIF(o.payment_status, ''), 'BELUM DITENTUKAN'))";
         $paymentCategorySourceExpression = "LOWER(COALESCE(NULLIF(o.payment_method, ''), NULLIF(o.payment_status, ''), ''))";

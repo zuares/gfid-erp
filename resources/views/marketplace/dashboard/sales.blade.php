@@ -1212,10 +1212,11 @@
                             <col style="width: 6.5rem">
                             <col style="width: 10rem">
                             <col style="width: 11rem">
+                            <col style="width: 10rem">
                             <col style="width: 9.5rem">
                             <col style="width: 9.5rem">
                         </colgroup>
-                        <thead><tr><th scope="col" class="sales-index-column">No.</th><th>Produk</th><th>SKU</th><th class="text-end">Order</th><th class="text-end">Pembeli</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">AOV Neto</th><th class="text-end pe-3">APC</th></tr></thead>
+                        <thead><tr><th scope="col" class="sales-index-column">No.</th><th>Produk</th><th>SKU</th><th class="text-end">Order</th><th class="text-end">Pembeli</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Biaya Iklan</th><th class="text-end">AOV Neto</th><th class="text-end pe-3">APC</th></tr></thead>
                         <tbody>
                             @foreach ($products as $product)
                                 <tr>
@@ -1231,6 +1232,7 @@
                                     <td class="text-end">{{ number_format((int) $product->qty) }}</td>
                                     <td class="text-end fw-semibold">{{ $fmt($product->sales) }}</td>
                                     <td class="text-end fw-semibold">{{ $fmt($product->buyer_payment) }}</td>
+                                    <td class="text-end {{ ($product->ad_spend ?? 0) > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">{{ ($product->ad_spend_matched ?? false) ? $fmt($product->ad_spend) : '—' }}</td>
                                     <td class="text-end">{{ $product->orders > 0 ? $fmt($product->buyer_payment / $product->orders) : '—' }}</td>
                                     <td class="text-end" title="Average Payment per Customer: pembayaran pembeli dibagi pembeli unik">{{ $product->buyers > 0 ? $fmt($product->buyer_payment / $product->buyers) : '—' }}</td>
                                 </tr>
