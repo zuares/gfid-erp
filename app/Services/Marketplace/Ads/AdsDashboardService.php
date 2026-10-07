@@ -132,6 +132,16 @@ class AdsDashboardService
      */
     public function getDailySpend(array $storeIds, int|string|null $storeId, string $dateFrom, string $dateTo): Collection
     {
+        return $this->getDailyMetrics($storeIds, $storeId, $dateFrom, $dateTo)
+            ->map(fn (array $metrics) => (float) $metrics['spend']);
+    }
+
+    /**
+     * @param  array<int>  $storeIds
+     * @return Collection<string, array{spend: float, impressions: int, clicks: int, orders: int, gmv: float}>
+     */
+    public function getDailyMetrics(array $storeIds, int|string|null $storeId, string $dateFrom, string $dateTo): Collection
+    {
         $storeIds = array_values(array_filter(array_map('intval', $storeIds)));
         if ($storeId !== null && $storeId !== 'all') {
             $selectedStoreId = (int) $storeId;
@@ -145,7 +155,7 @@ class AdsDashboardService
         $shop = DB::table('marketplace_ads_dailies')
             ->whereIn('store_id', $storeIds)
             ->whereBetween('date', [$dateFrom, $dateTo])
-            ->selectRaw('date, SUM(spend) as spend')
+            ->selectRaw('date, SUM(spend) as spend, SUM(impressions) as impressions, SUM(clicks) as clicks, SUM(orders) as orders, SUM(gmv) as gmv')
             ->groupBy('date')
             ->get()
             ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
@@ -154,7 +164,7 @@ class AdsDashboardService
             ->whereIn('store_id', $storeIds)
             ->whereNotLike('channel_campaign_id', 'GMS-%')
             ->whereBetween('date', [$dateFrom, $dateTo])
-            ->selectRaw('date, SUM(expense) as spend')
+            ->selectRaw('date, SUM(expense) as spend, SUM(impressions) as impressions, SUM(clicks) as clicks, SUM(broad_order) as orders, SUM(broad_gmv) as gmv')
             ->groupBy('date')
             ->get()
             ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
@@ -163,7 +173,7 @@ class AdsDashboardService
             ->whereIn('store_id', $storeIds)
             ->whereLike('channel_campaign_id', 'GMS-%')
             ->whereBetween('date', [$dateFrom, $dateTo])
-            ->selectRaw('date, SUM(expense) as spend')
+            ->selectRaw('date, SUM(expense) as spend, SUM(impressions) as impressions, SUM(clicks) as clicks, SUM(broad_order) as orders, SUM(broad_gmv) as gmv')
             ->groupBy('date')
             ->get()
             ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
@@ -175,12 +185,26 @@ class AdsDashboardService
             ->sort()
             ->mapWithKeys(function (string $date) use ($shop, $campaign, $gms) {
                 $shopRow = $shop->get($date);
-                $spend = $shopRow
-                    ? (float) ($shopRow->spend ?? 0)
-                    : (float) ($campaign->get($date)->spend ?? 0)
-                        + (float) ($gms->get($date)->spend ?? 0);
+                if ($shopRow) {
+                    return [$date => [
+                        'spend' => (float) ($shopRow->spend ?? 0),
+                        'impressions' => (int) ($shopRow->impressions ?? 0),
+                        'clicks' => (int) ($shopRow->clicks ?? 0),
+                        'orders' => (int) ($shopRow->orders ?? 0),
+                        'gmv' => (float) ($shopRow->gmv ?? 0),
+                    ]];
+                }
 
-                return [$date => $spend];
+                $campaignRow = $campaign->get($date);
+                $gmsRow = $gms->get($date);
+
+                return [$date => [
+                    'spend' => (float) ($campaignRow->spend ?? 0) + (float) ($gmsRow->spend ?? 0),
+                    'impressions' => (int) ($campaignRow->impressions ?? 0) + (int) ($gmsRow->impressions ?? 0),
+                    'clicks' => (int) ($campaignRow->clicks ?? 0) + (int) ($gmsRow->clicks ?? 0),
+                    'orders' => (int) ($campaignRow->orders ?? 0) + (int) ($gmsRow->orders ?? 0),
+                    'gmv' => (float) ($campaignRow->gmv ?? 0) + (float) ($gmsRow->gmv ?? 0),
+                ]];
             });
     }
 

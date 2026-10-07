@@ -446,40 +446,46 @@
     };
     $promotionComparisonPeriods = $comparisonMode === 'month'
         ? [
-            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'data' => ['daily' => $promotionDaily, 'summary' => $summary, 'orders' => $promotionOrders, 'ad_spend' => $adSpendTotal]],
-            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthData, 'summary', []), 'orders' => data_get($comparisonMonthData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonMonthData, 'adSpendTotal', 0)]],
-            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthPreviousData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthPreviousData, 'summary', []), 'orders' => data_get($comparisonMonthPreviousData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonMonthPreviousData, 'adSpendTotal', 0)]],
-            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthPreviousTwoData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthPreviousTwoData, 'summary', []), 'orders' => data_get($comparisonMonthPreviousTwoData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonMonthPreviousTwoData, 'adSpendTotal', 0)]],
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'data' => ['daily' => $promotionDaily, 'summary' => $summary, 'orders' => $promotionOrders, 'ad_spend' => $adSpendTotal, 'ad_impressions' => $adImpressionsTotal, 'ad_clicks' => $adClicksTotal, 'ad_orders' => $adOrdersTotal, 'ad_sales' => $adSalesTotal, 'ad_ctr' => $adCtr, 'ad_cvr' => $adCvr]],
+            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthData, 'summary', []), 'orders' => data_get($comparisonMonthData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonMonthData, 'adSpendTotal', 0), 'ad_impressions' => data_get($comparisonMonthData, 'adImpressionsTotal', 0), 'ad_clicks' => data_get($comparisonMonthData, 'adClicksTotal', 0), 'ad_orders' => data_get($comparisonMonthData, 'adOrdersTotal', 0), 'ad_sales' => data_get($comparisonMonthData, 'adSalesTotal', 0), 'ad_ctr' => data_get($comparisonMonthData, 'adCtr', 0), 'ad_cvr' => data_get($comparisonMonthData, 'adCvr', 0)]],
+            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthPreviousData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthPreviousData, 'summary', []), 'orders' => data_get($comparisonMonthPreviousData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonMonthPreviousData, 'adSpendTotal', 0), 'ad_impressions' => data_get($comparisonMonthPreviousData, 'adImpressionsTotal', 0), 'ad_clicks' => data_get($comparisonMonthPreviousData, 'adClicksTotal', 0), 'ad_orders' => data_get($comparisonMonthPreviousData, 'adOrdersTotal', 0), 'ad_sales' => data_get($comparisonMonthPreviousData, 'adSalesTotal', 0), 'ad_ctr' => data_get($comparisonMonthPreviousData, 'adCtr', 0), 'ad_cvr' => data_get($comparisonMonthPreviousData, 'adCvr', 0)]],
+            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthPreviousTwoData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthPreviousTwoData, 'summary', []), 'orders' => data_get($comparisonMonthPreviousTwoData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonMonthPreviousTwoData, 'adSpendTotal', 0), 'ad_impressions' => data_get($comparisonMonthPreviousTwoData, 'adImpressionsTotal', 0), 'ad_clicks' => data_get($comparisonMonthPreviousTwoData, 'adClicksTotal', 0), 'ad_orders' => data_get($comparisonMonthPreviousTwoData, 'adOrdersTotal', 0), 'ad_sales' => data_get($comparisonMonthPreviousTwoData, 'adSalesTotal', 0), 'ad_ctr' => data_get($comparisonMonthPreviousTwoData, 'adCtr', 0), 'ad_cvr' => data_get($comparisonMonthPreviousTwoData, 'adCvr', 0)]],
         ]
         : [
         [
             'label' => 'Aktif',
             'from' => $filters['date_from'],
             'to' => $filters['date_to'],
-            'data' => ['daily' => $promotionDaily, 'summary' => $summary, 'orders' => $promotionOrders, 'ad_spend' => $adSpendTotal],
+            'data' => ['daily' => $promotionDaily, 'summary' => $summary, 'orders' => $promotionOrders, 'ad_spend' => $adSpendTotal, 'ad_impressions' => $adImpressionsTotal, 'ad_clicks' => $adClicksTotal, 'ad_orders' => $adOrdersTotal, 'ad_sales' => $adSalesTotal, 'ad_ctr' => $adCtr, 'ad_cvr' => $adCvr],
         ],
         [
             'label' => 'Periode -1',
             'from' => $comparisonPeriod['from'] ?? null,
             'to' => $comparisonPeriod['to'] ?? null,
-            'data' => ['daily' => data_get($comparisonPeriodData, 'promotionDaily', []), 'summary' => $previousPeriodSummary, 'orders' => data_get($comparisonPeriodData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonPeriodData, 'adSpendTotal', 0)],
+            'data' => ['daily' => data_get($comparisonPeriodData, 'promotionDaily', []), 'summary' => $previousPeriodSummary, 'orders' => data_get($comparisonPeriodData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonPeriodData, 'adSpendTotal', 0), 'ad_impressions' => data_get($comparisonPeriodData, 'adImpressionsTotal', 0), 'ad_clicks' => data_get($comparisonPeriodData, 'adClicksTotal', 0), 'ad_orders' => data_get($comparisonPeriodData, 'adOrdersTotal', 0), 'ad_sales' => data_get($comparisonPeriodData, 'adSalesTotal', 0), 'ad_ctr' => data_get($comparisonPeriodData, 'adCtr', 0), 'ad_cvr' => data_get($comparisonPeriodData, 'adCvr', 0)],
         ],
         [
             'label' => 'Periode -2',
             'from' => $comparisonPeriodPrevious['from'] ?? null,
             'to' => $comparisonPeriodPrevious['to'] ?? null,
-            'data' => ['daily' => data_get($comparisonPeriodPreviousData, 'promotionDaily', []), 'summary' => data_get($comparisonPeriodPreviousData, 'summary', []), 'orders' => data_get($comparisonPeriodPreviousData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonPeriodPreviousData, 'adSpendTotal', 0)],
+            'data' => ['daily' => data_get($comparisonPeriodPreviousData, 'promotionDaily', []), 'summary' => data_get($comparisonPeriodPreviousData, 'summary', []), 'orders' => data_get($comparisonPeriodPreviousData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonPeriodPreviousData, 'adSpendTotal', 0), 'ad_impressions' => data_get($comparisonPeriodPreviousData, 'adImpressionsTotal', 0), 'ad_clicks' => data_get($comparisonPeriodPreviousData, 'adClicksTotal', 0), 'ad_orders' => data_get($comparisonPeriodPreviousData, 'adOrdersTotal', 0), 'ad_sales' => data_get($comparisonPeriodPreviousData, 'adSalesTotal', 0), 'ad_ctr' => data_get($comparisonPeriodPreviousData, 'adCtr', 0), 'ad_cvr' => data_get($comparisonPeriodPreviousData, 'adCvr', 0)],
         ],
         [
             'label' => 'Periode -3',
             'from' => $comparisonPeriodPreviousTwo['from'] ?? null,
             'to' => $comparisonPeriodPreviousTwo['to'] ?? null,
-            'data' => ['daily' => data_get($comparisonPeriodPreviousTwoData, 'promotionDaily', []), 'summary' => data_get($comparisonPeriodPreviousTwoData, 'summary', []), 'orders' => data_get($comparisonPeriodPreviousTwoData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonPeriodPreviousTwoData, 'adSpendTotal', 0)],
+            'data' => ['daily' => data_get($comparisonPeriodPreviousTwoData, 'promotionDaily', []), 'summary' => data_get($comparisonPeriodPreviousTwoData, 'summary', []), 'orders' => data_get($comparisonPeriodPreviousTwoData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonPeriodPreviousTwoData, 'adSpendTotal', 0), 'ad_impressions' => data_get($comparisonPeriodPreviousTwoData, 'adImpressionsTotal', 0), 'ad_clicks' => data_get($comparisonPeriodPreviousTwoData, 'adClicksTotal', 0), 'ad_orders' => data_get($comparisonPeriodPreviousTwoData, 'adOrdersTotal', 0), 'ad_sales' => data_get($comparisonPeriodPreviousTwoData, 'adSalesTotal', 0), 'ad_ctr' => data_get($comparisonPeriodPreviousTwoData, 'adCtr', 0), 'ad_cvr' => data_get($comparisonPeriodPreviousTwoData, 'adCvr', 0)],
         ],
     ];
     $platformPromotionPeriods = collect($promotionComparisonPeriods)->map(function ($period) use ($platformPromotionMetrics) {
         $period['metrics'] = $platformPromotionMetrics($period['data']['daily'], $period['data']['summary'], $period['data']['orders']);
         $period['metrics']['ad_spend'] = (float) ($period['data']['ad_spend'] ?? 0);
+        $period['metrics']['ad_impressions'] = (int) ($period['data']['ad_impressions'] ?? 0);
+        $period['metrics']['ad_clicks'] = (int) ($period['data']['ad_clicks'] ?? 0);
+        $period['metrics']['ad_orders'] = (int) ($period['data']['ad_orders'] ?? 0);
+        $period['metrics']['ad_sales'] = (float) ($period['data']['ad_sales'] ?? 0);
+        $period['metrics']['ad_ctr'] = (float) ($period['data']['ad_ctr'] ?? 0);
+        $period['metrics']['ad_cvr'] = (float) ($period['data']['ad_cvr'] ?? 0);
         $period['metrics']['ad_rate'] = (float) ($period['metrics']['sales'] ?? 0) > 0
             ? ($period['metrics']['ad_spend'] / (float) $period['metrics']['sales']) * 100
             : 0;
@@ -548,6 +554,12 @@
         'kicker' => 'Paid media efficiency',
         'title' => 'Biaya Iklan',
         'rows' => [
+            ['label' => 'Sales Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
+            ['label' => 'Order Iklan', 'key' => 'ad_orders', 'format' => $numberDisplay],
+            ['label' => 'Impression', 'key' => 'ad_impressions', 'format' => $numberDisplay],
+            ['label' => 'Klik', 'key' => 'ad_clicks', 'format' => $numberDisplay],
+            ['label' => 'CTR', 'key' => 'ad_ctr', 'format' => $percentDisplay],
+            ['label' => 'CVR', 'key' => 'ad_cvr', 'format' => $percentDisplay],
             ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
             ['label' => 'Rasio Iklan / GMV', 'key' => 'ad_rate', 'format' => $percentDisplay],
         ],

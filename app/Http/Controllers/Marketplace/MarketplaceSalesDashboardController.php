@@ -96,13 +96,20 @@ class MarketplaceSalesDashboardController extends Controller
             ->map(fn ($id) => (int) $id)
             ->values()
             ->all();
-        $adSpendDaily = app(AdsDashboardService::class)->getDailySpend(
+        $adDailyMetrics = app(AdsDashboardService::class)->getDailyMetrics(
             $adStoreIds,
             $storeId,
             $from->toDateString(),
             $to->toDateString(),
         );
+        $adSpendDaily = $adDailyMetrics->map(fn (array $metrics) => (float) $metrics['spend']);
         $adSpendTotal = (float) $adSpendDaily->sum();
+        $adImpressionsTotal = (int) $adDailyMetrics->sum('impressions');
+        $adClicksTotal = (int) $adDailyMetrics->sum('clicks');
+        $adOrdersTotal = (int) $adDailyMetrics->sum('orders');
+        $adSalesTotal = (float) $adDailyMetrics->sum('gmv');
+        $adCtr = $adImpressionsTotal > 0 ? ($adClicksTotal / $adImpressionsTotal) * 100 : 0;
+        $adCvr = $adClicksTotal > 0 ? ($adOrdersTotal / $adClicksTotal) * 100 : 0;
 
         $itemTotals = DB::table('marketplace_order_items as oi')
             ->selectRaw('COALESCE(oi.marketplace_order_id, oi.order_id) as order_key')
@@ -764,6 +771,12 @@ SQL;
             'promotionOrders' => $promotionOrders,
             'adSpendDaily' => $adSpendDaily,
             'adSpendTotal' => $adSpendTotal,
+            'adImpressionsTotal' => $adImpressionsTotal,
+            'adClicksTotal' => $adClicksTotal,
+            'adOrdersTotal' => $adOrdersTotal,
+            'adSalesTotal' => $adSalesTotal,
+            'adCtr' => $adCtr,
+            'adCvr' => $adCvr,
             'shipping' => $shipping,
             'shippingDaily' => $shippingDaily,
             'shippingKpi' => $shippingKpi,
