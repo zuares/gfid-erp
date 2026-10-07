@@ -137,9 +137,7 @@
             </a>
             <div class="d-flex flex-wrap align-items-end justify-content-between gap-3">
                 <div>
-                    <div class="promotion-kicker mb-2"><i class="bi bi-bar-chart-line me-1"></i>Detail promosi</div>
                     <h1 class="h3 promotion-title mb-2">Promosi {{ $dateLabel }}</h1>
-                    <p class="promotion-muted mb-0">Rincian alokasi promo per pesanan pada periode terpilih.</p>
                 </div>
                 <div class="promotion-period">
                     <span class="promotion-period-icon"><i class="bi bi-calendar3"></i></span>
@@ -156,8 +154,7 @@
         <div class="card-body p-3">
             <div class="row g-2 align-items-end">
                 <div class="col-12 col-md-auto me-md-2">
-                    <div class="promotion-kicker mb-1"><i class="bi bi-sliders me-1"></i>Ruang lingkup</div>
-                    <div class="small promotion-muted">Sesuaikan toko untuk analisis detail</div>
+                    <div class="promotion-table-title">Filter</div>
                 </div>
                 @if (!empty($filters['dummy']))
                     <input type="hidden" name="dummy" value="1">
@@ -185,19 +182,19 @@
     @include('marketplace.dashboard.partials._kpis', [
         'kpiTitle' => 'Detail Promosi',
         'kpis' => [
-            ['label' => 'Nilai Bruto', 'value' => $fmt($summary['subtotal']), 'note' => 'sebelum promosi', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
-            ['label' => 'Diskon Produk', 'value' => $fmt($summary['product_discount']), 'note' => 'potongan produk', 'icon' => 'bi-tag'],
-            ['label' => 'Voucher & Paket', 'value' => $fmt($summary['voucher_package_total']), 'note' => 'voucher dan bundle deal', 'icon' => 'bi-ticket-perforated'],
-            ['label' => 'Total Promosi', 'value' => $fmt($summary['promotion_total']), 'note' => 'seluruh komponen promo', 'icon' => 'bi-percent', 'variant' => 'sales-kpi--warning'],
+            ['label' => 'GMV', 'value' => $fmt($summary['subtotal']), 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
+            ['label' => 'Total Promosi', 'value' => $fmt($summary['promotion_total']), 'icon' => 'bi-percent', 'variant' => 'sales-kpi--warning'],
+            ['label' => 'Diskon Produk', 'value' => $fmt($summary['product_discount']), 'icon' => 'bi-tag'],
+            ['label' => 'Voucher Toko', 'value' => $fmt($summary['voucher_store']), 'icon' => 'bi-ticket-perforated'],
+            ['label' => 'Voucher Platform', 'value' => $fmt($summary['voucher_platform']), 'icon' => 'bi-shop'],
+            ['label' => 'Paket Diskon', 'value' => $fmt($summary['bundle_discount']), 'icon' => 'bi-gift'],
         ],
     ])
 
     <section class="card promotion-card promotion-table-card">
         <div class="promotion-table-toolbar">
             <div>
-                <div class="promotion-kicker mb-1">Rincian alokasi</div>
                 <div class="promotion-table-title">Transaksi terdampak promosi</div>
-                <div class="promotion-table-subtitle">Komponen diskon dan voucher per pesanan.</div>
             </div>
             <span class="promotion-count">{{ number_format($rows->count()) }} transaksi</span>
         </div>

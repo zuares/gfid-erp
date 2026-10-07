@@ -43,15 +43,14 @@
     .shipping-detail .shipping-kpi-card.ready::after { background: #16a34a; }
     .shipping-detail .shipping-kpi-card.ready .shipping-kpi-icon { background: #dcfce7; color: #15803d; }
     .shipping-detail .shipping-kpi-card.transit::after { background: #2563eb; }
-    .shipping-detail .shipping-kpi-card.completed::after { background: #ea580c; }
-    .shipping-detail .shipping-kpi-card.completed .shipping-kpi-icon { background: #ffedd5; color: #c2410c; }
+    .shipping-detail .shipping-kpi-card.completed::after { background: #16a34a; }
+    .shipping-detail .shipping-kpi-card.completed .shipping-kpi-icon { background: #dcfce7; color: #15803d; }
     .shipping-detail .shipping-kpi-card.failed::after { background: #dc2626; }
     .shipping-detail .shipping-kpi-card.failed .shipping-kpi-icon { background: #fee2e2; color: #b91c1c; }
     .shipping-detail .shipping-kpi-card.return::after { background: #9333ea; }
     .shipping-detail .shipping-kpi-card.return .shipping-kpi-icon { background: #f3e8ff; color: #7e22ce; }
     .shipping-detail .shipping-table-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.15rem 1.25rem; border-bottom: 1px solid var(--shipping-line); }
     .shipping-detail .shipping-table-title { color: var(--shipping-ink); font-size: .98rem; font-weight: 800; }
-    .shipping-detail .shipping-table-subtitle { color: var(--shipping-muted); font-size: .74rem; }
     .shipping-detail .shipping-count { border: 1px solid var(--shipping-line); border-radius: 999px; padding: .4rem .7rem; color: var(--shipping-muted); background: var(--shipping-soft); font-size: .7rem; font-weight: 800; white-space: nowrap; }
     .shipping-detail .shipping-table { --bs-table-bg: var(--shipping-card); --bs-table-color: var(--shipping-ink); margin-bottom: 0; }
     .shipping-detail .shipping-table th { padding-top: .75rem; padding-bottom: .75rem; background: var(--shipping-soft); border-bottom-color: var(--shipping-line); color: var(--shipping-muted); font-size: .66rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; }
@@ -87,6 +86,8 @@
     $dashboardQuery = ['date_from' => $selectedDate->toDateString(), 'date_to' => $selectedDate->toDateString(), 'tab' => 'shipping'];
     if ($filters['store_id']) $dashboardQuery['store_id'] = $filters['store_id'];
     if (!empty($filters['dummy'])) $dashboardQuery['dummy'] = 1;
+    $detailPct = fn ($value) => $summary['orders'] > 0
+        ? number_format(((float) $value / $summary['orders']) * 100, 1, ',', '.').'%' : '0,0%';
 @endphp
 
 <div class="container-fluid py-4 shipping-detail">
@@ -96,7 +97,6 @@
             <div>
                 <div class="shipping-kicker mb-2"><i class="bi bi-truck me-1"></i>Detail pengiriman</div>
                 <h1 class="h3 shipping-title mb-2">Pengiriman {{ $dateLabel }}</h1>
-                <p class="shipping-muted mb-0">Daftar order marketplace dan status pengiriman pada tanggal terpilih.</p>
             </div>
             <div class="shipping-period">
                 <span class="shipping-period-icon"><i class="bi bi-calendar3"></i></span>
@@ -108,10 +108,6 @@
     <form class="card shipping-card shipping-filter shadow-sm mb-4" method="GET" action="{{ route('marketplace.dashboard.shipping.detail', ['date' => $selectedDate->toDateString()]) }}">
         <div class="card-body p-3">
             <div class="row g-2 align-items-end">
-                <div class="col-12 col-md-auto me-md-2">
-                    <div class="shipping-kicker mb-1"><i class="bi bi-sliders me-1"></i>Ruang lingkup</div>
-                    <div class="small shipping-muted">Sesuaikan toko untuk analisis detail</div>
-                </div>
                 @if (!empty($filters['dummy']))
                     <input type="hidden" name="dummy" value="1">
                 @endif
@@ -133,17 +129,18 @@
 
     <div class="row g-3 mb-4">
         @foreach ([
-            ['label' => 'Total Order', 'value' => $summary['orders'], 'note' => 'order pada tanggal ini', 'icon' => 'bi-receipt', 'class' => ''],
-            ['label' => 'Siap Dikirim', 'value' => $summary['ready_orders'], 'note' => 'status operasional', 'icon' => 'bi-box-arrow-up', 'class' => 'ready'],
-            ['label' => 'Dalam Pengiriman', 'value' => $summary['transit_orders'], 'note' => 'status transit', 'icon' => 'bi-truck', 'class' => 'transit'],
-            ['label' => 'Selesai', 'value' => $summary['completed_orders'], 'note' => 'order selesai', 'icon' => 'bi-check2-circle', 'class' => 'completed'],
-            ['label' => 'Gagal', 'value' => $summary['failed_orders'], 'note' => 'pengiriman gagal', 'icon' => 'bi-exclamation-triangle', 'class' => 'failed'],
-            ['label' => 'Return', 'value' => $summary['return_orders'], 'note' => 'return atau refund', 'icon' => 'bi-arrow-return-left', 'class' => 'return'],
+            ['label' => 'Total Order', 'value' => number_format($summary['orders']), 'note' => '100% basis', 'icon' => 'bi-receipt', 'class' => ''],
+            ['label' => 'Siap Dikirim', 'value' => number_format($summary['ready_orders']), 'note' => $detailPct($summary['ready_orders']), 'icon' => 'bi-box-arrow-up', 'class' => 'ready'],
+            ['label' => 'Dalam Pengiriman', 'value' => number_format($summary['transit_orders']), 'note' => $detailPct($summary['transit_orders']), 'icon' => 'bi-truck', 'class' => 'transit'],
+            ['label' => 'Selesai', 'value' => number_format($summary['completed_orders']), 'note' => $detailPct($summary['completed_orders']), 'icon' => 'bi-check2-circle', 'class' => 'completed'],
+            ['label' => 'Gagal', 'value' => number_format($summary['failed_orders']), 'note' => $detailPct($summary['failed_orders']), 'icon' => 'bi-exclamation-triangle', 'class' => 'failed'],
+            ['label' => 'Return', 'value' => number_format($summary['return_orders']), 'note' => $detailPct($summary['return_orders']), 'icon' => 'bi-arrow-return-left', 'class' => 'return'],
+            ['label' => 'Tingkat Eksepsi', 'value' => $detailPct($summary['exception_orders']), 'note' => number_format($summary['exception_orders']).' order', 'icon' => 'bi-exclamation-diamond', 'class' => 'failed'],
         ] as $kpi)
-            <div class="col-12 col-sm-6 col-xl-3">
+            <div class="col-12 col-sm-6 col-xl">
                 <div class="shipping-kpi-card {{ $kpi['class'] }} h-100 p-3">
                     <div class="d-flex justify-content-between align-items-start gap-2">
-                        <div><div class="shipping-kpi-label mb-2">{{ $kpi['label'] }}</div><div class="shipping-kpi-value">{{ number_format($kpi['value']) }}</div><div class="shipping-kpi-note mt-1">{{ $kpi['note'] }}</div></div>
+                        <div><div class="shipping-kpi-label mb-2">{{ $kpi['label'] }}</div><div class="shipping-kpi-value">{{ is_numeric($kpi['value']) ? number_format($kpi['value']) : $kpi['value'] }}</div><div class="shipping-kpi-note mt-1">{{ $kpi['note'] }}</div></div>
                         <span class="shipping-kpi-icon"><i class="bi {{ $kpi['icon'] }}"></i></span>
                     </div>
                 </div>
@@ -154,15 +151,13 @@
     <section class="card shipping-card shipping-table-card">
         <div class="shipping-table-toolbar">
             <div>
-                <div class="shipping-kicker mb-1">Rincian order</div>
                 <div class="shipping-table-title">Daftar pengiriman</div>
-                <div class="shipping-table-subtitle">Maksimal 500 order terbaru pada tanggal ini.</div>
             </div>
             <span class="shipping-count">{{ number_format($rows->count()) }} order</span>
         </div>
         <div class="card-body p-0">
             @if ($rows->isEmpty())
-                <div class="shipping-empty text-center"><i class="bi bi-truck d-block fs-3 mb-2"></i>Belum ada order pengiriman pada tanggal ini.</div>
+                <div class="shipping-empty text-center"><i class="bi bi-truck d-block fs-3 mb-2"></i>Belum ada data</div>
             @else
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle shipping-table">

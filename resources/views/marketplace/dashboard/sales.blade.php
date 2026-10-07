@@ -12,7 +12,9 @@
         --sales-card: var(--card, #fff);
         --sales-soft: var(--card-soft, #f9fafb);
         --sales-ink: var(--text, #111827);
-        max-width: 1280px;
+        --sales-accent: var(--accent, #2563eb);
+        --sales-accent-soft: var(--accent-soft, #dbeafe);
+        max-width: 1680px;
         margin-inline: auto;
         color: var(--sales-ink);
     }
@@ -34,7 +36,7 @@
 
     .sales-dashboard .sales-title { color: var(--sales-ink); letter-spacing: -.035em; }
     .sales-dashboard .sales-subtitle,
-    .sales-dashboard .sales-section-subtitle { color: var(--sales-muted); }
+    .sales-dashboard .sales-section-subtitle { display: none; }
 
     .sales-dashboard .sales-filter-card { background: var(--sales-soft); }
     .sales-dashboard .sales-filter-card .form-label {
@@ -50,100 +52,13 @@
         color: var(--sales-ink);
         font-size: .8rem;
     }
-    .sales-dashboard .sales-filter-card .sales-date-range,
-    .sales-dashboard .sales-filter-card .sales-date-range-display {
-        min-width: 220px;
-        border-color: var(--sales-line);
-        background-color: var(--sales-card);
-        color: var(--sales-ink);
-        font-size: .8rem;
-        cursor: pointer;
-    }
-    .sales-dashboard .sales-filter-card .sales-date-range,
-    .sales-dashboard .sales-filter-card .sales-date-range-display,
-    .sales-dashboard .sales-filter-card input[type="date"],
-    .sales-dashboard .sales-filter-card input[name="date_from"],
-    .sales-dashboard .sales-filter-card input[name="date_to"] { display: none !important; }
-    .sales-dashboard .sales-period-filter { position: relative; width: min(100%, 560px); z-index: 20; }
-    .sales-dashboard .sales-period-filter { order: 3; margin-left: auto; }
-    .sales-dashboard .sales-filter-store { order: 2; }
-    .sales-dashboard #sales-date-from,
-    .sales-dashboard #sales-date-to { display: none !important; }
-    .sales-dashboard .sales-period-trigger {
-        display: flex; align-items: center; gap: .7rem; width: 100%; min-height: 48px;
-        padding: .7rem .85rem; border: 1px solid rgba(148,163,184,.38); border-radius: 12px;
-        background: var(--sales-card); color: var(--sales-ink); text-align: left; cursor: pointer;
-        transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
-    }
-    .sales-dashboard .sales-period-trigger:hover,
-    .sales-dashboard .sales-period-trigger[aria-expanded="true"] {
-        border-color: rgba(234,88,12,.55); box-shadow: 0 7px 18px rgba(15,23,42,.09); transform: translateY(-1px);
-    }
-    .sales-dashboard .sales-period-trigger-label { color: var(--sales-muted); font-size: .78rem; white-space: nowrap; }
-    .sales-dashboard .sales-period-trigger-preset { color: #ea580c; font-size: .82rem; font-weight: 800; white-space: nowrap; }
-    .sales-dashboard .sales-period-trigger-summary { color: var(--sales-muted); font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .sales-dashboard .sales-period-trigger-icon { margin-left: auto; color: #64748b; font-size: 1.05rem; flex: 0 0 auto; }
-    .sales-dashboard .sales-period-popover {
-        position: absolute; left: 0; top: calc(100% + .55rem); width: min(100vw - 2rem, 680px);
-        overflow: hidden; border: 1px solid rgba(148,163,184,.20); border-radius: 16px;
-        background: var(--sales-card); box-shadow: 0 18px 44px rgba(15,23,42,.16); z-index: 3000;
-    }
-    .sales-dashboard .sales-period-popover[hidden] { display: none; }
-    .sales-dashboard .sales-period-layout { display: grid; grid-template-columns: 190px minmax(0, 1fr); min-height: 320px; }
-    .sales-dashboard .sales-period-menu { padding: .65rem; border-right: 1px solid rgba(148,163,184,.17); background: var(--sales-card); }
-    .sales-dashboard .sales-period-option {
-        display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 38px;
-        padding: .55rem .65rem; border: 0; border-radius: 9px; background: transparent; color: var(--sales-ink);
-        font-size: .78rem; font-weight: 650; text-align: left; cursor: pointer; transition: background .14s ease, color .14s ease, transform .14s ease;
-    }
-    .sales-dashboard .sales-period-option:hover,
-    .sales-dashboard .sales-period-option.is-selected { background: rgba(234,88,12,.09); color: #c2410c; transform: translateX(2px); }
-    .sales-dashboard .sales-period-option .arrow { color: #94a3b8; font-size: 1.1rem; line-height: 1; }
-    .sales-dashboard .sales-period-divider { height: 1px; margin: .5rem .25rem; background: rgba(148,163,184,.19); }
-    .sales-dashboard .sales-period-panel { min-width: 0; padding: 1.15rem 1.25rem; background: color-mix(in srgb, var(--sales-soft) 60%, transparent); }
-    .sales-dashboard .sales-period-panel[hidden] { display: none; }
-    .sales-dashboard .sales-period-eyebrow { color: #ea580c; font-size: .68rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
-    .sales-dashboard .sales-period-title { margin: .5rem 0 0; color: var(--sales-ink); font-size: 1.2rem; font-weight: 850; letter-spacing: -.02em; }
-    .sales-dashboard .sales-period-help { margin: .35rem 0 1.1rem; color: var(--sales-muted); font-size: .82rem; line-height: 1.55; }
-    .sales-dashboard .sales-period-input-label { display: block; margin-bottom: .35rem; color: var(--sales-muted); font-size: .75rem; font-weight: 750; }
-    .sales-dashboard .sales-period-range-input { width: 100%; min-height: 42px; border: 1px solid rgba(148,163,184,.25); border-radius: 10px; background: var(--sales-card); color: var(--sales-ink); padding: .55rem .7rem; box-shadow: 0 4px 12px rgba(15,23,42,.06); cursor: pointer; }
-    .sales-dashboard #sales-date-range { display: none !important; }
-    .sales-dashboard .sales-period-filter input.form-control.input.active,
-    .sales-dashboard .sales-period-filter input.input.active,
-    .sales-dashboard .sales-period-calendar-wrap > input {
-        display: none !important;
-    }
-    .sales-dashboard .sales-period-range-input:focus { outline: 0; border-color: rgba(234,88,12,.6); box-shadow: 0 0 0 .2rem rgba(234,88,12,.13); }
-    .sales-dashboard .sales-period-calendar-wrap { margin-top: .65rem; }
-    .sales-dashboard .sales-period-calendar-wrap .flatpickr-calendar { box-shadow: none !important; border: 0 !important; width: 100%; }
-    .sales-dashboard .sales-period-calendar-wrap .flatpickr-calendar.inline { display: block; }
-    .sales-dashboard .sales-period-nav { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-    .sales-dashboard .sales-period-nav button { width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--sales-muted); cursor: pointer; }
-    .sales-dashboard .sales-period-nav button:hover { background: rgba(148,163,184,.15); color: var(--sales-ink); }
-    .sales-dashboard .sales-period-nav strong { color: var(--sales-ink); font-size: .9rem; }
-    .sales-dashboard .sales-period-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin-top: 1rem; }
-    .sales-dashboard .sales-period-grid button { min-height: 42px; border: 1px solid rgba(148,163,184,.19); border-radius: 9px; background: var(--sales-card); color: var(--sales-ink); font-size: .76rem; font-weight: 650; cursor: pointer; transition: all .14s ease; }
-    .sales-dashboard .sales-period-grid button:hover,
-    .sales-dashboard .sales-period-grid button.is-selected { border-color: rgba(234,88,12,.42); background: rgba(234,88,12,.08); color: #c2410c; transform: translateY(-1px); }
-    .sales-dashboard .sales-period-grid button:disabled { cursor: not-allowed; color: #cbd5e1; background: rgba(148,163,184,.07); }
-    body[data-theme="dark"] .sales-dashboard .sales-period-panel { background: rgba(15,23,42,.38); }
-    body[data-theme="dark"] .sales-dashboard .sales-period-option:hover,
-    body[data-theme="dark"] .sales-dashboard .sales-period-option.is-selected,
-    body[data-theme="dark"] .sales-dashboard .sales-period-grid button:hover,
-    body[data-theme="dark"] .sales-dashboard .sales-period-grid button.is-selected { color: #fdba74; background: rgba(234,88,12,.14); }
-    @media (max-width: 640px) {
-        .sales-dashboard .sales-period-filter { order: 1; margin-left: 0; }
-        .sales-dashboard .sales-filter-store { order: 2; }
-        .sales-dashboard .sales-period-popover { width: min(100vw - 1.5rem, 680px); left: 50%; transform: translateX(-50%); }
-        .sales-dashboard .sales-period-layout { grid-template-columns: 1fr; }
-        .sales-dashboard .sales-period-menu { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .2rem; border-right: 0; border-bottom: 1px solid rgba(148,163,184,.17); }
-        .sales-dashboard .sales-period-divider { grid-column: 1 / -1; }
-    }
     .sales-dashboard .sales-filter-card .form-control:focus,
     .sales-dashboard .sales-filter-card .form-select:focus {
         border-color: var(--accent, #2563eb);
         box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--accent, #2563eb) 18%, transparent);
     }
+    .sales-dashboard .sales-period-filter { order: 3; margin-left: auto; }
+    .sales-dashboard .sales-filter-store { order: 2; }
 
     .sales-dashboard .sales-nav { overflow-x: auto; scrollbar-width: none; }
     .sales-dashboard .sales-nav::-webkit-scrollbar { display: none; }
@@ -184,7 +99,6 @@
         color: var(--accent, #2563eb);
     }
     .sales-dashboard .sales-kpi-value { color: var(--sales-ink); font-size: 1.4rem; font-weight: 800; letter-spacing: -.03em; }
-    .sales-dashboard .sales-kpi-note { color: var(--sales-muted); font-size: .72rem; }
     .sales-dashboard .sales-kpi--success .sales-kpi-icon { background: var(--success-soft, #dcfce7); color: var(--success, #16a34a); }
     .sales-dashboard .sales-kpi--success::after { background: var(--success, #16a34a); }
     .sales-dashboard .sales-kpi--warning .sales-kpi-icon { background: #fff7ed; color: #c2410c; }
@@ -192,7 +106,6 @@
 
     .sales-dashboard .sales-section-header { padding: 1rem 1.15rem .85rem; }
     .sales-dashboard .sales-section-title { color: var(--sales-ink); font-size: 1rem; font-weight: 750; }
-    .sales-dashboard .sales-section-subtitle { font-size: .75rem; }
     .sales-dashboard .sales-detail-link { color: var(--accent, #2563eb); font-size: .75rem; font-weight: 700; text-decoration: none; }
     .sales-dashboard .sales-detail-link:hover { text-decoration: underline; }
     .sales-dashboard .sales-table { --bs-table-bg: var(--sales-card); --bs-table-color: var(--sales-ink); --bs-table-hover-bg: color-mix(in srgb, var(--accent-soft, #dbeafe) 35%, var(--sales-card)); margin-bottom: 0; }
@@ -207,23 +120,42 @@
         white-space: nowrap;
     }
     .sales-dashboard .sales-table td { border-color: color-mix(in srgb, var(--sales-line) 65%, transparent); font-size: .78rem; }
+    .sales-dashboard .sales-income-table { min-width: 1080px; }
+    .sales-dashboard .sales-income-table th,
+    .sales-dashboard .sales-income-table td { white-space: nowrap; }
+    .sales-dashboard .sales-income-table thead tr:first-child th {
+        background: var(--sales-soft);
+        color: var(--sales-ink);
+        font-size: .67rem;
+        letter-spacing: .02em;
+        text-transform: none;
+    }
+    .sales-dashboard .sales-income-table thead tr:nth-child(2) th {
+        font-size: .62rem;
+        color: var(--sales-muted);
+    }
+    .sales-dashboard .sales-income-table .income-group-start { border-left: 1px solid var(--sales-line); }
+    .sales-dashboard .sales-income-table .income-value { font-weight: 700; color: var(--sales-ink); }
+    .sales-dashboard .sales-income-table .income-percent { color: var(--sales-muted); font-size: .72rem; }
     .sales-dashboard .sales-order-table { width: 100%; min-width: 0; table-layout: fixed; }
     .sales-dashboard .sales-order-table th,
     .sales-dashboard .sales-order-table td { padding: .62rem .55rem; overflow-wrap: anywhere; }
     .sales-dashboard .sales-order-table th:nth-child(1),
     .sales-dashboard .sales-order-table td:nth-child(1) { width: 20%; }
     .sales-dashboard .sales-order-table th:nth-child(2),
-    .sales-dashboard .sales-order-table td:nth-child(2) { width: 16%; }
+    .sales-dashboard .sales-order-table td:nth-child(2) { width: 14%; }
     .sales-dashboard .sales-order-table th:nth-child(3),
     .sales-dashboard .sales-order-table th:nth-child(4),
     .sales-dashboard .sales-order-table td:nth-child(3),
-    .sales-dashboard .sales-order-table td:nth-child(4) { width: 11%; }
+    .sales-dashboard .sales-order-table td:nth-child(4) { width: 10%; }
     .sales-dashboard .sales-order-table th:nth-child(5),
-    .sales-dashboard .sales-order-table td:nth-child(5) { width: 12%; }
+    .sales-dashboard .sales-order-table td:nth-child(5) { width: 11%; }
     .sales-dashboard .sales-order-table th:nth-child(6),
-    .sales-dashboard .sales-order-table td:nth-child(6) { width: 18%; }
+    .sales-dashboard .sales-order-table td:nth-child(6) { width: 10%; }
     .sales-dashboard .sales-order-table th:nth-child(7),
-    .sales-dashboard .sales-order-table td:nth-child(7) { width: 12%; }
+    .sales-dashboard .sales-order-table td:nth-child(7) { width: 17%; }
+    .sales-dashboard .sales-order-table th:nth-child(8),
+    .sales-dashboard .sales-order-table td:nth-child(8) { width: 8%; }
     .sales-dashboard .sales-order-table .sales-order-cell { min-width: 0; }
     .sales-dashboard .sales-order-table .sales-order-number { color: var(--sales-ink); font-weight: 750; letter-spacing: -.01em; }
     .sales-dashboard .sales-order-table .sales-order-meta { color: var(--sales-muted); font-size: .68rem; line-height: 1.35; }
@@ -274,6 +206,8 @@
         .sales-dashboard .sales-order-table { min-width: 0; }
         .sales-dashboard .sales-kpi { min-height: 118px; }
         .sales-dashboard .sales-kpi-value { font-size: 1.2rem; }
+        .sales-dashboard .sales-period-filter { order: 1; width: 100%; margin-left: 0; }
+        .sales-dashboard .sales-filter-store { order: 2; }
     }
 </style>
 @endpush
@@ -282,6 +216,7 @@
 @php
     $fmt = fn ($value) => 'Rp '.number_format((float) $value, 0, ',', '.');
     $dateLabel = fn ($date) => \Carbon\Carbon::parse($date)->format('d M Y');
+    $pct = fn ($value, $total) => $total > 0 ? number_format(((float) $value / (float) $total) * 100, 1, ',', '.') : '0,0';
     $salesTabs = ['sales', 'products', 'payments', 'promotions', 'shipping', 'income', 'orders'];
     $activeTab = in_array(request('tab'), $salesTabs, true) ? request('tab') : 'sales';
     $todayDate = now()->toDateString();
@@ -308,22 +243,17 @@
     }
     $detailQuery = ['date_from' => $filters['date_from'], 'date_to' => $filters['date_to']];
     if ($filters['store_id']) $detailQuery['store_id'] = $filters['store_id'];
-    $promotionTotals = [
-        'product_discount' => (float) $promotionDaily->sum('product_discount'),
-        'voucher_store' => (float) $promotionDaily->sum('voucher_store'),
-        'voucher_platform' => (float) $promotionDaily->sum('voucher_platform'),
-        'bundle_discount' => (float) $promotionDaily->sum('bundle_discount'),
-    ];
-    $shippingOrders = fn (array $statuses) => (int) $shipping
-        ->whereIn('status', $statuses)
-        ->sum('orders');
-    $netProductTotal = max($summary['subtotal'] - $promotionTotals['product_discount'], 0);
+    $canImportMarketplace = auth()->check() && auth()->user()->canAccessModule('imports');
+    $importOrderQuery = $filters['store_id'] ? ['store_id' => $filters['store_id']] : [];
     $paymentDetailQuery = ['tab' => 'payments'];
     if ($filters['store_id']) $paymentDetailQuery['store_id'] = $filters['store_id'];
     if (!empty($filters['dummy'])) $paymentDetailQuery['dummy'] = 1;
     $shippingDetailQuery = ['tab' => 'shipping'];
     if ($filters['store_id']) $shippingDetailQuery['store_id'] = $filters['store_id'];
     if (!empty($filters['dummy'])) $shippingDetailQuery['dummy'] = 1;
+    $shippingPct = fn ($value) => $shippingKpi['total'] > 0
+        ? number_format(((float) $value / $shippingKpi['total']) * 100, 1, ',', '.').'%' : '0,0%';
+    $shippingExceptionPct = number_format($shippingKpi['exception_rate'], 1, ',', '.').'%';
     $topPaymentMethod = $payments->sortByDesc('buyer_paid')->first();
     $peakPaymentDay = $paymentDaily->sortByDesc('aov')->first();
     $paymentCategoryLabels = ['cod' => 'COD', 'non_cod' => 'Non-COD', 'pay_later' => 'Pay Later'];
@@ -337,6 +267,13 @@
             'order_share' => 0,
         ]];
     });
+    $globalAov = (float) $summary['aov'];
+    $topProductCount = $products->count();
+    $topProductQty = (int) $products->sum('qty');
+    $topProductSales = (float) $products->sum('sales');
+    $topProductBuyers = (int) $products->sum('buyers');
+    $incomeSettlementRate = $incomeSummary['orders'] > 0 ? ($incomeSummary['settled_orders'] / $incomeSummary['orders']) * 100 : 0;
+    $promotionRate = $summary['subtotal'] > 0 ? ($summary['promotion_total'] / $summary['subtotal']) * 100 : 0;
 @endphp
 
 <div class="container-fluid py-4 sales-dashboard">
@@ -344,76 +281,36 @@
         <div>
             <div class="text-muted small mb-1">Toko Online / Dashboard Operasional</div>
             <h1 class="h3 sales-title mb-1">Dashboard Penjualan</h1>
-            <p class="sales-subtitle mb-0">Ringkasan pesanan dan penjualan marketplace pada periode yang dipilih.</p>
         </div>
-        <span class="badge sales-badge rounded-pill px-3 py-2"><i class="bi bi-database-check me-1"></i>Data marketplace</span>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            @if ($canImportMarketplace)
+                <a class="btn btn-primary btn-sm" href="{{ route('imports.marketplace.create', $importOrderQuery) }}">
+                    <i class="bi bi-upload me-1"></i>Import Pesanan
+                </a>
+            @endif
+            <span class="badge sales-badge rounded-pill px-3 py-2"><i class="bi bi-database-check me-1"></i>Data marketplace</span>
+        </div>
     </div>
 
-    <form class="card sales-card sales-filter-card shadow-sm mb-4" method="GET" action="{{ route('marketplace.dashboard.sales') }}">
+    <form id="sales-filter-form" class="card sales-card sales-filter-card shadow-sm mb-4" method="GET" action="{{ route('marketplace.dashboard.sales') }}">
         <div class="card-body p-3">
             <div class="row g-2 align-items-end justify-content-end">
                 @if (!empty($filters['dummy']))
                     <input type="hidden" name="dummy" value="1">
                 @endif
                 <input type="hidden" name="tab" id="sales-active-tab" value="{{ $activeTab }}">
-                <input type="hidden" name="date_from" id="sales-date-from" value="{{ $filters['date_from'] }}" data-gf-date="off">
-                <input type="hidden" name="date_to" id="sales-date-to" value="{{ $filters['date_to'] }}" data-gf-date="off">
-                <div class="col-12 col-md-auto sales-period-filter" data-sales-period-filter>
-                    <button type="button" class="sales-period-trigger" data-sales-period-trigger aria-expanded="false" aria-controls="sales-period-popover">
-                        <span class="sales-period-trigger-label">Periode Data</span>
-                        <span class="sales-period-trigger-preset" data-sales-period-trigger-label>{{ $activeDatePresetLabel }}</span>
-                        <span class="sales-period-trigger-summary" data-sales-period-trigger-summary>{{ $activeDateSummary }}</span>
-                        <i class="bi bi-calendar3 sales-period-trigger-icon" aria-hidden="true"></i>
-                    </button>
-
-                    <div id="sales-period-popover" class="sales-period-popover" data-sales-period-popover hidden>
-                        <div class="sales-period-layout">
-                            <div class="sales-period-menu" role="menu" aria-label="Pilihan periode">
-                                <button type="button" class="sales-period-option {{ $activeDatePreset === 'today' ? 'is-selected' : '' }}" data-sales-period-preset="today" data-sales-period-label="Real-time">Real-time</button>
-                                <button type="button" class="sales-period-option {{ $activeDatePreset === 'yesterday' ? 'is-selected' : '' }}" data-sales-period-preset="yesterday" data-sales-period-label="Kemarin">Kemarin</button>
-                                <button type="button" class="sales-period-option {{ $activeDatePreset === 'last-7-days' ? 'is-selected' : '' }}" data-sales-period-preset="last-7-days" data-sales-period-label="7 hari sebelumnya">7 hari sebelumnya</button>
-                                <button type="button" class="sales-period-option {{ $activeDatePreset === 'last-30-days' ? 'is-selected' : '' }}" data-sales-period-preset="last-30-days" data-sales-period-label="30 hari sebelumnya">30 hari sebelumnya</button>
-                                <div class="sales-period-divider"></div>
-                                <button type="button" class="sales-period-option" data-sales-period-view="day">Per Hari <span class="arrow">›</span></button>
-                                <button type="button" class="sales-period-option" data-sales-period-view="week">Per Minggu <span class="arrow">›</span></button>
-                                <button type="button" class="sales-period-option" data-sales-period-view="month">Per Bulan <span class="arrow">›</span></button>
-                                <button type="button" class="sales-period-option" data-sales-period-view="year">Berdasarkan Tahun <span class="arrow">›</span></button>
-                            </div>
-
-                            <div class="sales-period-panel" data-sales-period-panel="default">
-                                <div class="sales-period-eyebrow">Periode terpilih</div>
-                                <div class="sales-period-title" data-sales-period-detail-label>{{ $activeDateSummary }}</div>
-                                <p class="sales-period-help" data-sales-period-detail-help>Pilih preset di sebelah kiri atau klik area filter untuk membuka kalender.</p>
-                                <input id="sales-date-range" class="sales-period-range-input" type="text" value="{{ $filters['date_from'] }} to {{ $filters['date_to'] }}" aria-hidden="true" tabindex="-1">
-                            </div>
-
-                            <div class="sales-period-panel" data-sales-period-panel="day" hidden>
-                                <div class="sales-period-eyebrow">Per Hari</div>
-                                <div class="sales-period-title">Pilih hari</div>
-                                <p class="sales-period-help">Klik satu tanggal untuk melihat data harian.</p>
-                                <div class="sales-period-calendar-wrap"><input id="sales-date-day" type="text" aria-label="Pilih hari"></div>
-                            </div>
-
-                            <div class="sales-period-panel" data-sales-period-panel="week" hidden>
-                                <div class="sales-period-eyebrow">Per Minggu</div>
-                                <div class="sales-period-title">Pilih minggu</div>
-                                <p class="sales-period-help">Arahkan kursor ke tanggal, lalu klik salah satu hari.</p>
-                                <div class="sales-period-calendar-wrap"><input id="sales-date-week" type="text" aria-label="Pilih minggu"></div>
-                            </div>
-
-                            <div class="sales-period-panel" data-sales-period-panel="month" hidden>
-                                <div class="sales-period-nav"><button type="button" data-sales-period-month-prev aria-label="Tahun sebelumnya">‹</button><strong data-sales-period-month-year></strong><button type="button" data-sales-period-month-next aria-label="Tahun berikutnya">›</button></div>
-                                <div class="sales-period-grid" data-sales-period-month-grid></div>
-                            </div>
-
-                            <div class="sales-period-panel" data-sales-period-panel="year" hidden>
-                                <div class="sales-period-nav"><button type="button" data-sales-period-year-prev aria-label="Dekade sebelumnya">‹</button><strong data-sales-period-year-range></strong><button type="button" data-sales-period-year-next aria-label="Dekade berikutnya">›</button></div>
-                                <div class="sales-period-grid" data-sales-period-year-grid></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                @if ($stores->isNotEmpty())
+                <x-gf.period-picker
+                    id="sales-period-picker"
+                    form-id="sales-filter-form"
+                    date-from="{{ $filters['date_from'] }}"
+                    date-to="{{ $filters['date_to'] }}"
+                    input-id-prefix="sales-date"
+                    active-preset="{{ $activeDatePreset }}"
+                    active-preset-label="{{ $activeDatePresetLabel }}"
+                    summary="{{ $activeDateSummary }}"
+                    class="col-12 col-md-auto sales-period-filter"
+                />
+               @if ($stores->isNotEmpty())
                 <div class="col-12 col-md-3 sales-filter-store">
                         <label class="form-label" for="sales-store">Toko</label>
                         <select id="sales-store" class="form-select form-select-sm" name="store_id">
@@ -444,10 +341,10 @@
     @include('marketplace.dashboard.partials._kpis', [
         'kpiTitle' => 'Penjualan',
         'kpis' => [
-            ['label' => 'Jumlah Order', 'value' => number_format($summary['orders']), 'note' => 'order aktif', 'icon' => 'bi-receipt'],
-            ['label' => 'Nilai Bruto', 'value' => $fmt($summary['subtotal']), 'note' => 'sebelum promosi', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
-            ['label' => 'Total Promosi', 'value' => $fmt($summary['promotion_total']), 'note' => 'diskon dan voucher', 'icon' => 'bi-percent', 'variant' => 'sales-kpi--warning'],
-            ['label' => 'Nilai Neto', 'value' => $fmt($summary['net_total']), 'note' => 'setelah promosi', 'icon' => 'bi-graph-down-arrow'],
+            ['label' => 'Penjualan', 'value' => $fmt($summary['subtotal']), 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
+            ['label' => 'Nilai Neto', 'value' => $fmt($summary['net_total']), 'icon' => 'bi-graph-down-arrow'],
+            ['label' => 'Order', 'value' => number_format($summary['orders']), 'icon' => 'bi-receipt'],
+            ['label' => 'AOV Neto', 'value' => $fmt($globalAov), 'note' => number_format($summary['buyers']).' pembeli', 'icon' => 'bi-bar-chart-line'],
         ],
     ])
     <section class="card sales-card shadow-sm" aria-labelledby="daily-sales-title">
@@ -455,7 +352,6 @@
             <div>
                 <div class="sales-kicker mb-1">Ringkasan waktu</div>
                 <h2 id="daily-sales-title" class="sales-section-title mb-1">Penjualan per tanggal</h2>
-                <div class="sales-section-subtitle">Klik tanggal untuk memfilter dashboard ke tanggal tersebut.</div>
             </div>
             <span class="badge sales-badge rounded-pill px-3 py-2">{{ $daily->count() }} hari aktif</span>
         </div>
@@ -467,23 +363,23 @@
                 <table class="table table-sm table-hover align-middle sales-table">
                     <thead>
                         <tr>
-                            <th class="ps-3">Tanggal</th>
+                            <th class="ps-3">No.</th>
+                            <th>Tanggal</th>
                             <th class="text-end">Pesanan</th>
                             <th class="text-end">Unit terjual</th>
-                            <th class="text-end">Subtotal barang</th>
-                            <th class="text-end">AOV</th>
-                            <th class="text-end pe-3">Aksi</th>
+                            <th class="text-end">Penjualan</th>
+                            <th class="text-end">AOV Neto</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach ($daily as $row)
-                            <tr>
-                                <td class="ps-3"><button class="sales-date-link" type="button" data-sales-order-detail-date="{{ $row->day }}">{{ $dateLabel($row->day) }}</button></td>
+                            <tr class="sales-clickable-row" data-sales-order-detail-date="{{ $row->day }}" tabindex="0" role="button">
+                                <td class="ps-3 text-muted">{{ $loop->iteration }}</td>
+                                <td><button class="sales-date-link" type="button" data-sales-order-detail-date="{{ $row->day }}">{{ $dateLabel($row->day) }}</button></td>
                                 <td class="text-end">{{ number_format($row->orders) }}</td>
                                 <td class="text-end">{{ number_format($row->qty) }}</td>
                                 <td class="text-end">{{ $fmt($row->subtotal) }}</td>
                                 <td class="text-end">{{ $fmt($row->aov) }}</td>
-                                <td class="text-end pe-3"><button class="sales-action-link" type="button" data-sales-order-detail-date="{{ $row->day }}">Detail pesanan <i class="bi bi-arrow-right"></i></button></td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -497,10 +393,10 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Penghasilan',
             'kpis' => [
-                ['label' => 'Dana Cair', 'value' => $fmt($incomeSummary['final_income']), 'note' => 'payout settlement aktual', 'icon' => 'bi-cash-coin', 'variant' => 'sales-kpi--success'],
-                ['label' => 'Pembayaran Pembeli', 'value' => $fmt($incomeSummary['buyer_paid']), 'note' => 'nilai pembayaran pada periode', 'icon' => 'bi-wallet2'],
-                ['label' => 'Order Sudah Cair', 'value' => number_format($incomeSummary['settled_orders']), 'note' => 'memiliki settlement final', 'icon' => 'bi-check-circle'],
-                ['label' => 'Order Belum Cair', 'value' => number_format($incomeSummary['pending_orders']), 'note' => 'belum memiliki tanggal cair', 'icon' => 'bi-clock-history', 'variant' => 'sales-kpi--warning'],
+                ['label' => 'Pembayaran Pembeli', 'value' => $fmt($incomeSummary['buyer_paid']), 'note' => number_format($incomeSummary['orders']).' orders', 'icon' => 'bi-wallet2'],
+                ['label' => 'Dana Cair', 'value' => $fmt($incomeSummary['final_income']), 'note' => number_format($incomeSummary['settled_orders']).' order settled', 'icon' => 'bi-cash-coin', 'variant' => 'sales-kpi--success'],
+                ['label' => 'Belum Cair', 'value' => $fmt($incomeSummary['pending_buyer_paid']), 'note' => number_format($incomeSummary['pending_orders']).' order pending', 'icon' => 'bi-hourglass-split'],
+                ['label' => 'Settlement Rate', 'value' => number_format($incomeSettlementRate, 1).'%','note' => 'berdasarkan jumlah order', 'icon' => 'bi-check2-circle'],
             ],
         ])
         <section class="card sales-card shadow-sm">
@@ -508,7 +404,6 @@
                 <div>
                     <div class="sales-kicker mb-1">Income trend</div>
                     <h2 class="sales-section-title mb-1">Penghasilan per tanggal order</h2>
-                    <div class="sales-section-subtitle">Dana cair hanya menghitung settlement yang sudah memiliki tanggal pencairan.</div>
                 </div>
                 <span class="badge sales-badge rounded-pill px-3 py-2">{{ $incomeDaily->count() }} hari aktif</span>
             </div>
@@ -516,26 +411,46 @@
                 <div class="sales-empty text-center"><i class="bi bi-cash-coin d-block fs-3 mb-2"></i>Belum ada data penghasilan pada periode ini.</div>
             @else
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle sales-table">
+                    <table class="table table-sm table-hover align-middle sales-table sales-income-table">
                         <thead>
                             <tr>
-                                <th class="ps-3">Tanggal</th>
-                                <th class="text-end">Order</th>
-                                <th class="text-end">Sudah Cair</th>
-                                <th class="text-end">Belum Cair</th>
-                                <th class="text-end">Pembayaran Pembeli</th>
-                                <th class="text-end pe-3">Dana Cair</th>
+                                <th class="ps-3" rowspan="2">No.</th>
+                                <th rowspan="2">Tanggal</th>
+                                <th class="text-end" colspan="3">Order</th>
+                                <th class="text-end income-group-start" colspan="3">Sudah Cair</th>
+                                <th class="text-end income-group-start" colspan="3">Belum Cair</th>
+                                <th class="text-end income-group-start pe-3" colspan="2">Dana Cair</th>
+                            </tr>
+                            <tr>
+                                <th class="text-end">Qty</th>
+                                <th class="text-end">Nilai</th>
+                                <th class="text-end">%</th>
+                                <th class="text-end income-group-start">Qty</th>
+                                <th class="text-end">Nilai</th>
+                                <th class="text-end">%</th>
+                                <th class="text-end income-group-start">Qty</th>
+                                <th class="text-end">Nilai</th>
+                                <th class="text-end">%</th>
+                                <th class="text-end income-group-start pe-3">Nilai</th>
+                                <th class="text-end pe-3">%</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach ($incomeDaily as $income)
                                 <tr>
-                                    <td class="ps-3 fw-semibold">{{ $dateLabel($income->day) }}</td>
-                                    <td class="text-end">{{ number_format($income->orders) }}</td>
-                                    <td class="text-end">{{ number_format($income->settled_orders) }}</td>
-                                    <td class="text-end">{{ number_format($income->pending_orders) }}</td>
-                                    <td class="text-end">{{ $fmt($income->buyer_paid) }}</td>
-                                    <td class="text-end pe-3 fw-semibold">{{ $fmt($income->final_income) }}</td>
+                                    <td class="ps-3 text-muted">{{ $loop->iteration }}</td>
+                                    <td class="fw-semibold">{{ $dateLabel($income->day) }}</td>
+                                    <td class="text-end income-value">{{ number_format($income->orders) }}</td>
+                                    <td class="text-end income-value">{{ $fmt($income->buyer_paid) }}</td>
+                                    <td class="text-end income-percent">{{ $pct($income->orders, $incomeSummary['orders']) }}%</td>
+                                    <td class="text-end income-group-start income-value">{{ number_format($income->settled_orders) }}</td>
+                                    <td class="text-end income-value">{{ $fmt($income->final_income) }}</td>
+                                    <td class="text-end income-percent">{{ $pct($income->settled_orders, $incomeSummary['orders']) }}%</td>
+                                    <td class="text-end income-group-start income-value">{{ number_format($income->pending_orders) }}</td>
+                                    <td class="text-end income-value">{{ $fmt($income->pending_buyer_paid) }}</td>
+                                    <td class="text-end income-percent">{{ $pct($income->pending_orders, $incomeSummary['orders']) }}%</td>
+                                    <td class="text-end income-group-start pe-3 income-value">{{ $fmt($income->final_income) }}</td>
+                                    <td class="text-end pe-3 income-percent">{{ $pct($income->final_income, $incomeSummary['final_income']) }}%</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -547,12 +462,12 @@
 
     <div class="sales-tab-pane {{ $activeTab === 'orders' ? '' : 'is-hidden' }}" data-sales-pane="orders" role="tabpanel" aria-hidden="{{ $activeTab === 'orders' ? 'false' : 'true' }}">
         @include('marketplace.dashboard.partials._kpis', [
-            'kpiTitle' => 'Detail Order',
+            'kpiTitle' => 'Detail Pesanan',
             'kpis' => [
-                ['label' => 'Jumlah Order', 'value' => number_format($summary['orders']), 'note' => 'periode aktif', 'icon' => 'bi-receipt'],
-                ['label' => 'Unit Terjual', 'value' => number_format($summary['qty']), 'note' => 'unit marketplace', 'icon' => 'bi-boxes', 'variant' => 'sales-kpi--success'],
-                ['label' => 'Nilai Bruto', 'value' => $fmt($summary['subtotal']), 'note' => 'subtotal order', 'icon' => 'bi-cash-stack'],
-                ['label' => 'Nilai Neto', 'value' => $fmt($summary['net_total']), 'note' => 'setelah promosi', 'icon' => 'bi-graph-down-arrow'],
+                ['label' => 'Total Order', 'value' => number_format($summary['orders']), 'icon' => 'bi-receipt'],
+                ['label' => 'Total Pembayaran', 'value' => $fmt($paymentSummary['buyer_paid']), 'icon' => 'bi-wallet2', 'variant' => 'sales-kpi--success'],
+                ['label' => 'AOV Neto', 'value' => $fmt($summary['aov']), 'note' => 'per order', 'icon' => 'bi-bar-chart-line'],
+                ['label' => 'Total Promosi', 'value' => $fmt($summary['promotion_total']), 'icon' => 'bi-percent', 'variant' => 'sales-kpi--warning'],
             ],
         ])
         <section class="card sales-card shadow-sm">
@@ -585,6 +500,7 @@
                                 <th>Kota</th>
                                 <th>Provinsi</th>
                                 <th>Pembayaran</th>
+                                <th>Status</th>
                                 <th class="text-end sales-order-promotion">Promosi</th>
                                 <th class="text-end pe-3 sales-order-total">Total Pembayaran</th>
                             </tr>
@@ -602,10 +518,11 @@
                                     <td class="sales-order-location">{{ $order->shipping_city ?: '-' }}</td>
                                     <td class="sales-order-location">{{ $order->shipping_province ?: '-' }}</td>
                                     <td class="text-muted">{{ ucwords(str_replace('_', ' ', strtolower($order->payment))) }}</td>
+                                    <td><span class="badge sales-badge">{{ ucwords(str_replace('_', ' ', strtolower($order->status ?: 'Belum ditentukan'))) }}</span></td>
                                     <td class="text-end sales-order-promotion">
-                                        <div>Voucher toko: {{ $fmt($order->voucher_store) }}</div>
-                                        <div class="small text-muted">Voucher platform: {{ $fmt($order->voucher_platform) }}</div>
-                                        <div class="small text-muted">Paket diskon: {{ $fmt($order->bundle_discount) }}</div>
+                                        <div class="fw-semibold">{{ $fmt($order->promotion_total) }}</div>
+                                        <div class="small text-muted">Voucher: {{ $fmt($order->voucher_store) }} + {{ $fmt($order->voucher_platform) }}</div>
+                                        <div class="small text-muted">Paket: {{ $fmt($order->bundle_discount) }}</div>
                                     </td>
                                     <td class="text-end pe-3 sales-order-total">
                                         <div class="fw-semibold">{{ $fmt($order->total_payment) }}</div>
@@ -625,10 +542,10 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Produk',
             'kpis' => [
-                ['label' => 'Unit Terjual', 'value' => number_format($summary['qty']), 'note' => 'unit marketplace', 'icon' => 'bi-boxes'],
-                ['label' => 'Nilai Bruto Produk', 'value' => $fmt($summary['subtotal']), 'note' => 'sebelum diskon produk', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
-                ['label' => 'Diskon Produk', 'value' => $fmt($promotionTotals['product_discount']), 'note' => 'nilai potongan produk', 'icon' => 'bi-tag'],
-                ['label' => 'Nilai Neto Produk', 'value' => $fmt($netProductTotal), 'note' => 'setelah diskon produk', 'icon' => 'bi-graph-down-arrow'],
+                ['label' => 'Produk Teratas', 'value' => number_format($topProductCount), 'note' => 'produk pada daftar Top 8', 'icon' => 'bi-box-seam'],
+                ['label' => 'Unit Terjual', 'value' => number_format($topProductQty), 'note' => 'dari produk teratas', 'icon' => 'bi-stack'],
+                ['label' => 'Penjualan Produk', 'value' => $fmt($topProductSales), 'note' => 'kontribusi Top 8', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
+                ['label' => 'Pembeli Produk', 'value' => number_format($topProductBuyers), 'note' => 'akumulasi produk teratas', 'icon' => 'bi-people'],
             ],
         ])
         <section class="card sales-card shadow-sm">
@@ -636,7 +553,6 @@
                 <div>
                     <div class="sales-kicker mb-1">Kinerja produk</div>
                     <h2 class="sales-section-title mb-1">Produk terlaris</h2>
-                    <div class="sales-section-subtitle">Produk diurutkan berdasarkan nilai penjualan pada periode aktif.</div>
                 </div>
                 <span class="badge sales-badge rounded-pill px-3 py-2">{{ $products->count() }} produk</span>
             </div>
@@ -645,7 +561,7 @@
             @else
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle sales-table">
-                        <thead><tr><th class="ps-3">No.</th><th>Produk</th><th>SKU</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">AOV</th><th class="text-end pe-3">APC</th></tr></thead>
+                        <thead><tr><th class="ps-3">No.</th><th>Produk</th><th>SKU</th><th class="text-end">Order</th><th class="text-end">Pembeli</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">AOV Neto</th><th class="text-end pe-3">APC</th></tr></thead>
                         <tbody>
                             @foreach ($products as $product)
                                 <tr>
@@ -656,10 +572,12 @@
                                         </button>
                                     </td>
                                     <td class="text-muted small">{{ $product->sku }}</td>
+                                    <td class="text-end">{{ number_format((int) $product->orders) }}</td>
+                                    <td class="text-end">{{ number_format((int) $product->buyers) }}</td>
                                     <td class="text-end">{{ number_format((int) $product->qty) }}</td>
                                     <td class="text-end fw-semibold">{{ $fmt($product->sales) }}</td>
                                     <td class="text-end fw-semibold">{{ $fmt($product->buyer_payment) }}</td>
-                                    <td class="text-end" title="Average Order Value: penjualan dibagi jumlah order">{{ $product->orders > 0 ? $fmt($product->sales / $product->orders) : '—' }}</td>
+                                        <td class="text-end">{{ $product->orders > 0 ? $fmt($product->buyer_payment / $product->orders) : '—' }}</td>
                                     <td class="text-end" title="Average Payment per Customer: pembayaran pembeli dibagi pembeli unik">{{ $product->buyers > 0 ? $fmt($product->buyer_payment / $product->buyers) : '—' }}</td>
                                 </tr>
                             @endforeach
@@ -674,62 +592,30 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Pembayaran',
             'kpis' => [
-                ['label' => 'Total Dibayar Pembeli', 'value' => $fmt($paymentSummary['buyer_paid']), 'note' => number_format($paymentSummary['orders']).' order pada periode aktif', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
-                ['label' => 'Average Ticket', 'value' => $fmt($paymentSummary['aov']), 'note' => 'rata-rata daya beli / order', 'icon' => 'bi-graph-up-arrow'],
-                ['label' => 'Median Ticket', 'value' => $fmt($paymentSummary['median_ticket']), 'note' => 'nilai tipikal yang dibayar customer', 'icon' => 'bi-bar-chart-line'],
-                ['label' => 'High-value Orders', 'value' => number_format($paymentSummary['high_value_orders']), 'note' => '≥ 1,5× average ticket', 'icon' => 'bi-stars', 'variant' => 'sales-kpi--warning'],
+                ['label' => 'Total Dibayar Pembeli', 'value' => $fmt($paymentSummary['buyer_paid']), 'note' => number_format($paymentSummary['orders']).' orders', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
+                ['label' => 'AOV Neto', 'value' => $fmt($paymentSummary['aov']), 'note' => 'per order', 'icon' => 'bi-graph-up-arrow'],
+                ['label' => 'Median Ticket', 'value' => $fmt($paymentSummary['median_ticket']), 'note' => 'nilai tengah order', 'icon' => 'bi-bar-chart-line'],
+                ['label' => 'COD Exposure', 'value' => number_format($paymentSummary['cod_order_share'], 1).'%', 'note' => number_format($paymentDaily->sum('cod_orders')).' COD orders', 'icon' => 'bi-shield-exclamation', 'variant' => 'sales-kpi--warning'],
             ],
         ])
-        <section class="card sales-card shadow-sm mb-3">
-            <div class="sales-section-header">
-                <div class="sales-kicker mb-1">Purchasing power trend</div>
-                <h2 class="sales-section-title mb-1">Daya beli per tanggal</h2>
-                <div class="sales-section-subtitle">Lihat perubahan nominal yang dibayar customer, average ticket, dan exposure COD sebagai indikator risiko fulfillment. Klik tanggal untuk drill-down.</div>
-            </div>
-            @if ($paymentDaily->isEmpty())
-                <div class="sales-empty text-center"><i class="bi bi-wallet2 d-block fs-3 mb-2"></i>Belum ada data pembayaran pada periode ini.</div>
-            @else
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle sales-table">
-                        <thead><tr><th class="ps-3">Tanggal</th><th class="text-end">Order</th><th class="text-end">COD</th><th class="text-end">Non-COD</th><th class="text-end">Pay Later</th><th class="text-end">Dibayar Pembeli</th><th class="text-end">COD Exposure</th><th class="text-end">Average Ticket</th><th class="text-end pe-3">Aksi</th></tr></thead>
-                        <tbody>
-                            @foreach ($paymentDaily as $payment)
-                                <tr class="sales-clickable-row" data-sales-payment-detail-url="{{ route('marketplace.dashboard.payments.detail', array_merge(['date' => $payment->day], $paymentDetailQuery)) }}" tabindex="0" role="button" aria-label="Lihat detail pembayaran {{ $dateLabel($payment->day) }}">
-                                    <td class="ps-3 fw-semibold">{{ $dateLabel($payment->day) }}</td>
-                                    <td class="text-end">{{ number_format($payment->orders) }}</td>
-                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->cod_amount) }}</div><div class="small text-muted">{{ number_format($payment->cod_orders) }} order</div></td>
-                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->non_cod_amount) }}</div><div class="small text-muted">{{ number_format($payment->non_cod_orders) }} order</div></td>
-                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->pay_later_amount) }}</div><div class="small text-muted">{{ number_format($payment->pay_later_orders) }} order</div></td>
-                                    <td class="text-end fw-semibold">{{ $fmt($payment->buyer_paid) }}</td>
-                                    <td class="text-end">{{ number_format($payment->cod_order_share, 1) }}%</td>
-                                    <td class="text-end">{{ $fmt($payment->aov) }}</td>
-                                    <td class="text-end pe-3"><span class="sales-action-link">Lihat detail <i class="bi bi-arrow-right"></i></span></td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
-        </section>
-        <div class="row g-3">
+        <div class="row g-3 mb-3">
             <div class="col-12 col-xl-8">
                 <section class="card sales-card shadow-sm h-100">
                     <div class="sales-section-header">
                         <div class="sales-kicker mb-1">Payment mix</div>
                         <h2 class="sales-section-title mb-1">Metode pembayaran</h2>
-                        <div class="sales-section-subtitle">Kontribusi setiap metode terhadap nominal yang benar-benar dibayar customer.</div>
                     </div>
                     @if ($payments->isEmpty())
                         <div class="sales-empty text-center"><i class="bi bi-credit-card d-block fs-3 mb-2"></i>Belum ada metode pembayaran.</div>
                     @else
                         <div class="table-responsive">
                             <table class="table table-sm table-hover align-middle sales-table">
-                                <thead><tr><th class="ps-3">Payment mix</th><th class="text-end">COD</th><th class="text-end">Non-COD</th><th class="text-end pe-3">Pay Later</th></tr></thead>
+                                <thead><tr><th class="ps-3">Metrik</th><th class="text-end">COD</th><th class="text-end">Non-COD</th><th class="text-end pe-3">Pay Later</th></tr></thead>
                                 <tbody>
                                     <tr><td class="ps-3 fw-semibold">Order</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ number_format((int) $payment->orders) }}</td>@endforeach</tr>
                                     <tr><td class="ps-3 fw-semibold">Dibayar Pembeli</td>@foreach ($paymentMix as $payment)<td class="text-end fw-semibold">{{ $fmt($payment->buyer_paid) }}</td>@endforeach</tr>
                                     <tr><td class="ps-3 fw-semibold">Share Nominal</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ number_format($paymentSummary['buyer_paid'] > 0 ? ($payment->buyer_paid / $paymentSummary['buyer_paid']) * 100 : 0, 1) }}%</td>@endforeach</tr>
-                                    <tr><td class="ps-3 fw-semibold">Average Ticket</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ $fmt($payment->avg_ticket) }}</td>@endforeach</tr>
+                                    <tr><td class="ps-3 fw-semibold">AOV Neto</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ $fmt($payment->avg_ticket) }}</td>@endforeach</tr>
                                     <tr><td class="ps-3 fw-semibold">Order Share</td>@foreach ($paymentMix as $payment)<td class="text-end">{{ number_format($paymentSummary['orders'] > 0 ? ($payment->orders / $paymentSummary['orders']) * 100 : 0, 1) }}%</td>@endforeach</tr>
                                 </tbody>
                             </table>
@@ -741,50 +627,77 @@
                 <section class="card sales-card shadow-sm h-100">
                     <div class="sales-section-header">
                         <div class="sales-kicker mb-1">Customer purchasing power</div>
-                        <h2 class="sales-section-title mb-1">Daya beli customer</h2>
-                        <div class="sales-section-subtitle">Indikator nilai transaksi dan performa pembayaran periode aktif.</div>
+                        <h2 class="sales-section-title mb-1">Daya beli &amp; exposure</h2>
                     </div>
                     <div class="p-3 pt-0">
                         <div class="border rounded p-3 mb-2">
-                            <div class="small text-muted">COD exposure</div>
+                            <div class="small text-muted">COD Order Exposure</div>
                             <div class="h4 mb-0">{{ number_format($paymentSummary['cod_order_share'], 1) }}%</div>
-                            <div class="small text-muted">{{ number_format($paymentDaily->sum('cod_orders')) }} dari {{ number_format($paymentSummary['orders']) }} order</div>
+                            <div class="small text-muted">{{ number_format($paymentDaily->sum('cod_orders')) }} / {{ number_format($paymentSummary['orders']) }} orders</div>
                         </div>
                         <div class="border rounded p-3 mb-2">
-                            <div class="small text-muted">COD amount exposure</div>
+                            <div class="small text-muted">COD Amount Exposure</div>
                             <div class="h5 mb-0">{{ $fmt($paymentSummary['cod_amount']) }}</div>
-                            <div class="small text-muted">{{ number_format($paymentSummary['cod_amount_share'], 1) }}% dari total dibayar pembeli</div>
+                            <div class="small text-muted">{{ number_format($paymentSummary['cod_amount_share'], 1) }}% buyer paid</div>
                         </div>
                         <div class="border rounded p-3">
-                            <div class="small text-muted">Metode dengan nominal terbesar</div>
+                            <div class="small text-muted">Top Payment Method</div>
                             <div class="fw-semibold">{{ $topPaymentMethod ? ($paymentCategoryLabels[$topPaymentMethod->category] ?? $topPaymentMethod->category) : '-' }}</div>
                             <div class="small text-muted">{{ $topPaymentMethod ? $fmt($topPaymentMethod->buyer_paid) : 'Belum ada data' }}</div>
                         </div>
                         @if ($peakPaymentDay)
-                            <div class="small text-muted mt-3">Peak average ticket: <strong>{{ $fmt($peakPaymentDay->aov) }}</strong> pada {{ $dateLabel($peakPaymentDay->day) }}</div>
+                            <div class="small text-muted mt-3">Peak AOV Neto: <strong>{{ $fmt($peakPaymentDay->aov) }}</strong> · {{ $dateLabel($peakPaymentDay->day) }}</div>
                         @endif
                     </div>
                 </section>
             </div>
         </div>
+        <section class="card sales-card shadow-sm mb-3">
+            <div class="sales-section-header">
+                <div class="sales-kicker mb-1">Purchasing power trend</div>
+                <h2 class="sales-section-title mb-1">Daya beli per tanggal</h2>
+            </div>
+            @if ($paymentDaily->isEmpty())
+                <div class="sales-empty text-center"><i class="bi bi-wallet2 d-block fs-3 mb-2"></i>Belum ada data pembayaran pada periode ini.</div>
+            @else
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle sales-table">
+                        <thead><tr><th class="ps-3">No.</th><th>Tanggal</th><th class="text-end">Orders</th><th class="text-end">COD</th><th class="text-end">Non-COD</th><th class="text-end">Pay Later</th><th class="text-end">Buyer Paid</th><th class="text-end">COD Exposure</th><th class="text-end pe-3">AOV Neto</th></tr></thead>
+                        <tbody>
+                            @foreach ($paymentDaily as $payment)
+                                <tr class="sales-clickable-row" data-sales-payment-detail-url="{{ route('marketplace.dashboard.payments.detail', array_merge(['date' => $payment->day], $paymentDetailQuery)) }}" tabindex="0" role="button" aria-label="Lihat detail pembayaran {{ $dateLabel($payment->day) }}">
+                                    <td class="ps-3 text-muted">{{ $loop->iteration }}</td>
+                                    <td class="fw-semibold">{{ $dateLabel($payment->day) }}</td>
+                                    <td class="text-end">{{ number_format($payment->orders) }}</td>
+                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->cod_amount) }}</div><div class="small text-muted">{{ number_format($payment->cod_orders) }} order</div></td>
+                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->non_cod_amount) }}</div><div class="small text-muted">{{ number_format($payment->non_cod_orders) }} order</div></td>
+                                    <td class="text-end"><div class="fw-semibold">{{ $fmt($payment->pay_later_amount) }}</div><div class="small text-muted">{{ number_format($payment->pay_later_orders) }} order</div></td>
+                                    <td class="text-end fw-semibold">{{ $fmt($payment->buyer_paid) }}</td>
+                                    <td class="text-end">{{ number_format($payment->cod_order_share, 1) }}%</td>
+                                    <td class="text-end pe-3">{{ $fmt($payment->aov) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </section>
     </div>
 
     <div class="sales-tab-pane {{ $activeTab === 'promotions' ? '' : 'is-hidden' }}" data-sales-pane="promotions" role="tabpanel" aria-hidden="{{ $activeTab === 'promotions' ? 'false' : 'true' }}">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Promosi',
             'kpis' => [
-                ['label' => 'Diskon Produk', 'value' => $fmt($promotionTotals['product_discount']), 'note' => 'nilai potongan produk', 'icon' => 'bi-tag'],
-                ['label' => 'Voucher Toko', 'value' => $fmt($promotionTotals['voucher_store']), 'note' => 'voucher seller', 'icon' => 'bi-ticket-perforated', 'variant' => 'sales-kpi--success'],
-                ['label' => 'Voucher Platform', 'value' => $fmt($promotionTotals['voucher_platform']), 'note' => 'voucher marketplace', 'icon' => 'bi-shop'],
-                ['label' => 'Bundle Deal', 'value' => $fmt($promotionTotals['bundle_discount']), 'note' => 'paket diskon', 'icon' => 'bi-gift', 'variant' => 'sales-kpi--warning'],
+                ['label' => 'GMV', 'value' => $fmt($summary['subtotal']), 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
+                ['label' => 'Total Promosi', 'value' => $fmt($summary['promotion_total']), 'icon' => 'bi-percent', 'variant' => 'sales-kpi--warning'],
+                ['label' => 'Promo Rate', 'value' => number_format($promotionRate, 1).'%','note' => 'promosi dibanding GMV', 'icon' => 'bi-graph-down-arrow'],
+                ['label' => 'Order dengan Promo', 'value' => number_format($promotionOrders), 'note' => 'order terdampak promosi', 'icon' => 'bi-ticket-perforated'],
             ],
         ])
         <section class="card sales-card shadow-sm">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
-                    <div class="sales-kicker mb-1">Dampak promosi</div>
                     <h2 class="sales-section-title mb-1">Promosi per tanggal</h2>
-                    <div class="sales-section-subtitle">Total promosi adalah gabungan diskon produk, voucher toko, voucher platform, dan paket diskon.</div>
                 </div>
                 <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($promotionDaily->count()) }} hari tercatat</span>
             </div>
@@ -795,13 +708,12 @@
                     <table class="table table-sm table-hover align-middle sales-table">
                         <thead>
                             <tr>
-                                <th class="ps-3">Tanggal</th>
-                                <th class="text-end">Nilai Bruto</th>
-                                <th class="text-end">Diskon produk</th>
-                                <th class="text-end">Nilai Neto</th>
+                                <th>Tanggal</th>
+                                <th class="text-end">GMV</th>
+                                <th class="text-end">Diskon Produk</th>
                                 <th class="text-end">Voucher Toko</th>
                                 <th class="text-end">Voucher Platform</th>
-                                <th class="text-end">Bundle Deal</th>
+                                <th class="text-end">Paket Diskon</th>
                                 <th class="text-end pe-3">Total Promosi</th>
                             </tr>
                         </thead>
@@ -815,7 +727,6 @@
                                     <td class="text-end">
                                         <div>{{ $fmt($row->product_discount) }}</div>
                                     </td>
-                                    <td class="text-end">{{ $fmt(max((float) ($row->order_before_discount ?? 0) - (float) ($row->product_discount ?? 0), 0)) }}</td>
                                     <td class="text-end">
                                         <div>{{ $fmt($row->voucher_store) }}</div>
                                         <div class="small text-muted">{{ number_format((int) ($row->voucher_store_orders ?? 0)) }} order</div>
@@ -842,51 +753,75 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Pengiriman',
             'kpis' => [
-                ['label' => 'Jumlah Order', 'value' => number_format($shipping->sum('orders')), 'note' => 'order terdistribusi', 'icon' => 'bi-receipt'],
-                ['label' => 'Siap Dikirim', 'value' => number_format($shippingOrders(['PENDING', 'INVOICE_PENDING', 'READY_TO_SHIP', 'MATCHED'])), 'note' => 'status operasional', 'icon' => 'bi-box-arrow-up', 'variant' => 'sales-kpi--success'],
-                ['label' => 'Dalam Pengiriman', 'value' => number_format($shippingOrders(['PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'TO_CONFIRM_RECEIVE'])), 'note' => 'status transit', 'icon' => 'bi-truck'],
-                ['label' => 'Selesai', 'value' => number_format($shippingOrders(['COMPLETED', 'SELESAI'])), 'note' => 'order selesai', 'icon' => 'bi-check2-circle', 'variant' => 'sales-kpi--warning'],
-                ['label' => 'Gagal', 'value' => number_format($shippingOrders(['FAILED_DELIVERY'])), 'note' => 'pengiriman gagal', 'icon' => 'bi-exclamation-triangle', 'variant' => 'sales-kpi--warning'],
-                ['label' => 'Return', 'value' => number_format($shippingOrders(['TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED'])), 'note' => 'return atau refund', 'icon' => 'bi-arrow-return-left', 'variant' => 'sales-kpi--warning'],
+                ['label' => 'Total Order', 'value' => number_format($shippingKpi['total']), 'note' => 'basis pengiriman', 'icon' => 'bi-receipt'],
+                ['label' => 'Selesai', 'value' => number_format($shippingKpi['completed']), 'note' => $shippingPct($shippingKpi['completed']).' dari total', 'icon' => 'bi-check2-circle', 'variant' => 'sales-kpi--success'],
+                ['label' => 'Dalam Pengiriman', 'value' => number_format($shippingKpi['transit']), 'note' => $shippingPct($shippingKpi['transit']).' dari total', 'icon' => 'bi-truck'],
+                ['label' => 'Tingkat Eksepsi', 'value' => $shippingExceptionPct, 'note' => number_format($shippingKpi['exception']).' gagal/return', 'icon' => 'bi-exclamation-diamond', 'variant' => 'sales-kpi--warning'],
             ],
         ])
         <section class="card sales-card shadow-sm">
-            <div class="sales-section-header">
-                <div class="sales-kicker mb-1">Fulfillment marketplace</div>
-                <h2 class="sales-section-title mb-1">Status pengiriman per tanggal</h2>
-                <div class="sales-section-subtitle">Jumlah order per tanggal dengan pecahan status yang tersimpan di marketplace.</div>
+            <div class="sales-section-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <h2 class="sales-section-title mb-0">Pengiriman per tanggal</h2>
+                <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($shippingKpi['total']) }} order</span>
             </div>
             @if ($shippingDaily->isEmpty())
-                <div class="sales-empty text-center"><i class="bi bi-truck d-block fs-3 mb-2"></i>Belum ada data pengiriman pada periode ini.</div>
+                <div class="sales-empty text-center"><i class="bi bi-truck d-block fs-3 mb-2"></i>Belum ada data</div>
             @else
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle sales-table">
                         <thead>
                             <tr>
-                                <th class="ps-3">Tanggal</th>
+                                <th class="ps-3">No.</th>
+                                <th>Tanggal</th>
                                 <th class="text-end">Total Order</th>
                                 <th class="text-end">Siap Dikirim</th>
                                 <th class="text-end">Dalam Pengiriman</th>
                                 <th class="text-end">Selesai</th>
                                 <th class="text-end">Gagal</th>
                                 <th class="text-end">Return</th>
-                                <th class="text-end pe-3">Status Lainnya</th>
+                                <th class="text-end pe-3">Eksepsi</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach ($shippingDaily as $row)
+                                @php
+                                    $exceptionCount = (int) $row->failed_orders + (int) $row->return_orders;
+                                @endphp
                                 <tr class="sales-clickable-row" data-sales-shipping-detail-url="{{ route('marketplace.dashboard.shipping.detail', array_merge(['date' => $row->day], $shippingDetailQuery)) }}" tabindex="0" role="button" aria-label="Lihat detail pengiriman {{ $dateLabel($row->day) }}">
-                                    <td class="ps-3 fw-semibold">{{ $dateLabel($row->day) }}</td>
+                                    <td class="ps-3 text-muted">{{ $loop->iteration }}</td>
+                                    <td class="fw-semibold">{{ $dateLabel($row->day) }}</td>
                                     <td class="text-end">{{ number_format($row->orders) }}</td>
                                     <td class="text-end">{{ number_format($row->ready_orders) }}</td>
                                     <td class="text-end">{{ number_format($row->transit_orders) }}</td>
                                     <td class="text-end">{{ number_format($row->completed_orders) }}</td>
                                     <td class="text-end">{{ number_format($row->failed_orders) }}</td>
                                     <td class="text-end">{{ number_format($row->return_orders) }}</td>
-                                    <td class="text-end pe-3">{{ number_format($row->other_orders) }}</td>
+                                    <td class="text-end pe-3"><div>{{ number_format($exceptionCount) }}</div><div class="small text-muted">{{ $row->orders > 0 ? number_format(($exceptionCount / $row->orders) * 100, 1, ',', '.') : '0,0' }}%</div></td>
                                 </tr>
                             @endforeach
                         </tbody>
+                        @php
+                            $periodTotal = (int) $shippingDaily->sum('orders');
+                            $periodReady = (int) $shippingDaily->sum('ready_orders');
+                            $periodTransit = (int) $shippingDaily->sum('transit_orders');
+                            $periodCompleted = (int) $shippingDaily->sum('completed_orders');
+                            $periodFailed = (int) $shippingDaily->sum('failed_orders');
+                            $periodReturn = (int) $shippingDaily->sum('return_orders');
+                            $periodException = $periodFailed + $periodReturn;
+                        @endphp
+                        <tfoot>
+                            <tr class="fw-semibold">
+                                <td class="ps-3"></td>
+                                <td>Total</td>
+                                <td class="text-end">{{ number_format($periodTotal) }}</td>
+                                <td class="text-end">{{ number_format($periodReady) }}</td>
+                                <td class="text-end">{{ number_format($periodTransit) }}</td>
+                                <td class="text-end">{{ number_format($periodCompleted) }}</td>
+                                <td class="text-end">{{ number_format($periodFailed) }}</td>
+                                <td class="text-end">{{ number_format($periodReturn) }}</td>
+                                <td class="text-end pe-3"><div>{{ number_format($periodException) }}</div><div class="small text-muted">{{ $periodTotal > 0 ? number_format(($periodException / $periodTotal) * 100, 1, ',', '.') : '0,0' }}%</div></td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             @endif
@@ -902,8 +837,6 @@
         const panes = document.querySelectorAll('[data-sales-pane]');
         const filterForm = document.querySelector('.sales-filter-card');
         const activeTabInput = document.querySelector('#sales-active-tab');
-        const dateFromInput = document.querySelector('#sales-date-from');
-        const dateToInput = document.querySelector('#sales-date-to');
         const storeInput = document.querySelector('#sales-store');
         const orderRows = document.querySelectorAll('[data-sales-order-row]');
         const orderDate = document.querySelector('#sales-order-detail-date');
@@ -969,192 +902,6 @@
             });
         });
 
-        // Filter periode ala MarketLens: preset + pilihan hari/minggu/bulan/tahun
-        // dalam satu popover, dengan submit otomatis setelah pilihan selesai.
-        const periodFilter = document.querySelector('[data-sales-period-filter]');
-        const periodTrigger = periodFilter?.querySelector('[data-sales-period-trigger]');
-        const periodPopover = periodFilter?.querySelector('[data-sales-period-popover]');
-        const periodPanels = periodFilter ? periodFilter.querySelectorAll('[data-sales-period-panel]') : [];
-        const periodTriggerLabel = periodFilter?.querySelector('[data-sales-period-trigger-label]');
-        const periodTriggerSummary = periodFilter?.querySelector('[data-sales-period-trigger-summary]');
-        const periodDetailLabel = periodFilter?.querySelector('[data-sales-period-detail-label]');
-        const periodDetailHelp = periodFilter?.querySelector('[data-sales-period-detail-help]');
-        const monthGrid = periodFilter?.querySelector('[data-sales-period-month-grid]');
-        const monthYear = periodFilter?.querySelector('[data-sales-period-month-year]');
-        const yearGrid = periodFilter?.querySelector('[data-sales-period-year-grid]');
-        const yearRange = periodFilter?.querySelector('[data-sales-period-year-range]');
-        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
-        let monthViewYear = new Date().getFullYear();
-        let yearViewStart = Math.floor(new Date().getFullYear() / 10) * 10;
-
-        const dateToYmd = function (date) {
-            return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
-        };
-        const parseYmd = function (value) {
-            if (!value) return null;
-            const parts = value.split('-').map(Number);
-            return parts.length === 3 ? new Date(parts[0], parts[1] - 1, parts[2]) : null;
-        };
-        const displayRange = function (from, to) {
-            return from && to ? (from === to ? from : from + ' – ' + to) : 'Pilih rentang tanggal';
-        };
-        const closePeriodPopover = function () {
-            if (!periodPopover || !periodTrigger) return;
-            periodPopover.hidden = true;
-            periodTrigger.setAttribute('aria-expanded', 'false');
-        };
-        const setPeriodView = function (view) {
-            if (!periodFilter) return;
-            periodPanels.forEach(function (panel) {
-                panel.hidden = panel.dataset.salesPeriodPanel !== view;
-            });
-            periodFilter.querySelectorAll('[data-sales-period-view]').forEach(function (option) {
-                option.classList.toggle('is-selected', option.dataset.salesPeriodView === view);
-            });
-            if (periodDetailHelp && view === 'default') {
-                periodDetailHelp.textContent = 'Pilih preset di sebelah kiri atau tentukan rentang tanggal.';
-            }
-        };
-        const syncPeriodSummary = function (label, from, to) {
-            const summary = displayRange(from, to);
-            if (periodTriggerLabel) periodTriggerLabel.textContent = label;
-            if (periodTriggerSummary) periodTriggerSummary.textContent = summary;
-            if (periodDetailLabel) periodDetailLabel.textContent = summary;
-            periodFilter?.querySelectorAll('[data-sales-period-preset]').forEach(function (option) {
-                option.classList.toggle('is-selected', option.dataset.salesPeriodLabel === label);
-            });
-        };
-        const submitPeriod = function (from, to, label, view) {
-            dateFromInput.value = from;
-            dateToInput.value = to;
-            syncPeriodSummary(label, from, to);
-            setPeriodView(view || 'default');
-            closePeriodPopover();
-            filterForm?.requestSubmit();
-        };
-        const rangeForPreset = function (preset) {
-            const end = new Date();
-            const start = new Date(end);
-            if (preset === 'yesterday') {
-                start.setDate(start.getDate() - 1);
-                end.setDate(end.getDate() - 1);
-            } else if (preset === 'last-7-days') {
-                start.setDate(start.getDate() - 6);
-            } else if (preset === 'last-30-days') {
-                start.setDate(start.getDate() - 29);
-            }
-            return [dateToYmd(start), dateToYmd(end)];
-        };
-
-        if (periodFilter && filterForm && window.flatpickr) {
-            const dateRangePicker = document.querySelector('#sales-date-range');
-            const dayPicker = document.querySelector('#sales-date-day');
-            const weekPicker = document.querySelector('#sales-date-week');
-            const flatpickrLocale = window.flatpickr.l10ns?.id || 'default';
-
-            window.flatpickr(dateRangePicker, {
-                mode: 'range', dateFormat: 'Y-m-d', altInput: false,
-                locale: flatpickrLocale, disableMobile: true, positionElement: periodTrigger,
-                defaultDate: [dateFromInput.value, dateToInput.value].filter(Boolean),
-                onChange: function (dates, value, instance) {
-                    dateFromInput.value = dates[0] ? instance.formatDate(dates[0], 'Y-m-d') : '';
-                    dateToInput.value = dates[1] ? instance.formatDate(dates[1], 'Y-m-d') : '';
-                    if (dates.length === 2) submitPeriod(dateFromInput.value, dateToInput.value, 'Rentang tanggal');
-                },
-            });
-
-            window.flatpickr(dayPicker, {
-                inline: true, dateFormat: 'Y-m-d', locale: flatpickrLocale, disableMobile: true,
-                defaultDate: dateFromInput.value,
-                onChange: function (dates, value, instance) {
-                    if (dates.length) submitPeriod(instance.formatDate(dates[0], 'Y-m-d'), instance.formatDate(dates[0], 'Y-m-d'), 'Per Hari', 'day');
-                },
-            });
-
-            let settingWeek = false;
-            window.flatpickr(weekPicker, {
-                mode: 'range', inline: true, dateFormat: 'Y-m-d', locale: flatpickrLocale, disableMobile: true,
-                defaultDate: [dateFromInput.value, dateToInput.value].filter(Boolean),
-                onChange: function (dates, value, instance) {
-                    if (!dates.length || settingWeek) return;
-                    const start = new Date(dates[dates.length - 1]);
-                    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-                    const end = new Date(start);
-                    end.setDate(end.getDate() + 6);
-                    settingWeek = true;
-                    instance.setDate([start, end], false);
-                    settingWeek = false;
-                    submitPeriod(dateToYmd(start), dateToYmd(end), 'Per Minggu', 'week');
-                },
-            });
-
-            periodFilter.querySelectorAll('[data-sales-period-preset]').forEach(function (option) {
-                option.addEventListener('mouseenter', function () { setPeriodView('default'); });
-                option.addEventListener('click', function () {
-                    const range = rangeForPreset(option.dataset.salesPeriodPreset);
-                    submitPeriod(range[0], range[1], option.dataset.salesPeriodLabel);
-                });
-            });
-            periodFilter.querySelectorAll('[data-sales-period-view]').forEach(function (option) {
-                option.addEventListener('mouseenter', function () { setPeriodView(option.dataset.salesPeriodView); });
-                option.addEventListener('click', function () { setPeriodView(option.dataset.salesPeriodView); });
-            });
-
-            const applyMonth = function (year, month) {
-                submitPeriod(dateToYmd(new Date(year, month, 1)), dateToYmd(new Date(year, month + 1, 0)), 'Per Bulan', 'month');
-            };
-            const renderMonths = function (year) {
-                if (!monthGrid || !monthYear) return;
-                monthViewYear = year;
-                monthYear.textContent = String(year);
-                monthGrid.replaceChildren();
-                monthNames.forEach(function (name, month) {
-                    const button = document.createElement('button');
-                    button.type = 'button'; button.textContent = name;
-                    button.className = dateFromInput.value === dateToYmd(new Date(year, month, 1)) ? 'is-selected' : '';
-                    button.addEventListener('click', function () { applyMonth(year, month); });
-                    monthGrid.appendChild(button);
-                });
-            };
-            const renderYears = function (start) {
-                if (!yearGrid || !yearRange) return;
-                yearViewStart = start;
-                yearRange.textContent = start + ' – ' + (start + 9);
-                yearGrid.replaceChildren();
-                const currentYear = new Date().getFullYear();
-                for (let year = start; year <= start + 9; year += 1) {
-                    const button = document.createElement('button');
-                    button.type = 'button'; button.textContent = String(year); button.disabled = year > currentYear;
-                    button.className = dateFromInput.value === dateToYmd(new Date(year, 0, 1)) ? 'is-selected' : '';
-                    if (!button.disabled) button.addEventListener('click', function () { submitPeriod(dateToYmd(new Date(year, 0, 1)), dateToYmd(new Date(year, 11, 31)), 'Berdasarkan Tahun', 'year'); });
-                    yearGrid.appendChild(button);
-                }
-            };
-            periodFilter.querySelector('[data-sales-period-month-prev]')?.addEventListener('click', function () { renderMonths(monthViewYear - 1); });
-            periodFilter.querySelector('[data-sales-period-month-next]')?.addEventListener('click', function () { renderMonths(monthViewYear + 1); });
-            periodFilter.querySelector('[data-sales-period-year-prev]')?.addEventListener('click', function () { renderYears(yearViewStart - 10); });
-            periodFilter.querySelector('[data-sales-period-year-next]')?.addEventListener('click', function () { renderYears(yearViewStart + 10); });
-            renderMonths(parseYmd(dateFromInput.value)?.getFullYear() || new Date().getFullYear());
-            renderYears(Math.floor((parseYmd(dateFromInput.value)?.getFullYear() || new Date().getFullYear()) / 10) * 10);
-
-            periodTrigger?.addEventListener('click', function () {
-                const willOpen = periodPopover.hidden;
-                periodPopover.hidden = !willOpen;
-                periodTrigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-                if (willOpen) {
-                    setPeriodView('default');
-                    dateRangePicker._flatpickr?.open();
-                } else {
-                    dateRangePicker._flatpickr?.close();
-                }
-            });
-            document.addEventListener('click', function (event) {
-                if (!periodFilter.contains(event.target) && !event.target.closest('.flatpickr-calendar')) closePeriodPopover();
-            });
-            document.addEventListener('keydown', function (event) {
-                if (event.key === 'Escape') closePeriodPopover();
-            });
-        }
 
         if (storeInput && filterForm) {
             storeInput.addEventListener('change', function () {

@@ -183,6 +183,7 @@ class MarketplaceSalesDashboardController extends Controller
                 $row->voucher_store = $voucherStore;
                 $row->voucher_platform = $voucherPlatform;
                 $row->bundle_discount = $bundleDiscount;
+                $row->promotion_total = $voucherStore + $voucherPlatform + $bundleDiscount;
 
                 unset($row->raw_json, $row->raw_payload_json, $row->settlement_raw_json, $row->seller_voucher, $row->item_qty, $row->total_paid_customer, $row->buyer_payment_amount, $row->total_amount);
 
@@ -214,6 +215,10 @@ class MarketplaceSalesDashboardController extends Controller
             'qty' => (int) $orderRows->sum('qty'),
             'subtotal' => (float) $orderRows->sum('subtotal'),
         ];
+        $buyerExpression = "COALESCE(NULLIF(o.buyer_username, ''), NULLIF(o.buyer_name, ''), o.id)";
+        $summary['buyers'] = (int) (clone $base)
+            ->selectRaw("COUNT(DISTINCT {$buyerExpression}) as buyers")
+            ->value('buyers');
         $summary['aov'] = $summary['orders'] > 0 ? $summary['subtotal'] / $summary['orders'] : 0;
 
         $daily = $orderRows
@@ -378,6 +383,8 @@ class MarketplaceSalesDashboardController extends Controller
             ->selectRaw("COUNT(DISTINCT CASE WHEN income_ms.settlement_time IS NOT NULL THEN o.id END) as settled_orders")
             ->selectRaw("COUNT(DISTINCT CASE WHEN income_ms.settlement_time IS NULL THEN o.id END) as pending_orders")
             ->selectRaw("COALESCE(SUM({$incomePaymentExpression}), 0) as buyer_paid")
+            ->selectRaw("COALESCE(SUM(CASE WHEN income_ms.settlement_time IS NOT NULL THEN ({$incomePaymentExpression}) ELSE 0 END), 0) as settled_buyer_paid")
+            ->selectRaw("COALESCE(SUM(CASE WHEN income_ms.settlement_time IS NULL THEN ({$incomePaymentExpression}) ELSE 0 END), 0) as pending_buyer_paid")
             ->selectRaw('COALESCE(SUM(CASE WHEN income_ms.settlement_time IS NOT NULL THEN COALESCE(income_ms.final_income, 0) ELSE 0 END), 0) as final_income')
             ->groupByRaw("DATE({$dateExpression})")
             ->orderByDesc('day')
@@ -387,6 +394,8 @@ class MarketplaceSalesDashboardController extends Controller
                 $row->settled_orders = (int) $row->settled_orders;
                 $row->pending_orders = (int) $row->pending_orders;
                 $row->buyer_paid = (float) $row->buyer_paid;
+                $row->settled_buyer_paid = (float) $row->settled_buyer_paid;
+                $row->pending_buyer_paid = (float) $row->pending_buyer_paid;
                 $row->final_income = (float) $row->final_income;
 
                 return $row;
@@ -396,6 +405,8 @@ class MarketplaceSalesDashboardController extends Controller
             'settled_orders' => (int) $incomeDaily->sum('settled_orders'),
             'pending_orders' => (int) $incomeDaily->sum('pending_orders'),
             'buyer_paid' => (float) $incomeDaily->sum('buyer_paid'),
+            'settled_buyer_paid' => (float) $incomeDaily->sum('settled_buyer_paid'),
+            'pending_buyer_paid' => (float) $incomeDaily->sum('pending_buyer_paid'),
             'final_income' => (float) $incomeDaily->sum('final_income'),
         ];
 
@@ -570,6 +581,18 @@ SQL;
         $summary['promotion_total'] = (float) $promotionDaily->sum('total_promotion');
         $summary['net_total'] = max($summary['subtotal'] - $summary['promotion_total'], 0);
 
+        // AOV dashboard memakai nilai neto setelah promosi agar selaras dengan
+        // nilai yang benar-benar direalisasikan per order.
+        $promotionByDay = $promotionDaily->keyBy(fn ($row) => (string) $row->day);
+        $daily = $daily->map(function ($row) use ($promotionByDay) {
+            $promotionTotal = (float) data_get($promotionByDay->get((string) $row->day), 'total_promotion', 0);
+            $row->net_total = max((float) $row->subtotal - $promotionTotal, 0);
+            $row->aov = $row->orders > 0 ? $row->net_total / $row->orders : 0;
+
+            return $row;
+        })->values();
+        $summary['aov'] = $summary['orders'] > 0 ? $summary['net_total'] / $summary['orders'] : 0;
+
         $shippingFailedStatusesSql = "'" . implode("', '", self::SHIPPING_FAILED_STATUSES) . "'";
         $shippingStatusExpression = "CASE WHEN COALESCE(o.delivery_failed, 0) = 1 OR UPPER(COALESCE(NULLIF(o.tracking_status, ''), '')) IN ({$shippingFailedStatusesSql}) THEN 'FAILED_DELIVERY' ELSE UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), 'BELUM DITENTUKAN')) END";
         $shippingExcludedPlaceholders = implode(',', array_fill(0, count(self::SHIPPING_EXCLUDED_STATUSES), '?'));
@@ -621,6 +644,19 @@ SQL;
                 return $row;
             });
 
+        $shippingKpi = [
+            'total' => (int) $shippingDaily->sum('orders'),
+            'ready' => (int) $shippingDaily->sum('ready_orders'),
+            'transit' => (int) $shippingDaily->sum('transit_orders'),
+            'completed' => (int) $shippingDaily->sum('completed_orders'),
+            'failed' => (int) $shippingDaily->sum('failed_orders'),
+            'return' => (int) $shippingDaily->sum('return_orders'),
+        ];
+        $shippingKpi['exception'] = $shippingKpi['failed'] + $shippingKpi['return'];
+        $shippingKpi['exception_rate'] = $shippingKpi['total'] > 0
+            ? ($shippingKpi['exception'] / $shippingKpi['total']) * 100
+            : 0;
+
         return view('marketplace.dashboard.sales', [
             'summary' => $summary,
             'daily' => $daily,
@@ -634,6 +670,7 @@ SQL;
             'promotionOrders' => $promotionOrders,
             'shipping' => $shipping,
             'shippingDaily' => $shippingDaily,
+            'shippingKpi' => $shippingKpi,
             'orderDetails' => $orderDetails,
             'stores' => $stores,
             'filters' => [
@@ -984,6 +1021,10 @@ SQL;
             0,
             $summary['orders'] - $summary['ready_orders'] - $summary['transit_orders'] - $summary['completed_orders'] - $summary['failed_orders'] - $summary['return_orders'],
         );
+        $summary['exception_orders'] = $summary['failed_orders'] + $summary['return_orders'];
+        $summary['exception_rate'] = $summary['orders'] > 0
+            ? ($summary['exception_orders'] / $summary['orders']) * 100
+            : 0;
 
         return view('marketplace.dashboard.shipping-detail', [
             'rows' => $rows,
@@ -1119,11 +1160,9 @@ SQL;
         $summary = [
             'subtotal' => (float) $rows->sum('subtotal'),
             'product_discount' => (float) $rows->sum('product_discount'),
-            'voucher_package_total' => (float) (
-                $rows->sum('voucher_store')
-                + $rows->sum('voucher_platform')
-                + $rows->sum('bundle_discount')
-            ),
+            'voucher_store' => (float) $rows->sum('voucher_store'),
+            'voucher_platform' => (float) $rows->sum('voucher_platform'),
+            'bundle_discount' => (float) $rows->sum('bundle_discount'),
             'promotion_total' => (float) $rows->sum('total_promotion'),
         ];
         $summary['net_total'] = max($summary['subtotal'] - $summary['promotion_total'], 0);
