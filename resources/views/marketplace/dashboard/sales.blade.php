@@ -401,7 +401,6 @@
     .sales-dashboard .sales-product-internal-row td { background: color-mix(in srgb, var(--sales-soft) 72%, var(--sales-card) 28%); }
     .sales-dashboard .sales-product-internal-cell { padding-left: 1.85rem !important; }
     .sales-dashboard .sales-product-internal-cell .sales-product-link { display: flex; align-items: center; gap: .45rem; }
-    .sales-dashboard .sales-product-internal-label { flex: 0 0 auto; color: var(--sales-muted); font-size: .56rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
     .sales-dashboard .sales-product-internal-index { color: var(--sales-muted); }
     .sales-dashboard .sales-product-group-title { font-size: .72rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
     .sales-dashboard .sales-product-group-meta { color: var(--sales-muted); font-size: .68rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
@@ -1446,19 +1445,20 @@
                     <table class="table table-sm table-hover align-middle sales-table sales-product-table sales-promotion-table">
                         <colgroup>
                             <col style="width: 4%">
-                            <col style="width: 27%">
+                            <col style="width: 24%">
+                            <col style="width: 7%">
                             <col style="width: 4%">
                             <col style="width: 4%">
-                            <col style="width: 9%">
-                            <col style="width: 9%">
-                            <col style="width: 10%">
                             <col style="width: 8%">
                             <col style="width: 8%">
+                            <col style="width: 9%">
+                            <col style="width: 7%">
+                            <col style="width: 7%">
                             <col style="width: 5%">
                             <col style="width: 5%">
                             <col style="width: 7%">
                         </colgroup>
-                        <thead><tr><th scope="col" class="sales-index-column">No.</th><th>Produk</th><th class="text-end">Order</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Penjualan Netto</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Biaya Iklan</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ACOS</th><th class="text-end">ROAS</th><th class="text-end pe-3">CPA</th></tr></thead>
+                        <thead><tr><th scope="col" class="sales-index-column">No.</th><th>Produk</th><th class="text-end">HPP</th><th class="text-end">Order</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Penjualan Netto</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Biaya Iklan</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ACOS</th><th class="text-end">ROAS</th><th class="text-end pe-3">CPA</th></tr></thead>
                         <tbody>
                             @php
                                 $productGroups = $products
@@ -1493,6 +1493,9 @@
                                     $categorySpend = (float) $categoryAdProducts->sum('ad_spend');
                                     $categoryAdSales = (float) $categoryAdProducts->sum('ad_sales');
                                     $categoryAdConversions = (int) $categoryAdProducts->sum('ad_conversions');
+                                    $categoryHppQty = (float) $categoryProducts->filter(fn ($product) => (float) ($product->hpp ?? 0) > 0)->sum('qty');
+                                    $categoryHppValue = (float) $categoryProducts->sum(fn ($product) => (float) ($product->hpp ?? 0) * (int) ($product->qty ?? 0));
+                                    $categoryHpp = $categoryHppQty > 0 ? $categoryHppValue / $categoryHppQty : 0;
                                 @endphp
                                 <tr class="sales-product-group-row">
                                     <td class="sales-index-cell" aria-label="Kategori {{ $categoryNumber }}">{{ $categoryNumber }}</td>
@@ -1505,6 +1508,7 @@
                                             </span>
                                         </button>
                                     </td>
+                                    <td class="text-end fw-semibold">{{ $categoryHpp > 0 ? $fmt($categoryHpp) : '—' }}</td>
                                     <td class="text-end">{{ number_format($categoryOrders) }}</td>
                                     <td class="text-end">{{ number_format($categoryQty) }}</td>
                                     <td class="text-end fw-semibold"><div>{{ $fmt($categorySales) }}</div><div class="small text-muted">AOV {{ $categoryOrders > 0 ? $fmt($categorySales / $categoryOrders) : '—' }}</div></td>
@@ -1534,6 +1538,9 @@
                                         $marketplaceSpend = (float) $marketplaceAdProducts->sum('ad_spend');
                                         $marketplaceAdSales = (float) $marketplaceAdProducts->sum('ad_sales');
                                         $marketplaceAdConversions = (int) $marketplaceAdProducts->sum('ad_conversions');
+                                        $marketplaceHppQty = (float) $marketplaceProducts->filter(fn ($product) => (float) ($product->hpp ?? 0) > 0)->sum('qty');
+                                        $marketplaceHppValue = (float) $marketplaceProducts->sum(fn ($product) => (float) ($product->hpp ?? 0) * (int) ($product->qty ?? 0));
+                                        $marketplaceHpp = $marketplaceHppQty > 0 ? $marketplaceHppValue / $marketplaceHppQty : 0;
                                     @endphp
                                     <tr id="{{ $marketplaceKey }}" class="sales-product-marketplace-row" data-sales-product-category-items="{{ $categoryKey }}" hidden>
                                         <td class="sales-index-cell sales-product-item-index" aria-label="Marketplace {{ $categoryNumber }}.{{ $marketplaceNumber }}"><span class="sales-product-item-number">{{ $categoryNumber }}.{{ $marketplaceNumber }}</span></td>
@@ -1549,6 +1556,7 @@
                                                 </span>
                                             </button>
                                         </td>
+                                        <td class="text-end fw-semibold">{{ $marketplaceHpp > 0 ? $fmt($marketplaceHpp) : '—' }}</td>
                                         <td class="text-end">{{ number_format($marketplaceOrders) }}</td>
                                         <td class="text-end">{{ number_format($marketplaceQty) }}</td>
                                         <td class="text-end fw-semibold"><div>{{ $fmt($marketplaceSales) }}</div><div class="small text-muted">AOV {{ $marketplaceOrders > 0 ? $fmt($marketplaceSales / $marketplaceOrders) : '—' }}</div></td>
@@ -1564,11 +1572,17 @@
                                         <tr id="{{ $marketplaceKey }}-items-{{ $loop->index }}" class="sales-product-internal-row" data-sales-product-category-items="{{ $categoryKey }}" data-sales-product-marketplace-items="{{ $marketplaceKey }}" hidden>
                                             <td class="sales-index-cell sales-product-item-index sales-product-internal-index" aria-label="Item internal {{ $categoryNumber }}.{{ $marketplaceNumber }}.{{ $loop->iteration }}"><span class="sales-product-item-number">{{ $categoryNumber }}.{{ $marketplaceNumber }}.{{ $loop->iteration }}</span></td>
                                             <td class="fw-semibold sales-product-internal-cell">
-                                                <button type="button" class="sales-product-link" data-sales-product-name="{{ $product->name }}" data-sales-product-sku="{{ $product->sku }}" data-sales-product-internal-item-id="{{ $product->internal_item_id ?? '' }}" title="Lihat pesanan item internal: {{ $product->name }}">
-                                                    <span class="sales-product-internal-label">Internal</span>
-                                                    <span class="sales-product-name" title="{{ $product->name }}">{{ $product->name }}</span>
+                                                @php
+                                                    $internalProductCode = trim((string) ($product->sku ?? ''));
+                                                    $internalProductCode = $internalProductCode !== '' && $internalProductCode !== '-'
+                                                        ? $internalProductCode
+                                                        : 'ID '.($product->internal_item_id ?? '—');
+                                                @endphp
+                                                <button type="button" class="sales-product-link" data-sales-product-name="{{ $product->name }}" data-sales-product-sku="{{ $product->sku }}" data-sales-product-internal-item-id="{{ $product->internal_item_id ?? '' }}" title="Lihat pesanan item internal: {{ $internalProductCode }}">
+                                                    <span class="sales-product-name" title="{{ $internalProductCode }}">{{ $internalProductCode }}</span>
                                                 </button>
                                             </td>
+                                            <td class="text-end fw-semibold">{{ (float) ($product->hpp ?? 0) > 0 ? $fmt($product->hpp) : '—' }}</td>
                                             <td class="text-end">{{ number_format((int) $product->orders) }}</td>
                                             <td class="text-end">{{ number_format((int) $product->qty) }}</td>
                                             <td class="text-end fw-semibold"><div>{{ $fmt($product->sales) }}</div><div class="small text-muted">AOV {{ $product->orders > 0 ? $fmt($product->sales / $product->orders) : '—' }}</div></td>

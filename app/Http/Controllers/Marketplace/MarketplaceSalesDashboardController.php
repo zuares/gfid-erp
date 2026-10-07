@@ -335,6 +335,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->selectRaw("COALESCE(MAX(NULLIF(internal_item.name, '')), MAX({$marketplaceProductNameExpression}), 'Produk tanpa nama') as name")
             ->selectRaw("MAX({$marketplaceProductNameExpression}) as marketplace_name")
             ->selectRaw("COALESCE(MAX(NULLIF(internal_item.code, '')), MAX({$marketplaceProductSkuExpression}), '-') as sku")
+            ->selectRaw("COALESCE(MAX(NULLIF(internal_item.base_unit_cost, 0)), MAX(NULLIF(internal_item.hpp, 0)), 0) as hpp")
             ->selectRaw("MAX(NULLIF(internal_category.code, '')) as category_code")
             ->selectRaw("MAX(NULLIF(internal_category.name, '')) as category_name")
             ->selectRaw('MAX(NULLIF(oi.internal_item_id, 0)) as internal_item_id')
