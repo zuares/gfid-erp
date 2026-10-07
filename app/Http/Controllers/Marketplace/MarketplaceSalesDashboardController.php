@@ -312,6 +312,8 @@ class MarketplaceSalesDashboardController extends Controller
             ->groupByRaw('COALESCE(oi_total.marketplace_order_id, oi_total.order_id)');
         $productBuyerPaymentExpression = 'COALESCE(NULLIF(s.buyer_payment_amount, 0), NULLIF(o.total_paid_customer, 0), NULLIF(o.total_amount, 0), NULLIF(o.subtotal_items, 0), 0)';
         $productLineValueForRow = 'CASE WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount WHEN COALESCE(oi.price, 0) > 0 THEN oi.price * COALESCE(oi.qty, 0) WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount ELSE 0 END';
+        $marketplaceProductNameExpression = "COALESCE(NULLIF(oi.item_name, ''), NULLIF(oi.item_name_snapshot, ''), NULLIF(oi.variant_name, ''), NULLIF(oi.variant_snapshot, ''), 'Produk tanpa nama')";
+        $marketplaceProductSkuExpression = "COALESCE(NULLIF(oi.item_sku, ''), NULLIF(oi.marketplace_sku, ''), NULLIF(oi.model_sku, ''), NULLIF(oi.external_sku, ''), NULLIF(oi.item_code_snapshot, ''), '-')";
 
         $products = DB::table('marketplace_order_items as oi')
             ->join('marketplace_orders as o', function ($join) {
@@ -320,6 +322,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->leftJoin('marketplace_order_settlements as s', 's.order_id', '=', 'o.id')
             ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
             ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
+            ->leftJoin('items as internal_item', 'internal_item.id', '=', 'oi.internal_item_id')
             ->leftJoinSub($productOrderTotals, 'product_order_totals', 'product_order_totals.order_key', '=', 'o.id')
             ->whereRaw("{$dateExpression} IS NOT NULL")
             ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
@@ -327,8 +330,8 @@ class MarketplaceSalesDashboardController extends Controller
             ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
-            ->selectRaw("COALESCE(NULLIF(oi.item_name, ''), NULLIF(oi.item_name_snapshot, ''), NULLIF(oi.variant_name, ''), NULLIF(oi.variant_snapshot, ''), 'Produk tanpa nama') as name")
-            ->selectRaw("COALESCE(NULLIF(oi.item_sku, ''), NULLIF(oi.marketplace_sku, ''), NULLIF(oi.model_sku, ''), NULLIF(oi.external_sku, ''), NULLIF(oi.item_code_snapshot, ''), '-') as sku")
+            ->selectRaw("COALESCE(MAX(NULLIF(internal_item.name, '')), MAX({$marketplaceProductNameExpression}), 'Produk tanpa nama') as name")
+            ->selectRaw("COALESCE(MAX(NULLIF(internal_item.code, '')), MAX({$marketplaceProductSkuExpression}), '-') as sku")
             ->selectRaw('MAX(NULLIF(oi.internal_item_id, 0)) as internal_item_id')
             ->selectRaw("MAX(NULLIF(oi.external_item_id, '')) as external_item_id")
             ->selectRaw('COALESCE(SUM(CASE WHEN oi.qty > 0 THEN oi.qty ELSE 0 END), 0) as qty')
@@ -336,49 +339,21 @@ class MarketplaceSalesDashboardController extends Controller
             ->selectRaw("COUNT(DISTINCT COALESCE(NULLIF(o.buyer_username, ''), NULLIF(o.buyer_name, ''), o.id)) as buyers")
             ->selectRaw('COALESCE(SUM(CASE WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount WHEN COALESCE(oi.price, 0) > 0 THEN oi.price * COALESCE(oi.qty, 0) WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount ELSE 0 END), 0) as sales')
             ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(product_order_totals.order_item_value, 0) > 0 THEN ({$productBuyerPaymentExpression} * {$productLineValueForRow} / product_order_totals.order_item_value) ELSE 0 END), 0) as buyer_payment")
-            ->groupByRaw("COALESCE(NULLIF(oi.item_name, ''), NULLIF(oi.item_name_snapshot, ''), NULLIF(oi.variant_name, ''), NULLIF(oi.variant_snapshot, ''), 'Produk tanpa nama')")
-            ->groupByRaw("COALESCE(NULLIF(oi.item_sku, ''), NULLIF(oi.marketplace_sku, ''), NULLIF(oi.model_sku, ''), NULLIF(oi.external_sku, ''), NULLIF(oi.item_code_snapshot, ''), '-')")
+            ->groupByRaw('NULLIF(oi.internal_item_id, 0)')
+            ->groupByRaw("CASE WHEN NULLIF(oi.internal_item_id, 0) IS NULL THEN {$marketplaceProductNameExpression} END")
+            ->groupByRaw("CASE WHEN NULLIF(oi.internal_item_id, 0) IS NULL THEN {$marketplaceProductSkuExpression} END")
             ->orderByDesc('sales')
             ->limit(8)
             ->get();
 
-        $adItemSpendRows = DB::table('marketplace_ads_item_dailies as ad')
-            ->whereBetween('ad.date', [$from->toDateString(), $to->toDateString()])
-            ->when($storeId, fn ($query) => $query->where('ad.store_id', $storeId))
-            ->select('ad.store_id', 'ad.channel_item_id')
-            ->selectRaw('COALESCE(SUM(ad.expense), 0) as ad_spend')
-            ->groupBy('ad.store_id', 'ad.channel_item_id')
-            ->get();
-        $adSpendByChannel = $adItemSpendRows->mapWithKeys(fn ($row) => [
-            $row->store_id.'|'.(string) $row->channel_item_id => (float) $row->ad_spend,
-        ]);
-        $adSpendByChannelItem = $adItemSpendRows
-            ->groupBy(fn ($row) => (string) $row->channel_item_id)
-            ->map(fn ($rows) => (float) $rows->sum('ad_spend'));
-
-        $campaignInternalByChannel = DB::table('marketplace_ad_campaigns')
-            ->whereNotNull('channel_item_id')
-            ->whereNotNull('internal_item_id')
-            ->when($storeId, fn ($query) => $query->where('store_id', $storeId))
-            ->select('store_id', 'channel_item_id', 'internal_item_id')
-            ->get()
-            ->mapWithKeys(fn ($row) => [$row->store_id.'|'.(string) $row->channel_item_id => (int) $row->internal_item_id]);
-        $manualInternalByChannel = DB::table('marketplace_ad_item_maps')
-            ->whereNotNull('channel_item_id')
-            ->whereNotNull('internal_item_id')
-            ->when($storeId, fn ($query) => $query->where('store_id', $storeId))
-            ->select('store_id', 'channel_item_id', 'internal_item_id')
-            ->get()
-            ->mapWithKeys(fn ($row) => [$row->store_id.'|'.(string) $row->channel_item_id => (int) $row->internal_item_id]);
-
-        $adSpendByInternalItem = collect();
-        foreach ($adSpendByChannel as $channelKey => $spend) {
-            $internalItemId = $campaignInternalByChannel->get($channelKey)
-                ?? $manualInternalByChannel->get($channelKey);
-            if ($internalItemId) {
-                $adSpendByInternalItem[$internalItemId] = (float) ($adSpendByInternalItem[$internalItemId] ?? 0) + (float) $spend;
-            }
-        }
+        $productAdSpend = app(AdsDashboardService::class)->getProductSpend(
+            $adStoreIds,
+            $storeId,
+            $from->toDateString(),
+            $to->toDateString(),
+        );
+        $adSpendByInternalItem = $productAdSpend['internal'];
+        $adSpendByChannelItem = $productAdSpend['external'];
 
         $products = $products->map(function ($product) use ($adSpendByInternalItem, $adSpendByChannelItem) {
             $internalItemId = (int) ($product->internal_item_id ?? 0);
@@ -1090,8 +1065,9 @@ SQL;
     {
         $name = trim((string) $request->query('name', ''));
         $sku = trim((string) $request->query('sku', ''));
+        $internalItemId = $request->integer('internal_item_id') ?: null;
 
-        if ($name === '') {
+        if ($name === '' && $internalItemId === null) {
             return response()->json(['message' => 'Nama produk wajib diisi.'], 422);
         }
 
@@ -1130,8 +1106,9 @@ SQL;
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
-            ->whereRaw("{$nameExpression} = ?", [$name])
-            ->when($sku !== '' && $sku !== '-', fn ($query) => $query->whereRaw("{$skuExpression} = ?", [$sku]))
+            ->when($internalItemId, fn ($query) => $query->where('oi.internal_item_id', $internalItemId))
+            ->when(! $internalItemId, fn ($query) => $query->whereRaw("{$nameExpression} = ?", [$name]))
+            ->when(! $internalItemId && $sku !== '' && $sku !== '-', fn ($query) => $query->whereRaw("{$skuExpression} = ?", [$sku]))
             ->select([
                 'o.id',
                 'o.channel_order_id',

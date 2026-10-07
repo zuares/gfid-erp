@@ -1222,7 +1222,7 @@
                                 <tr>
                                     <td class="sales-index-cell" aria-label="Urutan {{ $loop->iteration }}">{{ $loop->iteration }}</td>
                                     <td class="fw-semibold">
-                                        <button type="button" class="sales-product-link" data-sales-product-name="{{ $product->name }}" data-sales-product-sku="{{ $product->sku }}" title="Lihat pesanan produk: {{ $product->name }}">
+                                        <button type="button" class="sales-product-link" data-sales-product-name="{{ $product->name }}" data-sales-product-sku="{{ $product->sku }}" data-sales-product-internal-item-id="{{ $product->internal_item_id ?? '' }}" title="Lihat pesanan produk: {{ $product->name }}">
                                             <span class="sales-product-name">{{ $product->name }}</span>
                                         </button>
                                     </td>
@@ -1799,12 +1799,14 @@
             trigger.addEventListener('click', async function () {
                 const name = trigger.dataset.salesProductName || '';
                 const sku = trigger.dataset.salesProductSku || '';
+                const internalItemId = trigger.dataset.salesProductInternalItemId || '';
                 const query = new URLSearchParams({
                     name: name,
                     sku: sku,
                     date_from: @json($filters['date_from']),
                     date_to: @json($filters['date_to']),
                 });
+                if (internalItemId) query.set('internal_item_id', internalItemId);
                 @if ($filters['store_id'])
                     query.set('store_id', @json($filters['store_id']));
                 @endif

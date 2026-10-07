@@ -208,6 +208,109 @@ class AdsDashboardService
             });
     }
 
+    /**
+     * Biaya iklan per item dengan sumber yang sama seperti Ads Dashboard.
+     * Campaign reguler mengambil expense dari fakta harian campaign, sedangkan
+     * GMV Max mengambil expense dari fakta harian item. Spend agregat level toko
+     * sengaja tidak dialokasikan rata-rata ke produk karena tidak punya atribusi
+     * item yang dapat dipertanggungjawabkan.
+     *
+     * @param  array<int>  $storeIds
+     * @return array{internal: Collection<int, float>, external: Collection<string, float>}
+     */
+    public function getProductSpend(array $storeIds, int|string|null $storeId, string $dateFrom, string $dateTo): array
+    {
+        $storeIds = array_values(array_filter(array_map('intval', $storeIds)));
+        if ($storeId !== null && $storeId !== 'all') {
+            $selectedStoreId = (int) $storeId;
+            $storeIds = in_array($selectedStoreId, $storeIds, true) ? [$selectedStoreId] : [];
+        }
+
+        if ($storeIds === []) {
+            return ['internal' => collect(), 'external' => collect()];
+        }
+
+        $internalSpend = collect();
+        $externalSpend = collect();
+
+        $addSpend = static function (Collection $target, int|string|null $key, float $spend): void {
+            if ($key === null || (string) $key === '') {
+                return;
+            }
+
+            $normalizedKey = (string) $key;
+            $target[$normalizedKey] = (float) ($target->get($normalizedKey, 0) + $spend);
+        };
+
+        $campaignRows = DB::table('marketplace_ad_campaign_dailies as daily')
+            ->join('marketplace_ad_campaigns as campaign', function ($join) {
+                $join->on('campaign.store_id', '=', 'daily.store_id')
+                    ->on('campaign.channel_campaign_id', '=', 'daily.channel_campaign_id');
+            })
+            ->whereIn('daily.store_id', $storeIds)
+            ->whereNotLike('daily.channel_campaign_id', 'GMS-%')
+            ->whereBetween('daily.date', [$dateFrom, $dateTo])
+            ->where(function ($query) {
+                $query->whereNotNull('campaign.internal_item_id')
+                    ->orWhereNotNull('campaign.channel_item_id');
+            })
+            ->select([
+                'daily.store_id',
+                'campaign.channel_item_id',
+                'campaign.internal_item_id',
+            ])
+            ->selectRaw('COALESCE(SUM(daily.expense), 0) as spend')
+            ->groupBy('daily.store_id', 'campaign.channel_item_id', 'campaign.internal_item_id')
+            ->get();
+
+        foreach ($campaignRows as $row) {
+            $spend = (float) ($row->spend ?? 0);
+            $addSpend($internalSpend, $row->internal_item_id, $spend);
+            $addSpend($externalSpend, $row->channel_item_id, $spend);
+        }
+
+        $gmsRows = DB::table('marketplace_ads_item_dailies as daily')
+            ->whereIn('daily.store_id', $storeIds)
+            ->whereLike('daily.channel_campaign_id', 'GMS-%')
+            ->whereBetween('daily.date', [$dateFrom, $dateTo])
+            ->whereNotNull('daily.channel_item_id')
+            ->select('daily.store_id', 'daily.channel_item_id')
+            ->selectRaw('COALESCE(SUM(daily.expense), 0) as spend')
+            ->groupBy('daily.store_id', 'daily.channel_item_id')
+            ->get();
+
+        foreach ($gmsRows as $row) {
+            $spend = (float) ($row->spend ?? 0);
+            $addSpend($externalSpend, $row->channel_item_id, $spend);
+        }
+
+        // Manual item mappings yang dipakai Ads Dashboard juga menjadi sumber
+        // internal item untuk GMS item dan campaign yang belum auto-mapped.
+        $manualMaps = DB::table('marketplace_ad_item_maps')
+            ->whereIn('store_id', $storeIds)
+            ->whereNotNull('channel_item_id')
+            ->whereNotNull('internal_item_id')
+            ->select('store_id', 'channel_item_id', 'internal_item_id')
+            ->get()
+            ->mapWithKeys(fn ($row) => [
+                $row->store_id . '|' . (string) $row->channel_item_id => (int) $row->internal_item_id,
+            ]);
+
+        foreach ($gmsRows as $row) {
+            $internalItemId = $manualMaps->get($row->store_id . '|' . (string) $row->channel_item_id);
+            if ($internalItemId === null) {
+                continue;
+            }
+
+            $addSpend($internalSpend, $internalItemId, (float) ($row->spend ?? 0));
+        }
+
+        return [
+            'internal' => $internalSpend,
+            'external' => $externalSpend,
+        ];
+    }
+
     public function buildDashboardData(
         Collection $stores,
         int|string|null $storeId,
