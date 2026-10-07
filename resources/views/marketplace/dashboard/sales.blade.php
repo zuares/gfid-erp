@@ -1785,13 +1785,17 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @php($comparisonGroup = null)
+                            @php
+                                $comparisonGroup = null;
+                            @endphp
                             @foreach ($productComparisonRows as $row)
                                 @if (($row['group'] ?? null) !== null && $row['group'] !== $comparisonGroup)
                                     <tr class="sales-table-section-row" role="presentation">
                                         <td colspan="{{ 1 + count($productComparisonPeriods) }}">{{ $row['group'] }}</td>
                                     </tr>
-                                    @php($comparisonGroup = $row['group'])
+                                    @php
+                                        $comparisonGroup = $row['group'];
+                                    @endphp
                                 @endif
                                 <tr>
                                     <td class="ps-3 fw-semibold">{{ $row['label'] }}</td>
@@ -1905,13 +1909,17 @@
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        @php($categoryComparisonGroup = null)
+                                                        @php
+                                                            $categoryComparisonGroup = null;
+                                                        @endphp
                                                         @foreach ($categoryProductComparisonRows as $comparisonRow)
                                                             @if (($comparisonRow['group'] ?? null) !== null && $comparisonRow['group'] !== $categoryComparisonGroup)
                                                                 <tr class="sales-table-section-row" role="presentation">
                                                                     <td colspan="{{ 1 + $categoryComparisonPeriods->count() }}">{{ $comparisonRow['group'] }}</td>
                                                                 </tr>
-                                                                @php($categoryComparisonGroup = $comparisonRow['group'])
+                                                                @php
+                                                                    $categoryComparisonGroup = $comparisonRow['group'];
+                                                                @endphp
                                                             @endif
                                                             <tr>
                                                                 <td class="ps-3 fw-semibold">{{ $comparisonRow['label'] }}</td>
