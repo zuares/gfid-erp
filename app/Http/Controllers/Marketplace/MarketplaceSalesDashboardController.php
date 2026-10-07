@@ -232,6 +232,7 @@ class MarketplaceSalesDashboardController extends Controller
                     'orders' => $orders,
                     'qty' => (int) $rows->sum('qty'),
                     'subtotal' => $subtotal,
+                    'avg_units_per_order' => $orders > 0 ? (float) $rows->sum('qty') / $orders : 0,
                     'aov' => $orders > 0 ? $subtotal / $orders : 0,
                 ];
             })

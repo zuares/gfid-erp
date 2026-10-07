@@ -383,9 +383,10 @@
                         <tr>
                             <th class="ps-3">No.</th>
                             <th>Tanggal</th>
-                            <th class="text-end">Pesanan</th>
-                            <th class="text-end">Unit terjual</th>
-                            <th class="text-end">Penjualan</th>
+                            <th class="text-end">Jumlah Pesanan</th>
+                            <th class="text-end">Jumlah Unit Terjual</th>
+                            <th class="text-end">Rata-rata Unit/Pesanan</th>
+                            <th class="text-end">GMV</th>
                             <th class="text-end">AOV Neto</th>
                         </tr>
                     </thead>
@@ -396,6 +397,7 @@
                                 <td><button class="sales-date-link" type="button" data-sales-order-detail-date="{{ $row->day }}">{{ $dateLabel($row->day) }}</button></td>
                                 <td class="text-end">{{ number_format($row->orders) }}</td>
                                 <td class="text-end">{{ number_format($row->qty) }}</td>
+                                <td class="text-end">{{ number_format($row->avg_units_per_order, 2) }}</td>
                                 <td class="text-end">{{ $fmt($row->subtotal) }}</td>
                                 <td class="text-end">{{ $fmt($row->aov) }}</td>
                             </tr>
