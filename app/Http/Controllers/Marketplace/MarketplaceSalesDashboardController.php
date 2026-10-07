@@ -315,7 +315,16 @@ class MarketplaceSalesDashboardController extends Controller
         $productLineNetValueExpression = 'CASE WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount WHEN COALESCE(oi.price_after_discount, 0) > 0 THEN oi.price_after_discount * COALESCE(oi.qty, 0) WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount ELSE 0 END';
         $marketplaceProductNameExpression = "COALESCE(NULLIF(oi.item_name, ''), NULLIF(oi.item_name_snapshot, ''), NULLIF(oi.variant_name, ''), NULLIF(oi.variant_snapshot, ''), 'Produk tanpa nama')";
         $marketplaceProductSkuExpression = "COALESCE(NULLIF(oi.item_sku, ''), NULLIF(oi.marketplace_sku, ''), NULLIF(oi.model_sku, ''), NULLIF(oi.external_sku, ''), NULLIF(oi.item_code_snapshot, ''), '-')";
-        $periodLastPurchasePriceExpression = "(SELECT period_prl.unit_price / COALESCE(NULLIF(period_prl.conversion_factor, 0), 1)
+        $periodLastPurchaseOrderPriceExpression = "(SELECT period_pol.unit_price / COALESCE(NULLIF(period_pol.conversion_factor, 0), 1)
+            FROM purchase_order_lines as period_pol
+            JOIN purchase_orders as period_po ON period_po.id = period_pol.purchase_order_id
+            WHERE period_pol.item_id = internal_item.id
+                AND period_po.date <= ?
+                AND period_po.status NOT IN ('draft', 'cancelled', 'canceled', 'rejected')
+                AND period_pol.unit_price > 0
+            ORDER BY period_po.date DESC, period_po.id DESC, period_pol.id DESC
+            LIMIT 1)";
+        $periodLastReceiptPriceExpression = "(SELECT period_prl.unit_price / COALESCE(NULLIF(period_prl.conversion_factor, 0), 1)
             FROM purchase_receipt_lines as period_prl
             JOIN purchase_receipts as period_pr ON period_pr.id = period_prl.purchase_receipt_id
             WHERE period_prl.item_id = internal_item.id
@@ -345,18 +354,20 @@ class MarketplaceSalesDashboardController extends Controller
             ->selectRaw("MAX({$marketplaceProductNameExpression}) as marketplace_name")
             ->selectRaw("MAX(NULLIF(oi.image_url, '')) as image_url")
             ->selectRaw("COALESCE(MAX(NULLIF(internal_item.code, '')), MAX({$marketplaceProductSkuExpression}), '-') as sku")
-            ->selectRaw("COALESCE(NULLIF({$periodLastPurchasePriceExpression}, 0), MAX(NULLIF(internal_item.last_purchase_price, 0)), MAX(NULLIF(internal_item.base_unit_cost, 0)), MAX(NULLIF(internal_item.hpp, 0)), 0) as hpp", [$to->toDateString()])
+            ->selectRaw("COALESCE(NULLIF({$periodLastPurchaseOrderPriceExpression}, 0), NULLIF({$periodLastReceiptPriceExpression}, 0), MAX(NULLIF(internal_item.base_unit_cost, 0)), MAX(NULLIF(internal_item.hpp, 0)), 0) as hpp", [$to->toDateString(), $to->toDateString()])
             ->selectRaw("MAX(NULLIF(internal_category.code, '')) as category_code")
             ->selectRaw("MAX(NULLIF(internal_category.name, '')) as category_name")
             ->selectRaw('MAX(NULLIF(oi.internal_item_id, 0)) as internal_item_id')
             ->selectRaw("MAX(NULLIF(oi.external_item_id, '')) as external_item_id")
             ->selectRaw('COALESCE(SUM(CASE WHEN oi.qty > 0 THEN oi.qty ELSE 0 END), 0) as qty')
             ->selectRaw('COUNT(DISTINCT o.id) as orders')
+            ->selectRaw('GROUP_CONCAT(DISTINCT o.id) as order_keys')
             ->selectRaw("COUNT(DISTINCT COALESCE(NULLIF(o.buyer_username, ''), NULLIF(o.buyer_name, ''), o.id)) as buyers")
             ->selectRaw("COALESCE(SUM({$productLineNetValueExpression}), 0) as sales")
             ->selectRaw("COALESCE(SUM({$productLineNetValueExpression}), 0) as net_sales")
             ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(product_order_totals.order_item_value, 0) > 0 THEN ({$productBuyerPaymentExpression} * {$productLineValueForRow} / product_order_totals.order_item_value) ELSE 0 END), 0) as buyer_payment")
             ->groupByRaw('NULLIF(oi.internal_item_id, 0)')
+            ->groupByRaw("CASE WHEN NULLIF(oi.internal_item_id, 0) IS NOT NULL THEN NULLIF(oi.external_item_id, '') END")
             ->groupByRaw("CASE WHEN NULLIF(oi.internal_item_id, 0) IS NULL THEN {$marketplaceProductNameExpression} END")
             ->groupByRaw("CASE WHEN NULLIF(oi.internal_item_id, 0) IS NULL THEN {$marketplaceProductSkuExpression} END")
             ->orderByDesc('sales')
@@ -414,6 +425,7 @@ class MarketplaceSalesDashboardController extends Controller
                     'promo_s.raw_json as settlement_raw_json',
                     'promo_oi.id as item_id',
                     'promo_oi.internal_item_id',
+                    'promo_oi.external_item_id',
                     'promo_oi.qty',
                     'promo_oi.price',
                     'promo_oi.price_after_discount',
@@ -482,7 +494,7 @@ class MarketplaceSalesDashboardController extends Controller
                     foreach ($orderItems as $item) {
                         $internalItemId = (int) ($item->internal_item_id ?? 0);
                         $productKey = $internalItemId > 0
-                            ? 'internal:'.$internalItemId
+                            ? 'internal:'.$internalItemId.'|external:'.trim((string) ($item->external_item_id ?? ''))
                             : 'external:'.mb_strtolower(trim((string) $item->marketplace_name)).'|'.trim((string) $item->marketplace_sku);
                         $productExtraPromotionByKey[$productKey] = (float) ($productExtraPromotionByKey->get($productKey, 0))
                             + ($extraPromotion * $lineValue($item) / $orderLineValue);
@@ -493,7 +505,7 @@ class MarketplaceSalesDashboardController extends Controller
         $products = $products->map(function ($product) use ($productExtraPromotionByKey) {
             $internalItemId = (int) ($product->internal_item_id ?? 0);
             $productKey = $internalItemId > 0
-                ? 'internal:'.$internalItemId
+                ? 'internal:'.$internalItemId.'|external:'.trim((string) ($product->external_item_id ?? ''))
                 : 'external:'.mb_strtolower(trim((string) ($product->marketplace_name ?: $product->name))).'|'.trim((string) $product->sku);
             $extraPromotion = (float) $productExtraPromotionByKey->get($productKey, 0);
             $product->net_sales = max((float) $product->sales - $extraPromotion, 0);
@@ -538,12 +550,11 @@ class MarketplaceSalesDashboardController extends Controller
         $productExternalIds = $products->mapWithKeys(function ($product, $productIndex) use ($productExternalIdsByInternal) {
             $internalItemId = (int) ($product->internal_item_id ?? 0);
             $externalItemId = trim((string) ($product->external_item_id ?? ''));
-            $externalIds = $internalItemId > 0
-                ? collect($productExternalIdsByInternal->get($internalItemId, collect()))
-                : collect();
-            if ($externalItemId !== '') {
-                $externalIds->push($externalItemId);
-            }
+            $externalIds = $externalItemId !== ''
+                ? collect([$externalItemId])
+                : ($internalItemId > 0
+                    ? collect($productExternalIdsByInternal->get($internalItemId, collect()))
+                    : collect());
 
             return [$productIndex => $externalIds->map(fn ($itemId) => (string) $itemId)->filter()->unique()->values()];
         });
@@ -584,13 +595,39 @@ class MarketplaceSalesDashboardController extends Controller
             }
 
             if (! $hasExternalMetrics && $internalItemId > 0 && $adMetricsByInternalItem->has($internalItemId)) {
-                $productAdMetrics = $adMetricsByInternalItem->get($internalItemId);
+                $sameInternalProducts = $products
+                    ->filter(fn ($sameProduct) => (int) ($sameProduct->internal_item_id ?? 0) === $internalItemId)
+                    ->values();
+                $sameInternalSales = (float) $sameInternalProducts->sum(fn ($sameProduct) => (float) ($sameProduct->sales ?? 0));
+                $allocationShare = $sameInternalSales > 0
+                    ? (float) ($product->sales ?? 0) / $sameInternalSales
+                    : ($sameInternalProducts->count() > 0 ? 1 / $sameInternalProducts->count() : 0);
+                $internalMetrics = $adMetricsByInternalItem->get($internalItemId);
+                $productAdMetrics = [
+                    'spend' => (float) ($internalMetrics['spend'] ?? 0) * $allocationShare,
+                    'sales' => (float) ($internalMetrics['sales'] ?? 0) * $allocationShare,
+                    'conversions' => (int) round((int) ($internalMetrics['conversions'] ?? 0) * $allocationShare),
+                ];
             }
 
             $product->ad_spend_matched = $hasExternalMetrics || ($internalItemId > 0 && $adMetricsByInternalItem->has($internalItemId));
             $product->ad_spend = (float) ($productAdMetrics['spend'] ?? 0);
             $product->ad_sales = (float) ($productAdMetrics['sales'] ?? 0);
             $product->ad_conversions = (int) ($productAdMetrics['conversions'] ?? 0);
+            $product->hpp_total = (float) ($product->hpp ?? 0) * max(0, (int) ($product->qty ?? 0));
+            $product->hpp_available = (float) ($product->hpp ?? 0) > 0;
+            $product->gross_profit = $product->hpp_available
+                ? (float) ($product->net_sales ?? 0) - $product->hpp_total
+                : null;
+            $product->contribution_profit = $product->gross_profit !== null
+                ? $product->gross_profit - $product->ad_spend
+                : null;
+            $product->gross_margin = $product->gross_profit !== null && (float) ($product->net_sales ?? 0) > 0
+                ? ($product->gross_profit / (float) $product->net_sales) * 100
+                : null;
+            $product->contribution_margin = $product->contribution_profit !== null && (float) ($product->net_sales ?? 0) > 0
+                ? ($product->contribution_profit / (float) $product->net_sales) * 100
+                : null;
 
             return $product;
         });
