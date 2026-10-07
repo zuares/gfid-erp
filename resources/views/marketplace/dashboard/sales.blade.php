@@ -597,10 +597,10 @@
                 ['label' => 'Order Iklan', 'key' => 'ad_orders', 'format' => $numberDisplay],
                 ['label' => 'ROAS', 'key' => 'ad_roas', 'format' => $multipleDisplay],
                 ['label' => 'CTR', 'key' => 'ad_ctr', 'format' => $percentDisplay],
-            ['label' => 'CVR', 'key' => 'ad_cvr', 'format' => $percentDisplay],
-            ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
-            ['label' => 'Biaya / Konversi', 'key' => 'ad_cpa', 'format' => $currencyDisplay],
-            ['label' => 'Rasio Iklan / Sales Iklan', 'key' => 'ad_sales_rate', 'format' => $percentDisplay],
+                ['label' => 'CVR', 'key' => 'ad_cvr', 'format' => $percentDisplay],
+                ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
+                ['label' => 'CPA Iklan', 'key' => 'ad_cpa', 'format' => $currencyDisplay],
+                ['label' => 'Rasio Iklan / Sales Iklan', 'key' => 'ad_sales_rate', 'format' => $percentDisplay],
             ],
         ],
         [
@@ -1193,7 +1193,7 @@
                                 <th class="text-end" title="Biaya Iklan">Iklan</th>
                                 <th class="text-end" title="Return on Ad Spend terhadap Penjualan Neto">ROAS</th>
                                 <th class="text-end" title="Advertising Cost of Sales terhadap Penjualan Neto">ACOS</th>
-                                <th class="text-end pe-3" title="Biaya Iklan per Konversi">Biaya/Conv.</th>
+                                <th class="text-end pe-3" title="Biaya Iklan per Konversi">CPA Iklan</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1241,13 +1241,13 @@
                                     <td class="text-end fw-semibold">
                                         <div>{{ $fmt($dailyNetSales) }}</div>
                                     </td>
-                                    <td class="text-end pe-3">
+                                    <td class="text-end">
                                         <div>{{ $fmt($dailyAdSpend) }}</div>
                                     </td>
                                     <td class="text-end">
                                         <div>{{ $multipleDisplay($dailyRoas) }}</div>
                                     </td>
-                                    <td class="text-end pe-3">
+                                    <td class="text-end">
                                         <div>{{ $percentDisplay($dailyAcos) }}</div>
                                     </td>
                                     <td class="text-end pe-3">
