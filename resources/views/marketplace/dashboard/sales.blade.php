@@ -958,7 +958,7 @@
         ->unique()
         ->values();
     $categoryComparisonRows = $categoryNames
-        ->map(function ($categoryName) use ($categoryComparisonSourcePeriods, $categoryProductMetrics, $productAnalysisNetSales) {
+        ->map(function ($categoryName) use ($categoryComparisonSourcePeriods, $categoryProductMetrics, $productAnalysisNetSales, $masterVariantCountsByCategory) {
             $periods = collect($categoryComparisonSourcePeriods)->mapWithKeys(function ($period) use ($categoryName, $categoryProductMetrics) {
                 $categoryProducts = collect($period['products'])->filter(fn ($product) => (trim((string) ($product->category_name ?? '')) ?: 'Tanpa kategori') === $categoryName);
 
@@ -968,6 +968,12 @@
                     'to' => $period['to'],
                     'metrics' => $categoryProductMetrics($categoryProducts),
                 ]];
+            });
+            $masterVariantCount = (int) collect($masterVariantCountsByCategory ?? [])->get($categoryName, 0);
+            $periods = $periods->map(function ($period) use ($masterVariantCount) {
+                $period['metrics']['variants'] = $masterVariantCount;
+
+                return $period;
             });
             $activeMetrics = $periods->get('active')['metrics'];
             $previousMetrics = $periods->get('previous')['metrics'];
