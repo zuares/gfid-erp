@@ -1134,10 +1134,13 @@ SQL;
                 $row->buyer_paid_amount = (float) $row->buyer_paid_amount;
                 $row->shipping_fee = (float) ($row->shipping_fee_customer ?? 0);
                 $isSettlementBacked = $row->settlement_id !== null;
+                $settlementRaw = $this->decodePayload($row->settlement_raw_json);
+                $orderRaw = $this->decodePayload($row->order_raw_json ?? $row->raw_payload_json);
+                $incomeRaw = array_replace((array) ($orderRaw['income_details'] ?? []), $settlementRaw);
                 $promotionAmounts = $isSettlementBacked
                     ? $this->promotionAmountsFromSettlement(
                         $row->settlement_raw_json,
-                        $row->order_raw_json ?? $row->raw_payload_json,
+                        $orderRaw,
                         (float) ($row->seller_voucher ?? 0),
                     )
                     : [
@@ -1146,15 +1149,32 @@ SQL;
                     ];
                 $row->voucher_store = (float) ($promotionAmounts['voucher_store'] ?? 0);
                 $row->voucher_platform = (float) ($promotionAmounts['voucher_platform'] ?? 0);
-                $row->buyer_service_fee = $this->firstPayloadAmount(
-                    [$row->settlement_raw_json, $row->order_raw_json, $row->raw_payload_json],
-                    [
-                        'buyer_service_fee',
-                        'Buyer Service Fee',
-                        'promotion_breakdown.buyer_service_fee',
-                        'promotion_breakdown.Buyer Service Fee',
-                    ],
+                $buyerShippingFromPayload = $this->firstPayloadAmount(
+                    [$incomeRaw, $orderRaw],
+                    ['buyer_paid_shipping_fee'],
                 );
+                if ($buyerShippingFromPayload > 0) {
+                    $row->shipping_fee = $buyerShippingFromPayload;
+                }
+                $buyerCoins = $this->firstPayloadAmount(
+                    [$incomeRaw, $orderRaw, $orderRaw['promotion_breakdown'] ?? []],
+                    ['coin', 'coins', 'coin_discount', 'cashback_coin'],
+                );
+                $buyerTransactionFee = $this->firstPayloadAmount(
+                    [$incomeRaw, $orderRaw, $orderRaw['promotion_breakdown'] ?? []],
+                    ['buyer_transaction_fee', 'buyer_service_fee'],
+                );
+                $row->buyer_service_fee = $buyerTransactionFee > 0
+                    ? $buyerTransactionFee
+                    : max(
+                        $row->buyer_paid_amount
+                            - $row->product_subtotal
+                            - $row->shipping_fee
+                            + $row->voucher_platform
+                            + $row->voucher_store
+                            + $buyerCoins,
+                        0,
+                    );
                 $row->total_paid = $row->buyer_paid_amount;
                 $row->is_paid = in_array((string) $row->payment_state, ['PAID', 'COMPLETED', 'SELESAI', 'LUNAS'], true);
 
