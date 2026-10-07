@@ -658,6 +658,31 @@ SQL;
             ? ($shippingKpi['exception'] / $shippingKpi['total']) * 100
             : 0;
 
+        $comparisonMonth = null;
+        $comparisonPeriod = null;
+        if (! $request->boolean('_sales_comparison')) {
+            $loadComparison = function ($comparisonFrom, $comparisonTo) use ($request) {
+                $comparisonRequest = Request::create($request->url(), 'GET', array_merge($request->query(), [
+                    'date_from' => $comparisonFrom->toDateString(),
+                    'date_to' => $comparisonTo->toDateString(),
+                    '_sales_comparison' => 1,
+                ]));
+                $comparisonView = $this->index($comparisonRequest);
+
+                return [
+                    'from' => $comparisonFrom->toDateString(),
+                    'to' => $comparisonTo->toDateString(),
+                    'data' => $comparisonView->getData(),
+                ];
+            };
+
+            $comparisonMonth = $loadComparison((clone $from)->subMonthNoOverflow(), (clone $to)->subMonthNoOverflow());
+            $periodDays = $from->diffInDays($to) + 1;
+            $comparisonPeriodTo = (clone $from)->subDay();
+            $comparisonPeriodFrom = (clone $comparisonPeriodTo)->subDays($periodDays - 1);
+            $comparisonPeriod = $loadComparison($comparisonPeriodFrom, $comparisonPeriodTo);
+        }
+
         return view('marketplace.dashboard.sales', [
             'summary' => $summary,
             'daily' => $daily,
@@ -673,6 +698,8 @@ SQL;
             'shippingDaily' => $shippingDaily,
             'shippingKpi' => $shippingKpi,
             'orderDetails' => $orderDetails,
+            'comparisonMonth' => $comparisonMonth,
+            'comparisonPeriod' => $comparisonPeriod,
             'stores' => $stores,
             'filters' => [
                 'date_from' => $from->toDateString(),

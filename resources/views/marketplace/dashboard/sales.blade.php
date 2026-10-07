@@ -116,7 +116,51 @@
         color: var(--sales-accent);
         border: 1px solid color-mix(in srgb, var(--sales-accent) 12%, var(--sales-line) 88%);
     }
-    .sales-dashboard .sales-kpi-value { color: var(--sales-ink); font-size: 1.4rem; font-weight: 800; letter-spacing: -.03em; }
+    .sales-dashboard .sales-kpi-value { color: var(--sales-ink); font-size: clamp(1rem, 1.2vw, 1.2rem); font-weight: 800; letter-spacing: -.025em; line-height: 1.15; white-space: nowrap; }
+    .sales-dashboard .sales-kpi-comparison,
+    .sales-dashboard .sales-compare-line {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: .3rem;
+        margin-top: 0;
+        color: var(--sales-muted);
+        font-size: .56rem;
+        line-height: 1;
+        letter-spacing: -.01em;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+    .sales-dashboard .sales-kpi-comparison {
+        width: 7.4rem;
+        flex-shrink: 0;
+        padding: .18rem 0 .18rem .55rem;
+        border: 0;
+        border-left: 1px solid var(--sales-line);
+        background: transparent;
+        font-size: .56rem;
+    }
+    .sales-dashboard .sales-kpi-comparisons { display: flex; flex-direction: column; align-items: stretch; gap: .12rem; flex-shrink: 0; }
+    .sales-dashboard .sales-compare-line i { font-size: .58rem; }
+    .sales-dashboard .sales-compare-context { font-weight: 600; }
+    .sales-dashboard .sales-kpi-comparison strong,
+    .sales-dashboard .sales-compare-line strong { font-weight: 800; }
+    .sales-dashboard .sales-kpi-comparison.is-good strong,
+    .sales-dashboard .sales-compare-line.is-good strong { color: var(--success, #16a34a); }
+    .sales-dashboard .sales-kpi-comparison.is-bad strong,
+    .sales-dashboard .sales-compare-line.is-bad strong { color: var(--danger, #dc2626); }
+    .sales-dashboard .sales-kpi-comparison.is-bad { border-color: var(--sales-line); }
+    .sales-dashboard .sales-kpi-comparison.is-neutral strong,
+    .sales-dashboard .sales-compare-line.is-neutral strong { color: var(--sales-muted); }
+    .sales-dashboard .sales-kpi-comparison.is-neutral { background: transparent; }
+    .sales-dashboard .sales-compare-period-note {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        color: var(--sales-muted);
+        font-size: .7rem;
+        font-weight: 650;
+    }
     .sales-dashboard .sales-kpi--success .sales-kpi-icon { background: var(--success-soft, #dcfce7); color: var(--success, #16a34a); border-color: color-mix(in srgb, var(--success, #16a34a) 16%, var(--sales-line) 84%); }
     .sales-dashboard .sales-kpi--success::after { background: var(--success, #16a34a); }
     .sales-dashboard .sales-kpi--warning .sales-kpi-icon { background: var(--danger-soft, #fee2e2); color: var(--danger, #dc2626); border-color: color-mix(in srgb, var(--danger, #dc2626) 16%, var(--sales-line) 84%); }
@@ -138,6 +182,15 @@
         white-space: nowrap;
     }
     .sales-dashboard .sales-table td { border-color: color-mix(in srgb, var(--sales-line) 65%, transparent); font-size: .78rem; }
+    .sales-dashboard .sales-daily-table { min-width: 980px; }
+    .sales-dashboard .sales-daily-table .sales-table-metric { white-space: nowrap; }
+    .sales-dashboard .sales-daily-table .sales-compare-line { margin-top: .18rem; gap: .2rem; font-size: .52rem; }
+    .sales-dashboard .sales-daily-table .sales-compare-line i { font-size: .5rem; }
+    .sales-dashboard .sales-daily-table .sales-compare-line strong { font-size: .54rem; }
+    .sales-dashboard .sales-product-table { min-width: 1265px; table-layout: fixed; }
+    .sales-dashboard .sales-product-table th,
+    .sales-dashboard .sales-product-table td { white-space: nowrap; }
+    .sales-dashboard .sales-product-table .sales-product-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .sales-dashboard .sales-income-table { min-width: 1080px; }
     .sales-dashboard .sales-income-table th,
     .sales-dashboard .sales-income-table td { white-space: nowrap; }
@@ -292,6 +345,110 @@
     $topProductBuyers = (int) $products->sum('buyers');
     $incomeSettlementRate = $incomeSummary['orders'] > 0 ? ($incomeSummary['settled_orders'] / $incomeSummary['orders']) * 100 : 0;
     $promotionRate = $summary['subtotal'] > 0 ? ($summary['promotion_total'] / $summary['subtotal']) * 100 : 0;
+    $comparisonMonthData = $comparisonMonth['data'] ?? null;
+    $comparisonPeriodData = $comparisonPeriod['data'] ?? null;
+    $comparisonMonthLabel = $comparisonMonth
+        ? $dateLabel($comparisonMonth['from']).' – '.$dateLabel($comparisonMonth['to'])
+        : 'bulan lalu';
+    $comparisonPeriodLabel = $comparisonPeriod
+        ? $dateLabel($comparisonPeriod['from']).' – '.$dateLabel($comparisonPeriod['to'])
+        : 'periode lalu';
+    $previousMonthSummary = data_get($comparisonMonthData, 'summary', []);
+    $previousPeriodSummary = data_get($comparisonPeriodData, 'summary', []);
+    $previousMonthPaymentSummary = data_get($comparisonMonthData, 'paymentSummary', []);
+    $previousPeriodPaymentSummary = data_get($comparisonPeriodData, 'paymentSummary', []);
+    $previousMonthIncomeSummary = data_get($comparisonMonthData, 'incomeSummary', []);
+    $previousPeriodIncomeSummary = data_get($comparisonPeriodData, 'incomeSummary', []);
+    $previousMonthShippingKpi = data_get($comparisonMonthData, 'shippingKpi', []);
+    $previousPeriodShippingKpi = data_get($comparisonPeriodData, 'shippingKpi', []);
+    $previousMonthProducts = collect(data_get($comparisonMonthData, 'products', []));
+    $previousPeriodProducts = collect(data_get($comparisonPeriodData, 'products', []));
+    $previousMonthTopProductCount = $previousMonthProducts->count();
+    $previousPeriodTopProductCount = $previousPeriodProducts->count();
+    $previousMonthTopProductQty = (int) $previousMonthProducts->sum('qty');
+    $previousPeriodTopProductQty = (int) $previousPeriodProducts->sum('qty');
+    $previousMonthTopProductSales = (float) $previousMonthProducts->sum('sales');
+    $previousPeriodTopProductSales = (float) $previousPeriodProducts->sum('sales');
+    $previousMonthTopProductBuyers = (int) $previousMonthProducts->sum('buyers');
+    $previousPeriodTopProductBuyers = (int) $previousPeriodProducts->sum('buyers');
+    $previousMonthIncomeSettlementRate = ($previousMonthIncomeSummary['orders'] ?? 0) > 0
+        ? (($previousMonthIncomeSummary['settled_orders'] ?? 0) / $previousMonthIncomeSummary['orders']) * 100 : 0;
+    $previousPeriodIncomeSettlementRate = ($previousPeriodIncomeSummary['orders'] ?? 0) > 0
+        ? (($previousPeriodIncomeSummary['settled_orders'] ?? 0) / $previousPeriodIncomeSummary['orders']) * 100 : 0;
+    $previousMonthPromotionRate = ($previousMonthSummary['subtotal'] ?? 0) > 0
+        ? (($previousMonthSummary['promotion_total'] ?? 0) / $previousMonthSummary['subtotal']) * 100 : 0;
+    $previousPeriodPromotionRate = ($previousPeriodSummary['subtotal'] ?? 0) > 0
+        ? (($previousPeriodSummary['promotion_total'] ?? 0) / $previousPeriodSummary['subtotal']) * 100 : 0;
+    $numberDisplay = fn ($value) => number_format((float) $value, 0, ',', '.');
+    $currencyDisplay = fn ($value) => $fmt($value);
+    $percentDisplay = fn ($value) => number_format((float) $value, 1, ',', '.').'%';
+    $compareMetric = function ($current, $previous, callable $formatter, string $mode = 'relative', bool $higherIsBetter = true) {
+        if ($previous === null) return null;
+        $current = (float) $current;
+        $previous = (float) $previous;
+        $delta = $mode === 'points'
+            ? $current - $previous
+            : ($previous != 0.0 ? (($current - $previous) / abs($previous)) * 100 : null);
+        if ($delta === null) {
+            return [
+                'previous_label' => $formatter($previous),
+                'delta_label' => $current == 0.0 ? '0,0%' : 'baru',
+                'tone' => $current > 0.0 ? 'is-good' : 'is-neutral',
+            ];
+        }
+        $isNeutral = abs($delta) < 0.05;
+        $tone = $isNeutral ? 'is-neutral' : ((($delta > 0) === $higherIsBetter) ? 'is-good' : 'is-bad');
+        $suffix = $mode === 'points' ? ' pp' : '%';
+
+        return [
+            'previous_label' => $formatter($previous),
+            'delta_label' => ($delta > 0 ? '+' : '').number_format($delta, 1, ',', '.').$suffix,
+            'tone' => $tone,
+        ];
+    };
+    $kpiComparisons = function ($current, $monthPrevious, $periodPrevious, callable $formatter, string $mode = 'relative', bool $higherIsBetter = true) use ($compareMetric) {
+        return [
+            ['label' => 'Bln lalu', 'value' => $compareMetric($current, $monthPrevious, $formatter, $mode, $higherIsBetter)],
+            ['label' => 'Periode', 'value' => $compareMetric($current, $periodPrevious, $formatter, $mode, $higherIsBetter)],
+        ];
+    };
+    $dailyMonthRows = collect(data_get($comparisonMonthData, 'daily', []))->keyBy(fn ($row) => (string) data_get($row, 'day'));
+    $dailyPeriodRows = collect(data_get($comparisonPeriodData, 'daily', []))->keyBy(fn ($row) => (string) data_get($row, 'day'));
+    $currentPeriodStart = \Carbon\Carbon::parse($filters['date_from']);
+    $dailyComparisons = function ($row) use ($comparisonMonth, $comparisonPeriod, $currentPeriodStart, $dailyMonthRows, $dailyPeriodRows, $compareMetric, $numberDisplay, $currencyDisplay) {
+        $rowOffset = $currentPeriodStart->diffInDays(\Carbon\Carbon::parse((string) $row->day));
+        $comparisonRow = function ($comparison, $rows) use ($rowOffset) {
+            if (! $comparison) {
+                return null;
+            }
+
+            $comparisonDate = \Carbon\Carbon::parse($comparison['from'])->addDays($rowOffset)->toDateString();
+
+            return $rows->get($comparisonDate, (object) [
+                'orders' => 0,
+                'qty' => 0,
+                'avg_units_per_order' => 0,
+                'subtotal' => 0,
+                'aov' => 0,
+            ]);
+        };
+        $monthRow = $comparisonRow($comparisonMonth, $dailyMonthRows);
+        $periodRow = $comparisonRow($comparisonPeriod, $dailyPeriodRows);
+        $metric = function ($field, callable $formatter, string $mode = 'relative', bool $higherIsBetter = true) use ($row, $monthRow, $periodRow, $compareMetric) {
+            return [
+                ['label' => 'Bln lalu', 'value' => $compareMetric(data_get($row, $field, 0), $monthRow ? data_get($monthRow, $field, 0) : null, $formatter, $mode, $higherIsBetter)],
+                ['label' => 'Periode', 'value' => $compareMetric(data_get($row, $field, 0), $periodRow ? data_get($periodRow, $field, 0) : null, $formatter, $mode, $higherIsBetter)],
+            ];
+        };
+
+        return [
+            'orders' => $metric('orders', $numberDisplay),
+            'qty' => $metric('qty', $numberDisplay),
+            'avg_units_per_order' => $metric('avg_units_per_order', fn ($value) => number_format((float) $value, 2, ',', '.')),
+            'subtotal' => $metric('subtotal', $currencyDisplay),
+            'aov' => $metric('aov', $currencyDisplay),
+        ];
+    };
 @endphp
 
 <div class="container-fluid py-4 sales-dashboard">
@@ -345,6 +502,13 @@
         </div>
     </form>
 
+    @if ($comparisonMonth || $comparisonPeriod)
+        <div class="sales-compare-period-note mb-3" title="Bln lalu: {{ $comparisonMonthLabel }} · Periode: {{ $comparisonPeriodLabel }}">
+            <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+            Perbandingan: <span>Bln lalu</span> · <span>Periode</span>
+        </div>
+    @endif
+
     <nav class="sales-nav nav nav-pills gap-2 mb-4" aria-label="Dashboard operasional" role="tablist">
         <button class="nav-link {{ $activeTab === 'sales' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'sales' ? 'true' : 'false' }}" data-sales-tab="sales"><i class="bi bi-graph-up-arrow me-1"></i>Penjualan</button>
         <button class="nav-link {{ $activeTab === 'products' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'products' ? 'true' : 'false' }}" data-sales-tab="products"><i class="bi bi-box-seam me-1"></i>Produk</button>
@@ -359,10 +523,10 @@
     @include('marketplace.dashboard.partials._kpis', [
         'kpiTitle' => 'Penjualan',
         'kpis' => [
-            ['label' => 'Penjualan', 'value' => $fmt($summary['subtotal']), 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
-            ['label' => 'Nilai Neto', 'value' => $fmt($summary['net_total']), 'icon' => 'bi-graph-down-arrow'],
-            ['label' => 'Order', 'value' => number_format($summary['orders']), 'icon' => 'bi-receipt'],
-            ['label' => 'AOV Neto', 'value' => $fmt($globalAov), 'note' => number_format($summary['buyers']).' pembeli', 'icon' => 'bi-bar-chart-line'],
+            ['label' => 'Penjualan', 'value' => $fmt($summary['subtotal']), 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($summary['subtotal'], $previousMonthSummary['subtotal'] ?? null, $previousPeriodSummary['subtotal'] ?? null, $currencyDisplay)],
+            ['label' => 'Nilai Neto', 'value' => $fmt($summary['net_total']), 'icon' => 'bi-graph-down-arrow', 'comparisons' => $kpiComparisons($summary['net_total'], $previousMonthSummary['net_total'] ?? null, $previousPeriodSummary['net_total'] ?? null, $currencyDisplay)],
+            ['label' => 'Order', 'value' => number_format($summary['orders']), 'icon' => 'bi-receipt', 'comparisons' => $kpiComparisons($summary['orders'], $previousMonthSummary['orders'] ?? null, $previousPeriodSummary['orders'] ?? null, $numberDisplay)],
+            ['label' => 'AOV Neto', 'value' => $fmt($globalAov), 'note' => number_format($summary['buyers']).' pembeli', 'icon' => 'bi-bar-chart-line', 'comparisons' => $kpiComparisons($globalAov, $previousMonthSummary['aov'] ?? null, $previousPeriodSummary['aov'] ?? null, $currencyDisplay)],
         ],
     ])
     <section class="card sales-card shadow-sm" aria-labelledby="daily-sales-title">
@@ -378,7 +542,7 @@
             <div class="sales-empty text-center"><i class="bi bi-bar-chart-line d-block fs-3 mb-2"></i>Belum ada penjualan pada periode yang dipilih.</div>
         @else
             <div class="table-responsive">
-                <table class="table table-sm table-hover align-middle sales-table">
+                <table class="table table-sm table-hover align-middle sales-table sales-daily-table">
                     <thead>
                         <tr>
                             <th class="ps-3">No.</th>
@@ -392,14 +556,42 @@
                     </thead>
                     <tbody>
                         @foreach ($daily as $row)
+                            @php
+                                $dailyComparison = $dailyComparisons($row);
+                            @endphp
                             <tr class="sales-clickable-row" data-sales-order-detail-date="{{ $row->day }}" tabindex="0" role="button">
                                 <td class="ps-3 text-muted">{{ $loop->iteration }}</td>
                                 <td><button class="sales-date-link" type="button" data-sales-order-detail-date="{{ $row->day }}">{{ $dateLabel($row->day) }}</button></td>
-                                <td class="text-end">{{ number_format($row->orders) }}</td>
-                                <td class="text-end">{{ number_format($row->qty) }}</td>
-                                <td class="text-end">{{ number_format($row->avg_units_per_order, 2) }}</td>
-                                <td class="text-end">{{ $fmt($row->subtotal) }}</td>
-                                <td class="text-end">{{ $fmt($row->aov) }}</td>
+                                <td class="text-end sales-table-metric">
+                                    <div>{{ number_format($row->orders) }}</div>
+                                    @foreach ($dailyComparison['orders'] as $comparisonItem)
+                                        @include('marketplace.dashboard.partials._comparison', ['comparison' => $comparisonItem['value'], 'class' => 'sales-table-comparison', 'context_label' => $comparisonItem['label'], 'period_label' => str_contains(strtolower($comparisonItem['label']), 'bln') ? ($comparisonMonthLabel ?? 'bulan lalu') : ($comparisonPeriodLabel ?? 'periode lalu')])
+                                    @endforeach
+                                </td>
+                                <td class="text-end sales-table-metric">
+                                    <div>{{ number_format($row->qty) }}</div>
+                                    @foreach ($dailyComparison['qty'] as $comparisonItem)
+                                        @include('marketplace.dashboard.partials._comparison', ['comparison' => $comparisonItem['value'], 'class' => 'sales-table-comparison', 'context_label' => $comparisonItem['label'], 'period_label' => str_contains(strtolower($comparisonItem['label']), 'bln') ? ($comparisonMonthLabel ?? 'bulan lalu') : ($comparisonPeriodLabel ?? 'periode lalu')])
+                                    @endforeach
+                                </td>
+                                <td class="text-end sales-table-metric">
+                                    <div>{{ number_format($row->avg_units_per_order, 2, ',', '.') }}</div>
+                                    @foreach ($dailyComparison['avg_units_per_order'] as $comparisonItem)
+                                        @include('marketplace.dashboard.partials._comparison', ['comparison' => $comparisonItem['value'], 'class' => 'sales-table-comparison', 'context_label' => $comparisonItem['label'], 'period_label' => str_contains(strtolower($comparisonItem['label']), 'bln') ? ($comparisonMonthLabel ?? 'bulan lalu') : ($comparisonPeriodLabel ?? 'periode lalu')])
+                                    @endforeach
+                                </td>
+                                <td class="text-end sales-table-metric">
+                                    <div>{{ $fmt($row->subtotal) }}</div>
+                                    @foreach ($dailyComparison['subtotal'] as $comparisonItem)
+                                        @include('marketplace.dashboard.partials._comparison', ['comparison' => $comparisonItem['value'], 'class' => 'sales-table-comparison', 'context_label' => $comparisonItem['label'], 'period_label' => str_contains(strtolower($comparisonItem['label']), 'bln') ? ($comparisonMonthLabel ?? 'bulan lalu') : ($comparisonPeriodLabel ?? 'periode lalu')])
+                                    @endforeach
+                                </td>
+                                <td class="text-end sales-table-metric">
+                                    <div>{{ $fmt($row->aov) }}</div>
+                                    @foreach ($dailyComparison['aov'] as $comparisonItem)
+                                        @include('marketplace.dashboard.partials._comparison', ['comparison' => $comparisonItem['value'], 'class' => 'sales-table-comparison', 'context_label' => $comparisonItem['label'], 'period_label' => str_contains(strtolower($comparisonItem['label']), 'bln') ? ($comparisonMonthLabel ?? 'bulan lalu') : ($comparisonPeriodLabel ?? 'periode lalu')])
+                                    @endforeach
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -413,10 +605,10 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Penghasilan',
             'kpis' => [
-                ['label' => 'Pembayaran Pembeli', 'value' => $fmt($incomeSummary['buyer_paid']), 'note' => number_format($incomeSummary['orders']).' orders', 'icon' => 'bi-wallet2'],
-                ['label' => 'Dana Cair', 'value' => $fmt($incomeSummary['final_income']), 'note' => number_format($incomeSummary['settled_orders']).' order settled', 'icon' => 'bi-cash-coin', 'variant' => 'sales-kpi--success'],
-                ['label' => 'Belum Cair', 'value' => $fmt($incomeSummary['pending_buyer_paid']), 'note' => number_format($incomeSummary['pending_orders']).' order pending', 'icon' => 'bi-hourglass-split'],
-                ['label' => 'Settlement Rate', 'value' => number_format($incomeSettlementRate, 1).'%','note' => 'berdasarkan jumlah order', 'icon' => 'bi-check2-circle'],
+                ['label' => 'Pembayaran Pembeli', 'value' => $fmt($incomeSummary['buyer_paid']), 'note' => number_format($incomeSummary['orders']).' orders', 'icon' => 'bi-wallet2', 'comparisons' => $kpiComparisons($incomeSummary['buyer_paid'], $previousMonthIncomeSummary['buyer_paid'] ?? null, $previousPeriodIncomeSummary['buyer_paid'] ?? null, $currencyDisplay)],
+                ['label' => 'Dana Cair', 'value' => $fmt($incomeSummary['final_income']), 'note' => number_format($incomeSummary['settled_orders']).' order settled', 'icon' => 'bi-cash-coin', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($incomeSummary['final_income'], $previousMonthIncomeSummary['final_income'] ?? null, $previousPeriodIncomeSummary['final_income'] ?? null, $currencyDisplay)],
+                ['label' => 'Belum Cair', 'value' => $fmt($incomeSummary['pending_buyer_paid']), 'note' => number_format($incomeSummary['pending_orders']).' order pending', 'icon' => 'bi-hourglass-split', 'comparisons' => $kpiComparisons($incomeSummary['pending_buyer_paid'], $previousMonthIncomeSummary['pending_buyer_paid'] ?? null, $previousPeriodIncomeSummary['pending_buyer_paid'] ?? null, $currencyDisplay, 'relative', false)],
+                ['label' => 'Settlement Rate', 'value' => number_format($incomeSettlementRate, 1).'%','note' => 'berdasarkan jumlah order', 'icon' => 'bi-check2-circle', 'comparisons' => $kpiComparisons($incomeSettlementRate, $previousMonthIncomeSettlementRate, $previousPeriodIncomeSettlementRate, $percentDisplay, 'points')],
             ],
         ])
         <section class="card sales-card shadow-sm">
@@ -484,10 +676,10 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Detail Pesanan',
             'kpis' => [
-                ['label' => 'Total Order', 'value' => number_format($summary['orders']), 'icon' => 'bi-receipt'],
-                ['label' => 'Total Pembayaran', 'value' => $fmt($paymentSummary['buyer_paid']), 'icon' => 'bi-wallet2', 'variant' => 'sales-kpi--success'],
-                ['label' => 'AOV Neto', 'value' => $fmt($summary['aov']), 'note' => 'per order', 'icon' => 'bi-bar-chart-line'],
-                ['label' => 'Total Promosi', 'value' => $fmt($summary['promotion_total']), 'icon' => 'bi-percent', 'variant' => 'sales-kpi--warning'],
+                ['label' => 'Total Order', 'value' => number_format($summary['orders']), 'icon' => 'bi-receipt', 'comparisons' => $kpiComparisons($summary['orders'], $previousMonthSummary['orders'] ?? null, $previousPeriodSummary['orders'] ?? null, $numberDisplay)],
+                ['label' => 'Total Pembayaran', 'value' => $fmt($paymentSummary['buyer_paid']), 'icon' => 'bi-wallet2', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($paymentSummary['buyer_paid'], $previousMonthPaymentSummary['buyer_paid'] ?? null, $previousPeriodPaymentSummary['buyer_paid'] ?? null, $currencyDisplay)],
+                ['label' => 'AOV Neto', 'value' => $fmt($summary['aov']), 'note' => 'per order', 'icon' => 'bi-bar-chart-line', 'comparisons' => $kpiComparisons($summary['aov'], $previousMonthSummary['aov'] ?? null, $previousPeriodSummary['aov'] ?? null, $currencyDisplay)],
+                ['label' => 'Total Promosi', 'value' => $fmt($summary['promotion_total']), 'icon' => 'bi-percent', 'variant' => 'sales-kpi--warning', 'comparisons' => $kpiComparisons($summary['promotion_total'], $previousMonthSummary['promotion_total'] ?? null, $previousPeriodSummary['promotion_total'] ?? null, $currencyDisplay, 'relative', false)],
             ],
         ])
         <section class="card sales-card shadow-sm">
@@ -541,7 +733,8 @@
                                     <td><span class="badge sales-badge">{{ ucwords(str_replace('_', ' ', strtolower($order->status ?: 'Belum ditentukan'))) }}</span></td>
                                     <td class="text-end sales-order-promotion">
                                         <div class="fw-semibold">{{ $fmt($order->promotion_total) }}</div>
-                                        <div class="small text-muted">Voucher: {{ $fmt($order->voucher_store) }} + {{ $fmt($order->voucher_platform) }}</div>
+                                        <div class="small text-muted">Voucher toko: {{ $fmt($order->voucher_store) }}</div>
+                                        <div class="small text-muted">Voucher platform: {{ $fmt($order->voucher_platform) }}</div>
                                         <div class="small text-muted">Paket: {{ $fmt($order->bundle_discount) }}</div>
                                     </td>
                                     <td class="text-end pe-3 sales-order-total">
@@ -562,10 +755,10 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Produk',
             'kpis' => [
-                ['label' => 'Produk Teratas', 'value' => number_format($topProductCount), 'note' => 'produk pada daftar Top 8', 'icon' => 'bi-box-seam'],
-                ['label' => 'Unit Terjual', 'value' => number_format($topProductQty), 'note' => 'dari produk teratas', 'icon' => 'bi-stack'],
-                ['label' => 'Penjualan Produk', 'value' => $fmt($topProductSales), 'note' => 'kontribusi Top 8', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
-                ['label' => 'Pembeli Produk', 'value' => number_format($topProductBuyers), 'note' => 'akumulasi produk teratas', 'icon' => 'bi-people'],
+                ['label' => 'Produk Teratas', 'value' => number_format($topProductCount), 'note' => 'produk pada daftar Top 8', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($topProductCount, $previousMonthTopProductCount, $previousPeriodTopProductCount, $numberDisplay)],
+                ['label' => 'Unit Terjual', 'value' => number_format($topProductQty), 'note' => 'dari produk teratas', 'icon' => 'bi-stack', 'comparisons' => $kpiComparisons($topProductQty, $previousMonthTopProductQty, $previousPeriodTopProductQty, $numberDisplay)],
+                ['label' => 'Penjualan Produk', 'value' => $fmt($topProductSales), 'note' => 'kontribusi Top 8', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($topProductSales, $previousMonthTopProductSales, $previousPeriodTopProductSales, $currencyDisplay)],
+                ['label' => 'Pembeli Produk', 'value' => number_format($topProductBuyers), 'note' => 'akumulasi produk teratas', 'icon' => 'bi-people', 'comparisons' => $kpiComparisons($topProductBuyers, $previousMonthTopProductBuyers, $previousPeriodTopProductBuyers, $numberDisplay)],
             ],
         ])
         <section class="card sales-card shadow-sm">
@@ -580,7 +773,19 @@
                 <div class="sales-empty text-center"><i class="bi bi-box-seam d-block fs-3 mb-2"></i>Belum ada detail produk pada periode ini.</div>
             @else
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle sales-table">
+                    <table class="table table-sm table-hover align-middle sales-table sales-product-table">
+                        <colgroup>
+                            <col style="width: 3.25rem">
+                            <col style="width: 13.5rem">
+                            <col style="width: 7rem">
+                            <col style="width: 7rem">
+                            <col style="width: 7rem">
+                            <col style="width: 6.5rem">
+                            <col style="width: 10rem">
+                            <col style="width: 11rem">
+                            <col style="width: 9.5rem">
+                            <col style="width: 9.5rem">
+                        </colgroup>
                         <thead><tr><th class="ps-3">No.</th><th>Produk</th><th>SKU</th><th class="text-end">Order</th><th class="text-end">Pembeli</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">AOV Neto</th><th class="text-end pe-3">APC</th></tr></thead>
                         <tbody>
                             @foreach ($products as $product)
@@ -597,7 +802,7 @@
                                     <td class="text-end">{{ number_format((int) $product->qty) }}</td>
                                     <td class="text-end fw-semibold">{{ $fmt($product->sales) }}</td>
                                     <td class="text-end fw-semibold">{{ $fmt($product->buyer_payment) }}</td>
-                                        <td class="text-end">{{ $product->orders > 0 ? $fmt($product->buyer_payment / $product->orders) : '—' }}</td>
+                                    <td class="text-end">{{ $product->orders > 0 ? $fmt($product->buyer_payment / $product->orders) : '—' }}</td>
                                     <td class="text-end" title="Average Payment per Customer: pembayaran pembeli dibagi pembeli unik">{{ $product->buyers > 0 ? $fmt($product->buyer_payment / $product->buyers) : '—' }}</td>
                                 </tr>
                             @endforeach
@@ -612,10 +817,10 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Pembayaran',
             'kpis' => [
-                ['label' => 'Total Dibayar Pembeli', 'value' => $fmt($paymentSummary['buyer_paid']), 'note' => number_format($paymentSummary['orders']).' orders', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
-                ['label' => 'AOV Neto', 'value' => $fmt($paymentSummary['aov']), 'note' => 'per order', 'icon' => 'bi-graph-up-arrow'],
-                ['label' => 'Median Ticket', 'value' => $fmt($paymentSummary['median_ticket']), 'note' => 'nilai tengah order', 'icon' => 'bi-bar-chart-line'],
-                ['label' => 'COD Exposure', 'value' => number_format($paymentSummary['cod_order_share'], 1).'%', 'note' => number_format($paymentDaily->sum('cod_orders')).' COD orders', 'icon' => 'bi-shield-exclamation', 'variant' => 'sales-kpi--warning'],
+                ['label' => 'Total Dibayar Pembeli', 'value' => $fmt($paymentSummary['buyer_paid']), 'note' => number_format($paymentSummary['orders']).' orders', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($paymentSummary['buyer_paid'], $previousMonthPaymentSummary['buyer_paid'] ?? null, $previousPeriodPaymentSummary['buyer_paid'] ?? null, $currencyDisplay)],
+                ['label' => 'AOV Neto', 'value' => $fmt($paymentSummary['aov']), 'note' => 'per order', 'icon' => 'bi-graph-up-arrow', 'comparisons' => $kpiComparisons($paymentSummary['aov'], $previousMonthPaymentSummary['aov'] ?? null, $previousPeriodPaymentSummary['aov'] ?? null, $currencyDisplay)],
+                ['label' => 'Median Ticket', 'value' => $fmt($paymentSummary['median_ticket']), 'note' => 'nilai tengah order', 'icon' => 'bi-bar-chart-line', 'comparisons' => $kpiComparisons($paymentSummary['median_ticket'], $previousMonthPaymentSummary['median_ticket'] ?? null, $previousPeriodPaymentSummary['median_ticket'] ?? null, $currencyDisplay)],
+                ['label' => 'COD Exposure', 'value' => number_format($paymentSummary['cod_order_share'], 1).'%', 'note' => number_format($paymentDaily->sum('cod_orders')).' COD orders', 'icon' => 'bi-shield-exclamation', 'variant' => 'sales-kpi--warning', 'comparisons' => $kpiComparisons($paymentSummary['cod_order_share'], $previousMonthPaymentSummary['cod_order_share'] ?? null, $previousPeriodPaymentSummary['cod_order_share'] ?? null, $percentDisplay, 'points', false)],
             ],
         ])
         <div class="row g-3 mb-3">
@@ -708,10 +913,10 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Promosi',
             'kpis' => [
-                ['label' => 'GMV', 'value' => $fmt($summary['subtotal']), 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success'],
-                ['label' => 'Total Promosi', 'value' => $fmt($summary['promotion_total']), 'icon' => 'bi-percent', 'variant' => 'sales-kpi--warning'],
-                ['label' => 'Promo Rate', 'value' => number_format($promotionRate, 1).'%','note' => 'promosi dibanding GMV', 'icon' => 'bi-graph-down-arrow'],
-                ['label' => 'Order dengan Promo', 'value' => number_format($promotionOrders), 'note' => 'order terdampak promosi', 'icon' => 'bi-ticket-perforated'],
+                ['label' => 'GMV', 'value' => $fmt($summary['subtotal']), 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($summary['subtotal'], $previousMonthSummary['subtotal'] ?? null, $previousPeriodSummary['subtotal'] ?? null, $currencyDisplay)],
+                ['label' => 'Total Promosi', 'value' => $fmt($summary['promotion_total']), 'icon' => 'bi-percent', 'variant' => 'sales-kpi--warning', 'comparisons' => $kpiComparisons($summary['promotion_total'], $previousMonthSummary['promotion_total'] ?? null, $previousPeriodSummary['promotion_total'] ?? null, $currencyDisplay, 'relative', false)],
+                ['label' => 'Promo Rate', 'value' => number_format($promotionRate, 1).'%','note' => 'promosi dibanding GMV', 'icon' => 'bi-graph-down-arrow', 'comparisons' => $kpiComparisons($promotionRate, $previousMonthPromotionRate, $previousPeriodPromotionRate, $percentDisplay, 'points', false)],
+                ['label' => 'Order dengan Promo', 'value' => number_format($promotionOrders), 'note' => 'order terdampak promosi', 'icon' => 'bi-ticket-perforated', 'comparisons' => $kpiComparisons($promotionOrders, data_get($comparisonMonthData, 'promotionOrders'), data_get($comparisonPeriodData, 'promotionOrders'), $numberDisplay)],
             ],
         ])
         <section class="card sales-card shadow-sm">
@@ -773,10 +978,10 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Pengiriman',
             'kpis' => [
-                ['label' => 'Total Order', 'value' => number_format($shippingKpi['total']), 'note' => 'basis pengiriman', 'icon' => 'bi-receipt'],
-                ['label' => 'Selesai', 'value' => number_format($shippingKpi['completed']), 'note' => $shippingPct($shippingKpi['completed']).' dari total', 'icon' => 'bi-check2-circle', 'variant' => 'sales-kpi--success'],
-                ['label' => 'Dalam Pengiriman', 'value' => number_format($shippingKpi['transit']), 'note' => $shippingPct($shippingKpi['transit']).' dari total', 'icon' => 'bi-truck'],
-                ['label' => 'Tingkat Eksepsi', 'value' => $shippingExceptionPct, 'note' => number_format($shippingKpi['exception']).' gagal/return', 'icon' => 'bi-exclamation-diamond', 'variant' => 'sales-kpi--warning'],
+                ['label' => 'Total Order', 'value' => number_format($shippingKpi['total']), 'note' => 'basis pengiriman', 'icon' => 'bi-receipt', 'comparisons' => $kpiComparisons($shippingKpi['total'], $previousMonthShippingKpi['total'] ?? null, $previousPeriodShippingKpi['total'] ?? null, $numberDisplay)],
+                ['label' => 'Selesai', 'value' => number_format($shippingKpi['completed']), 'note' => $shippingPct($shippingKpi['completed']).' dari total', 'icon' => 'bi-check2-circle', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($shippingKpi['completed'], $previousMonthShippingKpi['completed'] ?? null, $previousPeriodShippingKpi['completed'] ?? null, $numberDisplay)],
+                ['label' => 'Dalam Pengiriman', 'value' => number_format($shippingKpi['transit']), 'note' => $shippingPct($shippingKpi['transit']).' dari total', 'icon' => 'bi-truck', 'comparisons' => $kpiComparisons($shippingKpi['transit'], $previousMonthShippingKpi['transit'] ?? null, $previousPeriodShippingKpi['transit'] ?? null, $numberDisplay)],
+                ['label' => 'Tingkat Eksepsi', 'value' => $shippingExceptionPct, 'note' => number_format($shippingKpi['exception']).' gagal/return', 'icon' => 'bi-exclamation-diamond', 'variant' => 'sales-kpi--warning', 'comparisons' => $kpiComparisons($shippingKpi['exception_rate'], $previousMonthShippingKpi['exception_rate'] ?? null, $previousPeriodShippingKpi['exception_rate'] ?? null, $percentDisplay, 'points', false)],
             ],
         ])
         <section class="card sales-card shadow-sm">
