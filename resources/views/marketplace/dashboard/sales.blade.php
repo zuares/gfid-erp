@@ -212,11 +212,14 @@
     }
     .sales-dashboard .sales-table td { border-color: color-mix(in srgb, var(--sales-line) 65%, transparent); font-size: .78rem; }
     .sales-dashboard .sales-promotion-table th {
-        font-size: clamp(.56rem, .1vw + .53rem, .64rem);
-        letter-spacing: .025em;
-        padding: .5rem .3rem;
-        white-space: normal;
-        overflow-wrap: anywhere;
+        font-size: clamp(.48rem, .07vw + .46rem, .56rem);
+        letter-spacing: .01em;
+        line-height: 1.15;
+        padding: .42rem .24rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: clip;
+        vertical-align: middle;
     }
     .sales-dashboard .sales-promotion-table td {
         font-size: clamp(.62rem, .14vw + .58rem, .7rem);
@@ -332,7 +335,13 @@
             width: 100%;
             table-layout: fixed;
         }
-        .sales-dashboard .sales-promotion-table th,
+        .sales-dashboard .sales-promotion-table th {
+            padding: .38rem .22rem;
+            font-size: .58rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: clip;
+        }
         .sales-dashboard .sales-promotion-table td {
             padding: .38rem .22rem;
             font-size: .58rem;
@@ -1173,18 +1182,18 @@
                         <thead>
                             <tr>
                                 <th>Tanggal</th>
-                                <th class="text-end">GMV</th>
+                                <th class="text-end" title="Penjualan Bruto">Penjualan Bruto</th>
                                 <th class="text-end">Diskon Produk</th>
-                                <th class="text-end">Voucher Toko</th>
-                                <th class="text-end">Voucher Platform</th>
+                                <th class="text-end" title="Voucher Toko">V Toko</th>
+                                <th class="text-end" title="Voucher Platform">V Platform</th>
                                 <th class="text-end">Paket Diskon</th>
                                 <th class="text-end">Kombo Hemat</th>
-                                <th class="text-end">Total Promosi</th>
-                                <th class="text-end">Penjualan Neto</th>
-                                <th class="text-end pe-3">Biaya Iklan</th>
-                                <th class="text-end">ROAS Neto</th>
-                                <th class="text-end">ACOS Neto</th>
-                                <th class="text-end pe-3">Biaya / Konversi</th>
+                                <th class="text-end" title="Total Promosi">Total Promo</th>
+                                <th class="text-end" title="Penjualan Neto">Penjualan Neto</th>
+                                <th class="text-end" title="Biaya Iklan">Iklan</th>
+                                <th class="text-end" title="Return on Ad Spend terhadap Penjualan Neto">ROAS</th>
+                                <th class="text-end" title="Advertising Cost of Sales terhadap Penjualan Neto">ACOS</th>
+                                <th class="text-end pe-3" title="Biaya Iklan per Konversi">Biaya/Conv.</th>
                             </tr>
                         </thead>
                         <tbody>
