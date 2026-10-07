@@ -369,6 +369,36 @@ class MarketplaceSalesDashboardController extends Controller
             ? ((float) $paymentDaily->sum('cod_amount') / $paymentSummary['buyer_paid']) * 100
             : 0;
 
+        $incomePaymentExpression = 'COALESCE(NULLIF(income_ms.buyer_payment_amount, 0), NULLIF(o.total_paid_customer, 0), NULLIF(o.total_amount, 0), NULLIF(o.subtotal_items, 0), 0)';
+        $incomeBase = (clone $base)
+            ->leftJoin('marketplace_order_settlements as income_ms', 'income_ms.order_id', '=', 'o.id');
+        $incomeDaily = (clone $incomeBase)
+            ->selectRaw("DATE({$dateExpression}) as day")
+            ->selectRaw('COUNT(DISTINCT o.id) as orders')
+            ->selectRaw("COUNT(DISTINCT CASE WHEN income_ms.settlement_time IS NOT NULL THEN o.id END) as settled_orders")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN income_ms.settlement_time IS NULL THEN o.id END) as pending_orders")
+            ->selectRaw("COALESCE(SUM({$incomePaymentExpression}), 0) as buyer_paid")
+            ->selectRaw('COALESCE(SUM(CASE WHEN income_ms.settlement_time IS NOT NULL THEN COALESCE(income_ms.final_income, 0) ELSE 0 END), 0) as final_income')
+            ->groupByRaw("DATE({$dateExpression})")
+            ->orderByDesc('day')
+            ->get()
+            ->map(function ($row) {
+                $row->orders = (int) $row->orders;
+                $row->settled_orders = (int) $row->settled_orders;
+                $row->pending_orders = (int) $row->pending_orders;
+                $row->buyer_paid = (float) $row->buyer_paid;
+                $row->final_income = (float) $row->final_income;
+
+                return $row;
+            });
+        $incomeSummary = [
+            'orders' => (int) $incomeDaily->sum('orders'),
+            'settled_orders' => (int) $incomeDaily->sum('settled_orders'),
+            'pending_orders' => (int) $incomeDaily->sum('pending_orders'),
+            'buyer_paid' => (float) $incomeDaily->sum('buyer_paid'),
+            'final_income' => (float) $incomeDaily->sum('final_income'),
+        ];
+
         // Imported order files keep the actual product promotion on the item
         // row. The legacy order-level discount columns are still used by API
         // orders, so combine both sources without double-counting them.
@@ -598,6 +628,8 @@ SQL;
             'payments' => $payments,
             'paymentDaily' => $paymentDaily,
             'paymentSummary' => $paymentSummary,
+            'incomeDaily' => $incomeDaily,
+            'incomeSummary' => $incomeSummary,
             'promotionDaily' => $promotionDaily,
             'promotionOrders' => $promotionOrders,
             'shipping' => $shipping,

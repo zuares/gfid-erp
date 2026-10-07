@@ -280,6 +280,7 @@
         <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="payments"><i class="bi bi-wallet2 me-1"></i>Pembayaran</button>
         <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="promotions"><i class="bi bi-percent me-1"></i>Promosi</button>
         <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="shipping"><i class="bi bi-truck me-1"></i>Pengiriman</button>
+        <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="income"><i class="bi bi-cash-coin me-1"></i>Penghasilan</button>
         <button class="nav-link" type="button" role="tab" aria-selected="false" data-sales-tab="orders"><i class="bi bi-list-ul me-1"></i>Detail Pesanan</button>
     </nav>
 
@@ -336,6 +337,57 @@
     </section>
     </div>
 
+    <div class="sales-tab-pane is-hidden" data-sales-pane="income" role="tabpanel" aria-hidden="true">
+        @include('marketplace.dashboard.partials._kpis', [
+            'kpiTitle' => 'Penghasilan',
+            'kpis' => [
+                ['label' => 'Dana Cair', 'value' => $fmt($incomeSummary['final_income']), 'note' => 'payout settlement aktual', 'icon' => 'bi-cash-coin', 'variant' => 'sales-kpi--success'],
+                ['label' => 'Pembayaran Pembeli', 'value' => $fmt($incomeSummary['buyer_paid']), 'note' => 'nilai pembayaran pada periode', 'icon' => 'bi-wallet2'],
+                ['label' => 'Order Sudah Cair', 'value' => number_format($incomeSummary['settled_orders']), 'note' => 'memiliki settlement final', 'icon' => 'bi-check-circle'],
+                ['label' => 'Order Belum Cair', 'value' => number_format($incomeSummary['pending_orders']), 'note' => 'belum memiliki tanggal cair', 'icon' => 'bi-clock-history', 'variant' => 'sales-kpi--warning'],
+            ],
+        ])
+        <section class="card sales-card shadow-sm">
+            <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
+                <div>
+                    <div class="sales-kicker mb-1">Income trend</div>
+                    <h2 class="sales-section-title mb-1">Penghasilan per tanggal order</h2>
+                    <div class="sales-section-subtitle">Dana cair hanya menghitung settlement yang sudah memiliki tanggal pencairan.</div>
+                </div>
+                <span class="badge sales-badge rounded-pill px-3 py-2">{{ $incomeDaily->count() }} hari aktif</span>
+            </div>
+            @if ($incomeDaily->isEmpty())
+                <div class="sales-empty text-center"><i class="bi bi-cash-coin d-block fs-3 mb-2"></i>Belum ada data penghasilan pada periode ini.</div>
+            @else
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle sales-table">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">Tanggal</th>
+                                <th class="text-end">Order</th>
+                                <th class="text-end">Sudah Cair</th>
+                                <th class="text-end">Belum Cair</th>
+                                <th class="text-end">Pembayaran Pembeli</th>
+                                <th class="text-end pe-3">Dana Cair</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($incomeDaily as $income)
+                                <tr>
+                                    <td class="ps-3 fw-semibold">{{ $dateLabel($income->day) }}</td>
+                                    <td class="text-end">{{ number_format($income->orders) }}</td>
+                                    <td class="text-end">{{ number_format($income->settled_orders) }}</td>
+                                    <td class="text-end">{{ number_format($income->pending_orders) }}</td>
+                                    <td class="text-end">{{ $fmt($income->buyer_paid) }}</td>
+                                    <td class="text-end pe-3 fw-semibold">{{ $fmt($income->final_income) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </section>
+    </div>
     <div class="sales-tab-pane is-hidden" data-sales-pane="orders" role="tabpanel" aria-hidden="true">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Detail Order',
