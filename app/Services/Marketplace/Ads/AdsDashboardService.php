@@ -209,16 +209,16 @@ class AdsDashboardService
     }
 
     /**
-     * Biaya iklan per item dengan sumber yang sama seperti Ads Dashboard.
-     * Campaign reguler mengambil expense dari fakta harian campaign, sedangkan
-     * GMV Max mengambil expense dari fakta harian item. Spend agregat level toko
-     * sengaja tidak dialokasikan rata-rata ke produk karena tidak punya atribusi
-     * item yang dapat dipertanggungjawabkan.
+     * Metrik iklan per item dengan sumber yang sama seperti Ads Dashboard.
+     * Campaign reguler mengambil fakta harian campaign, sedangkan GMV Max
+     * mengambil fakta harian item. Biaya detail GMV Max dinormalisasi terhadap
+     * biaya campaign parent agar selisih antara dua level sumber tidak hilang,
+     * tanpa menambahkan biaya parent sebagai biaya kedua.
      *
      * @param  array<int>  $storeIds
-     * @return array{internal: Collection<int, float>, external: Collection<string, float>}
+     * @return array{internal: Collection<int, array{spend: float, sales: float, conversions: int}>, external: Collection<string, array{spend: float, sales: float, conversions: int}>}
      */
-    public function getProductSpend(array $storeIds, int|string|null $storeId, string $dateFrom, string $dateTo): array
+    public function getProductAdMetrics(array $storeIds, int|string|null $storeId, string $dateFrom, string $dateTo): array
     {
         $storeIds = array_values(array_filter(array_map('intval', $storeIds)));
         if ($storeId !== null && $storeId !== 'all') {
@@ -233,13 +233,22 @@ class AdsDashboardService
         $internalSpend = collect();
         $externalSpend = collect();
 
-        $addSpend = static function (Collection $target, int|string|null $key, float $spend): void {
+        $addMetrics = static function (Collection $target, int|string|null $key, float $spend, float $sales, int $conversions): void {
             if ($key === null || (string) $key === '') {
                 return;
             }
 
             $normalizedKey = (string) $key;
-            $target[$normalizedKey] = (float) ($target->get($normalizedKey, 0) + $spend);
+            $current = $target->get($normalizedKey, [
+                'spend' => 0.0,
+                'sales' => 0.0,
+                'conversions' => 0,
+            ]);
+            $target[$normalizedKey] = [
+                'spend' => (float) $current['spend'] + $spend,
+                'sales' => (float) $current['sales'] + $sales,
+                'conversions' => (int) $current['conversions'] + $conversions,
+            ];
         };
 
         $campaignRows = DB::table('marketplace_ad_campaign_dailies as daily')
@@ -260,13 +269,17 @@ class AdsDashboardService
                 'campaign.internal_item_id',
             ])
             ->selectRaw('COALESCE(SUM(daily.expense), 0) as spend')
+            ->selectRaw('COALESCE(SUM(daily.broad_gmv), 0) as sales')
+            ->selectRaw('COALESCE(SUM(daily.broad_order), 0) as conversions')
             ->groupBy('daily.store_id', 'campaign.channel_item_id', 'campaign.internal_item_id')
             ->get();
 
         foreach ($campaignRows as $row) {
             $spend = (float) ($row->spend ?? 0);
-            $addSpend($internalSpend, $row->internal_item_id, $spend);
-            $addSpend($externalSpend, $row->channel_item_id, $spend);
+            $sales = (float) ($row->sales ?? 0);
+            $conversions = (int) ($row->conversions ?? 0);
+            $addMetrics($internalSpend, $row->internal_item_id, $spend, $sales, $conversions);
+            $addMetrics($externalSpend, $row->channel_item_id, $spend, $sales, $conversions);
         }
 
         $gmsRows = DB::table('marketplace_ads_item_dailies as daily')
@@ -276,12 +289,40 @@ class AdsDashboardService
             ->whereNotNull('daily.channel_item_id')
             ->select('daily.store_id', 'daily.channel_item_id')
             ->selectRaw('COALESCE(SUM(daily.expense), 0) as spend')
+            ->selectRaw('COALESCE(SUM(daily.broad_gmv), 0) as sales')
+            ->selectRaw('COALESCE(SUM(daily.broad_order), 0) as conversions')
             ->groupBy('daily.store_id', 'daily.channel_item_id')
             ->get();
 
+        $gmsParentSpendByStore = DB::table('marketplace_ad_campaign_dailies as daily')
+            ->whereIn('daily.store_id', $storeIds)
+            ->whereLike('daily.channel_campaign_id', 'GMS-%')
+            ->whereBetween('daily.date', [$dateFrom, $dateTo])
+            ->select('daily.store_id')
+            ->selectRaw('COALESCE(SUM(daily.expense), 0) as spend')
+            ->groupBy('daily.store_id')
+            ->pluck('spend', 'store_id');
+        $gmsItemSpendByStore = $gmsRows
+            ->groupBy('store_id')
+            ->map(fn (Collection $rows) => (float) $rows->sum('spend'));
+        $gmsSpendScaleByStore = $gmsItemSpendByStore->mapWithKeys(function (float $itemSpend, $currentStoreId) use ($gmsParentSpendByStore) {
+            $parentSpend = (float) ($gmsParentSpendByStore[$currentStoreId] ?? 0);
+            if ($itemSpend <= 0 || abs($parentSpend - $itemSpend) <= 0.001) {
+                return [$currentStoreId => 1.0];
+            }
+
+            return [$currentStoreId => max(0.0, $parentSpend) / $itemSpend];
+        });
+
         foreach ($gmsRows as $row) {
-            $spend = (float) ($row->spend ?? 0);
-            $addSpend($externalSpend, $row->channel_item_id, $spend);
+            $spend = (float) ($row->spend ?? 0) * (float) ($gmsSpendScaleByStore[$row->store_id] ?? 1.0);
+            $addMetrics(
+                $externalSpend,
+                $row->channel_item_id,
+                $spend,
+                (float) ($row->sales ?? 0),
+                (int) ($row->conversions ?? 0),
+            );
         }
 
         // Manual item mappings yang dipakai Ads Dashboard juga menjadi sumber
@@ -302,7 +343,18 @@ class AdsDashboardService
                 continue;
             }
 
-            $addSpend($internalSpend, $internalItemId, (float) ($row->spend ?? 0));
+            $gmsMetrics = [
+                'spend' => (float) ($row->spend ?? 0) * (float) ($gmsSpendScaleByStore[$row->store_id] ?? 1.0),
+                'sales' => (float) ($row->sales ?? 0),
+                'conversions' => (int) ($row->conversions ?? 0),
+            ];
+            $addMetrics(
+                $internalSpend,
+                $internalItemId,
+                (float) $gmsMetrics['spend'],
+                (float) $gmsMetrics['sales'],
+                (int) $gmsMetrics['conversions'],
+            );
         }
 
         return [

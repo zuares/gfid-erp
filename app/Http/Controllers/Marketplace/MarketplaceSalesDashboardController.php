@@ -350,14 +350,14 @@ class MarketplaceSalesDashboardController extends Controller
             ->limit(8)
             ->get();
 
-        $productAdSpend = app(AdsDashboardService::class)->getProductSpend(
+        $productAdMetrics = app(AdsDashboardService::class)->getProductAdMetrics(
             $adStoreIds,
             $storeId,
             $from->toDateString(),
             $to->toDateString(),
         );
-        $adSpendByInternalItem = $productAdSpend['internal'];
-        $adSpendByChannelItem = $productAdSpend['external'];
+        $adMetricsByInternalItem = $productAdMetrics['internal'];
+        $adMetricsByChannelItem = $productAdMetrics['external'];
         $productExternalIdsByInternal = collect();
         $internalProductIds = $products
             ->pluck('internal_item_id')
@@ -381,30 +381,40 @@ class MarketplaceSalesDashboardController extends Controller
                 ->map(fn ($rows) => $rows->pluck('external_item_id')->map(fn ($id) => (string) $id)->unique()->values());
         }
 
-        $products = $products->map(function ($product) use ($adSpendByInternalItem, $adSpendByChannelItem, $productExternalIdsByInternal) {
+        $products = $products->map(function ($product) use ($adMetricsByInternalItem, $adMetricsByChannelItem, $productExternalIdsByInternal) {
             $internalItemId = (int) ($product->internal_item_id ?? 0);
             $externalItemId = trim((string) ($product->external_item_id ?? ''));
-            $hasInternalMapping = $internalItemId > 0 && $adSpendByInternalItem->has($internalItemId);
+            $hasInternalMapping = $internalItemId > 0 && $adMetricsByInternalItem->has($internalItemId);
             $internalExternalIds = $productExternalIdsByInternal->get($internalItemId, collect());
-            $mappedExternalSpend = (float) $internalExternalIds
-                ->filter(fn ($itemId) => $adSpendByChannelItem->has($itemId))
-                ->sum(fn ($itemId) => (float) $adSpendByChannelItem->get($itemId));
-            $hasMappedExternalSpend = $internalExternalIds->contains(fn ($itemId) => $adSpendByChannelItem->has($itemId));
-            $hasExternalMapping = $externalItemId !== '' && $adSpendByChannelItem->has($externalItemId);
+            $mappedExternalMetrics = $internalExternalIds
+                ->filter(fn ($itemId) => $adMetricsByChannelItem->has($itemId))
+                ->reduce(function (array $carry, string $itemId) use ($adMetricsByChannelItem) {
+                    $metrics = $adMetricsByChannelItem->get($itemId);
+                    $carry['spend'] += (float) ($metrics['spend'] ?? 0);
+                    $carry['sales'] += (float) ($metrics['sales'] ?? 0);
+                    $carry['conversions'] += (int) ($metrics['conversions'] ?? 0);
+                    return $carry;
+                }, ['spend' => 0.0, 'sales' => 0.0, 'conversions' => 0]);
+            $hasMappedExternalMetrics = $internalExternalIds->contains(fn ($itemId) => $adMetricsByChannelItem->has($itemId));
+            $hasExternalMapping = $externalItemId !== '' && $adMetricsByChannelItem->has($externalItemId);
 
             if ($hasInternalMapping) {
-                $product->ad_spend = (float) $adSpendByInternalItem->get($internalItemId);
+                $productAdMetrics = $adMetricsByInternalItem->get($internalItemId);
                 $product->ad_spend_matched = true;
-            } elseif ($hasMappedExternalSpend) {
-                $product->ad_spend = $mappedExternalSpend;
+            } elseif ($hasMappedExternalMetrics) {
+                $productAdMetrics = $mappedExternalMetrics;
                 $product->ad_spend_matched = true;
             } elseif ($hasExternalMapping) {
-                $product->ad_spend = (float) $adSpendByChannelItem->get($externalItemId);
+                $productAdMetrics = $adMetricsByChannelItem->get($externalItemId);
                 $product->ad_spend_matched = true;
             } else {
-                $product->ad_spend = 0.0;
+                $productAdMetrics = ['spend' => 0.0, 'sales' => 0.0, 'conversions' => 0];
                 $product->ad_spend_matched = false;
             }
+
+            $product->ad_spend = (float) ($productAdMetrics['spend'] ?? 0);
+            $product->ad_sales = (float) ($productAdMetrics['sales'] ?? 0);
+            $product->ad_conversions = (int) ($productAdMetrics['conversions'] ?? 0);
 
             return $product;
         });
