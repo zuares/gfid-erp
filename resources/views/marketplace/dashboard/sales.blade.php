@@ -396,18 +396,24 @@
     .sales-dashboard .sales-product-marketplace-row td { background: color-mix(in srgb, var(--sales-accent-soft) 24%, var(--sales-card) 76%); border-top: 1px solid color-mix(in srgb, var(--sales-accent) 18%, var(--sales-line) 82%); }
     .sales-dashboard .sales-product-marketplace-row .sales-product-marketplace-toggle { min-height: 2.15rem; }
     .sales-dashboard .sales-product-marketplace-title { display: flex; min-width: 0; align-items: center; gap: .4rem; }
-    .sales-dashboard .sales-product-marketplace-thumb { position: relative; display: inline-flex; flex: 0 0 2rem; width: 2rem; height: 2rem; align-items: center; justify-content: center; overflow: hidden; border: 1px solid color-mix(in srgb, var(--sales-accent) 18%, var(--sales-line) 82%); border-radius: 7px; background: var(--sales-soft); color: var(--sales-muted); }
-    .sales-dashboard .sales-product-marketplace-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .18s ease, box-shadow .18s ease; }
+    .sales-dashboard .sales-product-marketplace-thumb { position: relative; z-index: 1; display: inline-flex; flex: 0 0 2rem; width: 2rem; height: 2rem; align-items: center; justify-content: center; border: 1px solid color-mix(in srgb, var(--sales-accent) 18%, var(--sales-line) 82%); border-radius: 7px; background: var(--sales-soft); color: var(--sales-muted); }
+    .sales-dashboard .sales-product-marketplace-thumb img { width: 100%; height: 100%; border-radius: 6px; object-fit: cover; transition: transform .18s ease, box-shadow .18s ease; }
+    .sales-dashboard .sales-product-marketplace-thumb:hover,
+    .sales-dashboard .sales-product-marketplace-thumb:focus-within { z-index: 20; }
     .sales-dashboard .sales-product-marketplace-thumb:hover img,
-    .sales-dashboard .sales-product-marketplace-thumb:focus-within img { position: relative; z-index: 2; transform: scale(2.8); border-radius: 7px; box-shadow: 0 8px 20px rgba(15, 23, 42, .22); }
+    .sales-dashboard .sales-product-marketplace-thumb:focus-within img { position: relative; z-index: 2; transform: scale(3); box-shadow: 0 8px 20px rgba(15, 23, 42, .22); }
     .sales-dashboard .sales-product-marketplace-thumb .sales-product-image-fallback { display: inline-flex; align-items: center; justify-content: center; font-size: .85rem; }
+    .sales-dashboard .sales-product-image-preview-title { position: absolute; top: calc(100% + .35rem); left: 0; z-index: 3; width: 190px; padding: .35rem .45rem; border: 1px solid var(--sales-line); border-radius: 6px; background: var(--sales-card); box-shadow: 0 8px 18px rgba(15, 23, 42, .16); color: var(--sales-ink); font-size: .64rem; font-weight: 700; line-height: 1.25; opacity: 0; pointer-events: none; transform: translateY(-2px); transition: opacity .15s ease, transform .15s ease; visibility: hidden; white-space: normal; }
+    .sales-dashboard .sales-product-marketplace-thumb:hover .sales-product-image-preview-title,
+    .sales-dashboard .sales-product-marketplace-thumb:focus-within .sales-product-image-preview-title { opacity: 1; transform: translateY(0); visibility: visible; }
     .sales-dashboard .sales-product-marketplace-code { flex: 0 0 auto; padding: .2rem .4rem; border: 1px solid color-mix(in srgb, var(--sales-accent) 20%, var(--sales-line) 80%); border-radius: 5px; background: var(--sales-accent-soft); color: var(--sales-accent); font-size: .58rem; font-weight: 800; letter-spacing: .025em; line-height: 1.1; }
-    .sales-dashboard .sales-product-marketplace-title .sales-product-name { min-width: 0; font-weight: 750; }
+    .sales-dashboard .sales-product-count-badge { display: inline-flex; flex: 0 0 auto; align-items: center; padding: .18rem .35rem; border: 1px solid color-mix(in srgb, var(--sales-line) 90%, transparent); border-radius: 5px; background: color-mix(in srgb, var(--sales-soft) 80%, var(--sales-card) 20%); color: var(--sales-muted); font-size: .57rem; font-weight: 800; line-height: 1.1; white-space: nowrap; }
+    .sales-dashboard .sales-product-marketplace-title .sales-product-group-meta { margin-left: .1rem; }
     .sales-dashboard .sales-product-internal-row td { background: color-mix(in srgb, var(--sales-soft) 72%, var(--sales-card) 28%); }
     .sales-dashboard .sales-product-internal-cell { position: relative; padding-left: 3rem !important; }
     .sales-dashboard .sales-product-internal-cell::before { content: ''; position: absolute; left: 1.7rem; top: -.5rem; bottom: -.5rem; border-left: 1px solid color-mix(in srgb, var(--sales-accent) 24%, var(--sales-line) 76%); }
     .sales-dashboard .sales-product-internal-cell .sales-product-link { display: flex; align-items: center; gap: .45rem; }
-    .sales-dashboard .sales-product-internal-code { display: block; max-width: 100%; overflow: hidden; color: var(--sales-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .68rem; font-weight: 750; letter-spacing: .01em; text-overflow: ellipsis; white-space: nowrap; }
+    .sales-dashboard .sales-product-internal-code { display: block; max-width: 100%; overflow: hidden; padding: .2rem .4rem; border: 1px solid color-mix(in srgb, var(--sales-line) 90%, transparent); border-radius: 5px; background: var(--sales-card); color: var(--sales-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .64rem; font-weight: 750; letter-spacing: .01em; text-overflow: ellipsis; white-space: nowrap; }
     .sales-dashboard .sales-product-internal-index { padding-left: 1.45rem !important; color: var(--sales-muted); }
     .sales-dashboard .sales-product-group-title { font-size: .72rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
     .sales-dashboard .sales-product-group-meta { color: var(--sales-muted); font-size: .68rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
@@ -1509,7 +1515,10 @@
                                             <i class="bi bi-chevron-right" aria-hidden="true"></i>
                                             <span>
                                                 <span class="sales-product-group-title">{{ $categoryCode !== '' ? $categoryCode.' · ' : '' }}{{ $categoryName }}</span>
-                                                <span class="sales-product-group-meta">{{ number_format($marketplaceGroups->count()) }} marketplace · {{ number_format($categoryProducts->count()) }} item</span>
+                                                <span class="sales-product-group-meta d-inline-flex align-items-center gap-1">
+                                                    <span class="sales-product-count-badge">{{ number_format($marketplaceGroups->count()) }} MP</span>
+                                                    <span class="sales-product-count-badge">{{ number_format($categoryProducts->count()) }} item</span>
+                                                </span>
                                             </span>
                                         </button>
                                     </td>
@@ -1549,22 +1558,22 @@
                                     <tr id="{{ $marketplaceKey }}" class="sales-product-marketplace-row" data-sales-product-category-items="{{ $categoryKey }}" hidden>
                                         <td class="sales-index-cell sales-product-item-index" aria-label="Marketplace {{ $categoryNumber }}.{{ $marketplaceNumber }}"><span class="sales-product-item-number">{{ $categoryNumber }}.{{ $marketplaceNumber }}</span></td>
                                         <td class="fw-semibold">
-                                            <button type="button" class="sales-product-marketplace-toggle" data-sales-product-marketplace-toggle="{{ $marketplaceKey }}" aria-expanded="false" aria-controls="{{ $marketplaceItemIds }}" title="{{ $marketplaceTitle }}">
+                                            <button type="button" class="sales-product-marketplace-toggle" data-sales-product-marketplace-toggle="{{ $marketplaceKey }}" aria-expanded="false" aria-controls="{{ $marketplaceItemIds }}">
                                                 <i class="bi bi-chevron-right" aria-hidden="true"></i>
                                                 <span class="sales-product-marketplace-title">
-                                                    <span class="sales-product-marketplace-thumb" title="{{ $marketplaceTitle }}">
+                                                    <span class="sales-product-marketplace-thumb" tabindex="0" aria-label="{{ $marketplaceTitle }}">
                                                         @if ($marketplaceImage !== '')
-                                                            <img src="{{ $marketplaceImage }}" alt="" loading="lazy" onerror="this.hidden=true; this.nextElementSibling.hidden=false;">
+                                                            <img src="{{ $marketplaceImage }}" alt="{{ $marketplaceTitle }}" loading="lazy" onerror="this.hidden=true; this.nextElementSibling.hidden=false;">
                                                             <span class="sales-product-image-fallback" hidden><i class="bi bi-image" aria-hidden="true"></i></span>
                                                         @else
                                                             <span class="sales-product-image-fallback"><i class="bi bi-image" aria-hidden="true"></i></span>
                                                         @endif
+                                                        <span class="sales-product-image-preview-title">{{ $marketplaceTitle }}</span>
                                                     </span>
                                                     @if ($marketplaceCode !== '')
                                                         <span class="sales-product-marketplace-code" title="Kode produk marketplace">{{ $marketplaceCode }}</span>
                                                     @endif
-                                                    <span class="sales-product-name" title="{{ $marketplaceTitle }}">{{ $marketplaceTitle }}</span>
-                                                    <span class="sales-product-group-meta">{{ number_format($marketplaceProducts->count()) }} item internal</span>
+                                                    <span class="sales-product-count-badge">{{ number_format($marketplaceProducts->count()) }} varian</span>
                                                 </span>
                                             </button>
                                         </td>
