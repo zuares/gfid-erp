@@ -1128,6 +1128,7 @@
                                     <td class="text-end fw-semibold">
                                         <div>{{ $fmt(max(
                                             (float) ($row->order_before_discount ?? 0)
+                                                - (float) ($row->product_discount ?? 0)
                                                 - (float) ($row->voucher_store ?? 0)
                                                 - (float) ($row->bundle_discount ?? 0)
                                                 - (float) ($row->combo_hemat ?? 0),
