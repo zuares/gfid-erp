@@ -775,24 +775,12 @@
             'buyer_paid' => (float) data_get($summary, 'buyer_paid', 0),
             'aov' => (float) data_get($summary, 'aov', 0),
             'cod_order_share' => (float) data_get($summary, 'cod_order_share', 0),
-            'cod_amount_share' => (float) data_get($summary, 'cod_amount_share', 0),
             'non_cod_order_share' => (float) data_get($summary, 'orders', 0) > 0
                 ? ((float) $daily->sum('non_cod_orders') / (float) data_get($summary, 'orders', 0)) * 100
-                : 0,
-            'non_cod_amount_share' => (float) data_get($summary, 'buyer_paid', 0) > 0
-                ? ((float) $daily->sum('non_cod_amount') / (float) data_get($summary, 'buyer_paid', 0)) * 100
                 : 0,
             'pay_later_order_share' => (float) data_get($summary, 'orders', 0) > 0
                 ? ((float) $daily->sum('pay_later_orders') / (float) data_get($summary, 'orders', 0)) * 100
                 : 0,
-            'pay_later_amount_share' => (float) data_get($summary, 'buyer_paid', 0) > 0
-                ? ((float) $daily->sum('pay_later_amount') / (float) data_get($summary, 'buyer_paid', 0)) * 100
-                : 0,
-            'buyer_shipping' => (float) $daily->sum('buyer_shipping'),
-            'buyer_service_fee' => (float) $daily->sum('buyer_service_fee'),
-            'product_protection' => (float) $daily->sum('product_protection'),
-            'seller_net_sales' => (float) $daily->sum('seller_net_sales'),
-            'voucher_platform' => (float) $daily->sum('voucher_platform'),
         ];
         unset($period['summary'], $period['daily']);
 
@@ -802,17 +790,9 @@
         ['label' => 'Orders', 'key' => 'orders', 'formatter' => $numberDisplay],
         ['label' => 'Buyer Paid', 'key' => 'buyer_paid', 'formatter' => $currencyDisplay],
         ['label' => 'AOV Buyer Paid', 'key' => 'aov', 'formatter' => $currencyDisplay],
-        ['label' => 'COD Exposure', 'key' => 'cod_order_share', 'formatter' => $percentDisplay],
-        ['label' => 'COD Nominal Share', 'key' => 'cod_amount_share', 'formatter' => $percentDisplay],
-        ['label' => 'Non-COD Exposure', 'key' => 'non_cod_order_share', 'formatter' => $percentDisplay],
-        ['label' => 'Non-COD Nominal Share', 'key' => 'non_cod_amount_share', 'formatter' => $percentDisplay],
-        ['label' => 'Pay Later Exposure', 'key' => 'pay_later_order_share', 'formatter' => $percentDisplay],
-        ['label' => 'Pay Later Nominal Share', 'key' => 'pay_later_amount_share', 'formatter' => $percentDisplay],
-        ['label' => 'Buyer Shipping', 'key' => 'buyer_shipping', 'formatter' => $currencyDisplay],
-        ['label' => 'Service Fee', 'key' => 'buyer_service_fee', 'formatter' => $currencyDisplay],
-        ['label' => 'Protection', 'key' => 'product_protection', 'formatter' => $currencyDisplay],
-        ['label' => 'Seller Net Sales', 'key' => 'seller_net_sales', 'formatter' => $currencyDisplay],
-        ['label' => 'Voucher Platform', 'key' => 'voucher_platform', 'formatter' => $currencyDisplay],
+        ['label' => 'COD %', 'key' => 'cod_order_share', 'formatter' => $percentDisplay],
+        ['label' => 'Non-COD %', 'key' => 'non_cod_order_share', 'formatter' => $percentDisplay],
+        ['label' => 'Pay Later %', 'key' => 'pay_later_order_share', 'formatter' => $percentDisplay],
     ];
 @endphp
 
