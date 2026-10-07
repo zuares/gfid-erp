@@ -109,7 +109,7 @@
             .gf-period-trigger:hover,
             .gf-period-trigger[aria-expanded="true"] {
                 border-color: color-mix(in srgb, var(--gf-period-accent) 55%, transparent);
-                box-shadow: 0 7px 18px rgba(15,23,42,.09); transform: translateY(-1px);
+                box-shadow: 0 8px 20px rgba(15,23,42,.12); transform: translateY(-1px);
             }
             .gf-period-trigger-label { color: var(--gf-period-muted); font-size: .68rem; white-space: nowrap; }
             .gf-period-trigger-preset { color: var(--gf-period-accent); font-size: .71rem; font-weight: 800; white-space: nowrap; }
@@ -118,7 +118,7 @@
             .gf-period-popover {
                 position: absolute; left: 0; top: calc(100% + .45rem); width: min(100vw - 2rem, 480px);
                 overflow: hidden; border: 1px solid rgba(148,163,184,.20); border-radius: 16px;
-                background: var(--gf-period-card); box-shadow: 0 18px 44px rgba(15,23,42,.16); z-index: 3000;
+                background: var(--gf-period-card); box-shadow: 0 18px 45px rgba(15,23,42,.18), 0 1px 0 rgba(15,23,42,.04); z-index: 3000;
             }
             .gf-period-popover[hidden], .gf-period-panel[hidden] { display: none; }
             .gf-period-layout { display: grid; grid-template-columns: 150px minmax(0, 1fr); min-height: 0; }

@@ -11,6 +11,7 @@
     }
 
     .sales-dashboard {
+        --sales-bg: var(--bg, #f4f5fb);
         --sales-line: var(--line, #d4d7e3);
         --sales-muted: var(--muted, #6b7280);
         --sales-card: var(--card, #fff);
@@ -18,16 +19,16 @@
         --sales-ink: var(--text, #111827);
         --sales-accent: var(--accent, #2563eb);
         --sales-accent-soft: var(--accent-soft, #dbeafe);
-        max-width: 1280px;
+        max-width: 1080px;
         margin-inline: auto;
         color: var(--sales-ink);
     }
 
     .sales-dashboard .sales-card {
         border: 1px solid var(--sales-line);
-        border-radius: .75rem;
+        border-radius: 14px;
         background: var(--sales-card);
-        box-shadow: 0 .125rem .25rem rgba(15, 23, 42, .035);
+        box-shadow: 0 18px 45px rgba(15, 23, 42, .12), 0 1px 0 rgba(15, 23, 42, .04);
     }
 
     .sales-dashboard .sales-kicker {
@@ -42,7 +43,7 @@
     .sales-dashboard .sales-subtitle,
     .sales-dashboard .sales-section-subtitle { display: none; }
 
-    .sales-dashboard .sales-filter-card { background: var(--sales-soft); }
+    .sales-dashboard .sales-filter-card { background: color-mix(in srgb, var(--sales-card) 85%, var(--sales-bg) 15%); }
     .sales-dashboard .sales-filter-card .form-label {
         color: var(--sales-muted);
         font-size: .74rem;
@@ -66,20 +67,32 @@
 
     .sales-dashboard .sales-nav { overflow-x: auto; scrollbar-width: none; }
     .sales-dashboard .sales-nav::-webkit-scrollbar { display: none; }
+    .sales-dashboard .sales-nav {
+        padding: .25rem;
+        border: 1px solid var(--sales-line);
+        border-radius: 12px;
+        background: color-mix(in srgb, var(--sales-card) 90%, var(--sales-bg) 10%);
+    }
     .sales-dashboard .sales-nav .nav-link {
         border: 0;
         color: var(--sales-muted);
         background: transparent;
-        border-radius: .55rem;
+        border-radius: 8px;
         font-size: .8rem;
         font-weight: 650;
+        padding: .55rem .75rem;
         white-space: nowrap;
+        transition: background .16s ease, color .16s ease, box-shadow .16s ease;
     }
-    .sales-dashboard .sales-nav .nav-link:hover { color: var(--accent, #2563eb); background: var(--accent-soft, #dbeafe); }
-    .sales-dashboard .sales-nav .nav-link.active { color: var(--accent, #2563eb); background: var(--accent-soft, #dbeafe); }
+    .sales-dashboard .sales-nav .nav-link:hover { color: var(--sales-accent); background: var(--sales-accent-soft); }
+    .sales-dashboard .sales-nav .nav-link.active {
+        color: var(--sales-accent);
+        background: var(--sales-accent-soft);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sales-accent) 12%, var(--sales-line) 88%);
+    }
     .sales-dashboard .sales-tab-pane.is-hidden { display: none; }
 
-    .sales-dashboard .sales-kpi { min-height: 132px; position: relative; overflow: hidden; }
+    .sales-dashboard .sales-kpi { min-height: 124px; position: relative; overflow: hidden; }
     .sales-dashboard .sales-kpi::after {
         content: '';
         position: absolute;
@@ -99,14 +112,15 @@
         align-items: center;
         justify-content: center;
         border-radius: .55rem;
-        background: var(--accent-soft, #dbeafe);
-        color: var(--accent, #2563eb);
+        background: var(--sales-accent-soft);
+        color: var(--sales-accent);
+        border: 1px solid color-mix(in srgb, var(--sales-accent) 12%, var(--sales-line) 88%);
     }
     .sales-dashboard .sales-kpi-value { color: var(--sales-ink); font-size: 1.4rem; font-weight: 800; letter-spacing: -.03em; }
-    .sales-dashboard .sales-kpi--success .sales-kpi-icon { background: var(--success-soft, #dcfce7); color: var(--success, #16a34a); }
+    .sales-dashboard .sales-kpi--success .sales-kpi-icon { background: var(--success-soft, #dcfce7); color: var(--success, #16a34a); border-color: color-mix(in srgb, var(--success, #16a34a) 16%, var(--sales-line) 84%); }
     .sales-dashboard .sales-kpi--success::after { background: var(--success, #16a34a); }
-    .sales-dashboard .sales-kpi--warning .sales-kpi-icon { background: #fff7ed; color: #c2410c; }
-    .sales-dashboard .sales-kpi--warning::after { background: #ea580c; }
+    .sales-dashboard .sales-kpi--warning .sales-kpi-icon { background: var(--danger-soft, #fee2e2); color: var(--danger, #dc2626); border-color: color-mix(in srgb, var(--danger, #dc2626) 16%, var(--sales-line) 84%); }
+    .sales-dashboard .sales-kpi--warning::after { background: var(--danger, #dc2626); }
 
     .sales-dashboard .sales-section-header { padding: 1rem 1.15rem .85rem; }
     .sales-dashboard .sales-section-title { color: var(--sales-ink); font-size: 1rem; font-weight: 750; }
@@ -114,9 +128,9 @@
     .sales-dashboard .sales-detail-link:hover { text-decoration: underline; }
     .sales-dashboard .sales-table { --bs-table-bg: var(--sales-card); --bs-table-color: var(--sales-ink); --bs-table-hover-bg: color-mix(in srgb, var(--accent-soft, #dbeafe) 35%, var(--sales-card)); margin-bottom: 0; }
     .sales-dashboard .sales-table th {
-        background: var(--sales-soft);
+        background: color-mix(in srgb, var(--sales-card) 85%, var(--sales-bg) 15%);
         border-bottom-color: var(--sales-line);
-        color: var(--sales-muted);
+        color: var(--sales-ink);
         font-size: .68rem;
         font-weight: 750;
         letter-spacing: .04em;
@@ -197,7 +211,7 @@
     .sales-dashboard .sales-action-link:hover { text-decoration: underline; }
     .sales-dashboard .sales-clickable-row { cursor: pointer; }
     .sales-dashboard .sales-empty { color: var(--sales-muted); padding: 2.5rem 1rem; }
-    .sales-dashboard .sales-badge { background: var(--sales-soft); border: 1px solid var(--sales-line); color: var(--sales-muted); font-size: .7rem; font-weight: 650; }
+    .sales-dashboard .sales-badge { background: var(--sales-accent-soft); border: 1px solid color-mix(in srgb, var(--sales-accent) 12%, var(--sales-line) 88%); color: var(--sales-accent); font-size: .7rem; font-weight: 700; }
 
     body[data-theme="dark"] .sales-dashboard .sales-filter-card,
     body[data-theme="dark"] .sales-dashboard .sales-table th { background: var(--card-soft, #132a45); }
