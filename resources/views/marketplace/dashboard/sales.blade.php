@@ -608,15 +608,16 @@
     .sales-dashboard .sales-category-summary-table th { padding: .65rem .55rem; color: var(--sales-muted); font-size: .61rem; font-weight: 800; letter-spacing: .025em; vertical-align: middle; }
     .sales-dashboard .sales-category-summary-table td { padding: .62rem .55rem; font-size: .7rem; vertical-align: middle; }
     .sales-dashboard .sales-category-summary-table th:nth-child(1) { width: 4%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(2) { width: 24%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(2) { width: 21%; }
     .sales-dashboard .sales-category-summary-table th:nth-child(3),
-    .sales-dashboard .sales-category-summary-table th:nth-child(4) { width: 8%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(5),
-    .sales-dashboard .sales-category-summary-table th:nth-child(6) { width: 6%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(7) { width: 13%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(8),
+    .sales-dashboard .sales-category-summary-table th:nth-child(4),
+    .sales-dashboard .sales-category-summary-table th:nth-child(5) { width: 7.5%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(6),
+    .sales-dashboard .sales-category-summary-table th:nth-child(7) { width: 5.5%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(8) { width: 13%; }
     .sales-dashboard .sales-category-summary-table th:nth-child(9),
-    .sales-dashboard .sales-category-summary-table th:nth-child(10) { width: 11%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(10),
+    .sales-dashboard .sales-category-summary-table th:nth-child(11) { width: 9.5%; }
     .sales-dashboard .sales-category-summary-table th,
     .sales-dashboard .sales-category-summary-table td { text-align: start; }
     .sales-dashboard .sales-category-summary-table tbody td:nth-child(n+3) { color: var(--sales-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -1155,6 +1156,7 @@
         return [
             'active_products' => (int) data_get($activeCatalog, 'products', 0),
             'active_variants' => (int) data_get($activeCatalog, 'variants', 0),
+            'unsold_variants' => max((int) data_get($activeCatalog, 'variants', 0) - $marketplaceVariantCount($rows), 0),
             'products' => $marketplaceProductCount($rows),
             'variants' => $marketplaceVariantCount($rows),
             'variants_sold' => $soldVariantCount($rows),
@@ -1205,6 +1207,7 @@
     $productComparisonRows = [
         ['group' => 'Katalog aktif', 'label' => 'Produk Aktif Marketplace', 'key' => 'active_products', 'format' => $numberDisplay],
         ['group' => 'Katalog aktif', 'label' => 'Variant Aktif Marketplace', 'key' => 'active_variants', 'format' => $numberDisplay],
+        ['group' => 'Katalog aktif', 'label' => 'Variant Tidak Terjual', 'key' => 'unsold_variants', 'format' => $numberDisplay],
         ['group' => 'Volume transaksi', 'label' => 'Produk Terjual Marketplace', 'key' => 'products', 'format' => $numberDisplay],
         ['group' => 'Volume transaksi', 'label' => 'Variant Terjual Marketplace', 'key' => 'variants', 'format' => $numberDisplay],
         ['group' => 'Volume transaksi', 'label' => 'Variant Terjual Unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
@@ -1329,6 +1332,7 @@
         return [
             'active_products' => (int) data_get($activeCatalog, 'products', 0),
             'active_variants' => (int) data_get($activeCatalog, 'variants', 0),
+            'unsold_variants' => max((int) data_get($activeCatalog, 'variants', 0) - $rows->count(), 0),
             'products' => $marketplaceProductKeys->count(),
             'variants' => $rows->count(),
             'variants_sold' => $soldVariantKeys->count(),
@@ -1411,6 +1415,7 @@
     $categoryProductComparisonRows = [
         ['group' => 'Katalog aktif', 'label' => 'Produk Aktif Marketplace', 'key' => 'active_products', 'format' => $numberDisplay],
         ['group' => 'Katalog aktif', 'label' => 'Variant Aktif Marketplace', 'key' => 'active_variants', 'format' => $numberDisplay],
+        ['group' => 'Katalog aktif', 'label' => 'Variant Tidak Terjual', 'key' => 'unsold_variants', 'format' => $numberDisplay],
         ['group' => 'Volume transaksi', 'label' => 'Produk Terjual Marketplace', 'key' => 'products', 'format' => $numberDisplay],
         ['group' => 'Volume transaksi', 'label' => 'Variant Terjual Marketplace', 'key' => 'variants', 'format' => $numberDisplay],
         ['group' => 'Volume transaksi', 'label' => 'Variant Terjual Unik', 'key' => 'variants_sold', 'format' => $numberDisplay],
@@ -2264,6 +2269,7 @@
                                 <th>Kategori Item</th>
                                 <th>Produk Aktif</th>
                                 <th>Variant Aktif</th>
+                                <th>Variant Tidak Terjual</th>
                                 <th>Order</th>
                                 <th>Unit</th>
                                 <th class="text-end">Penjualan Netto</th>
@@ -2288,6 +2294,7 @@
                                     </td>
                                     <td data-label="Produk Aktif">{{ number_format($activeCategoryMetrics['active_products']) }}</td>
                                     <td data-label="Variant Aktif">{{ number_format($activeCategoryMetrics['active_variants']) }}</td>
+                                    <td data-label="Variant Tidak Terjual">{{ number_format($activeCategoryMetrics['unsold_variants']) }}</td>
                                     <td data-label="Order">{{ number_format($activeCategoryMetrics['orders']) }}</td>
                                     <td data-label="Unit">{{ number_format($activeCategoryMetrics['qty']) }}</td>
                                     <td class="text-end" data-label="Penjualan Netto">{{ $fmt($activeCategoryMetrics['net_sales']) }}</td>
@@ -2296,7 +2303,7 @@
                                     <td class="text-end pe-3" data-label="Laba Bersih">{{ $fmt($activeCategoryMetrics['net_profit']) }}</td>
                                 </tr>
                                 <tr id="{{ $categoryKey }}-detail" class="sales-category-comparison-detail" data-sales-category-comparison-items="{{ $categoryKey }}" hidden>
-                                    <td colspan="10">
+                                    <td colspan="11">
                                         <div class="sales-category-comparison-detail-card">
                                             <div class="sales-category-detail-header d-flex align-items-start justify-content-between gap-2 mb-2">
                                                 <div>
@@ -2351,6 +2358,12 @@
                 </div>
             @endif
         </section>
+        @php
+            $productAnalysisUnsoldVariants = max(
+                (int) data_get($activeMarketplaceCatalog, 'variants', 0) - (int) ($activeProductKpi['variants'] ?? 0),
+                0
+            );
+        @endphp
         <section class="card sales-card sales-product-analysis-section shadow-sm mb-3">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
@@ -2391,6 +2404,7 @@
                         <thead><tr><th colspan="2">Skala &amp; kesehatan</th><th class="text-end">Nilai</th></tr></thead>
                         <tbody>
                             <tr><td class="analysis-label" colspan="2">Produk terjual</td><td class="text-end analysis-value">{{ number_format($topProductCount) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Variant tidak terjual</td><td class="text-end analysis-value">{{ number_format($productAnalysisUnsoldVariants) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Kategori terjual</td><td class="text-end analysis-value">{{ number_format($productAnalysisCategoryCount) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Kontribusi Top 20% produk</td><td class="text-end analysis-value">{{ $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisTop20Sales / $productAnalysisNetSales) * 100) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Pembayaran / Penjualan Netto</td><td class="text-end analysis-value">{{ $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisBuyerPayment / $productAnalysisNetSales) * 100) : '—' }}</td></tr>
