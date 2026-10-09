@@ -646,7 +646,24 @@
         border: 1px solid var(--sales-line);
         border-radius: .65rem;
         background: color-mix(in srgb, var(--sales-soft) 35%, var(--sales-card) 65%);
+        color: var(--sales-ink);
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color .16s ease, background-color .16s ease, box-shadow .16s ease, transform .16s ease;
     }
+    .sales-dashboard .sales-watchlist-card:hover,
+    .sales-dashboard .sales-watchlist-card:focus-visible,
+    .sales-dashboard .sales-watchlist-card.is-active,
+    .sales-dashboard .sales-watchlist-card[aria-pressed="true"] {
+        border-color: color-mix(in srgb, var(--sales-accent) 46%, var(--sales-line) 54%);
+        background: color-mix(in srgb, var(--sales-accent-soft) 40%, var(--sales-card) 60%);
+        box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
+        outline: none;
+        transform: translateY(-1px);
+    }
+    .sales-dashboard .sales-watchlist-card.is-active .sales-watchlist-icon,
+    .sales-dashboard .sales-watchlist-card[aria-pressed="true"] .sales-watchlist-icon { background: var(--sales-accent-soft); color: var(--sales-accent); }
     .sales-dashboard .sales-watchlist-icon {
         display: inline-flex;
         flex: 0 0 1.85rem;
@@ -670,12 +687,14 @@
     .sales-dashboard .sales-watchlist-value { margin-top: .1rem; color: var(--sales-ink); font-size: .82rem; font-weight: 850; font-variant-numeric: tabular-nums; }
     .sales-dashboard .sales-watchlist-impact { overflow: hidden; margin-top: .08rem; color: var(--sales-muted); font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
     .sales-dashboard .sales-watchlist-table-wrap { padding: 0 1.15rem 1.15rem; overflow-x: auto; }
-    .sales-dashboard .sales-watchlist-table { width: 100%; min-width: 820px; table-layout: fixed; }
+    .sales-dashboard .sales-watchlist-table { width: 100%; min-width: 980px; table-layout: fixed; }
     .sales-dashboard .sales-watchlist-table th,
     .sales-dashboard .sales-watchlist-table td { padding: .52rem .58rem; white-space: nowrap; }
     .sales-dashboard .sales-watchlist-table th { background: var(--sales-soft); color: var(--sales-muted); font-size: .59rem; font-weight: 800; letter-spacing: .035em; text-transform: uppercase; }
     .sales-dashboard .sales-watchlist-table td { color: var(--sales-ink); font-size: .68rem; vertical-align: middle; }
-    .sales-dashboard .sales-watchlist-product { display: block; max-width: 240px; overflow: hidden; font-weight: 700; text-overflow: ellipsis; }
+    .sales-dashboard .sales-watchlist-product-cell { display: flex; min-width: 0; align-items: center; gap: .5rem; }
+    .sales-dashboard .sales-watchlist-thumb { flex: 0 0 2rem; width: 2rem; height: 2rem; }
+    .sales-dashboard .sales-watchlist-product { display: block; max-width: 205px; overflow: hidden; font-weight: 700; text-overflow: ellipsis; }
     .sales-dashboard .sales-watchlist-meta { display: block; margin-top: .12rem; color: var(--sales-muted); font-size: .58rem; overflow: hidden; text-overflow: ellipsis; }
     .sales-dashboard .sales-watchlist-badge { display: inline-flex; align-items: center; padding: .2rem .38rem; border-radius: 999px; font-size: .56rem; font-weight: 800; line-height: 1.1; }
     .sales-dashboard .sales-watchlist-badge.is-danger { background: #fee2e2; color: #b91c1c; }
@@ -1149,6 +1168,24 @@
     $activeTab = in_array(request('tab'), $salesTabs, true) ? request('tab') : 'sales';
     $comparisonMode = $filters['comparison_mode'] ?? 'month';
     $comparisonModeLabel = $comparisonMode === 'month' ? 'Bulan lalu' : 'Periode lalu';
+    $comparisonPeriodDisplayLabel = function ($from, $to, $fallback) use ($comparisonMode, $dateRangeLabel) {
+        if (! $from) {
+            return $fallback;
+        }
+
+        if ($comparisonMode !== 'month') {
+            return $from && $to ? $dateRangeLabel($from, $to) : $fallback;
+        }
+
+        $monthNames = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+        ];
+        $date = \Carbon\Carbon::parse($from);
+
+        return ($monthNames[$date->month] ?? $date->format('F')).' '.$date->year;
+    };
     $todayDate = now()->toDateString();
     $yesterdayDate = now()->subDay()->toDateString();
     $activeDatePreset = 'custom';
@@ -1540,15 +1577,15 @@
     $productComparisonPeriods = $comparisonMode === 'month'
         ? [
             ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products, 'catalog' => $activeMarketplaceCatalog],
-            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'products' => $previousMonthProducts, 'catalog' => $previousMonthActiveCatalog],
-            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousData, 'products', [])), 'catalog' => $previousMonthPreviousActiveCatalog],
-            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousTwoData, 'products', [])), 'catalog' => $previousMonthPreviousTwoActiveCatalog],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonth['from'] ?? null, $comparisonMonth['to'] ?? null, 'Bulan -1'), 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'products' => $previousMonthProducts, 'catalog' => $previousMonthActiveCatalog],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonthPrevious['from'] ?? null, $comparisonMonthPrevious['to'] ?? null, 'Bulan -2'), 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousData, 'products', [])), 'catalog' => $previousMonthPreviousActiveCatalog],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonthPreviousTwo['from'] ?? null, $comparisonMonthPreviousTwo['to'] ?? null, 'Bulan -3'), 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousTwoData, 'products', [])), 'catalog' => $previousMonthPreviousTwoActiveCatalog],
         ]
         : [
             ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products, 'catalog' => $activeMarketplaceCatalog],
-            ['label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'products' => $previousPeriodProducts, 'catalog' => $previousPeriodActiveCatalog],
-            ['label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousData, 'products', [])), 'catalog' => $previousPeriodPreviousActiveCatalog],
-            ['label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousTwoData, 'products', [])), 'catalog' => $previousPeriodPreviousTwoActiveCatalog],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriod['from'] ?? null, $comparisonPeriod['to'] ?? null, 'Periode -1'), 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'products' => $previousPeriodProducts, 'catalog' => $previousPeriodActiveCatalog],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriodPrevious['from'] ?? null, $comparisonPeriodPrevious['to'] ?? null, 'Periode -2'), 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousData, 'products', [])), 'catalog' => $previousPeriodPreviousActiveCatalog],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriodPreviousTwo['from'] ?? null, $comparisonPeriodPreviousTwo['to'] ?? null, 'Periode -3'), 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousTwoData, 'products', [])), 'catalog' => $previousPeriodPreviousTwoActiveCatalog],
         ];
     $productComparisonPeriods = collect($productComparisonPeriods)->map(function ($period) use ($productComparisonMetrics) {
         $period['metrics'] = $productComparisonMetrics($period['products'], $period['catalog'] ?? []);
@@ -1618,15 +1655,15 @@
     $salesComparisonSources = $comparisonMode === 'month'
         ? [
             ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily, 'data' => ['promotionDaily' => $promotionDaily, 'paymentSummary' => $paymentSummary, 'adSpendTotal' => $adSpendTotal, 'adSalesTotal' => $adSalesTotal, 'adImpressionsTotal' => $adImpressionsTotal, 'adClicksTotal' => $adClicksTotal, 'adOrdersTotal' => $adOrdersTotal]],
-            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'daily' => data_get($comparisonMonthData, 'daily', []), 'data' => $comparisonMonthData],
-            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousData, 'daily', []), 'data' => $comparisonMonthPreviousData],
-            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousTwoData, 'daily', []), 'data' => $comparisonMonthPreviousTwoData],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonth['from'] ?? null, $comparisonMonth['to'] ?? null, 'Bulan -1'), 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'daily' => data_get($comparisonMonthData, 'daily', []), 'data' => $comparisonMonthData],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonthPrevious['from'] ?? null, $comparisonMonthPrevious['to'] ?? null, 'Bulan -2'), 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousData, 'daily', []), 'data' => $comparisonMonthPreviousData],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonthPreviousTwo['from'] ?? null, $comparisonMonthPreviousTwo['to'] ?? null, 'Bulan -3'), 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousTwoData, 'daily', []), 'data' => $comparisonMonthPreviousTwoData],
         ]
         : [
             ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily, 'data' => ['promotionDaily' => $promotionDaily, 'paymentSummary' => $paymentSummary, 'adSpendTotal' => $adSpendTotal, 'adSalesTotal' => $adSalesTotal, 'adImpressionsTotal' => $adImpressionsTotal, 'adClicksTotal' => $adClicksTotal, 'adOrdersTotal' => $adOrdersTotal]],
-            ['label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'daily' => data_get($comparisonPeriodData, 'daily', []), 'data' => $comparisonPeriodData],
-            ['label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousData, 'daily', []), 'data' => $comparisonPeriodPreviousData],
-            ['label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousTwoData, 'daily', []), 'data' => $comparisonPeriodPreviousTwoData],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriod['from'] ?? null, $comparisonPeriod['to'] ?? null, 'Periode -1'), 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'daily' => data_get($comparisonPeriodData, 'daily', []), 'data' => $comparisonPeriodData],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriodPrevious['from'] ?? null, $comparisonPeriodPrevious['to'] ?? null, 'Periode -2'), 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousData, 'daily', []), 'data' => $comparisonPeriodPreviousData],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriodPreviousTwo['from'] ?? null, $comparisonPeriodPreviousTwo['to'] ?? null, 'Periode -3'), 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousTwoData, 'daily', []), 'data' => $comparisonPeriodPreviousTwoData],
         ];
     $salesComparisonPeriods = collect($salesComparisonSources)->map(function ($period) use ($salesComparisonMetrics) {
         $period['metrics'] = $salesComparisonMetrics($period['daily'], $period['data'] ?? []);
@@ -1750,15 +1787,15 @@
     $categoryComparisonSourcePeriods = $comparisonMode === 'month'
         ? [
             ['key' => 'active', 'label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products, 'catalog' => $activeMarketplaceCatalog],
-            ['key' => 'previous', 'label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'products' => $previousMonthProducts, 'catalog' => $previousMonthActiveCatalog],
-            ['key' => 'previous_2', 'label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousData, 'products', [])), 'catalog' => $previousMonthPreviousActiveCatalog],
-            ['key' => 'previous_3', 'label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousTwoData, 'products', [])), 'catalog' => $previousMonthPreviousTwoActiveCatalog],
+            ['key' => 'previous', 'label' => $comparisonPeriodDisplayLabel($comparisonMonth['from'] ?? null, $comparisonMonth['to'] ?? null, 'Bulan -1'), 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'products' => $previousMonthProducts, 'catalog' => $previousMonthActiveCatalog],
+            ['key' => 'previous_2', 'label' => $comparisonPeriodDisplayLabel($comparisonMonthPrevious['from'] ?? null, $comparisonMonthPrevious['to'] ?? null, 'Bulan -2'), 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousData, 'products', [])), 'catalog' => $previousMonthPreviousActiveCatalog],
+            ['key' => 'previous_3', 'label' => $comparisonPeriodDisplayLabel($comparisonMonthPreviousTwo['from'] ?? null, $comparisonMonthPreviousTwo['to'] ?? null, 'Bulan -3'), 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonMonthPreviousTwoData, 'products', [])), 'catalog' => $previousMonthPreviousTwoActiveCatalog],
         ]
         : [
             ['key' => 'active', 'label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'products' => $products, 'catalog' => $activeMarketplaceCatalog],
-            ['key' => 'previous', 'label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'products' => $previousPeriodProducts, 'catalog' => $previousPeriodActiveCatalog],
-            ['key' => 'previous_2', 'label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousData, 'products', [])), 'catalog' => $previousPeriodPreviousActiveCatalog],
-            ['key' => 'previous_3', 'label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousTwoData, 'products', [])), 'catalog' => $previousPeriodPreviousTwoActiveCatalog],
+            ['key' => 'previous', 'label' => $comparisonPeriodDisplayLabel($comparisonPeriod['from'] ?? null, $comparisonPeriod['to'] ?? null, 'Periode -1'), 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'products' => $previousPeriodProducts, 'catalog' => $previousPeriodActiveCatalog],
+            ['key' => 'previous_2', 'label' => $comparisonPeriodDisplayLabel($comparisonPeriodPrevious['from'] ?? null, $comparisonPeriodPrevious['to'] ?? null, 'Periode -2'), 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousData, 'products', [])), 'catalog' => $previousPeriodPreviousActiveCatalog],
+            ['key' => 'previous_3', 'label' => $comparisonPeriodDisplayLabel($comparisonPeriodPreviousTwo['from'] ?? null, $comparisonPeriodPreviousTwo['to'] ?? null, 'Periode -3'), 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'products' => collect(data_get($comparisonPeriodPreviousTwoData, 'products', [])), 'catalog' => $previousPeriodPreviousTwoActiveCatalog],
         ];
     $categoryComparisonPeriods = collect($categoryComparisonSourcePeriods)
         ->map(fn ($period) => collect($period)->except('products')->all())
@@ -2456,8 +2493,53 @@
                     })->values()->all(),
                 ];
                 $dailyPreviousRows = collect(data_get($activeComparison, 'data.daily', []))->sortBy('day')->values();
-                $dailyComparisonByDay = collect($daily)->sortBy('day')->values()->mapWithKeys(function ($currentRow, $index) use ($dailyPreviousRows) {
-                    return [(string) $currentRow->day => $dailyPreviousRows->get($index)];
+                $dailyPreviousPaymentRows = collect(data_get($activeComparison, 'data.paymentDaily', []))->sortBy('day')->values();
+                $dailyComparisonByDate = $dailyPreviousRows->filter(fn ($row) => data_get($row, 'day'))->keyBy(fn ($row) => (string) data_get($row, 'day'));
+                $dailyComparisonByCalendarDay = $dailyPreviousRows
+                    ->filter(fn ($row) => data_get($row, 'day'))
+                    ->keyBy(fn ($row) => \Carbon\Carbon::parse(data_get($row, 'day'))->day);
+                $dailyPreviousPaymentByDate = $dailyPreviousPaymentRows->filter(fn ($row) => data_get($row, 'day'))->keyBy(fn ($row) => (string) data_get($row, 'day'));
+                $dailyPreviousPaymentByCalendarDay = $dailyPreviousPaymentRows
+                    ->filter(fn ($row) => data_get($row, 'day'))
+                    ->keyBy(fn ($row) => \Carbon\Carbon::parse(data_get($row, 'day'))->day);
+                $dailyZeroComparisonRow = [
+                    'orders' => 0,
+                    'qty' => 0,
+                    'avg_units_per_order' => 0,
+                    'subtotal' => 0,
+                    'net_total' => 0,
+                    'buyer_paid' => 0,
+                    'estimated_payout' => 0,
+                    'cogs' => 0,
+                    'gross_profit' => 0,
+                    'ad_spend' => 0,
+                    'net_profit' => 0,
+                ];
+                $dailyZeroPaymentComparisonRow = ['buyer_paid' => 0];
+                $resolveDailyComparisonRow = function ($currentRow, $byDate, $byCalendarDay, $zeroRow) use ($activeComparison, $comparisonMode, $filters) {
+                    $currentDate = \Carbon\Carbon::parse(data_get($currentRow, 'day'));
+                    if (! $activeComparison) {
+                        return null;
+                    }
+
+                    if ($comparisonMode === 'month') {
+                        $comparisonRow = $byCalendarDay->get($currentDate->day);
+                    } else {
+                        $activeFrom = data_get($activeComparison, 'from');
+                        $currentFrom = data_get($filters, 'date_from');
+                        $comparisonDate = $activeFrom && $currentFrom
+                            ? \Carbon\Carbon::parse($activeFrom)->addDays(\Carbon\Carbon::parse($currentFrom)->diffInDays($currentDate))->toDateString()
+                            : null;
+                        $comparisonRow = $comparisonDate ? $byDate->get($comparisonDate) : null;
+                    }
+
+                    return $comparisonRow ?? $zeroRow;
+                };
+                $dailyComparisonByDay = collect($daily)->sortBy('day')->mapWithKeys(function ($currentRow) use ($resolveDailyComparisonRow, $dailyComparisonByDate, $dailyComparisonByCalendarDay, $dailyZeroComparisonRow, $dailyPreviousPaymentByDate, $dailyPreviousPaymentByCalendarDay, $dailyZeroPaymentComparisonRow) {
+                    return [(string) data_get($currentRow, 'day') => [
+                        'daily' => $resolveDailyComparisonRow($currentRow, $dailyComparisonByDate, $dailyComparisonByCalendarDay, $dailyZeroComparisonRow),
+                        'payment' => $resolveDailyComparisonRow($currentRow, $dailyPreviousPaymentByDate, $dailyPreviousPaymentByCalendarDay, $dailyZeroPaymentComparisonRow),
+                    ]];
                 });
                 $dailyChange = function ($current, $previous, $format = 'currency', bool $lowerIsBetter = false) use ($fmt) {
                     if ($previous === null || !is_numeric($current) || !is_numeric($previous)) {
@@ -2493,7 +2575,9 @@
                 $dailyNetSalesPeak = collect($daily)->sortByDesc('net_total')->first();
                 $dailyNetSalesLowest = collect($daily)->sortBy('net_total')->first();
                 $dailyNegativeProfitDays = collect($daily)->filter(fn ($row) => (float) data_get($row, 'net_profit', 0) < 0)->count();
-                $dailyNetSalesChange = $dailyChange($daily->sum('net_total'), $dailyPreviousRows->sum('net_total'));
+                $dailyNetSalesChange = $activeComparison
+                    ? $dailyChange($daily->sum('net_total'), $dailyPreviousRows->sum('net_total'))
+                    : null;
             @endphp
             <div class="sales-daily-chart-shell">
                 <div class="sales-daily-chart-layout">
@@ -2592,14 +2676,16 @@
                                 $dailyBuyerPaid = (float) data_get($dailyPayment, 'buyer_paid', 0);
                                 $dailyOrders = (int) ($row->orders ?? 0);
                                 $dailyAov = fn ($value) => $dailyOrders > 0 ? $fmt((float) $value / $dailyOrders) : '—';
-                                $dailyPrevious = $dailyComparisonByDay->get((string) $row->day);
+                                $dailyComparison = $dailyComparisonByDay->get((string) $row->day, []);
+                                $dailyPrevious = data_get($dailyComparison, 'daily');
+                                $dailyPreviousPayment = data_get($dailyComparison, 'payment');
                                 $dailyChanges = [
                                     'orders' => $dailyChange($dailyOrders, data_get($dailyPrevious, 'orders'), 'number'),
                                     'qty' => $dailyChange($row->qty, data_get($dailyPrevious, 'qty'), 'number'),
                                     'avg_units_per_order' => $dailyChange($row->avg_units_per_order, data_get($dailyPrevious, 'avg_units_per_order'), 'decimal'),
                                     'subtotal' => $dailyChange($row->subtotal, data_get($dailyPrevious, 'subtotal')),
                                     'net_total' => $dailyChange($row->net_total, data_get($dailyPrevious, 'net_total')),
-                                    'buyer_paid' => $dailyChange($dailyBuyerPaid, data_get($dailyPrevious, 'buyer_paid')),
+                                    'buyer_paid' => $dailyChange($dailyBuyerPaid, data_get($dailyPreviousPayment, 'buyer_paid')),
                                     'estimated_payout' => $dailyChange($row->estimated_payout, data_get($dailyPrevious, 'estimated_payout')),
                                     'cogs' => $dailyChange($row->cogs, data_get($dailyPrevious, 'cogs')),
                                     'gross_profit' => $dailyChange($row->gross_profit, data_get($dailyPrevious, 'gross_profit')),
@@ -3146,6 +3232,7 @@
             $watchlistProducts = $productAnalysisProducts
                 ->map(function ($product) use ($watchlistLowMarginThreshold, $watchlistRoasThreshold) {
                     $issues = [];
+                    $issueKeys = [];
                     $priority = 0;
                     $contributionProfit = $product->contribution_profit !== null ? (float) $product->contribution_profit : null;
                     $contributionMargin = $product->contribution_margin !== null ? (float) $product->contribution_margin : null;
@@ -3154,27 +3241,33 @@
 
                     if ($contributionProfit !== null && $contributionProfit < 0) {
                         $issues[] = 'Produk rugi';
+                        $issueKeys[] = 'loss';
                         $priority = max($priority, 4);
                     } elseif ($contributionProfit !== null && $contributionMargin !== null && $contributionMargin < $watchlistLowMarginThreshold) {
                         $issues[] = 'Margin rendah';
+                        $issueKeys[] = 'low_margin';
                         $priority = max($priority, 2);
                     }
                     if ($product->gross_profit === null) {
                         $issues[] = 'HPP belum lengkap';
+                        $issueKeys[] = 'missing_hpp';
                         $priority = max($priority, 3);
                     }
                     if (($product->ad_spend_matched ?? false) && $adSpend > 0 && ($adSales <= 0 || ($adSales / $adSpend) < $watchlistRoasThreshold)) {
                         $issues[] = 'ROAS rendah';
+                        $issueKeys[] = 'ad_risk';
                         $priority = max($priority, 4);
                     }
                     if ((int) ($product->internal_item_id ?? 0) <= 0) {
                         $issues[] = 'Belum mapping';
+                        $issueKeys[] = 'unmapped';
                         $priority = max($priority, 3);
                     }
 
                     return [
                         'product' => $product,
                         'issues' => $issues,
+                        'issue_keys' => $issueKeys,
                         'priority' => $priority,
                     ];
                 })
@@ -3183,6 +3276,7 @@
                 ->values();
             $watchlistSummary = collect([
                 [
+                    'key' => 'loss',
                     'label' => 'Produk rugi',
                     'count' => $watchlistLossProducts->count(),
                     'impact' => $fmt(abs((float) $watchlistLossProducts->sum('contribution_profit'))).' kontribusi negatif',
@@ -3190,6 +3284,7 @@
                     'icon' => 'bi-graph-down-arrow',
                 ],
                 [
+                    'key' => 'low_margin',
                     'label' => 'Margin rendah',
                     'count' => $watchlistLowMarginProducts->count(),
                     'impact' => $fmt((float) $watchlistLowMarginProducts->sum('net_sales')).' penjualan terdampak',
@@ -3197,6 +3292,7 @@
                     'icon' => 'bi-percent',
                 ],
                 [
+                    'key' => 'ad_risk',
                     'label' => 'ROAS di bawah 2x',
                     'count' => $watchlistAdRiskProducts->count(),
                     'impact' => $fmt((float) $watchlistAdRiskProducts->sum('ad_spend')).' biaya iklan',
@@ -3204,6 +3300,7 @@
                     'icon' => 'bi-megaphone',
                 ],
                 [
+                    'key' => 'missing_hpp',
                     'label' => 'HPP belum lengkap',
                     'count' => $watchlistMissingHppProducts->count(),
                     'impact' => $fmt((float) $watchlistMissingHppProducts->sum('net_sales')).' belum terkosting',
@@ -3211,6 +3308,7 @@
                     'icon' => 'bi-box-seam',
                 ],
                 [
+                    'key' => 'unmapped',
                     'label' => 'Belum mapping internal',
                     'count' => $watchlistUnmappedProducts->count(),
                     'impact' => $fmt((float) $watchlistUnmappedProducts->sum('net_sales')).' belum terpetakan',
@@ -3228,15 +3326,23 @@
                 <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($watchlistProducts->count()) }} produk perlu ditinjau</span>
             </div>
             <div class="sales-watchlist-grid">
+                <button type="button" class="sales-watchlist-card is-active" data-watchlist-filter="all" aria-pressed="true">
+                    <span class="sales-watchlist-icon"><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i></span>
+                    <span class="sales-watchlist-content">
+                        <span class="sales-watchlist-label">Semua prioritas</span>
+                        <span class="sales-watchlist-value">{{ number_format($watchlistProducts->count()) }}</span>
+                        <span class="sales-watchlist-impact">Tampilkan semua</span>
+                    </span>
+                </button>
                 @foreach ($watchlistSummary as $watchItem)
-                    <div class="sales-watchlist-card is-{{ $watchItem['class'] }}">
+                    <button type="button" class="sales-watchlist-card is-{{ $watchItem['class'] }}" data-watchlist-filter="{{ $watchItem['key'] }}" aria-pressed="false">
                         <span class="sales-watchlist-icon"><i class="bi {{ $watchItem['icon'] }}" aria-hidden="true"></i></span>
-                        <div class="sales-watchlist-content">
-                            <div class="sales-watchlist-label">{{ $watchItem['label'] }}</div>
-                            <div class="sales-watchlist-value">{{ number_format($watchItem['count']) }}</div>
-                            <div class="sales-watchlist-impact">{{ $watchItem['impact'] }}</div>
-                        </div>
-                    </div>
+                        <span class="sales-watchlist-content">
+                            <span class="sales-watchlist-label">{{ $watchItem['label'] }}</span>
+                            <span class="sales-watchlist-value">{{ number_format($watchItem['count']) }}</span>
+                            <span class="sales-watchlist-impact">{{ $watchItem['impact'] }}</span>
+                        </span>
+                    </button>
                 @endforeach
             </div>
             @if ($watchlistProducts->isNotEmpty())
@@ -3247,11 +3353,12 @@
                                 <th style="width: 8%">Prioritas</th>
                                 <th style="width: 25%">Produk</th>
                                 <th style="width: 19%">Indikasi</th>
-                                <th class="text-end" style="width: 12%">Penjualan Netto</th>
-                                <th class="text-end" style="width: 12%">Kontribusi</th>
+                                <th class="text-end" style="width: 10%">Penjualan Netto</th>
+                                <th class="text-end" style="width: 9%">Margin</th>
+                                <th class="text-end" style="width: 11%">Laba Bersih</th>
                                 <th class="text-end" style="width: 10%">Biaya Iklan</th>
                                 <th class="text-end" style="width: 7%">ROAS</th>
-                                <th style="width: 12%">Status Data</th>
+                                <th style="width: 11%">Status Data</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -3260,20 +3367,41 @@
                                     $watchProduct = $watchRow['product'];
                                     $watchTone = $watchRow['priority'] >= 4 ? 'is-danger' : ($watchRow['priority'] >= 3 ? 'is-warning' : 'is-info');
                                     $watchProductTitle = trim((string) ($watchProduct->marketplace_name ?: $watchProduct->name)) ?: 'Produk tanpa nama';
+                                    $watchProductImage = trim((string) ($watchProduct->image_url ?? ''));
                                     $watchProductCode = trim((string) ($watchProduct->external_item_id ?? '')) ?: trim((string) ($watchProduct->sku ?? ''));
+                                    $watchContributionMargin = $watchProduct->contribution_margin !== null ? (float) $watchProduct->contribution_margin : null;
+                                    $watchNetProfit = $watchProduct->estimated_payout !== null
+                                        ? (float) $watchProduct->estimated_payout
+                                            - (float) ($watchProduct->hpp_total ?? ((float) ($watchProduct->hpp ?? 0) * (int) ($watchProduct->qty ?? 0)))
+                                            - (float) ($watchProduct->ad_spend ?? 0)
+                                        : null;
                                     $watchStatus = $watchProduct->gross_profit === null
                                         ? 'HPP belum lengkap'
                                         : ((int) ($watchProduct->internal_item_id ?? 0) > 0 ? 'Mapped' : 'Belum mapping');
                                 @endphp
-                                <tr>
+                                <tr data-watchlist-row data-watchlist-issues="{{ implode('|', $watchRow['issue_keys']) }}">
                                     <td><span class="sales-watchlist-badge {{ $watchTone }}">{{ $watchRow['priority'] >= 4 ? 'Tinggi' : ($watchRow['priority'] >= 3 ? 'Sedang' : 'Pantau') }}</span></td>
                                     <td>
-                                        <span class="sales-watchlist-product" title="{{ $watchProductTitle }}">{{ $watchProductTitle }}</span>
-                                        <span class="sales-watchlist-meta">{{ $watchProductCode !== '' ? $watchProductCode : 'Kode belum tersedia' }}</span>
+                                        <div class="sales-watchlist-product-cell">
+                                            <span class="sales-product-marketplace-thumb sales-watchlist-thumb" tabindex="0" aria-label="{{ $watchProductTitle }}">
+                                                @if ($watchProductImage !== '')
+                                                    <img src="{{ $watchProductImage }}" alt="{{ $watchProductTitle }}" loading="lazy" onerror="this.hidden=true; this.nextElementSibling.hidden=false;">
+                                                    <span class="sales-product-image-fallback" hidden><i class="bi bi-image" aria-hidden="true"></i></span>
+                                                @else
+                                                    <span class="sales-product-image-fallback"><i class="bi bi-image" aria-hidden="true"></i></span>
+                                                @endif
+                                                <span class="sales-product-image-preview-title">{{ $watchProductTitle }}</span>
+                                            </span>
+                                            <span class="min-w-0">
+                                                <span class="sales-watchlist-product" title="{{ $watchProductTitle }}">{{ $watchProductTitle }}</span>
+                                                <span class="sales-watchlist-meta">{{ $watchProductCode !== '' ? $watchProductCode : 'Kode belum tersedia' }}</span>
+                                            </span>
+                                        </div>
                                     </td>
                                     <td><span class="sales-watchlist-badge {{ $watchTone }}">{{ implode(' · ', $watchRow['issues']) }}</span></td>
                                     <td class="text-end sales-watchlist-number">{{ $fmt($watchProduct->net_sales ?? 0) }}</td>
-                                    <td class="text-end sales-watchlist-number {{ ($watchProduct->contribution_profit ?? 0) < 0 ? 'text-danger' : '' }}">{{ $watchProduct->contribution_profit === null ? '—' : $fmt($watchProduct->contribution_profit) }}</td>
+                                    <td class="text-end sales-watchlist-number">{{ $watchContributionMargin === null ? '—' : $percentDisplay($watchContributionMargin) }}</td>
+                                    <td class="text-end sales-watchlist-number {{ ($watchNetProfit ?? 0) < 0 ? 'text-danger' : '' }}">{{ $watchNetProfit === null ? '—' : $fmt($watchNetProfit) }}</td>
                                     <td class="text-end sales-watchlist-number">{{ ($watchProduct->ad_spend_matched ?? false) ? $fmt($watchProduct->ad_spend ?? 0) : '—' }}</td>
                                     <td class="text-end sales-watchlist-number">{{ ($watchProduct->ad_spend ?? 0) > 0 ? $multipleDisplay(($watchProduct->ad_sales ?? 0) / $watchProduct->ad_spend) : '—' }}</td>
                                     <td><span class="sales-watchlist-badge {{ $watchProduct->gross_profit === null || (int) ($watchProduct->internal_item_id ?? 0) <= 0 ? 'is-warning' : 'is-muted' }}">{{ $watchStatus }}</span></td>
@@ -3282,6 +3410,7 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="sales-empty text-center py-3 d-none" data-watchlist-empty>Tidak ada produk pada prioritas ini.</div>
             @else
                 <div class="sales-empty text-center py-3">Tidak ada prioritas kritis pada periode ini.</div>
             @endif
@@ -4241,6 +4370,44 @@
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const salesPane = document.querySelector('[data-sales-pane="sales"]');
+        const watchlistSection = salesPane?.querySelector('.sales-watchlist-section');
+        const kpiSection = salesPane?.querySelector('section[aria-label^="KPI"]');
+        if (salesPane && watchlistSection && kpiSection) {
+            kpiSection.insertAdjacentElement('afterend', watchlistSection);
+        }
+
+        const watchlistCards = document.querySelectorAll('[data-watchlist-filter]');
+        const watchlistRows = document.querySelectorAll('[data-watchlist-row]');
+        const watchlistEmpty = document.querySelector('[data-watchlist-empty]');
+        if (watchlistCards.length && watchlistRows.length) {
+            const applyWatchlistFilter = function (filter) {
+                watchlistCards.forEach(function (card) {
+                    const isActive = card.dataset.watchlistFilter === filter;
+                    card.classList.toggle('is-active', isActive);
+                    card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                });
+
+                let visibleRows = 0;
+                watchlistRows.forEach(function (row) {
+                    const issues = (row.dataset.watchlistIssues || '').split('|').filter(Boolean);
+                    const matches = filter === 'all' || issues.includes(filter);
+                    row.hidden = !matches;
+                    if (matches) visibleRows += 1;
+                });
+                if (watchlistEmpty) watchlistEmpty.classList.toggle('d-none', visibleRows > 0);
+            };
+
+            watchlistCards.forEach(function (card) {
+                card.addEventListener('click', function () {
+                    const filter = card.dataset.watchlistFilter || 'all';
+                    const alreadyActive = card.getAttribute('aria-pressed') === 'true';
+                    applyWatchlistFilter(alreadyActive && filter !== 'all' ? 'all' : filter);
+                });
+            });
+            applyWatchlistFilter('all');
+        }
+
         const tabs = document.querySelectorAll('[data-sales-tab]');
         const panes = document.querySelectorAll('[data-sales-pane]');
         const filterForm = document.querySelector('.sales-filter-card');
