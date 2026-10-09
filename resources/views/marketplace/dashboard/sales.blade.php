@@ -570,11 +570,17 @@
     .sales-dashboard .sales-category-summary-table th { padding: .65rem .55rem; color: var(--sales-muted); font-size: .61rem; font-weight: 800; letter-spacing: .025em; vertical-align: middle; }
     .sales-dashboard .sales-category-summary-table td { padding: .62rem .55rem; font-size: .7rem; vertical-align: middle; }
     .sales-dashboard .sales-category-summary-table th:nth-child(1) { width: 5%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(2) { width: 29%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(2) { width: 20%; }
     .sales-dashboard .sales-category-summary-table th:nth-child(3),
     .sales-dashboard .sales-category-summary-table th:nth-child(4),
     .sales-dashboard .sales-category-summary-table th:nth-child(5),
-    .sales-dashboard .sales-category-summary-table th:nth-child(6) { width: 16.5%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(6) { width: 7.5%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(7),
+    .sales-dashboard .sales-category-summary-table th:nth-child(8) { width: 5%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(9) { width: 11%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(10) { width: 11%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(11) { width: 9%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(12) { width: 5%; }
     .sales-dashboard .sales-category-summary-table th,
     .sales-dashboard .sales-category-summary-table td { text-align: start; }
     .sales-dashboard .sales-category-summary-table tbody td:nth-child(n+3) { color: var(--sales-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -2028,7 +2034,11 @@
                                 <th>Produk Aktif</th>
                                 <th>Variant Aktif</th>
                                 <th>Order</th>
-                                <th class="pe-3">Unit</th>
+                                <th>Unit</th>
+                                <th class="text-end">Penjualan Netto</th>
+                                <th class="text-end">Pembayaran Pembeli</th>
+                                <th class="text-end">Penjualan Atribusi Iklan</th>
+                                <th class="text-end pe-3">ACOS</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -2050,10 +2060,14 @@
                                     <td data-label="Produk Aktif">{{ number_format($activeCategoryMetrics['active_products']) }}</td>
                                     <td data-label="Variant Aktif">{{ number_format($activeCategoryMetrics['active_variants']) }}</td>
                                     <td data-label="Order">{{ number_format($activeCategoryMetrics['orders']) }}</td>
-                                    <td class="pe-3" data-label="Unit">{{ number_format($activeCategoryMetrics['qty']) }}</td>
+                                    <td data-label="Unit">{{ number_format($activeCategoryMetrics['qty']) }}</td>
+                                    <td class="text-end" data-label="Penjualan Netto">{{ $fmt($activeCategoryMetrics['net_sales']) }}</td>
+                                    <td class="text-end" data-label="Pembayaran Pembeli">{{ $fmt($activeCategoryMetrics['buyer_payment']) }}</td>
+                                    <td class="text-end" data-label="Penjualan Atribusi Iklan">{{ $fmt($activeCategoryMetrics['ad_sales']) }}</td>
+                                    <td class="text-end pe-3" data-label="ACOS">{{ $activeCategoryMetrics['acos'] === null ? '—' : $percentDisplay($activeCategoryMetrics['acos']) }}</td>
                                 </tr>
                                 <tr id="{{ $categoryKey }}-detail" class="sales-category-comparison-detail" data-sales-category-comparison-items="{{ $categoryKey }}" hidden>
-                                    <td colspan="8">
+                                    <td colspan="12">
                                         <div class="sales-category-comparison-detail-card">
                                             <div class="sales-category-detail-header d-flex align-items-start justify-content-between gap-2 mb-2">
                                                 <div>
