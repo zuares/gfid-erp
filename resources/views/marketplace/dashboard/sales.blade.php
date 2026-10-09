@@ -521,18 +521,20 @@
     .sales-dashboard .sales-daily-chart-legend i { width: .45rem; height: .45rem; border-radius: 50%; background: var(--sales-accent); }
     .sales-dashboard .sales-daily-chart-legend i.previous { background: var(--sales-muted); }
     .sales-dashboard .sales-daily-chart-legend i.period-two { background: #a78bfa; }
-    .sales-dashboard .sales-daily-chart-analysis { display: flex; flex-direction: column; justify-content: flex-start; min-width: 0; padding: .75rem .8rem; border: 1px solid color-mix(in srgb, var(--sales-line) 78%, transparent); border-radius: .65rem; background: color-mix(in srgb, var(--sales-card) 92%, var(--sales-soft) 8%); }
+    .sales-dashboard .sales-daily-chart-analysis { display: flex; flex-direction: column; justify-content: flex-start; min-width: 0; padding: .8rem; border: 1px solid color-mix(in srgb, var(--sales-line) 78%, transparent); border-radius: .65rem; background: color-mix(in srgb, var(--sales-card) 92%, var(--sales-soft) 8%); }
+    .sales-dashboard .sales-daily-chart-analysis-header { display: flex; align-items: flex-start; justify-content: space-between; gap: .65rem; }
     .sales-dashboard .sales-daily-chart-analysis-kicker { color: var(--sales-muted); font-size: .58rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
     .sales-dashboard .sales-daily-chart-analysis-title { margin-top: .2rem; color: var(--sales-ink); font-size: .68rem; font-weight: 800; }
-    .sales-dashboard .sales-daily-chart-analysis-value { margin-top: .1rem; color: var(--sales-ink); font-size: 1.08rem; font-weight: 900; line-height: 1.2; }
-    .sales-dashboard .sales-daily-chart-analysis-delta { min-height: 1rem; margin-top: .2rem; color: var(--sales-muted); font-size: .62rem; font-weight: 800; }
-    .sales-dashboard .sales-daily-chart-analysis-delta.good { color: #15803d; }
-    .sales-dashboard .sales-daily-chart-analysis-delta.bad { color: #b91c1c; }
-    .sales-dashboard .sales-daily-chart-analysis-list { display: grid; gap: .55rem; margin-top: .75rem; padding-top: .65rem; border-top: 1px solid color-mix(in srgb, var(--sales-line) 72%, transparent); }
-    .sales-dashboard .sales-daily-chart-analysis-item { display: grid; gap: .08rem; }
-    .sales-dashboard .sales-daily-chart-analysis-item-label { color: var(--sales-muted); font-size: .59rem; font-weight: 750; }
-    .sales-dashboard .sales-daily-chart-analysis-item-value { display: flex; align-items: baseline; justify-content: space-between; gap: .45rem; color: var(--sales-ink); font-size: .69rem; font-weight: 850; }
-    .sales-dashboard .sales-daily-chart-analysis-item-date { color: var(--sales-muted); font-size: .57rem; font-weight: 700; }
+    .sales-dashboard .sales-daily-chart-analysis-value { margin-top: .3rem; color: var(--sales-ink); font-size: 1.14rem; font-weight: 900; line-height: 1.2; }
+    .sales-dashboard .sales-daily-chart-analysis-delta { flex: 0 0 auto; min-height: 1rem; padding: .22rem .38rem; border: 1px solid color-mix(in srgb, var(--sales-line) 80%, transparent); border-radius: .38rem; color: var(--sales-muted); background: color-mix(in srgb, var(--sales-soft) 44%, var(--sales-card) 56%); font-size: .59rem; font-weight: 850; line-height: 1.15; text-align: right; white-space: nowrap; }
+    .sales-dashboard .sales-daily-chart-analysis-delta.good { border-color: color-mix(in srgb, #16a34a 22%, var(--sales-line) 78%); color: #15803d; background: color-mix(in srgb, #dcfce7 48%, var(--sales-card) 52%); }
+    .sales-dashboard .sales-daily-chart-analysis-delta.bad { border-color: color-mix(in srgb, #dc2626 22%, var(--sales-line) 78%); color: #b91c1c; background: color-mix(in srgb, #fee2e2 48%, var(--sales-card) 52%); }
+    .sales-dashboard .sales-daily-chart-analysis-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin-top: .75rem; padding-top: .65rem; border-top: 1px solid color-mix(in srgb, var(--sales-line) 72%, transparent); }
+    .sales-dashboard .sales-daily-chart-analysis-item { min-width: 0; padding: .48rem .52rem; border: 1px solid color-mix(in srgb, var(--sales-line) 72%, transparent); border-radius: .48rem; background: color-mix(in srgb, var(--sales-soft) 28%, var(--sales-card) 72%); }
+    .sales-dashboard .sales-daily-chart-analysis-item:last-child { grid-column: 1 / -1; }
+    .sales-dashboard .sales-daily-chart-analysis-item-label { display: block; color: var(--sales-muted); font-size: .57rem; font-weight: 750; line-height: 1.2; }
+    .sales-dashboard .sales-daily-chart-analysis-item-value { display: block; margin-top: .24rem; color: var(--sales-ink); font-size: .68rem; font-weight: 850; line-height: 1.2; }
+    .sales-dashboard .sales-daily-chart-analysis-item-date { display: block; margin-top: .12rem; color: var(--sales-muted); font-size: .56rem; font-weight: 700; line-height: 1.2; }
     .sales-dashboard .sales-product-table { min-width: 1265px; table-layout: fixed; }
     .sales-dashboard .sales-product-table th,
     .sales-dashboard .sales-product-table td { white-space: nowrap; }
@@ -2520,28 +2522,34 @@
                         </div>
                     </div>
                     <aside class="sales-daily-chart-analysis" aria-label="Kesimpulan analitik">
-                        <div class="sales-daily-chart-analysis-kicker">Kesimpulan analitik</div>
-                        <div class="sales-daily-chart-analysis-title" data-sales-daily-analysis-title>Net Sales</div>
-                        <div class="sales-daily-chart-analysis-value" data-sales-daily-analysis-value>{{ $fmt($daily->sum('net_total')) }}</div>
-                        <div class="sales-daily-chart-analysis-delta {{ $dailyNetSalesChange['tone'] ?? '' }}" data-sales-daily-analysis-delta>
-                            @if ($dailyNetSalesChange)
-                                {{ $dailyNetSalesChange['label'] }} vs {{ $comparisonModeLabel }}
-                            @else
-                                {{ $comparisonModeLabel }}
-                            @endif
+                        <div class="sales-daily-chart-analysis-header">
+                            <div>
+                                <div class="sales-daily-chart-analysis-kicker">Kesimpulan analitik</div>
+                                <div class="sales-daily-chart-analysis-title" data-sales-daily-analysis-title>Net Sales</div>
+                            </div>
+                            <div class="sales-daily-chart-analysis-delta {{ $dailyNetSalesChange['tone'] ?? '' }}" data-sales-daily-analysis-delta>
+                                @if ($dailyNetSalesChange)
+                                    {{ $dailyNetSalesChange['label'] }} vs {{ $comparisonModeLabel }}
+                                @else
+                                    {{ $comparisonModeLabel }}
+                                @endif
+                            </div>
                         </div>
+                        <div class="sales-daily-chart-analysis-value" data-sales-daily-analysis-value>{{ $fmt($daily->sum('net_total')) }}</div>
                         <div class="sales-daily-chart-analysis-list">
                             <div class="sales-daily-chart-analysis-item">
-                                <span class="sales-daily-chart-analysis-item-label">Puncak harian</span>
-                                <span class="sales-daily-chart-analysis-item-value"><strong>{{ $fmt(data_get($dailyNetSalesPeak, 'net_total', 0)) }}</strong><small class="sales-daily-chart-analysis-item-date">{{ data_get($dailyNetSalesPeak, 'day') ? \Carbon\Carbon::parse(data_get($dailyNetSalesPeak, 'day'))->format('d M Y') : '—' }}</small></span>
+                                <span class="sales-daily-chart-analysis-item-label" data-sales-daily-analysis-peak-label>Hari tertinggi</span>
+                                <strong class="sales-daily-chart-analysis-item-value" data-sales-daily-analysis-peak-value>{{ $fmt(data_get($dailyNetSalesPeak, 'net_total', 0)) }}</strong>
+                                <small class="sales-daily-chart-analysis-item-date" data-sales-daily-analysis-peak-date>{{ data_get($dailyNetSalesPeak, 'day') ? \Carbon\Carbon::parse(data_get($dailyNetSalesPeak, 'day'))->format('d M Y') : '—' }}</small>
                             </div>
                             <div class="sales-daily-chart-analysis-item">
-                                <span class="sales-daily-chart-analysis-item-label">Terendah harian</span>
-                                <span class="sales-daily-chart-analysis-item-value"><strong>{{ $fmt(data_get($dailyNetSalesLowest, 'net_total', 0)) }}</strong><small class="sales-daily-chart-analysis-item-date">{{ data_get($dailyNetSalesLowest, 'day') ? \Carbon\Carbon::parse(data_get($dailyNetSalesLowest, 'day'))->format('d M Y') : '—' }}</small></span>
+                                <span class="sales-daily-chart-analysis-item-label" data-sales-daily-analysis-low-label>Hari terendah</span>
+                                <strong class="sales-daily-chart-analysis-item-value" data-sales-daily-analysis-low-value>{{ $fmt(data_get($dailyNetSalesLowest, 'net_total', 0)) }}</strong>
+                                <small class="sales-daily-chart-analysis-item-date" data-sales-daily-analysis-low-date>{{ data_get($dailyNetSalesLowest, 'day') ? \Carbon\Carbon::parse(data_get($dailyNetSalesLowest, 'day'))->format('d M Y') : '—' }}</small>
                             </div>
                             <div class="sales-daily-chart-analysis-item">
-                                <span class="sales-daily-chart-analysis-item-label">Hari net profit negatif</span>
-                                <span class="sales-daily-chart-analysis-item-value"><strong>{{ number_format($dailyNegativeProfitDays, 0, ',', '.') }} hari</strong></span>
+                                <span class="sales-daily-chart-analysis-item-label" data-sales-daily-analysis-negative-label>Hari bernilai negatif</span>
+                                <strong class="sales-daily-chart-analysis-item-value" data-sales-daily-analysis-negative-value>{{ number_format($dailyNegativeProfitDays, 0, ',', '.') }} hari</strong>
                             </div>
                         </div>
                     </aside>
@@ -4258,6 +4266,14 @@
         const dailyAnalysisTitle = document.querySelector('[data-sales-daily-analysis-title]');
         const dailyAnalysisValue = document.querySelector('[data-sales-daily-analysis-value]');
         const dailyAnalysisDelta = document.querySelector('[data-sales-daily-analysis-delta]');
+        const dailyAnalysisPeakLabel = document.querySelector('[data-sales-daily-analysis-peak-label]');
+        const dailyAnalysisPeakValue = document.querySelector('[data-sales-daily-analysis-peak-value]');
+        const dailyAnalysisPeakDate = document.querySelector('[data-sales-daily-analysis-peak-date]');
+        const dailyAnalysisLowLabel = document.querySelector('[data-sales-daily-analysis-low-label]');
+        const dailyAnalysisLowValue = document.querySelector('[data-sales-daily-analysis-low-value]');
+        const dailyAnalysisLowDate = document.querySelector('[data-sales-daily-analysis-low-date]');
+        const dailyAnalysisNegativeLabel = document.querySelector('[data-sales-daily-analysis-negative-label]');
+        const dailyAnalysisNegativeValue = document.querySelector('[data-sales-daily-analysis-negative-value]');
 
         function escapeTrendText(value) {
             return String(value ?? '').replace(/[&<>'"]/g, function (character) {
@@ -4468,8 +4484,20 @@
                 qty: 'Terjual',
                 orders: 'Pesanan'
             };
-            if (dailyAnalysisTitle) dailyAnalysisTitle.textContent = metricLabels[metric] || 'Net Sales';
+            const metricLabel = metricLabels[metric] || 'Net Sales';
+            const peakIndex = currentValues.length ? currentValues.indexOf(Math.max(...currentValues)) : -1;
+            const lowIndex = currentValues.length ? currentValues.indexOf(Math.min(...currentValues)) : -1;
+            const negativeDays = currentValues.filter((value) => value < 0).length;
+            if (dailyAnalysisTitle) dailyAnalysisTitle.textContent = metricLabel;
             if (dailyAnalysisValue) dailyAnalysisValue.textContent = formatDailyChartValue(currentTotal, metric);
+            if (dailyAnalysisPeakLabel) dailyAnalysisPeakLabel.textContent = 'Hari tertinggi';
+            if (dailyAnalysisPeakValue) dailyAnalysisPeakValue.textContent = peakIndex >= 0 ? formatDailyChartValue(currentValues[peakIndex], metric) : '—';
+            if (dailyAnalysisPeakDate) dailyAnalysisPeakDate.textContent = peakIndex >= 0 ? (current[peakIndex]?.date || current[peakIndex]?.label || '—') : '—';
+            if (dailyAnalysisLowLabel) dailyAnalysisLowLabel.textContent = 'Hari terendah';
+            if (dailyAnalysisLowValue) dailyAnalysisLowValue.textContent = lowIndex >= 0 ? formatDailyChartValue(currentValues[lowIndex], metric) : '—';
+            if (dailyAnalysisLowDate) dailyAnalysisLowDate.textContent = lowIndex >= 0 ? (current[lowIndex]?.date || current[lowIndex]?.label || '—') : '—';
+            if (dailyAnalysisNegativeLabel) dailyAnalysisNegativeLabel.textContent = metric === 'net_profit' ? 'Hari net profit negatif' : 'Hari bernilai negatif';
+            if (dailyAnalysisNegativeValue) dailyAnalysisNegativeValue.textContent = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(negativeDays) + ' hari';
             if (dailyChartValue) dailyChartValue.textContent = formatDailyChartValue(currentTotal, metric);
             if (dailyChartCompare) {
                 dailyChartCompare.classList.remove('good', 'bad');
