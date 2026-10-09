@@ -389,8 +389,6 @@
     .sales-dashboard .sales-daily-table td { padding: .42rem .24rem; }
     .sales-dashboard .sales-daily-table th { font-size: clamp(.5rem, .1vw + .47rem, .62rem); line-height: 1.12; white-space: normal; overflow-wrap: anywhere; }
     .sales-dashboard .sales-daily-table td { font-size: clamp(.58rem, .12vw + .54rem, .68rem); white-space: normal; overflow-wrap: anywhere; }
-    .sales-dashboard .sales-daily-table .sales-table-metric { white-space: nowrap; }
-    .sales-dashboard .sales-daily-table .sales-table-metric .small { font-size: clamp(.46rem, .08vw + .43rem, .56rem); line-height: 1.15; }
     .sales-dashboard .sales-daily-table .sales-compare-line { margin-top: .18rem; gap: .2rem; font-size: .52rem; }
     .sales-dashboard .sales-daily-table .sales-compare-line i { font-size: .5rem; }
     .sales-dashboard .sales-daily-table .sales-compare-line strong { font-size: .54rem; }
@@ -1638,17 +1636,17 @@
                         <tr>
                             <th scope="col" class="sales-index-column">No.</th>
                             <th>Tanggal</th>
-                            <th class="text-end">Jumlah Pesanan</th>
-                            <th class="text-end">Jumlah Unit Terjual</th>
-                            <th class="text-end">Rata-rata Unit/Pesanan</th>
-                            <th class="text-end">GMV</th>
+                            <th class="text-end">Pesanan</th>
+                            <th class="text-end">Unit Terjual</th>
+                            <th class="text-end">Unit / Order</th>
+                            <th class="text-end">Penjualan Kotor</th>
                             <th class="text-end">Penjualan Neto</th>
                             <th class="text-end">COGS (HPP)</th>
-                            <th class="text-end">Gross Profit</th>
-                            <th class="text-end">Dibayar Pembeli</th>
+                            <th class="text-end">Laba Kotor</th>
                             <th class="text-end">Iklan</th>
+                            <th class="text-end">Laba Bersih</th>
+                            <th class="text-end">Dibayar Pembeli</th>
                             <th class="text-end">Estimasi Payout</th>
-                            <th class="text-end">AOV Neto</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1656,9 +1654,6 @@
                             @php
                                 $dailyPayment = $paymentDailyByDay->get((string) $row->day);
                                 $dailyBuyerPaid = (float) data_get($dailyPayment, 'buyer_paid', 0);
-                                $dailyAdSpend = (float) $adSpendDaily->get((string) $row->day, 0);
-                                $dailyOrders = (int) ($row->orders ?? 0);
-                                $dailyAov = fn ($value) => $dailyOrders > 0 ? $fmt((float) $value / $dailyOrders) : '—';
                             @endphp
                             <tr class="sales-clickable-row" data-sales-order-detail-date="{{ $row->day }}" tabindex="0" role="button">
                                 <td class="sales-index-cell" aria-label="Urutan {{ $loop->iteration }}">{{ $loop->iteration }}</td>
@@ -1666,13 +1661,14 @@
                                 <td class="text-end">{{ number_format($row->orders) }}</td>
                                 <td class="text-end">{{ number_format($row->qty) }}</td>
                                 <td class="text-end">{{ number_format($row->avg_units_per_order, 2, ',', '.') }}</td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->subtotal) }}</div><div class="small text-muted">AOV {{ $dailyAov($row->subtotal) }}</div></td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->net_total) }}</div><div class="small text-muted">AOV {{ $dailyAov($row->net_total) }}</div></td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->cogs) }}</div><div class="small text-muted">AOV {{ $dailyAov($row->cogs) }}</div></td>
-                                <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($row->gross_profit) }}</div><div class="small text-muted">AOV {{ $dailyAov($row->gross_profit) }}</div></td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($dailyBuyerPaid) }}</div><div class="small text-muted">AOV {{ $dailyAov($dailyBuyerPaid) }}</div></td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($dailyAdSpend) }}</div><div class="small text-muted">AOV {{ $dailyAov($dailyAdSpend) }}</div></td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->estimated_payout) }}</div><div class="small text-muted">AOV {{ $dailyAov($row->estimated_payout) }}</div></td>
+                                <td class="text-end">{{ $fmt($row->subtotal) }}</td>
+                                <td class="text-end">{{ $fmt($row->net_total) }}</td>
+                                <td class="text-end">{{ $fmt($row->cogs) }}</td>
+                                <td class="text-end fw-semibold">{{ $fmt($row->gross_profit) }}</td>
+                                <td class="text-end">{{ $fmt($row->ad_spend) }}</td>
+                                <td class="text-end fw-semibold">{{ $fmt($row->net_profit) }}</td>
+                                <td class="text-end">{{ $fmt($dailyBuyerPaid) }}</td>
+                                <td class="text-end">{{ $fmt($row->estimated_payout) }}</td>
                             </tr>
                         @endforeach
                     </tbody>

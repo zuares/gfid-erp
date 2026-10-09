@@ -150,6 +150,17 @@ class MarketplaceSalesDashboardController extends Controller
         $dateExpression = 'COALESCE(o.ordered_at, o.order_date)';
         $statusExpression = "UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), ''))";
         $subtotalExpression = 'CASE WHEN COALESCE(o.subtotal_items, 0) > 0 THEN o.subtotal_items ELSE COALESCE(o.total_amount, 0) END';
+        $gmvLineValueExpression = 'CASE'
+            . ' WHEN COALESCE(gmv_oi.line_net_amount, 0) > 0 THEN gmv_oi.line_net_amount'
+            . ' WHEN COALESCE(gmv_oi.price_after_discount, 0) > 0 THEN gmv_oi.price_after_discount * COALESCE(gmv_oi.qty, 0)'
+            . ' WHEN COALESCE(gmv_oi.line_gross_amount, 0) > 0 THEN gmv_oi.line_gross_amount'
+            . ' WHEN COALESCE(gmv_oi.price, 0) > 0 THEN gmv_oi.price * COALESCE(gmv_oi.qty, 0)'
+            . ' ELSE 0 END';
+        $gmvItemTotals = DB::table('marketplace_order_items as gmv_oi')
+            ->selectRaw('COALESCE(gmv_oi.marketplace_order_id, gmv_oi.order_id) as order_key')
+            ->selectRaw("COALESCE(SUM({$gmvLineValueExpression}), 0) as gmv")
+            ->selectRaw('COUNT(*) as item_count')
+            ->groupByRaw('COALESCE(gmv_oi.marketplace_order_id, gmv_oi.order_id)');
 
         $base = DB::table('marketplace_orders as o')
             ->leftJoinSub($itemTotals, 'itot', 'itot.order_key', '=', 'o.id')
@@ -259,7 +270,8 @@ class MarketplaceSalesDashboardController extends Controller
         // Item rows are preferred. For older/imported orders, fall back to the
         // marketplace payload so the quantity KPI does not silently become 0.
         $orderRows = (clone $base)
-            ->selectRaw("o.id, DATE({$dateExpression}) as day, {$subtotalExpression} as subtotal")
+            ->leftJoinSub($gmvItemTotals, 'gmv_itot', 'gmv_itot.order_key', '=', 'o.id')
+            ->selectRaw("o.id, DATE({$dateExpression}) as day, CASE WHEN COALESCE(gmv_itot.item_count, 0) > 0 AND COALESCE(gmv_itot.gmv, 0) > 0 THEN gmv_itot.gmv ELSE {$subtotalExpression} END as subtotal")
             ->selectRaw('COALESCE(itot.total_qty, 0) as item_qty')
             ->addSelect('o.raw_json', 'o.raw_payload_json')
             ->get()
@@ -1158,9 +1170,15 @@ SQL;
             $row->total_promotion += $promotionTotal;
         }
 
-        $orderBeforeDiscountByDay = $orderRows
+        $gmvByDay = $orderRows
             ->groupBy('day')
             ->map(fn ($rows) => (float) $rows->sum('subtotal'));
+        $orderBeforeDiscountByDay = (clone $base)
+            ->selectRaw("DATE({$dateExpression}) as day")
+            ->selectRaw("COALESCE(SUM({$subtotalExpression}), 0) as order_before_discount")
+            ->groupByRaw("DATE({$dateExpression})")
+            ->pluck('order_before_discount', 'day')
+            ->map(fn ($amount) => (float) $amount);
         $orderCountByDay = $orderRows
             ->groupBy('day')
             ->map(fn ($rows) => $rows->count());
@@ -1176,9 +1194,9 @@ SQL;
             ->values();
         $promotionByDay = $promotionDaily->keyBy(fn ($row) => (string) $row->day);
         $paymentDaily = $paymentDaily
-            ->map(function ($row) use ($promotionByDay) {
+            ->map(function ($row) use ($promotionByDay, $gmvByDay) {
                 $promotion = $promotionByDay->get((string) $row->day);
-                $sellerGrossSales = (float) data_get($promotion, 'order_before_discount', 0);
+                $sellerGrossSales = (float) $gmvByDay->get((string) $row->day, 0);
                 // Penjualan neto seller hanya mengurangi promosi yang menjadi
                 // beban seller: voucher toko, paket diskon, dan kombo hemat.
                 // Voucher platform tidak mengurangi revenue seller.
@@ -1204,11 +1222,13 @@ SQL;
         $paymentSummary['buyer_shipping'] = (float) $paymentDaily->sum('buyer_shipping');
         $paymentSummary['total_promotion'] = (float) $paymentDaily->sum('total_promotion');
 
-        // AOV dashboard memakai Penjualan Neto setelah promosi seller.
-        $daily = $daily->map(function ($row) use ($sellerNetSalesByDay, $cogsByDay, $estimatedPayoutByDay) {
+        // Profit harian memakai Penjualan Neto setelah promosi seller.
+        $daily = $daily->map(function ($row) use ($sellerNetSalesByDay, $cogsByDay, $estimatedPayoutByDay, $adSpendDaily) {
             $row->net_total = (float) data_get($sellerNetSalesByDay->get((string) $row->day), 'seller_net_sales', 0);
             $row->cogs = (float) $cogsByDay->get((string) $row->day, 0);
             $row->gross_profit = $row->net_total - $row->cogs;
+            $row->ad_spend = (float) $adSpendDaily->get((string) $row->day, 0);
+            $row->net_profit = $row->gross_profit - $row->ad_spend;
             $row->estimated_payout = (float) ($estimatedPayoutByDay->get((string) $row->day, 0));
             $row->aov = $row->orders > 0 ? $row->net_total / $row->orders : 0;
 
