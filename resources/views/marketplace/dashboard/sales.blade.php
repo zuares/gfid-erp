@@ -633,6 +633,8 @@
     .sales-dashboard .sales-sales-comparison-table th { font-size: .61rem; }
     .sales-dashboard .sales-sales-comparison-table td { font-size: .72rem; }
     .sales-dashboard .sales-sales-comparison-table .sales-period-current { background: color-mix(in srgb, var(--sales-accent-soft) 36%, var(--sales-card) 64%); }
+    .sales-dashboard .sales-comparison-cell { display: inline-flex; align-items: center; justify-content: flex-end; gap: .28rem; }
+    .sales-dashboard .sales-comparison-arrow { color: var(--sales-accent); font-size: .68rem; line-height: 1; }
     .sales-dashboard .sales-table-section-row td {
         padding: .58rem .75rem .38rem;
         border-bottom: 0;
@@ -1990,7 +1992,27 @@
                                 <td class="ps-3 fw-semibold">{{ $row['label'] }}</td>
                                 @foreach ($salesComparisonPeriods as $periodIndex => $period)
                                     @php $comparisonValue = $period['metrics'][$row['key']] ?? null; @endphp
-                                    <td class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">{{ $comparisonValue === null ? '—' : $row['format']($comparisonValue) }}</td>
+                                    @php
+                                        $currentValue = $salesComparisonPeriods[0]['metrics'][$row['key']] ?? null;
+                                        $comparisonArrow = null;
+                                        $comparisonArrowTitle = null;
+                                        if ($periodIndex > 0 && is_numeric($currentValue) && is_numeric($comparisonValue)) {
+                                            $comparisonArrow = (float) $currentValue > (float) $comparisonValue
+                                                ? 'bi-arrow-up-right'
+                                                : ((float) $currentValue < (float) $comparisonValue ? 'bi-arrow-down-right' : 'bi-arrow-left-right');
+                                            $comparisonArrowTitle = (float) $currentValue > (float) $comparisonValue
+                                                ? 'Aktif lebih tinggi'
+                                                : ((float) $currentValue < (float) $comparisonValue ? 'Aktif lebih rendah' : 'Nilai sama');
+                                        }
+                                    @endphp
+                                    <td class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
+                                        <span class="sales-comparison-cell">
+                                            {{ $comparisonValue === null ? '—' : $row['format']($comparisonValue) }}
+                                            @if ($comparisonArrow)
+                                                <i class="bi {{ $comparisonArrow }} sales-comparison-arrow" title="{{ $comparisonArrowTitle }} dibanding {{ $period['label'] }}" aria-label="{{ $comparisonArrowTitle }} dibanding {{ $period['label'] }}"></i>
+                                            @endif
+                                        </span>
+                                    </td>
                                 @endforeach
                             </tr>
                         @endforeach
