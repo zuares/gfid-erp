@@ -1565,19 +1565,22 @@ SQL;
             })
             ->when($storeId, fn ($query) => $query->where('mp.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
-            ->select('mp.id', 'mp.store_id', 'mp.item_id')
+            ->select('mp.id', 'mp.store_id', 'mp.item_id', 'mp.item_status')
             ->get();
 
-        $productSnapshots = DB::table('marketplace_product_daily')
-            ->whereIn('marketplace_product_id', $catalogProducts->pluck('id')->all())
-            ->whereDate('date', '<=', $asOfDate)
-            ->orderByDesc('date')
-            ->orderByDesc('id')
-            ->get()
-            ->groupBy('marketplace_product_id')
-            ->map(fn ($rows) => $rows->first());
+        $productSnapshots = collect();
+        if (Schema::hasTable('marketplace_product_daily') && $catalogProducts->isNotEmpty()) {
+            $productSnapshots = DB::table('marketplace_product_daily')
+                ->whereIn('marketplace_product_id', $catalogProducts->pluck('id')->all())
+                ->whereDate('date', '<=', $asOfDate)
+                ->orderByDesc('date')
+                ->orderByDesc('id')
+                ->get()
+                ->groupBy('marketplace_product_id')
+                ->map(fn ($rows) => $rows->first());
+        }
         $activeProducts = $catalogProducts
-            ->filter(fn ($product) => strtoupper((string) data_get($productSnapshots->get($product->id), 'item_status', 'NORMAL')) === 'NORMAL')
+            ->filter(fn ($product) => strtoupper((string) data_get($productSnapshots->get($product->id), 'item_status', $product->item_status)) === 'NORMAL')
             ->values();
 
         if ($activeProducts->isEmpty()) {
@@ -1590,20 +1593,45 @@ SQL;
         }
 
         $activeProductIds = $activeProducts->pluck('id')->map(fn ($id) => (int) $id)->values();
-        $modelsByProduct = DB::table('marketplace_product_models')
-            ->whereIn('marketplace_product_id', $activeProductIds->all())
-            ->select('marketplace_product_id', 'model_id')
-            ->get()
-            ->groupBy('marketplace_product_id');
+        $modelsByProduct = collect();
+        if (Schema::hasTable('marketplace_product_models') && $activeProductIds->isNotEmpty()) {
+            $modelsByProduct = DB::table('marketplace_product_models')
+                ->whereIn('marketplace_product_id', $activeProductIds->all())
+                ->select('marketplace_product_id', 'model_id', 'created_at')
+                ->get()
+                ->groupBy('marketplace_product_id');
+        }
 
-        $variantCount = $activeProducts->sum(function ($product) use ($modelsByProduct) {
+        $modelSnapshotsByKey = collect();
+        if (Schema::hasTable('marketplace_product_model_daily') && $activeProductIds->isNotEmpty()) {
+            $modelSnapshotsByKey = DB::table('marketplace_product_model_daily')
+                ->whereIn('marketplace_product_id', $activeProductIds->all())
+                ->whereDate('date', '<=', $asOfDate)
+                ->orderByDesc('date')
+                ->orderByDesc('id')
+                ->get()
+                ->groupBy(fn ($model) => (int) $model->marketplace_product_id.'|'.trim((string) $model->model_id))
+                ->map(fn ($rows) => $rows->first());
+        }
+
+        $variantCountForProduct = function ($product) use ($modelsByProduct, $modelSnapshotsByKey, $asOfDate): int {
+            $snapshotModels = $modelSnapshotsByKey->filter(function ($snapshot, $key) use ($product) {
+                return str_starts_with((string) $key, (int) $product->id.'|');
+            });
+            if ($snapshotModels->isNotEmpty()) {
+                return $snapshotModels->filter(fn ($snapshot) => (bool) $snapshot->is_available)->count();
+            }
+
             $models = collect($modelsByProduct->get($product->id, []))
+                ->filter(fn ($model) => empty($model->created_at) || substr((string) $model->created_at, 0, 10) <= $asOfDate)
                 ->map(fn ($model) => trim((string) ($model->model_id ?? '')))
-                ->filter(fn ($modelId) => $modelId !== '')
+                ->filter()
                 ->unique();
 
             return $models->isNotEmpty() ? $models->count() : 1;
-        });
+        };
+
+        $variantCount = $activeProducts->sum($variantCountForProduct);
 
         $itemIds = $activeProducts
             ->pluck('item_id')
@@ -1642,11 +1670,7 @@ SQL;
         foreach ($activeProducts as $product) {
             $listingKey = (int) $product->store_id.'|'.trim((string) $product->item_id);
             $category = (string) ($mappingByListing->get($listingKey) ?: 'Tanpa kategori');
-            $models = collect($modelsByProduct->get($product->id, []))
-                ->map(fn ($model) => trim((string) ($model->model_id ?? '')))
-                ->filter(fn ($modelId) => $modelId !== '')
-                ->unique();
-            $variants = $models->isNotEmpty() ? $models->count() : 1;
+            $variants = $variantCountForProduct($product);
 
             $byCategory[$category]['products'] = (int) ($byCategory[$category]['products'] ?? 0) + 1;
             $byCategory[$category]['variants'] = (int) ($byCategory[$category]['variants'] ?? 0) + $variants;
@@ -1656,7 +1680,7 @@ SQL;
             'products' => $activeProducts->count(),
             'variants' => (int) $variantCount,
             'by_category' => $byCategory,
-            'as_of' => now()->toDateString(),
+            'as_of' => $asOfDate,
         ];
     }
 
