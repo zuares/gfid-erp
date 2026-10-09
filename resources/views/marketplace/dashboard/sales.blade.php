@@ -646,21 +646,9 @@
     .sales-dashboard .sales-category-summary-table { width: 100%; min-width: 0; table-layout: fixed; }
     .sales-dashboard .sales-category-summary-table th,
     .sales-dashboard .sales-category-summary-table td { white-space: normal; overflow-wrap: anywhere; }
+    .sales-dashboard .sales-category-summary-table thead th { overflow-wrap: normal; word-break: normal; hyphens: none; }
     .sales-dashboard .sales-category-summary-table th { padding: .65rem .55rem; color: var(--sales-muted); font-size: .61rem; font-weight: 800; letter-spacing: .025em; vertical-align: middle; }
     .sales-dashboard .sales-category-summary-table td { padding: .62rem .55rem; font-size: .7rem; vertical-align: middle; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(1) { width: 4%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(2) { width: 17%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(3),
-    .sales-dashboard .sales-category-summary-table th:nth-child(4),
-    .sales-dashboard .sales-category-summary-table th:nth-child(5) { width: 6.5%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(6),
-    .sales-dashboard .sales-category-summary-table th:nth-child(7) { width: 4.5%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(8) { width: 11%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(9) { width: 7%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(10) { width: 10%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(11) { width: 9%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(12) { width: 7%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(13) { width: 8%; }
     .sales-dashboard .sales-category-summary-table th,
     .sales-dashboard .sales-category-summary-table td { text-align: start; }
     .sales-dashboard .sales-category-summary-table thead tr:first-child th {
@@ -684,6 +672,7 @@
     }
     .sales-dashboard .sales-category-summary-table thead th:nth-child(n+3),
     .sales-dashboard .sales-category-summary-table tbody td:nth-child(n+3) { text-align: end; }
+    .sales-dashboard .sales-category-summary-table thead tr:nth-child(2) th { text-align: center; }
     .sales-dashboard .sales-category-summary-table tbody td:nth-child(n+3) { color: var(--sales-ink); font-weight: 500; font-variant-numeric: tabular-nums; }
     .sales-dashboard .sales-category-summary-table tbody td:first-child { color: var(--sales-muted); font-variant-numeric: tabular-nums; text-align: start; }
     .sales-dashboard .sales-category-summary-table .sales-category-name { overflow: hidden; text-overflow: ellipsis; }
@@ -2364,6 +2353,21 @@
             @else
                 <div class="sales-category-table-wrap">
                     <table class="table table-sm align-middle sales-table sales-category-summary-table mb-0">
+                        <colgroup>
+                            <col style="width: 4%">
+                            <col style="width: 19%">
+                            <col style="width: 6.5%">
+                            <col style="width: 6.5%">
+                            <col style="width: 7%">
+                            <col style="width: 5%">
+                            <col style="width: 4%">
+                            <col style="width: 10%">
+                            <col style="width: 8%">
+                            <col style="width: 9%">
+                            <col style="width: 7%">
+                            <col style="width: 6%">
+                            <col style="width: 8%">
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th class="ps-3" rowspan="2">No.</th>
@@ -2534,7 +2538,6 @@
                             <tr><td class="analysis-label" colspan="2">Coverage HPP</td><td class="text-end analysis-value">{{ $productAnalysisProducts->count() > 0 ? $percentDisplay($productAnalysisHppCoverage) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">COGS (HPP)</td><td class="text-end analysis-value">{{ $productAnalysisHpp > 0 ? $fmtHpp($productAnalysisHpp) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Laba Bersih</td><td class="text-end analysis-value {{ $productAnalysisNetProfit >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisNetProfit) }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Margin Bersih</td><td class="text-end analysis-value {{ $productAnalysisNetMargin >= 20 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisEstimatedPayout > 0 ? $percentDisplay($productAnalysisNetMargin) : '—' }}</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -2553,7 +2556,6 @@
                             <tr><td class="analysis-label" colspan="2">Biaya Iklan / Produk Teratribusi</td><td class="text-end analysis-value">{{ $productAnalysisAdProducts->count() > 0 ? $fmt($productAnalysisAdSpend / $productAnalysisAdProducts->count()) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Kontribusi Pasca Iklan</td><td class="text-end analysis-value {{ $productAnalysisContributionProfit >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisContributionProfit) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Margin Kontribusi</td><td class="text-end analysis-value {{ $productAnalysisContributionMargin >= 20 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisContributionMargin !== 0 ? $percentDisplay($productAnalysisContributionMargin) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Laba Bersih setelah Iklan</td><td class="text-end analysis-value {{ $productAnalysisNetProfit >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisNetProfit) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Biaya Iklan / Penjualan Netto</td><td class="text-end analysis-value">{{ $productAnalysisAdSpend > 0 && $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisAdSpend / $productAnalysisNetSales) * 100) : '—' }}</td></tr>
                         </tbody>
                     </table>
