@@ -608,22 +608,15 @@
     .sales-dashboard .sales-category-summary-table th { padding: .65rem .55rem; color: var(--sales-muted); font-size: .61rem; font-weight: 800; letter-spacing: .025em; vertical-align: middle; }
     .sales-dashboard .sales-category-summary-table td { padding: .62rem .55rem; font-size: .7rem; vertical-align: middle; }
     .sales-dashboard .sales-category-summary-table th:nth-child(1) { width: 4%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(2) { width: 15%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(2) { width: 24%; }
     .sales-dashboard .sales-category-summary-table th:nth-child(3),
-    .sales-dashboard .sales-category-summary-table th:nth-child(4),
+    .sales-dashboard .sales-category-summary-table th:nth-child(4) { width: 8%; }
     .sales-dashboard .sales-category-summary-table th:nth-child(5),
-    .sales-dashboard .sales-category-summary-table th:nth-child(6) { width: 5%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(7),
-    .sales-dashboard .sales-category-summary-table th:nth-child(8) { width: 4%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(6) { width: 6%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(7) { width: 13%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(8),
     .sales-dashboard .sales-category-summary-table th:nth-child(9),
-    .sales-dashboard .sales-category-summary-table th:nth-child(10),
-    .sales-dashboard .sales-category-summary-table th:nth-child(11) { width: 6%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(12) { width: 5%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(13),
-    .sales-dashboard .sales-category-summary-table th:nth-child(14),
-    .sales-dashboard .sales-category-summary-table th:nth-child(15) { width: 6%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(16) { width: 4%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(17) { width: 8%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(10) { width: 11%; }
     .sales-dashboard .sales-category-summary-table th,
     .sales-dashboard .sales-category-summary-table td { text-align: start; }
     .sales-dashboard .sales-category-summary-table tbody td:nth-child(n+3) { color: var(--sales-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -2262,18 +2255,11 @@
                                 <th>Kategori Item</th>
                                 <th>Produk Aktif</th>
                                 <th>Variant Aktif</th>
-                                <th>Produk Terjual</th>
-                                <th>Variant Terjual</th>
                                 <th>Order</th>
                                 <th>Unit</th>
                                 <th class="text-end">Penjualan Netto</th>
-                                <th class="text-end">Pembayaran Pembeli</th>
                                 <th class="text-end">Estimasi Penghasilan</th>
-                                <th class="text-end">COGS (HPP)</th>
                                 <th class="text-end">Laba Kotor</th>
-                                <th class="text-end">Biaya Iklan</th>
-                                <th class="text-end">Penjualan Atribusi Iklan</th>
-                                <th class="text-end pe-3">ACOS</th>
                                 <th class="text-end pe-3">Laba Bersih</th>
                             </tr>
                         </thead>
@@ -2293,22 +2279,15 @@
                                     </td>
                                     <td data-label="Produk Aktif">{{ number_format($activeCategoryMetrics['active_products']) }}</td>
                                     <td data-label="Variant Aktif">{{ number_format($activeCategoryMetrics['active_variants']) }}</td>
-                                    <td data-label="Produk Terjual">{{ number_format($activeCategoryMetrics['products']) }}</td>
-                                    <td data-label="Variant Terjual">{{ number_format($activeCategoryMetrics['variants']) }}</td>
                                     <td data-label="Order">{{ number_format($activeCategoryMetrics['orders']) }}</td>
                                     <td data-label="Unit">{{ number_format($activeCategoryMetrics['qty']) }}</td>
                                     <td class="text-end" data-label="Penjualan Netto">{{ $fmt($activeCategoryMetrics['net_sales']) }}</td>
-                                    <td class="text-end" data-label="Pembayaran Pembeli">{{ $fmt($activeCategoryMetrics['buyer_payment']) }}</td>
                                     <td class="text-end" data-label="Estimasi Penghasilan">{{ $fmt($activeCategoryMetrics['estimated_payout']) }}</td>
-                                    <td class="text-end" data-label="COGS (HPP)">{{ $fmt($activeCategoryMetrics['cogs']) }}</td>
                                     <td class="text-end" data-label="Laba Kotor">{{ $fmt($activeCategoryMetrics['gross_profit_payout']) }}</td>
-                                    <td class="text-end" data-label="Biaya Iklan">{{ $fmt($activeCategoryMetrics['ad_spend']) }}</td>
-                                    <td class="text-end" data-label="Penjualan Atribusi Iklan">{{ $fmt($activeCategoryMetrics['ad_sales']) }}</td>
-                                    <td class="text-end" data-label="ACOS">{{ $activeCategoryMetrics['acos'] === null ? '—' : $percentDisplay($activeCategoryMetrics['acos']) }}</td>
                                     <td class="text-end pe-3" data-label="Laba Bersih">{{ $fmt($activeCategoryMetrics['net_profit']) }}</td>
                                 </tr>
                                 <tr id="{{ $categoryKey }}-detail" class="sales-category-comparison-detail" data-sales-category-comparison-items="{{ $categoryKey }}" hidden>
-                                    <td colspan="17">
+                                    <td colspan="10">
                                         <div class="sales-category-comparison-detail-card">
                                             <div class="sales-category-detail-header d-flex align-items-start justify-content-between gap-2 mb-2">
                                                 <div>
