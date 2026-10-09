@@ -2500,17 +2500,14 @@
                             <tr><td class="analysis-label" colspan="2">Coverage Mapping Internal</td><td class="text-end analysis-value">{{ $productAnalysisProducts->count() > 0 ? $percentDisplay(($productAnalysisMappedCount / $productAnalysisProducts->count()) * 100) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Coverage HPP</td><td class="text-end analysis-value">{{ $productAnalysisProducts->count() > 0 ? $percentDisplay($productAnalysisHppCoverage) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">COGS (HPP)</td><td class="text-end analysis-value">{{ $productAnalysisHpp > 0 ? $fmtHpp($productAnalysisHpp) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Laba Bersih</td><td class="text-end analysis-value {{ $productAnalysisNetProfit >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisNetProfit) }}</td></tr>
                         </tbody>
                     </table>
                 </div>
                 <div class="col-lg-6">
                     <table class="table table-sm align-middle sales-table sales-product-analysis-table">
-                        <thead><tr><th colspan="2">Profitabilitas &amp; iklan</th><th class="text-end">Nilai</th></tr></thead>
+                        <thead><tr><th colspan="2">Kinerja Iklan</th><th class="text-end">Nilai</th></tr></thead>
                         <tbody>
-                            <tr><td class="analysis-label" colspan="2">Laba Kotor</td><td class="text-end analysis-value {{ $productAnalysisGrossProfitPayout >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisGrossProfitPayout) }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Margin Kotor</td><td class="text-end analysis-value {{ $productAnalysisGrossMarginPayout >= 25 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisEstimatedPayout > 0 ? $percentDisplay($productAnalysisGrossMarginPayout) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Laba Bersih</td><td class="text-end analysis-value {{ $productAnalysisNetProfit >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisNetProfit) }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Margin Bersih</td><td class="text-end analysis-value {{ $productAnalysisNetMargin >= 20 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisEstimatedPayout > 0 ? $percentDisplay($productAnalysisNetMargin) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Produk Teratribusi Iklan</td><td class="text-end analysis-value">{{ number_format($productAnalysisAdProducts->count()) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Penjualan Atribusi Iklan</td><td class="text-end analysis-value">{{ $fmt($productAnalysisAdSales) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Biaya Iklan</td><td class="text-end analysis-value is-danger">{{ $fmt($productAnalysisAdSpend) }}</td></tr>
