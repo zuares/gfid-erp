@@ -628,6 +628,59 @@
     .sales-dashboard .sales-product-group-title { font-size: .72rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
     .sales-dashboard .sales-product-group-meta { color: var(--sales-muted); font-size: .68rem; font-weight: 600; letter-spacing: 0; text-transform: none; }
     .sales-dashboard .sales-product-analysis-section { overflow: hidden; }
+    .sales-dashboard .sales-watchlist-section { overflow: hidden; }
+    .sales-dashboard .sales-watchlist-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: .65rem;
+        padding: 0 1.15rem 1rem;
+    }
+    .sales-dashboard .sales-watchlist-card {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: .55rem;
+        padding: .68rem .72rem;
+        border: 1px solid var(--sales-line);
+        border-radius: .65rem;
+        background: color-mix(in srgb, var(--sales-soft) 35%, var(--sales-card) 65%);
+    }
+    .sales-dashboard .sales-watchlist-icon {
+        display: inline-flex;
+        flex: 0 0 1.85rem;
+        width: 1.85rem;
+        height: 1.85rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: .52rem;
+        background: color-mix(in srgb, var(--sales-muted) 12%, var(--sales-card) 88%);
+        color: var(--sales-muted);
+        font-size: .8rem;
+    }
+    .sales-dashboard .sales-watchlist-card.is-danger { border-color: color-mix(in srgb, #dc2626 26%, var(--sales-line) 74%); }
+    .sales-dashboard .sales-watchlist-card.is-danger .sales-watchlist-icon { background: #fee2e2; color: #b91c1c; }
+    .sales-dashboard .sales-watchlist-card.is-warning { border-color: color-mix(in srgb, #d97706 26%, var(--sales-line) 74%); }
+    .sales-dashboard .sales-watchlist-card.is-warning .sales-watchlist-icon { background: #fef3c7; color: #a16207; }
+    .sales-dashboard .sales-watchlist-card.is-info { border-color: color-mix(in srgb, #2563eb 22%, var(--sales-line) 78%); }
+    .sales-dashboard .sales-watchlist-card.is-info .sales-watchlist-icon { background: #dbeafe; color: #1d4ed8; }
+    .sales-dashboard .sales-watchlist-content { min-width: 0; }
+    .sales-dashboard .sales-watchlist-label { overflow: hidden; color: var(--sales-muted); font-size: .59rem; font-weight: 800; letter-spacing: .035em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+    .sales-dashboard .sales-watchlist-value { margin-top: .1rem; color: var(--sales-ink); font-size: .82rem; font-weight: 850; font-variant-numeric: tabular-nums; }
+    .sales-dashboard .sales-watchlist-impact { overflow: hidden; margin-top: .08rem; color: var(--sales-muted); font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
+    .sales-dashboard .sales-watchlist-table-wrap { padding: 0 1.15rem 1.15rem; overflow-x: auto; }
+    .sales-dashboard .sales-watchlist-table { width: 100%; min-width: 820px; table-layout: fixed; }
+    .sales-dashboard .sales-watchlist-table th,
+    .sales-dashboard .sales-watchlist-table td { padding: .52rem .58rem; white-space: nowrap; }
+    .sales-dashboard .sales-watchlist-table th { background: var(--sales-soft); color: var(--sales-muted); font-size: .59rem; font-weight: 800; letter-spacing: .035em; text-transform: uppercase; }
+    .sales-dashboard .sales-watchlist-table td { color: var(--sales-ink); font-size: .68rem; vertical-align: middle; }
+    .sales-dashboard .sales-watchlist-product { display: block; max-width: 240px; overflow: hidden; font-weight: 700; text-overflow: ellipsis; }
+    .sales-dashboard .sales-watchlist-meta { display: block; margin-top: .12rem; color: var(--sales-muted); font-size: .58rem; overflow: hidden; text-overflow: ellipsis; }
+    .sales-dashboard .sales-watchlist-badge { display: inline-flex; align-items: center; padding: .2rem .38rem; border-radius: 999px; font-size: .56rem; font-weight: 800; line-height: 1.1; }
+    .sales-dashboard .sales-watchlist-badge.is-danger { background: #fee2e2; color: #b91c1c; }
+    .sales-dashboard .sales-watchlist-badge.is-warning { background: #fef3c7; color: #a16207; }
+    .sales-dashboard .sales-watchlist-badge.is-info { background: #dbeafe; color: #1d4ed8; }
+    .sales-dashboard .sales-watchlist-badge.is-muted { background: color-mix(in srgb, var(--sales-muted) 12%, var(--sales-card) 88%); color: var(--sales-muted); }
+    .sales-dashboard .sales-watchlist-number { font-variant-numeric: tabular-nums; }
     .sales-dashboard .sales-product-analysis-grid {
         display: grid;
         grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -1032,6 +1085,8 @@
         .sales-dashboard .sales-product-analysis-subsection { align-items: flex-start; flex-direction: column; }
         .sales-dashboard .sales-product-analysis-legend { justify-content: flex-start; }
         .sales-dashboard .sales-product-analysis-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-inline: .75rem; }
+        .sales-dashboard .sales-watchlist-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-inline: .75rem; }
+        .sales-dashboard .sales-watchlist-table-wrap { padding-inline: .75rem; }
         .sales-dashboard .sales-product-analysis-tables,
         .sales-dashboard .sales-product-analysis-matrix-wrap { padding-inline: .75rem; overflow-x: auto; }
         .sales-dashboard .sales-product-analysis-table,
@@ -1344,14 +1399,14 @@
     $trendRiskLabel = $trendRisk ? 'Risiko laba' : 'Iklan tertinggi';
     $trendRisk ??= $trendCurrentRows->sortByDesc(fn ($row) => $row['ad_spend'])->first();
     $trendComparisonLabel = $comparisonMode === 'month' ? 'Bulan lalu' : 'Periode lalu';
-    $trendDelta = function ($current, $previous) {
+    $trendDelta = function ($current, $previous, bool $lowerIsBetter = false) {
         $current = (float) $current;
         $previous = (float) $previous;
 
         if ($previous === 0.0) {
             return [
                 'label' => $current === 0.0 ? '0,0%' : 'Baru',
-                'tone' => $current > 0 ? 'good' : 'neutral',
+                'tone' => $current === 0.0 ? 'neutral' : (($lowerIsBetter && $current > 0) ? 'bad' : 'good'),
             ];
         }
 
@@ -1359,7 +1414,7 @@
 
         return [
             'label' => ($delta >= 0 ? '↑ ' : '↓ ').number_format(abs($delta), 1, ',', '.').'%',
-            'tone' => $delta >= 0 ? 'good' : 'bad',
+            'tone' => $delta === 0.0 ? 'neutral' : (($lowerIsBetter ? $delta < 0 : $delta > 0) ? 'good' : 'bad'),
         ];
     };
     $trendCurrentTotals = [
@@ -1380,7 +1435,7 @@
         ['label' => 'Laba Bersih', 'key' => 'net_profit', 'icon' => 'bi-bar-chart-line'],
         ['label' => 'Iklan', 'key' => 'ad_spend', 'icon' => 'bi-megaphone'],
     ])->map(function ($item) use ($trendCurrentTotals, $trendPreviousTotals, $trendDelta, $fmt) {
-        $delta = $trendDelta($trendCurrentTotals[$item['key']], $trendPreviousTotals[$item['key']]);
+        $delta = $trendDelta($trendCurrentTotals[$item['key']], $trendPreviousTotals[$item['key']], $item['key'] === 'ad_spend');
 
         return $item + [
             'value' => $fmt($trendCurrentTotals[$item['key']]),
@@ -1969,7 +2024,7 @@
             ['label' => $comparisonModeLabel, 'value' => $compareMetric($current, $previous, $formatter, $mode, $higherIsBetter)],
         ];
     };
-    $comparisonCellMeta = function ($currentValue, $comparisonValue, callable $formatter, string $differenceMode = 'relative'): ?array {
+    $comparisonCellMeta = function ($currentValue, $comparisonValue, callable $formatter, string $differenceMode = 'relative', bool $lowerIsBetter = false): ?array {
         if (!is_numeric($currentValue) || !is_numeric($comparisonValue)) {
             return null;
         }
@@ -1983,7 +2038,7 @@
             : ($currentValue === 0.0 ? '0,0%' : 'Baru');
         $tone = abs($difference) < 0.00001
             ? 'is-neutral'
-            : ($difference > 0 ? 'is-up' : 'is-down');
+            : (($lowerIsBetter ? $difference < 0 : $difference > 0) ? 'is-up' : 'is-down');
 
         return [
             'arrow' => $difference > 0 ? 'bi-arrow-up-right' : ($difference < 0 ? 'bi-arrow-down-right' : 'bi-arrow-left-right'),
@@ -2301,6 +2356,7 @@
                                     @php $comparisonValue = $period['metrics'][$row['key']] ?? null; @endphp
                                     @php
                                         $currentValue = $salesComparisonPeriods[0]['metrics'][$row['key']] ?? null;
+                                        $comparisonLowerIsBetter = in_array($row['key'], ['ad_spend', 'roas', 'ad_roas'], true);
                                         $comparisonArrow = null;
                                         $comparisonArrowTitle = null;
                                         $comparisonPercentageLabel = null;
@@ -2310,9 +2366,11 @@
                                             $comparisonArrow = (float) $currentValue > (float) $comparisonValue
                                                 ? 'bi-arrow-up-right'
                                                 : ((float) $currentValue < (float) $comparisonValue ? 'bi-arrow-down-right' : 'bi-arrow-left-right');
-                                            $comparisonDeltaTone = (float) $currentValue > (float) $comparisonValue
-                                                ? 'is-up'
-                                                : ((float) $currentValue < (float) $comparisonValue ? 'is-down' : 'is-neutral');
+                                            $comparisonDeltaTone = abs((float) $currentValue - (float) $comparisonValue) < 0.00001
+                                                ? 'is-neutral'
+                                                : (($comparisonLowerIsBetter ? (float) $currentValue < (float) $comparisonValue : (float) $currentValue > (float) $comparisonValue)
+                                                    ? 'is-up'
+                                                    : 'is-down');
                                             $comparisonArrowTitle = (float) $currentValue > (float) $comparisonValue
                                                 ? 'Aktif lebih tinggi'
                                                 : ((float) $currentValue < (float) $comparisonValue ? 'Aktif lebih rendah' : 'Nilai sama');
@@ -2399,7 +2457,7 @@
                 $dailyComparisonByDay = collect($daily)->sortBy('day')->values()->mapWithKeys(function ($currentRow, $index) use ($dailyPreviousRows) {
                     return [(string) $currentRow->day => $dailyPreviousRows->get($index)];
                 });
-                $dailyChange = function ($current, $previous, $format = 'currency') use ($fmt) {
+                $dailyChange = function ($current, $previous, $format = 'currency', bool $lowerIsBetter = false) use ($fmt) {
                     if ($previous === null || !is_numeric($current) || !is_numeric($previous)) {
                         return null;
                     }
@@ -2413,10 +2471,12 @@
                             ? fn ($value) => number_format(abs((float) $value), 2, ',', '.')
                             : fn ($value) => $fmt(abs((float) $value)));
                     $differencePrefix = $difference > 0 ? '+' : ($difference < 0 ? '−' : '±');
+                    $positiveTone = $lowerIsBetter ? 'is-down' : 'is-up';
+                    $negativeTone = $lowerIsBetter ? 'is-up' : 'is-down';
                     if ($previous === 0.0) {
                         return $current === 0.0
                             ? ['icon' => 'bi-arrow-left-right', 'label' => '0,0%', 'difference' => '('.$differencePrefix.$differenceFormatter($difference).')', 'tone' => 'is-neutral']
-                            : ['icon' => 'bi-arrow-up-right', 'label' => 'Baru', 'difference' => '('.$differencePrefix.$differenceFormatter($difference).')', 'tone' => 'is-up'];
+                            : ['icon' => 'bi-arrow-up-right', 'label' => 'Baru', 'difference' => '('.$differencePrefix.$differenceFormatter($difference).')', 'tone' => $positiveTone];
                     }
 
                     $delta = (($current - $previous) / abs($previous)) * 100;
@@ -2425,7 +2485,7 @@
                         'icon' => $delta > 0 ? 'bi-arrow-up-right' : ($delta < 0 ? 'bi-arrow-down-right' : 'bi-arrow-left-right'),
                         'label' => ($delta > 0 ? '+' : ($delta < 0 ? '−' : '±')).number_format(abs($delta), 1, ',', '.').'%',
                         'difference' => '('.$differencePrefix.$differenceFormatter($difference).')',
-                        'tone' => $delta > 0 ? 'is-up' : ($delta < 0 ? 'is-down' : 'is-neutral'),
+                        'tone' => $delta > 0 ? $positiveTone : ($delta < 0 ? $negativeTone : 'is-neutral'),
                     ];
                 };
                 $dailyNetSalesPeak = collect($daily)->sortByDesc('net_total')->first();
@@ -2535,7 +2595,7 @@
                                     'estimated_payout' => $dailyChange($row->estimated_payout, data_get($dailyPrevious, 'estimated_payout')),
                                     'cogs' => $dailyChange($row->cogs, data_get($dailyPrevious, 'cogs')),
                                     'gross_profit' => $dailyChange($row->gross_profit, data_get($dailyPrevious, 'gross_profit')),
-                                    'ad_spend' => $dailyChange($row->ad_spend, data_get($dailyPrevious, 'ad_spend')),
+                                    'ad_spend' => $dailyChange($row->ad_spend, data_get($dailyPrevious, 'ad_spend'), 'currency', true),
                                     'net_profit' => $dailyChange($row->net_profit, data_get($dailyPrevious, 'net_profit')),
                                 ];
                             @endphp
@@ -2841,7 +2901,7 @@
                                             $comparisonValue = $period['metrics'][$row['key']] ?? null;
                                             $currentValue = $productComparisonPeriods[0]['metrics'][$row['key']] ?? null;
                                             $comparisonMeta = $periodIndex > 0
-                                                ? $comparisonCellMeta($currentValue, $comparisonValue, $row['format'], $row['delta_mode'] ?? 'relative')
+                                                ? $comparisonCellMeta($currentValue, $comparisonValue, $row['format'], $row['delta_mode'] ?? 'relative', in_array($row['key'], ['ad_spend', 'roas', 'ad_roas'], true))
                                                 : null;
                                         @endphp
                                         <td class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
@@ -3017,7 +3077,7 @@
                                                                         $categoryComparisonValue = $categoryRow['periods'][$period['key']]['metrics'][$comparisonRow['key']] ?? null;
                                                                         $categoryCurrentValue = $categoryRow['periods']['active']['metrics'][$comparisonRow['key']] ?? null;
                                                                         $categoryComparisonMeta = $periodIndex > 0
-                                                                            ? $comparisonCellMeta($categoryCurrentValue, $categoryComparisonValue, $comparisonRow['format'], $comparisonRow['delta_mode'] ?? 'relative')
+                                                                            ? $comparisonCellMeta($categoryCurrentValue, $categoryComparisonValue, $comparisonRow['format'], $comparisonRow['delta_mode'] ?? 'relative', in_array($comparisonRow['key'], ['ad_spend', 'roas', 'ad_roas'], true))
                                                                             : null;
                                                                     @endphp
                                                                     <td class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
@@ -3055,7 +3115,169 @@
                 (int) data_get($activeMarketplaceCatalog, 'variants', 0) - (int) ($activeProductKpi['variants'] ?? 0),
                 0
             );
+            $watchlistLowMarginThreshold = 20;
+            $watchlistRoasThreshold = 2;
+            $watchlistLossProducts = $productAnalysisProducts->filter(fn ($product) => $product->contribution_profit !== null && (float) $product->contribution_profit < 0);
+            $watchlistLowMarginProducts = $productAnalysisProducts->filter(function ($product) use ($watchlistLowMarginThreshold) {
+                return $product->contribution_profit !== null
+                    && (float) $product->contribution_profit >= 0
+                    && $product->contribution_margin !== null
+                    && (float) ($product->net_sales ?? 0) > 0
+                    && (float) $product->contribution_margin < $watchlistLowMarginThreshold;
+            });
+            $watchlistAdRiskProducts = $productAnalysisProducts->filter(function ($product) use ($watchlistRoasThreshold) {
+                $adSpend = (float) ($product->ad_spend ?? 0);
+                $adSales = (float) ($product->ad_sales ?? 0);
+
+                return ($product->ad_spend_matched ?? false)
+                    && $adSpend > 0
+                    && ($adSales <= 0 || ($adSales / $adSpend) < $watchlistRoasThreshold);
+            });
+            $watchlistMissingHppProducts = $productAnalysisProducts->filter(fn ($product) => $product->gross_profit === null);
+            $watchlistUnmappedProducts = $productAnalysisProducts->filter(fn ($product) => (int) ($product->internal_item_id ?? 0) <= 0);
+            $watchlistProducts = $productAnalysisProducts
+                ->map(function ($product) use ($watchlistLowMarginThreshold, $watchlistRoasThreshold) {
+                    $issues = [];
+                    $priority = 0;
+                    $contributionProfit = $product->contribution_profit !== null ? (float) $product->contribution_profit : null;
+                    $contributionMargin = $product->contribution_margin !== null ? (float) $product->contribution_margin : null;
+                    $adSpend = (float) ($product->ad_spend ?? 0);
+                    $adSales = (float) ($product->ad_sales ?? 0);
+
+                    if ($contributionProfit !== null && $contributionProfit < 0) {
+                        $issues[] = 'Produk rugi';
+                        $priority = max($priority, 4);
+                    } elseif ($contributionProfit !== null && $contributionMargin !== null && $contributionMargin < $watchlistLowMarginThreshold) {
+                        $issues[] = 'Margin rendah';
+                        $priority = max($priority, 2);
+                    }
+                    if ($product->gross_profit === null) {
+                        $issues[] = 'HPP belum lengkap';
+                        $priority = max($priority, 3);
+                    }
+                    if (($product->ad_spend_matched ?? false) && $adSpend > 0 && ($adSales <= 0 || ($adSales / $adSpend) < $watchlistRoasThreshold)) {
+                        $issues[] = 'ROAS rendah';
+                        $priority = max($priority, 4);
+                    }
+                    if ((int) ($product->internal_item_id ?? 0) <= 0) {
+                        $issues[] = 'Belum mapping';
+                        $priority = max($priority, 3);
+                    }
+
+                    return [
+                        'product' => $product,
+                        'issues' => $issues,
+                        'priority' => $priority,
+                    ];
+                })
+                ->filter(fn ($row) => ! empty($row['issues']))
+                ->sortByDesc(fn ($row) => ($row['priority'] * 1000000000) + (float) ($row['product']->net_sales ?? 0))
+                ->values();
+            $watchlistSummary = collect([
+                [
+                    'label' => 'Produk rugi',
+                    'count' => $watchlistLossProducts->count(),
+                    'impact' => $fmt(abs((float) $watchlistLossProducts->sum('contribution_profit'))).' kontribusi negatif',
+                    'class' => 'danger',
+                    'icon' => 'bi-graph-down-arrow',
+                ],
+                [
+                    'label' => 'Margin rendah',
+                    'count' => $watchlistLowMarginProducts->count(),
+                    'impact' => $fmt((float) $watchlistLowMarginProducts->sum('net_sales')).' penjualan terdampak',
+                    'class' => 'warning',
+                    'icon' => 'bi-percent',
+                ],
+                [
+                    'label' => 'ROAS di bawah 2x',
+                    'count' => $watchlistAdRiskProducts->count(),
+                    'impact' => $fmt((float) $watchlistAdRiskProducts->sum('ad_spend')).' biaya iklan',
+                    'class' => 'danger',
+                    'icon' => 'bi-megaphone',
+                ],
+                [
+                    'label' => 'HPP belum lengkap',
+                    'count' => $watchlistMissingHppProducts->count(),
+                    'impact' => $fmt((float) $watchlistMissingHppProducts->sum('net_sales')).' belum terkosting',
+                    'class' => 'warning',
+                    'icon' => 'bi-box-seam',
+                ],
+                [
+                    'label' => 'Belum mapping internal',
+                    'count' => $watchlistUnmappedProducts->count(),
+                    'impact' => $fmt((float) $watchlistUnmappedProducts->sum('net_sales')).' belum terpetakan',
+                    'class' => 'info',
+                    'icon' => 'bi-diagram-3',
+                ],
+            ]);
         @endphp
+        <section class="card sales-card sales-watchlist-section shadow-sm mb-3">
+            <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
+                <div>
+                    <div class="sales-kicker mb-1">Portfolio watchlist</div>
+                    <h2 class="sales-section-title mb-1">Hal yang Perlu Diperhatikan</h2>
+                </div>
+                <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($watchlistProducts->count()) }} produk perlu ditinjau</span>
+            </div>
+            <div class="sales-watchlist-grid">
+                @foreach ($watchlistSummary as $watchItem)
+                    <div class="sales-watchlist-card is-{{ $watchItem['class'] }}">
+                        <span class="sales-watchlist-icon"><i class="bi {{ $watchItem['icon'] }}" aria-hidden="true"></i></span>
+                        <div class="sales-watchlist-content">
+                            <div class="sales-watchlist-label">{{ $watchItem['label'] }}</div>
+                            <div class="sales-watchlist-value">{{ number_format($watchItem['count']) }}</div>
+                            <div class="sales-watchlist-impact">{{ $watchItem['impact'] }}</div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+            @if ($watchlistProducts->isNotEmpty())
+                <div class="sales-watchlist-table-wrap">
+                    <table class="table table-sm table-hover align-middle sales-table sales-watchlist-table mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 8%">Prioritas</th>
+                                <th style="width: 25%">Produk</th>
+                                <th style="width: 19%">Indikasi</th>
+                                <th class="text-end" style="width: 12%">Penjualan Netto</th>
+                                <th class="text-end" style="width: 12%">Kontribusi</th>
+                                <th class="text-end" style="width: 10%">Biaya Iklan</th>
+                                <th class="text-end" style="width: 7%">ROAS</th>
+                                <th style="width: 12%">Status Data</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($watchlistProducts->take(10) as $watchRow)
+                                @php
+                                    $watchProduct = $watchRow['product'];
+                                    $watchTone = $watchRow['priority'] >= 4 ? 'is-danger' : ($watchRow['priority'] >= 3 ? 'is-warning' : 'is-info');
+                                    $watchProductTitle = trim((string) ($watchProduct->marketplace_name ?: $watchProduct->name)) ?: 'Produk tanpa nama';
+                                    $watchProductCode = trim((string) ($watchProduct->external_item_id ?? '')) ?: trim((string) ($watchProduct->sku ?? ''));
+                                    $watchStatus = $watchProduct->gross_profit === null
+                                        ? 'HPP belum lengkap'
+                                        : ((int) ($watchProduct->internal_item_id ?? 0) > 0 ? 'Mapped' : 'Belum mapping');
+                                @endphp
+                                <tr>
+                                    <td><span class="sales-watchlist-badge {{ $watchTone }}">{{ $watchRow['priority'] >= 4 ? 'Tinggi' : ($watchRow['priority'] >= 3 ? 'Sedang' : 'Pantau') }}</span></td>
+                                    <td>
+                                        <span class="sales-watchlist-product" title="{{ $watchProductTitle }}">{{ $watchProductTitle }}</span>
+                                        <span class="sales-watchlist-meta">{{ $watchProductCode !== '' ? $watchProductCode : 'Kode belum tersedia' }}</span>
+                                    </td>
+                                    <td><span class="sales-watchlist-badge {{ $watchTone }}">{{ implode(' · ', $watchRow['issues']) }}</span></td>
+                                    <td class="text-end sales-watchlist-number">{{ $fmt($watchProduct->net_sales ?? 0) }}</td>
+                                    <td class="text-end sales-watchlist-number {{ ($watchProduct->contribution_profit ?? 0) < 0 ? 'text-danger' : '' }}">{{ $watchProduct->contribution_profit === null ? '—' : $fmt($watchProduct->contribution_profit) }}</td>
+                                    <td class="text-end sales-watchlist-number">{{ ($watchProduct->ad_spend_matched ?? false) ? $fmt($watchProduct->ad_spend ?? 0) : '—' }}</td>
+                                    <td class="text-end sales-watchlist-number">{{ ($watchProduct->ad_spend ?? 0) > 0 ? $multipleDisplay(($watchProduct->ad_sales ?? 0) / $watchProduct->ad_spend) : '—' }}</td>
+                                    <td><span class="sales-watchlist-badge {{ $watchProduct->gross_profit === null || (int) ($watchProduct->internal_item_id ?? 0) <= 0 ? 'is-warning' : 'is-muted' }}">{{ $watchStatus }}</span></td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <div class="sales-empty text-center py-3">Tidak ada prioritas kritis pada periode ini.</div>
+            @endif
+        </section>
         <section class="card sales-card sales-product-analysis-section shadow-sm mb-3">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                 <div>
@@ -3790,7 +4012,7 @@
                                             $comparisonValue = $period['metrics'][$row['key']] ?? null;
                                             $currentValue = $platformPromotionPeriods[0]['metrics'][$row['key']] ?? null;
                                             $comparisonMeta = $periodIndex > 0
-                                                ? $comparisonCellMeta($currentValue, $comparisonValue, $row['format'], $row['delta_mode'] ?? 'relative')
+                                                ? $comparisonCellMeta($currentValue, $comparisonValue, $row['format'], $row['delta_mode'] ?? 'relative', in_array($row['key'], ['ad_spend', 'roas', 'ad_roas'], true))
                                                 : null;
                                         @endphp
                                         <td class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }} {{ str_contains($row['label'], 'Total') ? 'fw-semibold' : '' }}">
