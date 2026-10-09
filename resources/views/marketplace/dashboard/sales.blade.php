@@ -1060,8 +1060,6 @@
     $productAnalysisAdSalesCoverage = $productAnalysisNetSales > 0 ? ($productAnalysisAdSales / $productAnalysisNetSales) * 100 : 0;
     $productAnalysisCategoryCount = $productAnalysisProducts->map(fn ($product) => trim((string) ($product->category_name ?? '')) ?: 'Tanpa kategori')->unique()->count();
     $productAnalysisTop10Sales = (float) $productAnalysisProducts->sortByDesc('net_sales')->take(10)->sum('net_sales');
-    $productAnalysisTop20Count = max(1, (int) ceil($productAnalysisProducts->count() * .2));
-    $productAnalysisTop20Sales = (float) $productAnalysisProducts->sortByDesc('net_sales')->take($productAnalysisTop20Count)->sum('net_sales');
     $productAnalysisSalesMedian = (float) ($productAnalysisProducts->pluck('net_sales')->median() ?? 0);
     $productAnalysisMarginValues = $productAnalysisProducts
         ->filter(fn ($product) => $product->contribution_margin !== null)
@@ -2492,15 +2490,7 @@
                             <tr><td class="analysis-label" colspan="2">Produk terjual</td><td class="text-end analysis-value">{{ number_format($topProductCount) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Variant tidak terjual</td><td class="text-end analysis-value">{{ number_format($productAnalysisUnsoldVariants) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Kategori terjual</td><td class="text-end analysis-value">{{ number_format($productAnalysisCategoryCount) }}</td></tr>
-                            <tr>
-                                <td class="analysis-label" colspan="2">Penjualan Top 20% Produk</td>
-                                <td class="text-end analysis-value">
-                                    <div>{{ $productAnalysisTop20Sales > 0 ? $fmt($productAnalysisTop20Sales) : '—' }}</div>
-                                    @if ($productAnalysisNetSales > 0)
-                                        <small class="text-muted">{{ $percentDisplay(($productAnalysisTop20Sales / $productAnalysisNetSales) * 100) }} dari penjualan netto</small>
-                                    @endif
-                                </td>
-                            </tr>
+                            <tr><td class="analysis-label" colspan="2">Penjualan Netto</td><td class="text-end analysis-value">{{ $productAnalysisNetSales > 0 ? $fmt($productAnalysisNetSales) : '—' }}</td></tr>
                             <tr>
                                 <td class="analysis-label" colspan="2">Pembayaran Pembeli</td>
                                 <td class="text-end analysis-value">
@@ -2526,12 +2516,16 @@
                         <tbody>
                             <tr><td class="analysis-label" colspan="2">Produk Teratribusi Iklan</td><td class="text-end analysis-value">{{ number_format($productAnalysisAdProducts->count()) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Penjualan Atribusi Iklan</td><td class="text-end analysis-value">{{ $fmt($productAnalysisAdSales) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Coverage Penjualan Atribusi</td><td class="text-end analysis-value">{{ $productAnalysisAdSales > 0 && $productAnalysisNetSales > 0 ? $percentDisplay($productAnalysisAdSalesCoverage) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Biaya Iklan</td><td class="text-end analysis-value is-danger">{{ $fmt($productAnalysisAdSpend) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">ACOS Blended</td><td class="text-end analysis-value">{{ $productAnalysisAdSales > 0 ? $percentDisplay(($productAnalysisAdSpend / $productAnalysisAdSales) * 100) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">ROAS Blended</td><td class="text-end analysis-value">{{ $productAnalysisAdSpend > 0 ? $multipleDisplay($productAnalysisAdSales / $productAnalysisAdSpend) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">CPA Blended</td><td class="text-end analysis-value">{{ $productAnalysisAdConversions > 0 ? $fmt($productAnalysisAdSpend / $productAnalysisAdConversions) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Konversi Iklan</td><td class="text-end analysis-value">{{ $productAnalysisAdConversions > 0 ? number_format($productAnalysisAdConversions) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Biaya Iklan / Produk Teratribusi</td><td class="text-end analysis-value">{{ $productAnalysisAdProducts->count() > 0 ? $fmt($productAnalysisAdSpend / $productAnalysisAdProducts->count()) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Kontribusi Pasca Iklan</td><td class="text-end analysis-value {{ $productAnalysisContributionProfit >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisContributionProfit) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Margin Kontribusi</td><td class="text-end analysis-value {{ $productAnalysisContributionMargin >= 20 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisContributionMargin !== 0 ? $percentDisplay($productAnalysisContributionMargin) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Coverage Penjualan Atribusi</td><td class="text-end analysis-value">{{ $productAnalysisAdSalesCoverage > 0 ? $percentDisplay($productAnalysisAdSalesCoverage) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Biaya Iklan / Penjualan Netto</td><td class="text-end analysis-value">{{ $productAnalysisAdSpend > 0 && $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisAdSpend / $productAnalysisNetSales) * 100) : '—' }}</td></tr>
                         </tbody>
                     </table>
                 </div>
