@@ -640,12 +640,12 @@
     .sales-dashboard .sales-comparison-metric { color: var(--sales-ink); font-weight: 750; }
     .sales-dashboard .sales-comparison-cell { display: inline-flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: .15rem; }
     .sales-dashboard .sales-comparison-value-row { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: .34rem; font-variant-numeric: tabular-nums; }
-    .sales-dashboard .sales-comparison-delta { display: inline-flex; align-items: center; justify-content: center; min-width: 3.7rem; gap: .1rem; padding: .16rem .28rem; border: 1px solid transparent; border-radius: 999px; font-size: .56rem; font-weight: 750; line-height: 1; text-align: center; white-space: nowrap; }
-    .sales-dashboard .sales-comparison-delta i { font-size: .62rem; }
+    .sales-dashboard .sales-comparison-delta { display: inline-flex; align-items: center; justify-content: center; min-width: 3.25rem; gap: .08rem; padding: .11rem .2rem; border: 1px solid transparent; border-radius: 4px; font-size: .5rem; font-weight: 750; line-height: 1; text-align: center; white-space: nowrap; }
+    .sales-dashboard .sales-comparison-delta i { font-size: .55rem; }
     .sales-dashboard .sales-comparison-delta.is-up { color: var(--success, #16a34a); background: color-mix(in srgb, var(--success, #16a34a) 10%, var(--sales-card) 90%); border-color: color-mix(in srgb, var(--success, #16a34a) 18%, var(--sales-line) 82%); }
     .sales-dashboard .sales-comparison-delta.is-down { color: var(--danger, #dc2626); background: color-mix(in srgb, var(--danger, #dc2626) 9%, var(--sales-card) 91%); border-color: color-mix(in srgb, var(--danger, #dc2626) 18%, var(--sales-line) 82%); }
     .sales-dashboard .sales-comparison-delta.is-neutral { color: var(--sales-muted); background: color-mix(in srgb, var(--sales-muted) 8%, var(--sales-card) 92%); border-color: color-mix(in srgb, var(--sales-muted) 15%, var(--sales-line) 85%); }
-    .sales-dashboard .sales-comparison-difference { font-size: .52rem; font-weight: 650; line-height: 1; opacity: .72; white-space: nowrap; }
+    .sales-dashboard .sales-comparison-difference { font-size: .47rem; font-weight: 650; line-height: 1; opacity: .68; white-space: nowrap; }
     .sales-dashboard .sales-comparison-difference.is-up { color: var(--success, #16a34a); }
     .sales-dashboard .sales-comparison-difference.is-down { color: var(--danger, #dc2626); }
     .sales-dashboard .sales-comparison-difference.is-neutral { color: var(--sales-muted); }
