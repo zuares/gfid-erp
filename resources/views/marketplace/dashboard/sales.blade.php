@@ -585,6 +585,12 @@
     .sales-dashboard .sales-product-comparison-table td { white-space: nowrap; }
     .sales-dashboard .sales-product-comparison-table th { font-size: .61rem; }
     .sales-dashboard .sales-product-comparison-table td { font-size: .72rem; }
+    .sales-dashboard .sales-sales-comparison-table { min-width: 760px; }
+    .sales-dashboard .sales-sales-comparison-table th,
+    .sales-dashboard .sales-sales-comparison-table td { white-space: nowrap; }
+    .sales-dashboard .sales-sales-comparison-table th { font-size: .61rem; }
+    .sales-dashboard .sales-sales-comparison-table td { font-size: .72rem; }
+    .sales-dashboard .sales-sales-comparison-table .sales-period-current { background: color-mix(in srgb, var(--sales-accent-soft) 36%, var(--sales-card) 64%); }
     .sales-dashboard .sales-table-section-row td {
         padding: .58rem .75rem .38rem;
         border-bottom: 0;
@@ -1221,6 +1227,49 @@
         ['group' => 'Kualitas data', 'label' => 'Coverage Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
         ['group' => 'Kualitas data', 'label' => 'Coverage HPP', 'key' => 'hpp_coverage', 'format' => $percentDisplay],
     ];
+    $salesComparisonMetrics = function ($rows) use ($salesKpiMetrics) {
+        $metrics = $salesKpiMetrics($rows);
+        $orders = max(1, $metrics['orders']);
+
+        return $metrics + [
+            'avg_units_per_order' => $metrics['orders'] > 0 ? (float) collect($rows)->sum(fn ($row) => (float) data_get($row, 'qty', 0)) / $orders : 0,
+            'net_margin' => $metrics['net_sales'] > 0 ? ($metrics['net_profit'] / $metrics['net_sales']) * 100 : null,
+            'ad_ratio' => $metrics['net_sales'] > 0 ? ($metrics['ad_spend'] / $metrics['net_sales']) * 100 : null,
+        ];
+    };
+    $salesComparisonSources = $comparisonMode === 'month'
+        ? [
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily],
+            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'daily' => data_get($comparisonMonthData, 'daily', [])],
+            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousData, 'daily', [])],
+            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousTwoData, 'daily', [])],
+        ]
+        : [
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily],
+            ['label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'daily' => data_get($comparisonPeriodData, 'daily', [])],
+            ['label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousData, 'daily', [])],
+            ['label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousTwoData, 'daily', [])],
+        ];
+    $salesComparisonPeriods = collect($salesComparisonSources)->map(function ($period) use ($salesComparisonMetrics) {
+        $period['metrics'] = $salesComparisonMetrics($period['daily']);
+        unset($period['daily']);
+
+        return $period;
+    })->all();
+    $salesComparisonRows = [
+        ['group' => 'Volume transaksi', 'label' => 'Pesanan', 'key' => 'orders', 'format' => $numberDisplay],
+        ['group' => 'Volume transaksi', 'label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
+        ['group' => 'Volume transaksi', 'label' => 'Unit / Order', 'key' => 'avg_units_per_order', 'format' => fn ($value) => number_format((float) $value, 2, ',', '.')],
+        ['group' => 'Pendapatan', 'label' => 'P Kotor', 'key' => 'gross_sales', 'format' => $currencyDisplay],
+        ['group' => 'Pendapatan', 'label' => 'P Bersih', 'key' => 'net_sales', 'format' => $currencyDisplay],
+        ['group' => 'Pendapatan', 'label' => 'Est Penghasilan', 'key' => 'payout', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas', 'label' => 'COGS', 'key' => 'cogs', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas', 'label' => 'Laba Kotor', 'key' => 'gross_profit', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas', 'label' => 'Laba Bersih', 'key' => 'net_profit', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas', 'label' => 'Margin Bersih', 'key' => 'net_margin', 'format' => fn ($value) => $value === null ? '—' : $percentDisplay($value)],
+        ['group' => 'Iklan', 'label' => 'Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
+        ['group' => 'Iklan', 'label' => 'Iklan / P Bersih', 'key' => 'ad_ratio', 'format' => fn ($value) => $value === null ? '—' : $percentDisplay($value)],
+    ];
     $activeProductKpi = $productComparisonMetrics($products, $activeMarketplaceCatalog);
     $previousMonthProductKpi = $productComparisonMetrics($previousMonthProducts, $previousMonthActiveCatalog);
     $previousPeriodProductKpi = $productComparisonMetrics($previousPeriodProducts, $previousPeriodActiveCatalog);
@@ -1806,6 +1855,50 @@
                 </div>
             </div>
             <script type="application/json" id="sales-trend-data">@json($trendPayload)</script>
+        </section>
+    @endif
+    @if ($activeComparison)
+        <section class="card sales-card shadow-sm mb-3" aria-labelledby="sales-period-comparison-title">
+            <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-2">
+                <div>
+                    <div class="sales-kicker mb-1">Perbandingan periode</div>
+                    <h2 id="sales-period-comparison-title" class="sales-section-title mb-1">Perbandingan kinerja penjualan</h2>
+                </div>
+                <span class="badge sales-badge rounded-pill px-3 py-2">{{ count($salesComparisonPeriods) }} periode</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle sales-table sales-sales-comparison-table mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-3">Metrik</th>
+                            @foreach ($salesComparisonPeriods as $periodIndex => $period)
+                                <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
+                                    {{ $period['label'] }}
+                                    <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
+                                </th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @php $salesComparisonGroup = null; @endphp
+                        @foreach ($salesComparisonRows as $row)
+                            @if (($row['group'] ?? null) !== null && $row['group'] !== $salesComparisonGroup)
+                                <tr class="sales-table-section-row" role="presentation">
+                                    <td colspan="{{ 1 + count($salesComparisonPeriods) }}">{{ $row['group'] }}</td>
+                                </tr>
+                                @php $salesComparisonGroup = $row['group']; @endphp
+                            @endif
+                            <tr>
+                                <td class="ps-3 fw-semibold">{{ $row['label'] }}</td>
+                                @foreach ($salesComparisonPeriods as $periodIndex => $period)
+                                    @php $comparisonValue = $period['metrics'][$row['key']] ?? null; @endphp
+                                    <td class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">{{ $comparisonValue === null ? '—' : $row['format']($comparisonValue) }}</td>
+                                @endforeach
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
         </section>
     @endif
     <section class="card sales-card shadow-sm" aria-labelledby="daily-sales-title">
