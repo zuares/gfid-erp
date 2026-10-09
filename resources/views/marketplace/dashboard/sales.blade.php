@@ -119,6 +119,7 @@
         white-space: nowrap;
         transition: background .16s ease, color .16s ease, box-shadow .16s ease;
     }
+    .sales-dashboard .sales-comparison-tab i { font-size: .68rem; }
     .sales-dashboard .sales-comparison-tab:hover { color: var(--sales-accent); background: var(--sales-accent-soft); }
     .sales-dashboard .sales-comparison-tab.active {
         color: var(--sales-accent);
@@ -1882,8 +1883,8 @@
         <button class="nav-link {{ $activeTab === 'orders' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'orders' ? 'true' : 'false' }}" data-sales-tab="orders"><i class="bi bi-list-ul me-1"></i>Detail Pesanan</button>
         <div class="sales-nav-comparison" role="group" aria-label="Perbandingan periode">
             <span class="sales-nav-comparison-label"><i class="bi bi-arrow-left-right" aria-hidden="true"></i>Bandingkan</span>
-            <button type="button" class="sales-comparison-tab {{ $comparisonMode === 'period' ? 'active' : '' }}" data-comparison-mode="period" aria-pressed="{{ $comparisonMode === 'period' ? 'true' : 'false' }}">Periode lalu</button>
-            <button type="button" class="sales-comparison-tab {{ $comparisonMode === 'month' ? 'active' : '' }}" data-comparison-mode="month" aria-pressed="{{ $comparisonMode === 'month' ? 'true' : 'false' }}">Bulan lalu</button>
+            <button type="button" class="sales-comparison-tab {{ $comparisonMode === 'period' ? 'active' : '' }}" data-comparison-mode="period" aria-pressed="{{ $comparisonMode === 'period' ? 'true' : 'false' }}"><i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>Periode lalu</button>
+            <button type="button" class="sales-comparison-tab {{ $comparisonMode === 'month' ? 'active' : '' }}" data-comparison-mode="month" aria-pressed="{{ $comparisonMode === 'month' ? 'true' : 'false' }}"><i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>Bulan lalu</button>
         </div>
         </nav>
     </div>
