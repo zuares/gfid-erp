@@ -613,19 +613,23 @@
                     <div class="row g-2">
                         <div class="col-md-6">
                             <label class="form-label" for="unit-cost">HPP sementara (Rp / unit)</label>
-                            <input id="unit-cost" type="number" min="0" step="0.01" name="unit_cost" class="form-control @error('unit_cost') is-invalid @enderror" value="{{ old('unit_cost', $activeSnapshot?->unit_cost) }}" placeholder="0">
+                            <input id="unit-cost" type="number" min="0" step="0.01" name="unit_cost" class="form-control @error('unit_cost') is-invalid @enderror" value="{{ old('unit_cost', $activeCost['unit_cost'] ?? $activeSnapshot?->unit_cost) }}" placeholder="0">
                             @error('unit_cost')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" for="hpp-notes">Catatan HPP</label>
-                    <input id="hpp-notes" type="text" name="hpp_notes" class="form-control @error('hpp_notes') is-invalid @enderror" value="{{ old('hpp_notes', $activeSnapshot?->notes) }}" maxlength="255">
+                    <input id="hpp-notes" type="text" name="hpp_notes" class="form-control @error('hpp_notes') is-invalid @enderror" value="{{ old('hpp_notes', $activeCost['notes'] ?? $activeSnapshot?->notes) }}" maxlength="255">
                             @error('hpp_notes')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                     </div>
                 </div>
             </div>
-            @if($activeSnapshot)
-                <div class="form-text mt-3"><i class="bi bi-clock-history me-1"></i>HPP aktif saat ini: <strong>Rp {{ number_format((float) $activeSnapshot->unit_cost, 0, ',', '.') }}</strong> · {{ $activeSnapshot->snapshot_date?->format('d/m/Y') ?? '-' }}</div>
+            @if($activeCost || $activeSnapshot)
+                @php
+                    $displayHpp = $activeCost['unit_cost'] ?? $activeSnapshot?->unit_cost ?? 0;
+                    $displayHppDate = $activeCost['date'] ?? $activeSnapshot?->snapshot_date?->toDateString();
+                @endphp
+                <div class="form-text mt-3"><i class="bi bi-clock-history me-1"></i>HPP aktif saat ini: <strong>Rp {{ number_format((float) $displayHpp, 0, ',', '.') }}</strong> · {{ $displayHppDate ? \Illuminate\Support\Carbon::parse($displayHppDate)->format('d/m/Y') : '-' }}</div>
             @endif
         </div>
     </div>

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\DB;
 
 class Item extends Model
 {
@@ -262,6 +263,11 @@ class Item extends Model
         return $this->hasMany(PurchaseOrderLine::class);
     }
 
+    public function purchaseReceiptLines(): HasMany
+    {
+        return $this->hasMany(PurchaseReceiptLine::class);
+    }
+
     public function supplierPrices(): HasMany
     {
         return $this->hasMany(SupplierPrice::class);
@@ -433,33 +439,102 @@ class Item extends Model
      */
 
     /**
-     * HPP global “efektif”.
-     * Urutan:
-     * 1) Snapshot aktif global
-     * 2) base_unit_cost
-     * 3) hpp (legacy)
+     * Harga/unit dari GRN posted terakhir yang benar-benar masuk stok.
+     * Harga dikonversi ke satuan stok agar konsisten dengan HPP master.
      */
-    public function getEffectiveUnitCostAttribute(): float
+    public function latestPostedGrnPurchase(?int $excludeGrnId = null): ?object
     {
-        $snapshot = $this->costSnapshots()
-            ->where('is_active', true)
-            ->orderByDesc('snapshot_date')
-            ->orderByDesc('id')
+        $row = DB::table('purchase_receipt_lines as prl')
+            ->join('purchase_receipts as pr', 'pr.id', '=', 'prl.purchase_receipt_id')
+            ->where('pr.status', 'posted')
+            ->where('prl.item_id', $this->id)
+            ->whereRaw('COALESCE(prl.stock_qty_received, prl.qty_received * COALESCE(prl.conversion_factor, 1)) > 0')
+            ->whereRaw('CAST(prl.unit_price AS REAL) > 0')
+            ->when($excludeGrnId, fn ($q) => $q->where('pr.id', '<>', $excludeGrnId))
+            ->orderByDesc('pr.date')
+            ->orderByDesc('pr.id')
+            ->orderByDesc('prl.id')
+            ->select([
+                'pr.id as grn_id',
+                'pr.code as grn_code',
+                'pr.date as grn_date',
+                'prl.unit_price',
+                'prl.conversion_factor',
+            ])
             ->first();
 
-        if ($snapshot && (float) $snapshot->unit_cost > 0) {
-            return (float) $snapshot->unit_cost;
+        if (!$row) {
+            return null;
         }
 
+        $factor = max(0.000001, (float) ($row->conversion_factor ?: 1));
+        $row->stock_unit_price = round((float) $row->unit_price / $factor, 2);
+
+        return $row;
+    }
+
+    /**
+     * HPP awal master item. base_unit_cost adalah sumber utama; snapshot
+     * opening/master lama dipakai sebagai fallback untuk data legacy.
+     */
+    public function initialMasterUnitCost(): float
+    {
         if ((float) $this->base_unit_cost > 0) {
             return (float) $this->base_unit_cost;
         }
 
-        if ((float) $this->hpp > 0) {
-            return (float) $this->hpp;
+        $initialSnapshot = $this->costSnapshots()
+            ->whereIn('reference_type', ['master_temp', 'stock_opname_opening'])
+            ->where('unit_cost', '>', 0)
+            ->orderBy('snapshot_date')
+            ->orderBy('id')
+            ->first();
+
+        if ($initialSnapshot && (float) $initialSnapshot->unit_cost > 0) {
+            return (float) $initialSnapshot->unit_cost;
         }
 
-        return 0.0;
+        return max(0.0, (float) ($this->hpp ?? 0));
+    }
+
+    /**
+     * Sumber HPP aktif yang dipakai master item dan modul costing.
+     */
+    public function activeUnitCostMeta(?int $excludeGrnId = null): array
+    {
+        $grn = $this->latestPostedGrnPurchase($excludeGrnId);
+        if ($grn && (float) $grn->stock_unit_price > 0) {
+            return [
+                'unit_cost' => (float) $grn->stock_unit_price,
+                'date' => $grn->grn_date,
+                'reference_type' => 'purchase_receipt',
+                'reference_id' => (int) $grn->grn_id,
+                'notes' => "Auto-calculated dari GRN {$grn->grn_code}",
+            ];
+        }
+
+        $initialSnapshot = $this->costSnapshots()
+            ->whereIn('reference_type', ['master_temp', 'stock_opname_opening'])
+            ->where('unit_cost', '>', 0)
+            ->orderBy('snapshot_date')
+            ->orderBy('id')
+            ->first();
+
+        return [
+            'unit_cost' => $this->initialMasterUnitCost(),
+            'date' => $initialSnapshot?->snapshot_date?->toDateString(),
+            'reference_type' => 'master_initial',
+            'reference_id' => null,
+            'notes' => 'HPP awal dari Master Item',
+        ];
+    }
+
+    /**
+     * HPP global “efektif”: GRN posted terakhir, lalu HPP awal master.
+     */
+    public function getEffectiveUnitCostAttribute(): float
+    {
+        return (float) ($this->activeUnitCostMeta()['unit_cost'] ?? 0);
     }
 
     /**
@@ -472,20 +547,6 @@ class Item extends Model
 
     public function getActiveUnitCostForWarehouse(?int $warehouseId = null): float
     {
-        $snapshot = ItemCostSnapshot::getActiveForItem($this->id, $warehouseId);
-
-        if ($snapshot && (float) $snapshot->unit_cost > 0) {
-            return (float) $snapshot->unit_cost;
-        }
-
-        if ((float) $this->base_unit_cost > 0) {
-            return (float) $this->base_unit_cost;
-        }
-
-        if ((float) $this->hpp > 0) {
-            return (float) $this->hpp;
-        }
-
-        return 0.0;
+        return (float) ($this->activeUnitCostMeta()['unit_cost'] ?? 0);
     }
 }

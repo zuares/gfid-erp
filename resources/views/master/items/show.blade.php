@@ -4,7 +4,8 @@
 
 @php
     $typeLabels = $typeLabels ?? ['material' => 'Material / Bahan', 'wip' => 'Setengah Jadi (WIP)', 'finished_good' => 'Barang Jadi (FG)'];
-    $hpp = (float) ($activeSnapshot?->unit_cost ?? $item->effective_unit_cost ?? 0);
+    $hpp = (float) ($activeCost['unit_cost'] ?? $activeSnapshot?->unit_cost ?? $item->effective_unit_cost ?? 0);
+    $hppDate = $activeCost['date'] ?? $activeSnapshot?->snapshot_date?->toDateString();
     $bomEstimate = $bomEstimate ?? null;
     $modeClass = $item->isHybrid() ? 'item-detail-hybrid' : ($item->canMake() ? 'item-detail-make' : ($item->canBuy() ? 'item-detail-buy' : 'item-detail-undefined'));
     $typeLabel = $item->itemTypeOption?->name ?? ($typeLabels[$item->type] ?? $item->type);
@@ -105,7 +106,7 @@
     <div class="item-detail-grid">
         <div class="item-detail-stat"><div class="item-detail-stat-label">Status</div><div class="item-detail-stat-value"><span class="item-detail-pill {{ $item->active ? 'item-detail-make' : 'item-detail-undefined' }}">{{ $item->active ? 'Aktif / Bisa dipakai' : 'Nonaktif' }}</span></div><div class="item-detail-stat-note">{{ $item->active ? 'Tersedia untuk transaksi baru' : 'Sembunyikan dari transaksi baru' }}</div></div>
         <div class="item-detail-stat"><div class="item-detail-stat-label">Tipe & kategori</div><div class="item-detail-stat-value">{{ $typeLabel }}</div><div class="item-detail-stat-note">{{ $item->category?->name ?? 'Tanpa kategori' }}</div></div>
-        <div class="item-detail-stat"><div class="item-detail-stat-label">HPP aktif</div><div class="item-detail-stat-value">{{ $hpp > 0 ? 'Rp '.number_format($hpp, 0, ',', '.') : 'Belum di-set' }}</div><div class="item-detail-stat-note">{{ $activeSnapshot?->snapshot_date?->format('d/m/Y') ?? 'Belum ada snapshot' }}</div></div>
+        <div class="item-detail-stat"><div class="item-detail-stat-label">HPP aktif</div><div class="item-detail-stat-value">{{ $hpp > 0 ? 'Rp '.number_format($hpp, 0, ',', '.') : 'Belum di-set' }}</div><div class="item-detail-stat-note">{{ $hppDate ? \Illuminate\Support\Carbon::parse($hppDate)->format('d/m/Y') : 'Belum ada snapshot' }}</div></div>
     </div>
 
     <div class="item-detail-card">

@@ -86,7 +86,8 @@ class ItemController extends Controller
         $typeLabels = $this->typeLabels();
         $itemTypeOptions = $this->itemTypeOptions();
         $purchaseTreatmentOptions = $this->purchaseTreatmentOptions();
-        return view('master.items.create', compact('item', 'categories', 'suppliers', 'expenseAccounts', 'activeSnapshot', 'typeLabels', 'itemTypeOptions', 'purchaseTreatmentOptions'));
+        $activeCost = null;
+        return view('master.items.create', compact('item', 'categories', 'suppliers', 'expenseAccounts', 'activeSnapshot', 'activeCost', 'typeLabels', 'itemTypeOptions', 'purchaseTreatmentOptions'));
     }
 
     public function codeSuggestions(Request $request): JsonResponse
@@ -237,10 +238,12 @@ class ItemController extends Controller
 
         // snapshot HPP aktif (kalau ada)
         $activeSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
+        $activeCost = $item->activeUnitCostMeta();
 
         return view('master.items.show', [
             'item' => $item,
             'activeSnapshot' => $activeSnapshot,
+            'activeCost' => $activeCost,
             'itemBom' => $itemBom,
             'bomEstimate' => $bomEstimate,
             'typeLabels' => $this->typeLabels(),
@@ -254,10 +257,12 @@ class ItemController extends Controller
     {
         // snapshot aktif kalau ada
         $snapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
+        $activeCost = $item->activeUnitCostMeta();
 
         return view('master.items.hpp_temp', [
             'item' => $item,
             'snapshot' => $snapshot,
+            'activeCost' => $activeCost,
         ]);
     }
 
@@ -271,6 +276,14 @@ class ItemController extends Controller
             'notes' => ['nullable', 'string', 'max:255'],
         ]);
 
+        if ($item->latestPostedGrnPurchase()) {
+            app(\App\Services\Costing\ActiveHppService::class)->sync($item);
+
+            return redirect()
+                ->route('master.items.edit', $item)
+                ->with('success', 'HPP aktif mengikuti harga GRN posted terbaru.');
+        }
+
         $now = Carbon::now();
 
         DB::transaction(function () use ($item, $validated, $now) {
@@ -282,7 +295,10 @@ class ItemController extends Controller
 
             // Sinkronkan kolom items.hpp agar valuasi Inventory Stock ikut.
             // (HPP referensi/statis — tidak menyentuh Lot.avg_cost / jurnal.)
-            $item->update(['hpp' => $validated['unit_cost']]);
+            $item->update([
+                'hpp' => $validated['unit_cost'],
+                'base_unit_cost' => $validated['unit_cost'],
+            ]);
 
             // Buat snapshot baru sebagai HPP sementara dari master
             ItemCostSnapshot::create([
@@ -349,13 +365,17 @@ class ItemController extends Controller
                 'purchase_treatment_id' => $data['purchase_treatment_id'] ?? null,
                 'default_expense_account_id' => $accountingPolicy['default_expense_account_id'],
                 'last_purchase_price' => $data['last_purchase_price'] ?? 0,
+                'base_unit_cost' => $data['unit_cost'] ?? 0,
             ]);
 
             $this->syncSuppliers($item, $data['supplier_ids'] ?? [], $data['primary_supplier_id'] ?? null);
             $this->syncBarcodes($item, $data['barcodes'] ?? []);
 
             if ($accountingPolicy['default_allocation'] === 'hpp' && isset($data['unit_cost'])) {
-                $item->update(['hpp' => $data['unit_cost']]);
+                $item->update([
+                    'hpp' => $data['unit_cost'],
+                    'base_unit_cost' => $data['unit_cost'],
+                ]);
                 ItemCostSnapshot::create([
                     'item_id' => $item->id,
                     'warehouse_id' => null,
@@ -390,18 +410,23 @@ class ItemController extends Controller
         $suppliers = $this->supplierOptions();
         $expenseAccounts = Account::where('type', 'expense')->where('is_active', true)->orderBy('name')->get();
         $activeSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
+        $activeCost = $item->activeUnitCostMeta();
         $itemBom = ItemBom::query()->where('item_id', $item->id)->first();
         $bomEstimate = $itemBom ? $bomCostService->estimate($itemBom) : null;
         $typeLabels = $this->typeLabels();
         $itemTypeOptions = $this->itemTypeOptions();
         $purchaseTreatmentOptions = $this->purchaseTreatmentOptions();
         
-        return view('master.items.edit', compact('item', 'categories', 'suppliers', 'expenseAccounts', 'activeSnapshot', 'itemBom', 'bomEstimate', 'typeLabels', 'itemTypeOptions', 'purchaseTreatmentOptions'));
+        return view('master.items.edit', compact('item', 'categories', 'suppliers', 'expenseAccounts', 'activeSnapshot', 'activeCost', 'itemBom', 'bomEstimate', 'typeLabels', 'itemTypeOptions', 'purchaseTreatmentOptions'));
     }
 
     public function update(Request $request, Item $item)
     {
         $data = $this->validateRequest($request, $item);
+        $latestGrn = $item->latestPostedGrnPurchase();
+        if ($latestGrn) {
+            $data['last_purchase_price'] = (float) $latestGrn->stock_unit_price;
+        }
 
         DB::transaction(function () use ($data, $item) {
             $classification = $this->classificationFor(
@@ -444,13 +469,21 @@ class ItemController extends Controller
             $this->syncBarcodes($item, $data['barcodes'] ?? []);
 
             if ($accountingPolicy['default_allocation'] === 'hpp' && isset($data['unit_cost'])) {
+                if ($item->latestPostedGrnPurchase()) {
+                    app(\App\Services\Costing\ActiveHppService::class)->sync($item);
+                    return;
+                }
+
                 $unitCost = $data['unit_cost'];
                 $hppNotes = $data['hpp_notes'] ?? 'HPP diperbarui dari form Master Item';
                 $currentSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
                 
                 if (!$currentSnapshot || (float)$currentSnapshot->unit_cost !== (float)$unitCost || $currentSnapshot->notes !== $hppNotes) {
                     ItemCostSnapshot::where('item_id', $item->id)->active()->update(['is_active' => 0]);
-                    $item->update(['hpp' => $unitCost]);
+                    $item->update([
+                        'hpp' => $unitCost,
+                        'base_unit_cost' => $unitCost,
+                    ]);
                     
                     ItemCostSnapshot::create([
                         'item_id' => $item->id,
@@ -595,11 +628,21 @@ class ItemController extends Controller
                 $unitCost = $data['unit_cost'];
                 $notes = $data['notes'] ?? 'HPP sementara (bulk) dari Master Item';
 
-                // Sinkronkan kolom items.hpp agar valuasi Inventory Stock ikut.
-                // (HPP referensi/statis — tidak menyentuh Lot.avg_cost / jurnal.)
-                Item::whereIn('id', $ids)->update(['hpp' => $unitCost]);
+                foreach (Item::whereIn('id', $ids)->get() as $item) {
+                    $itemId = (int) $item->id;
+                    if ($item->latestPostedGrnPurchase()) {
+                        app(\App\Services\Costing\ActiveHppService::class)->sync($item);
+                        $count++;
+                        continue;
+                    }
 
-                foreach ($ids as $itemId) {
+                    // Sinkronkan kolom items.hpp dan base_unit_cost agar HPP
+                    // awal master menjadi fallback permanen saat belum ada GRN.
+                    $item->update([
+                        'hpp' => $unitCost,
+                        'base_unit_cost' => $unitCost,
+                    ]);
+
                     // Nonaktifkan snapshot aktif sebelumnya
                     ItemCostSnapshot::where('item_id', $itemId)
                         ->active()

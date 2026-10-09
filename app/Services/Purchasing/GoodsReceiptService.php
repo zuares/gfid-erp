@@ -4,9 +4,7 @@ namespace App\Services\Purchasing;
 
 use App\Helpers\CodeGenerator;
 use App\Models\Account;
-use App\Models\InventoryStock;
 use App\Models\Item;
-use App\Models\ItemCostSnapshot;
 use App\Models\Lot;
 use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
@@ -17,6 +15,7 @@ use App\Models\PurchaseReceiptLine;
 use App\Models\SupplierPrice;
 use App\Models\Warehouse;
 use App\Services\Accounting\JournalService;
+use App\Services\Costing\ActiveHppService;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -29,6 +28,7 @@ class GoodsReceiptService
         protected InventoryService $inventory,
         protected JournalService $journal,
         protected PurchaseOrderService $purchaseOrders,
+        protected ActiveHppService $activeHpp,
     ) {}
 
     /**
@@ -507,7 +507,8 @@ class GoodsReceiptService
                     unitCost: $line->stockUnitPrice(),
                 );
 
-                // update last price + moving average HPP
+                // Simpan harga beli terakhir; HPP aktif disinkronkan setelah
+                // status GRN menjadi posted agar GRN ini ikut terbaca.
                 $this->touchLastPrices($grn, (int) $line->item_id, $line->stockUnitPrice(), $line->stockQtyReceived());
             }
 
@@ -518,6 +519,20 @@ class GoodsReceiptService
             $grn->posted_at = now();
             $grn->approved_by = auth()->id() ?: $grn->approved_by;
             $grn->save();
+
+            $affectedItemIds = $grn->lines
+                ->pluck('item_id')
+                ->filter()
+                ->map(fn ($v) => (int) $v)
+                ->unique()
+                ->values();
+
+            foreach ($affectedItemIds as $itemId) {
+                $item = Item::find($itemId);
+                if ($item) {
+                    $this->activeHpp->sync($item);
+                }
+            }
 
             // Sync received_status di PO terkait + pastikan PO terkunci (fallback
             // untuk GRN yang mungkin dibuat sebelum mekanisme lock aktif).
@@ -1126,53 +1141,8 @@ class GoodsReceiptService
             return;
         }
 
-        // ============================================================
-        // MOVING AVERAGE HPP
-        // Formula: new_avg = (old_qty × old_hpp + qty_beli × harga_beli) / (old_qty + qty_beli)
-        // stockIn sudah dijalankan sebelum method ini, jadi total qty di DB
-        // sudah termasuk pembelian baru → old_qty = total_sekarang - qty_beli
-        // ============================================================
-        if ($qtyReceived > 0 && $unitPrice > 0) {
-            $totalQtyAfter = (float) InventoryStock::where('item_id', $itemId)->sum('qty');
-            $oldQty = max(0.0, $totalQtyAfter - $qtyReceived);
-            $oldHpp = (float) ($item->hpp ?? 0);
-
-            if ($totalQtyAfter > 0) {
-                $newHpp = ($oldQty * $oldHpp + $qtyReceived * $unitPrice) / $totalQtyAfter;
-            } else {
-                $newHpp = $unitPrice;
-            }
-
-            $item->hpp = round($newHpp, 2);
-        }
-
         $item->last_purchase_price = $unitPrice;
         $item->save();
-
-        if (isset($newHpp)) {
-            // Nonaktifkan snapshot aktif lama
-            ItemCostSnapshot::where('item_id', $itemId)->active()->update(['is_active' => 0]);
-
-            // Simpan riwayat perubahan
-            ItemCostSnapshot::create([
-                'item_id' => $itemId,
-                'warehouse_id' => null,
-                'snapshot_date' => \Illuminate\Support\Carbon::now()->toDateString(),
-                'reference_type' => 'purchase_receipt',
-                'reference_id' => $grn->id,
-                'qty_basis' => $totalQtyAfter,
-                'rm_unit_cost' => round($newHpp, 2),
-                'cutting_unit_cost' => 0,
-                'sewing_unit_cost' => 0,
-                'finishing_unit_cost' => 0,
-                'packaging_unit_cost' => 0,
-                'overhead_unit_cost' => 0,
-                'unit_cost' => round($newHpp, 2),
-                'notes' => "Auto-calculated dari GRN {$grn->code}",
-                'is_active' => 1,
-                'created_by' => auth()->id() ?? null,
-            ]);
-        }
 
         SupplierPrice::updateOrCreate(
             ['supplier_id' => $grn->supplier_id, 'item_id' => $itemId],
@@ -1181,85 +1151,15 @@ class GoodsReceiptService
     }
 
     /**
-     * Recalculate moving average HPP dari seluruh riwayat GRN posted,
-     * opsional exclude satu GRN (dipakai saat unpost).
-     *
-     * Cara: replay semua GRN stockIn per item secara kronologis,
-     * hitung running average → tulis ke items.hpp.
+     * Setelah GRN di-unpost, kembalikan HPP ke GRN posted terakhir.
+     * Jika sudah tidak ada GRN, fallback ke HPP awal master item.
      */
     protected function recomputeHppFromHistory(int $itemId, ?int $excludeGrnId = null): void
     {
-        // Ambil hanya line yang benar-benar masuk stok. Line expense tetap
-        // tercatat di GRN/jurnal, tetapi tidak boleh ikut moving average HPP.
-        $query = DB::table('purchase_receipt_lines as prl')
-            ->join('purchase_receipts as pr', 'pr.id', '=', 'prl.purchase_receipt_id')
-            ->leftJoin('purchase_order_lines as pol', 'pol.id', '=', 'prl.purchase_order_line_id')
-            ->leftJoin('items as it', 'it.id', '=', 'prl.item_id')
-            ->where('pr.status', 'posted')
-            ->where('prl.item_id', $itemId)
-            ->whereRaw('CAST(prl.qty_received AS REAL) > 0')
-            ->whereRaw('CAST(prl.unit_price AS REAL) > 0')
-            ->where(function ($q) {
-                $q->where('pr.is_replacement', true)
-                    ->orWhereRaw("COALESCE(prl.allocation, pol.allocation, it.default_allocation, 'hpp') <> 'expense'");
-            });
-
-        if ($excludeGrnId) {
-            $query->where('pr.id', '!=', $excludeGrnId);
+        $item = Item::find($itemId);
+        if ($item) {
+            $this->activeHpp->sync($item, $excludeGrnId);
         }
-
-        $lines = $query
-            ->orderBy('pr.date')
-            ->orderBy('pr.id')
-            ->select('prl.qty_received', 'prl.unit_price', 'prl.stock_qty_received', 'prl.conversion_factor')
-            ->get();
-
-        if ($lines->isEmpty()) {
-            // Tidak ada riwayat beli → reset ke 0
-            Item::where('id', $itemId)->update(['hpp' => 0]);
-            ItemCostSnapshot::where('item_id', $itemId)->active()->update(['is_active' => 0]);
-
-            return;
-        }
-
-        // Replay moving average
-        $runningQty = 0.0;
-        $runningHpp = 0.0;
-
-        foreach ($lines as $line) {
-            $factor = max(0.000001, (float) ($line->conversion_factor ?: 1));
-            $qty = (float) ($line->stock_qty_received ?? $line->qty_received);
-            $price = (float) $line->unit_price / $factor;
-
-            $newQty = $runningQty + $qty;
-            $runningHpp = $newQty > 0
-                ? ($runningQty * $runningHpp + $qty * $price) / $newQty
-                : $price;
-            $runningQty = $newQty;
-        }
-
-        $runningHppRound = round($runningHpp, 2);
-        Item::where('id', $itemId)->update(['hpp' => $runningHppRound]);
-
-        // Catat sebagai snapshot koreksi dari Unpost
-        ItemCostSnapshot::where('item_id', $itemId)->active()->update(['is_active' => 0]);
-        ItemCostSnapshot::create([
-            'item_id' => $itemId,
-            'warehouse_id' => null,
-            'snapshot_date' => \Illuminate\Support\Carbon::now()->toDateString(),
-            'reference_type' => 'recalculation',
-            'qty_basis' => $runningQty,
-            'rm_unit_cost' => $runningHppRound,
-            'cutting_unit_cost' => 0,
-            'sewing_unit_cost' => 0,
-            'finishing_unit_cost' => 0,
-            'packaging_unit_cost' => 0,
-            'overhead_unit_cost' => 0,
-            'unit_cost' => $runningHppRound,
-            'notes' => 'Recalculated HPP (UNPOST GRN)',
-            'is_active' => 1,
-            'created_by' => auth()->id() ?? null,
-        ]);
     }
 
     /**

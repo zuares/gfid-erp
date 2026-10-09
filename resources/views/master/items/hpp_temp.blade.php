@@ -33,7 +33,7 @@
                         HPP Sementara (Rp / unit)
                     </label>
                     <input type="number" step="0.01" name="unit_cost"
-                        value="{{ old('unit_cost', $snapshot->unit_cost ?? '') }}"
+                        value="{{ old('unit_cost', $activeCost['unit_cost'] ?? $snapshot->unit_cost ?? '') }}"
                         class="w-full rounded-md border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
                     @error('unit_cost')
                         <p class="text-xs text-red-500 mt-1">{{ $message }}</p>
@@ -44,7 +44,7 @@
                     <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                         Catatan (opsional)
                     </label>
-                    <input type="text" name="notes" value="{{ old('notes', $snapshot->notes ?? '') }}"
+                    <input type="text" name="notes" value="{{ old('notes', $activeCost['notes'] ?? $snapshot->notes ?? '') }}"
                         class="w-full rounded-md border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
                 </div>
 
@@ -54,11 +54,15 @@
                 </button>
             </form>
 
-            @if ($snapshot)
+            @if ($activeCost || $snapshot)
+                @php
+                    $displayHpp = $activeCost['unit_cost'] ?? $snapshot?->unit_cost ?? 0;
+                    $displayHppDate = $activeCost['date'] ?? $snapshot?->snapshot_date?->toDateString();
+                @endphp
                 <p class="mt-3 text-xs text-slate-500">
                     HPP aktif saat ini:
-                    <strong>Rp {{ number_format($snapshot->unit_cost, 0) }}</strong>
-                    (snapshot {{ $snapshot->snapshot_date?->format('d/m/Y') ?? '-' }})
+                    <strong>Rp {{ number_format((float) $displayHpp, 0) }}</strong>
+                    ({{ $displayHppDate ? \Illuminate\Support\Carbon::parse($displayHppDate)->format('d/m/Y') : '-' }})
                 </p>
             @endif
         </div>
