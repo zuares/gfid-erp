@@ -634,7 +634,10 @@
     .sales-dashboard .sales-sales-comparison-table td { font-size: .72rem; }
     .sales-dashboard .sales-sales-comparison-table .sales-period-current { background: color-mix(in srgb, var(--sales-accent-soft) 36%, var(--sales-card) 64%); }
     .sales-dashboard .sales-comparison-cell { display: inline-flex; align-items: center; justify-content: flex-end; gap: .28rem; }
-    .sales-dashboard .sales-comparison-arrow { color: var(--sales-accent); font-size: .68rem; line-height: 1; }
+    .sales-dashboard .sales-comparison-delta { display: inline-flex; align-items: center; gap: .1rem; font-size: .56rem; font-weight: 700; line-height: 1; opacity: .78; white-space: nowrap; }
+    .sales-dashboard .sales-comparison-delta.is-up { color: var(--success, #16a34a); }
+    .sales-dashboard .sales-comparison-delta.is-down { color: var(--danger, #dc2626); }
+    .sales-dashboard .sales-comparison-delta.is-neutral { color: var(--sales-muted); }
     .sales-dashboard .sales-table-section-row td {
         padding: .58rem .75rem .38rem;
         border-bottom: 0;
@@ -1996,20 +1999,33 @@
                                         $currentValue = $salesComparisonPeriods[0]['metrics'][$row['key']] ?? null;
                                         $comparisonArrow = null;
                                         $comparisonArrowTitle = null;
+                                        $comparisonDifferenceLabel = null;
+                                        $comparisonDeltaTone = 'is-neutral';
                                         if ($periodIndex > 0 && is_numeric($currentValue) && is_numeric($comparisonValue)) {
                                             $comparisonArrow = (float) $currentValue > (float) $comparisonValue
                                                 ? 'bi-arrow-up-right'
                                                 : ((float) $currentValue < (float) $comparisonValue ? 'bi-arrow-down-right' : 'bi-arrow-left-right');
+                                            $comparisonDeltaTone = (float) $currentValue > (float) $comparisonValue
+                                                ? 'is-up'
+                                                : ((float) $currentValue < (float) $comparisonValue ? 'is-down' : 'is-neutral');
                                             $comparisonArrowTitle = (float) $currentValue > (float) $comparisonValue
                                                 ? 'Aktif lebih tinggi'
                                                 : ((float) $currentValue < (float) $comparisonValue ? 'Aktif lebih rendah' : 'Nilai sama');
+                                            $comparisonDifference = (float) $currentValue - (float) $comparisonValue;
+                                            $comparisonDifferencePrefix = $comparisonDifference > 0 ? '+' : ($comparisonDifference < 0 ? '−' : '±');
+                                            $comparisonDifferenceValue = in_array($row['key'], ['net_margin', 'ad_ratio'], true)
+                                                ? number_format(abs($comparisonDifference), 1, ',', '.').' pt'
+                                                : $row['format'](abs($comparisonDifference));
+                                            $comparisonDifferenceLabel = $comparisonDifferencePrefix.$comparisonDifferenceValue;
                                         }
                                     @endphp
                                     <td class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
                                         <span class="sales-comparison-cell">
                                             {{ $comparisonValue === null ? '—' : $row['format']($comparisonValue) }}
                                             @if ($comparisonArrow)
-                                                <i class="bi {{ $comparisonArrow }} sales-comparison-arrow" title="{{ $comparisonArrowTitle }} dibanding {{ $period['label'] }}" aria-label="{{ $comparisonArrowTitle }} dibanding {{ $period['label'] }}"></i>
+                                                <span class="sales-comparison-delta {{ $comparisonDeltaTone }}" title="{{ $comparisonArrowTitle }} dibanding {{ $period['label'] }}">
+                                                    <i class="bi {{ $comparisonArrow }}" aria-hidden="true"></i>{{ $comparisonDifferenceLabel }}
+                                                </span>
                                             @endif
                                         </span>
                                     </td>
