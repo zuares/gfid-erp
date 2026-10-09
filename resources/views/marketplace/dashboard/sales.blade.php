@@ -1039,10 +1039,13 @@
     $productAnalysisAdConversions = (int) $productAnalysisAdProducts->sum('ad_conversions');
     $productAnalysisMappedCount = $productAnalysisProducts->filter(fn ($product) => (int) ($product->internal_item_id ?? 0) > 0)->count();
     $productAnalysisCostedProducts = $productAnalysisProducts->filter(fn ($product) => $product->gross_profit !== null);
-    $productAnalysisHpp = (float) $productAnalysisCostedProducts->sum('hpp_total');
-    $productAnalysisEstimatedPayout = (float) $productAnalysisProducts->sum('estimated_payout');
-    $productAnalysisGrossProfitPayout = $productAnalysisEstimatedPayout - $productAnalysisHpp;
-    $productAnalysisNetProfit = $productAnalysisGrossProfitPayout - $productAnalysisAdSpend;
+    // Gunakan sumber KPI harian yang sama dengan tab Penjualan agar
+    // payout, COGS, iklan, dan laba bersih selalu konsisten lintas section.
+    $productAnalysisHpp = (float) collect($daily)->sum('cogs');
+    $productAnalysisEstimatedPayout = (float) collect($daily)->sum('estimated_payout');
+    $productAnalysisGrossProfitPayout = (float) collect($daily)->sum('gross_profit');
+    $productAnalysisAdSpend = (float) collect($daily)->sum('ad_spend');
+    $productAnalysisNetProfit = (float) collect($daily)->sum('net_profit');
     $productAnalysisGrossMarginPayout = $productAnalysisEstimatedPayout > 0
         ? ($productAnalysisGrossProfitPayout / $productAnalysisEstimatedPayout) * 100
         : 0;
