@@ -441,7 +441,18 @@
     .sales-dashboard .sales-daily-table .sales-compare-line i { font-size: .5rem; }
     .sales-dashboard .sales-daily-table .sales-compare-line strong { font-size: .54rem; }
     .sales-dashboard .sales-trend-section { overflow: hidden; }
-    .sales-dashboard .sales-trend-body { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(230px, .75fr); gap: .75rem; padding: 0 .85rem .85rem; }
+    .sales-dashboard .sales-trend-body { padding: 0 .85rem .85rem; }
+    .sales-dashboard .sales-trend-layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(230px, .75fr); gap: .75rem; }
+    .sales-dashboard .sales-trend-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; margin-bottom: .75rem; }
+    .sales-dashboard .sales-trend-summary-card { display: flex; min-width: 0; align-items: center; gap: .55rem; padding: .62rem .68rem; border: 1px solid color-mix(in srgb, var(--sales-line) 72%, transparent); border-radius: .65rem; background: color-mix(in srgb, var(--sales-soft) 35%, var(--sales-card) 65%); }
+    .sales-dashboard .sales-trend-summary-icon { display: inline-flex; flex: 0 0 1.85rem; width: 1.85rem; height: 1.85rem; align-items: center; justify-content: center; border-radius: .52rem; background: var(--sales-accent-soft); color: var(--sales-accent); font-size: .8rem; }
+    .sales-dashboard .sales-trend-summary-content { min-width: 0; }
+    .sales-dashboard .sales-trend-summary-label { overflow: hidden; color: var(--sales-muted); font-size: .57rem; font-weight: 800; letter-spacing: .035em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+    .sales-dashboard .sales-trend-summary-value { overflow: hidden; margin-top: .1rem; color: var(--sales-ink); font-size: .76rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
+    .sales-dashboard .sales-trend-summary-delta { display: inline-flex; margin-top: .08rem; font-size: .57rem; font-weight: 800; }
+    .sales-dashboard .sales-trend-summary-delta.good { color: #15803d; }
+    .sales-dashboard .sales-trend-summary-delta.bad { color: #b91c1c; }
+    .sales-dashboard .sales-trend-summary-delta.neutral { color: var(--sales-muted); }
     .sales-dashboard .sales-trend-panel,
     .sales-dashboard .sales-trend-insight { min-width: 0; border-radius: .75rem; background: color-mix(in srgb, var(--sales-soft) 42%, var(--sales-card) 58%); }
     .sales-dashboard .sales-trend-panel { padding: .7rem .75rem .55rem; }
@@ -471,6 +482,11 @@
     .sales-dashboard .sales-trend-insight-value { margin-top: .2rem; color: var(--sales-ink); font-size: .82rem; font-weight: 850; }
     .sales-dashboard .sales-trend-insight-meta { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .15rem; color: var(--sales-muted); font-size: .61rem; font-weight: 700; }
     .sales-dashboard .sales-trend-insight-meta strong { color: var(--sales-ink); font-weight: 850; }
+    .sales-dashboard .sales-trend-insight--alert { border: 1px solid color-mix(in srgb, #dc2626 18%, var(--sales-line) 82%); background: color-mix(in srgb, #fee2e2 30%, var(--sales-card) 70%); }
+    .sales-dashboard .sales-trend-insight--alert .sales-trend-insight-label,
+    .sales-dashboard .sales-trend-insight--alert .sales-trend-insight-value { color: #b91c1c; }
+    .sales-dashboard .sales-trend-header-meta { display: flex; align-items: center; justify-content: flex-end; gap: .45rem; }
+    .sales-dashboard .sales-trend-period { color: var(--sales-muted); font-size: .65rem; font-weight: 700; white-space: nowrap; }
     .sales-dashboard .sales-trend-empty { padding: 2rem 1rem; color: var(--sales-muted); font-size: .72rem; text-align: center; }
     .sales-dashboard .sales-product-table { min-width: 1265px; table-layout: fixed; }
     .sales-dashboard .sales-product-table th,
@@ -894,9 +910,12 @@
     @media (max-width: 767.98px) {
         .sales-dashboard { padding-inline: .75rem !important; }
         .sales-dashboard .sales-table { min-width: 720px; }
-        .sales-dashboard .sales-trend-body { grid-template-columns: 1fr; padding-inline: .65rem; }
+        .sales-dashboard .sales-trend-body { padding-inline: .65rem; }
+        .sales-dashboard .sales-trend-layout { grid-template-columns: 1fr; }
+        .sales-dashboard .sales-trend-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .sales-dashboard .sales-trend-toolbar { align-items: flex-start; flex-direction: column; }
         .sales-dashboard .sales-trend-select { width: 100%; }
+        .sales-dashboard .sales-trend-header-meta { align-items: flex-start; flex-direction: column; }
         .sales-dashboard .sales-promotion-table {
             min-width: 0;
             width: 100%;
@@ -1261,6 +1280,54 @@
     $trendRiskLabel = $trendRisk ? 'Risiko laba' : 'Iklan tertinggi';
     $trendRisk ??= $trendCurrentRows->sortByDesc(fn ($row) => $row['ad_spend'])->first();
     $trendComparisonLabel = $comparisonMode === 'month' ? 'Bulan lalu' : 'Periode lalu';
+    $trendDelta = function ($current, $previous) {
+        $current = (float) $current;
+        $previous = (float) $previous;
+
+        if ($previous === 0.0) {
+            return [
+                'label' => $current === 0.0 ? '0,0%' : 'Baru',
+                'tone' => $current > 0 ? 'good' : 'neutral',
+            ];
+        }
+
+        $delta = (($current - $previous) / abs($previous)) * 100;
+
+        return [
+            'label' => ($delta >= 0 ? '↑ ' : '↓ ').number_format(abs($delta), 1, ',', '.').'%',
+            'tone' => $delta >= 0 ? 'good' : 'bad',
+        ];
+    };
+    $trendCurrentTotals = [
+        'net_sales' => (float) $trendCurrentRows->sum('net_sales'),
+        'estimated_payout' => (float) $trendCurrentRows->sum('estimated_payout'),
+        'net_profit' => (float) $trendCurrentRows->sum('net_profit'),
+        'ad_spend' => (float) $trendCurrentRows->sum('ad_spend'),
+    ];
+    $trendPreviousTotals = [
+        'net_sales' => (float) $trendPreviousRows->sum('net_sales'),
+        'estimated_payout' => (float) $trendPreviousRows->sum('estimated_payout'),
+        'net_profit' => (float) $trendPreviousRows->sum('net_profit'),
+        'ad_spend' => (float) $trendPreviousRows->sum('ad_spend'),
+    ];
+    $trendSummary = collect([
+        ['label' => 'Net Sales', 'key' => 'net_sales', 'icon' => 'bi-graph-up-arrow'],
+        ['label' => 'Est Penghasilan', 'key' => 'estimated_payout', 'icon' => 'bi-wallet2'],
+        ['label' => 'Laba Bersih', 'key' => 'net_profit', 'icon' => 'bi-bar-chart-line'],
+        ['label' => 'Iklan', 'key' => 'ad_spend', 'icon' => 'bi-megaphone'],
+    ])->map(function ($item) use ($trendCurrentTotals, $trendPreviousTotals, $trendDelta, $fmt) {
+        $delta = $trendDelta($trendCurrentTotals[$item['key']], $trendPreviousTotals[$item['key']]);
+
+        return $item + [
+            'value' => $fmt($trendCurrentTotals[$item['key']]),
+            'delta' => $delta['label'],
+            'tone' => $delta['tone'],
+        ];
+    });
+    $trendNegativeDays = $trendCurrentRows->filter(fn ($row) => $row['net_profit'] < 0)->count();
+    $trendAverageNetSales = $trendCurrentRows->count() > 0 ? $trendCurrentTotals['net_sales'] / $trendCurrentRows->count() : 0;
+    $trendBestProfit = $trendCurrentRows->sortByDesc(fn ($row) => $row['net_profit'])->first();
+    $trendWorstProfit = $trendCurrentRows->sortBy(fn ($row) => $row['net_profit'])->first();
     $trendPayload = [
         'current' => $trendCurrentRows->all(),
         'previous' => $trendPreviousRows->all(),
@@ -2041,47 +2108,70 @@
                     <div class="sales-kicker mb-1">Analisis tren</div>
                     <h2 id="sales-trend-title" class="sales-section-title mb-1">Tren Kinerja &amp; Anomali</h2>
                 </div>
-                <span class="badge sales-badge rounded-pill px-3 py-2">{{ $trendComparisonLabel }}</span>
+                <div class="sales-trend-header-meta">
+                    <span class="badge sales-badge rounded-pill px-3 py-2"><i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>{{ $trendComparisonLabel }}</span>
+                    <span class="sales-trend-period">{{ $dateRangeLabel($filters['date_from'], $filters['date_to']) }}</span>
+                </div>
             </div>
             <div class="sales-trend-body">
-                <div class="sales-trend-panel">
-                    <div class="sales-trend-toolbar">
-                        <div>
-                            <div class="sales-trend-label">Indikator</div>
-                            <div class="sales-trend-total" data-sales-trend-total>{{ $fmt($trendCurrentRows->sum('net_sales')) }}</div>
+                <div class="sales-trend-summary" aria-label="Ringkasan indikator tren">
+                    @foreach ($trendSummary as $item)
+                        <div class="sales-trend-summary-card">
+                            <span class="sales-trend-summary-icon"><i class="bi {{ $item['icon'] }}" aria-hidden="true"></i></span>
+                            <div class="sales-trend-summary-content">
+                                <div class="sales-trend-summary-label">{{ $item['label'] }}</div>
+                                <div class="sales-trend-summary-value">{{ $item['value'] }}</div>
+                                <span class="sales-trend-summary-delta {{ $item['tone'] }}">{{ $item['delta'] }} vs {{ $trendComparisonLabel }}</span>
+                            </div>
                         </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="sales-trend-compare" data-sales-trend-compare>{{ $trendComparisonLabel }}</span>
-                            <select class="sales-trend-select" data-sales-trend-metric aria-label="Pilih indikator tren">
-                                <option value="net_sales">Net Sales</option>
-                                <option value="estimated_payout">Est Penghasilan</option>
-                                <option value="net_profit">Laba Bersih</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="sales-trend-chart" data-sales-trend-chart-container>
-                        <svg viewBox="0 0 1000 260" role="img" aria-label="Grafik tren kinerja" data-sales-trend-chart></svg>
-                    </div>
-                    <div class="sales-trend-legend" aria-label="Legenda grafik">
-                        <span><i aria-hidden="true"></i>Periode berjalan</span>
-                        <span><i class="previous" aria-hidden="true"></i>{{ $trendComparisonLabel }}</span>
-                    </div>
+                    @endforeach
                 </div>
-                <div class="sales-trend-insights">
-                    <div class="sales-trend-insight">
-                        <div class="sales-trend-insight-label">Puncak Net Sales</div>
-                        <div class="sales-trend-insight-value">{{ $fmt($trendPeak['net_sales']) }}</div>
-                        <div class="sales-trend-insight-meta"><span>{{ $trendPeak['label'] }}</span><strong>{{ number_format((float) $trendPeak['net_sales'] > 0 ? ((float) $trendPeak['net_sales'] / max(1, (float) $trendCurrentRows->sum('net_sales'))) * 100 : 0, 1, ',', '.') }}%</strong></div>
+                <div class="sales-trend-layout">
+                    <div class="sales-trend-panel">
+                        <div class="sales-trend-toolbar">
+                            <div>
+                                <div class="sales-trend-label">Indikator</div>
+                                <div class="sales-trend-total" data-sales-trend-total>{{ $fmt($trendCurrentRows->sum('net_sales')) }}</div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="sales-trend-compare" data-sales-trend-compare>{{ $trendComparisonLabel }}</span>
+                                <select class="sales-trend-select" data-sales-trend-metric aria-label="Pilih indikator tren">
+                                    <option value="net_sales">Net Sales</option>
+                                    <option value="estimated_payout">Est Penghasilan</option>
+                                    <option value="net_profit">Laba Bersih</option>
+                                    <option value="ad_spend">Iklan</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="sales-trend-chart" data-sales-trend-chart-container>
+                            <svg viewBox="0 0 1000 260" role="img" aria-label="Grafik tren kinerja" data-sales-trend-chart></svg>
+                        </div>
+                        <div class="sales-trend-legend" aria-label="Legenda grafik">
+                            <span><i aria-hidden="true"></i>Periode berjalan</span>
+                            <span><i class="previous" aria-hidden="true"></i>{{ $trendComparisonLabel }}</span>
+                        </div>
                     </div>
-                    <div class="sales-trend-insight">
-                        <div class="sales-trend-insight-label">Terendah Net Sales</div>
-                        <div class="sales-trend-insight-value">{{ $fmt($trendLow['net_sales']) }}</div>
-                        <div class="sales-trend-insight-meta"><span>{{ $trendLow['label'] }}</span><strong>{{ $trendLow['net_profit'] < 0 ? 'Laba negatif' : 'Perlu dipantau' }}</strong></div>
-                    </div>
-                    <div class="sales-trend-insight">
-                        <div class="sales-trend-insight-label">{{ $trendRiskLabel }}</div>
-                        <div class="sales-trend-insight-value">{{ $trendRisk ? $fmt($trendRisk['ad_spend']) : '—' }}</div>
-                        <div class="sales-trend-insight-meta"><span>{{ $trendRisk['label'] ?? '—' }}</span><strong>{{ $trendRisk && $trendRisk['net_profit'] < 0 ? $fmt($trendRisk['net_profit']) : '—' }}</strong></div>
+                    <div class="sales-trend-insights">
+                        <div class="sales-trend-insight">
+                            <div class="sales-trend-insight-label">Hari terbaik</div>
+                            <div class="sales-trend-insight-value">{{ $trendBestProfit ? $fmt($trendBestProfit['net_profit']) : '—' }}</div>
+                            <div class="sales-trend-insight-meta"><span>{{ $trendBestProfit['label'] ?? '—' }}</span><strong>Laba bersih</strong></div>
+                        </div>
+                        <div class="sales-trend-insight">
+                            <div class="sales-trend-insight-label">Hari terlemah</div>
+                            <div class="sales-trend-insight-value">{{ $trendWorstProfit ? $fmt($trendWorstProfit['net_profit']) : '—' }}</div>
+                            <div class="sales-trend-insight-meta"><span>{{ $trendWorstProfit['label'] ?? '—' }}</span><strong>{{ $trendWorstProfit && $trendWorstProfit['net_profit'] < 0 ? 'Laba negatif' : 'Perlu dipantau' }}</strong></div>
+                        </div>
+                        <div class="sales-trend-insight {{ $trendNegativeDays > 0 ? 'sales-trend-insight--alert' : '' }}">
+                            <div class="sales-trend-insight-label">Anomali laba</div>
+                            <div class="sales-trend-insight-value">{{ $trendNegativeDays }} hari</div>
+                            <div class="sales-trend-insight-meta"><span>{{ $trendNegativeDays > 0 ? 'Laba bersih negatif' : 'Tidak ada laba negatif' }}</span><strong>{{ $trendCurrentRows->count() }} hari aktif</strong></div>
+                        </div>
+                        <div class="sales-trend-insight">
+                            <div class="sales-trend-insight-label">Rata-rata Net Sales</div>
+                            <div class="sales-trend-insight-value">{{ $fmt($trendAverageNetSales) }}</div>
+                            <div class="sales-trend-insight-meta"><span>Per hari aktif</span><strong>{{ $trendCurrentRows->count() }} hari</strong></div>
+                        </div>
                     </div>
                 </div>
             </div>
