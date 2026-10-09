@@ -305,11 +305,15 @@ class MarketplaceSalesDashboardController extends Controller
             ->sortByDesc('day')
             ->values();
 
+        // Selaraskan dengan estimasi penghasilan pada data order. Nilai legacy
+        // ini adalah sumber utama yang dipakai halaman detail order; settlement
+        // final dan income detail hanya menjadi fallback untuk order yang belum
+        // memiliki nilai estimasi tersimpan.
         $estimatedPayoutByDay = (clone $base)
             ->leftJoin('marketplace_order_settlements as payout_ms', 'payout_ms.order_id', '=', 'o.id')
             ->leftJoin('marketplace_order_income_estimates as payout_ie', 'payout_ie.marketplace_order_id', '=', 'o.id')
             ->selectRaw("DATE({$dateExpression}) as day")
-            ->selectRaw('COALESCE(SUM(COALESCE(NULLIF(payout_ms.final_income, 0), payout_ie.estimated_escrow_amount, 0)), 0) as estimated_payout')
+            ->selectRaw('COALESCE(SUM(COALESCE(NULLIF(o.net_payout_estimated, 0), NULLIF(payout_ms.final_income, 0), payout_ie.estimated_escrow_amount, 0)), 0) as estimated_payout')
             ->groupByRaw("DATE({$dateExpression})")
             ->pluck('estimated_payout', 'day')
             ->map(fn ($amount) => (float) $amount);
