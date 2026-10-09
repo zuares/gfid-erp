@@ -420,6 +420,38 @@
     .sales-dashboard .sales-daily-table .sales-compare-line { margin-top: .18rem; gap: .2rem; font-size: .52rem; }
     .sales-dashboard .sales-daily-table .sales-compare-line i { font-size: .5rem; }
     .sales-dashboard .sales-daily-table .sales-compare-line strong { font-size: .54rem; }
+    .sales-dashboard .sales-trend-section { overflow: hidden; }
+    .sales-dashboard .sales-trend-body { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(230px, .75fr); gap: .75rem; padding: 0 .85rem .85rem; }
+    .sales-dashboard .sales-trend-panel,
+    .sales-dashboard .sales-trend-insight { min-width: 0; border-radius: .75rem; background: color-mix(in srgb, var(--sales-soft) 42%, var(--sales-card) 58%); }
+    .sales-dashboard .sales-trend-panel { padding: .7rem .75rem .55rem; }
+    .sales-dashboard .sales-trend-toolbar { display: flex; align-items: center; justify-content: space-between; gap: .65rem; margin-bottom: .45rem; }
+    .sales-dashboard .sales-trend-label { color: var(--sales-muted); font-size: .61rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+    .sales-dashboard .sales-trend-select { min-width: 145px; border: 1px solid var(--sales-line); border-radius: .45rem; background: var(--sales-card); color: var(--sales-ink); padding: .28rem .45rem; font-size: .68rem; font-weight: 750; }
+    .sales-dashboard .sales-trend-total { color: var(--sales-ink); font-size: .85rem; font-weight: 850; white-space: nowrap; }
+    .sales-dashboard .sales-trend-compare { margin-left: .25rem; color: var(--sales-muted); font-size: .61rem; font-weight: 750; white-space: nowrap; }
+    .sales-dashboard .sales-trend-compare.good { color: #15803d; }
+    .sales-dashboard .sales-trend-compare.bad { color: #b91c1c; }
+    .sales-dashboard .sales-trend-chart { min-height: 215px; border-radius: .65rem; background: linear-gradient(180deg, color-mix(in srgb, var(--sales-card) 92%, var(--sales-soft) 8%), var(--sales-card)); }
+    .sales-dashboard .sales-trend-chart svg { display: block; width: 100%; height: 215px; overflow: visible; }
+    .sales-dashboard .sales-trend-chart .trend-grid { stroke: color-mix(in srgb, var(--sales-line) 75%, transparent); stroke-width: 1; vector-effect: non-scaling-stroke; }
+    .sales-dashboard .sales-trend-chart .trend-axis-label { fill: var(--sales-muted); font-size: 11px; font-weight: 700; }
+    .sales-dashboard .sales-trend-chart .trend-area { fill: color-mix(in srgb, var(--sales-accent-soft) 55%, transparent); }
+    .sales-dashboard .sales-trend-chart .trend-line { fill: none; stroke: var(--sales-accent); stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; vector-effect: non-scaling-stroke; }
+    .sales-dashboard .sales-trend-chart .trend-line.previous { stroke: var(--sales-muted); stroke-dasharray: 5 5; stroke-width: 1.8; opacity: .72; }
+    .sales-dashboard .sales-trend-chart .trend-point { fill: var(--sales-accent); stroke: var(--sales-card); stroke-width: 2; vector-effect: non-scaling-stroke; }
+    .sales-dashboard .sales-trend-chart .trend-point.previous { fill: var(--sales-muted); }
+    .sales-dashboard .sales-trend-legend { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: .35rem; color: var(--sales-muted); font-size: .61rem; font-weight: 750; }
+    .sales-dashboard .sales-trend-legend span { display: inline-flex; align-items: center; gap: .25rem; }
+    .sales-dashboard .sales-trend-legend i { width: .45rem; height: .45rem; border-radius: 50%; background: var(--sales-accent); }
+    .sales-dashboard .sales-trend-legend i.previous { background: var(--sales-muted); }
+    .sales-dashboard .sales-trend-insights { display: grid; align-content: start; gap: .45rem; }
+    .sales-dashboard .sales-trend-insight { padding: .7rem .75rem; }
+    .sales-dashboard .sales-trend-insight-label { color: var(--sales-muted); font-size: .59rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+    .sales-dashboard .sales-trend-insight-value { margin-top: .2rem; color: var(--sales-ink); font-size: .82rem; font-weight: 850; }
+    .sales-dashboard .sales-trend-insight-meta { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .15rem; color: var(--sales-muted); font-size: .61rem; font-weight: 700; }
+    .sales-dashboard .sales-trend-insight-meta strong { color: var(--sales-ink); font-weight: 850; }
+    .sales-dashboard .sales-trend-empty { padding: 2rem 1rem; color: var(--sales-muted); font-size: .72rem; text-align: center; }
     .sales-dashboard .sales-product-table { min-width: 1265px; table-layout: fixed; }
     .sales-dashboard .sales-product-table th,
     .sales-dashboard .sales-product-table td { white-space: nowrap; }
@@ -569,18 +601,23 @@
     .sales-dashboard .sales-category-summary-table td { white-space: normal; overflow-wrap: anywhere; }
     .sales-dashboard .sales-category-summary-table th { padding: .65rem .55rem; color: var(--sales-muted); font-size: .61rem; font-weight: 800; letter-spacing: .025em; vertical-align: middle; }
     .sales-dashboard .sales-category-summary-table td { padding: .62rem .55rem; font-size: .7rem; vertical-align: middle; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(1) { width: 5%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(2) { width: 20%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(1) { width: 4%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(2) { width: 15%; }
     .sales-dashboard .sales-category-summary-table th:nth-child(3),
     .sales-dashboard .sales-category-summary-table th:nth-child(4),
     .sales-dashboard .sales-category-summary-table th:nth-child(5),
-    .sales-dashboard .sales-category-summary-table th:nth-child(6) { width: 7.5%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(6) { width: 5%; }
     .sales-dashboard .sales-category-summary-table th:nth-child(7),
-    .sales-dashboard .sales-category-summary-table th:nth-child(8) { width: 5%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(9) { width: 11%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(10) { width: 11%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(11) { width: 9%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(8) { width: 4%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(9),
+    .sales-dashboard .sales-category-summary-table th:nth-child(10),
+    .sales-dashboard .sales-category-summary-table th:nth-child(11) { width: 6%; }
     .sales-dashboard .sales-category-summary-table th:nth-child(12) { width: 5%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(13),
+    .sales-dashboard .sales-category-summary-table th:nth-child(14),
+    .sales-dashboard .sales-category-summary-table th:nth-child(15) { width: 6%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(16) { width: 4%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(17) { width: 8%; }
     .sales-dashboard .sales-category-summary-table th,
     .sales-dashboard .sales-category-summary-table td { text-align: start; }
     .sales-dashboard .sales-category-summary-table tbody td:nth-child(n+3) { color: var(--sales-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -731,6 +768,9 @@
     @media (max-width: 767.98px) {
         .sales-dashboard { padding-inline: .75rem !important; }
         .sales-dashboard .sales-table { min-width: 720px; }
+        .sales-dashboard .sales-trend-body { grid-template-columns: 1fr; padding-inline: .65rem; }
+        .sales-dashboard .sales-trend-toolbar { align-items: flex-start; flex-direction: column; }
+        .sales-dashboard .sales-trend-select { width: 100%; }
         .sales-dashboard .sales-promotion-table {
             min-width: 0;
             width: 100%;
@@ -1025,6 +1065,34 @@
     $currentSalesKpi = $salesKpiMetrics($daily);
     $previousMonthSalesKpi = $salesKpiMetrics(data_get($comparisonMonthData, 'daily', []));
     $previousPeriodSalesKpi = $salesKpiMetrics(data_get($comparisonPeriodData, 'daily', []));
+    $trendRow = function ($row) {
+        $day = (string) data_get($row, 'day', '');
+
+        return [
+            'day' => $day,
+            'label' => $day !== '' ? \Carbon\Carbon::parse($day)->format('d M') : '—',
+            'net_sales' => (float) data_get($row, 'net_total', 0),
+            'estimated_payout' => (float) data_get($row, 'estimated_payout', 0),
+            'net_profit' => (float) data_get($row, 'net_profit', 0),
+            'ad_spend' => (float) data_get($row, 'ad_spend', 0),
+        ];
+    };
+    $trendCurrentRows = collect($daily)->sortBy('day')->map($trendRow)->values();
+    $trendPreviousRows = collect(data_get($activeComparison, 'data.daily', []))->sortBy('day')->map($trendRow)->values();
+    $trendPeak = $trendCurrentRows->sortByDesc(fn ($row) => $row['net_sales'])->first();
+    $trendLow = $trendCurrentRows->sortBy(fn ($row) => $row['net_sales'])->first();
+    $trendRisk = $trendCurrentRows
+        ->filter(fn ($row) => $row['net_profit'] < 0)
+        ->sortByDesc(fn ($row) => $row['ad_spend'])
+        ->first();
+    $trendRiskLabel = $trendRisk ? 'Risiko laba' : 'Iklan tertinggi';
+    $trendRisk ??= $trendCurrentRows->sortByDesc(fn ($row) => $row['ad_spend'])->first();
+    $trendComparisonLabel = $comparisonMode === 'month' ? 'Bulan lalu' : 'Periode lalu';
+    $trendPayload = [
+        'current' => $trendCurrentRows->all(),
+        'previous' => $trendPreviousRows->all(),
+        'comparison_label' => $trendComparisonLabel,
+    ];
     $previousMonthPaymentSummary = data_get($comparisonMonthData, 'paymentSummary', []);
     $previousPeriodPaymentSummary = data_get($comparisonPeriodData, 'paymentSummary', []);
     $previousMonthPaymentDaily = collect(data_get($comparisonMonthData, 'paymentDaily', []));
@@ -1067,6 +1135,7 @@
         $buyerPayment = (float) $rows->sum('buyer_payment');
         $costedProducts = $rows->filter(fn ($product) => $product->gross_profit !== null);
         $hpp = (float) $costedProducts->sum(fn ($product) => (float) ($product->hpp_total ?? ((float) ($product->hpp ?? 0) * (int) ($product->qty ?? 0))));
+        $estimatedPayout = (float) $rows->sum('estimated_payout');
         $grossProfit = (float) $costedProducts->sum('gross_profit');
         $adProducts = $rows->filter(fn ($product) => $product->ad_spend_matched ?? false);
         $adSpend = (float) $adProducts->sum('ad_spend');
@@ -1086,12 +1155,16 @@
             'sales' => $sales,
             'net_sales' => $netSales,
             'buyer_payment' => $buyerPayment,
+            'estimated_payout' => $estimatedPayout,
             'aov_sales' => $orders > 0 ? $sales / $orders : 0,
             'aov_payment' => $orders > 0 ? $buyerPayment / $orders : 0,
             'hpp' => $hpp,
+            'cogs' => $hpp,
+            'gross_profit_payout' => $estimatedPayout - $hpp,
             'gross_profit' => $grossProfit,
             'gross_margin' => $netSales > 0 ? ($grossProfit / $netSales) * 100 : null,
             'contribution_profit' => $contributionProfit,
+            'net_profit' => $estimatedPayout - $hpp - $adSpend,
             'contribution_margin' => $netSales > 0 ? ($contributionProfit / $netSales) * 100 : null,
             'hpp_coverage' => $rows->count() > 0 ? ($costedProducts->count() / $rows->count()) * 100 : 0,
             'ad_spend' => $adSpend,
@@ -1134,7 +1207,10 @@
         ['group' => 'Pendapatan', 'label' => 'AOV Penjualan', 'key' => 'aov_sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'Pembayaran Pembeli', 'key' => 'buyer_payment', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'AOV Pembayaran', 'key' => 'aov_payment', 'format' => $currencyDisplay],
-        ['group' => 'Profitabilitas & iklan', 'label' => 'Total HPP', 'key' => 'hpp', 'format' => $fmtHpp],
+        ['group' => 'Profitabilitas', 'label' => 'Estimasi Penghasilan', 'key' => 'estimated_payout', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas', 'label' => 'COGS (HPP)', 'key' => 'cogs', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas', 'label' => 'Laba Kotor', 'key' => 'gross_profit_payout', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas', 'label' => 'Laba Bersih', 'key' => 'net_profit', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Kontribusi Pasca Iklan', 'key' => 'contribution_profit', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Margin Kontribusi', 'key' => 'contribution_margin', 'format' => $percentDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
@@ -1191,6 +1267,7 @@
         $costedProducts = $rows->filter(fn ($product) => $product->gross_profit !== null);
         $adProducts = $rows->filter(fn ($product) => $product->ad_spend_matched ?? false);
         $hpp = (float) $costedProducts->sum(fn ($product) => (float) ($product->hpp_total ?? ((float) ($product->hpp ?? 0) * (int) ($product->qty ?? 0))));
+        $estimatedPayout = (float) $rows->sum('estimated_payout');
         $grossProfit = (float) $costedProducts->sum('gross_profit');
         $adSpend = (float) $adProducts->sum('ad_spend');
         $adSales = (float) $adProducts->sum('ad_sales');
@@ -1209,12 +1286,16 @@
             'sales' => $sales,
             'net_sales' => $netSales,
             'buyer_payment' => (float) $rows->sum('buyer_payment'),
+            'estimated_payout' => $estimatedPayout,
             'aov_sales' => $orders > 0 ? $sales / $orders : 0,
             'aov_payment' => $orders > 0 ? ((float) $rows->sum('buyer_payment')) / $orders : 0,
             'hpp' => $hpp,
+            'cogs' => $hpp,
+            'gross_profit_payout' => $estimatedPayout - $hpp,
             'gross_profit' => $grossProfit,
             'gross_margin' => $netSales > 0 ? ($grossProfit / $netSales) * 100 : null,
             'contribution_profit' => $contributionProfit,
+            'net_profit' => $estimatedPayout - $hpp - $adSpend,
             'contribution_margin' => $netSales > 0 ? ($contributionProfit / $netSales) * 100 : null,
             'hpp_coverage' => $rows->count() > 0 ? ($costedProducts->count() / $rows->count()) * 100 : 0,
             'ad_spend' => $adSpend,
@@ -1289,7 +1370,10 @@
         ['group' => 'Pendapatan', 'label' => 'AOV Penjualan', 'key' => 'aov_sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'Pembayaran Pembeli', 'key' => 'buyer_payment', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'AOV Pembayaran', 'key' => 'aov_payment', 'format' => $currencyDisplay],
-        ['group' => 'Profitabilitas & iklan', 'label' => 'Total HPP', 'key' => 'hpp', 'format' => $fmtHpp],
+        ['group' => 'Profitabilitas', 'label' => 'Estimasi Penghasilan', 'key' => 'estimated_payout', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas', 'label' => 'COGS (HPP)', 'key' => 'cogs', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas', 'label' => 'Laba Kotor', 'key' => 'gross_profit_payout', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas', 'label' => 'Laba Bersih', 'key' => 'net_profit', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Kontribusi Pasca Iklan', 'key' => 'contribution_profit', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Margin Kontribusi', 'key' => 'contribution_margin', 'format' => $percentDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
@@ -1670,6 +1754,60 @@
             ['group' => 'Profitabilitas', 'label' => 'Laba Bersih', 'value' => $fmt($currentSalesKpi['net_profit']), 'note' => 'laba kotor − iklan', 'icon' => 'bi-bar-chart-line', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($currentSalesKpi['net_profit'], $previousMonthSalesKpi['net_profit'], $previousPeriodSalesKpi['net_profit'], $currencyDisplay)],
         ],
     ])
+    @if ($trendCurrentRows->isNotEmpty())
+        <section class="card sales-card sales-trend-section shadow-sm mb-3" aria-labelledby="sales-trend-title">
+            <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
+                <div>
+                    <div class="sales-kicker mb-1">Analisis tren</div>
+                    <h2 id="sales-trend-title" class="sales-section-title mb-1">Tren Kinerja &amp; Anomali</h2>
+                </div>
+                <span class="badge sales-badge rounded-pill px-3 py-2">{{ $trendComparisonLabel }}</span>
+            </div>
+            <div class="sales-trend-body">
+                <div class="sales-trend-panel">
+                    <div class="sales-trend-toolbar">
+                        <div>
+                            <div class="sales-trend-label">Indikator</div>
+                            <div class="sales-trend-total" data-sales-trend-total>{{ $fmt($trendCurrentRows->sum('net_sales')) }}</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="sales-trend-compare" data-sales-trend-compare>{{ $trendComparisonLabel }}</span>
+                            <select class="sales-trend-select" data-sales-trend-metric aria-label="Pilih indikator tren">
+                                <option value="net_sales">P Bersih</option>
+                                <option value="estimated_payout">Est Penghasilan</option>
+                                <option value="net_profit">Laba Bersih</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="sales-trend-chart" data-sales-trend-chart-container>
+                        <svg viewBox="0 0 1000 260" role="img" aria-label="Grafik tren kinerja" data-sales-trend-chart></svg>
+                    </div>
+                    <div class="sales-trend-legend" aria-label="Legenda grafik">
+                        <span><i aria-hidden="true"></i>Periode berjalan</span>
+                        <span><i class="previous" aria-hidden="true"></i>{{ $trendComparisonLabel }}</span>
+                    </div>
+                </div>
+                <div class="sales-trend-insights">
+                    <div class="sales-trend-insight">
+                        <div class="sales-trend-insight-label">Puncak P Bersih</div>
+                        <div class="sales-trend-insight-value">{{ $fmt($trendPeak['net_sales']) }}</div>
+                        <div class="sales-trend-insight-meta"><span>{{ $trendPeak['label'] }}</span><strong>{{ number_format((float) $trendPeak['net_sales'] > 0 ? ((float) $trendPeak['net_sales'] / max(1, (float) $trendCurrentRows->sum('net_sales'))) * 100 : 0, 1, ',', '.') }}%</strong></div>
+                    </div>
+                    <div class="sales-trend-insight">
+                        <div class="sales-trend-insight-label">Terendah P Bersih</div>
+                        <div class="sales-trend-insight-value">{{ $fmt($trendLow['net_sales']) }}</div>
+                        <div class="sales-trend-insight-meta"><span>{{ $trendLow['label'] }}</span><strong>{{ $trendLow['net_profit'] < 0 ? 'Laba negatif' : 'Perlu dipantau' }}</strong></div>
+                    </div>
+                    <div class="sales-trend-insight">
+                        <div class="sales-trend-insight-label">{{ $trendRiskLabel }}</div>
+                        <div class="sales-trend-insight-value">{{ $trendRisk ? $fmt($trendRisk['ad_spend']) : '—' }}</div>
+                        <div class="sales-trend-insight-meta"><span>{{ $trendRisk['label'] ?? '—' }}</span><strong>{{ $trendRisk && $trendRisk['net_profit'] < 0 ? $fmt($trendRisk['net_profit']) : '—' }}</strong></div>
+                    </div>
+                </div>
+            </div>
+            <script type="application/json" id="sales-trend-data">@json($trendPayload)</script>
+        </section>
+    @endif
     <section class="card sales-card shadow-sm" aria-labelledby="daily-sales-title">
         <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
             <div>
@@ -2037,8 +2175,13 @@
                                 <th>Unit</th>
                                 <th class="text-end">Penjualan Netto</th>
                                 <th class="text-end">Pembayaran Pembeli</th>
+                                <th class="text-end">Estimasi Penghasilan</th>
+                                <th class="text-end">COGS (HPP)</th>
+                                <th class="text-end">Laba Kotor</th>
+                                <th class="text-end">Biaya Iklan</th>
                                 <th class="text-end">Penjualan Atribusi Iklan</th>
                                 <th class="text-end pe-3">ACOS</th>
+                                <th class="text-end pe-3">Laba Bersih</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -2063,11 +2206,16 @@
                                     <td data-label="Unit">{{ number_format($activeCategoryMetrics['qty']) }}</td>
                                     <td class="text-end" data-label="Penjualan Netto">{{ $fmt($activeCategoryMetrics['net_sales']) }}</td>
                                     <td class="text-end" data-label="Pembayaran Pembeli">{{ $fmt($activeCategoryMetrics['buyer_payment']) }}</td>
+                                    <td class="text-end" data-label="Estimasi Penghasilan">{{ $fmt($activeCategoryMetrics['estimated_payout']) }}</td>
+                                    <td class="text-end" data-label="COGS (HPP)">{{ $fmt($activeCategoryMetrics['cogs']) }}</td>
+                                    <td class="text-end" data-label="Laba Kotor">{{ $fmt($activeCategoryMetrics['gross_profit_payout']) }}</td>
+                                    <td class="text-end" data-label="Biaya Iklan">{{ $fmt($activeCategoryMetrics['ad_spend']) }}</td>
                                     <td class="text-end" data-label="Penjualan Atribusi Iklan">{{ $fmt($activeCategoryMetrics['ad_sales']) }}</td>
-                                    <td class="text-end pe-3" data-label="ACOS">{{ $activeCategoryMetrics['acos'] === null ? '—' : $percentDisplay($activeCategoryMetrics['acos']) }}</td>
+                                    <td class="text-end" data-label="ACOS">{{ $activeCategoryMetrics['acos'] === null ? '—' : $percentDisplay($activeCategoryMetrics['acos']) }}</td>
+                                    <td class="text-end pe-3" data-label="Laba Bersih">{{ $fmt($activeCategoryMetrics['net_profit']) }}</td>
                                 </tr>
                                 <tr id="{{ $categoryKey }}-detail" class="sales-category-comparison-detail" data-sales-category-comparison-items="{{ $categoryKey }}" hidden>
-                                    <td colspan="12">
+                                    <td colspan="17">
                                         <div class="sales-category-comparison-detail-card">
                                             <div class="sales-category-detail-header d-flex align-items-start justify-content-between gap-2 mb-2">
                                                 <div>
@@ -2944,6 +3092,120 @@
         const orderDate = document.querySelector('#sales-order-detail-date');
         const orderCount = document.querySelector('[data-sales-order-count]');
         const orderEmpty = document.querySelector('[data-sales-order-empty]');
+        const trendDataElement = document.querySelector('#sales-trend-data');
+        const trendChart = document.querySelector('[data-sales-trend-chart]');
+        const trendMetric = document.querySelector('[data-sales-trend-metric]');
+        const trendTotal = document.querySelector('[data-sales-trend-total]');
+        const trendCompare = document.querySelector('[data-sales-trend-compare]');
+
+        function escapeTrendText(value) {
+            return String(value ?? '').replace(/[&<>'"]/g, function (character) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#039;',
+                    '"': '&quot;'
+                }[character];
+            });
+        }
+
+        function formatTrendCurrency(value) {
+            return 'Rp ' + new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Math.round(Number(value) || 0));
+        }
+
+        function formatTrendAxis(value) {
+            const absolute = Math.abs(Number(value) || 0);
+            if (absolute >= 1000000000) return 'Rp ' + (value / 1000000000).toFixed(1).replace('.', ',') + ' M';
+            if (absolute >= 1000000) return 'Rp ' + (value / 1000000).toFixed(1).replace('.', ',') + ' jt';
+            if (absolute >= 1000) return 'Rp ' + (value / 1000).toFixed(1).replace('.', ',') + ' rb';
+
+            return 'Rp ' + Math.round(value);
+        }
+
+        function renderSalesTrend() {
+            if (!trendDataElement || !trendChart || !trendMetric) return;
+
+            let payload;
+            try {
+                payload = JSON.parse(trendDataElement.textContent || '{}');
+            } catch (error) {
+                return;
+            }
+
+            const metric = trendMetric.value || 'net_sales';
+            const current = Array.isArray(payload.current) ? payload.current : [];
+            const previous = Array.isArray(payload.previous) ? payload.previous : [];
+            const pointCount = Math.max(current.length, previous.length, 1);
+            const currentValues = current.map((row) => Number(row?.[metric]) || 0);
+            const previousValues = previous.map((row) => Number(row?.[metric]) || 0);
+            const allValues = currentValues.concat(previousValues);
+            const minValue = Math.min(0, ...allValues);
+            const maxValue = Math.max(0, ...allValues);
+            const valueRange = Math.max(maxValue - minValue, 1);
+            const width = 1000;
+            const height = 260;
+            const left = 88;
+            const right = 16;
+            const top = 18;
+            const bottom = 34;
+            const chartWidth = width - left - right;
+            const chartHeight = height - top - bottom;
+            const x = (index) => left + (pointCount === 1 ? chartWidth / 2 : (index / (pointCount - 1)) * chartWidth);
+            const y = (value) => top + ((maxValue - value) / valueRange) * chartHeight;
+            const makePoints = (values) => values.map((value, index) => [x(index), y(value), value]);
+            const makePath = (points) => points.map((point, index) => (index === 0 ? 'M ' : ' L ') + point[0].toFixed(2) + ' ' + point[1].toFixed(2)).join('');
+            const currentPoints = makePoints(currentValues);
+            const previousPoints = makePoints(previousValues);
+            const gridValues = [maxValue, minValue + valueRange / 2, minValue];
+            let markup = '';
+
+            gridValues.forEach(function (value) {
+                const yPosition = y(value).toFixed(2);
+                markup += '<line class="trend-grid" x1="' + left + '" x2="' + (width - right) + '" y1="' + yPosition + '" y2="' + yPosition + '"></line>';
+                markup += '<text class="trend-axis-label" x="0" y="' + (Number(yPosition) + 4) + '">' + escapeTrendText(formatTrendAxis(value)) + '</text>';
+            });
+
+            if (currentPoints.length > 1) {
+                const areaPath = makePath(currentPoints) + ' L ' + currentPoints[currentPoints.length - 1][0].toFixed(2) + ' ' + (height - bottom) + ' L ' + currentPoints[0][0].toFixed(2) + ' ' + (height - bottom) + ' Z';
+                markup += '<path class="trend-area" d="' + areaPath + '"></path>';
+            }
+            if (previousPoints.length > 1) markup += '<path class="trend-line previous" d="' + makePath(previousPoints) + '"></path>';
+            if (currentPoints.length > 1) markup += '<path class="trend-line" d="' + makePath(currentPoints) + '"></path>';
+
+            currentPoints.forEach(function (point, index) {
+                const label = current[index]?.label || '';
+                markup += '<circle class="trend-point" cx="' + point[0].toFixed(2) + '" cy="' + point[1].toFixed(2) + '" r="3.5"><title>' + escapeTrendText(label + ' · ' + formatTrendCurrency(point[2])) + '</title></circle>';
+            });
+            previousPoints.forEach(function (point, index) {
+                const label = previous[index]?.label || payload.comparison_label || '';
+                markup += '<circle class="trend-point previous" cx="' + point[0].toFixed(2) + '" cy="' + point[1].toFixed(2) + '" r="2.5"><title>' + escapeTrendText(label + ' · ' + formatTrendCurrency(point[2])) + '</title></circle>';
+            });
+
+            [0, Math.floor((pointCount - 1) / 2), pointCount - 1].filter((value, index, values) => values.indexOf(value) === index).forEach(function (index) {
+                const label = current[index]?.label || '';
+                if (label) markup += '<text class="trend-axis-label" text-anchor="middle" x="' + x(index).toFixed(2) + '" y="' + (height - 8) + '">' + escapeTrendText(label) + '</text>';
+            });
+
+            trendChart.innerHTML = markup;
+
+            const currentTotal = currentValues.reduce((total, value) => total + value, 0);
+            const previousTotal = previousValues.reduce((total, value) => total + value, 0);
+            if (trendTotal) trendTotal.textContent = formatTrendCurrency(currentTotal);
+            if (trendCompare) {
+                trendCompare.classList.remove('good', 'bad');
+                if (previous.length && previousTotal !== 0) {
+                    const delta = ((currentTotal - previousTotal) / Math.abs(previousTotal)) * 100;
+                    trendCompare.textContent = (delta >= 0 ? '↑ ' : '↓ ') + Math.abs(delta).toFixed(1).replace('.', ',') + '% vs ' + (payload.comparison_label || 'pembanding');
+                    trendCompare.classList.add(delta >= 0 ? 'good' : 'bad');
+                } else {
+                    trendCompare.textContent = previous.length ? 'Tidak ada perubahan dasar' : 'Belum ada pembanding';
+                }
+            }
+        }
+
+        renderSalesTrend();
+        if (trendMetric) trendMetric.addEventListener('change', renderSalesTrend);
 
         function activateTab(target) {
             if (!document.querySelector('[data-sales-tab="' + target + '"]')) {
