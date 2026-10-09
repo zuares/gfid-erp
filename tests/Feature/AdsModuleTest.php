@@ -1085,6 +1085,27 @@ class AdsModuleTest extends TestCase
             ->assertJsonPath('0.suggestion_source', 'SKU marketplace');
     }
 
+    public function test_grouped_item_search_falls_back_to_unlisted_internal_item()
+    {
+        $item = \App\Models\Item::create([
+            'code' => 'ITEM-UNLISTED-ADS',
+            'name' => 'Item Internal Belum Masuk Katalog',
+            'type' => 'finished',
+            'hpp' => 27500,
+            'active' => true,
+        ]);
+
+        $response = $this->actingAs($this->createUser('admin'))
+            ->getJson('/api/marketplace/items/search?q=Belum%20Masuk%20Katalog&group_products=1');
+
+        $response->assertOk()
+            ->assertJsonPath('0.id', $item->id)
+            ->assertJsonPath('0.name', 'Item Internal Belum Masuk Katalog')
+            ->assertJsonPath('0.code', 'ITEM-UNLISTED-ADS')
+            ->assertJsonPath('0.hpp', 27500)
+            ->assertJsonPath('0.hpp_source', 'item');
+    }
+
     public function test_campaign_profit_uses_average_hpp_after_product_mapping()
     {
         $store = $this->createStore('MAPAVGPROFIT');

@@ -6693,8 +6693,48 @@ class MarketplaceController extends Controller
             );
             $products = $resolver->searchProducts($q, $limit);
 
+            // Produk Bermasalah tetap harus bisa di-mapping meskipun item
+            // internal belum pernah dimasukkan ke katalog storefront. Pada
+            // kondisi itu searchProducts() memang tidak punya baris untuk
+            // dikembalikan, sehingga modal sebelumnya terlihat kosong.
+            // Gunakan item master sebagai fallback, tetapi tetap normalisasi
+            // hasilnya ke representative item + HPP level produk agar
+            // perilakunya sama dengan pilihan dari katalog.
+            $productResults = $suggestions->merge($products)
+                ->unique(fn (array $row) => (string) $row['id']);
+            $fallbackLimit = max(0, $limit - $productResults->count());
+            $fallbackItems = $fallbackLimit === 0
+                ? collect()
+                : Item::query()
+                    ->when($q !== '', function ($query) use ($q) {
+                        $query->where(function ($inner) use ($q) {
+                            $inner->where('name', 'like', "%{$q}%")
+                                ->orWhere('code', 'like', "%{$q}%");
+                        });
+                    })
+                    ->select('id', 'name', 'code', 'base_unit_cost', 'hpp')
+                    ->orderBy('name')
+                    ->limit($fallbackLimit)
+                    ->get()
+                    ->map(function (Item $item) use ($resolver) {
+                        $summary = $resolver->summary($item);
+                        $representativeId = (int) ($summary['representative_item_id'] ?: $item->id);
+
+                        return [
+                            'id' => $representativeId,
+                            'name' => $summary['product_name'] ?: $item->name,
+                            'code' => $summary['item']?->code ?: $item->code,
+                            'hpp' => round((float) $summary['hpp'], 2),
+                            'hpp_source' => $summary['hpp_source'],
+                            'variant_count' => $summary['variant_count'],
+                        ];
+                    });
+
             return response()->json(
-                $suggestions->merge($products)->unique(fn (array $row) => (string) $row['id'])->take($limit)->values()
+                $productResults->merge($fallbackItems)
+                    ->unique(fn (array $row) => (string) $row['id'])
+                    ->take($limit)
+                    ->values()
             );
         }
 
