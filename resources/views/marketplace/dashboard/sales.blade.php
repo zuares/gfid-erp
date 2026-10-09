@@ -1379,14 +1379,20 @@
     $salesComparisonMetrics = function ($rows, $data = []) use ($salesKpiMetrics) {
         $metrics = $salesKpiMetrics($rows);
         $orders = max(1, $metrics['orders']);
+        $adSpend = (float) data_get($data, 'adSpendTotal', $metrics['ad_spend']);
+        $adSales = (float) data_get($data, 'adSalesTotal', 0);
         $impressions = (int) data_get($data, 'adImpressionsTotal', 0);
         $clicks = (int) data_get($data, 'adClicksTotal', 0);
         $adOrders = (int) data_get($data, 'adOrdersTotal', 0);
+        $metrics['ad_spend'] = $adSpend;
 
         return $metrics + [
             'avg_units_per_order' => $metrics['orders'] > 0 ? (float) collect($rows)->sum(fn ($row) => (float) data_get($row, 'qty', 0)) / $orders : 0,
             'net_margin' => $metrics['net_sales'] > 0 ? ($metrics['net_profit'] / $metrics['net_sales']) * 100 : null,
-            'ad_ratio' => $metrics['net_sales'] > 0 ? ($metrics['ad_spend'] / $metrics['net_sales']) * 100 : null,
+            'ad_sales' => $adSales,
+            'acos' => $adSales > 0 ? ($adSpend / $adSales) * 100 : null,
+            'roas' => $adSpend > 0 ? $adSales / $adSpend : null,
+            'cpa' => $adOrders > 0 ? $adSpend / $adOrders : null,
             'impressions' => $impressions,
             'clicks' => $clicks,
             'ctr' => $impressions > 0 ? ($clicks / $impressions) * 100 : null,
@@ -1395,13 +1401,13 @@
     };
     $salesComparisonSources = $comparisonMode === 'month'
         ? [
-            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily, 'data' => ['adImpressionsTotal' => $adImpressionsTotal, 'adClicksTotal' => $adClicksTotal, 'adOrdersTotal' => $adOrdersTotal]],
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily, 'data' => ['adSpendTotal' => $adSpendTotal, 'adSalesTotal' => $adSalesTotal, 'adImpressionsTotal' => $adImpressionsTotal, 'adClicksTotal' => $adClicksTotal, 'adOrdersTotal' => $adOrdersTotal]],
             ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'daily' => data_get($comparisonMonthData, 'daily', []), 'data' => $comparisonMonthData],
             ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousData, 'daily', []), 'data' => $comparisonMonthPreviousData],
             ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousTwoData, 'daily', []), 'data' => $comparisonMonthPreviousTwoData],
         ]
         : [
-            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily, 'data' => ['adImpressionsTotal' => $adImpressionsTotal, 'adClicksTotal' => $adClicksTotal, 'adOrdersTotal' => $adOrdersTotal]],
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily, 'data' => ['adSpendTotal' => $adSpendTotal, 'adSalesTotal' => $adSalesTotal, 'adImpressionsTotal' => $adImpressionsTotal, 'adClicksTotal' => $adClicksTotal, 'adOrdersTotal' => $adOrdersTotal]],
             ['label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'daily' => data_get($comparisonPeriodData, 'daily', []), 'data' => $comparisonPeriodData],
             ['label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousData, 'daily', []), 'data' => $comparisonPeriodPreviousData],
             ['label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousTwoData, 'daily', []), 'data' => $comparisonPeriodPreviousTwoData],
@@ -1424,7 +1430,10 @@
         ['group' => 'Profitabilitas', 'label' => 'Laba Bersih', 'key' => 'net_profit', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas', 'label' => 'Margin Bersih', 'key' => 'net_margin', 'format' => fn ($value) => $value === null ? '—' : $percentDisplay($value)],
         ['group' => 'Iklan', 'label' => 'Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
-        ['group' => 'Iklan', 'label' => 'Iklan / Net Sales', 'key' => 'ad_ratio', 'format' => fn ($value) => $value === null ? '—' : $percentDisplay($value)],
+        ['group' => 'Iklan', 'label' => 'Sales Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
+        ['group' => 'Iklan', 'label' => 'ACOS', 'key' => 'acos', 'format' => fn ($value) => $value === null ? '—' : $percentDisplay($value)],
+        ['group' => 'Iklan', 'label' => 'ROAS', 'key' => 'roas', 'format' => fn ($value) => $value === null ? '—' : $multipleDisplay($value)],
+        ['group' => 'Iklan', 'label' => 'CPA', 'key' => 'cpa', 'format' => fn ($value) => $value === null ? '—' : $currencyDisplay($value)],
         ['group' => 'Iklan', 'label' => 'Dilihat', 'key' => 'impressions', 'format' => $numberDisplay],
         ['group' => 'Iklan', 'label' => 'Klik', 'key' => 'clicks', 'format' => $numberDisplay],
         ['group' => 'Iklan', 'label' => 'CTR', 'key' => 'ctr', 'format' => fn ($value) => $value === null ? '—' : $percentDisplay($value)],
@@ -2104,7 +2113,7 @@
                                                 : ((float) $currentValue === 0.0 ? '0,0%' : 'Baru');
                                             $comparisonDifference = (float) $currentValue - (float) $comparisonValue;
                                             $comparisonDifferencePrefix = $comparisonDifference > 0 ? '+' : ($comparisonDifference < 0 ? '−' : '±');
-                                            $comparisonDifferenceValue = in_array($row['key'], ['net_margin', 'ad_ratio'], true)
+                                            $comparisonDifferenceValue = in_array($row['key'], ['net_margin', 'acos', 'ctr', 'cvr'], true)
                                                 ? number_format(abs($comparisonDifference), 1, ',', '.').' pt'
                                                 : $row['format'](abs($comparisonDifference));
                                             $comparisonDifferenceLabel = '('.$comparisonDifferencePrefix.$comparisonDifferenceValue.')';
