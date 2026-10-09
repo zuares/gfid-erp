@@ -385,24 +385,37 @@
     .sales-dashboard .sales-product-item-index { padding-left: .5rem !important; text-align: center; }
     .sales-dashboard .sales-product-item-number { display: inline-block; transform: translateX(.65rem); }
     .sales-dashboard .sales-daily-table { width: 100%; min-width: 0; table-layout: fixed; }
+    .sales-dashboard .sales-daily-col-toggle { width: 3.5rem; }
+    .sales-dashboard .sales-daily-col-date { width: 9%; }
+    .sales-dashboard .sales-daily-col-count { width: 6%; }
+    .sales-dashboard .sales-daily-col-units { width: 6%; }
+    .sales-dashboard .sales-daily-col-unit-order { width: 6%; }
+    .sales-dashboard .sales-daily-col-metric { width: auto; }
     .sales-dashboard .sales-daily-table th,
     .sales-dashboard .sales-daily-table td { padding: .42rem .24rem; }
     .sales-dashboard .sales-daily-table th { font-size: clamp(.5rem, .1vw + .47rem, .62rem); line-height: 1.12; white-space: normal; overflow-wrap: anywhere; }
     .sales-dashboard .sales-daily-table td { font-size: clamp(.58rem, .12vw + .54rem, .68rem); white-space: normal; overflow-wrap: anywhere; }
     .sales-dashboard .sales-daily-table .sales-table-metric { white-space: nowrap; }
     .sales-dashboard .sales-daily-table .sales-table-metric .small { font-size: clamp(.46rem, .08vw + .43rem, .56rem); line-height: 1.15; }
-    .sales-dashboard .sales-daily-toggle { display: inline-flex; width: 1.65rem; height: 1.65rem; align-items: center; justify-content: center; border: 1px solid var(--sales-line); border-radius: 50%; background: var(--sales-card); color: var(--sales-muted); padding: 0; transition: background-color .16s ease, color .16s ease, border-color .16s ease; }
+    .sales-dashboard .sales-daily-toggle { display: inline-flex; width: 1.65rem; height: 1.65rem; align-items: center; justify-content: center; border: 1px solid var(--sales-line); border-radius: 50%; background: var(--sales-card); color: var(--sales-muted); padding: 0; transition: background-color .16s ease, color .16s ease, border-color .16s ease, transform .16s ease; }
     .sales-dashboard .sales-daily-toggle:hover,
     .sales-dashboard .sales-daily-toggle:focus-visible { border-color: var(--sales-accent); background: var(--sales-accent-soft); color: var(--sales-accent); outline: none; }
     .sales-dashboard .sales-daily-toggle i { transition: transform .16s ease; }
     .sales-dashboard .sales-daily-toggle[aria-expanded="true"] { border-color: var(--sales-accent); background: var(--sales-accent-soft); color: var(--sales-accent); }
     .sales-dashboard .sales-daily-toggle[aria-expanded="true"] i { transform: rotate(90deg); }
-    .sales-dashboard .sales-daily-store-detail > td { background: color-mix(in srgb, var(--sales-accent-soft) 24%, var(--sales-card) 76%); border-top: 0; padding: .45rem .5rem .6rem; }
+    .sales-dashboard .sales-daily-row > td { vertical-align: middle; }
+    .sales-dashboard .sales-daily-row--expanded > td { background: color-mix(in srgb, var(--sales-accent-soft) 22%, var(--sales-card) 78%); }
+    .sales-dashboard .sales-daily-store-detail > td { background: color-mix(in srgb, var(--sales-accent-soft) 18%, var(--sales-card) 82%); border-top: 0; padding: 0; }
+    .sales-dashboard .sales-daily-store-shell { padding: .42rem 0 .5rem; }
     .sales-dashboard .sales-daily-store-table { width: 100%; min-width: 0; table-layout: fixed; margin: 0; }
-    .sales-dashboard .sales-daily-store-table th,
-    .sales-dashboard .sales-daily-store-table td { padding: .38rem .24rem; }
-    .sales-dashboard .sales-daily-store-table th { font-size: clamp(.47rem, .09vw + .44rem, .58rem); line-height: 1.12; white-space: normal; overflow-wrap: anywhere; }
-    .sales-dashboard .sales-daily-store-table td { font-size: clamp(.56rem, .11vw + .52rem, .65rem); white-space: normal; overflow-wrap: anywhere; }
+    .sales-dashboard .sales-daily-store-table td { padding: .42rem .24rem; border-top: 1px solid color-mix(in srgb, var(--sales-line) 72%, transparent); font-size: clamp(.56rem, .11vw + .52rem, .65rem); white-space: normal; overflow-wrap: anywhere; }
+    .sales-dashboard .sales-daily-store-table tbody tr:first-child td { border-top: 0; }
+    .sales-dashboard .sales-daily-store-table tbody tr:hover td { background: color-mix(in srgb, var(--sales-accent-soft) 30%, var(--sales-card) 70%); }
+    .sales-dashboard .sales-daily-store-spacer { padding-inline: 0 !important; }
+    .sales-dashboard .sales-daily-store-name { overflow: hidden; color: var(--sales-ink); font-weight: 750; white-space: nowrap; text-overflow: ellipsis; }
+    .sales-dashboard .sales-daily-store-name-inner { display: inline-flex; max-width: 100%; align-items: center; gap: .28rem; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+    .sales-dashboard .sales-daily-store-name-inner i { flex: 0 0 auto; color: var(--sales-accent); font-size: .7rem; }
+    .sales-dashboard .sales-daily-store-name-inner span { overflow: hidden; text-overflow: ellipsis; }
     .sales-dashboard .sales-daily-store-table .sales-table-metric { white-space: nowrap; }
     .sales-dashboard .sales-daily-store-table .sales-table-metric .small { font-size: clamp(.44rem, .07vw + .41rem, .53rem); line-height: 1.15; }
     .sales-dashboard .sales-daily-table .sales-compare-line { margin-top: .18rem; gap: .2rem; font-size: .52rem; }
@@ -1666,6 +1679,16 @@
         @else
             <div class="table-responsive">
                 <table class="table table-sm table-hover align-middle sales-table sales-daily-table">
+                    <colgroup>
+                        <col class="sales-daily-col-toggle">
+                        <col class="sales-daily-col-date">
+                        <col class="sales-daily-col-count">
+                        <col class="sales-daily-col-units">
+                        <col class="sales-daily-col-unit-order">
+                        @for ($metricColumn = 0; $metricColumn < 8; $metricColumn++)
+                            <col class="sales-daily-col-metric">
+                        @endfor
+                    </colgroup>
                     <thead>
                         <tr>
                             <th scope="col" class="sales-index-column"><i class="bi bi-chevron-right" aria-hidden="true"></i><span class="visually-hidden">Rincian toko</span></th>
@@ -1691,7 +1714,7 @@
                                 $dailyOrders = (int) ($row->orders ?? 0);
                                 $dailyAov = fn ($value) => $dailyOrders > 0 ? $fmt((float) $value / $dailyOrders) : '—';
                             @endphp
-                            <tr>
+                            <tr class="sales-daily-row">
                                 <td class="sales-index-cell">
                                     <button type="button" class="sales-daily-toggle" data-sales-store-toggle="{{ $row->day }}" aria-expanded="false" aria-controls="sales-store-detail-{{ $row->day }}" aria-label="Buka rincian toko {{ $dateLabel($row->day) }}">
                                         <i class="bi bi-chevron-right" aria-hidden="true"></i>
@@ -1716,15 +1739,29 @@
                                     @if ($storeRows->isEmpty())
                                         <div class="small text-muted text-center py-2">Belum ada rincian toko.</div>
                                     @else
-                                        <table class="table table-sm align-middle sales-table sales-daily-store-table">
-                                            <tbody>
-                                                @foreach ($storeRows as $storeRow)
-                                                    @php
-                                                        $storeOrders = (int) ($storeRow->orders ?? 0);
-                                                        $storeAov = fn ($value) => $storeOrders > 0 ? $fmt((float) $value / $storeOrders) : '—';
-                                                    @endphp
-                                                    <tr>
-                                                        <td class="fw-semibold">{{ $storeRow->store_name }}</td>
+                                        <div class="sales-daily-store-shell">
+                                            <table class="table table-sm align-middle sales-table sales-daily-store-table">
+                                                <colgroup>
+                                                    <col class="sales-daily-col-toggle">
+                                                    <col class="sales-daily-col-date">
+                                                    <col class="sales-daily-col-count">
+                                                    <col class="sales-daily-col-units">
+                                                    <col class="sales-daily-col-unit-order">
+                                                    @for ($metricColumn = 0; $metricColumn < 8; $metricColumn++)
+                                                        <col class="sales-daily-col-metric">
+                                                    @endfor
+                                                </colgroup>
+                                                <tbody>
+                                                    @foreach ($storeRows as $storeRow)
+                                                        @php
+                                                            $storeOrders = (int) ($storeRow->orders ?? 0);
+                                                            $storeAov = fn ($value) => $storeOrders > 0 ? $fmt((float) $value / $storeOrders) : '—';
+                                                        @endphp
+                                                        <tr>
+                                                        <td class="sales-daily-store-spacer" aria-hidden="true"></td>
+                                                        <td class="sales-daily-store-name" title="{{ $storeRow->store_name }}">
+                                                            <span class="sales-daily-store-name-inner"><i class="bi bi-shop" aria-hidden="true"></i><span>{{ $storeRow->store_name }}</span></span>
+                                                        </td>
                                                         <td class="text-end">{{ number_format($storeRow->orders) }}</td>
                                                         <td class="text-end">{{ number_format($storeRow->qty) }}</td>
                                                         <td class="text-end">{{ number_format($storeRow->avg_units_per_order, 2, ',', '.') }}</td>
@@ -1736,10 +1773,11 @@
                                                         <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($storeRow->gross_profit) }}</div><div class="small text-muted">({{ $storeAov($storeRow->gross_profit) }})</div></td>
                                                         <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->ad_spend) }}</div><div class="small text-muted">({{ $storeAov($storeRow->ad_spend) }})</div></td>
                                                         <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($storeRow->net_profit) }}</div><div class="small text-muted">({{ $storeAov($storeRow->net_profit) }})</div></td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     @endif
                                 </td>
                             </tr>
@@ -2983,6 +3021,8 @@
                 const nextExpanded = !expanded;
                 trigger.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false');
                 trigger.setAttribute('aria-label', (nextExpanded ? 'Tutup' : 'Buka') + ' rincian toko ' + (trigger.dataset.salesStoreToggle || ''));
+                const summaryRow = trigger.closest('.sales-daily-row');
+                if (summaryRow) summaryRow.classList.toggle('sales-daily-row--expanded', nextExpanded);
                 if (detail) detail.hidden = !nextExpanded;
             });
         });
