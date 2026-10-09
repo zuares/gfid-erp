@@ -2495,6 +2495,13 @@
                 ];
                 $dailyPreviousRows = collect(data_get($activeComparison, 'data.daily', []))->sortBy('day')->values();
                 $dailyPreviousPaymentRows = collect(data_get($activeComparison, 'data.paymentDaily', []))->sortBy('day')->values();
+                $dailyPreviousStoreRowsByDate = collect(data_get($activeComparison, 'data.storeDaily', []))
+                    ->mapWithKeys(fn ($rows, $day) => [(string) $day => collect($rows)->keyBy(fn ($storeRow) => (string) data_get($storeRow, 'store_id'))]);
+                $dailyPreviousStoreRowsByCalendarDay = collect(data_get($activeComparison, 'data.storeDaily', []))
+                    ->filter(fn ($rows, $day) => $day)
+                    ->mapWithKeys(fn ($rows, $day) => [
+                        (string) \Carbon\Carbon::parse($day)->day => collect($rows)->keyBy(fn ($storeRow) => (string) data_get($storeRow, 'store_id')),
+                    ]);
                 $dailyComparisonByDate = $dailyPreviousRows->filter(fn ($row) => data_get($row, 'day'))->keyBy(fn ($row) => (string) data_get($row, 'day'));
                 $dailyComparisonByCalendarDay = $dailyPreviousRows
                     ->filter(fn ($row) => data_get($row, 'day'))
@@ -2517,6 +2524,19 @@
                     'net_profit' => 0,
                 ];
                 $dailyZeroPaymentComparisonRow = ['buyer_paid' => 0];
+                $dailyZeroStoreComparisonRow = [
+                    'orders' => 0,
+                    'qty' => 0,
+                    'avg_units_per_order' => 0,
+                    'subtotal' => 0,
+                    'net_total' => 0,
+                    'buyer_paid' => 0,
+                    'estimated_payout' => 0,
+                    'cogs' => 0,
+                    'gross_profit' => 0,
+                    'ad_spend' => 0,
+                    'net_profit' => 0,
+                ];
                 $resolveDailyComparisonRow = function ($currentRow, $byDate, $byCalendarDay, $zeroRow) use ($activeComparison, $comparisonMode, $filters) {
                     $currentDate = \Carbon\Carbon::parse(data_get($currentRow, 'day'));
                     if (! $activeComparison) {
@@ -2535,6 +2555,27 @@
                     }
 
                     return $comparisonRow ?? $zeroRow;
+                };
+                $resolveStoreDailyComparisonRow = function ($currentRow) use ($activeComparison, $comparisonMode, $filters, $dailyPreviousStoreRowsByDate, $dailyPreviousStoreRowsByCalendarDay, $dailyZeroStoreComparisonRow) {
+                    if (! $activeComparison) {
+                        return null;
+                    }
+
+                    $currentDate = \Carbon\Carbon::parse(data_get($currentRow, 'day'));
+                    if ($comparisonMode === 'month') {
+                        $comparisonRows = $dailyPreviousStoreRowsByCalendarDay->get((string) $currentDate->day, collect());
+                    } else {
+                        $activeFrom = data_get($activeComparison, 'from');
+                        $currentFrom = data_get($filters, 'date_from');
+                        $comparisonDate = $activeFrom && $currentFrom
+                            ? \Carbon\Carbon::parse($activeFrom)->addDays(\Carbon\Carbon::parse($currentFrom)->diffInDays($currentDate))->toDateString()
+                            : null;
+                        $comparisonRows = $comparisonDate
+                            ? $dailyPreviousStoreRowsByDate->get($comparisonDate, collect())
+                            : collect();
+                    }
+
+                    return $comparisonRows->get((string) data_get($currentRow, 'store_id')) ?? $dailyZeroStoreComparisonRow;
                 };
                 $dailyComparisonByDay = collect($daily)->sortBy('day')->mapWithKeys(function ($currentRow) use ($resolveDailyComparisonRow, $dailyComparisonByDate, $dailyComparisonByCalendarDay, $dailyZeroComparisonRow, $dailyPreviousPaymentByDate, $dailyPreviousPaymentByCalendarDay, $dailyZeroPaymentComparisonRow) {
                     return [(string) data_get($currentRow, 'day') => [
@@ -2561,13 +2602,13 @@
                             ? fn ($value) => number_format((float) $value, 2, ',', '.')
                             : fn ($value) => $fmt((float) $value));
                     $differencePrefix = $difference > 0 ? '+' : ($difference < 0 ? '−' : '±');
-                    $comparisonTitle = $comparisonModeLabel.': '.$previousFormatter($previous);
+                    $comparisonTitle = 'Selisih: '.$differencePrefix.$differenceFormatter($difference);
                     $positiveTone = $lowerIsBetter ? 'is-down' : 'is-up';
                     $negativeTone = $lowerIsBetter ? 'is-up' : 'is-down';
                     if ($previous === 0.0) {
                         return $current === 0.0
-                            ? ['icon' => 'bi-arrow-left-right', 'label' => '0,0%', 'difference' => '('.$differencePrefix.$differenceFormatter($difference).')', 'title' => $comparisonTitle, 'tone' => 'is-neutral']
-                            : ['icon' => 'bi-arrow-up-right', 'label' => 'Baru', 'difference' => '('.$differencePrefix.$differenceFormatter($difference).')', 'title' => $comparisonTitle, 'tone' => $positiveTone];
+                            ? ['icon' => 'bi-arrow-left-right', 'label' => '0,0%', 'difference' => '('.$differencePrefix.$differenceFormatter($difference).')', 'baseline' => $previousFormatter($previous), 'title' => $comparisonTitle, 'tone' => 'is-neutral']
+                            : ['icon' => 'bi-arrow-up-right', 'label' => 'Baru', 'difference' => '('.$differencePrefix.$differenceFormatter($difference).')', 'baseline' => $previousFormatter($previous), 'title' => $comparisonTitle, 'tone' => $positiveTone];
                     }
 
                     $delta = (($current - $previous) / abs($previous)) * 100;
@@ -2576,6 +2617,7 @@
                         'icon' => $delta > 0 ? 'bi-arrow-up-right' : ($delta < 0 ? 'bi-arrow-down-right' : 'bi-arrow-left-right'),
                         'label' => ($delta > 0 ? '+' : ($delta < 0 ? '−' : '±')).number_format(abs($delta), 1, ',', '.').'%',
                         'difference' => '('.$differencePrefix.$differenceFormatter($difference).')',
+                        'baseline' => $previousFormatter($previous),
                         'title' => $comparisonTitle,
                         'tone' => $delta > 0 ? $positiveTone : ($delta < 0 ? $negativeTone : 'is-neutral'),
                     ];
@@ -2708,17 +2750,17 @@
                                     </button>
                                 </td>
                                 <td><button class="sales-date-link" type="button" data-sales-order-detail-date="{{ $row->day }}">{{ $dateLabel($row->day) }}</button></td>
-                                <td class="text-end">{{ number_format($row->orders) }}@if ($dailyChanges['orders'])<div class="sales-compare-line {{ $dailyChanges['orders']['tone'] }}" title="{{ $dailyChanges['orders']['title'] }}"><i class="bi {{ $dailyChanges['orders']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['orders']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end">{{ number_format($row->qty) }}@if ($dailyChanges['qty'])<div class="sales-compare-line {{ $dailyChanges['qty']['tone'] }}" title="{{ $dailyChanges['qty']['title'] }}"><i class="bi {{ $dailyChanges['qty']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['qty']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end">{{ number_format($row->avg_units_per_order, 2, ',', '.') }}@if ($dailyChanges['avg_units_per_order'])<div class="sales-compare-line {{ $dailyChanges['avg_units_per_order']['tone'] }}" title="{{ $dailyChanges['avg_units_per_order']['title'] }}"><i class="bi {{ $dailyChanges['avg_units_per_order']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['avg_units_per_order']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->subtotal) }}</div><div class="small text-muted">({{ $dailyAov($row->subtotal) }})</div>@if ($dailyChanges['subtotal'])<div class="sales-compare-line {{ $dailyChanges['subtotal']['tone'] }}" title="{{ $dailyChanges['subtotal']['title'] }}"><i class="bi {{ $dailyChanges['subtotal']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['subtotal']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->net_total) }}</div><div class="small text-muted">({{ $dailyAov($row->net_total) }})</div>@if ($dailyChanges['net_total'])<div class="sales-compare-line {{ $dailyChanges['net_total']['tone'] }}" title="{{ $dailyChanges['net_total']['title'] }}"><i class="bi {{ $dailyChanges['net_total']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['net_total']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($dailyBuyerPaid) }}</div><div class="small text-muted">({{ $dailyAov($dailyBuyerPaid) }})</div>@if ($dailyChanges['buyer_paid'])<div class="sales-compare-line {{ $dailyChanges['buyer_paid']['tone'] }}" title="{{ $dailyChanges['buyer_paid']['title'] }}"><i class="bi {{ $dailyChanges['buyer_paid']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['buyer_paid']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->estimated_payout) }}</div><div class="small text-muted">({{ $dailyAov($row->estimated_payout) }})</div>@if ($dailyChanges['estimated_payout'])<div class="sales-compare-line {{ $dailyChanges['estimated_payout']['tone'] }}" title="{{ $dailyChanges['estimated_payout']['title'] }}"><i class="bi {{ $dailyChanges['estimated_payout']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['estimated_payout']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->cogs) }}</div><div class="small text-muted">({{ $dailyAov($row->cogs) }})</div>@if ($dailyChanges['cogs'])<div class="sales-compare-line {{ $dailyChanges['cogs']['tone'] }}" title="{{ $dailyChanges['cogs']['title'] }}"><i class="bi {{ $dailyChanges['cogs']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['cogs']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($row->gross_profit) }}</div><div class="small text-muted">({{ $dailyAov($row->gross_profit) }})</div>@if ($dailyChanges['gross_profit'])<div class="sales-compare-line {{ $dailyChanges['gross_profit']['tone'] }}" title="{{ $dailyChanges['gross_profit']['title'] }}"><i class="bi {{ $dailyChanges['gross_profit']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['gross_profit']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->ad_spend) }}</div><div class="small text-muted">({{ $dailyAov($row->ad_spend) }})</div>@if ($dailyChanges['ad_spend'])<div class="sales-compare-line {{ $dailyChanges['ad_spend']['tone'] }}" title="{{ $dailyChanges['ad_spend']['title'] }}"><i class="bi {{ $dailyChanges['ad_spend']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['ad_spend']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($row->net_profit) }}</div><div class="small text-muted">({{ $dailyAov($row->net_profit) }})</div>@if ($dailyChanges['net_profit'])<div class="sales-compare-line {{ $dailyChanges['net_profit']['tone'] }}" title="{{ $dailyChanges['net_profit']['title'] }}"><i class="bi {{ $dailyChanges['net_profit']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['net_profit']['label'] }}</strong></div>@endif</td>
+                                <td class="text-end">{{ number_format($row->orders) }}@if ($dailyChanges['orders'])<div class="sales-compare-line {{ $dailyChanges['orders']['tone'] }}" title="{{ $dailyChanges['orders']['title'] }}"><i class="bi {{ $dailyChanges['orders']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['orders']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['orders']['baseline'] }}</span></div>@endif</td>
+                                <td class="text-end">{{ number_format($row->qty) }}@if ($dailyChanges['qty'])<div class="sales-compare-line {{ $dailyChanges['qty']['tone'] }}" title="{{ $dailyChanges['qty']['title'] }}"><i class="bi {{ $dailyChanges['qty']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['qty']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['qty']['baseline'] }}</span></div>@endif</td>
+                                <td class="text-end">{{ number_format($row->avg_units_per_order, 2, ',', '.') }}@if ($dailyChanges['avg_units_per_order'])<div class="sales-compare-line {{ $dailyChanges['avg_units_per_order']['tone'] }}" title="{{ $dailyChanges['avg_units_per_order']['title'] }}"><i class="bi {{ $dailyChanges['avg_units_per_order']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['avg_units_per_order']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['avg_units_per_order']['baseline'] }}</span></div>@endif</td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->subtotal) }}</div><div class="small text-muted">({{ $dailyAov($row->subtotal) }})</div>@if ($dailyChanges['subtotal'])<div class="sales-compare-line {{ $dailyChanges['subtotal']['tone'] }}" title="{{ $dailyChanges['subtotal']['title'] }}"><i class="bi {{ $dailyChanges['subtotal']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['subtotal']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['subtotal']['baseline'] }}</span></div>@endif</td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->net_total) }}</div><div class="small text-muted">({{ $dailyAov($row->net_total) }})</div>@if ($dailyChanges['net_total'])<div class="sales-compare-line {{ $dailyChanges['net_total']['tone'] }}" title="{{ $dailyChanges['net_total']['title'] }}"><i class="bi {{ $dailyChanges['net_total']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['net_total']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['net_total']['baseline'] }}</span></div>@endif</td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($dailyBuyerPaid) }}</div><div class="small text-muted">({{ $dailyAov($dailyBuyerPaid) }})</div>@if ($dailyChanges['buyer_paid'])<div class="sales-compare-line {{ $dailyChanges['buyer_paid']['tone'] }}" title="{{ $dailyChanges['buyer_paid']['title'] }}"><i class="bi {{ $dailyChanges['buyer_paid']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['buyer_paid']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['buyer_paid']['baseline'] }}</span></div>@endif</td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->estimated_payout) }}</div><div class="small text-muted">({{ $dailyAov($row->estimated_payout) }})</div>@if ($dailyChanges['estimated_payout'])<div class="sales-compare-line {{ $dailyChanges['estimated_payout']['tone'] }}" title="{{ $dailyChanges['estimated_payout']['title'] }}"><i class="bi {{ $dailyChanges['estimated_payout']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['estimated_payout']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['estimated_payout']['baseline'] }}</span></div>@endif</td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->cogs) }}</div><div class="small text-muted">({{ $dailyAov($row->cogs) }})</div>@if ($dailyChanges['cogs'])<div class="sales-compare-line {{ $dailyChanges['cogs']['tone'] }}" title="{{ $dailyChanges['cogs']['title'] }}"><i class="bi {{ $dailyChanges['cogs']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['cogs']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['cogs']['baseline'] }}</span></div>@endif</td>
+                                <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($row->gross_profit) }}</div><div class="small text-muted">({{ $dailyAov($row->gross_profit) }})</div>@if ($dailyChanges['gross_profit'])<div class="sales-compare-line {{ $dailyChanges['gross_profit']['tone'] }}" title="{{ $dailyChanges['gross_profit']['title'] }}"><i class="bi {{ $dailyChanges['gross_profit']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['gross_profit']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['gross_profit']['baseline'] }}</span></div>@endif</td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->ad_spend) }}</div><div class="small text-muted">({{ $dailyAov($row->ad_spend) }})</div>@if ($dailyChanges['ad_spend'])<div class="sales-compare-line {{ $dailyChanges['ad_spend']['tone'] }}" title="{{ $dailyChanges['ad_spend']['title'] }}"><i class="bi {{ $dailyChanges['ad_spend']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['ad_spend']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['ad_spend']['baseline'] }}</span></div>@endif</td>
+                                <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($row->net_profit) }}</div><div class="small text-muted">({{ $dailyAov($row->net_profit) }})</div>@if ($dailyChanges['net_profit'])<div class="sales-compare-line {{ $dailyChanges['net_profit']['tone'] }}" title="{{ $dailyChanges['net_profit']['title'] }}"><i class="bi {{ $dailyChanges['net_profit']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['net_profit']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['net_profit']['baseline'] }}</span></div>@endif</td>
                             </tr>
                             <tr id="sales-store-detail-{{ $row->day }}" class="sales-daily-store-detail" data-sales-store-items="{{ $row->day }}" hidden>
                                 <td colspan="13">
@@ -2743,23 +2785,37 @@
                                                         @php
                                                             $storeOrders = (int) ($storeRow->orders ?? 0);
                                                             $storeAov = fn ($value) => $storeOrders > 0 ? $fmt((float) $value / $storeOrders) : '—';
+                                                            $storePrevious = $resolveStoreDailyComparisonRow($storeRow);
+                                                            $storeChanges = [
+                                                                'orders' => $dailyChange($storeOrders, data_get($storePrevious, 'orders'), 'number'),
+                                                                'qty' => $dailyChange($storeRow->qty, data_get($storePrevious, 'qty'), 'number'),
+                                                                'avg_units_per_order' => $dailyChange($storeRow->avg_units_per_order, data_get($storePrevious, 'avg_units_per_order'), 'decimal'),
+                                                                'subtotal' => $dailyChange($storeRow->subtotal, data_get($storePrevious, 'subtotal')),
+                                                                'net_total' => $dailyChange($storeRow->net_total, data_get($storePrevious, 'net_total')),
+                                                                'buyer_paid' => $dailyChange($storeRow->buyer_paid, data_get($storePrevious, 'buyer_paid')),
+                                                                'estimated_payout' => $dailyChange($storeRow->estimated_payout, data_get($storePrevious, 'estimated_payout')),
+                                                                'cogs' => $dailyChange($storeRow->cogs, data_get($storePrevious, 'cogs')),
+                                                                'gross_profit' => $dailyChange($storeRow->gross_profit, data_get($storePrevious, 'gross_profit')),
+                                                                'ad_spend' => $dailyChange($storeRow->ad_spend, data_get($storePrevious, 'ad_spend'), 'currency', true),
+                                                                'net_profit' => $dailyChange($storeRow->net_profit, data_get($storePrevious, 'net_profit')),
+                                                            ];
                                                         @endphp
                                                         <tr>
                                                         <td class="sales-daily-store-spacer" aria-hidden="true"></td>
                                                         <td class="sales-daily-store-name" title="{{ $storeRow->store_name }}">
                                                             <span class="sales-daily-store-name-inner"><i class="bi bi-shop" aria-hidden="true"></i><span>{{ $storeRow->store_name }}</span></span>
                                                         </td>
-                                                        <td class="text-end">{{ number_format($storeRow->orders) }}</td>
-                                                        <td class="text-end">{{ number_format($storeRow->qty) }}</td>
-                                                        <td class="text-end">{{ number_format($storeRow->avg_units_per_order, 2, ',', '.') }}</td>
-                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->subtotal) }}</div><div class="small text-muted">({{ $storeAov($storeRow->subtotal) }})</div></td>
-                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->net_total) }}</div><div class="small text-muted">({{ $storeAov($storeRow->net_total) }})</div></td>
-                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->buyer_paid) }}</div><div class="small text-muted">({{ $storeAov($storeRow->buyer_paid) }})</div></td>
-                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->estimated_payout) }}</div><div class="small text-muted">({{ $storeAov($storeRow->estimated_payout) }})</div></td>
-                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->cogs) }}</div><div class="small text-muted">({{ $storeAov($storeRow->cogs) }})</div></td>
-                                                        <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($storeRow->gross_profit) }}</div><div class="small text-muted">({{ $storeAov($storeRow->gross_profit) }})</div></td>
-                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->ad_spend) }}</div><div class="small text-muted">({{ $storeAov($storeRow->ad_spend) }})</div></td>
-                                                        <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($storeRow->net_profit) }}</div><div class="small text-muted">({{ $storeAov($storeRow->net_profit) }})</div></td>
+                                                        <td class="text-end">{{ number_format($storeRow->orders) }}@if ($storeChanges['orders'])<div class="sales-compare-line {{ $storeChanges['orders']['tone'] }}" title="{{ $storeChanges['orders']['title'] }}"><i class="bi {{ $storeChanges['orders']['icon'] }}" aria-hidden="true"></i><strong>{{ $storeChanges['orders']['label'] }}</strong><span class="sales-compare-amount">{{ $storeChanges['orders']['baseline'] }}</span></div>@endif</td>
+                                                        <td class="text-end">{{ number_format($storeRow->qty) }}@if ($storeChanges['qty'])<div class="sales-compare-line {{ $storeChanges['qty']['tone'] }}" title="{{ $storeChanges['qty']['title'] }}"><i class="bi {{ $storeChanges['qty']['icon'] }}" aria-hidden="true"></i><strong>{{ $storeChanges['qty']['label'] }}</strong><span class="sales-compare-amount">{{ $storeChanges['qty']['baseline'] }}</span></div>@endif</td>
+                                                        <td class="text-end">{{ number_format($storeRow->avg_units_per_order, 2, ',', '.') }}@if ($storeChanges['avg_units_per_order'])<div class="sales-compare-line {{ $storeChanges['avg_units_per_order']['tone'] }}" title="{{ $storeChanges['avg_units_per_order']['title'] }}"><i class="bi {{ $storeChanges['avg_units_per_order']['icon'] }}" aria-hidden="true"></i><strong>{{ $storeChanges['avg_units_per_order']['label'] }}</strong><span class="sales-compare-amount">{{ $storeChanges['avg_units_per_order']['baseline'] }}</span></div>@endif</td>
+                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->subtotal) }}</div><div class="small text-muted">({{ $storeAov($storeRow->subtotal) }})</div>@if ($storeChanges['subtotal'])<div class="sales-compare-line {{ $storeChanges['subtotal']['tone'] }}" title="{{ $storeChanges['subtotal']['title'] }}"><i class="bi {{ $storeChanges['subtotal']['icon'] }}" aria-hidden="true"></i><strong>{{ $storeChanges['subtotal']['label'] }}</strong><span class="sales-compare-amount">{{ $storeChanges['subtotal']['baseline'] }}</span></div>@endif</td>
+                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->net_total) }}</div><div class="small text-muted">({{ $storeAov($storeRow->net_total) }})</div>@if ($storeChanges['net_total'])<div class="sales-compare-line {{ $storeChanges['net_total']['tone'] }}" title="{{ $storeChanges['net_total']['title'] }}"><i class="bi {{ $storeChanges['net_total']['icon'] }}" aria-hidden="true"></i><strong>{{ $storeChanges['net_total']['label'] }}</strong><span class="sales-compare-amount">{{ $storeChanges['net_total']['baseline'] }}</span></div>@endif</td>
+                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->buyer_paid) }}</div><div class="small text-muted">({{ $storeAov($storeRow->buyer_paid) }})</div>@if ($storeChanges['buyer_paid'])<div class="sales-compare-line {{ $storeChanges['buyer_paid']['tone'] }}" title="{{ $storeChanges['buyer_paid']['title'] }}"><i class="bi {{ $storeChanges['buyer_paid']['icon'] }}" aria-hidden="true"></i><strong>{{ $storeChanges['buyer_paid']['label'] }}</strong><span class="sales-compare-amount">{{ $storeChanges['buyer_paid']['baseline'] }}</span></div>@endif</td>
+                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->estimated_payout) }}</div><div class="small text-muted">({{ $storeAov($storeRow->estimated_payout) }})</div>@if ($storeChanges['estimated_payout'])<div class="sales-compare-line {{ $storeChanges['estimated_payout']['tone'] }}" title="{{ $storeChanges['estimated_payout']['title'] }}"><i class="bi {{ $storeChanges['estimated_payout']['icon'] }}" aria-hidden="true"></i><strong>{{ $storeChanges['estimated_payout']['label'] }}</strong><span class="sales-compare-amount">{{ $storeChanges['estimated_payout']['baseline'] }}</span></div>@endif</td>
+                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->cogs) }}</div><div class="small text-muted">({{ $storeAov($storeRow->cogs) }})</div>@if ($storeChanges['cogs'])<div class="sales-compare-line {{ $storeChanges['cogs']['tone'] }}" title="{{ $storeChanges['cogs']['title'] }}"><i class="bi {{ $storeChanges['cogs']['icon'] }}" aria-hidden="true"></i><strong>{{ $storeChanges['cogs']['label'] }}</strong><span class="sales-compare-amount">{{ $storeChanges['cogs']['baseline'] }}</span></div>@endif</td>
+                                                        <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($storeRow->gross_profit) }}</div><div class="small text-muted">({{ $storeAov($storeRow->gross_profit) }})</div>@if ($storeChanges['gross_profit'])<div class="sales-compare-line {{ $storeChanges['gross_profit']['tone'] }}" title="{{ $storeChanges['gross_profit']['title'] }}"><i class="bi {{ $storeChanges['gross_profit']['icon'] }}" aria-hidden="true"></i><strong>{{ $storeChanges['gross_profit']['label'] }}</strong><span class="sales-compare-amount">{{ $storeChanges['gross_profit']['baseline'] }}</span></div>@endif</td>
+                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->ad_spend) }}</div><div class="small text-muted">({{ $storeAov($storeRow->ad_spend) }})</div>@if ($storeChanges['ad_spend'])<div class="sales-compare-line {{ $storeChanges['ad_spend']['tone'] }}" title="{{ $storeChanges['ad_spend']['title'] }}"><i class="bi {{ $storeChanges['ad_spend']['icon'] }}" aria-hidden="true"></i><strong>{{ $storeChanges['ad_spend']['label'] }}</strong><span class="sales-compare-amount">{{ $storeChanges['ad_spend']['baseline'] }}</span></div>@endif</td>
+                                                        <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($storeRow->net_profit) }}</div><div class="small text-muted">({{ $storeAov($storeRow->net_profit) }})</div>@if ($storeChanges['net_profit'])<div class="sales-compare-line {{ $storeChanges['net_profit']['tone'] }}" title="{{ $storeChanges['net_profit']['title'] }}"><i class="bi {{ $storeChanges['net_profit']['icon'] }}" aria-hidden="true"></i><strong>{{ $storeChanges['net_profit']['label'] }}</strong><span class="sales-compare-amount">{{ $storeChanges['net_profit']['baseline'] }}</span></div>@endif</td>
                                                         </tr>
                                                     @endforeach
                                                 </tbody>

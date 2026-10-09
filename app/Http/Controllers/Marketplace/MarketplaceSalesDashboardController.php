@@ -1341,7 +1341,7 @@ SQL;
             $loadComparison = function ($comparisonFrom, $comparisonTo) use ($request) {
                 $comparisonFromDate = $comparisonFrom->toDateString();
                 $comparisonToDate = $comparisonTo->toDateString();
-                $cacheKey = 'marketplace:sales-dashboard:comparison:v2:'.sha1(implode('|', [
+                $cacheKey = 'marketplace:sales-dashboard:comparison:v3:'.sha1(implode('|', [
                     (string) ($request->user()?->getAuthIdentifier() ?? 'guest'),
                     (string) ($request->query('store_id') ?: 'all'),
                     (string) ($request->query('platform') ?: 'all'),
@@ -1359,12 +1359,14 @@ SQL;
                     $comparisonView = $this->index($comparisonRequest);
                     $comparisonData = $comparisonView->getData();
 
-                    // Do not serialize hidden-tab payloads (order detail,
-                    // store rows, and daily detail tables) into the cache.
+                    // Do not serialize hidden-tab payloads (order detail and
+                    // daily detail tables) into the cache. Store rows are
+                    // needed by the daily accordion comparison.
                     $comparisonData = collect($comparisonData)
                         ->only([
                             'summary',
                             'daily',
+                            'storeDaily',
                             'paymentDaily',
                             'paymentSummary',
                             'incomeSummary',
