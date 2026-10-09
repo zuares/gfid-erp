@@ -702,6 +702,7 @@
     .sales-dashboard .sales-watchlist-badge.is-info { background: #dbeafe; color: #1d4ed8; }
     .sales-dashboard .sales-watchlist-badge.is-muted { background: color-mix(in srgb, var(--sales-muted) 12%, var(--sales-card) 88%); color: var(--sales-muted); }
     .sales-dashboard .sales-watchlist-number { font-variant-numeric: tabular-nums; }
+    .sales-dashboard .sales-watchlist-map { padding: .2rem .45rem; border-radius: 999px; font-size: .56rem; font-weight: 800; line-height: 1.1; }
     .sales-dashboard .sales-product-analysis-grid {
         display: grid;
         grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -1909,9 +1910,9 @@
     $promotionComparisonPeriods = $comparisonMode === 'month'
         ? [
             ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'data' => ['daily' => $promotionDaily, 'summary' => $summary, 'orders' => $promotionOrders, 'ad_spend' => $adSpendTotal, 'ad_impressions' => $adImpressionsTotal, 'ad_clicks' => $adClicksTotal, 'ad_orders' => $adOrdersTotal, 'ad_sales' => $adSalesTotal, 'ad_ctr' => $adCtr, 'ad_cvr' => $adCvr]],
-            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthData, 'summary', []), 'orders' => data_get($comparisonMonthData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonMonthData, 'adSpendTotal', 0), 'ad_impressions' => data_get($comparisonMonthData, 'adImpressionsTotal', 0), 'ad_clicks' => data_get($comparisonMonthData, 'adClicksTotal', 0), 'ad_orders' => data_get($comparisonMonthData, 'adOrdersTotal', 0), 'ad_sales' => data_get($comparisonMonthData, 'adSalesTotal', 0), 'ad_ctr' => data_get($comparisonMonthData, 'adCtr', 0), 'ad_cvr' => data_get($comparisonMonthData, 'adCvr', 0)]],
-            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthPreviousData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthPreviousData, 'summary', []), 'orders' => data_get($comparisonMonthPreviousData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonMonthPreviousData, 'adSpendTotal', 0), 'ad_impressions' => data_get($comparisonMonthPreviousData, 'adImpressionsTotal', 0), 'ad_clicks' => data_get($comparisonMonthPreviousData, 'adClicksTotal', 0), 'ad_orders' => data_get($comparisonMonthPreviousData, 'adOrdersTotal', 0), 'ad_sales' => data_get($comparisonMonthPreviousData, 'adSalesTotal', 0), 'ad_ctr' => data_get($comparisonMonthPreviousData, 'adCtr', 0), 'ad_cvr' => data_get($comparisonMonthPreviousData, 'adCvr', 0)]],
-            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthPreviousTwoData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthPreviousTwoData, 'summary', []), 'orders' => data_get($comparisonMonthPreviousTwoData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonMonthPreviousTwoData, 'adSpendTotal', 0), 'ad_impressions' => data_get($comparisonMonthPreviousTwoData, 'adImpressionsTotal', 0), 'ad_clicks' => data_get($comparisonMonthPreviousTwoData, 'adClicksTotal', 0), 'ad_orders' => data_get($comparisonMonthPreviousTwoData, 'adOrdersTotal', 0), 'ad_sales' => data_get($comparisonMonthPreviousTwoData, 'adSalesTotal', 0), 'ad_ctr' => data_get($comparisonMonthPreviousTwoData, 'adCtr', 0), 'ad_cvr' => data_get($comparisonMonthPreviousTwoData, 'adCvr', 0)]],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonth['from'] ?? null, $comparisonMonth['to'] ?? null, 'Bulan -1'), 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthData, 'summary', []), 'orders' => data_get($comparisonMonthData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonMonthData, 'adSpendTotal', 0), 'ad_impressions' => data_get($comparisonMonthData, 'adImpressionsTotal', 0), 'ad_clicks' => data_get($comparisonMonthData, 'adClicksTotal', 0), 'ad_orders' => data_get($comparisonMonthData, 'adOrdersTotal', 0), 'ad_sales' => data_get($comparisonMonthData, 'adSalesTotal', 0), 'ad_ctr' => data_get($comparisonMonthData, 'adCtr', 0), 'ad_cvr' => data_get($comparisonMonthData, 'adCvr', 0)]],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonthPrevious['from'] ?? null, $comparisonMonthPrevious['to'] ?? null, 'Bulan -2'), 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthPreviousData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthPreviousData, 'summary', []), 'orders' => data_get($comparisonMonthPreviousData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonMonthPreviousData, 'adSpendTotal', 0), 'ad_impressions' => data_get($comparisonMonthPreviousData, 'adImpressionsTotal', 0), 'ad_clicks' => data_get($comparisonMonthPreviousData, 'adClicksTotal', 0), 'ad_orders' => data_get($comparisonMonthPreviousData, 'adOrdersTotal', 0), 'ad_sales' => data_get($comparisonMonthPreviousData, 'adSalesTotal', 0), 'ad_ctr' => data_get($comparisonMonthPreviousData, 'adCtr', 0), 'ad_cvr' => data_get($comparisonMonthPreviousData, 'adCvr', 0)]],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonthPreviousTwo['from'] ?? null, $comparisonMonthPreviousTwo['to'] ?? null, 'Bulan -3'), 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'data' => ['daily' => data_get($comparisonMonthPreviousTwoData, 'promotionDaily', []), 'summary' => data_get($comparisonMonthPreviousTwoData, 'summary', []), 'orders' => data_get($comparisonMonthPreviousTwoData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonMonthPreviousTwoData, 'adSpendTotal', 0), 'ad_impressions' => data_get($comparisonMonthPreviousTwoData, 'adImpressionsTotal', 0), 'ad_clicks' => data_get($comparisonMonthPreviousTwoData, 'adClicksTotal', 0), 'ad_orders' => data_get($comparisonMonthPreviousTwoData, 'adOrdersTotal', 0), 'ad_sales' => data_get($comparisonMonthPreviousTwoData, 'adSalesTotal', 0), 'ad_ctr' => data_get($comparisonMonthPreviousTwoData, 'adCtr', 0), 'ad_cvr' => data_get($comparisonMonthPreviousTwoData, 'adCvr', 0)]],
         ]
         : [
         [
@@ -1921,19 +1922,19 @@
             'data' => ['daily' => $promotionDaily, 'summary' => $summary, 'orders' => $promotionOrders, 'ad_spend' => $adSpendTotal, 'ad_impressions' => $adImpressionsTotal, 'ad_clicks' => $adClicksTotal, 'ad_orders' => $adOrdersTotal, 'ad_sales' => $adSalesTotal, 'ad_ctr' => $adCtr, 'ad_cvr' => $adCvr],
         ],
         [
-            'label' => 'Periode -1',
+            'label' => $comparisonPeriodDisplayLabel($comparisonPeriod['from'] ?? null, $comparisonPeriod['to'] ?? null, 'Periode -1'),
             'from' => $comparisonPeriod['from'] ?? null,
             'to' => $comparisonPeriod['to'] ?? null,
             'data' => ['daily' => data_get($comparisonPeriodData, 'promotionDaily', []), 'summary' => $previousPeriodSummary, 'orders' => data_get($comparisonPeriodData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonPeriodData, 'adSpendTotal', 0), 'ad_impressions' => data_get($comparisonPeriodData, 'adImpressionsTotal', 0), 'ad_clicks' => data_get($comparisonPeriodData, 'adClicksTotal', 0), 'ad_orders' => data_get($comparisonPeriodData, 'adOrdersTotal', 0), 'ad_sales' => data_get($comparisonPeriodData, 'adSalesTotal', 0), 'ad_ctr' => data_get($comparisonPeriodData, 'adCtr', 0), 'ad_cvr' => data_get($comparisonPeriodData, 'adCvr', 0)],
         ],
         [
-            'label' => 'Periode -2',
+            'label' => $comparisonPeriodDisplayLabel($comparisonPeriodPrevious['from'] ?? null, $comparisonPeriodPrevious['to'] ?? null, 'Periode -2'),
             'from' => $comparisonPeriodPrevious['from'] ?? null,
             'to' => $comparisonPeriodPrevious['to'] ?? null,
             'data' => ['daily' => data_get($comparisonPeriodPreviousData, 'promotionDaily', []), 'summary' => data_get($comparisonPeriodPreviousData, 'summary', []), 'orders' => data_get($comparisonPeriodPreviousData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonPeriodPreviousData, 'adSpendTotal', 0), 'ad_impressions' => data_get($comparisonPeriodPreviousData, 'adImpressionsTotal', 0), 'ad_clicks' => data_get($comparisonPeriodPreviousData, 'adClicksTotal', 0), 'ad_orders' => data_get($comparisonPeriodPreviousData, 'adOrdersTotal', 0), 'ad_sales' => data_get($comparisonPeriodPreviousData, 'adSalesTotal', 0), 'ad_ctr' => data_get($comparisonPeriodPreviousData, 'adCtr', 0), 'ad_cvr' => data_get($comparisonPeriodPreviousData, 'adCvr', 0)],
         ],
         [
-            'label' => 'Periode -3',
+            'label' => $comparisonPeriodDisplayLabel($comparisonPeriodPreviousTwo['from'] ?? null, $comparisonPeriodPreviousTwo['to'] ?? null, 'Periode -3'),
             'from' => $comparisonPeriodPreviousTwo['from'] ?? null,
             'to' => $comparisonPeriodPreviousTwo['to'] ?? null,
             'data' => ['daily' => data_get($comparisonPeriodPreviousTwoData, 'promotionDaily', []), 'summary' => data_get($comparisonPeriodPreviousTwoData, 'summary', []), 'orders' => data_get($comparisonPeriodPreviousTwoData, 'promotionOrders', 0), 'ad_spend' => data_get($comparisonPeriodPreviousTwoData, 'adSpendTotal', 0), 'ad_impressions' => data_get($comparisonPeriodPreviousTwoData, 'adImpressionsTotal', 0), 'ad_clicks' => data_get($comparisonPeriodPreviousTwoData, 'adClicksTotal', 0), 'ad_orders' => data_get($comparisonPeriodPreviousTwoData, 'adOrdersTotal', 0), 'ad_sales' => data_get($comparisonPeriodPreviousTwoData, 'adSalesTotal', 0), 'ad_ctr' => data_get($comparisonPeriodPreviousTwoData, 'adCtr', 0), 'ad_cvr' => data_get($comparisonPeriodPreviousTwoData, 'adCvr', 0)],
@@ -2114,15 +2115,15 @@
     $paymentComparisonPeriods = $comparisonMode === 'month'
         ? [
             ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'summary' => $paymentSummary, 'daily' => $paymentDaily],
-            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'summary' => data_get($comparisonMonthData, 'paymentSummary', []), 'daily' => data_get($comparisonMonthData, 'paymentDaily', [])],
-            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'summary' => data_get($comparisonMonthPreviousData, 'paymentSummary', []), 'daily' => data_get($comparisonMonthPreviousData, 'paymentDaily', [])],
-            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'summary' => data_get($comparisonMonthPreviousTwoData, 'paymentSummary', []), 'daily' => data_get($comparisonMonthPreviousTwoData, 'paymentDaily', [])],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonth['from'] ?? null, $comparisonMonth['to'] ?? null, 'Bulan -1'), 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'summary' => data_get($comparisonMonthData, 'paymentSummary', []), 'daily' => data_get($comparisonMonthData, 'paymentDaily', [])],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonthPrevious['from'] ?? null, $comparisonMonthPrevious['to'] ?? null, 'Bulan -2'), 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'summary' => data_get($comparisonMonthPreviousData, 'paymentSummary', []), 'daily' => data_get($comparisonMonthPreviousData, 'paymentDaily', [])],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonthPreviousTwo['from'] ?? null, $comparisonMonthPreviousTwo['to'] ?? null, 'Bulan -3'), 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'summary' => data_get($comparisonMonthPreviousTwoData, 'paymentSummary', []), 'daily' => data_get($comparisonMonthPreviousTwoData, 'paymentDaily', [])],
         ]
         : [
             ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'summary' => $paymentSummary, 'daily' => $paymentDaily],
-            ['label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'summary' => data_get($comparisonPeriodData, 'paymentSummary', []), 'daily' => data_get($comparisonPeriodData, 'paymentDaily', [])],
-            ['label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'summary' => data_get($comparisonPeriodPreviousData, 'paymentSummary', []), 'daily' => data_get($comparisonPeriodPreviousData, 'paymentDaily', [])],
-            ['label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'summary' => data_get($comparisonPeriodPreviousTwoData, 'paymentSummary', []), 'daily' => data_get($comparisonPeriodPreviousTwoData, 'paymentDaily', [])],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriod['from'] ?? null, $comparisonPeriod['to'] ?? null, 'Periode -1'), 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'summary' => data_get($comparisonPeriodData, 'paymentSummary', []), 'daily' => data_get($comparisonPeriodData, 'paymentDaily', [])],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriodPrevious['from'] ?? null, $comparisonPeriodPrevious['to'] ?? null, 'Periode -2'), 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'summary' => data_get($comparisonPeriodPreviousData, 'paymentSummary', []), 'daily' => data_get($comparisonPeriodPreviousData, 'paymentDaily', [])],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriodPreviousTwo['from'] ?? null, $comparisonPeriodPreviousTwo['to'] ?? null, 'Periode -3'), 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'summary' => data_get($comparisonPeriodPreviousTwoData, 'paymentSummary', []), 'daily' => data_get($comparisonPeriodPreviousTwoData, 'paymentDaily', [])],
         ];
     $paymentComparisonPeriods = collect($paymentComparisonPeriods)->map(function ($period) use ($paymentPeriodPhases) {
         $summary = (array) ($period['summary'] ?? []);
@@ -3368,6 +3369,7 @@
                                     $watchTone = $watchRow['priority'] >= 4 ? 'is-danger' : ($watchRow['priority'] >= 3 ? 'is-warning' : 'is-info');
                                     $watchProductTitle = trim((string) ($watchProduct->marketplace_name ?: $watchProduct->name)) ?: 'Produk tanpa nama';
                                     $watchProductImage = trim((string) ($watchProduct->image_url ?? ''));
+                                    $watchProductSku = trim((string) ($watchProduct->sku ?? ''));
                                     $watchProductCode = trim((string) ($watchProduct->external_item_id ?? '')) ?: trim((string) ($watchProduct->sku ?? ''));
                                     $watchContributionMargin = $watchProduct->contribution_margin !== null ? (float) $watchProduct->contribution_margin : null;
                                     $watchNetProfit = $watchProduct->estimated_payout !== null
@@ -3404,7 +3406,14 @@
                                     <td class="text-end sales-watchlist-number {{ ($watchNetProfit ?? 0) < 0 ? 'text-danger' : '' }}">{{ $watchNetProfit === null ? '—' : $fmt($watchNetProfit) }}</td>
                                     <td class="text-end sales-watchlist-number">{{ ($watchProduct->ad_spend_matched ?? false) ? $fmt($watchProduct->ad_spend ?? 0) : '—' }}</td>
                                     <td class="text-end sales-watchlist-number">{{ ($watchProduct->ad_spend ?? 0) > 0 ? $multipleDisplay(($watchProduct->ad_sales ?? 0) / $watchProduct->ad_spend) : '—' }}</td>
-                                    <td><span class="sales-watchlist-badge {{ $watchProduct->gross_profit === null || (int) ($watchProduct->internal_item_id ?? 0) <= 0 ? 'is-warning' : 'is-muted' }}">{{ $watchStatus }}</span></td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                                            <span class="sales-watchlist-badge {{ $watchProduct->gross_profit === null || (int) ($watchProduct->internal_item_id ?? 0) <= 0 ? 'is-warning' : 'is-muted' }}">{{ $watchStatus }}</span>
+                                            @if ((int) ($watchProduct->internal_item_id ?? 0) <= 0 && $watchProductSku !== '' && $watchProductSku !== '-')
+                                                <button type="button" class="btn btn-outline-primary sales-watchlist-map" data-watchlist-map data-watchlist-map-sku="{{ $watchProductSku }}" title="Mapping SKU marketplace ke item internal">Map</button>
+                                            @endif
+                                        </div>
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -4365,6 +4374,7 @@
         </section>
     </div>
 </div>
+@include('marketplace._mapping-modal')
 @endsection
 
 @push('scripts')
@@ -4407,6 +4417,16 @@
             });
             applyWatchlistFilter('all');
         }
+
+        document.querySelectorAll('[data-watchlist-map]').forEach(function (trigger) {
+            trigger.addEventListener('click', function () {
+                const sku = trigger.dataset.watchlistMapSku || '';
+                if (!sku || !window.mpMapping?.open) return;
+                window.mpMapping.open(sku, function () {
+                    window.location.reload();
+                });
+            });
+        });
 
         const tabs = document.querySelectorAll('[data-sales-tab]');
         const panes = document.querySelectorAll('[data-sales-pane]');
