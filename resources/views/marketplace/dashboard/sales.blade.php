@@ -2687,22 +2687,18 @@
                                 $dailyComparison = $dailyComparisonByDay->get((string) $row->day, []);
                                 $dailyPrevious = data_get($dailyComparison, 'daily');
                                 $dailyPreviousPayment = data_get($dailyComparison, 'payment');
-                                $dailyPreviousOrders = (int) data_get($dailyPrevious, 'orders', 0);
-                                $dailyPreviousPaymentOrders = (int) data_get($dailyPreviousPayment, 'orders', $dailyPreviousOrders);
-                                $dailyPreviousAov = fn ($value) => $dailyPreviousOrders > 0 ? (float) $value / $dailyPreviousOrders : null;
-                                $dailyPreviousPaymentAov = fn ($value) => $dailyPreviousPaymentOrders > 0 ? (float) $value / $dailyPreviousPaymentOrders : null;
                                 $dailyChanges = [
                                     'orders' => $dailyChange($dailyOrders, data_get($dailyPrevious, 'orders'), 'number'),
                                     'qty' => $dailyChange($row->qty, data_get($dailyPrevious, 'qty'), 'number'),
                                     'avg_units_per_order' => $dailyChange($row->avg_units_per_order, data_get($dailyPrevious, 'avg_units_per_order'), 'decimal'),
-                                    'subtotal' => $dailyChange($dailyOrders > 0 ? $row->subtotal / $dailyOrders : 0, $dailyPreviousAov(data_get($dailyPrevious, 'subtotal'))),
-                                    'net_total' => $dailyChange($dailyOrders > 0 ? $row->net_total / $dailyOrders : 0, $dailyPreviousAov(data_get($dailyPrevious, 'net_total'))),
-                                    'buyer_paid' => $dailyChange($dailyOrders > 0 ? $dailyBuyerPaid / $dailyOrders : 0, $dailyPreviousPaymentAov(data_get($dailyPreviousPayment, 'buyer_paid'))),
-                                    'estimated_payout' => $dailyChange($dailyOrders > 0 ? $row->estimated_payout / $dailyOrders : 0, $dailyPreviousAov(data_get($dailyPrevious, 'estimated_payout'))),
-                                    'cogs' => $dailyChange($dailyOrders > 0 ? $row->cogs / $dailyOrders : 0, $dailyPreviousAov(data_get($dailyPrevious, 'cogs'))),
-                                    'gross_profit' => $dailyChange($dailyOrders > 0 ? $row->gross_profit / $dailyOrders : 0, $dailyPreviousAov(data_get($dailyPrevious, 'gross_profit'))),
-                                    'ad_spend' => $dailyChange($dailyOrders > 0 ? $row->ad_spend / $dailyOrders : 0, $dailyPreviousAov(data_get($dailyPrevious, 'ad_spend')), 'currency', true),
-                                    'net_profit' => $dailyChange($dailyOrders > 0 ? $row->net_profit / $dailyOrders : 0, $dailyPreviousAov(data_get($dailyPrevious, 'net_profit'))),
+                                    'subtotal' => $dailyChange($row->subtotal, data_get($dailyPrevious, 'subtotal')),
+                                    'net_total' => $dailyChange($row->net_total, data_get($dailyPrevious, 'net_total')),
+                                    'buyer_paid' => $dailyChange($dailyBuyerPaid, data_get($dailyPreviousPayment, 'buyer_paid')),
+                                    'estimated_payout' => $dailyChange($row->estimated_payout, data_get($dailyPrevious, 'estimated_payout')),
+                                    'cogs' => $dailyChange($row->cogs, data_get($dailyPrevious, 'cogs')),
+                                    'gross_profit' => $dailyChange($row->gross_profit, data_get($dailyPrevious, 'gross_profit')),
+                                    'ad_spend' => $dailyChange($row->ad_spend, data_get($dailyPrevious, 'ad_spend'), 'currency', true),
+                                    'net_profit' => $dailyChange($row->net_profit, data_get($dailyPrevious, 'net_profit')),
                                 ];
                             @endphp
                             <tr class="sales-daily-row">
