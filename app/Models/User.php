@@ -51,6 +51,11 @@ class User extends Authenticatable
         return $this->hasMany(OauthIdentity::class);
     }
 
+    public function instagramConnections(): HasMany
+    {
+        return $this->hasMany(InstagramConnection::class);
+    }
+
     public function openAiConnection(): HasOne
     {
         return $this->hasOne(OpenAiConnection::class);

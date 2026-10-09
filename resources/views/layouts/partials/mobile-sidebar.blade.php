@@ -348,6 +348,7 @@
     $hasMarketplaceSalesDashboard = $router->has('marketplace.dashboard.sales');
     $hasMarketplaceIssues = $router->has('marketplace.issues');
     $hasMarketplaceShopeeApiLogs = $router->has('marketplace.shopee-api-logs');
+    $hasSocialMediaInstagram = $router->has('social-media.instagram');
     $hasMarketplaceIndex = $router->has('marketplace.orders');
     $hasMarketplaceSalesReport = $router->has('marketplace.reports.sales');
     $hasMarketplaceProfitReport = $isOwner && $router->has('marketplace.reports.profit');
@@ -979,6 +980,16 @@
                                     </div>
                                 @endif
                             </div>
+                        </li>
+                    @endif
+
+                    @if ($hasSocialMediaInstagram)
+                        <div class="mobile-sidebar-section-label">Social Media</div>
+                        <li>
+                            <a href="{{ route('social-media.instagram') }}"
+                               class="mobile-sidebar-link {{ request()->routeIs('social-media.*') ? 'active' : '' }}">
+                                <span class="icon"><i class="bi bi-instagram"></i></span><span>Instagram</span>
+                            </a>
                         </li>
                     @endif
 
@@ -2020,6 +2031,16 @@
                             @endif
                         </div>
                     </li>
+                    @endif
+
+                    @if ($hasSocialMediaInstagram)
+                        <div class="mobile-sidebar-section-label">Social Media</div>
+                        <li>
+                            <a href="{{ route('social-media.instagram') }}"
+                               class="mobile-sidebar-link {{ request()->routeIs('social-media.*') ? 'active' : '' }}">
+                                <span class="icon"><i class="bi bi-instagram"></i></span><span>Instagram</span>
+                            </a>
+                        </li>
                     @endif
 
                     @if ($hasSalesInvoicesIndex || $hasSalesInvoicesCreate || $hasSalesShipmentsIndex || $hasSalesShipmentsCreate || $hasSalesShipmentReturnsIndex || $hasSalesOperationalSettings || $hasSalesShipmentsReport || $hasSalesReportItemProfit || $hasSalesReportChannelProfit || $hasSalesReportShipmentAnalytics)

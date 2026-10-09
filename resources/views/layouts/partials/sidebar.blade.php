@@ -113,6 +113,7 @@
     $hasMarketplaceSalesDashboard = $router->has('marketplace.dashboard.sales');
     $hasMarketplaceIssues      = $router->has('marketplace.issues');
     $hasMarketplaceShopeeApiLogs = $router->has('marketplace.shopee-api-logs');
+    $hasSocialMediaInstagram = $router->has('social-media.instagram');
 
     // Toko Online (UPDATED sesuai routes terbaru yang kamu kasih)
     // =========================================================
@@ -1249,6 +1250,17 @@
                 </li>
             @endif
 
+            {{-- SOCIAL MEDIA --}}
+            @if ($hasSocialMediaInstagram)
+                <x-sidebar.label text="Social Media" />
+                <li>
+                    <x-sidebar.simple-link href="{{ route('social-media.instagram') }}" icon="bi bi-instagram"
+                        :active="request()->routeIs('social-media.*')">
+                        Instagram
+                    </x-sidebar.simple-link>
+                </li>
+            @endif
+
             {{-- CRM Storefront --}}
             @if ($isOwner)
                 <x-sidebar.label text="CRM Storefront" />
@@ -2074,6 +2086,17 @@
                             </div>
                         @endif
                     </div>
+                </li>
+            @endif
+
+            {{-- SOCIAL MEDIA --}}
+            @if ($hasSocialMediaInstagram)
+                <x-sidebar.label text="Social Media" />
+                <li>
+                    <x-sidebar.simple-link href="{{ route('social-media.instagram') }}" icon="bi bi-instagram"
+                        :active="request()->routeIs('social-media.*')">
+                        Instagram
+                    </x-sidebar.simple-link>
                 </li>
             @endif
 
