@@ -8,6 +8,7 @@ use App\Services\Marketplace\Ads\AdsDashboardService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -64,6 +65,7 @@ class MarketplaceSalesDashboardController extends Controller
     public function index(Request $request)
     {
         $isPromotionDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
+        $isSalesComparison = $request->boolean('_sales_comparison');
         $today = now()->startOfDay();
         $defaultFrom = (clone $today)->startOfMonth();
 
@@ -169,19 +171,34 @@ class MarketplaceSalesDashboardController extends Controller
             ->selectRaw('COUNT(*) as item_count')
             ->groupByRaw('COALESCE(gmv_oi.marketplace_order_id, gmv_oi.order_id)');
 
+        // Keep the generic order scope lean. The item quantity aggregate is
+        // only needed by the order and daily sales rows; joining it to every
+        // payment, income, COGS, and promotion query multiplies the work.
+        $fromDateTime = (clone $from)->startOfDay()->toDateTimeString();
+        $toDateTime = (clone $to)->endOfDay()->toDateTimeString();
         $base = DB::table('marketplace_orders as o')
-            ->leftJoinSub($itemTotals, 'itot', 'itot.order_key', '=', 'o.id')
             ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
             ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
             ->whereRaw("{$dateExpression} IS NOT NULL")
-            ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
-            ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
+            ->where(function ($query) use ($fromDateTime, $toDateTime) {
+                $query
+                    ->whereBetween('o.ordered_at', [$fromDateTime, $toDateTime])
+                    ->orWhere(function ($fallback) use ($fromDateTime, $toDateTime) {
+                        $fallback
+                            ->whereNull('o.ordered_at')
+                            ->whereBetween('o.order_date', [$fromDateTime, $toDateTime]);
+                    });
+            })
             ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes));
 
-        $orderDetails = (clone $base)
+        $orderBase = (clone $base)->leftJoinSub($itemTotals, 'itot', 'itot.order_key', '=', 'o.id');
+
+        // The comparison calls only need aggregates. Avoid loading and
+        // decoding 500 order-detail rows six times for the hidden periods.
+        $orderDetails = $isSalesComparison ? collect() : (clone $orderBase)
             ->select([
                 'o.id',
                 'o.channel_order_id',
@@ -276,7 +293,7 @@ class MarketplaceSalesDashboardController extends Controller
 
         // Item rows are preferred. For older/imported orders, fall back to the
         // marketplace payload so the quantity KPI does not silently become 0.
-        $orderRows = (clone $base)
+        $orderRows = (clone $orderBase)
             ->leftJoinSub($gmvItemTotals, 'gmv_itot', 'gmv_itot.order_key', '=', 'o.id')
             ->selectRaw("o.id, o.store_id, st.name as store_name, DATE({$dateExpression}) as day, CASE WHEN COALESCE(gmv_itot.item_count, 0) > 0 AND COALESCE(gmv_itot.gmv, 0) > 0 THEN gmv_itot.gmv ELSE {$subtotalExpression} END as subtotal")
             ->selectRaw('COALESCE(itot.total_qty, 0) as item_qty')
@@ -335,11 +352,14 @@ class MarketplaceSalesDashboardController extends Controller
             . '0)';
         $cogsByStoreDay = (clone $base)
             ->leftJoin('marketplace_order_items as cogs_oi', function ($join) {
-                $join->on(
-                    DB::raw('COALESCE(cogs_oi.marketplace_order_id, cogs_oi.order_id)'),
-                    '=',
-                    'o.id'
-                );
+                // Keep the nullable marketplace id fallback equivalent to
+                // COALESCE while allowing the database to use the indexes on
+                // both item order columns.
+                $join->on('cogs_oi.marketplace_order_id', '=', 'o.id')
+                    ->orOn(function ($fallback) {
+                        $fallback->whereNull('cogs_oi.marketplace_order_id')
+                            ->on('cogs_oi.order_id', '=', 'o.id');
+                    });
             })
             ->leftJoin('items as cogs_item', 'cogs_item.id', '=', 'cogs_oi.internal_item_id')
             ->selectRaw("DATE({$dateExpression}) as day")
@@ -764,26 +784,6 @@ class MarketplaceSalesDashboardController extends Controller
             ->selectRaw("DATE({$dateExpression}) as day")
             ->get()
             ->map(fn ($row) => $this->paymentSnapshotForDashboard($row));
-        $payments = (clone $paymentBase)
-            ->selectRaw("{$paymentCategoryExpression} as category")
-            ->selectRaw('COUNT(DISTINCT o.id) as orders')
-            ->selectRaw("COALESCE(SUM({$buyerPaymentExpression}), 0) as buyer_paid")
-            ->selectRaw("COALESCE(AVG({$buyerPaymentExpression}), 0) as avg_ticket")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN {$paymentStatusExpression} IN ('PAID', 'COMPLETED', 'SELESAI', 'LUNAS') THEN o.id END) as paid_orders")
-            ->groupByRaw($paymentCategoryExpression)
-            ->orderByDesc('orders')
-            ->get()
-            ->map(function ($row) {
-                $row->category = (string) $row->category;
-                $row->orders = (int) $row->orders;
-                $row->buyer_paid = (float) $row->buyer_paid;
-                $row->avg_ticket = (float) $row->avg_ticket;
-                $row->paid_orders = (int) $row->paid_orders;
-                $row->order_share = 0;
-
-                return $row;
-            });
-
         $paidPaymentStatuses = "'PAID', 'COMPLETED', 'SELESAI', 'LUNAS'";
         $paymentDaily = (clone $paymentBase)
             ->selectRaw("DATE({$dateExpression}) as day")
@@ -824,65 +824,6 @@ class MarketplaceSalesDashboardController extends Controller
                 $row->cod_amount_share = $row->buyer_paid > 0 ? ($row->cod_amount / $row->buyer_paid) * 100 : 0;
 
                 return $row;
-            });
-
-        $paymentFeeByDay = (clone $paymentBase)
-            ->selectRaw("DATE({$dateExpression}) as day")
-            ->addSelect('payment_ms.shipping_insurance_fee', 'payment_ms.raw_json', 'o.raw_json as order_raw_json')
-            ->get()
-            ->groupBy('day')
-            ->map(function ($rows) {
-                $buyerServiceFee = 0.0;
-                $productProtection = 0.0;
-                $buyerServiceFeeOrders = 0;
-                $productProtectionOrders = 0;
-                $rawValue = function ($raw, array $keys): float {
-                    $payload = is_array($raw) ? $raw : (json_decode((string) $raw, true) ?: []);
-                    foreach ($keys as $key) {
-                        $value = data_get($payload, $key);
-                        if ($value !== null && $value !== '' && is_numeric($value)) {
-                            return abs((float) $value);
-                        }
-                    }
-
-                    return 0.0;
-                };
-
-                foreach ($rows as $row) {
-                    $rowBuyerServiceFee = $rawValue($row->raw_json, [
-                        'buyer_service_fee',
-                        'Buyer Service Fee',
-                        'promotion_breakdown.buyer_service_fee',
-                        'promotion_breakdown.Buyer Service Fee',
-                    ]);
-                    if ($rowBuyerServiceFee <= 0) {
-                        $rowBuyerServiceFee = $rawValue($row->order_raw_json, [
-                            'buyer_service_fee',
-                            'Buyer Service Fee',
-                            'promotion_breakdown.buyer_service_fee',
-                            'promotion_breakdown.Buyer Service Fee',
-                        ]);
-                    }
-                    $rowProductProtection = $rawValue($row->raw_json, [
-                        'final_product_protection',
-                        'buyer_paid_extended_warranty',
-                        'product_protection_fee',
-                        'product_protection',
-                        'insurance_premium',
-                        'premi',
-                    ]);
-                    $buyerServiceFee += $rowBuyerServiceFee;
-                    $productProtection += $rowProductProtection;
-                    $buyerServiceFeeOrders += $rowBuyerServiceFee > 0 ? 1 : 0;
-                    $productProtectionOrders += $rowProductProtection > 0 ? 1 : 0;
-                }
-
-                return (object) [
-                    'buyer_service_fee' => $buyerServiceFee,
-                    'product_protection' => $productProtection,
-                    'buyer_service_fee_orders' => $buyerServiceFeeOrders,
-                    'product_protection_orders' => $productProtectionOrders,
-                ];
             });
 
         // Gunakan snapshot yang sama dengan detail pembayaran untuk index:
@@ -1396,20 +1337,58 @@ SQL;
         $comparisonPeriod = null;
         $comparisonPeriodPrevious = null;
         $comparisonPeriodPreviousTwo = null;
-        if (! $request->boolean('_sales_comparison')) {
+        if (! $isSalesComparison) {
             $loadComparison = function ($comparisonFrom, $comparisonTo) use ($request) {
-                $comparisonRequest = Request::create($request->url(), 'GET', array_merge($request->query(), [
-                    'date_from' => $comparisonFrom->toDateString(),
-                    'date_to' => $comparisonTo->toDateString(),
-                    '_sales_comparison' => 1,
+                $comparisonFromDate = $comparisonFrom->toDateString();
+                $comparisonToDate = $comparisonTo->toDateString();
+                $cacheKey = 'marketplace:sales-dashboard:comparison:v2:'.sha1(implode('|', [
+                    (string) ($request->user()?->getAuthIdentifier() ?? 'guest'),
+                    (string) ($request->query('store_id') ?: 'all'),
+                    (string) ($request->query('platform') ?: 'all'),
+                    $comparisonFromDate,
+                    $comparisonToDate,
+                    $request->boolean('dummy') ? 'dummy' : 'live',
                 ]));
-                $comparisonView = $this->index($comparisonRequest);
 
-                return [
-                    'from' => $comparisonFrom->toDateString(),
-                    'to' => $comparisonTo->toDateString(),
-                    'data' => $comparisonView->getData(),
-                ];
+                return Cache::remember($cacheKey, now()->addSeconds(90), function () use ($request, $comparisonFromDate, $comparisonToDate) {
+                    $comparisonRequest = Request::create($request->url(), 'GET', array_merge($request->query(), [
+                        'date_from' => $comparisonFromDate,
+                        'date_to' => $comparisonToDate,
+                        '_sales_comparison' => 1,
+                    ]));
+                    $comparisonView = $this->index($comparisonRequest);
+                    $comparisonData = $comparisonView->getData();
+
+                    // Do not serialize hidden-tab payloads (order detail,
+                    // store rows, and daily detail tables) into the cache.
+                    $comparisonData = collect($comparisonData)
+                        ->only([
+                            'summary',
+                            'daily',
+                            'paymentDaily',
+                            'paymentSummary',
+                            'incomeSummary',
+                            'shippingKpi',
+                            'products',
+                            'activeMarketplaceCatalog',
+                            'promotionDaily',
+                            'promotionOrders',
+                            'adSpendTotal',
+                            'adImpressionsTotal',
+                            'adClicksTotal',
+                            'adOrdersTotal',
+                            'adSalesTotal',
+                            'adCtr',
+                            'adCvr',
+                        ])
+                        ->all();
+
+                    return [
+                        'from' => $comparisonFromDate,
+                        'to' => $comparisonToDate,
+                        'data' => $comparisonData,
+                    ];
+                });
             };
 
             $comparisonMonth = $loadComparison((clone $from)->subMonthNoOverflow(), (clone $to)->subMonthNoOverflow());
