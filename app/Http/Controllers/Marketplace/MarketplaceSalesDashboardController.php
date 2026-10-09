@@ -305,6 +305,15 @@ class MarketplaceSalesDashboardController extends Controller
             ->sortByDesc('day')
             ->values();
 
+        $estimatedPayoutByDay = (clone $base)
+            ->leftJoin('marketplace_order_settlements as payout_ms', 'payout_ms.order_id', '=', 'o.id')
+            ->leftJoin('marketplace_order_income_estimates as payout_ie', 'payout_ie.marketplace_order_id', '=', 'o.id')
+            ->selectRaw("DATE({$dateExpression}) as day")
+            ->selectRaw('COALESCE(SUM(COALESCE(NULLIF(payout_ms.final_income, 0), payout_ie.estimated_escrow_amount, 0)), 0) as estimated_payout')
+            ->groupByRaw("DATE({$dateExpression})")
+            ->pluck('estimated_payout', 'day')
+            ->map(fn ($amount) => (float) $amount);
+
         $productLineValueExpression = 'CASE WHEN COALESCE(oi_total.line_net_amount, 0) > 0 THEN oi_total.line_net_amount WHEN COALESCE(oi_total.price, 0) > 0 THEN oi_total.price * COALESCE(oi_total.qty, 0) WHEN COALESCE(oi_total.line_gross_amount, 0) > 0 THEN oi_total.line_gross_amount ELSE 0 END';
         $productOrderTotals = DB::table('marketplace_order_items as oi_total')
             ->selectRaw('COALESCE(oi_total.marketplace_order_id, oi_total.order_id) as order_key')
@@ -1168,9 +1177,10 @@ SQL;
 
         // AOV dashboard memakai nilai neto setelah promosi agar selaras dengan
         // nilai yang benar-benar direalisasikan per order.
-        $daily = $daily->map(function ($row) use ($promotionByDay) {
+        $daily = $daily->map(function ($row) use ($promotionByDay, $estimatedPayoutByDay) {
             $promotionTotal = (float) data_get($promotionByDay->get((string) $row->day), 'total_promotion', 0);
             $row->net_total = max((float) $row->subtotal - $promotionTotal, 0);
+            $row->estimated_payout = (float) ($estimatedPayoutByDay->get((string) $row->day, 0));
             $row->aov = $row->orders > 0 ? $row->net_total / $row->orders : 0;
 
             return $row;

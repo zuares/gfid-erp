@@ -384,7 +384,7 @@
     .sales-dashboard .sales-index-cell { color: var(--sales-muted); font-variant-numeric: tabular-nums; font-weight: 650; }
     .sales-dashboard .sales-product-item-index { padding-left: .5rem !important; text-align: center; }
     .sales-dashboard .sales-product-item-number { display: inline-block; transform: translateX(.65rem); }
-    .sales-dashboard .sales-daily-table { min-width: 980px; }
+    .sales-dashboard .sales-daily-table { min-width: 1320px; }
     .sales-dashboard .sales-daily-table .sales-table-metric { white-space: nowrap; }
     .sales-dashboard .sales-daily-table .sales-compare-line { margin-top: .18rem; gap: .2rem; font-size: .52rem; }
     .sales-dashboard .sales-daily-table .sales-compare-line i { font-size: .5rem; }
@@ -962,6 +962,7 @@
     $adSpendDaily = collect($adSpendDaily ?? []);
     $adOrdersDaily = collect($adOrdersDaily ?? []);
     $adSpendTotal = (float) ($adSpendTotal ?? $adSpendDaily->sum());
+    $paymentDailyByDay = collect($paymentDaily)->keyBy(fn ($row) => (string) data_get($row, 'day'));
     $comparisonMonthData = $comparisonMonth['data'] ?? null;
     $comparisonMonthPreviousData = $comparisonMonthPrevious['data'] ?? null;
     $comparisonMonthPreviousTwoData = $comparisonMonthPreviousTwo['data'] ?? null;
@@ -1636,11 +1637,20 @@
                             <th class="text-end">Jumlah Unit Terjual</th>
                             <th class="text-end">Rata-rata Unit/Pesanan</th>
                             <th class="text-end">GMV</th>
+                            <th class="text-end">Penjualan Neto</th>
+                            <th class="text-end">Dibayar Pembeli</th>
+                            <th class="text-end">Iklan</th>
+                            <th class="text-end">Estimasi Payout</th>
                             <th class="text-end">AOV Neto</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach ($daily as $row)
+                            @php
+                                $dailyPayment = $paymentDailyByDay->get((string) $row->day);
+                                $dailyBuyerPaid = (float) data_get($dailyPayment, 'buyer_paid', 0);
+                                $dailyAdSpend = (float) $adSpendDaily->get((string) $row->day, 0);
+                            @endphp
                             <tr class="sales-clickable-row" data-sales-order-detail-date="{{ $row->day }}" tabindex="0" role="button">
                                 <td class="sales-index-cell" aria-label="Urutan {{ $loop->iteration }}">{{ $loop->iteration }}</td>
                                 <td><button class="sales-date-link" type="button" data-sales-order-detail-date="{{ $row->day }}">{{ $dateLabel($row->day) }}</button></td>
@@ -1648,6 +1658,10 @@
                                 <td class="text-end">{{ number_format($row->qty) }}</td>
                                 <td class="text-end">{{ number_format($row->avg_units_per_order, 2, ',', '.') }}</td>
                                 <td class="text-end">{{ $fmt($row->subtotal) }}</td>
+                                <td class="text-end">{{ $fmt($row->net_total) }}</td>
+                                <td class="text-end">{{ $fmt($dailyBuyerPaid) }}</td>
+                                <td class="text-end">{{ $fmt($dailyAdSpend) }}</td>
+                                <td class="text-end">{{ $fmt($row->estimated_payout) }}</td>
                                 <td class="text-end">{{ $fmt($row->aov) }}</td>
                             </tr>
                         @endforeach
