@@ -305,6 +305,28 @@ class MarketplaceSalesDashboardController extends Controller
             ->sortByDesc('day')
             ->values();
 
+        $cogsExpression = 'COALESCE('
+            . 'NULLIF(cogs_oi.hpp_total_snapshot, 0), '
+            . 'NULLIF(cogs_oi.hpp_snapshot, 0) * COALESCE(cogs_oi.qty, 0), '
+            . 'NULLIF(cogs_oi.hpp_unit_snapshot, 0) * COALESCE(cogs_oi.qty, 0), '
+            . 'NULLIF(cogs_item.base_unit_cost, 0) * COALESCE(cogs_oi.qty, 0), '
+            . 'NULLIF(cogs_item.hpp, 0) * COALESCE(cogs_oi.qty, 0), '
+            . '0)';
+        $cogsByDay = (clone $base)
+            ->leftJoin('marketplace_order_items as cogs_oi', function ($join) {
+                $join->on(
+                    DB::raw('COALESCE(cogs_oi.marketplace_order_id, cogs_oi.order_id)'),
+                    '=',
+                    'o.id'
+                );
+            })
+            ->leftJoin('items as cogs_item', 'cogs_item.id', '=', 'cogs_oi.internal_item_id')
+            ->selectRaw("DATE({$dateExpression}) as day")
+            ->selectRaw("COALESCE(SUM({$cogsExpression}), 0) as cogs")
+            ->groupByRaw("DATE({$dateExpression})")
+            ->pluck('cogs', 'day')
+            ->map(fn ($amount) => (float) $amount);
+
         // Selaraskan dengan estimasi penghasilan pada data order. Nilai legacy
         // ini adalah sumber utama yang dipakai halaman detail order; settlement
         // final dan income detail hanya menjadi fallback untuk order yang belum
@@ -1157,8 +1179,10 @@ SQL;
             ->map(function ($row) use ($promotionByDay) {
                 $promotion = $promotionByDay->get((string) $row->day);
                 $sellerGrossSales = (float) data_get($promotion, 'order_before_discount', 0);
-                $sellerDiscounts = (float) data_get($promotion, 'product_discount', 0)
-                    + (float) data_get($promotion, 'voucher_store', 0)
+                // Penjualan neto seller hanya mengurangi promosi yang menjadi
+                // beban seller: voucher toko, paket diskon, dan kombo hemat.
+                // Voucher platform tidak mengurangi revenue seller.
+                $sellerDiscounts = (float) data_get($promotion, 'voucher_store', 0)
                     + (float) data_get($promotion, 'combo_hemat', 0)
                     + (float) data_get($promotion, 'bundle_discount', 0);
                 $row->voucher_store = (float) data_get($promotion, 'voucher_store', 0);
@@ -1175,15 +1199,16 @@ SQL;
             ->values();
         $promotionOrders = (int) $promotionDaily->sum('promotion_orders');
         $summary['promotion_total'] = (float) $promotionDaily->sum('total_promotion');
-        $summary['net_total'] = max($summary['subtotal'] - $summary['promotion_total'], 0);
+        $sellerNetSalesByDay = $paymentDaily->keyBy(fn ($row) => (string) $row->day);
+        $summary['net_total'] = (float) $paymentDaily->sum('seller_net_sales');
         $paymentSummary['buyer_shipping'] = (float) $paymentDaily->sum('buyer_shipping');
         $paymentSummary['total_promotion'] = (float) $paymentDaily->sum('total_promotion');
 
-        // AOV dashboard memakai nilai neto setelah promosi agar selaras dengan
-        // nilai yang benar-benar direalisasikan per order.
-        $daily = $daily->map(function ($row) use ($promotionByDay, $estimatedPayoutByDay) {
-            $promotionTotal = (float) data_get($promotionByDay->get((string) $row->day), 'total_promotion', 0);
-            $row->net_total = max((float) $row->subtotal - $promotionTotal, 0);
+        // AOV dashboard memakai Penjualan Neto setelah promosi seller.
+        $daily = $daily->map(function ($row) use ($sellerNetSalesByDay, $cogsByDay, $estimatedPayoutByDay) {
+            $row->net_total = (float) data_get($sellerNetSalesByDay->get((string) $row->day), 'seller_net_sales', 0);
+            $row->cogs = (float) $cogsByDay->get((string) $row->day, 0);
+            $row->gross_profit = $row->net_total - $row->cogs;
             $row->estimated_payout = (float) ($estimatedPayoutByDay->get((string) $row->day, 0));
             $row->aov = $row->orders > 0 ? $row->net_total / $row->orders : 0;
 

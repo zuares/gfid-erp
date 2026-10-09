@@ -384,7 +384,7 @@
     .sales-dashboard .sales-index-cell { color: var(--sales-muted); font-variant-numeric: tabular-nums; font-weight: 650; }
     .sales-dashboard .sales-product-item-index { padding-left: .5rem !important; text-align: center; }
     .sales-dashboard .sales-product-item-number { display: inline-block; transform: translateX(.65rem); }
-    .sales-dashboard .sales-daily-table { min-width: 1320px; }
+    .sales-dashboard .sales-daily-table { min-width: 1500px; }
     .sales-dashboard .sales-daily-table .sales-table-metric { white-space: nowrap; }
     .sales-dashboard .sales-daily-table .sales-compare-line { margin-top: .18rem; gap: .2rem; font-size: .52rem; }
     .sales-dashboard .sales-daily-table .sales-compare-line i { font-size: .5rem; }
@@ -1638,6 +1638,8 @@
                             <th class="text-end">Rata-rata Unit/Pesanan</th>
                             <th class="text-end">GMV</th>
                             <th class="text-end">Penjualan Neto</th>
+                            <th class="text-end">COGS (HPP)</th>
+                            <th class="text-end">Gross Profit</th>
                             <th class="text-end">Dibayar Pembeli</th>
                             <th class="text-end">Iklan</th>
                             <th class="text-end">Estimasi Payout</th>
@@ -1659,6 +1661,8 @@
                                 <td class="text-end">{{ number_format($row->avg_units_per_order, 2, ',', '.') }}</td>
                                 <td class="text-end">{{ $fmt($row->subtotal) }}</td>
                                 <td class="text-end">{{ $fmt($row->net_total) }}</td>
+                                <td class="text-end">{{ $fmt($row->cogs) }}</td>
+                                <td class="text-end fw-semibold">{{ $fmt($row->gross_profit) }}</td>
                                 <td class="text-end">{{ $fmt($dailyBuyerPaid) }}</td>
                                 <td class="text-end">{{ $fmt($dailyAdSpend) }}</td>
                                 <td class="text-end">{{ $fmt($row->estimated_payout) }}</td>
