@@ -2561,7 +2561,7 @@
                             ? fn ($value) => number_format((float) $value, 2, ',', '.')
                             : fn ($value) => $fmt((float) $value));
                     $differencePrefix = $difference > 0 ? '+' : ($difference < 0 ? '−' : '±');
-                    $comparisonTitle = $comparisonModeLabel.': '.$previousFormatter($previous).' · Selisih: '.$differencePrefix.$differenceFormatter($difference);
+                    $comparisonTitle = $comparisonModeLabel.': '.$previousFormatter($previous);
                     $positiveTone = $lowerIsBetter ? 'is-down' : 'is-up';
                     $negativeTone = $lowerIsBetter ? 'is-up' : 'is-down';
                     if ($previous === 0.0) {
