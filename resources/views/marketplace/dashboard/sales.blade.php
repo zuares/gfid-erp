@@ -1295,7 +1295,7 @@
         ['group' => 'Volume transaksi', 'label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
         ['group' => 'Pendapatan', 'label' => 'Penjualan Produk', 'key' => 'sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'Penjualan Netto', 'key' => 'net_sales', 'format' => $currencyDisplay],
-        ['group' => 'Pendapatan', 'label' => 'AOV Penjualan', 'key' => 'aov_sales', 'format' => $currencyDisplay],
+        ['group' => 'Pendapatan', 'label' => 'AOV Penjualan Netto', 'key' => 'aov_sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'Pembayaran Pembeli', 'key' => 'buyer_payment', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'AOV Pembayaran', 'key' => 'aov_payment', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas', 'label' => 'Estimasi Penghasilan', 'key' => 'estimated_payout', 'format' => $currencyDisplay],
@@ -1503,7 +1503,7 @@
         ['group' => 'Volume transaksi', 'label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
         ['group' => 'Pendapatan', 'label' => 'Penjualan Produk', 'key' => 'sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'Penjualan Netto', 'key' => 'net_sales', 'format' => $currencyDisplay],
-        ['group' => 'Pendapatan', 'label' => 'AOV Penjualan', 'key' => 'aov_sales', 'format' => $currencyDisplay],
+        ['group' => 'Pendapatan', 'label' => 'AOV Penjualan Netto', 'key' => 'aov_sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'Pembayaran Pembeli', 'key' => 'buyer_payment', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'AOV Pembayaran', 'key' => 'aov_payment', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas', 'label' => 'Estimasi Penghasilan', 'key' => 'estimated_payout', 'format' => $currencyDisplay],
@@ -2501,12 +2501,13 @@
                                 </td>
                             </tr>
                             <tr><td class="analysis-label" colspan="2">Unit per Order</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? number_format($activeProductKpi['qty'] / $activeProductKpi['orders'], 2, ',', '.') : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">AOV Penjualan</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_sales']) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">AOV Penjualan Netto</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_sales']) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">AOV Pembayaran</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_payment']) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Coverage Mapping Internal</td><td class="text-end analysis-value">{{ $productAnalysisProducts->count() > 0 ? $percentDisplay(($productAnalysisMappedCount / $productAnalysisProducts->count()) * 100) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Coverage HPP</td><td class="text-end analysis-value">{{ $productAnalysisProducts->count() > 0 ? $percentDisplay($productAnalysisHppCoverage) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">COGS (HPP)</td><td class="text-end analysis-value">{{ $productAnalysisHpp > 0 ? $fmtHpp($productAnalysisHpp) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Laba Bersih</td><td class="text-end analysis-value {{ $productAnalysisNetProfit >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisNetProfit) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Margin Bersih</td><td class="text-end analysis-value {{ $productAnalysisNetMargin >= 20 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisEstimatedPayout > 0 ? $percentDisplay($productAnalysisNetMargin) : '—' }}</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -2525,6 +2526,7 @@
                             <tr><td class="analysis-label" colspan="2">Biaya Iklan / Produk Teratribusi</td><td class="text-end analysis-value">{{ $productAnalysisAdProducts->count() > 0 ? $fmt($productAnalysisAdSpend / $productAnalysisAdProducts->count()) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Kontribusi Pasca Iklan</td><td class="text-end analysis-value {{ $productAnalysisContributionProfit >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisContributionProfit) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Margin Kontribusi</td><td class="text-end analysis-value {{ $productAnalysisContributionMargin >= 20 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisContributionMargin !== 0 ? $percentDisplay($productAnalysisContributionMargin) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Laba Bersih setelah Iklan</td><td class="text-end analysis-value {{ $productAnalysisNetProfit >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisNetProfit) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Biaya Iklan / Penjualan Netto</td><td class="text-end analysis-value">{{ $productAnalysisAdSpend > 0 && $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisAdSpend / $productAnalysisNetSales) * 100) : '—' }}</td></tr>
                         </tbody>
                     </table>
