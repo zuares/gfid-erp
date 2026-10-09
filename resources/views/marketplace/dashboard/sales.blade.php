@@ -686,6 +686,25 @@
     .sales-dashboard .sales-comparison-difference.is-up { color: var(--success, #16a34a); }
     .sales-dashboard .sales-comparison-difference.is-down { color: var(--danger, #dc2626); }
     .sales-dashboard .sales-comparison-difference.is-neutral { color: var(--sales-muted); }
+    .sales-dashboard .sales-sales-comparison-row { cursor: pointer; }
+    .sales-dashboard .sales-sales-comparison-row > td { transition: background-color .16s ease; }
+    .sales-dashboard .sales-sales-comparison-row:hover > td,
+    .sales-dashboard .sales-sales-comparison-row.is-expanded > td { background: color-mix(in srgb, var(--sales-accent-soft) 25%, var(--sales-card) 75%); }
+    .sales-dashboard .sales-comparison-metric-toggle { display: inline-flex; max-width: 100%; align-items: center; gap: .42rem; border: 0; border-radius: .4rem; background: transparent; color: inherit; padding: .15rem .25rem; font: inherit; text-align: left; }
+    .sales-dashboard .sales-comparison-metric-toggle:hover { background: color-mix(in srgb, var(--sales-accent-soft) 72%, transparent); color: var(--sales-accent); }
+    .sales-dashboard .sales-comparison-metric-toggle:focus-visible { outline: 2px solid color-mix(in srgb, var(--sales-accent) 52%, transparent); outline-offset: 2px; }
+    .sales-dashboard .sales-comparison-metric-toggle i { flex: 0 0 auto; color: var(--sales-accent); font-size: .68rem; transition: transform .16s ease; }
+    .sales-dashboard .sales-comparison-metric-toggle[aria-expanded="true"] i { transform: rotate(90deg); }
+    .sales-dashboard .sales-sales-comparison-detail > td { padding: 0 !important; border: 0 !important; background: color-mix(in srgb, var(--sales-accent-soft) 14%, var(--sales-card) 86%); }
+    .sales-dashboard .sales-comparison-chart-detail { padding: .7rem .85rem .75rem; }
+    .sales-dashboard .sales-comparison-chart-title { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-bottom: .25rem; color: var(--sales-muted); font-size: .61rem; font-weight: 750; }
+    .sales-dashboard .sales-comparison-chart-title strong { color: var(--sales-ink); font-weight: 850; }
+    .sales-dashboard .sales-comparison-chart { min-height: 150px; border-radius: .55rem; background: color-mix(in srgb, var(--sales-card) 92%, var(--sales-soft) 8%); }
+    .sales-dashboard .sales-comparison-chart svg { display: block; width: 100%; height: 150px; }
+    .sales-dashboard .sales-comparison-chart .comparison-chart-grid { stroke: color-mix(in srgb, var(--sales-line) 74%, transparent); stroke-width: 1; vector-effect: non-scaling-stroke; }
+    .sales-dashboard .sales-comparison-chart .comparison-chart-label { fill: var(--sales-muted); font-size: 10px; font-weight: 700; }
+    .sales-dashboard .sales-comparison-chart .comparison-chart-line { fill: none; stroke: var(--sales-accent); stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+    .sales-dashboard .sales-comparison-chart .comparison-chart-point { fill: var(--sales-accent); stroke: var(--sales-card); stroke-width: 2; vector-effect: non-scaling-stroke; }
     .sales-dashboard .sales-table-section-row td {
         padding: .58rem .75rem .38rem;
         border-bottom: 0;
@@ -1208,6 +1227,7 @@
             'gross_sales' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'subtotal', 0)),
             'net_sales' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'net_total', 0)),
             'orders' => (int) $rows->sum(fn ($row) => (int) data_get($row, 'orders', 0)),
+            'qty' => (int) $rows->sum(fn ($row) => (int) data_get($row, 'qty', 0)),
             'payout' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'estimated_payout', 0)),
             'cogs' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'cogs', 0)),
             'gross_profit' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'gross_profit', 0)),
@@ -1384,10 +1404,14 @@
         $impressions = (int) data_get($data, 'adImpressionsTotal', 0);
         $clicks = (int) data_get($data, 'adClicksTotal', 0);
         $adOrders = (int) data_get($data, 'adOrdersTotal', 0);
+        $promotionRows = collect(data_get($data, 'promotionDaily', []));
+        $buyerPaid = (float) data_get($data, 'paymentSummary.buyer_paid', 0);
         $metrics['ad_spend'] = $adSpend;
 
         return $metrics + [
             'avg_units_per_order' => $metrics['orders'] > 0 ? (float) collect($rows)->sum(fn ($row) => (float) data_get($row, 'qty', 0)) / $orders : 0,
+            'buyer_paid' => $buyerPaid,
+            'aov_buyer_paid' => $metrics['orders'] > 0 ? $buyerPaid / $orders : null,
             'net_margin' => $metrics['net_sales'] > 0 ? ($metrics['net_profit'] / $metrics['net_sales']) * 100 : null,
             'ad_sales' => $adSales,
             'acos' => $adSales > 0 ? ($adSpend / $adSales) * 100 : null,
@@ -1397,17 +1421,21 @@
             'clicks' => $clicks,
             'ctr' => $impressions > 0 ? ($clicks / $impressions) * 100 : null,
             'cvr' => $clicks > 0 ? ($adOrders / $clicks) * 100 : null,
+            'voucher_seller' => (float) $promotionRows->sum('voucher_store'),
+            'voucher_platform' => (float) $promotionRows->sum('voucher_platform'),
+            'bundle_discount' => (float) $promotionRows->sum('bundle_discount'),
+            'combo_hemat' => (float) $promotionRows->sum('combo_hemat'),
         ];
     };
     $salesComparisonSources = $comparisonMode === 'month'
         ? [
-            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily, 'data' => ['adSpendTotal' => $adSpendTotal, 'adSalesTotal' => $adSalesTotal, 'adImpressionsTotal' => $adImpressionsTotal, 'adClicksTotal' => $adClicksTotal, 'adOrdersTotal' => $adOrdersTotal]],
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily, 'data' => ['promotionDaily' => $promotionDaily, 'paymentSummary' => $paymentSummary, 'adSpendTotal' => $adSpendTotal, 'adSalesTotal' => $adSalesTotal, 'adImpressionsTotal' => $adImpressionsTotal, 'adClicksTotal' => $adClicksTotal, 'adOrdersTotal' => $adOrdersTotal]],
             ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'daily' => data_get($comparisonMonthData, 'daily', []), 'data' => $comparisonMonthData],
             ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousData, 'daily', []), 'data' => $comparisonMonthPreviousData],
             ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousTwoData, 'daily', []), 'data' => $comparisonMonthPreviousTwoData],
         ]
         : [
-            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily, 'data' => ['adSpendTotal' => $adSpendTotal, 'adSalesTotal' => $adSalesTotal, 'adImpressionsTotal' => $adImpressionsTotal, 'adClicksTotal' => $adClicksTotal, 'adOrdersTotal' => $adOrdersTotal]],
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily, 'data' => ['promotionDaily' => $promotionDaily, 'paymentSummary' => $paymentSummary, 'adSpendTotal' => $adSpendTotal, 'adSalesTotal' => $adSalesTotal, 'adImpressionsTotal' => $adImpressionsTotal, 'adClicksTotal' => $adClicksTotal, 'adOrdersTotal' => $adOrdersTotal]],
             ['label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'daily' => data_get($comparisonPeriodData, 'daily', []), 'data' => $comparisonPeriodData],
             ['label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousData, 'daily', []), 'data' => $comparisonPeriodPreviousData],
             ['label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousTwoData, 'daily', []), 'data' => $comparisonPeriodPreviousTwoData],
@@ -1424,6 +1452,8 @@
         ['group' => 'Volume transaksi', 'label' => 'Unit / Order', 'key' => 'avg_units_per_order', 'format' => fn ($value) => number_format((float) $value, 2, ',', '.')],
         ['group' => 'Pendapatan', 'label' => 'Gross Sales', 'key' => 'gross_sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'Net Sales', 'key' => 'net_sales', 'format' => $currencyDisplay],
+        ['group' => 'Pendapatan', 'label' => 'Pembayaran Pembeli', 'key' => 'buyer_paid', 'format' => $currencyDisplay],
+        ['group' => 'Pendapatan', 'label' => 'AOV Pembayaran', 'key' => 'aov_buyer_paid', 'format' => fn ($value) => $value === null ? '—' : $currencyDisplay($value)],
         ['group' => 'Pendapatan', 'label' => 'Est Penghasilan', 'key' => 'payout', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas', 'label' => 'COGS', 'key' => 'cogs', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas', 'label' => 'Laba Kotor', 'key' => 'gross_profit', 'format' => $currencyDisplay],
@@ -1438,6 +1468,10 @@
         ['group' => 'Iklan', 'label' => 'Klik', 'key' => 'clicks', 'format' => $numberDisplay],
         ['group' => 'Iklan', 'label' => 'CTR', 'key' => 'ctr', 'format' => fn ($value) => $value === null ? '—' : $percentDisplay($value)],
         ['group' => 'Iklan', 'label' => 'CVR', 'key' => 'cvr', 'format' => fn ($value) => $value === null ? '—' : $percentDisplay($value)],
+        ['group' => 'Kontribusi Promosi', 'label' => 'Voucher Seller', 'key' => 'voucher_seller', 'format' => $currencyDisplay],
+        ['group' => 'Kontribusi Promosi', 'label' => 'Voucher Platform', 'key' => 'voucher_platform', 'format' => $currencyDisplay],
+        ['group' => 'Kontribusi Promosi', 'label' => 'Paket Diskon', 'key' => 'bundle_discount', 'format' => $currencyDisplay],
+        ['group' => 'Kontribusi Promosi', 'label' => 'Kombo Hemat', 'key' => 'combo_hemat', 'format' => $currencyDisplay],
     ];
     $activeProductKpi = $productComparisonMetrics($products, $activeMarketplaceCatalog);
     $previousMonthProductKpi = $productComparisonMetrics($previousMonthProducts, $previousMonthActiveCatalog);
@@ -2086,8 +2120,29 @@
                                 </tr>
                                 @php $salesComparisonGroup = $row['group']; @endphp
                             @endif
-                            <tr>
-                                <td class="ps-3 sales-comparison-metric">{{ $row['label'] }}</td>
+                            @php
+                                $comparisonDetailId = 'sales-comparison-detail-'.$loop->index;
+                                $comparisonChartUnit = in_array($row['key'], ['net_margin', 'acos', 'ctr', 'cvr'], true)
+                                    ? 'percent'
+                                    : (in_array($row['key'], ['roas'], true) ? 'multiple' : (in_array($row['key'], ['orders', 'qty', 'impressions', 'clicks'], true) ? 'number' : 'currency'));
+                                $comparisonChartData = collect($salesComparisonPeriods)->map(function ($period) use ($row, $dateRangeLabel) {
+                                    $value = $period['metrics'][$row['key']] ?? null;
+
+                                    return [
+                                        'label' => $period['label'],
+                                        'range' => $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—',
+                                        'value' => $value,
+                                        'display' => $value === null ? '—' : $row['format']($value),
+                                    ];
+                                })->values()->all();
+                            @endphp
+                            <tr class="sales-sales-comparison-row" data-sales-comparison-row data-sales-comparison-detail-id="{{ $comparisonDetailId }}">
+                                <td class="ps-3 sales-comparison-metric">
+                                    <button type="button" class="sales-comparison-metric-toggle" data-sales-comparison-toggle aria-expanded="false" aria-controls="{{ $comparisonDetailId }}" aria-label="Lihat tren {{ $row['label'] }}">
+                                        <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                        <span>{{ $row['label'] }}</span>
+                                    </button>
+                                </td>
                                 @foreach ($salesComparisonPeriods as $periodIndex => $period)
                                     @php $comparisonValue = $period['metrics'][$row['key']] ?? null; @endphp
                                     @php
@@ -2135,6 +2190,17 @@
                                         </span>
                                     </td>
                                 @endforeach
+                            </tr>
+                            <tr id="{{ $comparisonDetailId }}" class="sales-sales-comparison-detail" hidden>
+                                <td colspan="{{ 1 + count($salesComparisonPeriods) }}">
+                                    <div class="sales-comparison-chart-detail">
+                                        <div class="sales-comparison-chart-title"><strong>{{ $row['label'] }}</strong><span>Perbandingan antarperiode</span></div>
+                                        <div class="sales-comparison-chart">
+                                            <svg viewBox="0 0 900 180" role="img" aria-label="Grafik {{ $row['label'] }} per periode" data-sales-comparison-chart data-sales-comparison-chart-unit="{{ $comparisonChartUnit }}"></svg>
+                                        </div>
+                                        <script type="application/json" data-sales-comparison-chart-data>@json($comparisonChartData)</script>
+                                    </div>
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -3678,6 +3744,95 @@
 
         renderSalesTrend();
         if (trendMetric) trendMetric.addEventListener('change', renderSalesTrend);
+
+        function formatComparisonAxis(value, unit) {
+            if (unit === 'percent') return (Number(value) || 0).toFixed(1).replace('.', ',') + '%';
+            if (unit === 'multiple') return (Number(value) || 0).toFixed(2).replace('.', ',') + 'x';
+            if (unit === 'number') return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Math.round(Number(value) || 0));
+
+            return formatTrendAxis(value);
+        }
+
+        function renderSalesComparisonChart(detail) {
+            const chart = detail.querySelector('[data-sales-comparison-chart]');
+            const dataElement = detail.querySelector('[data-sales-comparison-chart-data]');
+            if (!chart || !dataElement) return;
+
+            let rows;
+            try {
+                rows = JSON.parse(dataElement.textContent || '[]');
+            } catch (error) {
+                rows = [];
+            }
+
+            const unit = chart.dataset.salesComparisonChartUnit || 'currency';
+            const values = rows.map((row) => row.value === null ? null : Number(row.value));
+            const validValues = values.filter((value) => Number.isFinite(value));
+            if (!validValues.length) {
+                chart.innerHTML = '<text class="comparison-chart-label" x="450" y="94" text-anchor="middle">Belum ada data</text>';
+                return;
+            }
+
+            const width = 900;
+            const height = 180;
+            const left = 72;
+            const right = 18;
+            const top = 16;
+            const bottom = 38;
+            const chartWidth = width - left - right;
+            const chartHeight = height - top - bottom;
+            const minValue = Math.min(0, ...validValues);
+            const maxValue = Math.max(0, ...validValues);
+            const valueRange = Math.max(maxValue - minValue, 1);
+            const x = (index) => left + (rows.length === 1 ? chartWidth / 2 : (index / (rows.length - 1)) * chartWidth);
+            const y = (value) => top + ((maxValue - value) / valueRange) * chartHeight;
+            const points = values.map((value, index) => value === null || !Number.isFinite(value) ? null : [x(index), y(value), value]);
+            const validPoints = points.filter(Boolean);
+            const path = validPoints.map((point, index) => (index === 0 ? 'M ' : ' L ') + point[0].toFixed(2) + ' ' + point[1].toFixed(2)).join('');
+            const gridValues = [maxValue, minValue + valueRange / 2, minValue];
+            let markup = '';
+
+            gridValues.forEach(function (value) {
+                const yPosition = y(value).toFixed(2);
+                markup += '<line class="comparison-chart-grid" x1="' + left + '" x2="' + (width - right) + '" y1="' + yPosition + '" y2="' + yPosition + '"></line>';
+                markup += '<text class="comparison-chart-label" x="2" y="' + (Number(yPosition) + 4) + '">' + escapeTrendText(formatComparisonAxis(value, unit)) + '</text>';
+            });
+            if (validPoints.length > 1) markup += '<path class="comparison-chart-line" d="' + path + '"></path>';
+
+            points.forEach(function (point, index) {
+                if (!point) return;
+                const row = rows[index] || {};
+                markup += '<circle class="comparison-chart-point" cx="' + point[0].toFixed(2) + '" cy="' + point[1].toFixed(2) + '" r="4"><title>' + escapeTrendText((row.label || '') + ' · ' + (row.display || '—')) + '</title></circle>';
+            });
+            rows.forEach(function (row, index) {
+                markup += '<text class="comparison-chart-label" text-anchor="middle" x="' + x(index).toFixed(2) + '" y="' + (height - 10) + '">' + escapeTrendText(row.label || '') + '</text>';
+            });
+            chart.innerHTML = markup;
+        }
+
+        document.querySelectorAll('[data-sales-comparison-row]').forEach(function (row) {
+            const trigger = row.querySelector('[data-sales-comparison-toggle]');
+            const detailId = row.dataset.salesComparisonDetailId || '';
+            const detail = detailId ? document.getElementById(detailId) : null;
+            if (!trigger || !detail) return;
+
+            function toggleComparisonDetail() {
+                const expanded = trigger.getAttribute('aria-expanded') === 'true';
+                const nextExpanded = !expanded;
+                trigger.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false');
+                detail.hidden = !nextExpanded;
+                row.classList.toggle('is-expanded', nextExpanded);
+                if (nextExpanded) renderSalesComparisonChart(detail);
+            }
+
+            trigger.addEventListener('click', function (event) {
+                event.stopPropagation();
+                toggleComparisonDetail();
+            });
+            row.addEventListener('click', function (event) {
+                if (!event.target.closest('button')) toggleComparisonDetail();
+            });
+        });
 
         function activateTab(target) {
             if (!document.querySelector('[data-sales-tab="' + target + '"]')) {
