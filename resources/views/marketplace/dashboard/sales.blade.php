@@ -844,7 +844,6 @@
             'order_share' => 0,
         ]];
     });
-    $globalAov = (float) $summary['aov'];
     $marketplaceProductCount = function ($rows) {
         return collect($rows)
             ->map(function ($product) {
@@ -991,6 +990,23 @@
     $activeComparison = $comparisonMode === 'month' ? $comparisonMonth : $comparisonPeriod;
     $previousMonthSummary = data_get($comparisonMonthData, 'summary', []);
     $previousPeriodSummary = data_get($comparisonPeriodData, 'summary', []);
+    $salesKpiMetrics = function ($rows) {
+        $rows = collect($rows);
+
+        return [
+            'gross_sales' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'subtotal', 0)),
+            'net_sales' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'net_total', 0)),
+            'orders' => (int) $rows->sum(fn ($row) => (int) data_get($row, 'orders', 0)),
+            'payout' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'estimated_payout', 0)),
+            'cogs' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'cogs', 0)),
+            'gross_profit' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'gross_profit', 0)),
+            'ad_spend' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'ad_spend', 0)),
+            'net_profit' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'net_profit', 0)),
+        ];
+    };
+    $currentSalesKpi = $salesKpiMetrics($daily);
+    $previousMonthSalesKpi = $salesKpiMetrics(data_get($comparisonMonthData, 'daily', []));
+    $previousPeriodSalesKpi = $salesKpiMetrics(data_get($comparisonPeriodData, 'daily', []));
     $previousMonthPaymentSummary = data_get($comparisonMonthData, 'paymentSummary', []);
     $previousPeriodPaymentSummary = data_get($comparisonPeriodData, 'paymentSummary', []);
     $previousMonthPaymentDaily = collect(data_get($comparisonMonthData, 'paymentDaily', []));
@@ -1628,10 +1644,12 @@
     @include('marketplace.dashboard.partials._kpis', [
         'kpiTitle' => 'Penjualan',
         'kpis' => [
-            ['label' => 'Penjualan', 'value' => $fmt($summary['subtotal']), 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($summary['subtotal'], $previousMonthSummary['subtotal'] ?? null, $previousPeriodSummary['subtotal'] ?? null, $currencyDisplay)],
-            ['label' => 'Nilai Neto', 'value' => $fmt($summary['net_total']), 'icon' => 'bi-graph-down-arrow', 'comparisons' => $kpiComparisons($summary['net_total'], $previousMonthSummary['net_total'] ?? null, $previousPeriodSummary['net_total'] ?? null, $currencyDisplay)],
-            ['label' => 'Order', 'value' => number_format($summary['orders']), 'icon' => 'bi-receipt', 'comparisons' => $kpiComparisons($summary['orders'], $previousMonthSummary['orders'] ?? null, $previousPeriodSummary['orders'] ?? null, $numberDisplay)],
-            ['label' => 'AOV Neto', 'value' => $fmt($globalAov), 'note' => number_format($summary['buyers']).' pembeli', 'icon' => 'bi-bar-chart-line', 'comparisons' => $kpiComparisons($globalAov, $previousMonthSummary['aov'] ?? null, $previousPeriodSummary['aov'] ?? null, $currencyDisplay)],
+            ['group' => 'Pendapatan', 'label' => 'P Kotor', 'value' => $fmt($currentSalesKpi['gross_sales']), 'note' => number_format($currentSalesKpi['orders']).' pesanan', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($currentSalesKpi['gross_sales'], $previousMonthSalesKpi['gross_sales'], $previousPeriodSalesKpi['gross_sales'], $currencyDisplay)],
+            ['group' => 'Pendapatan', 'label' => 'P Bersih', 'value' => $fmt($currentSalesKpi['net_sales']), 'note' => 'setelah diskon seller', 'icon' => 'bi-graph-down-arrow', 'comparisons' => $kpiComparisons($currentSalesKpi['net_sales'], $previousMonthSalesKpi['net_sales'], $previousPeriodSalesKpi['net_sales'], $currencyDisplay)],
+            ['group' => 'Pendapatan', 'label' => 'Est Penghasilan', 'value' => $fmt($currentSalesKpi['payout']), 'note' => 'dasar laba kotor', 'icon' => 'bi-wallet2', 'comparisons' => $kpiComparisons($currentSalesKpi['payout'], $previousMonthSalesKpi['payout'], $previousPeriodSalesKpi['payout'], $currencyDisplay)],
+            ['group' => 'Profitabilitas', 'label' => 'COGS (HPP)', 'value' => $fmt($currentSalesKpi['cogs']), 'note' => 'biaya produk terjual', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($currentSalesKpi['cogs'], $previousMonthSalesKpi['cogs'], $previousPeriodSalesKpi['cogs'], $currencyDisplay, 'relative', false)],
+            ['group' => 'Profitabilitas', 'label' => 'Laba Kotor', 'value' => $fmt($currentSalesKpi['gross_profit']), 'note' => 'payout − COGS', 'icon' => 'bi-graph-up-arrow', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($currentSalesKpi['gross_profit'], $previousMonthSalesKpi['gross_profit'], $previousPeriodSalesKpi['gross_profit'], $currencyDisplay)],
+            ['group' => 'Profitabilitas', 'label' => 'Laba Bersih', 'value' => $fmt($currentSalesKpi['net_profit']), 'note' => 'laba kotor − iklan', 'icon' => 'bi-bar-chart-line', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($currentSalesKpi['net_profit'], $previousMonthSalesKpi['net_profit'], $previousPeriodSalesKpi['net_profit'], $currencyDisplay)],
         ],
     ])
     <section class="card sales-card shadow-sm" aria-labelledby="daily-sales-title">
@@ -1655,10 +1673,10 @@
                             <th class="text-end">Pesanan</th>
                             <th class="text-end">Unit Terjual</th>
                             <th class="text-end">Unit / Order</th>
-                            <th class="text-end">Penjualan Kotor</th>
-                            <th class="text-end">Penjualan Neto</th>
-                            <th class="text-end">Dibayar Pembeli</th>
-                            <th class="text-end">Estimasi Payout</th>
+                            <th class="text-end">P Kotor</th>
+                            <th class="text-end">P Bersih</th>
+                            <th class="text-end">Di Bayar</th>
+                            <th class="text-end">Est Penghasilan</th>
                             <th class="text-end">COGS (HPP)</th>
                             <th class="text-end">Laba Kotor</th>
                             <th class="text-end">Iklan</th>
@@ -1683,14 +1701,14 @@
                                 <td class="text-end">{{ number_format($row->orders) }}</td>
                                 <td class="text-end">{{ number_format($row->qty) }}</td>
                                 <td class="text-end">{{ number_format($row->avg_units_per_order, 2, ',', '.') }}</td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->subtotal) }}</div><div class="small text-muted">AOV {{ $dailyAov($row->subtotal) }}</div></td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->net_total) }}</div><div class="small text-muted">AOV {{ $dailyAov($row->net_total) }}</div></td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($dailyBuyerPaid) }}</div><div class="small text-muted">AOV {{ $dailyAov($dailyBuyerPaid) }}</div></td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->estimated_payout) }}</div><div class="small text-muted">AOV {{ $dailyAov($row->estimated_payout) }}</div></td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->cogs) }}</div><div class="small text-muted">AOV {{ $dailyAov($row->cogs) }}</div></td>
-                                <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($row->gross_profit) }}</div><div class="small text-muted">AOV {{ $dailyAov($row->gross_profit) }}</div></td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->ad_spend) }}</div><div class="small text-muted">AOV {{ $dailyAov($row->ad_spend) }}</div></td>
-                                <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($row->net_profit) }}</div><div class="small text-muted">AOV {{ $dailyAov($row->net_profit) }}</div></td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->subtotal) }}</div><div class="small text-muted">({{ $dailyAov($row->subtotal) }})</div></td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->net_total) }}</div><div class="small text-muted">({{ $dailyAov($row->net_total) }})</div></td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($dailyBuyerPaid) }}</div><div class="small text-muted">({{ $dailyAov($dailyBuyerPaid) }})</div></td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->estimated_payout) }}</div><div class="small text-muted">({{ $dailyAov($row->estimated_payout) }})</div></td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->cogs) }}</div><div class="small text-muted">({{ $dailyAov($row->cogs) }})</div></td>
+                                <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($row->gross_profit) }}</div><div class="small text-muted">({{ $dailyAov($row->gross_profit) }})</div></td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->ad_spend) }}</div><div class="small text-muted">({{ $dailyAov($row->ad_spend) }})</div></td>
+                                <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($row->net_profit) }}</div><div class="small text-muted">({{ $dailyAov($row->net_profit) }})</div></td>
                             </tr>
                             <tr id="sales-store-detail-{{ $row->day }}" class="sales-daily-store-detail" data-sales-store-items="{{ $row->day }}" hidden>
                                 <td colspan="13">
@@ -1699,22 +1717,6 @@
                                         <div class="small text-muted text-center py-2">Belum ada rincian toko.</div>
                                     @else
                                         <table class="table table-sm align-middle sales-table sales-daily-store-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Toko</th>
-                                                    <th class="text-end">Pesanan</th>
-                                                    <th class="text-end">Unit Terjual</th>
-                                                    <th class="text-end">Unit / Order</th>
-                                                    <th class="text-end">Penjualan Kotor</th>
-                                                    <th class="text-end">Penjualan Neto</th>
-                                                    <th class="text-end">Dibayar Pembeli</th>
-                                                    <th class="text-end">Estimasi Payout</th>
-                                                    <th class="text-end">COGS (HPP)</th>
-                                                    <th class="text-end">Laba Kotor</th>
-                                                    <th class="text-end">Iklan</th>
-                                                    <th class="text-end">Laba Bersih</th>
-                                                </tr>
-                                            </thead>
                                             <tbody>
                                                 @foreach ($storeRows as $storeRow)
                                                     @php
@@ -1726,14 +1728,14 @@
                                                         <td class="text-end">{{ number_format($storeRow->orders) }}</td>
                                                         <td class="text-end">{{ number_format($storeRow->qty) }}</td>
                                                         <td class="text-end">{{ number_format($storeRow->avg_units_per_order, 2, ',', '.') }}</td>
-                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->subtotal) }}</div><div class="small text-muted">AOV {{ $storeAov($storeRow->subtotal) }}</div></td>
-                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->net_total) }}</div><div class="small text-muted">AOV {{ $storeAov($storeRow->net_total) }}</div></td>
-                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->buyer_paid) }}</div><div class="small text-muted">AOV {{ $storeAov($storeRow->buyer_paid) }}</div></td>
-                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->estimated_payout) }}</div><div class="small text-muted">AOV {{ $storeAov($storeRow->estimated_payout) }}</div></td>
-                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->cogs) }}</div><div class="small text-muted">AOV {{ $storeAov($storeRow->cogs) }}</div></td>
-                                                        <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($storeRow->gross_profit) }}</div><div class="small text-muted">AOV {{ $storeAov($storeRow->gross_profit) }}</div></td>
-                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->ad_spend) }}</div><div class="small text-muted">AOV {{ $storeAov($storeRow->ad_spend) }}</div></td>
-                                                        <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($storeRow->net_profit) }}</div><div class="small text-muted">AOV {{ $storeAov($storeRow->net_profit) }}</div></td>
+                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->subtotal) }}</div><div class="small text-muted">({{ $storeAov($storeRow->subtotal) }})</div></td>
+                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->net_total) }}</div><div class="small text-muted">({{ $storeAov($storeRow->net_total) }})</div></td>
+                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->buyer_paid) }}</div><div class="small text-muted">({{ $storeAov($storeRow->buyer_paid) }})</div></td>
+                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->estimated_payout) }}</div><div class="small text-muted">({{ $storeAov($storeRow->estimated_payout) }})</div></td>
+                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->cogs) }}</div><div class="small text-muted">({{ $storeAov($storeRow->cogs) }})</div></td>
+                                                        <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($storeRow->gross_profit) }}</div><div class="small text-muted">({{ $storeAov($storeRow->gross_profit) }})</div></td>
+                                                        <td class="text-end sales-table-metric"><div>{{ $fmt($storeRow->ad_spend) }}</div><div class="small text-muted">({{ $storeAov($storeRow->ad_spend) }})</div></td>
+                                                        <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($storeRow->net_profit) }}</div><div class="small text-muted">({{ $storeAov($storeRow->net_profit) }})</div></td>
                                                     </tr>
                                                 @endforeach
                                             </tbody>
