@@ -443,7 +443,9 @@
     .sales-dashboard .sales-daily-table .sales-compare-line.is-up strong { color: var(--success, #16a34a); }
     .sales-dashboard .sales-daily-table .sales-compare-line.is-down strong { color: var(--danger, #dc2626); }
     .sales-dashboard .sales-daily-table .sales-compare-line.is-neutral strong { color: var(--sales-muted); }
-    .sales-dashboard .sales-daily-table .sales-compare-amount { color: var(--sales-muted); font-size: .5rem; font-weight: 650; }
+    .sales-dashboard .sales-daily-table .sales-compare-amount { display: none; color: var(--sales-muted); font-size: .5rem; font-weight: 650; }
+    .sales-dashboard .sales-daily-table .sales-compare-line:hover .sales-compare-amount,
+    .sales-dashboard .sales-daily-table .sales-compare-line:focus-within .sales-compare-amount { display: inline; }
     .sales-dashboard .sales-trend-section { overflow: hidden; }
     .sales-dashboard .sales-trend-body { padding: 0 .85rem .85rem; }
     .sales-dashboard .sales-trend-layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(230px, .75fr); gap: .75rem; }
@@ -493,6 +495,8 @@
     .sales-dashboard .sales-trend-period { color: var(--sales-muted); font-size: .65rem; font-weight: 700; white-space: nowrap; }
     .sales-dashboard .sales-trend-empty { padding: 2rem 1rem; color: var(--sales-muted); font-size: .72rem; text-align: center; }
     .sales-dashboard .sales-daily-chart-shell { margin: 0 .85rem .75rem; padding: .75rem .8rem .55rem; border: 1px solid color-mix(in srgb, var(--sales-line) 78%, transparent); border-radius: .75rem; background: color-mix(in srgb, var(--sales-soft) 32%, var(--sales-card) 68%); }
+    .sales-dashboard .sales-daily-chart-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .28fr); gap: .75rem; align-items: stretch; }
+    .sales-dashboard .sales-daily-chart-main { min-width: 0; }
     .sales-dashboard .sales-daily-chart-toolbar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .45rem; }
     .sales-dashboard .sales-daily-chart-heading { min-width: 0; }
     .sales-dashboard .sales-daily-chart-label { color: var(--sales-muted); font-size: .6rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
@@ -517,6 +521,18 @@
     .sales-dashboard .sales-daily-chart-legend i { width: .45rem; height: .45rem; border-radius: 50%; background: var(--sales-accent); }
     .sales-dashboard .sales-daily-chart-legend i.previous { background: var(--sales-muted); }
     .sales-dashboard .sales-daily-chart-legend i.period-two { background: #a78bfa; }
+    .sales-dashboard .sales-daily-chart-analysis { display: flex; flex-direction: column; justify-content: flex-start; min-width: 0; padding: .75rem .8rem; border: 1px solid color-mix(in srgb, var(--sales-line) 78%, transparent); border-radius: .65rem; background: color-mix(in srgb, var(--sales-card) 92%, var(--sales-soft) 8%); }
+    .sales-dashboard .sales-daily-chart-analysis-kicker { color: var(--sales-muted); font-size: .58rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+    .sales-dashboard .sales-daily-chart-analysis-title { margin-top: .2rem; color: var(--sales-ink); font-size: .68rem; font-weight: 800; }
+    .sales-dashboard .sales-daily-chart-analysis-value { margin-top: .1rem; color: var(--sales-ink); font-size: 1.08rem; font-weight: 900; line-height: 1.2; }
+    .sales-dashboard .sales-daily-chart-analysis-delta { min-height: 1rem; margin-top: .2rem; color: var(--sales-muted); font-size: .62rem; font-weight: 800; }
+    .sales-dashboard .sales-daily-chart-analysis-delta.good { color: #15803d; }
+    .sales-dashboard .sales-daily-chart-analysis-delta.bad { color: #b91c1c; }
+    .sales-dashboard .sales-daily-chart-analysis-list { display: grid; gap: .55rem; margin-top: .75rem; padding-top: .65rem; border-top: 1px solid color-mix(in srgb, var(--sales-line) 72%, transparent); }
+    .sales-dashboard .sales-daily-chart-analysis-item { display: grid; gap: .08rem; }
+    .sales-dashboard .sales-daily-chart-analysis-item-label { color: var(--sales-muted); font-size: .59rem; font-weight: 750; }
+    .sales-dashboard .sales-daily-chart-analysis-item-value { display: flex; align-items: baseline; justify-content: space-between; gap: .45rem; color: var(--sales-ink); font-size: .69rem; font-weight: 850; }
+    .sales-dashboard .sales-daily-chart-analysis-item-date { color: var(--sales-muted); font-size: .57rem; font-weight: 700; }
     .sales-dashboard .sales-product-table { min-width: 1265px; table-layout: fixed; }
     .sales-dashboard .sales-product-table th,
     .sales-dashboard .sales-product-table td { white-space: nowrap; }
@@ -805,6 +821,7 @@
     .sales-dashboard .sales-category-summary-table tbody td:nth-child(n+3) { text-align: end; }
     .sales-dashboard .sales-category-summary-table thead tr:nth-child(2) th { text-align: center; }
     .sales-dashboard .sales-category-summary-table tbody td:nth-child(n+3) { color: var(--sales-ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+    .sales-dashboard .sales-category-summary-table .sales-category-metric { display: inline-flex; flex-direction: column; align-items: flex-end; gap: .12rem; }
     .sales-dashboard .sales-category-summary-table tbody td:first-child { color: var(--sales-muted); font-variant-numeric: tabular-nums; text-align: start; }
     .sales-dashboard .sales-category-summary-table .sales-category-name { overflow: hidden; text-overflow: ellipsis; }
     .sales-dashboard .sales-category-summary-table > tbody > tr.sales-category-comparison-row { cursor: pointer; transition: background-color .16s ease, box-shadow .16s ease; }
@@ -959,6 +976,7 @@
         .sales-dashboard .sales-trend-select { width: 100%; }
         .sales-dashboard .sales-trend-header-meta { align-items: flex-start; flex-direction: column; }
         .sales-dashboard .sales-daily-chart-shell { margin-inline: .65rem; }
+        .sales-dashboard .sales-daily-chart-layout { grid-template-columns: 1fr; }
         .sales-dashboard .sales-daily-chart-toolbar { align-items: flex-start; flex-direction: column; }
         .sales-dashboard .sales-daily-chart-select { width: 100%; }
         .sales-dashboard .sales-promotion-table {
@@ -997,6 +1015,7 @@
         .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row > td:first-child { display: none; }
         .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row > td[data-label]::before { content: attr(data-label); margin-bottom: .2rem; color: var(--sales-muted); font-size: .58rem; font-weight: 750; letter-spacing: .02em; }
         .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-row > td:nth-child(2) { grid-column: 1 / -1; }
+        .sales-dashboard .sales-category-summary-table .sales-category-metric { align-items: flex-start; }
         .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-detail { display: block; }
         .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-detail[hidden] { display: none !important; }
         .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-detail > td { display: block; width: 100%; }
@@ -2359,6 +2378,7 @@
                 $dailyChartRow = function ($row) {
                     return [
                         'label' => \Carbon\Carbon::parse(data_get($row, 'day'))->format('d M'),
+                        'date' => \Carbon\Carbon::parse(data_get($row, 'day'))->format('d M Y'),
                         'net_sales' => (float) data_get($row, 'net_total', 0),
                         'estimated_payout' => (float) data_get($row, 'estimated_payout', 0),
                         'gross_profit' => (float) data_get($row, 'gross_profit', 0),
@@ -2408,29 +2428,63 @@
                         'tone' => $delta > 0 ? 'is-up' : ($delta < 0 ? 'is-down' : 'is-neutral'),
                     ];
                 };
+                $dailyNetSalesPeak = collect($daily)->sortByDesc('net_total')->first();
+                $dailyNetSalesLowest = collect($daily)->sortBy('net_total')->first();
+                $dailyNegativeProfitDays = collect($daily)->filter(fn ($row) => (float) data_get($row, 'net_profit', 0) < 0)->count();
+                $dailyNetSalesChange = $dailyChange($daily->sum('net_total'), $dailyPreviousRows->sum('net_total'));
             @endphp
             <div class="sales-daily-chart-shell">
-                <div class="sales-daily-chart-toolbar">
-                    <div class="sales-daily-chart-heading">
-                        <div class="sales-daily-chart-label">Grafik harian</div>
-                        <div class="sales-daily-chart-total" data-sales-daily-chart-total><span data-sales-daily-chart-value>{{ $fmt($daily->sum('net_total')) }}</span> <span class="sales-daily-chart-compare" data-sales-daily-chart-compare>{{ $comparisonModeLabel }}</span></div>
+                <div class="sales-daily-chart-layout">
+                    <div class="sales-daily-chart-main">
+                        <div class="sales-daily-chart-toolbar">
+                            <div class="sales-daily-chart-heading">
+                                <div class="sales-daily-chart-label">Grafik harian</div>
+                                <div class="sales-daily-chart-total" data-sales-daily-chart-total><span data-sales-daily-chart-value>{{ $fmt($daily->sum('net_total')) }}</span> <span class="sales-daily-chart-compare" data-sales-daily-chart-compare>{{ $comparisonModeLabel }}</span></div>
+                            </div>
+                            <select class="sales-daily-chart-select" data-sales-daily-chart-metric aria-label="Pilih metrik grafik harian">
+                                <option value="net_sales">Net Sales</option>
+                                <option value="estimated_payout">Est Revenue</option>
+                                <option value="gross_profit">Gross Profit</option>
+                                <option value="net_profit">Net Profit</option>
+                                <option value="qty">Terjual</option>
+                                <option value="orders">Pesanan</option>
+                            </select>
+                        </div>
+                        <div class="sales-daily-chart">
+                            <svg viewBox="0 0 1000 220" role="img" aria-label="Grafik penjualan per tanggal" data-sales-daily-chart></svg>
+                        </div>
+                        <div class="sales-daily-chart-legend" aria-label="Legenda grafik harian">
+                            <span><i aria-hidden="true"></i>{{ $salesComparisonSources[0]['label'] ?? 'Aktif' }}</span>
+                            <span><i class="previous" aria-hidden="true"></i>{{ $salesComparisonSources[1]['label'] ?? $comparisonModeLabel }}</span>
+                            <span><i class="period-two" aria-hidden="true"></i>{{ $salesComparisonSources[2]['label'] ?? ($comparisonModeLabel.' -2') }}</span>
+                        </div>
                     </div>
-                    <select class="sales-daily-chart-select" data-sales-daily-chart-metric aria-label="Pilih metrik grafik harian">
-                        <option value="net_sales">Net Sales</option>
-                        <option value="estimated_payout">Est Revenue</option>
-                        <option value="gross_profit">Gross Profit</option>
-                        <option value="net_profit">Net Profit</option>
-                        <option value="qty">Terjual</option>
-                        <option value="orders">Pesanan</option>
-                    </select>
-                </div>
-                <div class="sales-daily-chart">
-                    <svg viewBox="0 0 1000 220" role="img" aria-label="Grafik penjualan per tanggal" data-sales-daily-chart></svg>
-                </div>
-                <div class="sales-daily-chart-legend" aria-label="Legenda grafik harian">
-                    <span><i aria-hidden="true"></i>{{ $salesComparisonSources[0]['label'] ?? 'Aktif' }}</span>
-                    <span><i class="previous" aria-hidden="true"></i>{{ $salesComparisonSources[1]['label'] ?? $comparisonModeLabel }}</span>
-                    <span><i class="period-two" aria-hidden="true"></i>{{ $salesComparisonSources[2]['label'] ?? ($comparisonModeLabel.' -2') }}</span>
+                    <aside class="sales-daily-chart-analysis" aria-label="Kesimpulan analitik">
+                        <div class="sales-daily-chart-analysis-kicker">Kesimpulan analitik</div>
+                        <div class="sales-daily-chart-analysis-title" data-sales-daily-analysis-title>Net Sales</div>
+                        <div class="sales-daily-chart-analysis-value" data-sales-daily-analysis-value>{{ $fmt($daily->sum('net_total')) }}</div>
+                        <div class="sales-daily-chart-analysis-delta {{ $dailyNetSalesChange['tone'] ?? '' }}" data-sales-daily-analysis-delta>
+                            @if ($dailyNetSalesChange)
+                                {{ $dailyNetSalesChange['label'] }} vs {{ $comparisonModeLabel }}
+                            @else
+                                {{ $comparisonModeLabel }}
+                            @endif
+                        </div>
+                        <div class="sales-daily-chart-analysis-list">
+                            <div class="sales-daily-chart-analysis-item">
+                                <span class="sales-daily-chart-analysis-item-label">Puncak harian</span>
+                                <span class="sales-daily-chart-analysis-item-value"><strong>{{ $fmt(data_get($dailyNetSalesPeak, 'net_total', 0)) }}</strong><small class="sales-daily-chart-analysis-item-date">{{ data_get($dailyNetSalesPeak, 'day') ? \Carbon\Carbon::parse(data_get($dailyNetSalesPeak, 'day'))->format('d M Y') : '—' }}</small></span>
+                            </div>
+                            <div class="sales-daily-chart-analysis-item">
+                                <span class="sales-daily-chart-analysis-item-label">Terendah harian</span>
+                                <span class="sales-daily-chart-analysis-item-value"><strong>{{ $fmt(data_get($dailyNetSalesLowest, 'net_total', 0)) }}</strong><small class="sales-daily-chart-analysis-item-date">{{ data_get($dailyNetSalesLowest, 'day') ? \Carbon\Carbon::parse(data_get($dailyNetSalesLowest, 'day'))->format('d M Y') : '—' }}</small></span>
+                            </div>
+                            <div class="sales-daily-chart-analysis-item">
+                                <span class="sales-daily-chart-analysis-item-label">Hari net profit negatif</span>
+                                <span class="sales-daily-chart-analysis-item-value"><strong>{{ number_format($dailyNegativeProfitDays, 0, ',', '.') }} hari</strong></span>
+                            </div>
+                        </div>
+                    </aside>
                 </div>
                 <script type="application/json" id="sales-daily-chart-data">@json($dailyChartPayload)</script>
             </div>
@@ -2885,6 +2939,11 @@
                                 @php
                                     $categoryKey = 'sales-category-comparison-'.$loop->index;
                                     $activeCategoryMetrics = $categoryRow['periods']['active']['metrics'];
+                                    $categoryNetSalesTrend = $comparisonCellMeta(
+                                        $activeCategoryMetrics['net_sales'] ?? null,
+                                        $categoryRow['periods']['previous']['metrics']['net_sales'] ?? null,
+                                        $currencyDisplay
+                                    );
                                 @endphp
                                 <tr class="sales-category-comparison-row" data-sales-category-comparison-row="{{ $categoryKey }}" tabindex="0" aria-controls="{{ $categoryKey }}-detail">
                                     <td class="ps-3 text-muted" data-label="No.">{{ $loop->iteration }}</td>
@@ -2900,7 +2959,16 @@
                                     <td data-label="Order">{{ number_format($activeCategoryMetrics['orders']) }}</td>
                                     <td data-label="Unit">{{ number_format($activeCategoryMetrics['qty']) }}</td>
                                     <td class="text-end" data-label="Kontribusi Penjualan">{{ $percentDisplay($categoryRow['share']) }}</td>
-                                    <td class="text-end" data-label="Penjualan Netto">{{ $fmt($activeCategoryMetrics['net_sales']) }}</td>
+                                    <td class="text-end" data-label="Penjualan Netto">
+                                        <span class="sales-category-metric">
+                                            <span>{{ $fmt($activeCategoryMetrics['net_sales']) }}</span>
+                                            @if ($categoryNetSalesTrend)
+                                                <span class="sales-comparison-delta {{ $categoryNetSalesTrend['tone'] }}" title="{{ $categoryNetSalesTrend['arrow_title'] }} dibanding periode sebelumnya">
+                                                    <i class="bi {{ $categoryNetSalesTrend['arrow'] }}" aria-hidden="true"></i>{{ $categoryNetSalesTrend['percentage'] }}
+                                                </span>
+                                            @endif
+                                        </span>
+                                    </td>
                                     <td class="text-end" data-label="Estimasi Penghasilan">{{ $fmt($activeCategoryMetrics['estimated_payout']) }}</td>
                                     <td class="text-end" data-label="Laba Kotor">{{ $fmt($activeCategoryMetrics['gross_profit_payout']) }}</td>
                                     <td class="text-end" data-label="Margin Kontribusi">{{ $activeCategoryMetrics['contribution_margin'] === null ? '—' : $percentDisplay($activeCategoryMetrics['contribution_margin']) }}</td>
@@ -3965,6 +4033,9 @@
         const dailyChartTotal = document.querySelector('[data-sales-daily-chart-total]');
         const dailyChartValue = document.querySelector('[data-sales-daily-chart-value]');
         const dailyChartCompare = document.querySelector('[data-sales-daily-chart-compare]');
+        const dailyAnalysisTitle = document.querySelector('[data-sales-daily-analysis-title]');
+        const dailyAnalysisValue = document.querySelector('[data-sales-daily-analysis-value]');
+        const dailyAnalysisDelta = document.querySelector('[data-sales-daily-analysis-delta]');
 
         function escapeTrendText(value) {
             return String(value ?? '').replace(/[&<>'"]/g, function (character) {
@@ -4147,15 +4218,15 @@
             if (currentPoints.length > 1) markup += '<path class="daily-chart-line" d="' + makePath(currentPoints) + '"></path>';
 
             currentPoints.forEach(function (point, index) {
-                const label = current[index]?.label || '';
+                const label = current[index]?.date || current[index]?.label || '';
                 markup += '<circle class="daily-chart-point" cx="' + point[0].toFixed(2) + '" cy="' + point[1].toFixed(2) + '" r="3.5"><title>' + escapeTrendText(label + ' · ' + formatDailyChartValue(point[2], metric)) + '</title></circle>';
             });
             previousPoints.forEach(function (point, index) {
-                const label = previous[index]?.label || periods[1]?.label || '';
+                const label = previous[index]?.date || previous[index]?.label || periods[1]?.label || '';
                 markup += '<circle class="daily-chart-point previous" cx="' + point[0].toFixed(2) + '" cy="' + point[1].toFixed(2) + '" r="2.5"><title>' + escapeTrendText(label + ' · ' + formatDailyChartValue(point[2], metric)) + '</title></circle>';
             });
             previousTwoPoints.forEach(function (point, index) {
-                const label = previousTwo[index]?.label || periods[2]?.label || '';
+                const label = previousTwo[index]?.date || previousTwo[index]?.label || periods[2]?.label || '';
                 markup += '<circle class="daily-chart-point period-two" cx="' + point[0].toFixed(2) + '" cy="' + point[1].toFixed(2) + '" r="2.5"><title>' + escapeTrendText(label + ' · ' + formatDailyChartValue(point[2], metric)) + '</title></circle>';
             });
 
@@ -4167,15 +4238,33 @@
 
             const currentTotal = currentValues.reduce((total, value) => total + value, 0);
             const previousTotal = previousValues.reduce((total, value) => total + value, 0);
+            const metricLabels = {
+                net_sales: 'Net Sales',
+                estimated_payout: 'Est Revenue',
+                gross_profit: 'Gross Profit',
+                net_profit: 'Net Profit',
+                qty: 'Terjual',
+                orders: 'Pesanan'
+            };
+            if (dailyAnalysisTitle) dailyAnalysisTitle.textContent = metricLabels[metric] || 'Net Sales';
+            if (dailyAnalysisValue) dailyAnalysisValue.textContent = formatDailyChartValue(currentTotal, metric);
             if (dailyChartValue) dailyChartValue.textContent = formatDailyChartValue(currentTotal, metric);
             if (dailyChartCompare) {
                 dailyChartCompare.classList.remove('good', 'bad');
+                if (dailyAnalysisDelta) dailyAnalysisDelta.classList.remove('good', 'bad');
                 if (previous.length && previousTotal !== 0) {
                     const delta = ((currentTotal - previousTotal) / Math.abs(previousTotal)) * 100;
-                    dailyChartCompare.textContent = (delta >= 0 ? '↑ ' : '↓ ') + Math.abs(delta).toFixed(1).replace('.', ',') + '% vs ' + (periods[1]?.label || 'pembanding');
+                    const compareText = (delta >= 0 ? '↑ ' : '↓ ') + Math.abs(delta).toFixed(1).replace('.', ',') + '% vs ' + (periods[1]?.label || 'pembanding');
+                    dailyChartCompare.textContent = compareText;
                     dailyChartCompare.classList.add(delta >= 0 ? 'good' : 'bad');
+                    if (dailyAnalysisDelta) {
+                        dailyAnalysisDelta.textContent = compareText;
+                        dailyAnalysisDelta.classList.add(delta >= 0 ? 'good' : 'bad');
+                    }
                 } else {
-                    dailyChartCompare.textContent = previous.length ? 'Tidak ada perubahan dasar' : 'Belum ada pembanding';
+                    const compareText = previous.length ? 'Tidak ada perubahan dasar' : 'Belum ada pembanding';
+                    dailyChartCompare.textContent = compareText;
+                    if (dailyAnalysisDelta) dailyAnalysisDelta.textContent = compareText;
                 }
             }
         }
