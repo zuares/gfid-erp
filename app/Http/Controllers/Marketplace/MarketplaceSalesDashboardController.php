@@ -432,6 +432,7 @@ class MarketplaceSalesDashboardController extends Controller
                 $join->on(DB::raw('COALESCE(oi.marketplace_order_id, oi.order_id)'), '=', 'o.id');
             })
             ->leftJoin('marketplace_order_settlements as s', 's.order_id', '=', 'o.id')
+            ->leftJoin('marketplace_order_income_estimates as payout_ie', 'payout_ie.marketplace_order_id', '=', 'o.id')
             ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
             ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
             ->leftJoin('items as internal_item', 'internal_item.id', '=', 'oi.internal_item_id')
@@ -459,6 +460,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->selectRaw("COALESCE(SUM({$productLineNetValueExpression}), 0) as sales")
             ->selectRaw("COALESCE(SUM({$productLineNetValueExpression}), 0) as net_sales")
             ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(product_order_totals.order_item_value, 0) > 0 THEN ({$productBuyerPaymentExpression} * {$productLineValueForRow} / product_order_totals.order_item_value) ELSE 0 END), 0) as buyer_payment")
+            ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(product_order_totals.order_item_value, 0) > 0 THEN (COALESCE(NULLIF(o.net_payout_estimated, 0), NULLIF(s.final_income, 0), payout_ie.estimated_escrow_amount, 0) * {$productLineValueForRow} / product_order_totals.order_item_value) ELSE 0 END), 0) as estimated_payout")
             ->groupByRaw('NULLIF(oi.internal_item_id, 0)')
             ->groupByRaw("CASE WHEN NULLIF(oi.internal_item_id, 0) IS NOT NULL THEN NULLIF(oi.external_item_id, '') END")
             ->groupByRaw("CASE WHEN NULLIF(oi.internal_item_id, 0) IS NULL THEN {$marketplaceProductNameExpression} END")
