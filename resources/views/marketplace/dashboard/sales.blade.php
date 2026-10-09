@@ -702,16 +702,29 @@
     .sales-dashboard .sales-comparison-difference.is-up { color: var(--success, #16a34a); }
     .sales-dashboard .sales-comparison-difference.is-down { color: var(--danger, #dc2626); }
     .sales-dashboard .sales-comparison-difference.is-neutral { color: var(--sales-muted); }
-    .sales-dashboard .sales-sales-comparison-row { cursor: pointer; }
-    .sales-dashboard .sales-sales-comparison-row > td { transition: background-color .16s ease; }
+    .sales-dashboard .sales-sales-comparison-row,
+    .sales-dashboard .sales-product-comparison-row,
+    .sales-dashboard .sales-payment-comparison-row,
+    .sales-dashboard .sales-funding-comparison-row { cursor: pointer; }
+    .sales-dashboard .sales-sales-comparison-row > td,
+    .sales-dashboard .sales-product-comparison-row > td,
+    .sales-dashboard .sales-payment-comparison-row > td,
+    .sales-dashboard .sales-funding-comparison-row > td { transition: background-color .16s ease; }
     .sales-dashboard .sales-sales-comparison-row:hover > td,
-    .sales-dashboard .sales-sales-comparison-row.is-expanded > td { background: color-mix(in srgb, var(--sales-accent-soft) 25%, var(--sales-card) 75%); }
+    .sales-dashboard .sales-sales-comparison-row.is-expanded > td,
+    .sales-dashboard .sales-product-comparison-row:hover > td,
+    .sales-dashboard .sales-product-comparison-row.is-expanded > td,
+    .sales-dashboard .sales-payment-comparison-row:hover > td,
+    .sales-dashboard .sales-payment-comparison-row.is-expanded > td,
+    .sales-dashboard .sales-funding-comparison-row:hover > td,
+    .sales-dashboard .sales-funding-comparison-row.is-expanded > td { background: color-mix(in srgb, var(--sales-accent-soft) 25%, var(--sales-card) 75%); }
     .sales-dashboard .sales-comparison-metric-toggle { display: inline-flex; max-width: 100%; align-items: center; gap: .42rem; border: 0; border-radius: .4rem; background: transparent; color: inherit; padding: .15rem .25rem; font: inherit; text-align: left; }
     .sales-dashboard .sales-comparison-metric-toggle:hover { background: color-mix(in srgb, var(--sales-accent-soft) 72%, transparent); color: var(--sales-accent); }
     .sales-dashboard .sales-comparison-metric-toggle:focus-visible { outline: 2px solid color-mix(in srgb, var(--sales-accent) 52%, transparent); outline-offset: 2px; }
     .sales-dashboard .sales-comparison-metric-toggle i { flex: 0 0 auto; color: var(--sales-accent); font-size: .68rem; transition: transform .16s ease; }
     .sales-dashboard .sales-comparison-metric-toggle[aria-expanded="true"] i { transform: rotate(90deg); }
-    .sales-dashboard .sales-sales-comparison-detail > td { padding: 0 !important; border: 0 !important; background: color-mix(in srgb, var(--sales-accent-soft) 14%, var(--sales-card) 86%); }
+    .sales-dashboard .sales-sales-comparison-detail > td,
+    .sales-dashboard .sales-comparison-detail > td { padding: 0 !important; border: 0 !important; background: color-mix(in srgb, var(--sales-accent-soft) 14%, var(--sales-card) 86%); }
     .sales-dashboard .sales-comparison-chart-detail { padding: .7rem .85rem .75rem; }
     .sales-dashboard .sales-comparison-chart-title { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-bottom: .25rem; color: var(--sales-muted); font-size: .61rem; font-weight: 750; }
     .sales-dashboard .sales-comparison-chart-title strong { color: var(--sales-ink); font-weight: 850; }
@@ -2621,8 +2634,29 @@
                                         $comparisonGroup = $row['group'];
                                     @endphp
                                 @endif
-                                <tr>
-                                    <td class="ps-3 fw-semibold">{{ $row['label'] }}</td>
+                                @php
+                                    $comparisonDetailId = 'product-comparison-detail-'.$loop->index;
+                                    $comparisonChartUnit = in_array($row['key'], ['contribution_margin', 'gross_margin', 'acos', 'mapping_rate', 'hpp_coverage'], true)
+                                        ? 'percent'
+                                        : (in_array($row['key'], ['roas'], true) ? 'multiple' : (in_array($row['key'], ['orders', 'qty', 'products', 'variants', 'variants_sold', 'active_products', 'active_variants', 'unsold_variants'], true) ? 'number' : 'currency'));
+                                    $comparisonChartData = collect($productComparisonPeriods)->reverse()->values()->map(function ($period) use ($row, $dateRangeLabel) {
+                                        $value = $period['metrics'][$row['key']] ?? null;
+
+                                        return [
+                                            'label' => $period['label'],
+                                            'range' => $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—',
+                                            'value' => $value,
+                                            'display' => $value === null ? '—' : $row['format']($value),
+                                        ];
+                                    })->values()->all();
+                                @endphp
+                                <tr class="sales-product-comparison-row" data-sales-comparison-row data-sales-comparison-detail-id="{{ $comparisonDetailId }}">
+                                    <td class="ps-3 fw-semibold">
+                                        <button type="button" class="sales-comparison-metric-toggle" data-sales-comparison-toggle aria-expanded="false" aria-controls="{{ $comparisonDetailId }}" aria-label="Lihat tren {{ $row['label'] }}">
+                                            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                            <span>{{ $row['label'] }}</span>
+                                        </button>
+                                    </td>
                                     @foreach ($productComparisonPeriods as $periodIndex => $period)
                                         @php
                                             $comparisonValue = $period['metrics'][$row['key']] ?? null;
@@ -2647,6 +2681,17 @@
                                             </span>
                                         </td>
                                     @endforeach
+                                </tr>
+                                <tr id="{{ $comparisonDetailId }}" class="sales-comparison-detail" hidden>
+                                    <td colspan="{{ 1 + count($productComparisonPeriods) }}">
+                                        <div class="sales-comparison-chart-detail">
+                                            <div class="sales-comparison-chart-title"><strong>{{ $row['label'] }}</strong><span>Perbandingan antarperiode</span></div>
+                                            <div class="sales-comparison-chart">
+                                                <svg viewBox="0 0 900 180" role="img" aria-label="Grafik {{ $row['label'] }} per periode" data-sales-comparison-chart data-sales-comparison-chart-unit="{{ $comparisonChartUnit }}"></svg>
+                                            </div>
+                                            <script type="application/json" data-sales-comparison-chart-data>@json($comparisonChartData)</script>
+                                        </div>
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -3322,8 +3367,29 @@
                         </thead>
                         <tbody>
                             @foreach ($paymentComparisonRows as $row)
-                                <tr>
-                                    <td class="ps-3 fw-semibold">{{ $row['label'] }}</td>
+                                @php
+                                    $comparisonDetailId = 'payment-comparison-detail-'.$loop->index;
+                                    $comparisonChartUnit = in_array($row['key'], ['cod_order_share', 'non_cod_order_share', 'pay_later_order_share'], true)
+                                        ? 'percent'
+                                        : (in_array($row['key'], ['orders'], true) ? 'number' : 'currency');
+                                    $comparisonChartData = collect($paymentComparisonPeriods)->reverse()->values()->map(function ($period) use ($row, $dateRangeLabel) {
+                                        $value = $period['metrics'][$row['key']] ?? null;
+
+                                        return [
+                                            'label' => $period['label'],
+                                            'range' => $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—',
+                                            'value' => $value,
+                                            'display' => $value === null ? '—' : $row['formatter']($value),
+                                        ];
+                                    })->values()->all();
+                                @endphp
+                                <tr class="sales-payment-comparison-row" data-sales-comparison-row data-sales-comparison-detail-id="{{ $comparisonDetailId }}">
+                                    <td class="ps-3 fw-semibold">
+                                        <button type="button" class="sales-comparison-metric-toggle" data-sales-comparison-toggle aria-expanded="false" aria-controls="{{ $comparisonDetailId }}" aria-label="Lihat tren {{ $row['label'] }}">
+                                            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                            <span>{{ $row['label'] }}</span>
+                                        </button>
+                                    </td>
                                     @foreach ($paymentComparisonPeriods as $periodIndex => $period)
                                         @php
                                             $comparisonValue = $period['metrics'][$row['key']] ?? null;
@@ -3348,6 +3414,17 @@
                                             </span>
                                         </td>
                                     @endforeach
+                                </tr>
+                                <tr id="{{ $comparisonDetailId }}" class="sales-comparison-detail" hidden>
+                                    <td colspan="{{ 1 + count($paymentComparisonPeriods) }}">
+                                        <div class="sales-comparison-chart-detail">
+                                            <div class="sales-comparison-chart-title"><strong>{{ $row['label'] }}</strong><span>Perbandingan antarperiode</span></div>
+                                            <div class="sales-comparison-chart">
+                                                <svg viewBox="0 0 900 180" role="img" aria-label="Grafik {{ $row['label'] }} per periode" data-sales-comparison-chart data-sales-comparison-chart-unit="{{ $comparisonChartUnit }}"></svg>
+                                            </div>
+                                            <script type="application/json" data-sales-comparison-chart-data>@json($comparisonChartData)</script>
+                                        </div>
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -3492,8 +3569,29 @@
                         </thead>
                         <tbody>
                             @foreach ($fundingSection['rows'] as $row)
-                                <tr>
-                                    <td class="ps-3 fw-semibold">{{ $row['label'] }}</td>
+                                @php
+                                    $comparisonDetailId = 'promotion-comparison-detail-'.\Illuminate\Support\Str::slug($fundingSection['title']).'-'.$loop->index;
+                                    $comparisonChartUnit = in_array($row['key'], ['ad_ctr', 'ad_cvr', 'ad_sales_rate', 'platform_rate', 'voucher_seller_rate', 'bundle_discount_rate', 'combo_hemat_rate'], true)
+                                        ? 'percent'
+                                        : (in_array($row['key'], ['ad_roas'], true) ? 'multiple' : (in_array($row['key'], ['ad_orders', 'ad_impressions', 'ad_clicks'], true) ? 'number' : 'currency'));
+                                    $comparisonChartData = collect($platformPromotionPeriods)->reverse()->values()->map(function ($period) use ($row, $dateRangeLabel) {
+                                        $value = $period['metrics'][$row['key']] ?? null;
+
+                                        return [
+                                            'label' => $period['label'],
+                                            'range' => $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—',
+                                            'value' => $value,
+                                            'display' => $value === null ? '—' : $row['format']($value),
+                                        ];
+                                    })->values()->all();
+                                @endphp
+                                <tr class="sales-funding-comparison-row" data-sales-comparison-row data-sales-comparison-detail-id="{{ $comparisonDetailId }}">
+                                    <td class="ps-3 fw-semibold">
+                                        <button type="button" class="sales-comparison-metric-toggle" data-sales-comparison-toggle aria-expanded="false" aria-controls="{{ $comparisonDetailId }}" aria-label="Lihat tren {{ $row['label'] }}">
+                                            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                            <span>{{ $row['label'] }}</span>
+                                        </button>
+                                    </td>
                                     @foreach ($platformPromotionPeriods as $periodIndex => $period)
                                         @php
                                             $comparisonValue = $period['metrics'][$row['key']] ?? null;
@@ -3518,6 +3616,17 @@
                                             </span>
                                         </td>
                                     @endforeach
+                                </tr>
+                                <tr id="{{ $comparisonDetailId }}" class="sales-comparison-detail" hidden>
+                                    <td colspan="{{ 1 + count($platformPromotionPeriods) }}">
+                                        <div class="sales-comparison-chart-detail">
+                                            <div class="sales-comparison-chart-title"><strong>{{ $row['label'] }}</strong><span>Perbandingan antarperiode</span></div>
+                                            <div class="sales-comparison-chart">
+                                                <svg viewBox="0 0 900 180" role="img" aria-label="Grafik {{ $row['label'] }} per periode" data-sales-comparison-chart data-sales-comparison-chart-unit="{{ $comparisonChartUnit }}"></svg>
+                                            </div>
+                                            <script type="application/json" data-sales-comparison-chart-data>@json($comparisonChartData)</script>
+                                        </div>
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
