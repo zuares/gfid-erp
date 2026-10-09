@@ -7,7 +7,9 @@ use App\Models\Store;
 use App\Services\Marketplace\Ads\AdsDashboardService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class MarketplaceSalesDashboardController extends Controller
 {
@@ -129,6 +131,11 @@ class MarketplaceSalesDashboardController extends Controller
         $adDailyMetrics = app(AdsDashboardService::class)->getDailyMetrics(
             $adStoreIds,
             $storeId,
+            $from->toDateString(),
+            $to->toDateString(),
+        );
+        $adSpendByStoreDay = $this->adSpendByStoreDay(
+            $adStoreIds,
             $from->toDateString(),
             $to->toDateString(),
         );
@@ -271,7 +278,7 @@ class MarketplaceSalesDashboardController extends Controller
         // marketplace payload so the quantity KPI does not silently become 0.
         $orderRows = (clone $base)
             ->leftJoinSub($gmvItemTotals, 'gmv_itot', 'gmv_itot.order_key', '=', 'o.id')
-            ->selectRaw("o.id, DATE({$dateExpression}) as day, CASE WHEN COALESCE(gmv_itot.item_count, 0) > 0 AND COALESCE(gmv_itot.gmv, 0) > 0 THEN gmv_itot.gmv ELSE {$subtotalExpression} END as subtotal")
+            ->selectRaw("o.id, o.store_id, st.name as store_name, DATE({$dateExpression}) as day, CASE WHEN COALESCE(gmv_itot.item_count, 0) > 0 AND COALESCE(gmv_itot.gmv, 0) > 0 THEN gmv_itot.gmv ELSE {$subtotalExpression} END as subtotal")
             ->selectRaw('COALESCE(itot.total_qty, 0) as item_qty')
             ->addSelect('o.raw_json', 'o.raw_payload_json')
             ->get()
@@ -283,6 +290,8 @@ class MarketplaceSalesDashboardController extends Controller
 
                 return [
                     'day' => (string) $row->day,
+                    'store_id' => $row->store_id !== null ? (int) $row->store_id : null,
+                    'store_name' => trim((string) ($row->store_name ?: 'Toko marketplace')),
                     'subtotal' => (float) $row->subtotal,
                     'qty' => max(0, $quantity),
                 ];
@@ -324,7 +333,7 @@ class MarketplaceSalesDashboardController extends Controller
             . 'NULLIF(cogs_item.base_unit_cost, 0) * COALESCE(cogs_oi.qty, 0), '
             . 'NULLIF(cogs_item.hpp, 0) * COALESCE(cogs_oi.qty, 0), '
             . '0)';
-        $cogsByDay = (clone $base)
+        $cogsByStoreDay = (clone $base)
             ->leftJoin('marketplace_order_items as cogs_oi', function ($join) {
                 $join->on(
                     DB::raw('COALESCE(cogs_oi.marketplace_order_id, cogs_oi.order_id)'),
@@ -334,23 +343,47 @@ class MarketplaceSalesDashboardController extends Controller
             })
             ->leftJoin('items as cogs_item', 'cogs_item.id', '=', 'cogs_oi.internal_item_id')
             ->selectRaw("DATE({$dateExpression}) as day")
+            ->addSelect('o.store_id', 'st.name as store_name')
             ->selectRaw("COALESCE(SUM({$cogsExpression}), 0) as cogs")
-            ->groupByRaw("DATE({$dateExpression})")
-            ->pluck('cogs', 'day')
-            ->map(fn ($amount) => (float) $amount);
+            ->groupByRaw("DATE({$dateExpression}), o.store_id, st.name")
+            ->get()
+            ->map(function ($row) {
+                $row->day = (string) $row->day;
+                $row->store_id = $row->store_id !== null ? (int) $row->store_id : null;
+                $row->store_name = trim((string) ($row->store_name ?: 'Toko marketplace'));
+                $row->cogs = (float) $row->cogs;
+
+                return $row;
+            })
+            ->keyBy(fn ($row) => $this->storeDayKey($row->day, $row->store_id));
+        $cogsByDay = $cogsByStoreDay
+            ->groupBy('day')
+            ->map(fn ($rows) => (float) $rows->sum('cogs'));
 
         // Selaraskan dengan estimasi penghasilan pada data order. Nilai legacy
         // ini adalah sumber utama yang dipakai halaman detail order; settlement
         // final dan income detail hanya menjadi fallback untuk order yang belum
         // memiliki nilai estimasi tersimpan.
-        $estimatedPayoutByDay = (clone $base)
+        $estimatedPayoutByStoreDay = (clone $base)
             ->leftJoin('marketplace_order_settlements as payout_ms', 'payout_ms.order_id', '=', 'o.id')
             ->leftJoin('marketplace_order_income_estimates as payout_ie', 'payout_ie.marketplace_order_id', '=', 'o.id')
             ->selectRaw("DATE({$dateExpression}) as day")
+            ->addSelect('o.store_id', 'st.name as store_name')
             ->selectRaw('COALESCE(SUM(COALESCE(NULLIF(o.net_payout_estimated, 0), NULLIF(payout_ms.final_income, 0), payout_ie.estimated_escrow_amount, 0)), 0) as estimated_payout')
-            ->groupByRaw("DATE({$dateExpression})")
-            ->pluck('estimated_payout', 'day')
-            ->map(fn ($amount) => (float) $amount);
+            ->groupByRaw("DATE({$dateExpression}), o.store_id, st.name")
+            ->get()
+            ->map(function ($row) {
+                $row->day = (string) $row->day;
+                $row->store_id = $row->store_id !== null ? (int) $row->store_id : null;
+                $row->store_name = trim((string) ($row->store_name ?: 'Toko marketplace'));
+                $row->estimated_payout = (float) $row->estimated_payout;
+
+                return $row;
+            })
+            ->keyBy(fn ($row) => $this->storeDayKey($row->day, $row->store_id));
+        $estimatedPayoutByDay = $estimatedPayoutByStoreDay
+            ->groupBy('day')
+            ->map(fn ($rows) => (float) $rows->sum('estimated_payout'));
 
         $productLineValueExpression = 'CASE WHEN COALESCE(oi_total.line_net_amount, 0) > 0 THEN oi_total.line_net_amount WHEN COALESCE(oi_total.price, 0) > 0 THEN oi_total.price * COALESCE(oi_total.qty, 0) WHEN COALESCE(oi_total.line_gross_amount, 0) > 0 THEN oi_total.line_gross_amount ELSE 0 END';
         $productOrderTotals = DB::table('marketplace_order_items as oi_total')
@@ -710,6 +743,8 @@ class MarketplaceSalesDashboardController extends Controller
         $paymentSnapshotRows = (clone $paymentBase)
             ->select([
                 'o.id',
+                'o.store_id',
+                'st.name as store_name',
                 'o.payment_method',
                 'o.payment_status',
                 'o.subtotal_items',
@@ -1222,18 +1257,64 @@ SQL;
         $paymentSummary['buyer_shipping'] = (float) $paymentDaily->sum('buyer_shipping');
         $paymentSummary['total_promotion'] = (float) $paymentDaily->sum('total_promotion');
 
-        // Profit harian memakai Penjualan Neto setelah promosi seller.
+        // Profit harian memakai payout aktual/estimasi setelah dikurangi COGS.
         $daily = $daily->map(function ($row) use ($sellerNetSalesByDay, $cogsByDay, $estimatedPayoutByDay, $adSpendDaily) {
             $row->net_total = (float) data_get($sellerNetSalesByDay->get((string) $row->day), 'seller_net_sales', 0);
             $row->cogs = (float) $cogsByDay->get((string) $row->day, 0);
-            $row->gross_profit = $row->net_total - $row->cogs;
+            $row->estimated_payout = (float) ($estimatedPayoutByDay->get((string) $row->day, 0));
+            $row->gross_profit = $row->estimated_payout - $row->cogs;
             $row->ad_spend = (float) $adSpendDaily->get((string) $row->day, 0);
             $row->net_profit = $row->gross_profit - $row->ad_spend;
-            $row->estimated_payout = (float) ($estimatedPayoutByDay->get((string) $row->day, 0));
             $row->aov = $row->orders > 0 ? $row->net_total / $row->orders : 0;
 
             return $row;
         })->values();
+        $paymentStoreDaily = $paymentSnapshotRows
+            ->groupBy(fn ($row) => $this->storeDayKey($row->day, $row->store_id))
+            ->map(function ($rows) {
+                return (object) [
+                    'buyer_paid' => (float) $rows->sum('buyer_paid'),
+                    'seller_discounts' => (float) $rows->sum(fn ($row) =>
+                        (float) ($row->voucher_store ?? 0)
+                        + (float) ($row->bundle_discount ?? 0)
+                        + (float) ($row->combo_hemat ?? 0)
+                    ),
+                ];
+            });
+        $storeDaily = $orderRows
+            ->groupBy(fn (array $row) => $this->storeDayKey($row['day'], $row['store_id'] ?? null))
+            ->map(function ($rows) {
+                $first = (array) $rows->first();
+                $orders = $rows->count();
+                $subtotal = (float) $rows->sum('subtotal');
+
+                return (object) [
+                    'day' => (string) ($first['day'] ?? ''),
+                    'store_id' => $first['store_id'] ?? null,
+                    'store_name' => (string) ($first['store_name'] ?? 'Toko marketplace'),
+                    'orders' => $orders,
+                    'qty' => (int) $rows->sum('qty'),
+                    'subtotal' => $subtotal,
+                    'avg_units_per_order' => $orders > 0 ? (float) $rows->sum('qty') / $orders : 0,
+                ];
+            })
+            ->map(function ($row, $key) use ($paymentStoreDaily, $cogsByStoreDay, $estimatedPayoutByStoreDay, $adSpendByStoreDay) {
+                $payment = $paymentStoreDaily->get($key);
+                $row->net_total = max(
+                    $row->subtotal - (float) data_get($payment, 'seller_discounts', 0),
+                    0,
+                );
+                $row->cogs = (float) data_get($cogsByStoreDay->get($key), 'cogs', 0);
+                $row->estimated_payout = (float) data_get($estimatedPayoutByStoreDay->get($key), 'estimated_payout', 0);
+                $row->gross_profit = $row->estimated_payout - $row->cogs;
+                $row->ad_spend = (float) $adSpendByStoreDay->get($key, 0);
+                $row->net_profit = $row->gross_profit - $row->ad_spend;
+                $row->buyer_paid = (float) data_get($payment, 'buyer_paid', 0);
+
+                return $row;
+            })
+            ->groupBy('day')
+            ->map(fn ($rows) => $rows->sortBy('store_name')->values());
         $summary['aov'] = $summary['orders'] > 0 ? $summary['net_total'] / $summary['orders'] : 0;
 
         $shippingFailedStatusesSql = "'" . implode("', '", self::SHIPPING_FAILED_STATUSES) . "'";
@@ -1305,7 +1386,7 @@ SQL;
         // Katalog aktif berasal dari sinkronisasi marketplace, bukan dari
         // order pada periode. Dengan begitu produk tanpa transaksi tetap
         // masuk sebagai produk aktif marketplace.
-        $activeMarketplaceCatalog = $this->activeMarketplaceCatalog($storeId, $platformCode);
+        $activeMarketplaceCatalog = $this->activeMarketplaceCatalog($storeId, $platformCode, $to->toDateString());
 
         $comparisonMonth = null;
         $comparisonMonthPrevious = null;
@@ -1354,6 +1435,7 @@ SQL;
         return view('marketplace.dashboard.sales', [
             'summary' => $summary,
             'daily' => $daily,
+            'storeDaily' => $storeDaily,
             'products' => $products,
             'payments' => $payments,
             'paymentDaily' => $paymentDaily,
@@ -1396,30 +1478,114 @@ SQL;
         ]);
     }
 
+    private function storeDayKey(?string $day, mixed $storeId): string
+    {
+        return (string) $day . '|' . ($storeId === null ? '0' : (string) $storeId);
+    }
+
+    private function adSpendByStoreDay(array $storeIds, string $dateFrom, string $dateTo): Collection
+    {
+        $storeIds = collect($storeIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+        if ($storeIds === []) {
+            return collect();
+        }
+
+        $aggregate = function ($query): Collection {
+            return $query
+                ->get()
+                ->map(function ($row) {
+                    $row->day = substr((string) $row->date, 0, 10);
+                    $row->store_id = (int) $row->store_id;
+                    $row->spend = (float) ($row->spend ?? 0);
+
+                    return $row;
+                })
+                ->keyBy(fn ($row) => $this->storeDayKey($row->day, $row->store_id));
+        };
+
+        $shop = $aggregate(
+            DB::table('marketplace_ads_dailies')
+                ->whereIn('store_id', $storeIds)
+                ->whereBetween('date', [$dateFrom, $dateTo])
+                ->selectRaw('date, store_id, SUM(spend) as spend')
+                ->groupBy('date', 'store_id')
+        );
+        $campaign = $aggregate(
+            DB::table('marketplace_ad_campaign_dailies')
+                ->whereIn('store_id', $storeIds)
+                ->where('channel_campaign_id', 'not like', 'GMS-%')
+                ->whereBetween('date', [$dateFrom, $dateTo])
+                ->selectRaw('date, store_id, SUM(expense) as spend')
+                ->groupBy('date', 'store_id')
+        );
+        $gms = $aggregate(
+            DB::table('marketplace_ad_campaign_dailies')
+                ->whereIn('store_id', $storeIds)
+                ->where('channel_campaign_id', 'like', 'GMS-%')
+                ->whereBetween('date', [$dateFrom, $dateTo])
+                ->selectRaw('date, store_id, SUM(expense) as spend')
+                ->groupBy('date', 'store_id')
+        );
+
+        return $shop->keys()
+            ->merge($campaign->keys())
+            ->merge($gms->keys())
+            ->unique()
+            ->sort()
+            ->mapWithKeys(function (string $key) use ($shop, $campaign, $gms) {
+                $shopRow = $shop->get($key);
+                if ($shopRow) {
+                    return [$key => (float) $shopRow->spend];
+                }
+
+                return [$key => (float) ($campaign->get($key)->spend ?? 0) + (float) ($gms->get($key)->spend ?? 0)];
+            });
+    }
+
     /**
      * Ringkasan katalog marketplace yang masih aktif pada scope filter toko
      * dan channel. Variant tanpa model tetap dihitung sebagai satu variant.
      * Mapping kategori memakai mapping item marketplace yang paling baru.
      */
-    private function activeMarketplaceCatalog(?int $storeId, ?string $platformCode): array
+    private function activeMarketplaceCatalog(?int $storeId, ?string $platformCode, string $asOfDate): array
     {
         $platformCodes = $this->platformCodes($platformCode);
-        $activeProducts = DB::table('marketplace_products as mp')
+        $catalogProducts = DB::table('marketplace_products as mp')
             ->join('stores as st', 'st.id', '=', 'mp.store_id')
             ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
-            ->where('mp.item_status', 'NORMAL')
             ->where('st.is_active', true)
+            ->where(function ($query) use ($asOfDate) {
+                $query->whereNull('mp.created_at')
+                    ->orWhereDate('mp.created_at', '<=', $asOfDate);
+            })
             ->when($storeId, fn ($query) => $query->where('mp.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
             ->select('mp.id', 'mp.store_id', 'mp.item_id')
             ->get();
+
+        $productSnapshots = DB::table('marketplace_product_daily')
+            ->whereIn('marketplace_product_id', $catalogProducts->pluck('id')->all())
+            ->whereDate('date', '<=', $asOfDate)
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('marketplace_product_id')
+            ->map(fn ($rows) => $rows->first());
+        $activeProducts = $catalogProducts
+            ->filter(fn ($product) => strtoupper((string) data_get($productSnapshots->get($product->id), 'item_status', 'NORMAL')) === 'NORMAL')
+            ->values();
 
         if ($activeProducts->isEmpty()) {
             return [
                 'products' => 0,
                 'variants' => 0,
                 'by_category' => [],
-                'as_of' => now()->toDateString(),
+                'as_of' => $asOfDate,
             ];
         }
 
@@ -2365,12 +2531,17 @@ SQL;
 
         return (object) [
             'day' => (string) $row->day,
+            'store_id' => $row->store_id !== null ? (int) $row->store_id : null,
+            'store_name' => trim((string) ($row->store_name ?: 'Toko marketplace')),
             'category' => $this->paymentCategoryForDashboard($row->payment_method, $row->payment_status),
             'is_paid' => in_array(strtoupper((string) $row->payment_status), ['PAID', 'COMPLETED', 'SELESAI', 'LUNAS'], true),
             'buyer_paid' => max($buyerPaid, 0),
             'buyer_shipping' => max($shipping, 0),
             'buyer_service_fee' => max($buyerServiceFee, 0),
             'product_protection' => max($productProtection, 0),
+            'voucher_store' => max($voucherStore, 0),
+            'bundle_discount' => max((float) ($promotion['bundle_discount'] ?? 0), 0),
+            'combo_hemat' => max((float) ($promotion['combo_hemat'] ?? 0), 0),
         ];
     }
 
