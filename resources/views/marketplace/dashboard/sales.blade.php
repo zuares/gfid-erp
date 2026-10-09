@@ -951,7 +951,6 @@
     };
     $topProductCount = $marketplaceProductCount($products);
     $productAnalysisProducts = $products->values();
-    $productAnalysisSales = (float) $productAnalysisProducts->sum('sales');
     $productAnalysisNetSales = (float) $productAnalysisProducts->sum('net_sales');
     $productAnalysisBuyerPayment = (float) $productAnalysisProducts->sum('buyer_payment');
     $productAnalysisAdProducts = $productAnalysisProducts->filter(fn ($product) => $product->ad_spend_matched ?? false);
@@ -961,9 +960,19 @@
     $productAnalysisMappedCount = $productAnalysisProducts->filter(fn ($product) => (int) ($product->internal_item_id ?? 0) > 0)->count();
     $productAnalysisCostedProducts = $productAnalysisProducts->filter(fn ($product) => $product->gross_profit !== null);
     $productAnalysisHpp = (float) $productAnalysisCostedProducts->sum('hpp_total');
-    $productAnalysisGrossProfit = (float) $productAnalysisCostedProducts->sum('gross_profit');
+    $productAnalysisEstimatedPayout = (float) $productAnalysisProducts->sum('estimated_payout');
+    $productAnalysisGrossProfitPayout = $productAnalysisEstimatedPayout - $productAnalysisHpp;
+    $productAnalysisNetProfit = $productAnalysisGrossProfitPayout - $productAnalysisAdSpend;
+    $productAnalysisGrossMarginPayout = $productAnalysisEstimatedPayout > 0
+        ? ($productAnalysisGrossProfitPayout / $productAnalysisEstimatedPayout) * 100
+        : 0;
+    $productAnalysisNetMargin = $productAnalysisEstimatedPayout > 0
+        ? ($productAnalysisNetProfit / $productAnalysisEstimatedPayout) * 100
+        : 0;
+    $productAnalysisHppCoverage = $productAnalysisProducts->count() > 0
+        ? ($productAnalysisCostedProducts->count() / $productAnalysisProducts->count()) * 100
+        : 0;
     $productAnalysisContributionProfit = (float) $productAnalysisCostedProducts->sum('contribution_profit');
-    $productAnalysisGrossMargin = $productAnalysisNetSales > 0 ? ($productAnalysisGrossProfit / $productAnalysisNetSales) * 100 : 0;
     $productAnalysisContributionMargin = $productAnalysisNetSales > 0 ? ($productAnalysisContributionProfit / $productAnalysisNetSales) * 100 : 0;
     $productAnalysisAdSalesCoverage = $productAnalysisNetSales > 0 ? ($productAnalysisAdSales / $productAnalysisNetSales) * 100 : 0;
     $productAnalysisCategoryCount = $productAnalysisProducts->map(fn ($product) => trim((string) ($product->category_name ?? '')) ?: 'Tanpa kategori')->unique()->count();
@@ -2348,56 +2357,60 @@
                     <div class="sales-kicker mb-1">Inteligensi portofolio</div>
                     <h2 class="sales-section-title mb-1">Analitik Portofolio Produk</h2>
                 </div>
-                <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($productAnalysisCategoryCount) }} kategori · {{ number_format($productAnalysisProducts->count()) }} baris analisis</span>
+                <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($productAnalysisCategoryCount) }} kategori · {{ number_format($topProductCount) }} produk terjual</span>
             </div>
             <div class="sales-product-analysis-grid">
                 <div class="sales-product-analysis-kpi">
-                    <span class="sales-product-analysis-kpi-label">Penjualan Produk</span>
-                    <span class="sales-product-analysis-kpi-value">{{ $fmt($productAnalysisSales) }}</span>
+                    <span class="sales-product-analysis-kpi-label">Produk Terjual</span>
+                    <span class="sales-product-analysis-kpi-value">{{ number_format($topProductCount) }}</span>
                 </div>
                 <div class="sales-product-analysis-kpi">
                     <span class="sales-product-analysis-kpi-label">Penjualan Netto</span>
                     <span class="sales-product-analysis-kpi-value is-positive">{{ $fmt($productAnalysisNetSales) }}</span>
                 </div>
                 <div class="sales-product-analysis-kpi">
-                    <span class="sales-product-analysis-kpi-label">Realisasi Netto</span>
-                    <span class="sales-product-analysis-kpi-value {{ $productAnalysisSales > 0 && ($productAnalysisNetSales / $productAnalysisSales) >= .85 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisSales > 0 ? $percentDisplay(($productAnalysisNetSales / $productAnalysisSales) * 100) : '—' }}</span>
+                    <span class="sales-product-analysis-kpi-label">Est. Penghasilan</span>
+                    <span class="sales-product-analysis-kpi-value is-positive">{{ $fmt($productAnalysisEstimatedPayout) }}</span>
                 </div>
                 <div class="sales-product-analysis-kpi">
-                    <span class="sales-product-analysis-kpi-label">Top 10 Konsentrasi</span>
-                    <span class="sales-product-analysis-kpi-value {{ ($productAnalysisNetSales > 0 ? ($productAnalysisTop10Sales / $productAnalysisNetSales) : 0) <= .6 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisTop10Sales / $productAnalysisNetSales) * 100) : '—' }}</span>
+                    <span class="sales-product-analysis-kpi-label">Laba Kotor</span>
+                    <span class="sales-product-analysis-kpi-value {{ $productAnalysisGrossProfitPayout >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisGrossProfitPayout) }}</span>
                 </div>
                 <div class="sales-product-analysis-kpi">
-                    <span class="sales-product-analysis-kpi-label">Coverage Mapping Internal</span>
-                    <span class="sales-product-analysis-kpi-value {{ $productAnalysisMappedCount === $productAnalysisProducts->count() ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisProducts->count() > 0 ? $percentDisplay(($productAnalysisMappedCount / $productAnalysisProducts->count()) * 100) : '—' }}</span>
+                    <span class="sales-product-analysis-kpi-label">Laba Bersih</span>
+                    <span class="sales-product-analysis-kpi-value {{ $productAnalysisNetProfit >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisNetProfit) }}</span>
                 </div>
                 <div class="sales-product-analysis-kpi">
-                    <span class="sales-product-analysis-kpi-label">ROAS Blended</span>
-                    <span class="sales-product-analysis-kpi-value {{ $productAnalysisAdSpend > 0 ? ($productAnalysisAdSales / $productAnalysisAdSpend >= 2 ? 'is-positive' : 'is-warning') : 'is-muted' }}">{{ $productAnalysisAdSpend > 0 ? $multipleDisplay($productAnalysisAdSales / $productAnalysisAdSpend) : '—' }}</span>
+                    <span class="sales-product-analysis-kpi-label">Margin Bersih</span>
+                    <span class="sales-product-analysis-kpi-value {{ $productAnalysisNetMargin >= 20 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisEstimatedPayout > 0 ? $percentDisplay($productAnalysisNetMargin) : '—' }}</span>
                 </div>
             </div>
             <div class="row g-3 sales-product-analysis-tables">
                 <div class="col-lg-6">
                     <table class="table table-sm align-middle sales-table sales-product-analysis-table">
-                        <thead><tr><th colspan="2">Portofolio</th><th class="text-end">Nilai</th></tr></thead>
+                        <thead><tr><th colspan="2">Skala &amp; kesehatan</th><th class="text-end">Nilai</th></tr></thead>
                         <tbody>
-                            <tr><td class="analysis-label" colspan="2">Baris produk aktif</td><td class="text-end analysis-value">{{ number_format($productAnalysisProducts->count()) }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Kategori aktif</td><td class="text-end analysis-value">{{ number_format($productAnalysisCategoryCount) }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Top 20% kontribusi</td><td class="text-end analysis-value">{{ $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisTop20Sales / $productAnalysisNetSales) * 100) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Pembayaran Pembeli / Penjualan</td><td class="text-end analysis-value">{{ $productAnalysisSales > 0 ? $percentDisplay(($productAnalysisBuyerPayment / $productAnalysisSales) * 100) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Produk terjual</td><td class="text-end analysis-value">{{ number_format($topProductCount) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Kategori terjual</td><td class="text-end analysis-value">{{ number_format($productAnalysisCategoryCount) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Kontribusi Top 20% produk</td><td class="text-end analysis-value">{{ $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisTop20Sales / $productAnalysisNetSales) * 100) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Pembayaran / Penjualan Netto</td><td class="text-end analysis-value">{{ $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisBuyerPayment / $productAnalysisNetSales) * 100) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Unit per Order</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? number_format($activeProductKpi['qty'] / $activeProductKpi['orders'], 2, ',', '.') : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">AOV Penjualan</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_sales']) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">AOV Pembayaran</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_payment']) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Produk dengan HPP</td><td class="text-end analysis-value">{{ number_format($productAnalysisCostedProducts->count()) }} / {{ number_format($productAnalysisProducts->count()) }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Total HPP</td><td class="text-end analysis-value">{{ $productAnalysisHpp > 0 ? $fmtHpp($productAnalysisHpp) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Margin Kotor</td><td class="text-end analysis-value {{ $productAnalysisGrossMargin >= 25 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisGrossMargin !== 0 ? $percentDisplay($productAnalysisGrossMargin) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Coverage Mapping Internal</td><td class="text-end analysis-value">{{ $productAnalysisProducts->count() > 0 ? $percentDisplay(($productAnalysisMappedCount / $productAnalysisProducts->count()) * 100) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Coverage HPP</td><td class="text-end analysis-value">{{ $productAnalysisProducts->count() > 0 ? $percentDisplay($productAnalysisHppCoverage) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">COGS (HPP)</td><td class="text-end analysis-value">{{ $productAnalysisHpp > 0 ? $fmtHpp($productAnalysisHpp) : '—' }}</td></tr>
                         </tbody>
                     </table>
                 </div>
                 <div class="col-lg-6">
                     <table class="table table-sm align-middle sales-table sales-product-analysis-table">
-                        <thead><tr><th colspan="2">Kinerja Iklan</th><th class="text-end">Nilai</th></tr></thead>
+                        <thead><tr><th colspan="2">Profitabilitas &amp; iklan</th><th class="text-end">Nilai</th></tr></thead>
                         <tbody>
+                            <tr><td class="analysis-label" colspan="2">Laba Kotor</td><td class="text-end analysis-value {{ $productAnalysisGrossProfitPayout >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisGrossProfitPayout) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Margin Kotor</td><td class="text-end analysis-value {{ $productAnalysisGrossMarginPayout >= 25 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisEstimatedPayout > 0 ? $percentDisplay($productAnalysisGrossMarginPayout) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Laba Bersih</td><td class="text-end analysis-value {{ $productAnalysisNetProfit >= 0 ? 'is-positive' : 'is-danger' }}">{{ $fmt($productAnalysisNetProfit) }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">Margin Bersih</td><td class="text-end analysis-value {{ $productAnalysisNetMargin >= 20 ? 'is-positive' : 'is-warning' }}">{{ $productAnalysisEstimatedPayout > 0 ? $percentDisplay($productAnalysisNetMargin) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Produk Teratribusi Iklan</td><td class="text-end analysis-value">{{ number_format($productAnalysisAdProducts->count()) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Penjualan Atribusi Iklan</td><td class="text-end analysis-value">{{ $fmt($productAnalysisAdSales) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Biaya Iklan</td><td class="text-end analysis-value is-danger">{{ $fmt($productAnalysisAdSpend) }}</td></tr>
