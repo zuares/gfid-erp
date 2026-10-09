@@ -934,8 +934,8 @@
     $pct = fn ($value, $total) => $total > 0 ? number_format(((float) $value / (float) $total) * 100, 1, ',', '.') : '0,0';
     $salesTabs = ['sales', 'products', 'payments', 'promotions', 'shipping', 'income', 'orders'];
     $activeTab = in_array(request('tab'), $salesTabs, true) ? request('tab') : 'sales';
-    $comparisonMode = $filters['comparison_mode'] ?? 'period';
-    $comparisonModeLabel = $comparisonMode === 'month' ? 'Bln sama' : 'Periode';
+    $comparisonMode = $filters['comparison_mode'] ?? 'month';
+    $comparisonModeLabel = $comparisonMode === 'month' ? 'Bulan lalu' : 'Periode lalu';
     $todayDate = now()->toDateString();
     $yesterdayDate = now()->subDay()->toDateString();
     $activeDatePreset = 'custom';

@@ -84,7 +84,7 @@ class MarketplaceSalesDashboardController extends Controller
         $platformCodes = $this->platformCodes($platformCode);
         $comparisonMode = in_array($request->query('comparison_mode'), ['period', 'month'], true)
             ? $request->query('comparison_mode')
-            : 'period';
+            : 'month';
         $stores = Store::query()
             ->where('is_active', true)
             ->with('channel')
