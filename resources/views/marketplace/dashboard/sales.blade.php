@@ -625,8 +625,26 @@
     .sales-dashboard .sales-product-comparison-table { min-width: 980px; }
     .sales-dashboard .sales-product-comparison-table th,
     .sales-dashboard .sales-product-comparison-table td { white-space: nowrap; }
-    .sales-dashboard .sales-product-comparison-table th { font-size: .61rem; }
-    .sales-dashboard .sales-product-comparison-table td { font-size: .72rem; }
+    .sales-dashboard .sales-payment-comparison-table,
+    .sales-dashboard .sales-funding-table { min-width: 760px; }
+    .sales-dashboard .sales-product-comparison-table th,
+    .sales-dashboard .sales-payment-comparison-table th,
+    .sales-dashboard .sales-funding-table th { padding: .72rem .72rem .64rem; font-size: .61rem; vertical-align: bottom; }
+    .sales-dashboard .sales-product-comparison-table td,
+    .sales-dashboard .sales-payment-comparison-table td,
+    .sales-dashboard .sales-funding-table td { padding: .68rem .72rem; font-size: .72rem; }
+    .sales-dashboard .sales-product-comparison-table th,
+    .sales-dashboard .sales-product-comparison-table td,
+    .sales-dashboard .sales-payment-comparison-table th,
+    .sales-dashboard .sales-payment-comparison-table td,
+    .sales-dashboard .sales-funding-table th,
+    .sales-dashboard .sales-funding-table td { vertical-align: middle; }
+    .sales-dashboard .sales-product-comparison-table .sales-period-current,
+    .sales-dashboard .sales-payment-comparison-table .sales-period-current,
+    .sales-dashboard .sales-funding-table .sales-period-current { background: color-mix(in srgb, var(--sales-accent-soft) 32%, var(--sales-card) 68%); }
+    .sales-dashboard .sales-product-comparison-table .sales-period-current .sales-period-label,
+    .sales-dashboard .sales-payment-comparison-table .sales-period-current .sales-period-label,
+    .sales-dashboard .sales-funding-table .sales-period-current .sales-period-label { color: var(--sales-accent); }
     .sales-dashboard .sales-sales-comparison-table { min-width: 760px; }
     .sales-dashboard .sales-comparison-section .sales-section-subtitle { display: block; margin-top: .22rem; color: var(--sales-muted); font-size: .68rem; font-weight: 550; }
     .sales-dashboard .sales-sales-comparison-table th,
@@ -1330,41 +1348,48 @@
         ['group' => 'Profitabilitas', 'label' => 'Laba Kotor', 'key' => 'gross_profit_payout', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas', 'label' => 'Laba Bersih', 'key' => 'net_profit', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Kontribusi Pasca Iklan', 'key' => 'contribution_profit', 'format' => $currencyDisplay],
-        ['group' => 'Profitabilitas & iklan', 'label' => 'Margin Kontribusi', 'key' => 'contribution_margin', 'format' => $percentDisplay],
+        ['group' => 'Profitabilitas & iklan', 'label' => 'Margin Kontribusi', 'key' => 'contribution_margin', 'format' => $percentDisplay, 'delta_mode' => 'points'],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Penjualan Atribusi Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
-        ['group' => 'Profitabilitas & iklan', 'label' => 'ACOS', 'key' => 'acos', 'format' => $percentDisplay],
+        ['group' => 'Profitabilitas & iklan', 'label' => 'ACOS', 'key' => 'acos', 'format' => $percentDisplay, 'delta_mode' => 'points'],
         ['group' => 'Profitabilitas & iklan', 'label' => 'ROAS Blended', 'key' => 'roas', 'format' => $multipleDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'CPA', 'key' => 'cpa', 'format' => $currencyDisplay],
-        ['group' => 'Kualitas data', 'label' => 'Coverage Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
-        ['group' => 'Kualitas data', 'label' => 'Coverage HPP', 'key' => 'hpp_coverage', 'format' => $percentDisplay],
+        ['group' => 'Kualitas data', 'label' => 'Coverage Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay, 'delta_mode' => 'points'],
+        ['group' => 'Kualitas data', 'label' => 'Coverage HPP', 'key' => 'hpp_coverage', 'format' => $percentDisplay, 'delta_mode' => 'points'],
     ];
-    $salesComparisonMetrics = function ($rows) use ($salesKpiMetrics) {
+    $salesComparisonMetrics = function ($rows, $data = []) use ($salesKpiMetrics) {
         $metrics = $salesKpiMetrics($rows);
         $orders = max(1, $metrics['orders']);
+        $impressions = (int) data_get($data, 'adImpressionsTotal', 0);
+        $clicks = (int) data_get($data, 'adClicksTotal', 0);
+        $adOrders = (int) data_get($data, 'adOrdersTotal', 0);
 
         return $metrics + [
             'avg_units_per_order' => $metrics['orders'] > 0 ? (float) collect($rows)->sum(fn ($row) => (float) data_get($row, 'qty', 0)) / $orders : 0,
             'net_margin' => $metrics['net_sales'] > 0 ? ($metrics['net_profit'] / $metrics['net_sales']) * 100 : null,
             'ad_ratio' => $metrics['net_sales'] > 0 ? ($metrics['ad_spend'] / $metrics['net_sales']) * 100 : null,
+            'impressions' => $impressions,
+            'clicks' => $clicks,
+            'ctr' => $impressions > 0 ? ($clicks / $impressions) * 100 : null,
+            'cvr' => $clicks > 0 ? ($adOrders / $clicks) * 100 : null,
         ];
     };
     $salesComparisonSources = $comparisonMode === 'month'
         ? [
-            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily],
-            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'daily' => data_get($comparisonMonthData, 'daily', [])],
-            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousData, 'daily', [])],
-            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousTwoData, 'daily', [])],
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily, 'data' => ['adImpressionsTotal' => $adImpressionsTotal, 'adClicksTotal' => $adClicksTotal, 'adOrdersTotal' => $adOrdersTotal]],
+            ['label' => 'Bulan -1', 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'daily' => data_get($comparisonMonthData, 'daily', []), 'data' => $comparisonMonthData],
+            ['label' => 'Bulan -2', 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousData, 'daily', []), 'data' => $comparisonMonthPreviousData],
+            ['label' => 'Bulan -3', 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousTwoData, 'daily', []), 'data' => $comparisonMonthPreviousTwoData],
         ]
         : [
-            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily],
-            ['label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'daily' => data_get($comparisonPeriodData, 'daily', [])],
-            ['label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousData, 'daily', [])],
-            ['label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousTwoData, 'daily', [])],
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'daily' => $daily, 'data' => ['adImpressionsTotal' => $adImpressionsTotal, 'adClicksTotal' => $adClicksTotal, 'adOrdersTotal' => $adOrdersTotal]],
+            ['label' => 'Periode -1', 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'daily' => data_get($comparisonPeriodData, 'daily', []), 'data' => $comparisonPeriodData],
+            ['label' => 'Periode -2', 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousData, 'daily', []), 'data' => $comparisonPeriodPreviousData],
+            ['label' => 'Periode -3', 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousTwoData, 'daily', []), 'data' => $comparisonPeriodPreviousTwoData],
         ];
     $salesComparisonPeriods = collect($salesComparisonSources)->map(function ($period) use ($salesComparisonMetrics) {
-        $period['metrics'] = $salesComparisonMetrics($period['daily']);
-        unset($period['daily']);
+        $period['metrics'] = $salesComparisonMetrics($period['daily'], $period['data'] ?? []);
+        unset($period['daily'], $period['data']);
 
         return $period;
     })->all();
@@ -1372,15 +1397,19 @@
         ['group' => 'Volume transaksi', 'label' => 'Pesanan', 'key' => 'orders', 'format' => $numberDisplay],
         ['group' => 'Volume transaksi', 'label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
         ['group' => 'Volume transaksi', 'label' => 'Unit / Order', 'key' => 'avg_units_per_order', 'format' => fn ($value) => number_format((float) $value, 2, ',', '.')],
-        ['group' => 'Pendapatan', 'label' => 'P Kotor', 'key' => 'gross_sales', 'format' => $currencyDisplay],
-        ['group' => 'Pendapatan', 'label' => 'P Bersih', 'key' => 'net_sales', 'format' => $currencyDisplay],
+        ['group' => 'Pendapatan', 'label' => 'Gross Sales', 'key' => 'gross_sales', 'format' => $currencyDisplay],
+        ['group' => 'Pendapatan', 'label' => 'Net Sales', 'key' => 'net_sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'Est Penghasilan', 'key' => 'payout', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas', 'label' => 'COGS', 'key' => 'cogs', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas', 'label' => 'Laba Kotor', 'key' => 'gross_profit', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas', 'label' => 'Laba Bersih', 'key' => 'net_profit', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas', 'label' => 'Margin Bersih', 'key' => 'net_margin', 'format' => fn ($value) => $value === null ? '—' : $percentDisplay($value)],
         ['group' => 'Iklan', 'label' => 'Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
-        ['group' => 'Iklan', 'label' => 'Iklan / P Bersih', 'key' => 'ad_ratio', 'format' => fn ($value) => $value === null ? '—' : $percentDisplay($value)],
+        ['group' => 'Iklan', 'label' => 'Iklan / Net Sales', 'key' => 'ad_ratio', 'format' => fn ($value) => $value === null ? '—' : $percentDisplay($value)],
+        ['group' => 'Iklan', 'label' => 'Dilihat', 'key' => 'impressions', 'format' => $numberDisplay],
+        ['group' => 'Iklan', 'label' => 'Klik', 'key' => 'clicks', 'format' => $numberDisplay],
+        ['group' => 'Iklan', 'label' => 'CTR', 'key' => 'ctr', 'format' => fn ($value) => $value === null ? '—' : $percentDisplay($value)],
+        ['group' => 'Iklan', 'label' => 'CVR', 'key' => 'cvr', 'format' => fn ($value) => $value === null ? '—' : $percentDisplay($value)],
     ];
     $activeProductKpi = $productComparisonMetrics($products, $activeMarketplaceCatalog);
     $previousMonthProductKpi = $productComparisonMetrics($previousMonthProducts, $previousMonthActiveCatalog);
@@ -1538,14 +1567,14 @@
         ['group' => 'Profitabilitas', 'label' => 'Laba Kotor', 'key' => 'gross_profit_payout', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas', 'label' => 'Laba Bersih', 'key' => 'net_profit', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Kontribusi Pasca Iklan', 'key' => 'contribution_profit', 'format' => $currencyDisplay],
-        ['group' => 'Profitabilitas & iklan', 'label' => 'Margin Kontribusi', 'key' => 'contribution_margin', 'format' => $percentDisplay],
+        ['group' => 'Profitabilitas & iklan', 'label' => 'Margin Kontribusi', 'key' => 'contribution_margin', 'format' => $percentDisplay, 'delta_mode' => 'points'],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Penjualan Atribusi Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
-        ['group' => 'Profitabilitas & iklan', 'label' => 'ACOS', 'key' => 'acos', 'format' => $percentDisplay],
+        ['group' => 'Profitabilitas & iklan', 'label' => 'ACOS', 'key' => 'acos', 'format' => $percentDisplay, 'delta_mode' => 'points'],
         ['group' => 'Profitabilitas & iklan', 'label' => 'ROAS Blended', 'key' => 'roas', 'format' => $multipleDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'CPA', 'key' => 'cpa', 'format' => $currencyDisplay],
-        ['group' => 'Kualitas data', 'label' => 'Coverage Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay],
-        ['group' => 'Kualitas data', 'label' => 'Coverage HPP', 'key' => 'hpp_coverage', 'format' => $percentDisplay],
+        ['group' => 'Kualitas data', 'label' => 'Coverage Mapping Internal', 'key' => 'mapping_rate', 'format' => $percentDisplay, 'delta_mode' => 'points'],
+        ['group' => 'Kualitas data', 'label' => 'Coverage HPP', 'key' => 'hpp_coverage', 'format' => $percentDisplay, 'delta_mode' => 'points'],
     ];
     $platformPromotionMetrics = function ($rows, $periodSummary, $promotionOrders = null) {
         $rows = collect($rows);
@@ -1664,11 +1693,11 @@
                 ['label' => 'Sales Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
                 ['label' => 'Order Iklan', 'key' => 'ad_orders', 'format' => $numberDisplay],
                 ['label' => 'ROAS', 'key' => 'ad_roas', 'format' => $multipleDisplay],
-                ['label' => 'CTR', 'key' => 'ad_ctr', 'format' => $percentDisplay],
-                ['label' => 'CVR', 'key' => 'ad_cvr', 'format' => $percentDisplay],
+                ['label' => 'CTR', 'key' => 'ad_ctr', 'format' => $percentDisplay, 'delta_mode' => 'points'],
+                ['label' => 'CVR', 'key' => 'ad_cvr', 'format' => $percentDisplay, 'delta_mode' => 'points'],
                 ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
                 ['label' => 'CPA Iklan', 'key' => 'ad_cpa', 'format' => $currencyDisplay],
-                ['label' => 'Rasio Iklan / Sales Iklan', 'key' => 'ad_sales_rate', 'format' => $percentDisplay],
+                ['label' => 'Rasio Iklan / Sales Iklan', 'key' => 'ad_sales_rate', 'format' => $percentDisplay, 'delta_mode' => 'points'],
             ],
         ],
         [
@@ -1679,7 +1708,7 @@
                 ['label' => 'Order Promo', 'key' => 'voucher_platform_orders', 'format' => $numberDisplay],
                 ['label' => 'Voucher Platform', 'key' => 'voucher_platform', 'format' => $currencyDisplay],
                 ['label' => 'Rata-rata Promo', 'key' => 'voucher_platform_average', 'format' => $currencyDisplay],
-                ['label' => 'Kontribusi Sales', 'key' => 'platform_rate', 'format' => $percentDisplay],
+                ['label' => 'Kontribusi Sales', 'key' => 'platform_rate', 'format' => $percentDisplay, 'delta_mode' => 'points'],
             ],
         ],
         [
@@ -1690,7 +1719,7 @@
                 ['label' => 'Order Promo', 'key' => 'voucher_seller_orders', 'format' => $numberDisplay],
                 ['label' => 'Voucher Seller', 'key' => 'voucher_seller', 'format' => $currencyDisplay],
                 ['label' => 'Rata-rata Promo', 'key' => 'voucher_seller_average', 'format' => $currencyDisplay],
-                ['label' => 'Kontribusi Sales', 'key' => 'voucher_seller_rate', 'format' => $percentDisplay],
+                ['label' => 'Kontribusi Sales', 'key' => 'voucher_seller_rate', 'format' => $percentDisplay, 'delta_mode' => 'points'],
             ],
         ],
         [
@@ -1701,7 +1730,7 @@
                 ['label' => 'Order Promo', 'key' => 'bundle_discount_orders', 'format' => $numberDisplay],
                 ['label' => 'Paket Diskon', 'key' => 'bundle_discount', 'format' => $currencyDisplay],
                 ['label' => 'Rata-rata Promo', 'key' => 'bundle_discount_average', 'format' => $currencyDisplay],
-                ['label' => 'Kontribusi Sales', 'key' => 'bundle_discount_rate', 'format' => $percentDisplay],
+                ['label' => 'Kontribusi Sales', 'key' => 'bundle_discount_rate', 'format' => $percentDisplay, 'delta_mode' => 'points'],
             ],
         ],
         [
@@ -1712,7 +1741,7 @@
                 ['label' => 'Order Promo', 'key' => 'combo_hemat_orders', 'format' => $numberDisplay],
                 ['label' => 'Kombo Hemat', 'key' => 'combo_hemat', 'format' => $currencyDisplay],
                 ['label' => 'Rata-rata Promo', 'key' => 'combo_hemat_average', 'format' => $currencyDisplay],
-                ['label' => 'Kontribusi Sales', 'key' => 'combo_hemat_rate', 'format' => $percentDisplay],
+                ['label' => 'Kontribusi Sales', 'key' => 'combo_hemat_rate', 'format' => $percentDisplay, 'delta_mode' => 'points'],
             ],
         ],
     ];
@@ -1745,6 +1774,32 @@
 
         return [
             ['label' => $comparisonModeLabel, 'value' => $compareMetric($current, $previous, $formatter, $mode, $higherIsBetter)],
+        ];
+    };
+    $comparisonCellMeta = function ($currentValue, $comparisonValue, callable $formatter, string $differenceMode = 'relative'): ?array {
+        if (!is_numeric($currentValue) || !is_numeric($comparisonValue)) {
+            return null;
+        }
+
+        $currentValue = (float) $currentValue;
+        $comparisonValue = (float) $comparisonValue;
+        $difference = $currentValue - $comparisonValue;
+        $comparisonBase = abs($comparisonValue);
+        $percentageLabel = $comparisonBase > 0
+            ? number_format(abs(($difference / $comparisonBase) * 100), 1, ',', '.').'%'
+            : ($currentValue === 0.0 ? '0,0%' : 'Baru');
+        $tone = abs($difference) < 0.00001
+            ? 'is-neutral'
+            : ($difference > 0 ? 'is-up' : 'is-down');
+
+        return [
+            'arrow' => $difference > 0 ? 'bi-arrow-up-right' : ($difference < 0 ? 'bi-arrow-down-right' : 'bi-arrow-left-right'),
+            'arrow_title' => $difference > 0 ? 'Aktif lebih tinggi' : ($difference < 0 ? 'Aktif lebih rendah' : 'Nilai sama'),
+            'percentage' => $percentageLabel,
+            'difference' => '('.($difference > 0 ? '+' : ($difference < 0 ? '−' : '±')).($differenceMode === 'points'
+                ? number_format(abs($difference), 1, ',', '.').' pt'
+                : $formatter(abs($difference))).')',
+            'tone' => $tone,
         ];
     };
     $paymentDatePhase = function ($date): string {
@@ -1812,9 +1867,9 @@
         ['label' => 'AOV Buyer Paid', 'key' => 'aov', 'formatter' => $currencyDisplay],
         ['label' => 'Seller Net Sales', 'key' => 'seller_net_sales', 'formatter' => $currencyDisplay],
         ['label' => 'AOV Seller Net', 'key' => 'seller_aov', 'formatter' => $currencyDisplay],
-        ['label' => 'COD %', 'key' => 'cod_order_share', 'formatter' => $percentDisplay],
-        ['label' => 'Non-COD %', 'key' => 'non_cod_order_share', 'formatter' => $percentDisplay],
-        ['label' => 'Pay Later %', 'key' => 'pay_later_order_share', 'formatter' => $percentDisplay],
+        ['label' => 'COD %', 'key' => 'cod_order_share', 'formatter' => $percentDisplay, 'delta_mode' => 'points'],
+        ['label' => 'Non-COD %', 'key' => 'non_cod_order_share', 'formatter' => $percentDisplay, 'delta_mode' => 'points'],
+        ['label' => 'Pay Later %', 'key' => 'pay_later_order_share', 'formatter' => $percentDisplay, 'delta_mode' => 'points'],
     ];
     $paymentOrderShare = function ($summary, $daily, string $field): float {
         $orders = (int) data_get($summary, 'orders', 0);
@@ -1909,8 +1964,8 @@
     @include('marketplace.dashboard.partials._kpis', [
         'kpiTitle' => 'Penjualan',
         'kpis' => [
-            ['group' => 'Pendapatan', 'label' => 'P Kotor', 'value' => $fmt($currentSalesKpi['gross_sales']), 'note' => number_format($currentSalesKpi['orders']).' pesanan', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($currentSalesKpi['gross_sales'], $previousMonthSalesKpi['gross_sales'], $previousPeriodSalesKpi['gross_sales'], $currencyDisplay)],
-            ['group' => 'Pendapatan', 'label' => 'P Bersih', 'value' => $fmt($currentSalesKpi['net_sales']), 'note' => 'setelah diskon seller', 'icon' => 'bi-graph-down-arrow', 'comparisons' => $kpiComparisons($currentSalesKpi['net_sales'], $previousMonthSalesKpi['net_sales'], $previousPeriodSalesKpi['net_sales'], $currencyDisplay)],
+            ['group' => 'Pendapatan', 'label' => 'Gross Sales', 'value' => $fmt($currentSalesKpi['gross_sales']), 'note' => number_format($currentSalesKpi['orders']).' pesanan', 'icon' => 'bi-cash-stack', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($currentSalesKpi['gross_sales'], $previousMonthSalesKpi['gross_sales'], $previousPeriodSalesKpi['gross_sales'], $currencyDisplay)],
+            ['group' => 'Pendapatan', 'label' => 'Net Sales', 'value' => $fmt($currentSalesKpi['net_sales']), 'note' => 'setelah diskon seller', 'icon' => 'bi-graph-down-arrow', 'comparisons' => $kpiComparisons($currentSalesKpi['net_sales'], $previousMonthSalesKpi['net_sales'], $previousPeriodSalesKpi['net_sales'], $currencyDisplay)],
             ['group' => 'Pendapatan', 'label' => 'Est Penghasilan', 'value' => $fmt($currentSalesKpi['payout']), 'note' => 'dasar laba kotor', 'icon' => 'bi-wallet2', 'comparisons' => $kpiComparisons($currentSalesKpi['payout'], $previousMonthSalesKpi['payout'], $previousPeriodSalesKpi['payout'], $currencyDisplay)],
             ['group' => 'Profitabilitas', 'label' => 'COGS (HPP)', 'value' => $fmt($currentSalesKpi['cogs']), 'note' => 'biaya produk terjual', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($currentSalesKpi['cogs'], $previousMonthSalesKpi['cogs'], $previousPeriodSalesKpi['cogs'], $currencyDisplay, 'relative', false)],
             ['group' => 'Profitabilitas', 'label' => 'Laba Kotor', 'value' => $fmt($currentSalesKpi['gross_profit']), 'note' => 'payout − COGS', 'icon' => 'bi-graph-up-arrow', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($currentSalesKpi['gross_profit'], $previousMonthSalesKpi['gross_profit'], $previousPeriodSalesKpi['gross_profit'], $currencyDisplay)],
@@ -1936,7 +1991,7 @@
                         <div class="d-flex align-items-center gap-2">
                             <span class="sales-trend-compare" data-sales-trend-compare>{{ $trendComparisonLabel }}</span>
                             <select class="sales-trend-select" data-sales-trend-metric aria-label="Pilih indikator tren">
-                                <option value="net_sales">P Bersih</option>
+                                <option value="net_sales">Net Sales</option>
                                 <option value="estimated_payout">Est Penghasilan</option>
                                 <option value="net_profit">Laba Bersih</option>
                             </select>
@@ -1952,12 +2007,12 @@
                 </div>
                 <div class="sales-trend-insights">
                     <div class="sales-trend-insight">
-                        <div class="sales-trend-insight-label">Puncak P Bersih</div>
+                        <div class="sales-trend-insight-label">Puncak Net Sales</div>
                         <div class="sales-trend-insight-value">{{ $fmt($trendPeak['net_sales']) }}</div>
                         <div class="sales-trend-insight-meta"><span>{{ $trendPeak['label'] }}</span><strong>{{ number_format((float) $trendPeak['net_sales'] > 0 ? ((float) $trendPeak['net_sales'] / max(1, (float) $trendCurrentRows->sum('net_sales'))) * 100 : 0, 1, ',', '.') }}%</strong></div>
                     </div>
                     <div class="sales-trend-insight">
-                        <div class="sales-trend-insight-label">Terendah P Bersih</div>
+                        <div class="sales-trend-insight-label">Terendah Net Sales</div>
                         <div class="sales-trend-insight-value">{{ $fmt($trendLow['net_sales']) }}</div>
                         <div class="sales-trend-insight-meta"><span>{{ $trendLow['label'] }}</span><strong>{{ $trendLow['net_profit'] < 0 ? 'Laba negatif' : 'Perlu dipantau' }}</strong></div>
                     </div>
@@ -2090,8 +2145,8 @@
                             <th class="text-end">Pesanan</th>
                             <th class="text-end">Unit Terjual</th>
                             <th class="text-end">Unit / Order</th>
-                            <th class="text-end">P Kotor</th>
-                            <th class="text-end">P Bersih</th>
+                            <th class="text-end">Gross Sales</th>
+                            <th class="text-end">Net Sales</th>
                             <th class="text-end">Di Bayar</th>
                             <th class="text-end">Est Penghasilan</th>
                             <th class="text-end">COGS (HPP)</th>
@@ -2347,23 +2402,24 @@
             ],
         ])
         @if ($activeComparison)
-            <section class="card sales-card shadow-sm mb-3">
+            <section class="card sales-card sales-comparison-section shadow-sm mb-3">
                 <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-2">
                     <div>
                         <div class="sales-kicker mb-1">Perbandingan periode</div>
                         <h2 class="sales-section-title mb-1">Perbandingan kinerja produk</h2>
+                        <div class="sales-section-subtitle">Aktif sebagai baseline, dengan perubahan terhadap setiap periode pembanding.</div>
                     </div>
-                    <span class="badge sales-badge rounded-pill px-3 py-2">{{ count($productComparisonPeriods) }} periode</span>
+                    <span class="badge sales-badge rounded-pill px-3 py-2"><i class="bi bi-columns-gap me-1" aria-hidden="true"></i>{{ count($productComparisonPeriods) }} periode</span>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle sales-table sales-product-comparison-table mb-0">
                         <thead>
                             <tr>
                                 <th class="ps-3">Metrik</th>
-                                @foreach ($productComparisonPeriods as $period)
-                                    <th class="text-end">
-                                        {{ $period['label'] }}
-                                        <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
+                                @foreach ($productComparisonPeriods as $periodIndex => $period)
+                                    <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
+                                        <span class="sales-period-label">{{ $period['label'] }}</span>
+                                        <span class="sales-period-range">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
                                     </th>
                                 @endforeach
                             </tr>
@@ -2383,11 +2439,29 @@
                                 @endif
                                 <tr>
                                     <td class="ps-3 fw-semibold">{{ $row['label'] }}</td>
-                                    @foreach ($productComparisonPeriods as $period)
+                                    @foreach ($productComparisonPeriods as $periodIndex => $period)
                                         @php
                                             $comparisonValue = $period['metrics'][$row['key']] ?? null;
+                                            $currentValue = $productComparisonPeriods[0]['metrics'][$row['key']] ?? null;
+                                            $comparisonMeta = $periodIndex > 0
+                                                ? $comparisonCellMeta($currentValue, $comparisonValue, $row['format'], $row['delta_mode'] ?? 'relative')
+                                                : null;
                                         @endphp
-                                        <td class="text-end">{{ $comparisonValue === null ? '—' : $row['format']($comparisonValue) }}</td>
+                                        <td class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
+                                            <span class="sales-comparison-cell">
+                                                <span class="sales-comparison-value-row">
+                                                    {{ $comparisonValue === null ? '—' : $row['format']($comparisonValue) }}
+                                                    @if ($comparisonMeta)
+                                                        <span class="sales-comparison-delta {{ $comparisonMeta['tone'] }}" title="{{ $comparisonMeta['arrow_title'] }} dibanding {{ $period['label'] }}">
+                                                            <i class="bi {{ $comparisonMeta['arrow'] }}" aria-hidden="true"></i>{{ $comparisonMeta['percentage'] }}
+                                                        </span>
+                                                    @endif
+                                                </span>
+                                                @if ($comparisonMeta)
+                                                    <span class="sales-comparison-difference {{ $comparisonMeta['tone'] }}">{{ $comparisonMeta['difference'] }}</span>
+                                                @endif
+                                            </span>
+                                        </td>
                                     @endforeach
                                 </tr>
                             @endforeach
@@ -2493,10 +2567,10 @@
                                                     <thead>
                                                         <tr>
                                                             <th class="ps-3">Metrik</th>
-                                                            @foreach ($categoryComparisonPeriods as $period)
-                                                                <th class="text-end">
-                                                                    {{ $period['label'] }}
-                                                                    <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
+                                                            @foreach ($categoryComparisonPeriods as $periodIndex => $period)
+                                                                <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
+                                                                    <span class="sales-period-label">{{ $period['label'] }}</span>
+                                                                    <span class="sales-period-range">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
                                                                 </th>
                                                             @endforeach
                                                         </tr>
@@ -2516,9 +2590,29 @@
                                                             @endif
                                                             <tr>
                                                                 <td class="ps-3 fw-semibold">{{ $comparisonRow['label'] }}</td>
-                                                                @foreach ($categoryComparisonPeriods as $period)
-                                                                    @php $categoryComparisonValue = $categoryRow['periods'][$period['key']]['metrics'][$comparisonRow['key']] ?? null; @endphp
-                                                                    <td class="text-end">{{ $categoryComparisonValue === null ? '—' : $comparisonRow['format']($categoryComparisonValue) }}</td>
+                                                                @foreach ($categoryComparisonPeriods as $periodIndex => $period)
+                                                                    @php
+                                                                        $categoryComparisonValue = $categoryRow['periods'][$period['key']]['metrics'][$comparisonRow['key']] ?? null;
+                                                                        $categoryCurrentValue = $categoryRow['periods']['active']['metrics'][$comparisonRow['key']] ?? null;
+                                                                        $categoryComparisonMeta = $periodIndex > 0
+                                                                            ? $comparisonCellMeta($categoryCurrentValue, $categoryComparisonValue, $comparisonRow['format'], $comparisonRow['delta_mode'] ?? 'relative')
+                                                                            : null;
+                                                                    @endphp
+                                                                    <td class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
+                                                                        <span class="sales-comparison-cell">
+                                                                            <span class="sales-comparison-value-row">
+                                                                                {{ $categoryComparisonValue === null ? '—' : $comparisonRow['format']($categoryComparisonValue) }}
+                                                                                @if ($categoryComparisonMeta)
+                                                                                    <span class="sales-comparison-delta {{ $categoryComparisonMeta['tone'] }}" title="{{ $categoryComparisonMeta['arrow_title'] }} dibanding {{ $period['label'] }}">
+                                                                                        <i class="bi {{ $categoryComparisonMeta['arrow'] }}" aria-hidden="true"></i>{{ $categoryComparisonMeta['percentage'] }}
+                                                                                    </span>
+                                                                                @endif
+                                                                            </span>
+                                                                            @if ($categoryComparisonMeta)
+                                                                                <span class="sales-comparison-difference {{ $categoryComparisonMeta['tone'] }}">{{ $categoryComparisonMeta['difference'] }}</span>
+                                                                            @endif
+                                                                        </span>
+                                                                    </td>
                                                                 @endforeach
                                                             </tr>
                                                         @endforeach
@@ -3013,23 +3107,24 @@
             ],
         ])
         @if ($activeComparison)
-            <section class="card sales-card shadow-sm mb-3">
+            <section class="card sales-card sales-comparison-section shadow-sm mb-3">
                 <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-2">
                     <div>
-                        <div class="sales-kicker mb-1">Period comparison</div>
+                        <div class="sales-kicker mb-1">Perbandingan periode</div>
                         <h2 class="sales-section-title mb-1">Perbandingan pembayaran</h2>
+                        <div class="sales-section-subtitle">Aktif sebagai baseline, dengan perubahan terhadap setiap periode pembanding.</div>
                     </div>
-                    <span class="badge sales-badge rounded-pill px-3 py-2">4 periode</span>
+                    <span class="badge sales-badge rounded-pill px-3 py-2"><i class="bi bi-columns-gap me-1" aria-hidden="true"></i>{{ count($paymentComparisonPeriods) }} periode</span>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle sales-table sales-payment-comparison-table mb-0">
                         <thead>
                             <tr>
                                 <th class="ps-3">Metrik</th>
-                                @foreach ($paymentComparisonPeriods as $period)
-                                    <th class="text-end">
-                                        {{ $period['label'] }}
-                                        <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
+                                @foreach ($paymentComparisonPeriods as $periodIndex => $period)
+                                    <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
+                                        <span class="sales-period-label">{{ $period['label'] }}</span>
+                                        <span class="sales-period-range">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
                                         @foreach ($period['phases'] as $phase)
                                             <span class="sales-period-phase-badge sales-period-phase-badge--{{ $phase['key'] }}" title="{{ $phase['label'] }}: tanggal {{ $phase['range'] }}">
                                                 <i class="sales-phase-dot sales-phase-dot--{{ $phase['key'] }}"></i>
@@ -3045,8 +3140,29 @@
                             @foreach ($paymentComparisonRows as $row)
                                 <tr>
                                     <td class="ps-3 fw-semibold">{{ $row['label'] }}</td>
-                                    @foreach ($paymentComparisonPeriods as $period)
-                                        <td class="text-end">{{ $row['formatter']($period['metrics'][$row['key']] ?? 0) }}</td>
+                                    @foreach ($paymentComparisonPeriods as $periodIndex => $period)
+                                        @php
+                                            $comparisonValue = $period['metrics'][$row['key']] ?? null;
+                                            $currentValue = $paymentComparisonPeriods[0]['metrics'][$row['key']] ?? null;
+                                            $comparisonMeta = $periodIndex > 0
+                                                ? $comparisonCellMeta($currentValue, $comparisonValue, $row['formatter'], $row['delta_mode'] ?? 'relative')
+                                                : null;
+                                        @endphp
+                                        <td class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
+                                            <span class="sales-comparison-cell">
+                                                <span class="sales-comparison-value-row">
+                                                    {{ $row['formatter']($comparisonValue ?? 0) }}
+                                                    @if ($comparisonMeta)
+                                                        <span class="sales-comparison-delta {{ $comparisonMeta['tone'] }}" title="{{ $comparisonMeta['arrow_title'] }} dibanding {{ $period['label'] }}">
+                                                            <i class="bi {{ $comparisonMeta['arrow'] }}" aria-hidden="true"></i>{{ $comparisonMeta['percentage'] }}
+                                                        </span>
+                                                    @endif
+                                                </span>
+                                                @if ($comparisonMeta)
+                                                    <span class="sales-comparison-difference {{ $comparisonMeta['tone'] }}">{{ $comparisonMeta['difference'] }}</span>
+                                                @endif
+                                            </span>
+                                        </td>
                                     @endforeach
                                 </tr>
                             @endforeach
@@ -3168,23 +3284,24 @@
             ],
         ])
         @foreach ($promotionFundingSections as $fundingSection)
-            <section class="card sales-card sales-funding-section shadow-sm">
+            <section class="card sales-card sales-comparison-section sales-funding-section shadow-sm">
                 <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                     <div>
                         <div class="sales-kicker mb-1">{{ $fundingSection['kicker'] }}</div>
                         <h2 class="sales-section-title mb-1">{{ $fundingSection['title'] }}</h2>
+                        <div class="sales-section-subtitle">Aktif sebagai baseline, dengan perubahan terhadap setiap periode pembanding.</div>
                     </div>
-                    <span class="badge sales-badge rounded-pill px-3 py-2">4 periode</span>
+                    <span class="badge sales-badge rounded-pill px-3 py-2"><i class="bi bi-columns-gap me-1" aria-hidden="true"></i>{{ count($platformPromotionPeriods) }} periode</span>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle sales-table sales-funding-table">
                         <thead>
                             <tr>
                                 <th class="ps-3">Metrik</th>
-                                @foreach ($platformPromotionPeriods as $period)
-                                    <th class="text-end">
-                                        {{ $period['label'] }}
-                                        <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
+                                @foreach ($platformPromotionPeriods as $periodIndex => $period)
+                                    <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
+                                        <span class="sales-period-label">{{ $period['label'] }}</span>
+                                        <span class="sales-period-range">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
                                     </th>
                                 @endforeach
                             </tr>
@@ -3193,9 +3310,28 @@
                             @foreach ($fundingSection['rows'] as $row)
                                 <tr>
                                     <td class="ps-3 fw-semibold">{{ $row['label'] }}</td>
-                                    @foreach ($platformPromotionPeriods as $period)
-                                        <td class="text-end {{ str_contains($row['label'], 'Total') ? 'fw-semibold' : '' }}">
-                                            {{ $row['format']($period['metrics'][$row['key']]) }}
+                                    @foreach ($platformPromotionPeriods as $periodIndex => $period)
+                                        @php
+                                            $comparisonValue = $period['metrics'][$row['key']] ?? null;
+                                            $currentValue = $platformPromotionPeriods[0]['metrics'][$row['key']] ?? null;
+                                            $comparisonMeta = $periodIndex > 0
+                                                ? $comparisonCellMeta($currentValue, $comparisonValue, $row['format'], $row['delta_mode'] ?? 'relative')
+                                                : null;
+                                        @endphp
+                                        <td class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }} {{ str_contains($row['label'], 'Total') ? 'fw-semibold' : '' }}">
+                                            <span class="sales-comparison-cell">
+                                                <span class="sales-comparison-value-row">
+                                                    {{ $row['format']($comparisonValue ?? 0) }}
+                                                    @if ($comparisonMeta)
+                                                        <span class="sales-comparison-delta {{ $comparisonMeta['tone'] }}" title="{{ $comparisonMeta['arrow_title'] }} dibanding {{ $period['label'] }}">
+                                                            <i class="bi {{ $comparisonMeta['arrow'] }}" aria-hidden="true"></i>{{ $comparisonMeta['percentage'] }}
+                                                        </span>
+                                                    @endif
+                                                </span>
+                                                @if ($comparisonMeta)
+                                                    <span class="sales-comparison-difference {{ $comparisonMeta['tone'] }}">{{ $comparisonMeta['difference'] }}</span>
+                                                @endif
+                                            </span>
                                         </td>
                                     @endforeach
                                 </tr>
