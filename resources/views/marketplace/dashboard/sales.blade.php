@@ -663,7 +663,28 @@
     .sales-dashboard .sales-category-summary-table th:nth-child(13) { width: 8%; }
     .sales-dashboard .sales-category-summary-table th,
     .sales-dashboard .sales-category-summary-table td { text-align: start; }
-    .sales-dashboard .sales-category-summary-table tbody td:nth-child(n+3) { color: var(--sales-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
+    .sales-dashboard .sales-category-summary-table thead tr:first-child th {
+        background: var(--sales-soft);
+        color: var(--sales-ink);
+        font-size: .58rem;
+        font-weight: 850;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+    .sales-dashboard .sales-category-summary-table thead tr:first-child th.sales-category-table-group-head {
+        border-left: 1px solid var(--sales-line);
+        border-right: 1px solid var(--sales-line);
+        text-align: center;
+    }
+    .sales-dashboard .sales-category-summary-table thead tr:nth-child(2) th {
+        color: var(--sales-muted);
+        font-size: .55rem;
+        font-weight: 750;
+        line-height: 1.15;
+    }
+    .sales-dashboard .sales-category-summary-table thead th:nth-child(n+3),
+    .sales-dashboard .sales-category-summary-table tbody td:nth-child(n+3) { text-align: end; }
+    .sales-dashboard .sales-category-summary-table tbody td:nth-child(n+3) { color: var(--sales-ink); font-weight: 500; font-variant-numeric: tabular-nums; }
     .sales-dashboard .sales-category-summary-table tbody td:first-child { color: var(--sales-muted); font-variant-numeric: tabular-nums; text-align: start; }
     .sales-dashboard .sales-category-summary-table .sales-category-name { overflow: hidden; text-overflow: ellipsis; }
     .sales-dashboard .sales-category-summary-table > tbody > tr.sales-category-comparison-row { cursor: pointer; transition: background-color .16s ease, box-shadow .16s ease; }
@@ -2345,19 +2366,25 @@
                     <table class="table table-sm align-middle sales-table sales-category-summary-table mb-0">
                         <thead>
                             <tr>
-                                <th class="ps-3">No.</th>
-                                <th>Kategori Item</th>
+                                <th class="ps-3" rowspan="2">No.</th>
+                                <th rowspan="2">Kategori Item</th>
+                                <th class="sales-category-table-group-head" colspan="3">Katalog Aktif</th>
+                                <th class="sales-category-table-group-head" colspan="2">Transaksi</th>
+                                <th class="sales-category-table-group-head" colspan="2">Pendapatan</th>
+                                <th class="sales-category-table-group-head" colspan="4">Profitabilitas</th>
+                            </tr>
+                            <tr>
                                 <th>Produk Aktif</th>
                                 <th>Variant Aktif</th>
                                 <th>Variant Tidak Terjual</th>
                                 <th>Order</th>
                                 <th>Unit</th>
-                                <th class="text-end">Penjualan Netto</th>
-                                <th class="text-end">Kontribusi Penjualan</th>
-                                <th class="text-end">Estimasi Penghasilan</th>
-                                <th class="text-end">Laba Kotor</th>
-                                <th class="text-end">Margin Kontribusi</th>
-                                <th class="text-end pe-3">Laba Bersih</th>
+                                <th>Penjualan Netto</th>
+                                <th>Kontribusi Penjualan</th>
+                                <th>Estimasi Penghasilan</th>
+                                <th>Laba Kotor</th>
+                                <th>Margin Kontribusi</th>
+                                <th class="pe-3">Laba Bersih</th>
                             </tr>
                         </thead>
                         <tbody>
