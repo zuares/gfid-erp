@@ -330,6 +330,25 @@
     .sales-dashboard .sales-funding-section .sales-table tbody tr:last-child td {
         border-bottom: 0;
     }
+    .sales-dashboard .sales-cost-section {
+        border-color: color-mix(in srgb, #f59e0b 28%, var(--sales-line) 72%);
+        background: color-mix(in srgb, #fffbeb 34%, var(--sales-card) 66%);
+    }
+    .sales-dashboard .sales-cost-section .sales-section-header {
+        background: linear-gradient(180deg, color-mix(in srgb, #f59e0b 8%, var(--sales-card) 92%), var(--sales-card));
+        border-bottom: 1px solid color-mix(in srgb, #f59e0b 18%, var(--sales-line) 82%);
+    }
+    .sales-dashboard .sales-cost-section .sales-kicker,
+    .sales-dashboard .sales-cost-section .sales-period-current .sales-period-label { color: #b45309; }
+    .sales-dashboard .sales-cost-section .sales-badge {
+        color: #b45309;
+        background: color-mix(in srgb, #f59e0b 12%, var(--sales-card) 88%);
+        border-color: color-mix(in srgb, #f59e0b 30%, var(--sales-line) 70%);
+    }
+    .sales-dashboard .sales-cost-section .sales-period-current { background: color-mix(in srgb, #f59e0b 9%, var(--sales-card) 91%); }
+    body[data-theme="dark"] .sales-dashboard .sales-cost-section .sales-kicker,
+    body[data-theme="dark"] .sales-dashboard .sales-cost-section .sales-period-current .sales-period-label,
+    body[data-theme="dark"] .sales-dashboard .sales-cost-section .sales-badge { color: #fbbf24; }
     .sales-dashboard .sales-funding-table {
         width: 100%;
         table-layout: fixed;
@@ -3284,7 +3303,7 @@
             ],
         ])
         @foreach ($promotionFundingSections as $fundingSection)
-            <section class="card sales-card sales-comparison-section sales-funding-section shadow-sm">
+            <section class="card sales-card sales-comparison-section sales-funding-section {{ $fundingSection['title'] === 'Biaya Iklan' ? 'sales-cost-section' : '' }} shadow-sm">
                 <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
                     <div>
                         <div class="sales-kicker mb-1">{{ $fundingSection['kicker'] }}</div>
