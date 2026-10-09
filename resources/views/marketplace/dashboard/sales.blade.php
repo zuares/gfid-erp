@@ -457,8 +457,49 @@
     .sales-dashboard .sales-product-table td { white-space: nowrap; }
     .sales-dashboard .sales-product-table .sales-product-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .sales-dashboard .sales-product-table.sales-promotion-table { width: 100%; min-width: 0; table-layout: fixed; }
-    .sales-dashboard .sales-product-table.sales-promotion-table th { font-size: clamp(.42rem, .08vw + .4rem, .52rem); line-height: 1.1; padding: .34rem .18rem; white-space: normal; overflow-wrap: anywhere; }
-    .sales-dashboard .sales-product-table.sales-promotion-table td { font-size: clamp(.58rem, .12vw + .54rem, .66rem); padding: .42rem .18rem; }
+    .sales-dashboard .sales-product-table.sales-promotion-table th { font-size: clamp(.48rem, .08vw + .45rem, .6rem); line-height: 1.15; padding: .42rem .24rem; white-space: normal; overflow-wrap: anywhere; }
+    .sales-dashboard .sales-product-table.sales-promotion-table td { font-size: clamp(.6rem, .12vw + .56rem, .7rem); padding: .48rem .24rem; }
+    .sales-dashboard .sales-product-table.sales-promotion-table thead tr:first-child th {
+        background: var(--sales-soft);
+        color: var(--sales-ink);
+        font-size: .58rem;
+        font-weight: 850;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+    .sales-dashboard .sales-product-table.sales-promotion-table thead tr:nth-child(2) th {
+        color: var(--sales-muted);
+        font-size: .55rem;
+        font-weight: 800;
+    }
+    .sales-dashboard .sales-product-table.sales-promotion-table .sales-product-table-group-head {
+        border-left: 1px solid var(--sales-line);
+        border-right: 1px solid var(--sales-line);
+        text-align: center;
+    }
+    .sales-dashboard .sales-product-table-wrap { position: relative; }
+    .sales-dashboard .sales-product-table th:first-child,
+    .sales-dashboard .sales-product-table td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 3;
+        background: var(--sales-card);
+    }
+    .sales-dashboard .sales-product-table th:nth-child(2),
+    .sales-dashboard .sales-product-table td:nth-child(2) {
+        position: sticky;
+        left: 4%;
+        z-index: 3;
+        background: var(--sales-card);
+        box-shadow: 8px 0 10px -12px rgba(15, 23, 42, .65);
+    }
+    .sales-dashboard .sales-product-table thead th { z-index: 5; }
+    .sales-dashboard .sales-product-table .sales-product-group-row > td:first-child,
+    .sales-dashboard .sales-product-table .sales-product-group-row > td:nth-child(2) { background: var(--sales-soft); }
+    .sales-dashboard .sales-product-table .sales-product-marketplace-row > td:first-child,
+    .sales-dashboard .sales-product-table .sales-product-marketplace-row > td:nth-child(2) { background: color-mix(in srgb, var(--sales-accent-soft) 24%, var(--sales-card) 76%); }
+    .sales-dashboard .sales-product-table .sales-product-internal-row > td:first-child,
+    .sales-dashboard .sales-product-table .sales-product-internal-row > td:nth-child(2) { background: color-mix(in srgb, var(--sales-soft) 72%, var(--sales-card) 28%); }
     .sales-dashboard .sales-product-group-row td { background: var(--sales-soft); border-top: 2px solid var(--sales-line); color: var(--sales-ink); padding-block: .62rem; }
     .sales-dashboard .sales-product-category-toggle { display: flex; width: 100%; align-items: center; gap: .55rem; border: 0; background: transparent; color: inherit; padding: 0; text-align: left; }
     .sales-dashboard .sales-product-category-toggle:hover { color: var(--accent, #2563eb); }
@@ -2637,7 +2678,11 @@
                     <div class="sales-kicker mb-1">Daftar kinerja produk</div>
                     <h2 class="sales-section-title mb-1">Analisis Produk Terjual Marketplace</h2>
                 </div>
-                <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($topProductCount) }} produk terjual · {{ number_format($activeProductKpi['variants']) }} variant terjual</span>
+                <div class="d-flex flex-wrap gap-2 justify-content-end">
+                    <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($productAnalysisCategoryCount) }} kategori</span>
+                    <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($topProductCount) }} produk</span>
+                    <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($activeProductKpi['variants']) }} variant</span>
+                </div>
             </div>
             <div class="sales-product-hierarchy" aria-label="Hierarki detail produk">
                 <span><i class="bi bi-collection" aria-hidden="true"></i>Kategori item</span>
@@ -2647,7 +2692,7 @@
             @if ($products->isEmpty())
                 <div class="sales-empty text-center"><i class="bi bi-box-seam d-block fs-3 mb-2"></i>Belum ada detail produk pada periode ini.</div>
             @else
-                <div class="table-responsive">
+                <div class="table-responsive sales-product-table-wrap">
                     <table class="table table-sm table-hover align-middle sales-table sales-product-table sales-promotion-table">
                         <colgroup>
                             <col style="width: 4%">
@@ -2664,7 +2709,27 @@
                             <col style="width: 5%">
                             <col style="width: 7%">
                         </colgroup>
-                        <thead><tr><th scope="col" class="sales-index-column">No.</th><th>Produk Terjual Marketplace / Variant Terjual</th><th class="text-end" title="Variant: HPP terakhir per unit · Marketplace/kategori: total HPP berdasarkan unit">HPP Unit / Total HPP</th><th class="text-end">Order Unik</th><th class="text-end">Unit</th><th class="text-end">Penjualan</th><th class="text-end">Penjualan Netto</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Biaya Iklan</th><th class="text-end">Penjualan Atribusi Iklan</th><th class="text-end">ACOS</th><th class="text-end">ROAS</th><th class="text-end pe-3">CPA</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th scope="col" class="sales-index-column" rowspan="2">No.</th>
+                                <th rowspan="2">Produk / Variant</th>
+                                <th class="sales-product-table-group-head" colspan="6">Kinerja Penjualan</th>
+                                <th class="sales-product-table-group-head" colspan="5">Kinerja Iklan</th>
+                            </tr>
+                            <tr>
+                                <th class="text-end" title="Variant: HPP terakhir per unit · Marketplace/kategori: total HPP berdasarkan unit">HPP</th>
+                                <th class="text-end">Order</th>
+                                <th class="text-end">Unit</th>
+                                <th class="text-end">Penjualan</th>
+                                <th class="text-end">Penjualan Netto</th>
+                                <th class="text-end">Pembayaran</th>
+                                <th class="text-end">Biaya Iklan</th>
+                                <th class="text-end">Penjualan Iklan</th>
+                                <th class="text-end">ACOS</th>
+                                <th class="text-end">ROAS</th>
+                                <th class="text-end pe-3">CPA</th>
+                            </tr>
+                        </thead>
                         <tbody>
                             @php
                                 $productGroups = $products
