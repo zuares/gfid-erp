@@ -628,18 +628,24 @@
     .sales-dashboard .sales-product-comparison-table th { font-size: .61rem; }
     .sales-dashboard .sales-product-comparison-table td { font-size: .72rem; }
     .sales-dashboard .sales-sales-comparison-table { min-width: 760px; }
+    .sales-dashboard .sales-comparison-section .sales-section-subtitle { display: block; margin-top: .22rem; color: var(--sales-muted); font-size: .68rem; font-weight: 550; }
     .sales-dashboard .sales-sales-comparison-table th,
     .sales-dashboard .sales-sales-comparison-table td { white-space: nowrap; }
-    .sales-dashboard .sales-sales-comparison-table th { font-size: .61rem; }
-    .sales-dashboard .sales-sales-comparison-table td { font-size: .72rem; }
-    .sales-dashboard .sales-sales-comparison-table .sales-period-current { background: color-mix(in srgb, var(--sales-accent-soft) 36%, var(--sales-card) 64%); }
+    .sales-dashboard .sales-sales-comparison-table th { padding: .72rem .72rem .64rem; font-size: .61rem; vertical-align: bottom; }
+    .sales-dashboard .sales-sales-comparison-table td { padding: .68rem .72rem; font-size: .72rem; vertical-align: middle; }
+    .sales-dashboard .sales-sales-comparison-table .sales-period-current { background: color-mix(in srgb, var(--sales-accent-soft) 32%, var(--sales-card) 68%); }
+    .sales-dashboard .sales-sales-comparison-table .sales-period-current .sales-period-label { color: var(--sales-accent); }
+    .sales-dashboard .sales-period-label { display: block; color: var(--sales-ink); font-size: .65rem; font-weight: 800; letter-spacing: .035em; line-height: 1.1; text-transform: uppercase; }
+    .sales-dashboard .sales-period-range { display: block; margin-top: .25rem; color: var(--sales-muted); font-size: .56rem; font-weight: 600; line-height: 1.15; }
+    .sales-dashboard .sales-comparison-metric { color: var(--sales-ink); font-weight: 750; }
     .sales-dashboard .sales-comparison-cell { display: inline-flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: .15rem; }
-    .sales-dashboard .sales-comparison-value-row { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: .28rem; }
-    .sales-dashboard .sales-comparison-delta { display: inline-flex; align-items: center; gap: .1rem; font-size: .56rem; font-weight: 700; line-height: 1; opacity: .78; white-space: nowrap; }
-    .sales-dashboard .sales-comparison-delta.is-up { color: var(--success, #16a34a); }
-    .sales-dashboard .sales-comparison-delta.is-down { color: var(--danger, #dc2626); }
-    .sales-dashboard .sales-comparison-delta.is-neutral { color: var(--sales-muted); }
-    .sales-dashboard .sales-comparison-difference { font-size: .52rem; font-weight: 650; line-height: 1; opacity: .78; white-space: nowrap; }
+    .sales-dashboard .sales-comparison-value-row { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: .34rem; font-variant-numeric: tabular-nums; }
+    .sales-dashboard .sales-comparison-delta { display: inline-flex; align-items: center; justify-content: center; min-width: 3.7rem; gap: .1rem; padding: .16rem .28rem; border: 1px solid transparent; border-radius: 999px; font-size: .56rem; font-weight: 750; line-height: 1; text-align: center; white-space: nowrap; }
+    .sales-dashboard .sales-comparison-delta i { font-size: .62rem; }
+    .sales-dashboard .sales-comparison-delta.is-up { color: var(--success, #16a34a); background: color-mix(in srgb, var(--success, #16a34a) 10%, var(--sales-card) 90%); border-color: color-mix(in srgb, var(--success, #16a34a) 18%, var(--sales-line) 82%); }
+    .sales-dashboard .sales-comparison-delta.is-down { color: var(--danger, #dc2626); background: color-mix(in srgb, var(--danger, #dc2626) 9%, var(--sales-card) 91%); border-color: color-mix(in srgb, var(--danger, #dc2626) 18%, var(--sales-line) 82%); }
+    .sales-dashboard .sales-comparison-delta.is-neutral { color: var(--sales-muted); background: color-mix(in srgb, var(--sales-muted) 8%, var(--sales-card) 92%); border-color: color-mix(in srgb, var(--sales-muted) 15%, var(--sales-line) 85%); }
+    .sales-dashboard .sales-comparison-difference { font-size: .52rem; font-weight: 650; line-height: 1; opacity: .72; white-space: nowrap; }
     .sales-dashboard .sales-comparison-difference.is-up { color: var(--success, #16a34a); }
     .sales-dashboard .sales-comparison-difference.is-down { color: var(--danger, #dc2626); }
     .sales-dashboard .sales-comparison-difference.is-neutral { color: var(--sales-muted); }
@@ -1966,23 +1972,24 @@
         </section>
     @endif
     @if ($activeComparison)
-        <section class="card sales-card shadow-sm mb-3" aria-labelledby="sales-period-comparison-title">
+        <section class="card sales-card sales-comparison-section shadow-sm mb-3" aria-labelledby="sales-period-comparison-title">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-2">
                 <div>
                     <div class="sales-kicker mb-1">Perbandingan periode</div>
                     <h2 id="sales-period-comparison-title" class="sales-section-title mb-1">Perbandingan kinerja penjualan</h2>
+                    <div class="sales-section-subtitle d-block">Aktif sebagai baseline, dengan perubahan terhadap setiap periode pembanding.</div>
                 </div>
-                <span class="badge sales-badge rounded-pill px-3 py-2">{{ count($salesComparisonPeriods) }} periode</span>
+                <span class="badge sales-badge rounded-pill px-3 py-2"><i class="bi bi-columns-gap me-1" aria-hidden="true"></i>{{ count($salesComparisonPeriods) }} periode</span>
             </div>
             <div class="table-responsive">
                 <table class="table table-sm table-hover align-middle sales-table sales-sales-comparison-table mb-0">
                     <thead>
                         <tr>
-                            <th class="ps-3">Metrik</th>
+                            <th class="ps-3" scope="col">Metrik</th>
                             @foreach ($salesComparisonPeriods as $periodIndex => $period)
-                                <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
-                                    {{ $period['label'] }}
-                                    <div class="small fw-normal text-muted">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</div>
+                                <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}" scope="col">
+                                    <span class="sales-period-label">{{ $period['label'] }}</span>
+                                    <span class="sales-period-range">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
                                 </th>
                             @endforeach
                         </tr>
@@ -1997,7 +2004,7 @@
                                 @php $salesComparisonGroup = $row['group']; @endphp
                             @endif
                             <tr>
-                                <td class="ps-3 fw-semibold">{{ $row['label'] }}</td>
+                                <td class="ps-3 sales-comparison-metric">{{ $row['label'] }}</td>
                                 @foreach ($salesComparisonPeriods as $periodIndex => $period)
                                     @php $comparisonValue = $period['metrics'][$row['key']] ?? null; @endphp
                                     @php
@@ -2035,7 +2042,7 @@
                                                 {{ $comparisonValue === null ? '—' : $row['format']($comparisonValue) }}
                                                 @if ($comparisonArrow)
                                                     <span class="sales-comparison-delta {{ $comparisonDeltaTone }}" title="{{ $comparisonArrowTitle }} dibanding {{ $period['label'] }}">
-                                                        {{ $comparisonPercentageLabel }}
+                                                        <i class="bi {{ $comparisonArrow }}" aria-hidden="true"></i>{{ $comparisonPercentageLabel }}
                                                     </span>
                                                 @endif
                                             </span>
