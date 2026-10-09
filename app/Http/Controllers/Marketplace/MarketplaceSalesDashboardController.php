@@ -446,6 +446,7 @@ class MarketplaceSalesDashboardController extends Controller
                 AND period_prl.unit_price > 0
             ORDER BY period_pr.date DESC, period_pr.id DESC, period_prl.id DESC
             LIMIT 1)";
+        $resolvedProductInternalItemExpression = 'COALESCE(NULLIF(oi.internal_item_id, 0), sku_mapping_channel.item_id, sku_mapping_global.item_id)';
 
         $products = DB::table('marketplace_order_items as oi')
             ->join('marketplace_orders as o', function ($join) {
@@ -455,7 +456,20 @@ class MarketplaceSalesDashboardController extends Controller
             ->leftJoin('marketplace_order_income_estimates as payout_ie', 'payout_ie.marketplace_order_id', '=', 'o.id')
             ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
             ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
-            ->leftJoin('items as internal_item', 'internal_item.id', '=', 'oi.internal_item_id')
+            // SKU mapping is the source of truth even when the denormalized
+            // order item projection has not been backfilled yet. Resolve the
+            // channel-specific mapping first, then fall back to global.
+            ->leftJoin('sku_mappings as sku_mapping_channel', function ($join) use ($marketplaceProductSkuExpression) {
+                $join->whereRaw("sku_mapping_channel.marketplace_sku = {$marketplaceProductSkuExpression}")
+                    ->whereRaw('LOWER(sku_mapping_channel.channel_code) = LOWER(ch.code)');
+            })
+            ->leftJoin('sku_mappings as sku_mapping_global', function ($join) use ($marketplaceProductSkuExpression) {
+                $join->whereRaw("sku_mapping_global.marketplace_sku = {$marketplaceProductSkuExpression}")
+                    ->whereNull('sku_mapping_global.channel_code');
+            })
+            ->leftJoin('items as internal_item', function ($join) use ($resolvedProductInternalItemExpression) {
+                $join->on('internal_item.id', '=', DB::raw($resolvedProductInternalItemExpression));
+            })
             ->leftJoin('item_categories as internal_category', 'internal_category.id', '=', 'internal_item.item_category_id')
             ->leftJoinSub($productOrderTotals, 'product_order_totals', 'product_order_totals.order_key', '=', 'o.id')
             ->whereRaw("{$dateExpression} IS NOT NULL")
@@ -471,7 +485,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->selectRaw("COALESCE(NULLIF({$periodLastPurchaseOrderPriceExpression}, 0), NULLIF({$periodLastReceiptPriceExpression}, 0), MAX(NULLIF(internal_item.base_unit_cost, 0)), MAX(NULLIF(internal_item.hpp, 0)), 0) as hpp", [$to->toDateString(), $to->toDateString()])
             ->selectRaw("MAX(NULLIF(internal_category.code, '')) as category_code")
             ->selectRaw("MAX(NULLIF(internal_category.name, '')) as category_name")
-            ->selectRaw('MAX(NULLIF(oi.internal_item_id, 0)) as internal_item_id')
+            ->selectRaw("MAX({$resolvedProductInternalItemExpression}) as internal_item_id")
             ->selectRaw("MAX(NULLIF(oi.external_item_id, '')) as external_item_id")
             ->selectRaw('COALESCE(SUM(CASE WHEN oi.qty > 0 THEN oi.qty ELSE 0 END), 0) as qty')
             ->selectRaw('COUNT(DISTINCT o.id) as orders')
@@ -481,10 +495,10 @@ class MarketplaceSalesDashboardController extends Controller
             ->selectRaw("COALESCE(SUM({$productLineNetValueExpression}), 0) as net_sales")
             ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(product_order_totals.order_item_value, 0) > 0 THEN ({$productBuyerPaymentExpression} * {$productLineValueForRow} / product_order_totals.order_item_value) ELSE 0 END), 0) as buyer_payment")
             ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(product_order_totals.order_item_value, 0) > 0 THEN (COALESCE(NULLIF(o.net_payout_estimated, 0), NULLIF(s.final_income, 0), payout_ie.estimated_escrow_amount, 0) * {$productLineValueForRow} / product_order_totals.order_item_value) ELSE 0 END), 0) as estimated_payout")
-            ->groupByRaw('NULLIF(oi.internal_item_id, 0)')
-            ->groupByRaw("CASE WHEN NULLIF(oi.internal_item_id, 0) IS NOT NULL THEN NULLIF(oi.external_item_id, '') END")
-            ->groupByRaw("CASE WHEN NULLIF(oi.internal_item_id, 0) IS NULL THEN {$marketplaceProductNameExpression} END")
-            ->groupByRaw("CASE WHEN NULLIF(oi.internal_item_id, 0) IS NULL THEN {$marketplaceProductSkuExpression} END")
+            ->groupByRaw($resolvedProductInternalItemExpression)
+            ->groupByRaw("CASE WHEN {$resolvedProductInternalItemExpression} IS NOT NULL THEN NULLIF(oi.external_item_id, '') END")
+            ->groupByRaw("CASE WHEN {$resolvedProductInternalItemExpression} IS NULL THEN {$marketplaceProductNameExpression} END")
+            ->groupByRaw("CASE WHEN {$resolvedProductInternalItemExpression} IS NULL THEN {$marketplaceProductSkuExpression} END")
             ->orderByDesc('sales')
             ->get();
 
