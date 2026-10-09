@@ -404,12 +404,11 @@
     .sales-dashboard .sales-daily-toggle[aria-expanded="true"] { border-color: var(--sales-accent); background: var(--sales-accent-soft); color: var(--sales-accent); }
     .sales-dashboard .sales-daily-toggle[aria-expanded="true"] i { transform: rotate(90deg); }
     .sales-dashboard .sales-daily-row > td { vertical-align: middle; }
-    .sales-dashboard .sales-daily-row--expanded > td { background: color-mix(in srgb, var(--sales-accent-soft) 22%, var(--sales-card) 78%); }
-    .sales-dashboard .sales-daily-store-detail > td { background: color-mix(in srgb, var(--sales-accent-soft) 18%, var(--sales-card) 82%); border-top: 0; padding: 0; }
+    .sales-dashboard .sales-daily-row--expanded > td { background: color-mix(in srgb, var(--sales-accent-soft) 22%, var(--sales-card) 78%); border-bottom-color: transparent; }
+    .sales-dashboard .sales-daily-store-detail > td { background: color-mix(in srgb, var(--sales-accent-soft) 18%, var(--sales-card) 82%); border: 0 !important; padding: 0; }
     .sales-dashboard .sales-daily-store-shell { padding: .42rem 0 .5rem; }
     .sales-dashboard .sales-daily-store-table { width: 100%; min-width: 0; table-layout: fixed; margin: 0; }
-    .sales-dashboard .sales-daily-store-table td { padding: .42rem .24rem; border-top: 1px solid color-mix(in srgb, var(--sales-line) 72%, transparent); font-size: clamp(.56rem, .11vw + .52rem, .65rem); white-space: normal; overflow-wrap: anywhere; }
-    .sales-dashboard .sales-daily-store-table tbody tr:first-child td { border-top: 0; }
+    .sales-dashboard .sales-daily-store-table td { padding: .42rem .24rem; border: 0 !important; font-size: clamp(.56rem, .11vw + .52rem, .65rem); white-space: normal; overflow-wrap: anywhere; }
     .sales-dashboard .sales-daily-store-table tbody tr:hover td { background: color-mix(in srgb, var(--sales-accent-soft) 30%, var(--sales-card) 70%); }
     .sales-dashboard .sales-daily-store-spacer { padding-inline: 0 !important; }
     .sales-dashboard .sales-daily-store-name { overflow: hidden; color: var(--sales-ink); font-weight: 750; white-space: nowrap; text-overflow: ellipsis; }
