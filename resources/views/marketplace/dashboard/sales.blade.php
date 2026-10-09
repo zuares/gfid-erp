@@ -2492,8 +2492,24 @@
                             <tr><td class="analysis-label" colspan="2">Produk terjual</td><td class="text-end analysis-value">{{ number_format($topProductCount) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Variant tidak terjual</td><td class="text-end analysis-value">{{ number_format($productAnalysisUnsoldVariants) }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Kategori terjual</td><td class="text-end analysis-value">{{ number_format($productAnalysisCategoryCount) }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Kontribusi Top 20% produk</td><td class="text-end analysis-value">{{ $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisTop20Sales / $productAnalysisNetSales) * 100) : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">Pembayaran / Penjualan Netto</td><td class="text-end analysis-value">{{ $productAnalysisNetSales > 0 ? $percentDisplay(($productAnalysisBuyerPayment / $productAnalysisNetSales) * 100) : '—' }}</td></tr>
+                            <tr>
+                                <td class="analysis-label" colspan="2">Penjualan Top 20% Produk</td>
+                                <td class="text-end analysis-value">
+                                    <div>{{ $productAnalysisTop20Sales > 0 ? $fmt($productAnalysisTop20Sales) : '—' }}</div>
+                                    @if ($productAnalysisNetSales > 0)
+                                        <small class="text-muted">{{ $percentDisplay(($productAnalysisTop20Sales / $productAnalysisNetSales) * 100) }} dari penjualan netto</small>
+                                    @endif
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="analysis-label" colspan="2">Pembayaran Pembeli</td>
+                                <td class="text-end analysis-value">
+                                    <div>{{ $productAnalysisBuyerPayment > 0 ? $fmt($productAnalysisBuyerPayment) : '—' }}</div>
+                                    @if ($productAnalysisNetSales > 0)
+                                        <small class="text-muted">{{ $percentDisplay(($productAnalysisBuyerPayment / $productAnalysisNetSales) * 100) }} dari penjualan netto</small>
+                                    @endif
+                                </td>
+                            </tr>
                             <tr><td class="analysis-label" colspan="2">Unit per Order</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? number_format($activeProductKpi['qty'] / $activeProductKpi['orders'], 2, ',', '.') : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">AOV Penjualan</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_sales']) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">AOV Pembayaran</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_payment']) : '—' }}</td></tr>
