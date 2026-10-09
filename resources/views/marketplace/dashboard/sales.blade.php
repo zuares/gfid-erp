@@ -443,6 +443,7 @@
     .sales-dashboard .sales-daily-table .sales-compare-line.is-up strong { color: var(--success, #16a34a); }
     .sales-dashboard .sales-daily-table .sales-compare-line.is-down strong { color: var(--danger, #dc2626); }
     .sales-dashboard .sales-daily-table .sales-compare-line.is-neutral strong { color: var(--sales-muted); }
+    .sales-dashboard .sales-daily-table .sales-compare-amount { color: var(--sales-muted); font-size: .5rem; font-weight: 650; }
     .sales-dashboard .sales-trend-section { overflow: hidden; }
     .sales-dashboard .sales-trend-body { padding: 0 .85rem .85rem; }
     .sales-dashboard .sales-trend-layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(230px, .75fr); gap: .75rem; }
@@ -507,12 +508,15 @@
     .sales-dashboard .sales-daily-chart .daily-chart-area { fill: color-mix(in srgb, var(--sales-accent-soft) 58%, transparent); }
     .sales-dashboard .sales-daily-chart .daily-chart-line { fill: none; stroke: var(--sales-accent); stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.8; vector-effect: non-scaling-stroke; }
     .sales-dashboard .sales-daily-chart .daily-chart-line.previous { stroke: var(--sales-muted); stroke-dasharray: 5 5; stroke-width: 1.8; opacity: .72; }
+    .sales-dashboard .sales-daily-chart .daily-chart-line.period-two { stroke: #a78bfa; stroke-dasharray: 2 4; stroke-width: 1.8; opacity: .82; }
     .sales-dashboard .sales-daily-chart .daily-chart-point { fill: var(--sales-accent); stroke: var(--sales-card); stroke-width: 2; vector-effect: non-scaling-stroke; }
     .sales-dashboard .sales-daily-chart .daily-chart-point.previous { fill: var(--sales-muted); }
+    .sales-dashboard .sales-daily-chart .daily-chart-point.period-two { fill: #a78bfa; }
     .sales-dashboard .sales-daily-chart-legend { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: .35rem; color: var(--sales-muted); font-size: .6rem; font-weight: 750; }
     .sales-dashboard .sales-daily-chart-legend span { display: inline-flex; align-items: center; gap: .25rem; }
     .sales-dashboard .sales-daily-chart-legend i { width: .45rem; height: .45rem; border-radius: 50%; background: var(--sales-accent); }
     .sales-dashboard .sales-daily-chart-legend i.previous { background: var(--sales-muted); }
+    .sales-dashboard .sales-daily-chart-legend i.period-two { background: #a78bfa; }
     .sales-dashboard .sales-product-table { min-width: 1265px; table-layout: fixed; }
     .sales-dashboard .sales-product-table th,
     .sales-dashboard .sales-product-table td { white-space: nowrap; }
@@ -2364,25 +2368,35 @@
                     ];
                 };
                 $dailyChartPayload = [
-                    'current' => collect($daily)->sortBy('day')->map($dailyChartRow)->values()->all(),
-                    'previous' => collect(data_get($activeComparison, 'data.daily', []))->sortBy('day')->map($dailyChartRow)->values()->all(),
-                    'comparison_label' => $comparisonModeLabel,
+                    'periods' => collect($salesComparisonSources)->take(3)->map(function ($period) use ($dailyChartRow) {
+                        return [
+                            'label' => $period['label'],
+                            'rows' => collect($period['daily'] ?? [])->sortBy('day')->map($dailyChartRow)->values()->all(),
+                        ];
+                    })->values()->all(),
                 ];
                 $dailyPreviousRows = collect(data_get($activeComparison, 'data.daily', []))->sortBy('day')->values();
                 $dailyComparisonByDay = collect($daily)->sortBy('day')->values()->mapWithKeys(function ($currentRow, $index) use ($dailyPreviousRows) {
                     return [(string) $currentRow->day => $dailyPreviousRows->get($index)];
                 });
-                $dailyChange = function ($current, $previous) {
+                $dailyChange = function ($current, $previous, $format = 'currency') use ($fmt) {
                     if ($previous === null || !is_numeric($current) || !is_numeric($previous)) {
                         return null;
                     }
 
                     $current = (float) $current;
                     $previous = (float) $previous;
+                    $difference = $current - $previous;
+                    $differenceFormatter = $format === 'number'
+                        ? fn ($value) => number_format(abs((float) $value), 0, ',', '.')
+                        : ($format === 'decimal'
+                            ? fn ($value) => number_format(abs((float) $value), 2, ',', '.')
+                            : fn ($value) => $fmt(abs((float) $value)));
+                    $differencePrefix = $difference > 0 ? '+' : ($difference < 0 ? '−' : '±');
                     if ($previous === 0.0) {
                         return $current === 0.0
-                            ? ['icon' => 'bi-arrow-left-right', 'label' => '0,0%', 'tone' => 'is-neutral']
-                            : ['icon' => 'bi-arrow-up-right', 'label' => 'Baru', 'tone' => 'is-up'];
+                            ? ['icon' => 'bi-arrow-left-right', 'label' => '0,0%', 'difference' => '('.$differencePrefix.$differenceFormatter($difference).')', 'tone' => 'is-neutral']
+                            : ['icon' => 'bi-arrow-up-right', 'label' => 'Baru', 'difference' => '('.$differencePrefix.$differenceFormatter($difference).')', 'tone' => 'is-up'];
                     }
 
                     $delta = (($current - $previous) / abs($previous)) * 100;
@@ -2390,6 +2404,7 @@
                     return [
                         'icon' => $delta > 0 ? 'bi-arrow-up-right' : ($delta < 0 ? 'bi-arrow-down-right' : 'bi-arrow-left-right'),
                         'label' => ($delta > 0 ? '+' : ($delta < 0 ? '−' : '±')).number_format(abs($delta), 1, ',', '.').'%',
+                        'difference' => '('.$differencePrefix.$differenceFormatter($difference).')',
                         'tone' => $delta > 0 ? 'is-up' : ($delta < 0 ? 'is-down' : 'is-neutral'),
                     ];
                 };
@@ -2413,8 +2428,9 @@
                     <svg viewBox="0 0 1000 220" role="img" aria-label="Grafik penjualan per tanggal" data-sales-daily-chart></svg>
                 </div>
                 <div class="sales-daily-chart-legend" aria-label="Legenda grafik harian">
-                    <span><i aria-hidden="true"></i>Periode berjalan</span>
-                    <span><i class="previous" aria-hidden="true"></i>{{ $comparisonModeLabel }}</span>
+                    <span><i aria-hidden="true"></i>{{ $salesComparisonSources[0]['label'] ?? 'Aktif' }}</span>
+                    <span><i class="previous" aria-hidden="true"></i>{{ $salesComparisonSources[1]['label'] ?? $comparisonModeLabel }}</span>
+                    <span><i class="period-two" aria-hidden="true"></i>{{ $salesComparisonSources[2]['label'] ?? ($comparisonModeLabel.' -2') }}</span>
                 </div>
                 <script type="application/json" id="sales-daily-chart-data">@json($dailyChartPayload)</script>
             </div>
@@ -2456,9 +2472,9 @@
                                 $dailyAov = fn ($value) => $dailyOrders > 0 ? $fmt((float) $value / $dailyOrders) : '—';
                                 $dailyPrevious = $dailyComparisonByDay->get((string) $row->day);
                                 $dailyChanges = [
-                                    'orders' => $dailyChange($dailyOrders, data_get($dailyPrevious, 'orders')),
-                                    'qty' => $dailyChange($row->qty, data_get($dailyPrevious, 'qty')),
-                                    'avg_units_per_order' => $dailyChange($row->avg_units_per_order, data_get($dailyPrevious, 'avg_units_per_order')),
+                                    'orders' => $dailyChange($dailyOrders, data_get($dailyPrevious, 'orders'), 'number'),
+                                    'qty' => $dailyChange($row->qty, data_get($dailyPrevious, 'qty'), 'number'),
+                                    'avg_units_per_order' => $dailyChange($row->avg_units_per_order, data_get($dailyPrevious, 'avg_units_per_order'), 'decimal'),
                                     'subtotal' => $dailyChange($row->subtotal, data_get($dailyPrevious, 'subtotal')),
                                     'net_total' => $dailyChange($row->net_total, data_get($dailyPrevious, 'net_total')),
                                     'buyer_paid' => $dailyChange($dailyBuyerPaid, data_get($dailyPrevious, 'buyer_paid')),
@@ -2476,17 +2492,17 @@
                                     </button>
                                 </td>
                                 <td><button class="sales-date-link" type="button" data-sales-order-detail-date="{{ $row->day }}">{{ $dateLabel($row->day) }}</button></td>
-                                <td class="text-end">{{ number_format($row->orders) }}@if ($dailyChanges['orders'])<div class="sales-compare-line {{ $dailyChanges['orders']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['orders']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['orders']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end">{{ number_format($row->qty) }}@if ($dailyChanges['qty'])<div class="sales-compare-line {{ $dailyChanges['qty']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['qty']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['qty']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end">{{ number_format($row->avg_units_per_order, 2, ',', '.') }}@if ($dailyChanges['avg_units_per_order'])<div class="sales-compare-line {{ $dailyChanges['avg_units_per_order']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['avg_units_per_order']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['avg_units_per_order']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->subtotal) }}</div><div class="small text-muted">({{ $dailyAov($row->subtotal) }})</div>@if ($dailyChanges['subtotal'])<div class="sales-compare-line {{ $dailyChanges['subtotal']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['subtotal']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['subtotal']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->net_total) }}</div><div class="small text-muted">({{ $dailyAov($row->net_total) }})</div>@if ($dailyChanges['net_total'])<div class="sales-compare-line {{ $dailyChanges['net_total']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['net_total']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['net_total']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($dailyBuyerPaid) }}</div><div class="small text-muted">({{ $dailyAov($dailyBuyerPaid) }})</div>@if ($dailyChanges['buyer_paid'])<div class="sales-compare-line {{ $dailyChanges['buyer_paid']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['buyer_paid']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['buyer_paid']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->estimated_payout) }}</div><div class="small text-muted">({{ $dailyAov($row->estimated_payout) }})</div>@if ($dailyChanges['estimated_payout'])<div class="sales-compare-line {{ $dailyChanges['estimated_payout']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['estimated_payout']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['estimated_payout']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->cogs) }}</div><div class="small text-muted">({{ $dailyAov($row->cogs) }})</div>@if ($dailyChanges['cogs'])<div class="sales-compare-line {{ $dailyChanges['cogs']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['cogs']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['cogs']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($row->gross_profit) }}</div><div class="small text-muted">({{ $dailyAov($row->gross_profit) }})</div>@if ($dailyChanges['gross_profit'])<div class="sales-compare-line {{ $dailyChanges['gross_profit']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['gross_profit']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['gross_profit']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->ad_spend) }}</div><div class="small text-muted">({{ $dailyAov($row->ad_spend) }})</div>@if ($dailyChanges['ad_spend'])<div class="sales-compare-line {{ $dailyChanges['ad_spend']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['ad_spend']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['ad_spend']['label'] }}</strong></div>@endif</td>
-                                <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($row->net_profit) }}</div><div class="small text-muted">({{ $dailyAov($row->net_profit) }})</div>@if ($dailyChanges['net_profit'])<div class="sales-compare-line {{ $dailyChanges['net_profit']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['net_profit']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['net_profit']['label'] }}</strong></div>@endif</td>
+                                <td class="text-end">{{ number_format($row->orders) }}@if ($dailyChanges['orders'])<div class="sales-compare-line {{ $dailyChanges['orders']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['orders']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['orders']['label'] }}</strong> <span class="sales-compare-amount">{{ $dailyChanges['orders']['difference'] }}</span></div>@endif</td>
+                                <td class="text-end">{{ number_format($row->qty) }}@if ($dailyChanges['qty'])<div class="sales-compare-line {{ $dailyChanges['qty']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['qty']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['qty']['label'] }}</strong> <span class="sales-compare-amount">{{ $dailyChanges['qty']['difference'] }}</span></div>@endif</td>
+                                <td class="text-end">{{ number_format($row->avg_units_per_order, 2, ',', '.') }}@if ($dailyChanges['avg_units_per_order'])<div class="sales-compare-line {{ $dailyChanges['avg_units_per_order']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['avg_units_per_order']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['avg_units_per_order']['label'] }}</strong> <span class="sales-compare-amount">{{ $dailyChanges['avg_units_per_order']['difference'] }}</span></div>@endif</td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->subtotal) }}</div><div class="small text-muted">({{ $dailyAov($row->subtotal) }})</div>@if ($dailyChanges['subtotal'])<div class="sales-compare-line {{ $dailyChanges['subtotal']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['subtotal']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['subtotal']['label'] }}</strong> <span class="sales-compare-amount">{{ $dailyChanges['subtotal']['difference'] }}</span></div>@endif</td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->net_total) }}</div><div class="small text-muted">({{ $dailyAov($row->net_total) }})</div>@if ($dailyChanges['net_total'])<div class="sales-compare-line {{ $dailyChanges['net_total']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['net_total']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['net_total']['label'] }}</strong> <span class="sales-compare-amount">{{ $dailyChanges['net_total']['difference'] }}</span></div>@endif</td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($dailyBuyerPaid) }}</div><div class="small text-muted">({{ $dailyAov($dailyBuyerPaid) }})</div>@if ($dailyChanges['buyer_paid'])<div class="sales-compare-line {{ $dailyChanges['buyer_paid']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['buyer_paid']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['buyer_paid']['label'] }}</strong> <span class="sales-compare-amount">{{ $dailyChanges['buyer_paid']['difference'] }}</span></div>@endif</td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->estimated_payout) }}</div><div class="small text-muted">({{ $dailyAov($row->estimated_payout) }})</div>@if ($dailyChanges['estimated_payout'])<div class="sales-compare-line {{ $dailyChanges['estimated_payout']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['estimated_payout']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['estimated_payout']['label'] }}</strong> <span class="sales-compare-amount">{{ $dailyChanges['estimated_payout']['difference'] }}</span></div>@endif</td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->cogs) }}</div><div class="small text-muted">({{ $dailyAov($row->cogs) }})</div>@if ($dailyChanges['cogs'])<div class="sales-compare-line {{ $dailyChanges['cogs']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['cogs']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['cogs']['label'] }}</strong> <span class="sales-compare-amount">{{ $dailyChanges['cogs']['difference'] }}</span></div>@endif</td>
+                                <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($row->gross_profit) }}</div><div class="small text-muted">({{ $dailyAov($row->gross_profit) }})</div>@if ($dailyChanges['gross_profit'])<div class="sales-compare-line {{ $dailyChanges['gross_profit']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['gross_profit']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['gross_profit']['label'] }}</strong> <span class="sales-compare-amount">{{ $dailyChanges['gross_profit']['difference'] }}</span></div>@endif</td>
+                                <td class="text-end sales-table-metric"><div>{{ $fmt($row->ad_spend) }}</div><div class="small text-muted">({{ $dailyAov($row->ad_spend) }})</div>@if ($dailyChanges['ad_spend'])<div class="sales-compare-line {{ $dailyChanges['ad_spend']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['ad_spend']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['ad_spend']['label'] }}</strong> <span class="sales-compare-amount">{{ $dailyChanges['ad_spend']['difference'] }}</span></div>@endif</td>
+                                <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($row->net_profit) }}</div><div class="small text-muted">({{ $dailyAov($row->net_profit) }})</div>@if ($dailyChanges['net_profit'])<div class="sales-compare-line {{ $dailyChanges['net_profit']['tone'] }}" title="{{ $comparisonModeLabel }}"><i class="bi {{ $dailyChanges['net_profit']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['net_profit']['label'] }}</strong> <span class="sales-compare-amount">{{ $dailyChanges['net_profit']['difference'] }}</span></div>@endif</td>
                             </tr>
                             <tr id="sales-store-detail-{{ $row->day }}" class="sales-daily-store-detail" data-sales-store-items="{{ $row->day }}" hidden>
                                 <td colspan="13">
@@ -4086,12 +4102,15 @@
             }
 
             const metric = dailyChartMetric.value || 'net_sales';
-            const current = Array.isArray(payload.current) ? payload.current : [];
-            const previous = Array.isArray(payload.previous) ? payload.previous : [];
-            const pointCount = Math.max(current.length, previous.length, 1);
+            const periods = Array.isArray(payload.periods) ? payload.periods : [];
+            const current = Array.isArray(periods[0]?.rows) ? periods[0].rows : [];
+            const previous = Array.isArray(periods[1]?.rows) ? periods[1].rows : [];
+            const previousTwo = Array.isArray(periods[2]?.rows) ? periods[2].rows : [];
+            const pointCount = Math.max(current.length, previous.length, previousTwo.length, 1);
             const currentValues = current.map((row) => Number(row?.[metric]) || 0);
             const previousValues = previous.map((row) => Number(row?.[metric]) || 0);
-            const allValues = currentValues.concat(previousValues);
+            const previousTwoValues = previousTwo.map((row) => Number(row?.[metric]) || 0);
+            const allValues = currentValues.concat(previousValues, previousTwoValues);
             const minValue = Math.min(0, ...allValues);
             const maxValue = Math.max(0, ...allValues);
             const valueRange = Math.max(maxValue - minValue, 1);
@@ -4109,6 +4128,7 @@
             const makePath = (points) => points.map((point, index) => (index === 0 ? 'M ' : ' L ') + point[0].toFixed(2) + ' ' + point[1].toFixed(2)).join('');
             const currentPoints = makePoints(currentValues);
             const previousPoints = makePoints(previousValues);
+            const previousTwoPoints = makePoints(previousTwoValues);
             const gridValues = [maxValue, minValue + valueRange / 2, minValue];
             let markup = '';
 
@@ -4122,6 +4142,7 @@
                 const areaPath = makePath(currentPoints) + ' L ' + currentPoints[currentPoints.length - 1][0].toFixed(2) + ' ' + (height - bottom) + ' L ' + currentPoints[0][0].toFixed(2) + ' ' + (height - bottom) + ' Z';
                 markup += '<path class="daily-chart-area" d="' + areaPath + '"></path>';
             }
+            if (previousTwoPoints.length > 1) markup += '<path class="daily-chart-line period-two" d="' + makePath(previousTwoPoints) + '"></path>';
             if (previousPoints.length > 1) markup += '<path class="daily-chart-line previous" d="' + makePath(previousPoints) + '"></path>';
             if (currentPoints.length > 1) markup += '<path class="daily-chart-line" d="' + makePath(currentPoints) + '"></path>';
 
@@ -4130,8 +4151,12 @@
                 markup += '<circle class="daily-chart-point" cx="' + point[0].toFixed(2) + '" cy="' + point[1].toFixed(2) + '" r="3.5"><title>' + escapeTrendText(label + ' · ' + formatDailyChartValue(point[2], metric)) + '</title></circle>';
             });
             previousPoints.forEach(function (point, index) {
-                const label = previous[index]?.label || payload.comparison_label || '';
+                const label = previous[index]?.label || periods[1]?.label || '';
                 markup += '<circle class="daily-chart-point previous" cx="' + point[0].toFixed(2) + '" cy="' + point[1].toFixed(2) + '" r="2.5"><title>' + escapeTrendText(label + ' · ' + formatDailyChartValue(point[2], metric)) + '</title></circle>';
+            });
+            previousTwoPoints.forEach(function (point, index) {
+                const label = previousTwo[index]?.label || periods[2]?.label || '';
+                markup += '<circle class="daily-chart-point period-two" cx="' + point[0].toFixed(2) + '" cy="' + point[1].toFixed(2) + '" r="2.5"><title>' + escapeTrendText(label + ' · ' + formatDailyChartValue(point[2], metric)) + '</title></circle>';
             });
 
             [0, Math.floor((pointCount - 1) / 2), pointCount - 1].filter((value, index, values) => values.indexOf(value) === index).forEach(function (index) {
@@ -4147,7 +4172,7 @@
                 dailyChartCompare.classList.remove('good', 'bad');
                 if (previous.length && previousTotal !== 0) {
                     const delta = ((currentTotal - previousTotal) / Math.abs(previousTotal)) * 100;
-                    dailyChartCompare.textContent = (delta >= 0 ? '↑ ' : '↓ ') + Math.abs(delta).toFixed(1).replace('.', ',') + '% vs ' + (payload.comparison_label || 'pembanding');
+                    dailyChartCompare.textContent = (delta >= 0 ? '↑ ' : '↓ ') + Math.abs(delta).toFixed(1).replace('.', ',') + '% vs ' + (periods[1]?.label || 'pembanding');
                     dailyChartCompare.classList.add(delta >= 0 ? 'good' : 'bad');
                 } else {
                     dailyChartCompare.textContent = previous.length ? 'Tidak ada perubahan dasar' : 'Belum ada pembanding';
