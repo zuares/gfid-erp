@@ -2029,10 +2029,10 @@
                             <tr>
                                 <th class="ps-3">No.</th>
                                 <th>Kategori Item</th>
-                                <th>Produk Terjual</th>
-                                <th>Variant Terjual</th>
                                 <th>Produk Aktif</th>
                                 <th>Variant Aktif</th>
+                                <th>Produk Terjual</th>
+                                <th>Variant Terjual</th>
                                 <th>Order</th>
                                 <th>Unit</th>
                                 <th class="text-end">Penjualan Netto</th>
@@ -2055,10 +2055,10 @@
                                             <span>{{ $categoryRow['name'] }}</span>
                                         </button>
                                     </td>
-                                    <td data-label="Produk Terjual">{{ number_format($activeCategoryMetrics['products']) }}</td>
-                                    <td data-label="Variant Terjual">{{ number_format($activeCategoryMetrics['variants']) }}</td>
                                     <td data-label="Produk Aktif">{{ number_format($activeCategoryMetrics['active_products']) }}</td>
                                     <td data-label="Variant Aktif">{{ number_format($activeCategoryMetrics['active_variants']) }}</td>
+                                    <td data-label="Produk Terjual">{{ number_format($activeCategoryMetrics['products']) }}</td>
+                                    <td data-label="Variant Terjual">{{ number_format($activeCategoryMetrics['variants']) }}</td>
                                     <td data-label="Order">{{ number_format($activeCategoryMetrics['orders']) }}</td>
                                     <td data-label="Unit">{{ number_format($activeCategoryMetrics['qty']) }}</td>
                                     <td class="text-end" data-label="Penjualan Netto">{{ $fmt($activeCategoryMetrics['net_sales']) }}</td>
