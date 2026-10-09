@@ -2125,7 +2125,7 @@
                                 $comparisonChartUnit = in_array($row['key'], ['net_margin', 'acos', 'ctr', 'cvr'], true)
                                     ? 'percent'
                                     : (in_array($row['key'], ['roas'], true) ? 'multiple' : (in_array($row['key'], ['orders', 'qty', 'impressions', 'clicks'], true) ? 'number' : 'currency'));
-                                $comparisonChartData = collect($salesComparisonPeriods)->map(function ($period) use ($row, $dateRangeLabel) {
+                                $comparisonChartData = collect($salesComparisonPeriods)->reverse()->values()->map(function ($period) use ($row, $dateRangeLabel) {
                                     $value = $period['metrics'][$row['key']] ?? null;
 
                                     return [
