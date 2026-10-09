@@ -649,16 +649,18 @@
     .sales-dashboard .sales-category-summary-table th { padding: .65rem .55rem; color: var(--sales-muted); font-size: .61rem; font-weight: 800; letter-spacing: .025em; vertical-align: middle; }
     .sales-dashboard .sales-category-summary-table td { padding: .62rem .55rem; font-size: .7rem; vertical-align: middle; }
     .sales-dashboard .sales-category-summary-table th:nth-child(1) { width: 4%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(2) { width: 21%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(2) { width: 17%; }
     .sales-dashboard .sales-category-summary-table th:nth-child(3),
     .sales-dashboard .sales-category-summary-table th:nth-child(4),
-    .sales-dashboard .sales-category-summary-table th:nth-child(5) { width: 7.5%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(5) { width: 6.5%; }
     .sales-dashboard .sales-category-summary-table th:nth-child(6),
-    .sales-dashboard .sales-category-summary-table th:nth-child(7) { width: 5.5%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(8) { width: 13%; }
-    .sales-dashboard .sales-category-summary-table th:nth-child(9),
-    .sales-dashboard .sales-category-summary-table th:nth-child(10),
-    .sales-dashboard .sales-category-summary-table th:nth-child(11) { width: 9.5%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(7) { width: 4.5%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(8) { width: 11%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(9) { width: 7%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(10) { width: 10%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(11) { width: 9%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(12) { width: 7%; }
+    .sales-dashboard .sales-category-summary-table th:nth-child(13) { width: 8%; }
     .sales-dashboard .sales-category-summary-table th,
     .sales-dashboard .sales-category-summary-table td { text-align: start; }
     .sales-dashboard .sales-category-summary-table tbody td:nth-child(n+3) { color: var(--sales-ink); font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -2350,8 +2352,10 @@
                                 <th>Order</th>
                                 <th>Unit</th>
                                 <th class="text-end">Penjualan Netto</th>
+                                <th class="text-end">Kontribusi Penjualan</th>
                                 <th class="text-end">Estimasi Penghasilan</th>
                                 <th class="text-end">Laba Kotor</th>
+                                <th class="text-end">Margin Kontribusi</th>
                                 <th class="text-end pe-3">Laba Bersih</th>
                             </tr>
                         </thead>
@@ -2375,12 +2379,14 @@
                                     <td data-label="Order">{{ number_format($activeCategoryMetrics['orders']) }}</td>
                                     <td data-label="Unit">{{ number_format($activeCategoryMetrics['qty']) }}</td>
                                     <td class="text-end" data-label="Penjualan Netto">{{ $fmt($activeCategoryMetrics['net_sales']) }}</td>
+                                    <td class="text-end" data-label="Kontribusi Penjualan">{{ $percentDisplay($categoryRow['share']) }}</td>
                                     <td class="text-end" data-label="Estimasi Penghasilan">{{ $fmt($activeCategoryMetrics['estimated_payout']) }}</td>
                                     <td class="text-end" data-label="Laba Kotor">{{ $fmt($activeCategoryMetrics['gross_profit_payout']) }}</td>
+                                    <td class="text-end" data-label="Margin Kontribusi">{{ $activeCategoryMetrics['contribution_margin'] === null ? '—' : $percentDisplay($activeCategoryMetrics['contribution_margin']) }}</td>
                                     <td class="text-end pe-3" data-label="Laba Bersih">{{ $fmt($activeCategoryMetrics['net_profit']) }}</td>
                                 </tr>
                                 <tr id="{{ $categoryKey }}-detail" class="sales-category-comparison-detail" data-sales-category-comparison-items="{{ $categoryKey }}" hidden>
-                                    <td colspan="11">
+                                    <td colspan="13">
                                         <div class="sales-category-comparison-detail-card">
                                             <div class="sales-category-detail-header d-flex align-items-start justify-content-between gap-2 mb-2">
                                                 <div>
@@ -2789,11 +2795,11 @@
                                     <td class="text-end fw-semibold"><div>{{ $categoryHppTotal > 0 ? $fmtHpp($categoryHppTotal) : '—' }}</div><div class="small text-muted">Total HPP</div></td>
                                     <td class="text-end">{{ number_format($categoryOrders) }}</td>
                                     <td class="text-end">{{ number_format($categoryQty) }}</td>
-                                    <td class="text-end fw-semibold"><div>{{ $fmt($categorySales) }}</div><div class="small text-muted">AOV {{ $categoryOrders > 0 ? $fmt($categorySales / $categoryOrders) : '—' }}</div></td>
-                                    <td class="text-end fw-semibold"><div>{{ $fmt($categoryNetSales) }}</div><div class="small text-muted">AOV {{ $categoryOrders > 0 ? $fmt($categoryNetSales / $categoryOrders) : '—' }} · M {{ $categoryContributionMargin !== null ? $percentDisplay($categoryContributionMargin) : '—' }}</div></td>
-                                    <td class="text-end fw-semibold"><div>{{ $fmt($categoryBuyerPayment) }}</div><div class="small text-muted">AOV {{ $categoryOrders > 0 ? $fmt($categoryBuyerPayment / $categoryOrders) : '—' }}</div></td>
+                                    <td class="text-end fw-semibold">{{ $fmt($categorySales) }}</td>
+                                    <td class="text-end fw-semibold"><div>{{ $fmt($categoryNetSales) }}</div><div class="small text-muted">M {{ $categoryContributionMargin !== null ? $percentDisplay($categoryContributionMargin) : '—' }}</div></td>
+                                    <td class="text-end fw-semibold">{{ $fmt($categoryBuyerPayment) }}</td>
                                     <td class="text-end text-danger fw-semibold">{{ $fmt($categorySpend) }}</td>
-                                    <td class="text-end text-danger fw-semibold"><div>{{ $fmt($categoryAdSales) }}</div><div class="small text-muted">AOV {{ $categoryAdConversions > 0 ? $fmt($categoryAdSales / $categoryAdConversions) : '—' }}</div></td>
+                                    <td class="text-end text-danger fw-semibold">{{ $fmt($categoryAdSales) }}</td>
                                     <td class="text-end">{{ $categoryAdSales > 0 ? $percentDisplay(($categorySpend / $categoryAdSales) * 100) : '—' }}</td>
                                     <td class="text-end">{{ $categorySpend > 0 ? $multipleDisplay($categoryAdSales / $categorySpend) : '—' }}</td>
                                     <td class="text-end pe-3">{{ $categoryAdConversions > 0 ? $fmt($categorySpend / $categoryAdConversions) : '—' }}</td>
@@ -2846,11 +2852,11 @@
                                         <td class="text-end fw-semibold"><div>{{ $marketplaceHppTotal > 0 ? $fmtHpp($marketplaceHppTotal) : '—' }}</div><div class="small text-muted">Total HPP</div></td>
                                         <td class="text-end">{{ number_format($marketplaceOrders) }}</td>
                                         <td class="text-end">{{ number_format($marketplaceQty) }}</td>
-                                        <td class="text-end fw-semibold"><div>{{ $fmt($marketplaceSales) }}</div><div class="small text-muted">AOV {{ $marketplaceOrders > 0 ? $fmt($marketplaceSales / $marketplaceOrders) : '—' }}</div></td>
-                                        <td class="text-end fw-semibold"><div>{{ $fmt($marketplaceNetSales) }}</div><div class="small text-muted">AOV {{ $marketplaceOrders > 0 ? $fmt($marketplaceNetSales / $marketplaceOrders) : '—' }} · M {{ $marketplaceContributionMargin !== null ? $percentDisplay($marketplaceContributionMargin) : '—' }}</div></td>
-                                        <td class="text-end fw-semibold"><div>{{ $fmt($marketplaceBuyerPayment) }}</div><div class="small text-muted">AOV {{ $marketplaceOrders > 0 ? $fmt($marketplaceBuyerPayment / $marketplaceOrders) : '—' }}</div></td>
+                                        <td class="text-end fw-semibold">{{ $fmt($marketplaceSales) }}</td>
+                                        <td class="text-end fw-semibold"><div>{{ $fmt($marketplaceNetSales) }}</div><div class="small text-muted">M {{ $marketplaceContributionMargin !== null ? $percentDisplay($marketplaceContributionMargin) : '—' }}</div></td>
+                                        <td class="text-end fw-semibold">{{ $fmt($marketplaceBuyerPayment) }}</td>
                                         <td class="text-end text-danger fw-semibold">{{ $fmt($marketplaceSpend) }}</td>
-                                        <td class="text-end text-danger fw-semibold"><div>{{ $fmt($marketplaceAdSales) }}</div><div class="small text-muted">AOV {{ $marketplaceAdConversions > 0 ? $fmt($marketplaceAdSales / $marketplaceAdConversions) : '—' }}</div></td>
+                                        <td class="text-end text-danger fw-semibold">{{ $fmt($marketplaceAdSales) }}</td>
                                         <td class="text-end">{{ $marketplaceAdSales > 0 ? $percentDisplay(($marketplaceSpend / $marketplaceAdSales) * 100) : '—' }}</td>
                                         <td class="text-end">{{ $marketplaceSpend > 0 ? $multipleDisplay($marketplaceAdSales / $marketplaceSpend) : '—' }}</td>
                                         <td class="text-end pe-3">{{ $marketplaceAdConversions > 0 ? $fmt($marketplaceSpend / $marketplaceAdConversions) : '—' }}</td>
@@ -2872,11 +2878,11 @@
                                             <td class="text-end fw-semibold"><div>{{ (float) ($product->hpp ?? 0) > 0 ? $fmtHpp($product->hpp) : '—' }}</div><div class="small text-muted">HPP/unit</div></td>
                                             <td class="text-end">{{ number_format((int) $product->orders) }}</td>
                                             <td class="text-end">{{ number_format((int) $product->qty) }}</td>
-                                            <td class="text-end fw-semibold"><div>{{ $fmt($product->sales) }}</div><div class="small text-muted">AOV {{ $product->orders > 0 ? $fmt($product->sales / $product->orders) : '—' }}</div></td>
-                                            <td class="text-end fw-semibold"><div>{{ $fmt($product->net_sales) }}</div><div class="small text-muted">AOV {{ $product->orders > 0 ? $fmt($product->net_sales / $product->orders) : '—' }} · M {{ $product->contribution_margin !== null ? $percentDisplay($product->contribution_margin) : '—' }}</div></td>
-                                            <td class="text-end fw-semibold"><div>{{ $fmt($product->buyer_payment) }}</div><div class="small text-muted">AOV {{ $product->orders > 0 ? $fmt($product->buyer_payment / $product->orders) : '—' }}</div></td>
+                                            <td class="text-end fw-semibold">{{ $fmt($product->sales) }}</td>
+                                            <td class="text-end fw-semibold"><div>{{ $fmt($product->net_sales) }}</div><div class="small text-muted">M {{ $product->contribution_margin !== null ? $percentDisplay($product->contribution_margin) : '—' }}</div></td>
+                                            <td class="text-end fw-semibold">{{ $fmt($product->buyer_payment) }}</td>
                                             <td class="text-end {{ ($product->ad_spend ?? 0) > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">{{ ($product->ad_spend_matched ?? false) ? $fmt($product->ad_spend) : '—' }}</td>
-                                            <td class="text-end text-danger {{ ($product->ad_sales ?? 0) > 0 ? 'fw-semibold' : 'text-muted' }}"><div>{{ ($product->ad_spend_matched ?? false) ? $fmt($product->ad_sales) : '—' }}</div><div class="small text-muted">AOV {{ ($product->ad_spend_matched ?? false) && ($product->ad_conversions ?? 0) > 0 ? $fmt($product->ad_sales / $product->ad_conversions) : '—' }}</div></td>
+                                            <td class="text-end text-danger {{ ($product->ad_sales ?? 0) > 0 ? 'fw-semibold' : 'text-muted' }}">{{ ($product->ad_spend_matched ?? false) ? $fmt($product->ad_sales) : '—' }}</td>
                                             <td class="text-end">{{ ($product->ad_spend_matched ?? false) && ($product->ad_sales ?? 0) > 0 ? $percentDisplay(($product->ad_spend / $product->ad_sales) * 100) : '—' }}</td>
                                             <td class="text-end">{{ ($product->ad_spend_matched ?? false) && ($product->ad_spend ?? 0) > 0 ? $multipleDisplay($product->ad_sales / $product->ad_spend) : '—' }}</td>
                                             <td class="text-end pe-3">{{ ($product->ad_spend_matched ?? false) && ($product->ad_conversions ?? 0) > 0 ? $fmt($product->ad_spend / $product->ad_conversions) : '—' }}</td>
