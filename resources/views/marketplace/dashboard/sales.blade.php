@@ -827,6 +827,42 @@
         .sales-dashboard .sales-product-analysis-matrix-wrap { padding-inline: .75rem; overflow-x: auto; }
         .sales-dashboard .sales-product-analysis-table,
         .sales-dashboard .sales-product-analysis-matrix { min-width: 650px; }
+        .sales-dashboard .sales-product-analysis-matrix { display: block; min-width: 0 !important; }
+        .sales-dashboard .sales-product-analysis-matrix thead { display: none; }
+        .sales-dashboard .sales-product-analysis-matrix tbody { display: block; }
+        .sales-dashboard .sales-product-analysis-matrix tr[data-sales-analysis-row] {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .35rem .8rem;
+            margin-bottom: .55rem;
+            padding: .7rem .75rem;
+            border: 1px solid var(--sales-line);
+            border-radius: .7rem;
+            background: var(--sales-card);
+        }
+        .sales-dashboard .sales-product-analysis-matrix tr[data-sales-analysis-row] > td {
+            display: flex;
+            min-width: 0;
+            flex-direction: column;
+            align-items: flex-start;
+            padding: .25rem 0 !important;
+            border: 0;
+            text-align: left !important;
+        }
+        .sales-dashboard .sales-product-analysis-matrix tr[data-sales-analysis-row] > td:first-child {
+            grid-column: 1 / -1;
+        }
+        .sales-dashboard .sales-product-analysis-matrix tr[data-sales-analysis-row] > td[data-label]::before {
+            content: attr(data-label);
+            margin-bottom: .2rem;
+            color: var(--sales-muted);
+            font-size: .58rem;
+            font-weight: 750;
+            letter-spacing: .02em;
+        }
+        .sales-dashboard .sales-product-analysis-matrix tr.sales-product-analysis-detail { display: block; }
+        .sales-dashboard .sales-product-analysis-matrix tr.sales-product-analysis-detail[hidden] { display: none !important; }
+        .sales-dashboard .sales-product-analysis-matrix tr.sales-product-analysis-detail > td { display: block; width: 100%; }
     }
 </style>
 @endpush
@@ -2451,7 +2487,7 @@
             </div>
             <div class="sales-product-analysis-matrix-wrap">
                 <table class="table table-sm align-middle sales-table sales-product-analysis-matrix">
-                    <thead><tr><th style="width: 16%">Segmentasi</th><th class="text-end">Produk Terjual Marketplace</th><th class="text-end">Variant Terjual Unik</th><th class="text-end">Penjualan Netto</th><th class="text-end">Share</th><th class="text-end">Kontribusi</th><th class="text-end">Margin</th><th class="text-end">Penjualan Atribusi Iklan</th><th class="text-end">ROAS</th><th class="text-end">Biaya Iklan</th></tr></thead>
+                    <thead><tr><th style="width: 16%">Segmentasi</th><th class="text-end">Produk</th><th class="text-end">Variant</th><th class="text-end">Penjualan Netto</th><th class="text-end">Share</th><th class="text-end">Kontribusi</th><th class="text-end">Margin</th><th class="text-end">Penjualan Iklan</th><th class="text-end">ROAS</th><th class="text-end">Biaya Iklan</th></tr></thead>
                     <tbody>
                         @foreach ($productAnalysisMatrixRows as $matrixRow)
                             @php
@@ -2469,21 +2505,21 @@
                                     ->values();
                             @endphp
                             <tr class="sales-product-analysis-matrix-row" data-sales-analysis-row="{{ $matrixKey }}" tabindex="0" aria-controls="{{ $matrixKey }}-detail">
-                                <td class="analysis-status">
+                                <td class="analysis-status" data-label="Segmentasi">
                                     <button type="button" class="sales-product-analysis-matrix-toggle" data-sales-analysis-toggle="{{ $matrixKey }}" aria-expanded="false" aria-controls="{{ $matrixKey }}-detail" aria-label="Buka detail produk segmentasi {{ $matrixRow['label'] }}">
                                         <i class="bi bi-chevron-right" aria-hidden="true"></i>
                                         <span class="analysis-status-badge analysis-status-badge--{{ $matrixRow['class'] }}">{{ $matrixRow['label'] }}</span>
                                     </button>
                                 </td>
-                                <td class="text-end analysis-number">{{ number_format($matrixRow['count']) }}</td>
-                                <td class="text-end analysis-number">{{ number_format($matrixRow['variants_sold']) }}</td>
-                                <td class="text-end analysis-number">{{ $fmt($matrixRow['sales']) }}</td>
-                                <td class="text-end analysis-share">{{ $percentDisplay($matrixRow['sales_share']) }}</td>
-                                <td class="text-end analysis-number">{{ $fmt($matrixRow['contribution_profit']) }}</td>
-                                <td class="text-end analysis-share">{{ $matrixRow['contribution_margin'] !== null ? $percentDisplay($matrixRow['contribution_margin']) : '—' }}</td>
-                                <td class="text-end analysis-number">{{ $fmt($matrixRow['ad_sales']) }}</td>
-                                <td class="text-end analysis-number">{{ $matrixRow['ad_spend'] > 0 ? $multipleDisplay($matrixRow['roas']) : '—' }}</td>
-                                <td class="text-end analysis-number">{{ $fmt($matrixRow['ad_spend']) }}</td>
+                                <td class="text-end analysis-number" data-label="Produk">{{ number_format($matrixRow['count']) }}</td>
+                                <td class="text-end analysis-number" data-label="Variant">{{ number_format($matrixRow['variants_sold']) }}</td>
+                                <td class="text-end analysis-number" data-label="Penjualan Netto">{{ $fmt($matrixRow['sales']) }}</td>
+                                <td class="text-end analysis-share" data-label="Share">{{ $percentDisplay($matrixRow['sales_share']) }}</td>
+                                <td class="text-end analysis-number" data-label="Kontribusi">{{ $fmt($matrixRow['contribution_profit']) }}</td>
+                                <td class="text-end analysis-share" data-label="Margin">{{ $matrixRow['contribution_margin'] !== null ? $percentDisplay($matrixRow['contribution_margin']) : '—' }}</td>
+                                <td class="text-end analysis-number" data-label="Penjualan Iklan">{{ $fmt($matrixRow['ad_sales']) }}</td>
+                                <td class="text-end analysis-number" data-label="ROAS">{{ $matrixRow['ad_spend'] > 0 ? $multipleDisplay($matrixRow['roas']) : '—' }}</td>
+                                <td class="text-end analysis-number" data-label="Biaya Iklan">{{ $fmt($matrixRow['ad_spend']) }}</td>
                             </tr>
                             <tr id="{{ $matrixKey }}-detail" class="sales-product-analysis-detail" data-sales-analysis-items="{{ $matrixKey }}" hidden>
                                 <td colspan="10">
