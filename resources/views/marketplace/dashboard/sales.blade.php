@@ -2361,8 +2361,8 @@
                             <col style="width: 7%">
                             <col style="width: 5%">
                             <col style="width: 4%">
-                            <col style="width: 10%">
                             <col style="width: 8%">
+                            <col style="width: 10%">
                             <col style="width: 9%">
                             <col style="width: 7%">
                             <col style="width: 6%">
@@ -2383,8 +2383,8 @@
                                 <th>Variant Tidak Terjual</th>
                                 <th>Order</th>
                                 <th>Unit</th>
-                                <th>Penjualan Netto</th>
                                 <th>Kontribusi Penjualan</th>
+                                <th>Penjualan Netto</th>
                                 <th>Estimasi Penghasilan</th>
                                 <th>Laba Kotor</th>
                                 <th>Margin Kontribusi</th>
@@ -2410,8 +2410,8 @@
                                     <td data-label="Variant Tidak Terjual">{{ number_format($activeCategoryMetrics['unsold_variants']) }}</td>
                                     <td data-label="Order">{{ number_format($activeCategoryMetrics['orders']) }}</td>
                                     <td data-label="Unit">{{ number_format($activeCategoryMetrics['qty']) }}</td>
-                                    <td class="text-end" data-label="Penjualan Netto">{{ $fmt($activeCategoryMetrics['net_sales']) }}</td>
                                     <td class="text-end" data-label="Kontribusi Penjualan">{{ $percentDisplay($categoryRow['share']) }}</td>
+                                    <td class="text-end" data-label="Penjualan Netto">{{ $fmt($activeCategoryMetrics['net_sales']) }}</td>
                                     <td class="text-end" data-label="Estimasi Penghasilan">{{ $fmt($activeCategoryMetrics['estimated_payout']) }}</td>
                                     <td class="text-end" data-label="Laba Kotor">{{ $fmt($activeCategoryMetrics['gross_profit_payout']) }}</td>
                                     <td class="text-end" data-label="Margin Kontribusi">{{ $activeCategoryMetrics['contribution_margin'] === null ? '—' : $percentDisplay($activeCategoryMetrics['contribution_margin']) }}</td>
