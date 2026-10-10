@@ -8,6 +8,12 @@
             ['label' => 'Total Promo', 'key' => 'total_promotion', 'format' => $currencyDisplay, 'icon' => 'bi-percent'],
             ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay, 'icon' => 'bi-megaphone'],
         ];
+        $eventDailyAverageKeys = [
+            'net_sales', 'orders', 'qty', 'estimated_payout', 'net_profit',
+            'product_discount', 'voucher_store', 'voucher_platform', 'bundle_discount',
+            'combo_hemat', 'total_promotion', 'promotion_orders', 'ad_spend',
+            'ad_sales', 'ad_orders', 'ad_impressions', 'ad_clicks',
+        ];
         $eventGroup = null;
     @endphp
     <section class="card sales-card sales-comparison-section shadow-sm mb-3" aria-labelledby="{{ $eventId }}-title">
@@ -43,34 +49,28 @@
                                 <span class="sales-period-range sales-twin-period-range">{{ $period['event_date'] }}</span>
                             </th>
                         @endforeach
-                        <th class="text-end sales-period-average" scope="col">
-                            <span class="sales-period-label">Rata-rata</span>
-                            <span class="sales-period-range sales-twin-period-range">Periode tersedia</span>
-                        </th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($eventRows as $eventRow)
                         @if (($eventRow['group'] ?? null) !== null && $eventRow['group'] !== $eventGroup)
                             <tr class="sales-table-section-row" role="presentation">
-                                <td colspan="{{ 2 + count($eventPeriods) }}">{{ $eventRow['group'] }}</td>
+                                <td colspan="{{ 1 + count($eventPeriods) }}">{{ $eventRow['group'] }}</td>
                             </tr>
                             @php $eventGroup = $eventRow['group']; @endphp
                         @endif
-                        @php
-                            $eventCurrentValue = $eventPeriods[0]['metrics'][$eventRow['key']] ?? null;
-                            $eventAverageValues = collect($eventPeriods)
-                                ->map(fn ($period) => $period['metrics'][$eventRow['key']] ?? null)
-                                ->filter(fn ($value) => is_numeric($value));
-                            $eventAverage = $eventAverageValues->isNotEmpty()
-                                ? (float) $eventAverageValues->avg()
-                                : null;
-                        @endphp
+                        @php $eventCurrentValue = $eventPeriods[0]['metrics'][$eventRow['key']] ?? null; @endphp
                         <tr>
                             <td class="ps-3 fw-semibold">{{ $eventRow['label'] }}</td>
                             @foreach ($eventPeriods as $periodIndex => $period)
                                 @php
                                     $eventValue = $period['metrics'][$eventRow['key']] ?? null;
+                                    $eventPeriodDays = (int) ($period['period_days'] ?? 1);
+                                    $eventDailyAverage = in_array($eventRow['key'], $eventDailyAverageKeys, true)
+                                        && $eventPeriodDays > 0
+                                        && is_numeric($eventValue)
+                                        ? (float) $eventValue / $eventPeriodDays
+                                        : null;
                                     $eventDelta = null;
                                     if ($periodIndex > 0 && is_numeric($eventCurrentValue) && is_numeric($eventValue)) {
                                         $eventDifference = (float) $eventCurrentValue - (float) $eventValue;
@@ -91,16 +91,12 @@
                                                 </span>
                                             @endif
                                         </span>
+                                        @if ($eventDailyAverage !== null && $eventPeriodDays > 1)
+                                            <small class="sales-comparison-difference">Rata-rata/hari: {{ $eventRow['format']($eventDailyAverage) }}</small>
+                                        @endif
                                     </span>
                                 </td>
                             @endforeach
-                            <td class="text-end sales-period-average">
-                                <span class="sales-comparison-cell">
-                                    <span class="sales-comparison-value-row fw-semibold">
-                                        {{ $eventAverage === null ? '—' : $eventRow['format']($eventAverage) }}
-                                    </span>
-                                </span>
-                            </td>
                         </tr>
                     @endforeach
                 </tbody>

@@ -811,8 +811,6 @@
     .sales-dashboard .sales-sales-comparison-table td { padding: .68rem .72rem; font-size: .72rem; vertical-align: middle; }
     .sales-dashboard .sales-sales-comparison-table .sales-period-current { background: color-mix(in srgb, var(--sales-accent-soft) 32%, var(--sales-card) 68%); }
     .sales-dashboard .sales-sales-comparison-table .sales-period-current .sales-period-label { color: var(--sales-accent); }
-    .sales-dashboard .sales-sales-comparison-table .sales-period-average { background: color-mix(in srgb, var(--sales-accent-soft) 12%, var(--sales-card) 88%); border-left: 1px solid var(--sales-line); }
-    .sales-dashboard .sales-sales-comparison-table .sales-period-average .sales-period-label { color: var(--sales-accent); }
     .sales-dashboard .sales-event-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .55rem; padding: 0 1.15rem .9rem; }
     .sales-dashboard .sales-event-summary-item { display: flex; min-width: 0; align-items: center; gap: .55rem; padding: .62rem .68rem; border: 1px solid var(--sales-line); border-radius: .55rem; background: color-mix(in srgb, var(--sales-card) 88%, var(--sales-soft) 12%); }
     .sales-dashboard .sales-event-summary-icon { display: inline-flex; flex: 0 0 1.85rem; width: 1.85rem; height: 1.85rem; align-items: center; justify-content: center; border: 1px solid color-mix(in srgb, var(--sales-accent) 18%, var(--sales-line) 82%); border-radius: .48rem; background: var(--sales-accent-soft); color: var(--sales-accent); font-size: .75rem; }
@@ -1737,6 +1735,7 @@
         return [
             'label' => $targetDate ? $targetDate->format('j').'.'.$targetDate->month : '—',
             'event_date' => $targetDate ? $targetDate->format('d M Y') : '—',
+            'period_days' => $eventRow ? 1 : 0,
             'target_date' => $targetDate,
             'from' => $period['from'],
             'to' => $period['to'],
@@ -1777,10 +1776,14 @@
         $orders = (int) $windowRows->sum(fn ($row) => (int) data_get($row, 'orders', 0));
         $windowStartLabel = $windowStart ? $windowStart->format('d M') : '—';
         $windowEndLabel = $windowEnd ? $windowEnd->format('d M') : '—';
+        $periodDays = $visibleStart && $visibleEnd && $visibleStart->lte($visibleEnd)
+            ? $visibleStart->diffInDays($visibleEnd) + 1
+            : 0;
 
         return [
             'label' => $targetDate ? $targetDate->format('j').'.'.$targetDate->month : '—',
             'event_date' => $windowStart && $windowEnd ? $windowStartLabel.' – '.$windowEndLabel : '—',
+            'period_days' => $periodDays,
             'target_date' => $targetDate,
             'from' => $period['from'],
             'to' => $period['to'],
@@ -1811,6 +1814,7 @@
         return [
             'label' => $targetDate ? $targetDate->format('d M') : '—',
             'event_date' => $targetDate ? $targetDate->format('d M Y') : '—',
+            'period_days' => $eventRow ? 1 : 0,
             'from' => $period['from'],
             'to' => $period['to'],
             'has_event' => $targetDate !== null,
@@ -1846,10 +1850,14 @@
             : collect();
         $netSales = (float) $windowRows->sum(fn ($row) => (float) data_get($row, 'net_total', 0));
         $orders = (int) $windowRows->sum(fn ($row) => (int) data_get($row, 'orders', 0));
+        $periodDays = $visibleStart && $visibleEnd && $visibleStart->lte($visibleEnd)
+            ? $visibleStart->diffInDays($visibleEnd) + 1
+            : 0;
 
         return [
             'label' => $targetDate ? $targetDate->format('d M') : '—',
             'event_date' => $windowStart && $windowEnd ? $windowStart->format('d M').' – '.$windowEnd->format('d M') : '—',
+            'period_days' => $periodDays,
             'from' => $period['from'],
             'to' => $period['to'],
             'has_event' => $targetDate !== null,
