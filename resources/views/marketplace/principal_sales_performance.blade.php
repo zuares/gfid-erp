@@ -56,6 +56,10 @@
     .principal-dashboard .pd-eyebrow { color: var(--pd-accent); font-size: .66rem; font-weight: 850; letter-spacing: .11em; text-transform: uppercase; }
     .principal-dashboard .pd-section-title { margin: .18rem 0 0; color: var(--pd-text); font-size: 1rem; font-weight: 800; letter-spacing: -.02em; }
     .principal-dashboard .pd-filter-body { padding: 1rem 1.15rem 1.1rem; }
+    .principal-dashboard .pd-filter-grid { display: grid; gap: .9rem 1rem; align-items: start; }
+    .principal-dashboard .pd-filter-grid-primary { grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(130px, 1fr) minmax(120px, 1fr); }
+    .principal-dashboard .pd-filter-grid-secondary { grid-template-columns: minmax(130px, 1fr) minmax(130px, 1fr) minmax(160px, 1.15fr) minmax(0, 2.85fr); margin-top: .9rem; }
+    .principal-dashboard .pd-filter-field { min-width: 0; }
     .principal-dashboard .pd-filter .form-label { margin-bottom: .35rem; color: var(--pd-muted); font-size: .7rem; font-weight: 800; }
     .principal-dashboard .pd-filter .form-control, .principal-dashboard .pd-filter .form-select { min-height: 38px; border-color: var(--pd-line); border-radius: 8px; background-color: var(--pd-card); color: var(--pd-text); font-size: .8rem; }
     .principal-dashboard .pd-filter .form-control::placeholder { color: #94a3b8; }
@@ -112,8 +116,9 @@
     body[data-theme="dark"] .principal-dashboard .pd-kpi-icon.blue { color: #93c5fd; background: rgba(30,64,175,.35); } body[data-theme="dark"] .principal-dashboard .pd-kpi-icon.violet { color: #c4b5fd; background: rgba(76,29,149,.35); } body[data-theme="dark"] .principal-dashboard .pd-kpi-icon.amber { color: #fcd34d; background: rgba(120,53,15,.35); } body[data-theme="dark"] .principal-dashboard .pd-kpi-icon.cyan { color: #67e8f9; background: rgba(22,78,99,.35); } body[data-theme="dark"] .principal-dashboard .pd-kpi-icon.emerald { color: #6ee7b7; background: rgba(6,78,59,.35); } body[data-theme="dark"] .principal-dashboard .pd-kpi-icon.rose { color: #fda4af; background: rgba(136,19,55,.35); }
     body[data-theme="dark"] .principal-dashboard .pd-table th { background: #132a45; }
     @media (max-width: 1100px) { .principal-dashboard .pd-main-grid { grid-template-columns: 1fr; } .principal-dashboard .pd-side-card { display: grid; grid-template-columns: repeat(3, 1fr); gap: .7rem; } .principal-dashboard .pd-side-row { display: block; padding: 0; border: 0; } .principal-dashboard .pd-side-value { margin-top: .18rem; text-align: left; } .principal-dashboard .pd-info { grid-column: 1 / -1; margin-top: .2rem; } }
-    @media (max-width: 768px) { .principal-dashboard { padding-inline: 0; } .principal-dashboard .pd-hero { display: block; min-height: 0; padding: 1.2rem; } .principal-dashboard .pd-hero-context { min-width: 0; margin-top: 1.2rem; } .principal-dashboard .pd-filter-head, .principal-dashboard .pd-filter-body, .principal-dashboard .pd-panel-head, .principal-dashboard .pd-side-card { padding-inline: .85rem; } .principal-dashboard .pd-filter-foot { display: block; } .principal-dashboard .pd-actions { justify-content: space-between; margin-top: .75rem; } .principal-dashboard .pd-section-head { display: block; } .principal-dashboard .pd-result-meta { margin-top: .55rem; } }
-    @media (max-width: 576px) { .principal-dashboard .pd-kpi-body { padding: .85rem; } .principal-dashboard .pd-kpi { min-height: 122px; } .principal-dashboard .pd-side-card { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 960px) { .principal-dashboard .pd-filter-grid-primary, .principal-dashboard .pd-filter-grid-secondary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .principal-dashboard .pd-filter-grid-secondary .pd-filter-field:last-child { grid-column: 1 / -1; } }
+    @media (max-width: 768px) { .principal-dashboard { padding-inline: 0; } .principal-dashboard .pd-hero { display: block; min-height: 0; padding: 1.2rem; } .principal-dashboard .pd-hero-context { min-width: 0; margin-top: 1.2rem; } .principal-dashboard .pd-filter-head, .principal-dashboard .pd-filter-body, .principal-dashboard .pd-panel-head, .principal-dashboard .pd-side-card { padding-inline: .85rem; } .principal-dashboard .pd-filter-foot { display: block; } .principal-dashboard .pd-actions { justify-content: space-between; margin-top: .75rem; } .principal-dashboard .pd-section-head { display: block; } .principal-dashboard .pd-result-meta { margin-top: .55rem; } .principal-dashboard .pd-panel-head { align-items: flex-start; } }
+    @media (max-width: 576px) { .principal-dashboard .pd-filter-grid-primary, .principal-dashboard .pd-filter-grid-secondary { grid-template-columns: 1fr; } .principal-dashboard .pd-filter-grid-secondary .pd-filter-field:last-child { grid-column: auto; } .principal-dashboard .pd-filter-note { align-items: flex-start; } .principal-dashboard .pd-kpi-body { padding: .85rem; } .principal-dashboard .pd-kpi { min-height: 122px; } .principal-dashboard .pd-side-card { grid-template-columns: repeat(2, 1fr); } }
 </style>
 @endpush
 
@@ -160,8 +165,8 @@
             <div class="pd-filter-note"><i class="bi bi-info-circle"></i><span>Hanya data periode selesai yang tersedia</span></div>
         </div>
         <div class="pd-filter-body">
-            <div class="row g-3">
-                <div class="col-12 col-xl-3">
+            <div class="pd-filter-grid pd-filter-grid-primary">
+                <div class="pd-filter-field">
                     <label class="form-label" for="principal-store">Koneksi Shopee</label>
                     <select id="principal-store" class="form-select" name="store_id" required>
                         @foreach ($stores as $store)
@@ -170,26 +175,28 @@
                     </select>
                     <div class="pd-filter-help">Token principal harus tersedia pada koneksi terpilih.</div>
                 </div>
-                <div class="col-12 col-xl-3">
+                <div class="pd-filter-field">
                     <label class="form-label" for="principal-id">Principal ID</label>
                     <input id="principal-id" class="form-control" name="principal_id" value="{{ $filters['principal_id'] ?? '' }}" inputmode="numeric" placeholder="Contoh: 123456" required>
                     <div class="pd-filter-help">Opsional dari konfigurasi <code>SHOPEE_PRINCIPAL_ID</code>.</div>
                 </div>
-                <div class="col-6 col-xl-2"><label class="form-label" for="principal-start">Mulai</label><input id="principal-start" type="date" class="form-control" name="start_date" value="{{ $filters['start_date'] ?? '' }}" max="{{ $latestDate }}" required></div>
-                <div class="col-6 col-xl-2"><label class="form-label" for="principal-end">Sampai</label><input id="principal-end" type="date" class="form-control" name="end_date" value="{{ $filters['end_date'] ?? '' }}" max="{{ $latestDate }}" required></div>
-                <div class="col-6 col-xl-2">
+                <div class="pd-filter-field">
                     <label class="form-label" for="principal-timezone">Timezone</label>
                     <select id="principal-timezone" class="form-select" name="timezone">@foreach (['GMT+7', 'GMT+8', 'GMT-3'] as $timezone)<option value="{{ $timezone }}" @selected(($filters['timezone'] ?? 'GMT+7') === $timezone)>{{ $timezone }}</option>@endforeach</select>
                 </div>
-                <div class="col-6 col-xl-2">
-                    <label class="form-label" for="principal-granularity">Granularitas</label>
-                    <select id="principal-granularity" class="form-select" name="granularity">@foreach ($granularityLabels as $value => $label)<option value="{{ $value }}" @selected(($filters['granularity'] ?? 'customize') === $value)>{{ $label }}</option>@endforeach</select>
-                </div>
-                <div class="col-6 col-xl-2">
+                <div class="pd-filter-field">
                     <label class="form-label" for="principal-currency">Mata uang</label>
                     <select id="principal-currency" class="form-select" name="currency">@foreach (['USD', 'LOCAL'] as $currencyOption)<option value="{{ $currencyOption }}" @selected(($filters['currency'] ?? 'USD') === $currencyOption)>{{ $currencyOption }}</option>@endforeach</select>
                 </div>
-                <div class="col-12 col-xl-6"><label class="form-label" for="principal-regions">Wilayah <span class="fw-normal">(opsional)</span></label><input id="principal-regions" class="form-control" name="regions" value="{{ $filters['regions'] ?? '' }}" placeholder="Contoh: ID, MY, SG — kosongkan untuk semua wilayah"><div class="pd-filter-help">Gunakan kode negara yang dipisahkan koma atau spasi.</div></div>
+            </div>
+            <div class="pd-filter-grid pd-filter-grid-secondary">
+                <div class="pd-filter-field"><label class="form-label" for="principal-start">Mulai</label><input id="principal-start" type="date" class="form-control" name="start_date" value="{{ $filters['start_date'] ?? '' }}" max="{{ $latestDate }}" required></div>
+                <div class="pd-filter-field"><label class="form-label" for="principal-end">Sampai</label><input id="principal-end" type="date" class="form-control" name="end_date" value="{{ $filters['end_date'] ?? '' }}" max="{{ $latestDate }}" required></div>
+                <div class="pd-filter-field">
+                    <label class="form-label" for="principal-granularity">Granularitas</label>
+                    <select id="principal-granularity" class="form-select" name="granularity">@foreach ($granularityLabels as $value => $label)<option value="{{ $value }}" @selected(($filters['granularity'] ?? 'customize') === $value)>{{ $label }}</option>@endforeach</select>
+                </div>
+                <div class="pd-filter-field"><label class="form-label" for="principal-regions">Wilayah <span class="fw-normal">(opsional)</span></label><input id="principal-regions" class="form-control" name="regions" value="{{ $filters['regions'] ?? '' }}" placeholder="Contoh: ID, MY, SG — kosongkan untuk semua wilayah"><div class="pd-filter-help">Gunakan kode negara yang dipisahkan koma atau spasi.</div></div>
             </div>
             <div class="pd-filter-foot">
                 <div class="pd-filter-note"><i class="bi bi-lock"></i><span>Request bersifat read-only dan tidak mengubah data Shopee.</span></div>
@@ -203,7 +210,7 @@
 
         <div class="row g-3">
             @foreach ($kpis as $kpi)
-                <div class="col-6 col-xl-2"><article class="pd-card pd-kpi h-100"><div class="pd-kpi-body"><div class="pd-kpi-top"><div class="pd-kpi-label">{{ $kpi['label'] }}</div><span class="pd-kpi-icon {{ $kpi['tone'] }}"><i class="bi {{ $kpi['icon'] }}"></i></span></div><div class="pd-kpi-value" title="{{ $kpi['value'] }}">{{ $kpi['value'] }}</div><div class="pd-kpi-note">{{ $kpi['note'] }}</div></div></article></div>
+                <div class="col-6 col-md-4 col-xl-2"><article class="pd-card pd-kpi h-100"><div class="pd-kpi-body"><div class="pd-kpi-top"><div class="pd-kpi-label">{{ $kpi['label'] }}</div><span class="pd-kpi-icon {{ $kpi['tone'] }}"><i class="bi {{ $kpi['icon'] }}"></i></span></div><div class="pd-kpi-value" title="{{ $kpi['value'] }}">{{ $kpi['value'] }}</div><div class="pd-kpi-note">{{ $kpi['note'] }}</div></div></article></div>
             @endforeach
         </div>
 
