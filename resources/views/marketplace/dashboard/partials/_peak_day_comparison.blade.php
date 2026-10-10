@@ -121,4 +121,26 @@
             </div>
         </section>
     @endif
+    @if ($comparisonMode === 'month')
+        @include('marketplace.dashboard.partials._event_comparison_table', [
+            'eventId' => 'sales-payday-comparison',
+            'eventPeriods' => $salesPaydayComparisonPeriods,
+            'eventRows' => $salesTwinComparisonRows,
+            'eventKicker' => 'Perbandingan payday',
+            'eventTitle' => 'Perbandingan tanggal gajian '.$paydayDay,
+            'eventSubtitle' => 'Baseline payday pada bulan aktif dibandingkan dengan tanggal gajian pada tiga bulan sebelumnya.',
+            'eventIcon' => 'bi-wallet2',
+            'eventBadge' => 'Bulanan',
+        ])
+        @include('marketplace.dashboard.partials._event_comparison_table', [
+            'eventId' => 'sales-payday-pre-peak',
+            'eventPeriods' => $salesPaydayPrePeakPeriods,
+            'eventRows' => $salesTwinComparisonRows,
+            'eventKicker' => 'Persiapan payday',
+            'eventTitle' => 'Performa 7 hari sebelum payday '.$paydayDay,
+            'eventSubtitle' => 'Membandingkan periode D-7 sampai D-1 sebelum tanggal gajian. Payday tidak termasuk.',
+            'eventIcon' => 'bi-calendar-week',
+            'eventBadge' => 'Pre-payday',
+        ])
+    @endif
 @endif

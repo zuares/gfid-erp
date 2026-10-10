@@ -1166,9 +1166,10 @@
     $dateLabel = fn ($date) => \Carbon\Carbon::parse($date)->format('d M Y');
     $dateRangeLabel = fn ($from, $to) => $dateLabel($from).' – '.$dateLabel($to);
     $pct = fn ($value, $total) => $total > 0 ? number_format(((float) $value / (float) $total) * 100, 1, ',', '.') : '0,0';
-    $salesTabs = ['sales', 'peak_day', 'products', 'payments', 'promotions', 'shipping', 'income', 'orders'];
+    $salesTabs = ['sales', 'event_day', 'products', 'payments', 'promotions', 'shipping', 'income', 'orders'];
     $activeTab = in_array(request('tab'), $salesTabs, true) ? request('tab') : 'sales';
     $comparisonMode = $filters['comparison_mode'] ?? 'month';
+    $paydayDay = min(max((int) request('payday_day', 25), 1), 31);
     $comparisonModeLabel = $comparisonMode === 'month' ? 'Bulan lalu' : 'Periode lalu';
     $comparisonPeriodDisplayLabel = function ($from, $to, $fallback) use ($comparisonMode, $dateRangeLabel) {
         if (! $from) {
@@ -1730,6 +1731,74 @@
             'label' => $targetDate ? $targetDate->format('j').'.'.$targetDate->month : '—',
             'event_date' => $windowStart && $windowEnd ? $windowStartLabel.' – '.$windowEndLabel : '—',
             'target_date' => $targetDate,
+            'from' => $period['from'],
+            'to' => $period['to'],
+            'has_event' => $targetDate !== null,
+            'metrics' => [
+                'net_sales' => $netSales,
+                'orders' => $orders,
+                'qty' => (int) $windowRows->sum(fn ($row) => (int) data_get($row, 'qty', 0)),
+                'aov' => $orders > 0 ? $netSales / $orders : null,
+                'estimated_payout' => (float) $windowRows->sum(fn ($row) => (float) data_get($row, 'estimated_payout', 0)),
+                'net_profit' => (float) $windowRows->sum(fn ($row) => (float) data_get($row, 'net_profit', 0)),
+                'net_margin' => $netSales > 0
+                    ? ((float) $windowRows->sum(fn ($row) => (float) data_get($row, 'net_profit', 0)) / $netSales) * 100
+                    : null,
+            ],
+        ];
+    })->values()->all();
+    $salesPaydayComparisonPeriods = collect($salesTwinComparisonSources)->map(function ($period) use ($paydayDay) {
+        $periodStart = $period['from'] ? \Carbon\Carbon::parse($period['from']) : null;
+        $periodEnd = $period['to'] ? \Carbon\Carbon::parse($period['to']) : null;
+        $targetDate = $periodStart ? $periodStart->copy()->day(min($paydayDay, $periodStart->daysInMonth)) : null;
+        $eventRow = $targetDate
+            ? collect($period['daily'] ?? [])->first(fn ($row) => data_get($row, 'day') && \Carbon\Carbon::parse(data_get($row, 'day'))->isSameDay($targetDate))
+            : null;
+        $orders = $eventRow ? (int) data_get($eventRow, 'orders', 0) : null;
+        $netSales = $eventRow ? (float) data_get($eventRow, 'net_total', 0) : null;
+
+        return [
+            'label' => $targetDate ? $targetDate->format('d M') : '—',
+            'event_date' => $targetDate ? $targetDate->format('d M Y') : '—',
+            'from' => $period['from'],
+            'to' => $period['to'],
+            'has_event' => $targetDate !== null,
+            'metrics' => [
+                'net_sales' => $netSales,
+                'orders' => $orders,
+                'qty' => $eventRow ? (int) data_get($eventRow, 'qty', 0) : null,
+                'aov' => $eventRow && $orders > 0 ? $netSales / $orders : null,
+                'estimated_payout' => $eventRow ? (float) data_get($eventRow, 'estimated_payout', 0) : null,
+                'net_profit' => $eventRow ? (float) data_get($eventRow, 'net_profit', 0) : null,
+                'net_margin' => $eventRow && $netSales > 0 ? ((float) data_get($eventRow, 'net_profit', 0) / $netSales) * 100 : null,
+            ],
+        ];
+    })->values()->all();
+    $salesPaydayPrePeakPeriods = collect($salesTwinComparisonSources)->map(function ($period) use ($paydayDay) {
+        $periodStart = $period['from'] ? \Carbon\Carbon::parse($period['from']) : null;
+        $periodEnd = $period['to'] ? \Carbon\Carbon::parse($period['to']) : null;
+        $targetDate = $periodStart ? $periodStart->copy()->day(min($paydayDay, $periodStart->daysInMonth)) : null;
+        $windowStart = $targetDate ? $targetDate->copy()->subDays(7) : null;
+        $windowEnd = $targetDate ? $targetDate->copy()->subDay() : null;
+        $visibleStart = $windowStart && $periodStart && $windowStart->lt($periodStart) ? $periodStart->copy() : $windowStart;
+        $visibleEnd = $windowEnd && $periodEnd && $windowEnd->gt($periodEnd) ? $periodEnd->copy() : $windowEnd;
+        $windowRows = $visibleStart && $visibleEnd
+            ? collect($period['daily'] ?? [])->filter(function ($row) use ($visibleStart, $visibleEnd) {
+                $day = data_get($row, 'day');
+
+                if (! $day) {
+                    return false;
+                }
+
+                return \Carbon\Carbon::parse($day)->betweenIncluded($visibleStart, $visibleEnd);
+            })
+            : collect();
+        $netSales = (float) $windowRows->sum(fn ($row) => (float) data_get($row, 'net_total', 0));
+        $orders = (int) $windowRows->sum(fn ($row) => (int) data_get($row, 'orders', 0));
+
+        return [
+            'label' => $targetDate ? $targetDate->format('d M') : '—',
+            'event_date' => $windowStart && $windowEnd ? $windowStart->format('d M').' – '.$windowEnd->format('d M') : '—',
             'from' => $period['from'],
             'to' => $period['to'],
             'has_event' => $targetDate !== null,
@@ -2316,6 +2385,14 @@
                     summary="{{ $activeDateSummary }}"
                     class="col-12 col-md-auto sales-period-filter"
                 />
+                <div class="col-12 col-md-auto sales-filter-field">
+                    <label class="sales-filter-label" for="sales-payday-day"><i class="bi bi-wallet2" aria-hidden="true"></i>Tanggal gajian</label>
+                    <select id="sales-payday-day" class="form-select form-select-sm" name="payday_day">
+                        @for ($day = 1; $day <= 31; $day++)
+                            <option value="{{ $day }}" @selected($paydayDay === $day)>Tanggal {{ $day }}</option>
+                        @endfor
+                    </select>
+                </div>
             </div>
         </div>
     </form>
@@ -2323,7 +2400,7 @@
     <div class="sales-nav-shell">
         <nav class="sales-nav nav nav-pills gap-2" aria-label="Dashboard operasional" role="tablist">
         <button class="nav-link {{ $activeTab === 'sales' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'sales' ? 'true' : 'false' }}" data-sales-tab="sales"><i class="bi bi-graph-up-arrow me-1"></i>Penjualan</button>
-        <button class="nav-link {{ $activeTab === 'peak_day' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'peak_day' ? 'true' : 'false' }}" data-sales-tab="peak_day"><i class="bi bi-calendar2-event me-1"></i>Peak Day</button>
+        <button class="nav-link {{ $activeTab === 'event_day' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'event_day' ? 'true' : 'false' }}" data-sales-tab="event_day"><i class="bi bi-calendar2-event me-1"></i>Event Day</button>
         <button class="nav-link {{ $activeTab === 'products' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'products' ? 'true' : 'false' }}" data-sales-tab="products"><i class="bi bi-box-seam me-1"></i>Produk</button>
         <button class="nav-link {{ $activeTab === 'payments' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'payments' ? 'true' : 'false' }}" data-sales-tab="payments"><i class="bi bi-wallet2 me-1"></i>Pembayaran</button>
         <button class="nav-link {{ $activeTab === 'promotions' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'promotions' ? 'true' : 'false' }}" data-sales-tab="promotions"><i class="bi bi-percent me-1"></i>Promosi</button>
@@ -2922,7 +2999,7 @@
     </section>
     </div>
 
-    <div class="sales-tab-pane {{ $activeTab === 'peak_day' ? '' : 'is-hidden' }}" data-sales-pane="peak_day" role="tabpanel" aria-hidden="{{ $activeTab === 'peak_day' ? 'false' : 'true' }}">
+    <div class="sales-tab-pane {{ $activeTab === 'event_day' ? '' : 'is-hidden' }}" data-sales-pane="event_day" role="tabpanel" aria-hidden="{{ $activeTab === 'event_day' ? 'false' : 'true' }}">
         @include('marketplace.dashboard.partials._peak_day_comparison')
     </div>
 
@@ -4591,6 +4668,7 @@
         const activeTabInput = document.querySelector('#sales-active-tab');
         const storeInput = document.querySelector('#sales-store');
         const platformInput = document.querySelector('#sales-platform');
+        const paydayInput = document.querySelector('#sales-payday-day');
         const orderRows = document.querySelectorAll('[data-sales-order-row]');
         const comparisonModeInput = document.querySelector('#sales-comparison-mode');
         const orderDate = document.querySelector('#sales-order-detail-date');
@@ -5023,6 +5101,12 @@
 
         if (platformInput && filterForm) {
             platformInput.addEventListener('change', function () {
+                filterForm.requestSubmit();
+            });
+        }
+
+        if (paydayInput && filterForm) {
+            paydayInput.addEventListener('change', function () {
                 filterForm.requestSubmit();
             });
         }
