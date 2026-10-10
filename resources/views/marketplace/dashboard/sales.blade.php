@@ -2547,7 +2547,10 @@
                 $dailyPeakRow = $dailyRowsSorted->sortByDesc(fn ($row) => (float) data_get($row, 'net_total', 0))->first();
                 $dailyChartRow = function ($row, $eventMetaByDate = null) {
                     $day = \Carbon\Carbon::parse(data_get($row, 'day'));
-                    $eventMeta = $eventMetaByDate?->get($day->toDateString(), ['types' => ['normal'], 'is_twin' => false, 'twin_label' => null, 'peak_rank' => null]);
+                    $defaultEventMeta = ['types' => ['normal'], 'is_twin' => false, 'twin_label' => null, 'peak_rank' => null];
+                    $eventMeta = $eventMetaByDate
+                        ? ($eventMetaByDate->get($day->toDateString(), $defaultEventMeta) ?: $defaultEventMeta)
+                        : $defaultEventMeta;
 
                     return [
                         'label' => $day->format('d M'),
