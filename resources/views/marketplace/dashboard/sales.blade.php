@@ -407,6 +407,7 @@
     .sales-dashboard .sales-daily-table { width: 100%; min-width: 0; table-layout: fixed; }
     .sales-dashboard .sales-daily-col-toggle { width: 3.5rem; }
     .sales-dashboard .sales-daily-col-date { width: 9%; }
+    .sales-dashboard .sales-daily-col-event { width: 8rem; }
     .sales-dashboard .sales-daily-col-count { width: 6%; }
     .sales-dashboard .sales-daily-col-units { width: 6%; }
     .sales-dashboard .sales-daily-col-unit-order { width: 6%; }
@@ -521,6 +522,10 @@
     .sales-dashboard .sales-daily-chart-legend i { width: .45rem; height: .45rem; border-radius: 50%; background: var(--sales-accent); }
     .sales-dashboard .sales-daily-chart-legend i.previous { background: var(--sales-muted); }
     .sales-dashboard .sales-daily-chart-legend i.period-two { background: #a78bfa; }
+    .sales-dashboard .sales-daily-chart-legend i.event-twin { background: #7c3aed; }
+    .sales-dashboard .sales-daily-chart-legend i.event-peak { background: #ea580c; }
+    .sales-dashboard .sales-daily-chart .daily-chart-point.event-twin { fill: #7c3aed; }
+    .sales-dashboard .sales-daily-chart .daily-chart-point.event-peak { fill: #ea580c; }
     .sales-dashboard .sales-daily-chart-analysis { display: flex; flex-direction: column; justify-content: flex-start; min-width: 0; padding: .8rem; border: 1px solid color-mix(in srgb, var(--sales-line) 78%, transparent); border-radius: .65rem; background: color-mix(in srgb, var(--sales-card) 92%, var(--sales-soft) 8%); }
     .sales-dashboard .sales-daily-chart-analysis-header { display: flex; align-items: flex-start; justify-content: space-between; gap: .65rem; }
     .sales-dashboard .sales-daily-chart-analysis-kicker { color: var(--sales-muted); font-size: .58rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
@@ -535,6 +540,33 @@
     .sales-dashboard .sales-daily-chart-analysis-item-label { display: block; color: var(--sales-muted); font-size: .57rem; font-weight: 750; line-height: 1.2; }
     .sales-dashboard .sales-daily-chart-analysis-item-value { display: block; margin-top: .24rem; color: var(--sales-ink); font-size: .68rem; font-weight: 850; line-height: 1.2; }
     .sales-dashboard .sales-daily-chart-analysis-item-date { display: block; margin-top: .12rem; color: var(--sales-muted); font-size: .56rem; font-weight: 700; line-height: 1.2; }
+    .sales-dashboard .sales-daily-event-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .65rem; margin: 0 .85rem .75rem; padding: .65rem .75rem; border: 1px solid color-mix(in srgb, var(--sales-line) 78%, transparent); border-radius: .75rem; background: color-mix(in srgb, var(--sales-soft) 34%, var(--sales-card) 66%); }
+    .sales-dashboard .sales-daily-event-toolbar-label { color: var(--sales-muted); font-size: .6rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+    .sales-dashboard .sales-daily-event-filters { display: flex; flex-wrap: wrap; gap: .3rem; }
+    .sales-dashboard .sales-daily-event-filter { border: 1px solid var(--sales-line); border-radius: 999px; padding: .3rem .58rem; color: var(--sales-muted); background: var(--sales-card); font-size: .64rem; font-weight: 750; line-height: 1; transition: color .16s ease, background .16s ease, border-color .16s ease; }
+    .sales-dashboard .sales-daily-event-filter:hover,
+    .sales-dashboard .sales-daily-event-filter.active { border-color: color-mix(in srgb, var(--sales-accent) 55%, var(--sales-line) 45%); color: var(--sales-accent); background: var(--sales-accent-soft); }
+    .sales-dashboard .sales-daily-event-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; margin: 0 .85rem .75rem; }
+    .sales-dashboard .sales-daily-event-summary-card { min-width: 0; padding: .58rem .68rem; border: 1px solid color-mix(in srgb, var(--sales-line) 72%, transparent); border-radius: .65rem; background: color-mix(in srgb, var(--sales-soft) 28%, var(--sales-card) 72%); }
+    .sales-dashboard .sales-daily-event-summary-label { overflow: hidden; color: var(--sales-muted); font-size: .56rem; font-weight: 800; letter-spacing: .035em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+    .sales-dashboard .sales-daily-event-summary-value { overflow: hidden; margin-top: .16rem; color: var(--sales-ink); font-size: .78rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
+    .sales-dashboard .sales-daily-event-summary-meta { display: block; margin-top: .12rem; color: var(--sales-muted); font-size: .57rem; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sales-dashboard .sales-daily-event-summary-meta.good { color: #15803d; font-weight: 800; }
+    .sales-dashboard .sales-daily-event-summary-meta.bad { color: #b91c1c; font-weight: 800; }
+    .sales-dashboard .sales-daily-event-badges { display: flex; flex-wrap: wrap; gap: .18rem; margin-top: .2rem; }
+    .sales-dashboard .sales-daily-event-badge { display: inline-flex; align-items: center; gap: .2rem; border: 1px solid transparent; border-radius: 999px; padding: .16rem .36rem; font-size: .52rem; font-weight: 800; line-height: 1; white-space: nowrap; }
+    .sales-dashboard .sales-daily-event-badge--normal { border-color: color-mix(in srgb, var(--sales-line) 85%, transparent); color: var(--sales-muted); background: color-mix(in srgb, var(--sales-soft) 45%, var(--sales-card) 55%); }
+    .sales-dashboard .sales-daily-event-badge--twin { border-color: color-mix(in srgb, #7c3aed 25%, var(--sales-line) 75%); color: #6d28d9; background: #f3e8ff; }
+    .sales-dashboard .sales-daily-event-badge--peak { border-color: color-mix(in srgb, #ea580c 25%, var(--sales-line) 75%); color: #c2410c; background: #ffedd5; }
+    .sales-dashboard .sales-daily-event-cell { min-width: 8rem; }
+    @media (max-width: 900px) {
+        .sales-dashboard .sales-daily-event-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 575px) {
+        .sales-dashboard .sales-daily-event-toolbar { align-items: flex-start; flex-direction: column; }
+        .sales-dashboard .sales-daily-event-summary { grid-template-columns: 1fr 1fr; margin-inline: .65rem; }
+        .sales-dashboard .sales-daily-chart-shell { margin-inline: .65rem; }
+    }
     .sales-dashboard .sales-product-table { min-width: 1265px; table-layout: fixed; }
     .sales-dashboard .sales-product-table th,
     .sales-dashboard .sales-product-table td { white-space: nowrap; }
@@ -2463,8 +2495,8 @@
     <section class="card sales-card shadow-sm" aria-labelledby="daily-sales-title">
         <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
             <div>
-                <div class="sales-kicker mb-1">Ringkasan waktu</div>
-                <h2 id="daily-sales-title" class="sales-section-title mb-1">Penjualan per tanggal</h2>
+                <div class="sales-kicker mb-1">Ringkasan waktu &amp; event</div>
+                <h2 id="daily-sales-title" class="sales-section-title mb-1">Analisis Waktu &amp; Peak Day</h2>
             </div>
             <span class="badge sales-badge rounded-pill px-3 py-2">{{ $daily->count() }} hari aktif</span>
         </div>
@@ -2473,23 +2505,69 @@
             <div class="sales-empty text-center"><i class="bi bi-bar-chart-line d-block fs-3 mb-2"></i>Belum ada penjualan pada periode yang dipilih.</div>
         @else
             @php
-                $dailyChartRow = function ($row) {
+                $dailyRowsSorted = collect($daily)->sortBy('day')->values();
+                $dailyPeakRankByDate = $dailyRowsSorted
+                    ->sortByDesc(fn ($row) => (float) data_get($row, 'net_total', 0))
+                    ->take(3)
+                    ->values()
+                    ->mapWithKeys(fn ($row, $index) => [(string) data_get($row, 'day') => $index + 1]);
+                $dailyEventMeta = function ($row) use ($dailyPeakRankByDate) {
+                    $date = \Carbon\Carbon::parse(data_get($row, 'day'));
+                    $dateKey = $date->toDateString();
+                    $isTwinDate = $date->day === $date->month;
+                    $peakRank = $dailyPeakRankByDate->get($dateKey);
+                    $types = [];
+                    if ($isTwinDate) $types[] = 'tanggal_kembar';
+                    if ($peakRank !== null) $types[] = 'peak_day';
+                    if (!$types) $types[] = 'normal';
+
                     return [
-                        'label' => \Carbon\Carbon::parse(data_get($row, 'day'))->format('d M'),
-                        'date' => \Carbon\Carbon::parse(data_get($row, 'day'))->format('d M Y'),
+                        'types' => $types,
+                        'is_twin' => $isTwinDate,
+                        'twin_label' => $isTwinDate ? $date->day.'.'.$date->month : null,
+                        'peak_rank' => $peakRank,
+                    ];
+                };
+                $dailyEventMetaByDate = $dailyRowsSorted->mapWithKeys(fn ($row) => [
+                    (string) data_get($row, 'day') => $dailyEventMeta($row),
+                ]);
+                $dailyNormalRows = $dailyRowsSorted->filter(fn ($row) => in_array('normal', $dailyEventMetaByDate->get((string) data_get($row, 'day'), [])['types'] ?? [], true));
+                $dailyTwinRows = $dailyRowsSorted->filter(fn ($row) => in_array('tanggal_kembar', $dailyEventMetaByDate->get((string) data_get($row, 'day'), [])['types'] ?? [], true));
+                $dailyPeakRows = $dailyRowsSorted->filter(fn ($row) => in_array('peak_day', $dailyEventMetaByDate->get((string) data_get($row, 'day'), [])['types'] ?? [], true));
+                $dailyAverage = function ($rows, $field) {
+                    $rows = collect($rows);
+
+                    return $rows->count() > 0 ? (float) $rows->avg(fn ($row) => (float) data_get($row, $field, 0)) : 0;
+                };
+                $dailyNormalAverageNetSales = $dailyAverage($dailyNormalRows, 'net_total');
+                $dailyTwinAverageNetSales = $dailyAverage($dailyTwinRows, 'net_total');
+                $dailyTwinLift = $dailyNormalAverageNetSales > 0
+                    ? (($dailyTwinAverageNetSales - $dailyNormalAverageNetSales) / $dailyNormalAverageNetSales) * 100
+                    : null;
+                $dailyPeakRow = $dailyRowsSorted->sortByDesc(fn ($row) => (float) data_get($row, 'net_total', 0))->first();
+                $dailyChartRow = function ($row, $eventMetaByDate = null) {
+                    $day = \Carbon\Carbon::parse(data_get($row, 'day'));
+                    $eventMeta = $eventMetaByDate?->get($day->toDateString(), ['types' => ['normal'], 'is_twin' => false, 'twin_label' => null, 'peak_rank' => null]);
+
+                    return [
+                        'label' => $day->format('d M'),
+                        'date' => $day->format('d M Y'),
                         'net_sales' => (float) data_get($row, 'net_total', 0),
                         'estimated_payout' => (float) data_get($row, 'estimated_payout', 0),
                         'gross_profit' => (float) data_get($row, 'gross_profit', 0),
                         'net_profit' => (float) data_get($row, 'net_profit', 0),
                         'qty' => (float) data_get($row, 'qty', 0),
                         'orders' => (float) data_get($row, 'orders', 0),
+                        'event_types' => $eventMeta['types'],
+                        'event_label' => $eventMeta['is_twin'] ? 'Tanggal kembar '.$eventMeta['twin_label'] : null,
+                        'peak_rank' => $eventMeta['peak_rank'],
                     ];
                 };
                 $dailyChartPayload = [
-                    'periods' => collect($salesComparisonSources)->take(3)->map(function ($period) use ($dailyChartRow) {
+                    'periods' => collect($salesComparisonSources)->take(3)->map(function ($period, $periodIndex) use ($dailyChartRow, $dailyEventMetaByDate) {
                         return [
                             'label' => $period['label'],
-                            'rows' => collect($period['daily'] ?? [])->sortBy('day')->map($dailyChartRow)->values()->all(),
+                            'rows' => collect($period['daily'] ?? [])->sortBy('day')->map(fn ($row) => $dailyChartRow($row, $periodIndex === 0 ? $dailyEventMetaByDate : null))->values()->all(),
                         ];
                     })->values()->all(),
                 ];
@@ -2653,6 +2731,8 @@
                             <span><i aria-hidden="true"></i>{{ $salesComparisonSources[0]['label'] ?? 'Aktif' }}</span>
                             <span><i class="previous" aria-hidden="true"></i>{{ $salesComparisonSources[1]['label'] ?? $comparisonModeLabel }}</span>
                             <span><i class="period-two" aria-hidden="true"></i>{{ $salesComparisonSources[2]['label'] ?? ($comparisonModeLabel.' -2') }}</span>
+                            <span><i class="event-twin" aria-hidden="true"></i>Tanggal kembar</span>
+                            <span><i class="event-peak" aria-hidden="true"></i>Peak day</span>
                         </div>
                     </div>
                     <aside class="sales-daily-chart-analysis" aria-label="Kesimpulan analitik">
@@ -2690,11 +2770,46 @@
                 </div>
                 <script type="application/json" id="sales-daily-chart-data">@json($dailyChartPayload)</script>
             </div>
+            <div class="sales-daily-event-toolbar" aria-label="Filter analisa tanggal">
+                <div>
+                    <div class="sales-daily-event-toolbar-label">Fokus analisa</div>
+                    <div class="small text-muted">Bandingkan event dengan hari normal pada periode aktif.</div>
+                </div>
+                <div class="sales-daily-event-filters" role="group" aria-label="Filter event tanggal">
+                    <button type="button" class="sales-daily-event-filter active" data-sales-daily-event-filter="all" aria-pressed="true">Semua tanggal</button>
+                    <button type="button" class="sales-daily-event-filter" data-sales-daily-event-filter="tanggal_kembar" aria-pressed="false">Tanggal kembar</button>
+                    <button type="button" class="sales-daily-event-filter" data-sales-daily-event-filter="peak_day" aria-pressed="false">Peak day</button>
+                    <button type="button" class="sales-daily-event-filter" data-sales-daily-event-filter="normal" aria-pressed="false">Hari normal</button>
+                </div>
+            </div>
+            <div class="sales-daily-event-summary" aria-label="Ringkasan peak day dan tanggal kembar">
+                <div class="sales-daily-event-summary-card">
+                    <div class="sales-daily-event-summary-label">Tanggal kembar</div>
+                    <div class="sales-daily-event-summary-value" data-sales-event-twin-count>{{ $dailyTwinRows->count() }} hari</div>
+                    <span class="sales-daily-event-summary-meta" data-sales-event-twin-meta>terdeteksi pada periode aktif</span>
+                </div>
+                <div class="sales-daily-event-summary-card">
+                    <div class="sales-daily-event-summary-label">Peak day</div>
+                    <div class="sales-daily-event-summary-value" data-sales-event-peak-value>{{ $dailyPeakRow ? $fmt($dailyPeakRow->net_total) : '—' }}</div>
+                    <span class="sales-daily-event-summary-meta" data-sales-event-peak-meta>{{ $dailyPeakRow ? $dateLabel($dailyPeakRow->day) : 'Belum ada data' }}</span>
+                </div>
+                <div class="sales-daily-event-summary-card">
+                    <div class="sales-daily-event-summary-label">Avg Net Sales tanggal kembar</div>
+                    <div class="sales-daily-event-summary-value" data-sales-event-twin-average>{{ $fmt($dailyTwinAverageNetSales) }}</div>
+                    <span class="sales-daily-event-summary-meta {{ $dailyTwinLift !== null ? ($dailyTwinLift >= 0 ? 'good' : 'bad') : '' }}" data-sales-event-twin-lift>{{ $dailyTwinLift !== null ? ($dailyTwinLift >= 0 ? '↑ ' : '↓ ').number_format(abs($dailyTwinLift), 1, ',', '.').' vs hari normal' : 'Belum ada baseline hari normal' }}</span>
+                </div>
+                <div class="sales-daily-event-summary-card">
+                    <div class="sales-daily-event-summary-label">Baseline hari normal</div>
+                    <div class="sales-daily-event-summary-value" data-sales-event-normal-average>{{ $fmt($dailyNormalAverageNetSales) }}</div>
+                    <span class="sales-daily-event-summary-meta" data-sales-event-visible-count>{{ $daily->count() }} hari ditampilkan</span>
+                </div>
+            </div>
             <div class="table-responsive">
                 <table class="table table-sm table-hover align-middle sales-table sales-daily-table">
                     <colgroup>
                         <col class="sales-daily-col-toggle">
                         <col class="sales-daily-col-date">
+                        <col class="sales-daily-col-event">
                         <col class="sales-daily-col-count">
                         <col class="sales-daily-col-units">
                         <col class="sales-daily-col-unit-order">
@@ -2706,6 +2821,7 @@
                         <tr>
                             <th scope="col" class="sales-index-column"><i class="bi bi-chevron-right" aria-hidden="true"></i><span class="visually-hidden">Rincian toko</span></th>
                             <th>Tanggal</th>
+                            <th>Event</th>
                             <th class="text-end">Pesanan</th>
                             <th class="text-end">Terjual</th>
                             <th class="text-end">Avg Order</th>
@@ -2722,6 +2838,7 @@
                     <tbody>
                         @foreach ($daily as $row)
                             @php
+                                $dailyEvent = $dailyEventMetaByDate->get((string) $row->day, ['types' => ['normal'], 'is_twin' => false, 'twin_label' => null, 'peak_rank' => null]);
                                 $dailyPayment = $paymentDailyByDay->get((string) $row->day);
                                 $dailyBuyerPaid = (float) data_get($dailyPayment, 'buyer_paid', 0);
                                 $dailyOrders = (int) ($row->orders ?? 0);
@@ -2743,13 +2860,26 @@
                                     'net_profit' => $dailyChange($row->net_profit, data_get($dailyPrevious, 'net_profit')),
                                 ];
                             @endphp
-                            <tr class="sales-daily-row">
+                            <tr class="sales-daily-row" data-sales-daily-filter-row data-daily-event-day="{{ $row->day }}" data-daily-event-types="{{ implode('|', $dailyEvent['types']) }}">
                                 <td class="sales-index-cell">
                                     <button type="button" class="sales-daily-toggle" data-sales-store-toggle="{{ $row->day }}" aria-expanded="false" aria-controls="sales-store-detail-{{ $row->day }}" aria-label="Buka rincian toko {{ $dateLabel($row->day) }}">
                                         <i class="bi bi-chevron-right" aria-hidden="true"></i>
                                     </button>
                                 </td>
                                 <td><button class="sales-date-link" type="button" data-sales-order-detail-date="{{ $row->day }}">{{ $dateLabel($row->day) }}</button></td>
+                                <td class="sales-daily-event-cell">
+                                    <div class="sales-daily-event-badges">
+                                        @if ($dailyEvent['is_twin'])
+                                            <span class="sales-daily-event-badge sales-daily-event-badge--twin"><i class="bi bi-stars" aria-hidden="true"></i>{{ $dailyEvent['twin_label'] }}</span>
+                                        @endif
+                                        @if ($dailyEvent['peak_rank'] !== null)
+                                            <span class="sales-daily-event-badge sales-daily-event-badge--peak"><i class="bi bi-lightning-charge-fill" aria-hidden="true"></i>Peak #{{ $dailyEvent['peak_rank'] }}</span>
+                                        @endif
+                                        @if (!$dailyEvent['is_twin'] && $dailyEvent['peak_rank'] === null)
+                                            <span class="sales-daily-event-badge sales-daily-event-badge--normal">Normal</span>
+                                        @endif
+                                    </div>
+                                </td>
                                 <td class="text-end">{{ number_format($row->orders) }}@if ($dailyChanges['orders'])<div class="sales-compare-line {{ $dailyChanges['orders']['tone'] }}" title="{{ $dailyChanges['orders']['title'] }}"><i class="bi {{ $dailyChanges['orders']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['orders']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['orders']['baseline'] }}</span></div>@endif</td>
                                 <td class="text-end">{{ number_format($row->qty) }}@if ($dailyChanges['qty'])<div class="sales-compare-line {{ $dailyChanges['qty']['tone'] }}" title="{{ $dailyChanges['qty']['title'] }}"><i class="bi {{ $dailyChanges['qty']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['qty']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['qty']['baseline'] }}</span></div>@endif</td>
                                 <td class="text-end">{{ number_format($row->avg_units_per_order, 2, ',', '.') }}@if ($dailyChanges['avg_units_per_order'])<div class="sales-compare-line {{ $dailyChanges['avg_units_per_order']['tone'] }}" title="{{ $dailyChanges['avg_units_per_order']['title'] }}"><i class="bi {{ $dailyChanges['avg_units_per_order']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['avg_units_per_order']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['avg_units_per_order']['baseline'] }}</span></div>@endif</td>
@@ -2762,8 +2892,8 @@
                                 <td class="text-end sales-table-metric"><div>{{ $fmt($row->ad_spend) }}</div><div class="small text-muted">({{ $dailyAov($row->ad_spend) }})</div>@if ($dailyChanges['ad_spend'])<div class="sales-compare-line {{ $dailyChanges['ad_spend']['tone'] }}" title="{{ $dailyChanges['ad_spend']['title'] }}"><i class="bi {{ $dailyChanges['ad_spend']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['ad_spend']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['ad_spend']['baseline'] }}</span></div>@endif</td>
                                 <td class="text-end fw-semibold sales-table-metric"><div>{{ $fmt($row->net_profit) }}</div><div class="small text-muted">({{ $dailyAov($row->net_profit) }})</div>@if ($dailyChanges['net_profit'])<div class="sales-compare-line {{ $dailyChanges['net_profit']['tone'] }}" title="{{ $dailyChanges['net_profit']['title'] }}"><i class="bi {{ $dailyChanges['net_profit']['icon'] }}" aria-hidden="true"></i><strong>{{ $dailyChanges['net_profit']['label'] }}</strong><span class="sales-compare-amount">{{ $dailyChanges['net_profit']['baseline'] }}</span></div>@endif</td>
                             </tr>
-                            <tr id="sales-store-detail-{{ $row->day }}" class="sales-daily-store-detail" data-sales-store-items="{{ $row->day }}" hidden>
-                                <td colspan="13">
+                            <tr id="sales-store-detail-{{ $row->day }}" class="sales-daily-store-detail" data-sales-store-items="{{ $row->day }}" data-sales-daily-detail-row="{{ $row->day }}" hidden>
+                                <td colspan="14">
                                     @php $storeRows = $storeDaily->get((string) $row->day, collect()); @endphp
                                     @if ($storeRows->isEmpty())
                                         <div class="small text-muted text-center py-2">Belum ada rincian toko.</div>
@@ -4524,6 +4654,18 @@
         const dailyAnalysisLowDate = document.querySelector('[data-sales-daily-analysis-low-date]');
         const dailyAnalysisNegativeLabel = document.querySelector('[data-sales-daily-analysis-negative-label]');
         const dailyAnalysisNegativeValue = document.querySelector('[data-sales-daily-analysis-negative-value]');
+        const dailyEventFilters = document.querySelectorAll('[data-sales-daily-event-filter]');
+        const dailyEventRows = document.querySelectorAll('[data-sales-daily-filter-row]');
+        const dailyEventDetailRows = document.querySelectorAll('[data-sales-daily-detail-row]');
+        const dailyEventTwinCount = document.querySelector('[data-sales-event-twin-count]');
+        const dailyEventTwinMeta = document.querySelector('[data-sales-event-twin-meta]');
+        const dailyEventPeakValue = document.querySelector('[data-sales-event-peak-value]');
+        const dailyEventPeakMeta = document.querySelector('[data-sales-event-peak-meta]');
+        const dailyEventTwinAverage = document.querySelector('[data-sales-event-twin-average]');
+        const dailyEventTwinLift = document.querySelector('[data-sales-event-twin-lift]');
+        const dailyEventNormalAverage = document.querySelector('[data-sales-event-normal-average]');
+        const dailyEventVisibleCount = document.querySelector('[data-sales-event-visible-count]');
+        let dailyEventFilter = 'all';
 
         function escapeTrendText(value) {
             return String(value ?? '').replace(/[&<>'"]/g, function (character) {
@@ -4650,6 +4792,78 @@
             return formatTrendAxis(value);
         }
 
+        function dailyRowHasEvent(row, eventType) {
+            return Array.isArray(row?.event_types) && row.event_types.includes(eventType);
+        }
+
+        function filterDailyChartRows(rows) {
+            if (dailyEventFilter === 'all') return rows;
+
+            return rows.filter((row) => dailyRowHasEvent(row, dailyEventFilter));
+        }
+
+        function formatDailyLift(current, baseline) {
+            if (!baseline) return 'Belum ada baseline hari normal';
+
+            const delta = ((current - baseline) / Math.abs(baseline)) * 100;
+            return (delta >= 0 ? '↑ ' : '↓ ') + Math.abs(delta).toFixed(1).replace('.', ',') + '% vs hari normal';
+        }
+
+        function updateDailyEventSummary(allRows, visibleRows) {
+            const twinRows = allRows.filter((row) => dailyRowHasEvent(row, 'tanggal_kembar'));
+            const normalRows = allRows.filter((row) => dailyRowHasEvent(row, 'normal'));
+            const visiblePeak = visibleRows.slice().sort((a, b) => (Number(b?.net_sales) || 0) - (Number(a?.net_sales) || 0))[0];
+            const twinAverage = twinRows.length ? twinRows.reduce((total, row) => total + (Number(row?.net_sales) || 0), 0) / twinRows.length : 0;
+            const normalAverage = normalRows.length ? normalRows.reduce((total, row) => total + (Number(row?.net_sales) || 0), 0) / normalRows.length : 0;
+
+            if (dailyEventTwinCount) dailyEventTwinCount.textContent = twinRows.length + ' hari';
+            if (dailyEventTwinMeta) dailyEventTwinMeta.textContent = dailyEventFilter === 'tanggal_kembar' ? 'filter aktif' : 'terdeteksi pada periode aktif';
+            if (dailyEventPeakValue) dailyEventPeakValue.textContent = visiblePeak ? formatTrendCurrency(visiblePeak.net_sales) : '—';
+            if (dailyEventPeakMeta) dailyEventPeakMeta.textContent = visiblePeak ? (visiblePeak.date || visiblePeak.label || '—') : 'Belum ada data';
+            if (dailyEventTwinAverage) dailyEventTwinAverage.textContent = formatTrendCurrency(twinAverage);
+            if (dailyEventTwinLift) {
+                const delta = normalAverage ? ((twinAverage - normalAverage) / Math.abs(normalAverage)) * 100 : null;
+                dailyEventTwinLift.textContent = formatDailyLift(twinAverage, normalAverage);
+                dailyEventTwinLift.classList.toggle('good', delta !== null && delta >= 0);
+                dailyEventTwinLift.classList.toggle('bad', delta !== null && delta < 0);
+            }
+            if (dailyEventNormalAverage) dailyEventNormalAverage.textContent = formatTrendCurrency(normalAverage);
+            if (dailyEventVisibleCount) dailyEventVisibleCount.textContent = visibleRows.length + ' hari ditampilkan';
+        }
+
+        function applyDailyEventFilter(filter) {
+            dailyEventFilter = filter || 'all';
+            dailyEventFilters.forEach(function (button) {
+                const active = button.dataset.salesDailyEventFilter === dailyEventFilter;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+
+            dailyEventRows.forEach(function (row) {
+                const types = (row.dataset.dailyEventTypes || '').split('|').filter(Boolean);
+                const visible = dailyEventFilter === 'all' || types.includes(dailyEventFilter);
+                row.hidden = !visible;
+                const day = row.dataset.dailyEventDay || '';
+                const detail = Array.from(dailyEventDetailRows).find((item) => item.dataset.salesDailyDetailRow === day);
+                if (detail && !visible) {
+                    detail.hidden = true;
+                    const toggle = row.querySelector('[data-sales-store-toggle]');
+                    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+                }
+            });
+
+            if (dailyChartDataElement) {
+                try {
+                    const payload = JSON.parse(dailyChartDataElement.textContent || '{}');
+                    const allRows = Array.isArray(payload.periods?.[0]?.rows) ? payload.periods[0].rows : [];
+                    updateDailyEventSummary(allRows, filterDailyChartRows(allRows));
+                } catch (error) {
+                    // Keep the server-rendered summary when the chart payload is unavailable.
+                }
+            }
+            renderSalesDailyChart();
+        }
+
         function renderSalesDailyChart() {
             if (!dailyChartDataElement || !dailyChart || !dailyChartMetric) return;
 
@@ -4662,7 +4876,8 @@
 
             const metric = dailyChartMetric.value || 'net_sales';
             const periods = Array.isArray(payload.periods) ? payload.periods : [];
-            const current = Array.isArray(periods[0]?.rows) ? periods[0].rows : [];
+            const allCurrent = Array.isArray(periods[0]?.rows) ? periods[0].rows : [];
+            const current = filterDailyChartRows(allCurrent);
             const previous = Array.isArray(periods[1]?.rows) ? periods[1].rows : [];
             const previousTwo = Array.isArray(periods[2]?.rows) ? periods[2].rows : [];
             const pointCount = Math.max(current.length, previous.length, previousTwo.length, 1);
@@ -4707,7 +4922,10 @@
 
             currentPoints.forEach(function (point, index) {
                 const label = current[index]?.date || current[index]?.label || '';
-                markup += '<circle class="daily-chart-point" cx="' + point[0].toFixed(2) + '" cy="' + point[1].toFixed(2) + '" r="3.5"><title>' + escapeTrendText(label + ' · ' + formatDailyChartValue(point[2], metric)) + '</title></circle>';
+                const eventTypes = Array.isArray(current[index]?.event_types) ? current[index].event_types : [];
+                const eventClass = eventTypes.includes('peak_day') ? ' event-peak' : (eventTypes.includes('tanggal_kembar') ? ' event-twin' : '');
+                const eventLabel = current[index]?.event_label || (eventTypes.includes('peak_day') ? 'Peak day' : '');
+                markup += '<circle class="daily-chart-point' + eventClass + '" cx="' + point[0].toFixed(2) + '" cy="' + point[1].toFixed(2) + '" r="3.5"><title>' + escapeTrendText(label + (eventLabel ? ' · ' + eventLabel : '') + ' · ' + formatDailyChartValue(point[2], metric)) + '</title></circle>';
             });
             previousPoints.forEach(function (point, index) {
                 const label = previous[index]?.date || previous[index]?.label || periods[1]?.label || '';
@@ -4767,10 +4985,16 @@
                     if (dailyAnalysisDelta) dailyAnalysisDelta.textContent = compareText;
                 }
             }
+            updateDailyEventSummary(allCurrent, current);
         }
 
         renderSalesDailyChart();
         if (dailyChartMetric) dailyChartMetric.addEventListener('change', renderSalesDailyChart);
+        dailyEventFilters.forEach(function (filterButton) {
+            filterButton.addEventListener('click', function () {
+                applyDailyEventFilter(filterButton.dataset.salesDailyEventFilter || 'all');
+            });
+        });
 
         function formatComparisonAxis(value, unit) {
             if (unit === 'percent') return (Number(value) || 0).toFixed(1).replace('.', ',') + '%';
