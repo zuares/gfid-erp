@@ -61,11 +61,17 @@
         --ams-line: color-mix(in srgb, var(--ams-ink) 12%, transparent);
         --ams-soft: color-mix(in srgb, var(--primary-soft, #eff6ff) 58%, var(--card, #fff) 42%);
         --ams-card: var(--card, #fff);
-        max-width: 1760px;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
         margin: 0 auto;
         padding: 1.75rem 1.25rem 2.75rem;
         color: var(--ams-ink);
+        overflow-x: clip;
     }
+    .app-main:has(.ams-page) { min-width: 0; max-width: 100%; overflow-x: hidden; }
+    .app-main .page-wrap:has(.ams-page) { width: 100%; max-width: none; min-width: 0; padding-inline: 0; }
+    .ams-page > * { max-width: 100%; min-width: 0; }
     .ams-page .text-muted,
     .ams-muted { color: var(--ams-muted) !important; font-size: .82rem; }
     .ams-hero {
