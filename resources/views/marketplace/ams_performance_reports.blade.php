@@ -54,6 +54,7 @@
 
 @section('title', 'AMS Performance & Report')
 
+@push('head')
 <style>
     .ams-page {
         --ams-ink: var(--text, #172033);
@@ -69,8 +70,6 @@
         color: var(--ams-ink);
         overflow-x: clip;
     }
-    .app-main:has(.ams-page) { min-width: 0; max-width: 100%; overflow-x: hidden; }
-    .app-main .page-wrap:has(.ams-page) { width: 100%; max-width: none; min-width: 0; padding-inline: 0; }
     .ams-page > * { max-width: 100%; min-width: 0; }
     .ams-page .text-muted,
     .ams-muted { color: var(--ams-muted) !important; font-size: .82rem; }
@@ -165,7 +164,9 @@
         .ams-report-meta { align-items: flex-start; flex-direction: column; gap: .3rem; }
     }
 </style>
+@endpush
 
+@section('content')
 <div class="ams-page">
     <div class="ams-hero mb-4">
         <div class="ams-breadcrumb mb-2"><i class="bi bi-grid-1x2-fill me-1"></i> Marketplace <span class="mx-1">/</span> Reports <span class="mx-1">/</span> AMS</div>
@@ -467,3 +468,4 @@
     sync();
 })();
 </script>
+@endsection

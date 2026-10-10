@@ -44,6 +44,10 @@
     --success-dark:#4ade80;
     --success-soft-dark:#064e3b;
 
+    /* ========= GLOBAL SHELL DIMENSIONS ========= */
+    --sidebar-width-tablet:220px;
+    --sidebar-width-desktop:260px;
+
     /* Android baseline viewport helper (dipakai layout kamu) */
     --app-vh: 100vh;
     --vv-kbd: 0px;
@@ -159,26 +163,42 @@
 
   .help{ color:var(--muted); font-size:.85rem; }
 
-  /* ========= FLEX LAYOUT SCROLL FIX (ANDROID) =========
-     Karena #app kamu flex-column + min-height var(--app-vh),
-     scroll HARUS terjadi di .app-main (bukan body).
+  /* ========= GLOBAL APP SHELL =========
+     Sidebar desktop bersifat fixed, sehingga main harus memiliki lebar
+     eksplisit setelah ruang sidebar dikurangi. Tanpa ini, width:100% +
+     margin-left membuat konten melebar melewati viewport dan tertutup sidebar.
   */
-  #app.app-root{ min-height: var(--app-vh); }
-  .app-shell{ min-height:0; }
-  /* .app-main{
-    min-height:0;
-    overflow-y:auto;
-    -webkit-overflow-scrolling:touch;
-    overscroll-behavior: none;
-  } */
+  #app.app-root{ min-height:var(--app-vh); width:100%; min-width:0; }
+  .app-shell{ min-height:0; width:100%; min-width:0; }
+  .app-main{
+    width:100%;
+    min-width:0;
+    margin-left:0;
+    overflow-x:hidden;
+  }
 
-  /* Prevent horizontal scroll */
   html, body{ overflow-x:hidden; }
 
   .page-wrap{
-    max-width:1080px;
+    width:100%;
+    max-width:1760px;
+    min-width:0;
     margin-inline:auto;
-    padding-inline:.75rem;
+    padding-inline:1rem;
+  }
+
+  @media (min-width:768px) and (max-width:991.98px){
+    .app-main{
+      width:calc(100% - var(--sidebar-width-tablet));
+      margin-left:var(--sidebar-width-tablet);
+    }
+  }
+
+  @media (min-width:992px){
+    .app-main{
+      width:calc(100% - var(--sidebar-width-desktop));
+      margin-left:var(--sidebar-width-desktop);
+    }
   }
 
   @media (max-width: 767.98px){
