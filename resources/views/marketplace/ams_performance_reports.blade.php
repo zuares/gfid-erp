@@ -258,9 +258,6 @@
                         <label class="form-label" for="amsPageNo">Halaman</label>
                         <input type="number" class="form-control" name="page_no" id="amsPageNo" min="1" max="500" value="{{ $filters['page_no'] ?? 1 }}">
                     </div>
-                    <div class="col-12 col-xl-2 d-flex align-items-end">
-                        <button class="btn btn-primary w-100" type="submit"><i class="bi bi-arrow-repeat me-1"></i>Jalankan report</button>
-                    </div>
                 </div>
 
                 <details class="ams-advanced" @if ($hasAdvancedFilters) open @endif>
@@ -286,7 +283,11 @@
 
                 <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mt-3 pt-3 border-top">
                     <div class="ams-filter-note"><i class="bi bi-info-circle"></i><span>Tanggal AMS mengikuti kalender Shopee. Data performa dapat tertinggal dari hari berjalan.</span></div>
-                    <span class="ams-section-meta"><i class="bi bi-cloud-check me-1"></i>Mode sinkronisasi manual</span>
+                    <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto">
+                        <span class="ams-section-meta me-1"><i class="bi bi-cloud-check me-1"></i>Mode sinkronisasi manual</span>
+                        <a href="{{ url()->current() }}" class="btn btn-light border"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</a>
+                        <button class="btn btn-primary px-4" type="submit"><i class="bi bi-arrow-repeat me-1"></i>Jalankan report</button>
+                    </div>
                 </div>
             </div>
         </form>
