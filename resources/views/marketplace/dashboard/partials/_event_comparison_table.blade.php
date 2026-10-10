@@ -1,4 +1,15 @@
 @if (collect($eventPeriods)->contains(fn ($period) => $period['has_event']))
+    @php
+        $eventBaseline = $eventPeriods[0]['metrics'] ?? [];
+        $eventSummary = [
+            ['label' => 'Net Sales', 'key' => 'net_sales', 'format' => $currencyDisplay, 'icon' => 'bi-graph-up-arrow'],
+            ['label' => 'Pesanan', 'key' => 'orders', 'format' => $numberDisplay, 'icon' => 'bi-receipt'],
+            ['label' => 'Laba Bersih', 'key' => 'net_profit', 'format' => $currencyDisplay, 'icon' => 'bi-piggy-bank'],
+            ['label' => 'Total Promo', 'key' => 'total_promotion', 'format' => $currencyDisplay, 'icon' => 'bi-percent'],
+            ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay, 'icon' => 'bi-megaphone'],
+        ];
+        $eventGroup = null;
+    @endphp
     <section class="card sales-card sales-comparison-section shadow-sm mb-3" aria-labelledby="{{ $eventId }}-title">
         <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-2">
             <div>
@@ -7,6 +18,19 @@
                 <div class="sales-section-subtitle d-block">{{ $eventSubtitle }}</div>
             </div>
             <span class="badge sales-badge rounded-pill px-3 py-2"><i class="bi {{ $eventIcon }} me-1" aria-hidden="true"></i>{{ $eventBadge }}</span>
+        </div>
+        <div class="sales-event-summary" aria-label="Ringkasan {{ $eventTitle }}">
+            @foreach ($eventSummary as $summary)
+                @php $summaryValue = $eventBaseline[$summary['key']] ?? null; @endphp
+                <div class="sales-event-summary-item">
+                    <span class="sales-event-summary-icon"><i class="bi {{ $summary['icon'] }}" aria-hidden="true"></i></span>
+                    <div class="sales-event-summary-content">
+                        <span class="sales-event-summary-label">{{ $summary['label'] }}</span>
+                        <strong class="sales-event-summary-value">{{ $summaryValue === null ? '—' : $summary['format']($summaryValue) }}</strong>
+                        <small>Baseline {{ $eventPeriods[0]['label'] }}</small>
+                    </div>
+                </div>
+            @endforeach
         </div>
         <div class="table-responsive">
             <table class="table table-sm table-hover align-middle sales-table sales-sales-comparison-table mb-0">
@@ -23,6 +47,12 @@
                 </thead>
                 <tbody>
                     @foreach ($eventRows as $eventRow)
+                        @if (($eventRow['group'] ?? null) !== null && $eventRow['group'] !== $eventGroup)
+                            <tr class="sales-table-section-row" role="presentation">
+                                <td colspan="{{ 1 + count($eventPeriods) }}">{{ $eventRow['group'] }}</td>
+                            </tr>
+                            @php $eventGroup = $eventRow['group']; @endphp
+                        @endif
                         @php $eventCurrentValue = $eventPeriods[0]['metrics'][$eventRow['key']] ?? null; @endphp
                         <tr>
                             <td class="ps-3 fw-semibold">{{ $eventRow['label'] }}</td>

@@ -811,6 +811,14 @@
     .sales-dashboard .sales-sales-comparison-table td { padding: .68rem .72rem; font-size: .72rem; vertical-align: middle; }
     .sales-dashboard .sales-sales-comparison-table .sales-period-current { background: color-mix(in srgb, var(--sales-accent-soft) 32%, var(--sales-card) 68%); }
     .sales-dashboard .sales-sales-comparison-table .sales-period-current .sales-period-label { color: var(--sales-accent); }
+    .sales-dashboard .sales-event-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .55rem; padding: 0 1.15rem .9rem; }
+    .sales-dashboard .sales-event-summary-item { display: flex; min-width: 0; align-items: center; gap: .55rem; padding: .62rem .68rem; border: 1px solid var(--sales-line); border-radius: .55rem; background: color-mix(in srgb, var(--sales-card) 88%, var(--sales-soft) 12%); }
+    .sales-dashboard .sales-event-summary-icon { display: inline-flex; flex: 0 0 1.85rem; width: 1.85rem; height: 1.85rem; align-items: center; justify-content: center; border: 1px solid color-mix(in srgb, var(--sales-accent) 18%, var(--sales-line) 82%); border-radius: .48rem; background: var(--sales-accent-soft); color: var(--sales-accent); font-size: .75rem; }
+    .sales-dashboard .sales-event-summary-content { min-width: 0; display: flex; flex-direction: column; gap: .12rem; }
+    .sales-dashboard .sales-event-summary-label { overflow: hidden; color: var(--sales-muted); font-size: .58rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+    .sales-dashboard .sales-event-summary-value { overflow: hidden; color: var(--sales-ink); font-size: .78rem; font-weight: 850; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+    .sales-dashboard .sales-event-summary-content small { color: var(--sales-muted); font-size: .5rem; font-weight: 600; }
+    .sales-dashboard .sales-event-summary + .table-responsive { border-top: 1px solid color-mix(in srgb, var(--sales-line) 70%, transparent); }
     .sales-dashboard .sales-period-label { display: block; color: var(--sales-ink); font-size: .65rem; font-weight: 800; letter-spacing: .035em; line-height: 1.1; text-transform: uppercase; }
     .sales-dashboard .sales-period-range { display: block; margin-top: .25rem; color: var(--sales-muted); font-size: .56rem; font-weight: 600; line-height: 1.15; }
     .sales-dashboard .sales-twin-period-range { color: #6d28d9; font-weight: 750; }
@@ -1100,6 +1108,7 @@
         .sales-dashboard .sales-category-summary-table tr.sales-category-comparison-detail > td { display: block; width: 100%; }
         .sales-dashboard .sales-kpi { min-height: 142px; }
         .sales-dashboard .sales-kpi-value { font-size: 1.2rem; }
+        .sales-dashboard .sales-event-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-right: .8rem; padding-left: .8rem; }
         .sales-dashboard .sales-period-filter { order: 1; width: 100%; margin-left: 0; }
         .sales-dashboard .sales-filter-scope { order: 2; width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; }
         .sales-dashboard .sales-filter-comparison { order: 3; width: 100%; }
@@ -1850,26 +1859,26 @@
         ];
     })->values()->all();
     $salesTwinComparisonRows = [
-        ['label' => 'Net Sales', 'key' => 'net_sales', 'format' => $currencyDisplay],
-        ['label' => 'Pesanan', 'key' => 'orders', 'format' => $numberDisplay],
-        ['label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
-        ['label' => 'AOV', 'key' => 'aov', 'format' => $currencyDisplay],
-        ['label' => 'Est Penghasilan', 'key' => 'estimated_payout', 'format' => $currencyDisplay],
-        ['label' => 'Laba Bersih', 'key' => 'net_profit', 'format' => $currencyDisplay],
-        ['label' => 'Margin Bersih', 'key' => 'net_margin', 'format' => $percentDisplay, 'is_percent' => true],
-        ['label' => 'Diskon Produk', 'key' => 'product_discount', 'format' => $currencyDisplay],
-        ['label' => 'Voucher Seller', 'key' => 'voucher_store', 'format' => $currencyDisplay],
-        ['label' => 'Voucher Platform', 'key' => 'voucher_platform', 'format' => $currencyDisplay],
-        ['label' => 'Paket Diskon', 'key' => 'bundle_discount', 'format' => $currencyDisplay],
-        ['label' => 'Kombo Hemat', 'key' => 'combo_hemat', 'format' => $currencyDisplay],
-        ['label' => 'Total Promo', 'key' => 'total_promotion', 'format' => $currencyDisplay],
-        ['label' => 'Order Berpromo', 'key' => 'promotion_orders', 'format' => $numberDisplay],
-        ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
-        ['label' => 'Sales Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
-        ['label' => 'Order Iklan', 'key' => 'ad_orders', 'format' => $numberDisplay],
-        ['label' => 'ROAS Iklan', 'key' => 'ad_roas', 'format' => $multipleDisplay],
-        ['label' => 'ACOS Iklan', 'key' => 'ad_acos', 'format' => $percentDisplay, 'is_percent' => true],
-        ['label' => 'CPA Iklan', 'key' => 'ad_cpa', 'format' => $currencyDisplay],
+        ['group' => 'Transaksi', 'label' => 'Net Sales', 'key' => 'net_sales', 'format' => $currencyDisplay],
+        ['group' => 'Transaksi', 'label' => 'Pesanan', 'key' => 'orders', 'format' => $numberDisplay],
+        ['group' => 'Transaksi', 'label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
+        ['group' => 'Transaksi', 'label' => 'AOV', 'key' => 'aov', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas', 'label' => 'Est Penghasilan', 'key' => 'estimated_payout', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas', 'label' => 'Laba Bersih', 'key' => 'net_profit', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas', 'label' => 'Margin Bersih', 'key' => 'net_margin', 'format' => $percentDisplay, 'is_percent' => true],
+        ['group' => 'Promosi', 'label' => 'Diskon Produk', 'key' => 'product_discount', 'format' => $currencyDisplay],
+        ['group' => 'Promosi', 'label' => 'Voucher Seller', 'key' => 'voucher_store', 'format' => $currencyDisplay],
+        ['group' => 'Promosi', 'label' => 'Voucher Platform', 'key' => 'voucher_platform', 'format' => $currencyDisplay],
+        ['group' => 'Promosi', 'label' => 'Paket Diskon', 'key' => 'bundle_discount', 'format' => $currencyDisplay],
+        ['group' => 'Promosi', 'label' => 'Kombo Hemat', 'key' => 'combo_hemat', 'format' => $currencyDisplay],
+        ['group' => 'Promosi', 'label' => 'Total Promo', 'key' => 'total_promotion', 'format' => $currencyDisplay],
+        ['group' => 'Promosi', 'label' => 'Order Berpromo', 'key' => 'promotion_orders', 'format' => $numberDisplay],
+        ['group' => 'Iklan', 'label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
+        ['group' => 'Iklan', 'label' => 'Sales Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
+        ['group' => 'Iklan', 'label' => 'Order Iklan', 'key' => 'ad_orders', 'format' => $numberDisplay],
+        ['group' => 'Iklan', 'label' => 'ROAS Iklan', 'key' => 'ad_roas', 'format' => $multipleDisplay],
+        ['group' => 'Iklan', 'label' => 'ACOS Iklan', 'key' => 'ad_acos', 'format' => $percentDisplay, 'is_percent' => true],
+        ['group' => 'Iklan', 'label' => 'CPA Iklan', 'key' => 'ad_cpa', 'format' => $currencyDisplay],
     ];
     $salesComparisonPeriods = collect($salesComparisonSources)->map(function ($period) use ($salesComparisonMetrics) {
         $period['metrics'] = $salesComparisonMetrics($period['daily'], $period['data'] ?? []);
@@ -3041,7 +3050,7 @@
     </div>
 
     <div class="sales-tab-pane {{ $activeTab === 'event_day' ? '' : 'is-hidden' }}" data-sales-pane="event_day" role="tabpanel" aria-hidden="{{ $activeTab === 'event_day' ? 'false' : 'true' }}">
-        @include('marketplace.dashboard.partials._peak_day_comparison')
+        @include('marketplace.dashboard.partials._event_day_sections')
     </div>
 
     <div class="sales-tab-pane {{ $activeTab === 'income' ? '' : 'is-hidden' }}" data-sales-pane="income" role="tabpanel" aria-hidden="{{ $activeTab === 'income' ? 'false' : 'true' }}">
