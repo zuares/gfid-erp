@@ -1677,7 +1677,38 @@
         ['from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousData, 'daily', [])],
         ['from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonMonthPreviousTwoData, 'daily', [])],
     ];
-    $salesTwinComparisonPeriods = collect($salesTwinComparisonSources)->map(function ($period) {
+    $salesEventAdMetrics = function ($rows) {
+        $rows = collect($rows);
+        $adSpend = (float) $rows->sum(fn ($row) => (float) data_get($row, 'ad_spend', 0));
+        $adSales = (float) $rows->sum(fn ($row) => (float) data_get($row, 'ad_sales', 0));
+        $adOrders = (int) $rows->sum(fn ($row) => (int) data_get($row, 'ad_orders', 0));
+
+        return [
+            'ad_spend' => $adSpend,
+            'ad_sales' => $adSales,
+            'ad_orders' => $adOrders,
+            'ad_roas' => $adSpend > 0 ? $adSales / $adSpend : null,
+            'ad_acos' => $adSales > 0 ? ($adSpend / $adSales) * 100 : null,
+            'ad_cpa' => $adOrders > 0 ? $adSpend / $adOrders : null,
+        ];
+    };
+    $salesEventPromotionMetrics = function ($rows) {
+        $rows = collect($rows);
+
+        return [
+            'product_discount' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'product_discount', 0)),
+            'voucher_store' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'voucher_store', 0)),
+            'voucher_platform' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'voucher_platform', 0)),
+            'bundle_discount' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'bundle_discount', 0)),
+            'combo_hemat' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'combo_hemat', 0)),
+            'total_promotion' => (float) $rows->sum(fn ($row) => (float) data_get($row, 'total_promotion', 0)),
+            'promotion_orders' => (int) $rows->sum(fn ($row) => (int) data_get($row, 'promotion_orders', 0)),
+        ];
+    };
+    $salesEventMetrics = function ($rows) use ($salesEventAdMetrics, $salesEventPromotionMetrics) {
+        return $salesEventAdMetrics($rows) + $salesEventPromotionMetrics($rows);
+    };
+    $salesTwinComparisonPeriods = collect($salesTwinComparisonSources)->map(function ($period) use ($salesEventMetrics) {
         $periodStart = $period['from'] ? \Carbon\Carbon::parse($period['from']) : null;
         $targetDate = $periodStart ? $periodStart->copy()->day($periodStart->month) : null;
         $eventRow = $targetDate
@@ -1693,7 +1724,7 @@
             'from' => $period['from'],
             'to' => $period['to'],
             'has_event' => $eventRow !== null,
-            'metrics' => [
+            'metrics' => array_merge([
                 'net_sales' => $netSales,
                 'orders' => $orders,
                 'qty' => $eventRow ? (int) data_get($eventRow, 'qty', 0) : null,
@@ -1701,10 +1732,10 @@
                 'estimated_payout' => $eventRow ? (float) data_get($eventRow, 'estimated_payout', 0) : null,
                 'net_profit' => $eventRow ? (float) data_get($eventRow, 'net_profit', 0) : null,
                 'net_margin' => $eventRow && $netSales > 0 ? ((float) data_get($eventRow, 'net_profit', 0) / $netSales) * 100 : null,
-            ],
+            ], $salesEventMetrics($eventRow ? [$eventRow] : [])),
         ];
     })->values()->all();
-    $salesTwinPrePeakPeriods = collect($salesTwinComparisonSources)->map(function ($period) {
+    $salesTwinPrePeakPeriods = collect($salesTwinComparisonSources)->map(function ($period) use ($salesEventMetrics) {
         $periodStart = $period['from'] ? \Carbon\Carbon::parse($period['from']) : null;
         $periodEnd = $period['to'] ? \Carbon\Carbon::parse($period['to']) : null;
         $targetDate = $periodStart ? $periodStart->copy()->day($periodStart->month) : null;
@@ -1737,7 +1768,7 @@
             'from' => $period['from'],
             'to' => $period['to'],
             'has_event' => $targetDate !== null,
-            'metrics' => [
+            'metrics' => array_merge([
                 'net_sales' => $netSales,
                 'orders' => $orders,
                 'qty' => (int) $windowRows->sum(fn ($row) => (int) data_get($row, 'qty', 0)),
@@ -1747,10 +1778,10 @@
                 'net_margin' => $netSales > 0
                     ? ((float) $windowRows->sum(fn ($row) => (float) data_get($row, 'net_profit', 0)) / $netSales) * 100
                     : null,
-            ],
+            ], $salesEventMetrics($windowRows)),
         ];
     })->values()->all();
-    $salesPaydayComparisonPeriods = collect($salesTwinComparisonSources)->map(function ($period) use ($paydayDay) {
+    $salesPaydayComparisonPeriods = collect($salesTwinComparisonSources)->map(function ($period) use ($paydayDay, $salesEventMetrics) {
         $periodStart = $period['from'] ? \Carbon\Carbon::parse($period['from']) : null;
         $periodEnd = $period['to'] ? \Carbon\Carbon::parse($period['to']) : null;
         $targetDate = $periodStart ? $periodStart->copy()->day(min($paydayDay, $periodStart->daysInMonth)) : null;
@@ -1766,7 +1797,7 @@
             'from' => $period['from'],
             'to' => $period['to'],
             'has_event' => $targetDate !== null,
-            'metrics' => [
+            'metrics' => array_merge([
                 'net_sales' => $netSales,
                 'orders' => $orders,
                 'qty' => $eventRow ? (int) data_get($eventRow, 'qty', 0) : null,
@@ -1774,10 +1805,10 @@
                 'estimated_payout' => $eventRow ? (float) data_get($eventRow, 'estimated_payout', 0) : null,
                 'net_profit' => $eventRow ? (float) data_get($eventRow, 'net_profit', 0) : null,
                 'net_margin' => $eventRow && $netSales > 0 ? ((float) data_get($eventRow, 'net_profit', 0) / $netSales) * 100 : null,
-            ],
+            ], $salesEventMetrics($eventRow ? [$eventRow] : [])),
         ];
     })->values()->all();
-    $salesPaydayPrePeakPeriods = collect($salesTwinComparisonSources)->map(function ($period) use ($paydayDay) {
+    $salesPaydayPrePeakPeriods = collect($salesTwinComparisonSources)->map(function ($period) use ($paydayDay, $salesEventMetrics) {
         $periodStart = $period['from'] ? \Carbon\Carbon::parse($period['from']) : null;
         $periodEnd = $period['to'] ? \Carbon\Carbon::parse($period['to']) : null;
         $targetDate = $periodStart ? $periodStart->copy()->day(min($paydayDay, $periodStart->daysInMonth)) : null;
@@ -1805,7 +1836,7 @@
             'from' => $period['from'],
             'to' => $period['to'],
             'has_event' => $targetDate !== null,
-            'metrics' => [
+            'metrics' => array_merge([
                 'net_sales' => $netSales,
                 'orders' => $orders,
                 'qty' => (int) $windowRows->sum(fn ($row) => (int) data_get($row, 'qty', 0)),
@@ -1815,7 +1846,7 @@
                 'net_margin' => $netSales > 0
                     ? ((float) $windowRows->sum(fn ($row) => (float) data_get($row, 'net_profit', 0)) / $netSales) * 100
                     : null,
-            ],
+            ], $salesEventMetrics($windowRows)),
         ];
     })->values()->all();
     $salesTwinComparisonRows = [
@@ -1826,6 +1857,19 @@
         ['label' => 'Est Penghasilan', 'key' => 'estimated_payout', 'format' => $currencyDisplay],
         ['label' => 'Laba Bersih', 'key' => 'net_profit', 'format' => $currencyDisplay],
         ['label' => 'Margin Bersih', 'key' => 'net_margin', 'format' => $percentDisplay, 'is_percent' => true],
+        ['label' => 'Diskon Produk', 'key' => 'product_discount', 'format' => $currencyDisplay],
+        ['label' => 'Voucher Seller', 'key' => 'voucher_store', 'format' => $currencyDisplay],
+        ['label' => 'Voucher Platform', 'key' => 'voucher_platform', 'format' => $currencyDisplay],
+        ['label' => 'Paket Diskon', 'key' => 'bundle_discount', 'format' => $currencyDisplay],
+        ['label' => 'Kombo Hemat', 'key' => 'combo_hemat', 'format' => $currencyDisplay],
+        ['label' => 'Total Promo', 'key' => 'total_promotion', 'format' => $currencyDisplay],
+        ['label' => 'Order Berpromo', 'key' => 'promotion_orders', 'format' => $numberDisplay],
+        ['label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
+        ['label' => 'Sales Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
+        ['label' => 'Order Iklan', 'key' => 'ad_orders', 'format' => $numberDisplay],
+        ['label' => 'ROAS Iklan', 'key' => 'ad_roas', 'format' => $multipleDisplay],
+        ['label' => 'ACOS Iklan', 'key' => 'ad_acos', 'format' => $percentDisplay, 'is_percent' => true],
+        ['label' => 'CPA Iklan', 'key' => 'ad_cpa', 'format' => $currencyDisplay],
     ];
     $salesComparisonPeriods = collect($salesComparisonSources)->map(function ($period) use ($salesComparisonMetrics) {
         $period['metrics'] = $salesComparisonMetrics($period['daily'], $period['data'] ?? []);

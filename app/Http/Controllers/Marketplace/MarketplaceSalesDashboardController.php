@@ -1215,12 +1215,25 @@ SQL;
         $paymentSummary['total_promotion'] = (float) $paymentDaily->sum('total_promotion');
 
         // Profit harian memakai payout aktual/estimasi setelah dikurangi COGS.
-        $daily = $daily->map(function ($row) use ($sellerNetSalesByDay, $cogsByDay, $estimatedPayoutByDay, $adSpendDaily) {
+        $daily = $daily->map(function ($row) use ($sellerNetSalesByDay, $cogsByDay, $estimatedPayoutByDay, $adSpendDaily, $adDailyMetrics, $promotionByDay) {
+            $promotion = $promotionByDay->get((string) $row->day);
+            $adMetrics = $adDailyMetrics->get((string) $row->day, []);
             $row->net_total = (float) data_get($sellerNetSalesByDay->get((string) $row->day), 'seller_net_sales', 0);
             $row->cogs = (float) $cogsByDay->get((string) $row->day, 0);
             $row->estimated_payout = (float) ($estimatedPayoutByDay->get((string) $row->day, 0));
             $row->gross_profit = $row->estimated_payout - $row->cogs;
             $row->ad_spend = (float) $adSpendDaily->get((string) $row->day, 0);
+            $row->ad_sales = (float) data_get($adMetrics, 'gmv', 0);
+            $row->ad_orders = (int) data_get($adMetrics, 'orders', 0);
+            $row->ad_impressions = (int) data_get($adMetrics, 'impressions', 0);
+            $row->ad_clicks = (int) data_get($adMetrics, 'clicks', 0);
+            $row->product_discount = (float) data_get($promotion, 'product_discount', 0);
+            $row->voucher_store = (float) data_get($promotion, 'voucher_store', 0);
+            $row->voucher_platform = (float) data_get($promotion, 'voucher_platform', 0);
+            $row->bundle_discount = (float) data_get($promotion, 'bundle_discount', 0);
+            $row->combo_hemat = (float) data_get($promotion, 'combo_hemat', 0);
+            $row->total_promotion = (float) data_get($promotion, 'total_promotion', 0);
+            $row->promotion_orders = (int) data_get($promotion, 'promotion_orders', 0);
             $row->net_profit = $row->gross_profit - $row->ad_spend;
             $row->aov = $row->orders > 0 ? $row->net_total / $row->orders : 0;
 
