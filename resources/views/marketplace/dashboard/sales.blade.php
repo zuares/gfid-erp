@@ -811,6 +811,8 @@
     .sales-dashboard .sales-sales-comparison-table td { padding: .68rem .72rem; font-size: .72rem; vertical-align: middle; }
     .sales-dashboard .sales-sales-comparison-table .sales-period-current { background: color-mix(in srgb, var(--sales-accent-soft) 32%, var(--sales-card) 68%); }
     .sales-dashboard .sales-sales-comparison-table .sales-period-current .sales-period-label { color: var(--sales-accent); }
+    .sales-dashboard .sales-sales-comparison-table .sales-period-average { background: color-mix(in srgb, var(--sales-accent-soft) 12%, var(--sales-card) 88%); border-left: 1px solid var(--sales-line); }
+    .sales-dashboard .sales-sales-comparison-table .sales-period-average .sales-period-label { color: var(--sales-accent); }
     .sales-dashboard .sales-event-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .55rem; padding: 0 1.15rem .9rem; }
     .sales-dashboard .sales-event-summary-item { display: flex; min-width: 0; align-items: center; gap: .55rem; padding: .62rem .68rem; border: 1px solid var(--sales-line); border-radius: .55rem; background: color-mix(in srgb, var(--sales-card) 88%, var(--sales-soft) 12%); }
     .sales-dashboard .sales-event-summary-icon { display: inline-flex; flex: 0 0 1.85rem; width: 1.85rem; height: 1.85rem; align-items: center; justify-content: center; border: 1px solid color-mix(in srgb, var(--sales-accent) 18%, var(--sales-line) 82%); border-radius: .48rem; background: var(--sales-accent-soft); color: var(--sales-accent); font-size: .75rem; }
@@ -1691,11 +1693,17 @@
         $adSpend = (float) $rows->sum(fn ($row) => (float) data_get($row, 'ad_spend', 0));
         $adSales = (float) $rows->sum(fn ($row) => (float) data_get($row, 'ad_sales', 0));
         $adOrders = (int) $rows->sum(fn ($row) => (int) data_get($row, 'ad_orders', 0));
+        $adImpressions = (int) $rows->sum(fn ($row) => (int) data_get($row, 'ad_impressions', 0));
+        $adClicks = (int) $rows->sum(fn ($row) => (int) data_get($row, 'ad_clicks', 0));
 
         return [
             'ad_spend' => $adSpend,
             'ad_sales' => $adSales,
             'ad_orders' => $adOrders,
+            'ad_impressions' => $adImpressions,
+            'ad_clicks' => $adClicks,
+            'ad_ctr' => $adImpressions > 0 ? ($adClicks / $adImpressions) * 100 : null,
+            'ad_cvr' => $adClicks > 0 ? ($adOrders / $adClicks) * 100 : null,
             'ad_roas' => $adSpend > 0 ? $adSales / $adSpend : null,
             'ad_acos' => $adSales > 0 ? ($adSpend / $adSales) * 100 : null,
             'ad_cpa' => $adOrders > 0 ? $adSpend / $adOrders : null,
@@ -1876,6 +1884,10 @@
         ['group' => 'Iklan', 'label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
         ['group' => 'Iklan', 'label' => 'Sales Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
         ['group' => 'Iklan', 'label' => 'Order Iklan', 'key' => 'ad_orders', 'format' => $numberDisplay],
+        ['group' => 'Iklan', 'label' => 'Impresi Iklan', 'key' => 'ad_impressions', 'format' => $numberDisplay],
+        ['group' => 'Iklan', 'label' => 'Klik Iklan', 'key' => 'ad_clicks', 'format' => $numberDisplay],
+        ['group' => 'Iklan', 'label' => 'CTR Iklan', 'key' => 'ad_ctr', 'format' => $percentDisplay, 'is_percent' => true],
+        ['group' => 'Iklan', 'label' => 'CVR Iklan', 'key' => 'ad_cvr', 'format' => $percentDisplay, 'is_percent' => true],
         ['group' => 'Iklan', 'label' => 'ROAS Iklan', 'key' => 'ad_roas', 'format' => $multipleDisplay],
         ['group' => 'Iklan', 'label' => 'ACOS Iklan', 'key' => 'ad_acos', 'format' => $percentDisplay, 'is_percent' => true],
         ['group' => 'Iklan', 'label' => 'CPA Iklan', 'key' => 'ad_cpa', 'format' => $currencyDisplay],
