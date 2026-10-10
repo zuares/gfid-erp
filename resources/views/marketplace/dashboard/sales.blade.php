@@ -89,10 +89,14 @@
         display: inline-flex;
         align-items: center;
         gap: .2rem;
-        margin-left: auto;
+        min-height: 58px;
         padding: .2rem;
-        border-left: 1px solid var(--sales-line);
+        border: 1px solid var(--sales-line);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--sales-card) 92%, var(--sales-bg) 8%);
+        box-shadow: 0 6px 16px rgba(15, 23, 42, .06);
     }
+    .sales-dashboard .sales-filter-comparison { display: flex; align-items: flex-end; order: 4; width: auto; }
     .sales-dashboard .sales-nav-comparison-label {
         display: inline-flex;
         align-items: center;
@@ -264,7 +268,6 @@
     .sales-dashboard .sales-filter-field { min-width: 0; }
     .sales-dashboard .sales-filter-platform { width: 145px; }
     .sales-dashboard .sales-filter-store { width: 235px; }
-    .sales-dashboard .sales-filter-comparison { width: 175px; }
     .sales-dashboard .sales-filter-label {
         display: flex;
         align-items: center;
@@ -1099,11 +1102,11 @@
         .sales-dashboard .sales-kpi-value { font-size: 1.2rem; }
         .sales-dashboard .sales-period-filter { order: 1; width: 100%; margin-left: 0; }
         .sales-dashboard .sales-filter-scope { order: 2; width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; }
+        .sales-dashboard .sales-filter-comparison { order: 3; width: 100%; }
+        .sales-dashboard .sales-filter-comparison .sales-nav-comparison { width: 100%; justify-content: flex-start; }
         .sales-dashboard .sales-filter-platform,
-        .sales-dashboard .sales-filter-store,
-        .sales-dashboard .sales-filter-comparison { width: auto; }
+        .sales-dashboard .sales-filter-store { width: auto; }
         .sales-dashboard .sales-nav-shell { align-items: stretch; flex-direction: column; }
-        .sales-dashboard .sales-nav-comparison { margin-left: .25rem; }
         .sales-dashboard .sales-nav-comparison-label { padding-left: .35rem; }
         .sales-dashboard .sales-product-analysis-subsection { align-items: flex-start; flex-direction: column; }
         .sales-dashboard .sales-product-analysis-legend { justify-content: flex-start; }
@@ -2385,6 +2388,13 @@
                     summary="{{ $activeDateSummary }}"
                     class="col-12 col-md-auto sales-period-filter"
                 />
+                <div class="col-12 col-md-auto sales-filter-comparison">
+                    <div class="sales-nav-comparison" role="group" aria-label="Perbandingan periode">
+                        <span class="sales-nav-comparison-label"><i class="bi bi-arrow-left-right" aria-hidden="true"></i>Bandingkan</span>
+                        <button type="button" class="sales-comparison-tab {{ $comparisonMode === 'period' ? 'active' : '' }}" data-comparison-mode="period" aria-pressed="{{ $comparisonMode === 'period' ? 'true' : 'false' }}"><i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>Periode lalu</button>
+                        <button type="button" class="sales-comparison-tab {{ $comparisonMode === 'month' ? 'active' : '' }}" data-comparison-mode="month" aria-pressed="{{ $comparisonMode === 'month' ? 'true' : 'false' }}"><i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>Bulan lalu</button>
+                    </div>
+                </div>
                 <div class="col-12 col-md-auto sales-filter-field">
                     <label class="sales-filter-label" for="sales-payday-day"><i class="bi bi-wallet2" aria-hidden="true"></i>Tanggal gajian</label>
                     <select id="sales-payday-day" class="form-select form-select-sm" name="payday_day">
@@ -2407,11 +2417,6 @@
         <button class="nav-link {{ $activeTab === 'shipping' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'shipping' ? 'true' : 'false' }}" data-sales-tab="shipping"><i class="bi bi-truck me-1"></i>Pengiriman</button>
         <button class="nav-link {{ $activeTab === 'income' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'income' ? 'true' : 'false' }}" data-sales-tab="income"><i class="bi bi-cash-coin me-1"></i>Penghasilan</button>
         <button class="nav-link {{ $activeTab === 'orders' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'orders' ? 'true' : 'false' }}" data-sales-tab="orders"><i class="bi bi-list-ul me-1"></i>Detail Pesanan</button>
-        <div class="sales-nav-comparison" role="group" aria-label="Perbandingan periode">
-            <span class="sales-nav-comparison-label"><i class="bi bi-arrow-left-right" aria-hidden="true"></i>Bandingkan</span>
-            <button type="button" class="sales-comparison-tab {{ $comparisonMode === 'period' ? 'active' : '' }}" data-comparison-mode="period" aria-pressed="{{ $comparisonMode === 'period' ? 'true' : 'false' }}"><i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>Periode lalu</button>
-            <button type="button" class="sales-comparison-tab {{ $comparisonMode === 'month' ? 'active' : '' }}" data-comparison-mode="month" aria-pressed="{{ $comparisonMode === 'month' ? 'true' : 'false' }}"><i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>Bulan lalu</button>
-        </div>
         </nav>
     </div>
 
