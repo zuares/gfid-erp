@@ -1,4 +1,7 @@
-    function setLoading(message) { $('anSyncNote').textContent = message; }
+    function setLoading(message) {
+        const note = $('anSyncNote');
+        if (note) note.textContent = message;
+    }
     function fillStores() {
         const current = selectedStore() || String(initialStore || '');
         const unique = new Map(stores
