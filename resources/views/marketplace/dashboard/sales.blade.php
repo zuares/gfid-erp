@@ -842,7 +842,6 @@
     .sales-dashboard .sales-sales-comparison-table .sales-period-current .sales-period-label { color: var(--sales-accent); }
     .sales-dashboard .sales-period-label { display: block; color: var(--sales-ink); font-size: .65rem; font-weight: 800; letter-spacing: .035em; line-height: 1.1; text-transform: uppercase; }
     .sales-dashboard .sales-period-range { display: block; margin-top: .25rem; color: var(--sales-muted); font-size: .56rem; font-weight: 600; line-height: 1.15; }
-    .sales-dashboard .sales-event-period-range { color: #c2410c; font-weight: 750; }
     .sales-dashboard .sales-comparison-metric { color: var(--sales-ink); font-weight: 750; }
     .sales-dashboard .sales-comparison-cell { display: inline-flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: .15rem; }
     .sales-dashboard .sales-comparison-value-row { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: .34rem; font-variant-numeric: tabular-nums; }
@@ -1699,52 +1698,6 @@
             ['label' => $comparisonPeriodDisplayLabel($comparisonPeriodPrevious['from'] ?? null, $comparisonPeriodPrevious['to'] ?? null, 'Periode -2'), 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousData, 'daily', []), 'data' => $comparisonPeriodPreviousData],
             ['label' => $comparisonPeriodDisplayLabel($comparisonPeriodPreviousTwo['from'] ?? null, $comparisonPeriodPreviousTwo['to'] ?? null, 'Periode -3'), 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'daily' => data_get($comparisonPeriodPreviousTwoData, 'daily', []), 'data' => $comparisonPeriodPreviousTwoData],
         ];
-    $salesEventComparisonPeriods = collect($salesComparisonSources)->map(function ($period) {
-        $rows = collect($period['daily'] ?? [])->filter(fn ($row) => data_get($row, 'day'));
-        $twinRows = $rows->filter(function ($row) {
-            $date = \Carbon\Carbon::parse(data_get($row, 'day'));
-
-            return $date->day === $date->month;
-        });
-        $eventRow = $twinRows->sortByDesc(fn ($row) => (float) data_get($row, 'net_total', 0))->first();
-        $eventType = 'Tanggal kembar';
-        if (!$eventRow) {
-            $eventRow = $rows->sortByDesc(fn ($row) => (float) data_get($row, 'net_total', 0))->first();
-            $eventType = 'Peak day';
-        }
-
-        $eventDate = $eventRow ? \Carbon\Carbon::parse(data_get($eventRow, 'day')) : null;
-        $orders = (int) data_get($eventRow, 'orders', 0);
-        $netSales = (float) data_get($eventRow, 'net_total', 0);
-        $estimatedPayout = (float) data_get($eventRow, 'estimated_payout', 0);
-
-        return [
-            'label' => $period['label'],
-            'from' => $period['from'],
-            'to' => $period['to'],
-            'event_type' => $eventType,
-            'event_date' => $eventDate,
-            'event_label' => $eventDate ? $eventDate->format('d M Y') : 'Belum ada data',
-            'metrics' => [
-                'net_sales' => $netSales,
-                'orders' => $orders,
-                'qty' => (int) data_get($eventRow, 'qty', 0),
-                'aov' => $orders > 0 ? $netSales / $orders : null,
-                'estimated_payout' => $estimatedPayout,
-                'net_profit' => (float) data_get($eventRow, 'net_profit', 0),
-                'net_margin' => $netSales > 0 ? ((float) data_get($eventRow, 'net_profit', 0) / $netSales) * 100 : null,
-            ],
-        ];
-    })->values()->all();
-    $salesEventComparisonRows = [
-        ['label' => 'Net Sales', 'key' => 'net_sales', 'format' => $currencyDisplay],
-        ['label' => 'Pesanan', 'key' => 'orders', 'format' => $numberDisplay],
-        ['label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
-        ['label' => 'AOV', 'key' => 'aov', 'format' => $currencyDisplay],
-        ['label' => 'Est Penghasilan', 'key' => 'estimated_payout', 'format' => $currencyDisplay],
-        ['label' => 'Laba Bersih', 'key' => 'net_profit', 'format' => $currencyDisplay],
-        ['label' => 'Margin Bersih', 'key' => 'net_margin', 'format' => $percentDisplay, 'is_percent' => true],
-    ];
     $salesComparisonPeriods = collect($salesComparisonSources)->map(function ($period) use ($salesComparisonMetrics) {
         $period['metrics'] = $salesComparisonMetrics($period['daily'], $period['data'] ?? []);
         unset($period['daily'], $period['data']);
@@ -2417,76 +2370,12 @@
         </section>
     @endif
     @if ($activeComparison)
-        @if (collect($salesEventComparisonPeriods)->contains(fn ($period) => $period['event_date'] !== null))
-            <section class="card sales-card sales-comparison-section sales-event-comparison-section shadow-sm mb-3" aria-labelledby="sales-event-comparison-title">
-                <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-2">
-                    <div>
-                        <div class="sales-kicker mb-1">Perbandingan periode</div>
-                        <h2 id="sales-event-comparison-title" class="sales-section-title mb-1">Perbandingan Peak Day &amp; Tanggal Kembar</h2>
-                        <div class="sales-section-subtitle d-block">Fokus pada tanggal kembar tiap bulan; jika tidak tersedia, digunakan peak day tertinggi pada periode tersebut.</div>
-                    </div>
-                    <span class="badge sales-badge rounded-pill px-3 py-2"><i class="bi bi-calendar-event me-1" aria-hidden="true"></i>{{ count($salesEventComparisonPeriods) }} periode</span>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle sales-table sales-sales-comparison-table mb-0">
-                        <thead>
-                            <tr>
-                                <th class="ps-3" scope="col">Metrik</th>
-                                @foreach ($salesEventComparisonPeriods as $periodIndex => $period)
-                                    <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}" scope="col">
-                                        <span class="sales-period-label">{{ $period['label'] }}</span>
-                                        <span class="sales-period-range sales-event-period-range">{{ $period['event_type'] }} · {{ $period['event_label'] }}</span>
-                                    </th>
-                                @endforeach
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($salesEventComparisonRows as $eventRow)
-                                @php
-                                    $eventCurrentValue = $salesEventComparisonPeriods[0]['metrics'][$eventRow['key']] ?? null;
-                                @endphp
-                                <tr>
-                                    <td class="ps-3 fw-semibold">{{ $eventRow['label'] }}</td>
-                                    @foreach ($salesEventComparisonPeriods as $periodIndex => $period)
-                                        @php
-                                            $eventValue = $period['metrics'][$eventRow['key']] ?? null;
-                                            $eventDelta = null;
-                                            $eventDeltaTone = 'is-neutral';
-                                            if ($periodIndex > 0 && is_numeric($eventCurrentValue) && is_numeric($eventValue)) {
-                                                $eventBase = abs((float) $eventValue);
-                                                $eventDifference = (float) $eventCurrentValue - (float) $eventValue;
-                                                $eventDelta = ($eventRow['is_percent'] ?? false)
-                                                    ? $eventDifference
-                                                    : ($eventBase > 0 ? (($eventDifference / $eventBase) * 100) : ($eventDifference === 0.0 ? 0 : null));
-                                                $eventDeltaTone = $eventDelta === null || $eventDelta === 0.0 ? 'is-neutral' : ($eventDelta > 0 ? 'is-up' : 'is-down');
-                                            }
-                                        @endphp
-                                        <td class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
-                                            <span class="sales-comparison-cell">
-                                                <span class="sales-comparison-value-row">
-                                                    {{ $eventValue === null ? '—' : $eventRow['format']($eventValue) }}
-                                                    @if ($eventDelta !== null)
-                                                        <span class="sales-comparison-delta {{ $eventDeltaTone }}" title="Perubahan dibanding {{ $period['label'] }}">
-                                                            <i class="bi {{ $eventDelta > 0 ? 'bi-arrow-up-right' : ($eventDelta < 0 ? 'bi-arrow-down-right' : 'bi-arrow-left-right') }}" aria-hidden="true"></i>{{ ($eventDelta > 0 ? '+' : ($eventDelta < 0 ? '−' : '±')).number_format(abs($eventDelta), 1, ',', '.') }}{{ ($eventRow['is_percent'] ?? false) ? ' pt' : '%' }}
-                                                        </span>
-                                                    @endif
-                                                </span>
-                                            </span>
-                                        </td>
-                                    @endforeach
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-        @endif
         <section class="card sales-card sales-comparison-section shadow-sm mb-3" aria-labelledby="sales-period-comparison-title">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-2">
                 <div>
-                    <div class="sales-kicker mb-1">Perbandingan total periode</div>
-                    <h2 id="sales-period-comparison-title" class="sales-section-title mb-1">Perbandingan kinerja penjualan keseluruhan</h2>
-                    <div class="sales-section-subtitle d-block">Agregat seluruh hari pada periode aktif, dengan perubahan terhadap setiap periode pembanding.</div>
+                    <div class="sales-kicker mb-1">Perbandingan periode</div>
+                    <h2 id="sales-period-comparison-title" class="sales-section-title mb-1">Perbandingan kinerja penjualan</h2>
+                    <div class="sales-section-subtitle d-block">Aktif sebagai baseline, dengan perubahan terhadap setiap periode pembanding.</div>
                 </div>
                 <span class="badge sales-badge rounded-pill px-3 py-2"><i class="bi bi-columns-gap me-1" aria-hidden="true"></i>{{ count($salesComparisonPeriods) }} periode</span>
             </div>
