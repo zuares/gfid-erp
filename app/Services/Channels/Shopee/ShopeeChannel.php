@@ -636,59 +636,59 @@ class ShopeeChannel implements MarketplaceChannel
 
     public function getAmsPerformanceDataUpdateTime(Store $store, string $markerType = 'AmsMarker'): array
     {
-        return $this->get($store, '/api/v2/ams/get_performance_data_update_time', [
+        return $this->post($store, '/api/v2/ams/get_performance_data_update_time', [
             'marker_type' => $markerType,
         ]);
     }
 
     public function getAmsShopPerformance(Store $store, array $params): array
     {
-        return $this->get($store, '/api/v2/ams/get_shop_performance', $params);
+        return $this->post($store, '/api/v2/ams/get_shop_performance', $params);
     }
 
     public function getAmsProductPerformance(Store $store, array $params): array
     {
-        return $this->get($store, '/api/v2/ams/get_product_performance', $params);
+        return $this->post($store, '/api/v2/ams/get_product_performance', $params);
     }
 
     public function getAmsAffiliatePerformance(Store $store, array $params): array
     {
-        return $this->get($store, '/api/v2/ams/get_affiliate_performance', $params);
+        return $this->post($store, '/api/v2/ams/get_affiliate_performance', $params);
     }
 
     public function getAmsContentPerformance(Store $store, array $params): array
     {
-        return $this->get($store, '/api/v2/ams/get_content_performance', $params);
+        return $this->post($store, '/api/v2/ams/get_content_performance', $params);
     }
 
     public function getAmsCampaignKeyMetricsPerformance(Store $store, array $params): array
     {
-        return $this->get($store, '/api/v2/ams/get_campaign_key_metrics_performance', $params);
+        return $this->post($store, '/api/v2/ams/get_campaign_key_metrics_performance', $params);
     }
 
     public function getAmsOpenCampaignPerformance(Store $store, array $params): array
     {
-        return $this->get($store, '/api/v2/ams/get_open_campaign_performance', $params);
+        return $this->post($store, '/api/v2/ams/get_open_campaign_performance', $params);
     }
 
     public function getAmsTargetedCampaignPerformance(Store $store, array $params): array
     {
-        return $this->get($store, '/api/v2/ams/get_targeted_campaign_performance', $params);
+        return $this->post($store, '/api/v2/ams/get_targeted_campaign_performance', $params);
     }
 
     public function getAmsConversionReport(Store $store, array $params): array
     {
-        return $this->get($store, '/api/v2/ams/get_conversion_report', $params);
+        return $this->post($store, '/api/v2/ams/get_conversion_report', $params);
     }
 
     public function getAmsValidationList(Store $store): array
     {
-        return $this->get($store, '/api/v2/ams/get_validation_list');
+        return $this->post($store, '/api/v2/ams/get_validation_list', []);
     }
 
     public function getAmsValidationReport(Store $store, array $params): array
     {
-        return $this->get($store, '/api/v2/ams/get_validation_report', $params);
+        return $this->post($store, '/api/v2/ams/get_validation_report', $params);
     }
 
     // ─── Ads API ──────────────────────────────────────────────────────────────

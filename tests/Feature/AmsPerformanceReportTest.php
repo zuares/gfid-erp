@@ -59,13 +59,15 @@ class AmsPerformanceReportTest extends TestCase
 
         Http::assertSent(function ($request): bool {
             parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+            $body = $request->data();
 
-            return str_contains($request->url(), '/api/v2/ams/get_shop_performance')
+            return $request->method() === 'POST'
+                && str_contains($request->url(), '/api/v2/ams/get_shop_performance')
                 && ($query['access_token'] ?? null) === 'dummy_access_token'
-                && ($query['period_type'] ?? null) === 'Last30d'
-                && ($query['start_date'] ?? null) === '20260910'
-                && ($query['end_date'] ?? null) === '20261009'
-                && ($query['order_type'] ?? null) === 'ConfirmedOrder';
+                && ($body['period_type'] ?? null) === 'Last30d'
+                && ($body['start_date'] ?? null) === '20260910'
+                && ($body['end_date'] ?? null) === '20261009'
+                && ($body['order_type'] ?? null) === 'ConfirmedOrder';
         });
     }
 
@@ -113,11 +115,14 @@ class AmsPerformanceReportTest extends TestCase
 
         Http::assertSent(function ($request): bool {
             parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+            $body = $request->data();
 
-            return str_contains($request->url(), '/api/v2/ams/get_conversion_report')
-                && ($query['page_size'] ?? null) === '20'
-                && ($query['place_order_time_start'] ?? null) === (string) strtotime('2026-10-01 00:00:00')
-                && ($query['place_order_time_end'] ?? null) === (string) strtotime('2026-10-09 23:59:59');
+            return $request->method() === 'POST'
+                && str_contains($request->url(), '/api/v2/ams/get_conversion_report')
+                && ($query['access_token'] ?? null) === 'dummy_access_token'
+                && ($body['page_size'] ?? null) === 20
+                && ($body['place_order_time_start'] ?? null) === strtotime('2026-10-01 00:00:00')
+                && ($body['place_order_time_end'] ?? null) === strtotime('2026-10-09 23:59:59');
         });
     }
 

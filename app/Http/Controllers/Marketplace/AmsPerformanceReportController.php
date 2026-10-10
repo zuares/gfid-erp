@@ -279,6 +279,10 @@ class AmsPerformanceReportController extends Controller
             return;
         }
 
-        $error = trim((string) ($payload['message'] ?? $payload['error']));
+        $error = match ((string) $payload['error']) {
+            'error_api_permission' => 'Aplikasi Shopee belum memiliki permission "Affiliate Marketing Solution Management". Aktifkan permission tersebut pada Shopee Open Platform Console, lalu hubungkan ulang toko ini.',
+            'error_ashop_api_permission' => 'Toko ini belum memiliki akses Affiliate Marketing Solution. Aktifkan Affiliate Marketing pada Seller Centre Shopee atau gunakan toko yang sudah terdaftar.',
+            default => trim((string) ($payload['message'] ?? $payload['error'])),
+        };
     }
 }
