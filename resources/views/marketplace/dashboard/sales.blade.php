@@ -2395,14 +2395,6 @@
                         <button type="button" class="sales-comparison-tab {{ $comparisonMode === 'month' ? 'active' : '' }}" data-comparison-mode="month" aria-pressed="{{ $comparisonMode === 'month' ? 'true' : 'false' }}"><i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>Bulan lalu</button>
                     </div>
                 </div>
-                <div class="col-12 col-md-auto sales-filter-field">
-                    <label class="sales-filter-label" for="sales-payday-day"><i class="bi bi-wallet2" aria-hidden="true"></i>Tanggal gajian</label>
-                    <select id="sales-payday-day" class="form-select form-select-sm" name="payday_day">
-                        @for ($day = 1; $day <= 31; $day++)
-                            <option value="{{ $day }}" @selected($paydayDay === $day)>Tanggal {{ $day }}</option>
-                        @endfor
-                    </select>
-                </div>
             </div>
         </div>
     </form>
@@ -4673,7 +4665,6 @@
         const activeTabInput = document.querySelector('#sales-active-tab');
         const storeInput = document.querySelector('#sales-store');
         const platformInput = document.querySelector('#sales-platform');
-        const paydayInput = document.querySelector('#sales-payday-day');
         const orderRows = document.querySelectorAll('[data-sales-order-row]');
         const comparisonModeInput = document.querySelector('#sales-comparison-mode');
         const orderDate = document.querySelector('#sales-order-detail-date');
@@ -5106,12 +5097,6 @@
 
         if (platformInput && filterForm) {
             platformInput.addEventListener('change', function () {
-                filterForm.requestSubmit();
-            });
-        }
-
-        if (paydayInput && filterForm) {
-            paydayInput.addEventListener('change', function () {
                 filterForm.requestSubmit();
             });
         }
