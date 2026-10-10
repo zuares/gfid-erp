@@ -1685,6 +1685,7 @@
         return [
             'label' => $targetDate ? $targetDate->format('j').'.'.$targetDate->month : '—',
             'event_date' => $targetDate ? $targetDate->format('d M Y') : '—',
+            'target_date' => $targetDate,
             'from' => $period['from'],
             'to' => $period['to'],
             'has_event' => $eventRow !== null,
@@ -1696,6 +1697,52 @@
                 'estimated_payout' => $eventRow ? (float) data_get($eventRow, 'estimated_payout', 0) : null,
                 'net_profit' => $eventRow ? (float) data_get($eventRow, 'net_profit', 0) : null,
                 'net_margin' => $eventRow && $netSales > 0 ? ((float) data_get($eventRow, 'net_profit', 0) / $netSales) * 100 : null,
+            ],
+        ];
+    })->values()->all();
+    $salesTwinPrePeakPeriods = collect($salesTwinComparisonSources)->map(function ($period) {
+        $periodStart = $period['from'] ? \Carbon\Carbon::parse($period['from']) : null;
+        $periodEnd = $period['to'] ? \Carbon\Carbon::parse($period['to']) : null;
+        $targetDate = $periodStart ? $periodStart->copy()->day($periodStart->month) : null;
+        $windowStart = $targetDate ? $targetDate->copy()->subDays(7) : null;
+        $windowEnd = $targetDate ? $targetDate->copy()->subDay() : null;
+        $visibleStart = $windowStart && $periodStart && $windowStart->lt($periodStart) ? $periodStart->copy() : $windowStart;
+        $visibleEnd = $windowEnd && $periodEnd && $windowEnd->gt($periodEnd) ? $periodEnd->copy() : $windowEnd;
+        $windowRows = $visibleStart && $visibleEnd
+            ? collect($period['daily'] ?? [])->filter(function ($row) use ($visibleStart, $visibleEnd) {
+                $day = data_get($row, 'day');
+
+                if (! $day) {
+                    return false;
+                }
+
+                $date = \Carbon\Carbon::parse($day);
+
+                return $date->betweenIncluded($visibleStart, $visibleEnd);
+            })
+            : collect();
+        $netSales = (float) $windowRows->sum(fn ($row) => (float) data_get($row, 'net_total', 0));
+        $orders = (int) $windowRows->sum(fn ($row) => (int) data_get($row, 'orders', 0));
+        $windowStartLabel = $windowStart ? $windowStart->format('d M') : '—';
+        $windowEndLabel = $windowEnd ? $windowEnd->format('d M') : '—';
+
+        return [
+            'label' => $targetDate ? $targetDate->format('j').'.'.$targetDate->month : '—',
+            'event_date' => $windowStart && $windowEnd ? $windowStartLabel.' – '.$windowEndLabel : '—',
+            'target_date' => $targetDate,
+            'from' => $period['from'],
+            'to' => $period['to'],
+            'has_event' => $targetDate !== null,
+            'metrics' => [
+                'net_sales' => $netSales,
+                'orders' => $orders,
+                'qty' => (int) $windowRows->sum(fn ($row) => (int) data_get($row, 'qty', 0)),
+                'aov' => $orders > 0 ? $netSales / $orders : null,
+                'estimated_payout' => (float) $windowRows->sum(fn ($row) => (float) data_get($row, 'estimated_payout', 0)),
+                'net_profit' => (float) $windowRows->sum(fn ($row) => (float) data_get($row, 'net_profit', 0)),
+                'net_margin' => $netSales > 0
+                    ? ((float) $windowRows->sum(fn ($row) => (float) data_get($row, 'net_profit', 0)) / $netSales) * 100
+                    : null,
             ],
         ];
     })->values()->all();
@@ -2428,6 +2475,67 @@
                                                     @if ($twinDelta !== null)
                                                         <span class="sales-comparison-delta {{ $twinDeltaTone }}" title="Perubahan dibanding {{ $period['label'] }}">
                                                             <i class="bi {{ $twinDelta > 0 ? 'bi-arrow-up-right' : ($twinDelta < 0 ? 'bi-arrow-down-right' : 'bi-arrow-left-right') }}" aria-hidden="true"></i>{{ ($twinDelta > 0 ? '+' : ($twinDelta < 0 ? '−' : '±')).number_format(abs($twinDelta), 1, ',', '.') }}{{ ($twinRow['is_percent'] ?? false) ? ' pt' : '%' }}
+                                                        </span>
+                                                    @endif
+                                                </span>
+                                            </span>
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        @endif
+        @if ($comparisonMode === 'month' && collect($salesTwinPrePeakPeriods)->contains(fn ($period) => $period['has_event']))
+            <section class="card sales-card sales-comparison-section shadow-sm mb-3" aria-labelledby="sales-twin-pre-peak-title">
+                <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-2">
+                    <div>
+                        <div class="sales-kicker mb-1">Persiapan peak day</div>
+                        <h2 id="sales-twin-pre-peak-title" class="sales-section-title mb-1">Performa 7 hari sebelum {{ collect($salesTwinPrePeakPeriods)->pluck('label')->implode(', ') }}</h2>
+                        <div class="sales-section-subtitle d-block">Membandingkan periode D-7 sampai D-1 sebelum setiap tanggal kembar. Peak day tidak termasuk.</div>
+                    </div>
+                    <span class="badge sales-badge rounded-pill px-3 py-2"><i class="bi bi-calendar-week me-1" aria-hidden="true"></i>Pre-peak</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle sales-table sales-sales-comparison-table mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-3" scope="col">Metrik</th>
+                                @foreach ($salesTwinPrePeakPeriods as $periodIndex => $period)
+                                    <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}" scope="col">
+                                        <span class="sales-period-label">{{ $period['label'] }}</span>
+                                        <span class="sales-period-range sales-twin-period-range">{{ $period['event_date'] }}</span>
+                                    </th>
+                                @endforeach
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($salesTwinComparisonRows as $twinRow)
+                                @php $prePeakCurrentValue = $salesTwinPrePeakPeriods[0]['metrics'][$twinRow['key']] ?? null; @endphp
+                                <tr>
+                                    <td class="ps-3 fw-semibold">{{ $twinRow['label'] }}</td>
+                                    @foreach ($salesTwinPrePeakPeriods as $periodIndex => $period)
+                                        @php
+                                            $prePeakValue = $period['metrics'][$twinRow['key']] ?? null;
+                                            $prePeakDelta = null;
+                                            if ($periodIndex > 0 && is_numeric($prePeakCurrentValue) && is_numeric($prePeakValue)) {
+                                                $prePeakDifference = (float) $prePeakCurrentValue - (float) $prePeakValue;
+                                                $prePeakBase = abs((float) $prePeakValue);
+                                                $prePeakDelta = ($twinRow['is_percent'] ?? false)
+                                                    ? $prePeakDifference
+                                                    : ($prePeakBase > 0 ? ($prePeakDifference / $prePeakBase) * 100 : ($prePeakDifference === 0.0 ? 0 : null));
+                                            }
+                                            $prePeakDeltaTone = $prePeakDelta === null || $prePeakDelta === 0.0 ? 'is-neutral' : ($prePeakDelta > 0 ? 'is-up' : 'is-down');
+                                        @endphp
+                                        <td class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
+                                            <span class="sales-comparison-cell">
+                                                <span class="sales-comparison-value-row">
+                                                    {{ $prePeakValue === null ? '—' : $twinRow['format']($prePeakValue) }}
+                                                    @if ($prePeakDelta !== null)
+                                                        <span class="sales-comparison-delta {{ $prePeakDeltaTone }}" title="Perubahan dibanding {{ $period['label'] }}">
+                                                            <i class="bi {{ $prePeakDelta > 0 ? 'bi-arrow-up-right' : ($prePeakDelta < 0 ? 'bi-arrow-down-right' : 'bi-arrow-left-right') }}" aria-hidden="true"></i>{{ ($prePeakDelta > 0 ? '+' : ($prePeakDelta < 0 ? '−' : '±')).number_format(abs($prePeakDelta), 1, ',', '.') }}{{ ($twinRow['is_percent'] ?? false) ? ' pt' : '%' }}
                                                         </span>
                                                     @endif
                                                 </span>
