@@ -11,6 +11,8 @@ use Illuminate\Validation\Rule;
 
 class AmsPerformanceReportController extends Controller
 {
+    private const PAGE_SIZES = [20, 50, 100, 500];
+
     private const REPORTS = [
         'overview',
         'product',
@@ -25,7 +27,7 @@ class AmsPerformanceReportController extends Controller
     public function index(Request $request, AmsPerformanceReportService $service)
     {
         $stores = Store::query()
-            ->select('id', 'name', 'external_shop_id', 'channel_id', 'status', 'is_active', 'token_expires_at')
+            ->select('id', 'name', 'external_shop_id', 'channel_id', 'status', 'is_active', 'token_expires_at', 'credentials')
             ->with('channel:id,code,name')
             ->whereHas('channel', fn ($query) => $query->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
             ->where('is_active', true)
@@ -66,6 +68,10 @@ class AmsPerformanceReportController extends Controller
 
         if (! in_array($filters['report'], self::REPORTS, true)) {
             $filters['report'] = 'overview';
+        }
+
+        if (! in_array($filters['page_size'], self::PAGE_SIZES, true)) {
+            $filters['page_size'] = self::PAGE_SIZES[0];
         }
 
         $loaded = $request->boolean('load');
@@ -156,7 +162,7 @@ class AmsPerformanceReportController extends Controller
             'order_type' => ['required', Rule::in(['PlacedOrder', 'ConfirmedOrder'])],
             'channel' => ['required', Rule::in($channelRules)],
             'page_no' => ['nullable', 'integer', 'min:1', 'max:500'],
-            'page_size' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'page_size' => ['nullable', 'integer', Rule::in(self::PAGE_SIZES)],
             'item_id' => ['nullable', 'regex:/^\d+$/', 'max:32'],
             'affiliate_id' => ['nullable', 'regex:/^\d+$/', 'max:32'],
             'campaign_id' => ['nullable', 'regex:/^\d+$/', 'max:32'],
@@ -194,7 +200,7 @@ class AmsPerformanceReportController extends Controller
 
         if (in_array($report, ['product', 'affiliate', 'content', 'open_campaign', 'targeted_campaign'], true)) {
             $params['page_no'] = max(1, (int) $filters['page_no']);
-            $params['page_size'] = min(20, max(1, (int) $filters['page_size']));
+            $params['page_size'] = min(max(self::PAGE_SIZES), max(1, (int) $filters['page_size']));
         }
 
         if ($report === 'product' && $filters['item_id'] !== '') {

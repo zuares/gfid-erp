@@ -61,6 +61,7 @@ class AmsPerformanceReportTest extends TestCase
             parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
 
             return str_contains($request->url(), '/api/v2/ams/get_shop_performance')
+                && ($query['access_token'] ?? null) === 'dummy_access_token'
                 && ($query['period_type'] ?? null) === 'Last30d'
                 && ($query['start_date'] ?? null) === '20260910'
                 && ($query['end_date'] ?? null) === '20261009'
@@ -82,8 +83,8 @@ class AmsPerformanceReportTest extends TestCase
                         'affiliate_name' => 'Affiliate One',
                         'items' => [['item_name' => 'Produk AMS', 'seller_service_fee' => '12.50']],
                     ]],
-                    'total_count' => 1,
-                    'has_more' => false,
+                    'total_count' => 41,
+                    'has_more' => true,
                 ],
             ]),
             '*/api/v2/ams/get_performance_data_update_time*' => Http::response([
@@ -104,7 +105,11 @@ class AmsPerformanceReportTest extends TestCase
             'page_size' => 20,
         ]));
 
-        $response->assertOk()->assertSee('ORDER-AMS-1')->assertSee('Affiliate One');
+        $response->assertOk()
+            ->assertSee('ORDER-AMS-1')
+            ->assertSee('Affiliate One')
+            ->assertSeeText('Halaman 1 dari 3')
+            ->assertSee('page_no=2', false);
 
         Http::assertSent(function ($request): bool {
             parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);

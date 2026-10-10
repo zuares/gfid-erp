@@ -19,6 +19,34 @@
         'validation' => 'Validation Report',
     ];
     $selectedReport = $filters['report'] ?? 'overview';
+    $pageNo = max(1, (int) ($filters['page_no'] ?? 1));
+    $pageSize = max(1, (int) ($filters['page_size'] ?? 20));
+    $totalCount = is_numeric($response['total_count'] ?? null) ? (int) $response['total_count'] : null;
+    $hasMore = filter_var($response['has_more'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    $totalPages = $totalCount !== null
+        ? max(1, (int) ceil($totalCount / $pageSize))
+        : ($hasMore ? $pageNo + 1 : $pageNo);
+    $showPagination = $selectedReport !== 'overview'
+        && ($selectedReport !== 'validation' || filled($filters['validation_id'] ?? null));
+    $pageLinks = [];
+    if ($showPagination && $totalPages > 1) {
+        if ($totalPages <= 7) {
+            $pageLinks = range(1, $totalPages);
+        } else {
+            $pageLinks = [1];
+            $windowStart = max(2, $pageNo - 2);
+            $windowEnd = min($totalPages - 1, $pageNo + 2);
+            if ($windowStart > 2) $pageLinks[] = null;
+            for ($page = $windowStart; $page <= $windowEnd; $page++) $pageLinks[] = $page;
+            if ($windowEnd < $totalPages - 1) $pageLinks[] = null;
+            $pageLinks[] = $totalPages;
+        }
+    }
+    $pageUrl = fn (int $page) => request()->fullUrlWithQuery([
+        'load' => 1,
+        'page_no' => $page,
+        'page_size' => $pageSize,
+    ]);
     $hasAdvancedFilters = collect([
         'item_id', 'affiliate_id', 'campaign_id', 'order_sn', 'item_name',
         'l1_category_id', 'l2_category_id', 'l3_category_id', 'order_status',
@@ -149,6 +177,16 @@
     .ams-table .ams-id { color: var(--ams-muted); font-size: .74rem; }
     .ams-report-meta { display: flex; align-items: center; gap: .65rem; color: var(--ams-muted); font-size: .78rem; }
     .ams-report-meta .badge { border: 1px solid var(--ams-line); background: var(--ams-soft); color: var(--ams-muted); font-weight: 650; }
+    .ams-pagination-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem 1.2rem; background: color-mix(in srgb, var(--ams-card) 82%, var(--bg, #f8fafc) 18%); }
+    .ams-pagination-summary { color: var(--ams-muted); font-size: .76rem; line-height: 1.45; }
+    .ams-pagination-summary strong { color: var(--ams-ink); font-weight: 750; }
+    .ams-pagination-dot { margin: 0 .25rem; color: color-mix(in srgb, var(--ams-muted) 58%, transparent); }
+    .ams-pagination { display: flex; align-items: center; justify-content: flex-end; gap: .3rem; }
+    .ams-page-link { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; min-width: 2.15rem; height: 2.15rem; padding: 0 .65rem; border: 1px solid var(--ams-line); border-radius: .55rem; background: var(--ams-card); color: var(--ams-ink); font-size: .76rem; font-weight: 700; line-height: 1; text-decoration: none; transition: border-color .15s ease, background .15s ease, color .15s ease, transform .15s ease; }
+    a.ams-page-link:hover { border-color: color-mix(in srgb, var(--primary) 45%, transparent); background: var(--primary-soft, #eff6ff); color: var(--primary, #2563eb); transform: translateY(-1px); }
+    .ams-page-link.is-active { border-color: var(--primary, #2563eb); background: var(--primary, #2563eb); color: #fff; }
+    .ams-page-link.is-disabled { cursor: not-allowed; opacity: .45; }
+    .ams-page-ellipsis { display: inline-flex; align-items: center; justify-content: center; min-width: 1.3rem; color: var(--ams-muted); }
     .ams-empty { padding: 2.6rem 1rem; text-align: center; color: var(--ams-muted); }
     .ams-empty i { display: block; margin-bottom: .65rem; color: color-mix(in srgb, var(--primary) 58%, var(--ams-muted) 42%); font-size: 1.8rem; }
     .ams-empty strong { display: block; color: var(--ams-ink); font-size: .9rem; }
@@ -162,6 +200,12 @@
         .ams-filter-card .card-body { padding: .95rem; }
         .ams-table { min-width: 900px; }
         .ams-report-meta { align-items: flex-start; flex-direction: column; gap: .3rem; }
+        .ams-pagination-bar { align-items: stretch; flex-direction: column; padding: .85rem .95rem; }
+        .ams-pagination { justify-content: space-between; }
+        .ams-page-number { display: none; }
+        .ams-page-link.is-active { display: inline-flex; }
+        .ams-page-prev span,
+        .ams-page-next span { display: inline; }
     }
 </style>
 @endpush
@@ -233,8 +277,8 @@
                     <div class="col-6 col-xl-2">
                         <label class="form-label" for="amsPageSize">Baris / halaman</label>
                         <select class="form-select" name="page_size" id="amsPageSize">
-                            @foreach ([20, 50, 100, 500] as $pageSize)
-                                <option value="{{ $pageSize }}" @selected((int) ($filters['page_size'] ?? 20) === $pageSize)>{{ $pageSize }} baris</option>
+                            @foreach ([20, 50, 100, 500] as $size)
+                                <option value="{{ $size }}" @selected((int) ($filters['page_size'] ?? 20) === $size)>{{ $size }} baris</option>
                             @endforeach
                         </select>
                     </div>
@@ -261,10 +305,7 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-6 col-xl-2">
-                        <label class="form-label" for="amsPageNo">Halaman</label>
-                        <input type="number" class="form-control" name="page_no" id="amsPageNo" min="1" max="500" value="{{ $filters['page_no'] ?? 1 }}">
-                    </div>
+                    <input type="hidden" name="page_no" id="amsPageNo" value="1">
                 </div>
 
                 <details class="ams-advanced" @if ($hasAdvancedFilters) open @endif>
@@ -377,7 +418,7 @@
                         <tr><td><a class="ams-primary-cell" href="{{ request()->fullUrlWithQuery(['validation_id' => $bill['validation_id'] ?? '', 'validation_month' => $bill['validation_month'] ?? '', 'campaign_source' => $bill['campaign_source'] ?? 'ShopeeManaged']) }}">{{ $bill['validation_id'] ?? '—' }}</a></td><td>{{ $bill['validation_month'] ?? '—' }}</td><td>{{ $bill['campaign_source'] ?? '—' }}</td><td>{{ $money(data_get($bill, 'online_bill.total_amount', data_get($bill, 'total_amount'))) }}</td></tr>
                     @empty <tr><td colspan="4"><div class="ams-empty"><i class="bi bi-inbox"></i><strong>Belum ada validation bill</strong><span>Shopee belum mengembalikan validation bill untuk filter ini.</span></div></td></tr>@endforelse
                 </tbody></table></div>
-                    </div>
+                </div>
                 </div>
                 <div class="col-12 col-xl-7">
                     <div class="ams-card h-100">
@@ -397,6 +438,38 @@
                     </div>
                 </div>
             </div>
+            @if ($showPagination)
+                <div class="ams-pagination-bar ams-card border-top mt-3">
+                    <div class="ams-pagination-summary">
+                        <strong>{{ $rows->count() }}</strong> baris ditampilkan
+                        @if ($totalCount !== null)
+                            <span class="ams-pagination-dot">·</span><strong>{{ $value($totalCount) }}</strong> total data
+                        @endif
+                        <span class="ams-pagination-dot">·</span>Halaman <strong>{{ $pageNo }}</strong>{{ $totalCount !== null ? ' dari ' . $totalPages : '' }}
+                    </div>
+                    <nav class="ams-pagination" aria-label="Navigasi halaman report AMS">
+                        @if ($pageNo > 1)
+                            <a class="ams-page-link ams-page-prev" href="{{ $pageUrl($pageNo - 1) }}" aria-label="Halaman sebelumnya"><i class="bi bi-chevron-left"></i><span>Sebelumnya</span></a>
+                        @else
+                            <span class="ams-page-link ams-page-prev is-disabled" aria-disabled="true"><i class="bi bi-chevron-left"></i><span>Sebelumnya</span></span>
+                        @endif
+                        @foreach ($pageLinks as $page)
+                            @if ($page === null)
+                                <span class="ams-page-ellipsis" aria-hidden="true">…</span>
+                            @elseif ($page === $pageNo)
+                                <span class="ams-page-link is-active" aria-current="page">{{ $page }}</span>
+                            @else
+                                <a class="ams-page-link ams-page-number" href="{{ $pageUrl($page) }}" aria-label="Halaman {{ $page }}">{{ $page }}</a>
+                            @endif
+                        @endforeach
+                        @if ($hasMore || $pageNo < $totalPages)
+                            <a class="ams-page-link ams-page-next" href="{{ $pageUrl($pageNo + 1) }}" aria-label="Halaman berikutnya"><span>Berikutnya</span><i class="bi bi-chevron-right"></i></a>
+                        @else
+                            <span class="ams-page-link ams-page-next is-disabled" aria-disabled="true"><span>Berikutnya</span><i class="bi bi-chevron-right"></i></span>
+                        @endif
+                    </nav>
+                </div>
+            @endif
         @else
             <div class="ams-card">
                 <div class="card-body border-bottom">
@@ -432,7 +505,40 @@
                     @endif
                     </tr>
                 @empty <tr><td colspan="10"><div class="ams-empty"><i class="bi bi-bar-chart"></i><strong>Belum ada data untuk filter ini</strong><span>Shopee tidak mengembalikan data. Coba ubah report, periode, atau filter lanjutan.</span></div></td></tr>@endforelse
-            </tbody></table></div></div>
+            </tbody></table></div>
+            @if ($showPagination)
+                <div class="ams-pagination-bar border-top">
+                    <div class="ams-pagination-summary">
+                        <strong>{{ $rows->count() }}</strong> baris ditampilkan
+                        @if ($totalCount !== null)
+                            <span class="ams-pagination-dot">·</span><strong>{{ $value($totalCount) }}</strong> total data
+                        @endif
+                        <span class="ams-pagination-dot">·</span>Halaman <strong>{{ $pageNo }}</strong>{{ $totalCount !== null ? ' dari ' . $totalPages : '' }}
+                    </div>
+                    <nav class="ams-pagination" aria-label="Navigasi halaman report AMS">
+                        @if ($pageNo > 1)
+                            <a class="ams-page-link ams-page-prev" href="{{ $pageUrl($pageNo - 1) }}" aria-label="Halaman sebelumnya"><i class="bi bi-chevron-left"></i><span>Sebelumnya</span></a>
+                        @else
+                            <span class="ams-page-link ams-page-prev is-disabled" aria-disabled="true"><i class="bi bi-chevron-left"></i><span>Sebelumnya</span></span>
+                        @endif
+                        @foreach ($pageLinks as $page)
+                            @if ($page === null)
+                                <span class="ams-page-ellipsis" aria-hidden="true">…</span>
+                            @elseif ($page === $pageNo)
+                                <span class="ams-page-link is-active" aria-current="page">{{ $page }}</span>
+                            @else
+                                <a class="ams-page-link ams-page-number" href="{{ $pageUrl($page) }}" aria-label="Halaman {{ $page }}">{{ $page }}</a>
+                            @endif
+                        @endforeach
+                        @if ($hasMore || $pageNo < $totalPages)
+                            <a class="ams-page-link ams-page-next" href="{{ $pageUrl($pageNo + 1) }}" aria-label="Halaman berikutnya"><span>Berikutnya</span><i class="bi bi-chevron-right"></i></a>
+                        @else
+                            <span class="ams-page-link ams-page-next is-disabled" aria-disabled="true"><span>Berikutnya</span><i class="bi bi-chevron-right"></i></span>
+                        @endif
+                    </nav>
+                </div>
+            @endif
+            </div>
         @endif
     @elseif (!$loaded && !$stores->isEmpty())
         <div class="ams-card">
