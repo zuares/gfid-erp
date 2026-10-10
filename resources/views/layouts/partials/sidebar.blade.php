@@ -124,6 +124,8 @@
 
     // Toko Online Laporan
     $hasMarketplaceSalesReport = !$isAdmin && $router->has('marketplace.reports.sales');
+    $hasMarketplacePrincipalSalesPerformance = $router->has('marketplace.reports.principal-sales-performance');
+    $hasMarketplaceAmsPerformance = $router->has('marketplace.reports.ams-performance');
     $hasMarketplaceSalesExport = $router->has('marketplace.reports.sales.export');
     $hasMarketplaceProfitReport = $isOwner && $router->has('marketplace.reports.profit');
     $hasMarketplaceFinancialStatement = $isOwner && $router->has('marketplace.reports.financial-statement');
@@ -201,6 +203,7 @@
     $hasCashReceiptsIndex = $router->has('accounting.cash-receipts.index');
     $hasLoansIndex = $router->has('accounting.loans.index');
     $hasEmployeeLoansIndex = $router->has('accounting.employee-loans.index');
+    $hasEmployeeSavingsIndex = $router->has('accounting.employee-savings.index');
     $hasSupplierLoansIndex = $router->has('accounting.supplier-loans.index');
     $hasJournalsIndex = $router->has('accounting.journals.index');
     $hasOpeningBalancesIndex = $router->has('accounting.opening-balances.index');
@@ -263,6 +266,8 @@
         $hasMarketplaceSalesDashboard = false;
         $hasMarketplaceIndex = $hasMarketplaceCreate = $hasMarketplaceShow = false;
         $hasMarketplaceSalesReport = $hasMarketplaceSalesExport = false;
+        $hasMarketplacePrincipalSalesPerformance = false;
+        $hasMarketplaceAmsPerformance = false;
         $hasMarketplaceFinance = false;
         $hasMarketplaceReconcileQueue = $hasMarketplaceReconcileQueueBulk = false;
         $hasMarketplaceReconcilePreview = $hasMarketplaceReconcileCommit = false;
@@ -301,7 +306,7 @@
     if (!$canModule('accounting')) {
         $hasAccountingIndex = $hasAccountsIndex = $hasCashBasisReportIndex = false;
         $hasCashReceiptsIndex = $hasJournalsIndex = $hasOpeningBalancesIndex = false;
-        $hasLoansIndex = $hasEmployeeLoansIndex = $hasSupplierLoansIndex = false;
+        $hasLoansIndex = $hasEmployeeLoansIndex = $hasEmployeeSavingsIndex = $hasSupplierLoansIndex = false;
         $hasOpeningBalancesBatchIndex = $hasCashTransfersIndex = false;
         $hasSupplierApOpeningsIndex = false;
     }
@@ -439,6 +444,7 @@
         $open('accounting.cash-receipts.*') ||
         $open('accounting.loans.*') ||
         $open('accounting.employee-loans.*') ||
+        $open('accounting.employee-savings.*') ||
         $open('accounting.supplier-loans.*') ||
         $open('accounting.cash-transfers.*') ||
         $open('accounting.marketplace-payouts.*') ||
@@ -1205,7 +1211,7 @@
                             </div>
                         @endif
 
-                        @if ($hasMarketplaceSalesReport || $hasMarketplaceSalesDashboard || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
+                        @if ($hasMarketplaceSalesReport || $hasMarketplacePrincipalSalesPerformance || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
                             <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceFinanceGroup ? 'is-open' : '' }}" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminFinance"
                                 aria-expanded="{{ $openMarketplaceFinanceGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminFinance">
@@ -1224,6 +1230,18 @@
                                     <x-sidebar.sub-link href="{{ route('marketplace.reports.sales') }}" icon="bi bi-graph-up"
                                         :active="request()->routeIs('marketplace.reports.sales')">
                                         Laporan Penjualan
+                                    </x-sidebar.sub-link>
+                                @endif
+                                @if ($hasMarketplacePrincipalSalesPerformance)
+                                    <x-sidebar.sub-link href="{{ route('marketplace.reports.principal-sales-performance') }}" icon="bi bi-globe2"
+                                        :active="request()->routeIs('marketplace.reports.principal-sales-performance')">
+                                        Performa Principal Shopee
+                                    </x-sidebar.sub-link>
+                                @endif
+                                @if ($hasMarketplaceAmsPerformance)
+                                    <x-sidebar.sub-link href="{{ route('marketplace.reports.ams-performance') }}" icon="bi bi-person-hearts"
+                                        :active="request()->routeIs('marketplace.reports.ams-performance')">
+                                        AMS Performance &amp; Report
                                     </x-sidebar.sub-link>
                                 @endif
                                 @if ($hasMarketplaceFinance)
@@ -1662,6 +1680,7 @@
                 $hasCashReceiptsIndex,
                 $hasLoansIndex,
                 $hasEmployeeLoansIndex,
+                $hasEmployeeSavingsIndex,
                 $hasSupplierLoansIndex,
                 $hasCashBasisReportIndex,
                 $hasJournalsIndex,
@@ -1738,6 +1757,13 @@
                         </x-sidebar.simple-link>
                     @endif
 
+                    @if ($hasEmployeeSavingsIndex)
+                        <x-sidebar.simple-link href="{{ route('accounting.employee-savings.index') }}" icon="bi bi-wallet2"
+                            :active="request()->routeIs('accounting.employee-savings.*')">
+                            Tabungan Karyawan
+                        </x-sidebar.simple-link>
+                    @endif
+
                     @if ($hasMarketplacePayoutsIndex)
                         <x-sidebar.simple-link href="{{ route('accounting.marketplace-payouts.index') }}" icon="bi bi-cart3"
                             :active="request()->routeIs('accounting.marketplace-payouts.*')">
@@ -1807,6 +1833,8 @@
                 $hasMarketplaceProfit,
                 $hasMarketplaceFinance,
                 $hasMarketplaceSalesReport,
+                $hasMarketplacePrincipalSalesPerformance,
+                $hasMarketplaceAmsPerformance,
                 $hasMarketplaceProfitReport,
                 $hasMarketplaceFinancialStatement,
                 $hasMarketplaceFinancialQuality,
@@ -1955,7 +1983,7 @@
                             </div>
                         @endif
 
-                        @if ($hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialClosing || $hasMarketplaceSalesReport || $hasMarketplaceSalesDashboard || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceFinance)
+                        @if ($hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialClosing || $hasMarketplaceSalesReport || $hasMarketplacePrincipalSalesPerformance || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceFinance)
                             <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceFinanceGroup ? 'is-open' : '' }}" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerFinance"
                                 aria-expanded="{{ $openMarketplaceFinanceGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerFinance">
@@ -2025,6 +2053,18 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.reports.sales') }}" icon="bi bi-bar-chart-line"
                                 :active="request()->routeIs('marketplace.reports.sales')">
                                 Laporan Penjualan
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplacePrincipalSalesPerformance)
+                            <x-sidebar.sub-link href="{{ route('marketplace.reports.principal-sales-performance') }}" icon="bi bi-globe2"
+                                :active="request()->routeIs('marketplace.reports.principal-sales-performance')">
+                                Performa Principal Shopee
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceAmsPerformance)
+                            <x-sidebar.sub-link href="{{ route('marketplace.reports.ams-performance') }}" icon="bi bi-person-hearts"
+                                :active="request()->routeIs('marketplace.reports.ams-performance')">
+                                AMS Performance &amp; Report
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceFinancialQuality)
@@ -2604,7 +2644,7 @@
             @endif
 
             {{-- FINANCE --}}
-            @if ($canShow($hasAccountingIndex, $hasOpeningBalancesIndex, $hasOpeningBalancesBatchIndex, $hasSupplierApOpeningsIndex, $hasCashExpensesIndex, $hasCashReceiptsIndex, $hasLoansIndex, $hasEmployeeLoansIndex, $hasSupplierLoansIndex, $hasCashTransfersIndex, $hasCashBasisReportIndex, $hasJournalsIndex, $hasAccountsIndex, $hasMarketplacePayoutsIndex, $hasApReportIndex, $hasTrialBalanceIndex, $hasProfitLossIndex, $hasBukuBesarIndex))
+            @if ($canShow($hasAccountingIndex, $hasOpeningBalancesIndex, $hasOpeningBalancesBatchIndex, $hasSupplierApOpeningsIndex, $hasCashExpensesIndex, $hasCashReceiptsIndex, $hasLoansIndex, $hasEmployeeLoansIndex, $hasEmployeeSavingsIndex, $hasSupplierLoansIndex, $hasCashTransfersIndex, $hasCashBasisReportIndex, $hasJournalsIndex, $hasAccountsIndex, $hasMarketplacePayoutsIndex, $hasApReportIndex, $hasTrialBalanceIndex, $hasProfitLossIndex, $hasBukuBesarIndex))
                 <x-sidebar.label text="Keuangan" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openAccounting ? 'is-open' : '' }}" type="button"
@@ -2689,6 +2729,13 @@
                             <x-sidebar.sub-link href="{{ route('accounting.employee-loans.index') }}" icon="bi bi-person-vcard"
                                 :active="request()->routeIs('accounting.employee-loans.*')">
                                 Pinjaman Karyawan
+                            </x-sidebar.sub-link>
+                        @endif
+
+                        @if ($hasEmployeeSavingsIndex)
+                            <x-sidebar.sub-link href="{{ route('accounting.employee-savings.index') }}" icon="bi bi-wallet2"
+                                :active="request()->routeIs('accounting.employee-savings.*')">
+                                Tabungan Karyawan
                             </x-sidebar.sub-link>
                         @endif
 

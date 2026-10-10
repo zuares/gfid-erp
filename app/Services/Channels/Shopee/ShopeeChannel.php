@@ -265,6 +265,56 @@ class ShopeeChannel implements MarketplaceChannel
     }
 
     /**
+     * Call a read-only Brand Portal endpoint at principal scope.
+     *
+     * Principal APIs differ from normal shop APIs: the signature and query
+     * string use principal_id and must not include shop_id.
+     */
+    public function getPrincipalSalesPerformanceDetail(
+        Store $store,
+        int|string $principalId,
+        array $body
+    ): array {
+        $path = '/api/v2/principal/get_principal_sales_performance_detail';
+        $principalId = trim((string) $principalId);
+
+        if ($principalId === '') {
+            return [
+                'error' => 'missing_principal_id',
+                'message' => 'principal_id wajib diisi untuk Brand Portal API.',
+                '_meta' => ['http_status' => 422],
+            ];
+        }
+
+        return $this->resilientRequest(
+            $store,
+            fn () => $this->doPrincipalPost($store, $path, $principalId, $body),
+            true
+        );
+    }
+
+    protected function doPrincipalPost(Store $store, string $path, string $principalId, array $body = []): array
+    {
+        $timestamp = time();
+        $accessToken = $this->accessToken($store);
+        $baseString = $this->partnerId($store) . $path . $timestamp . $accessToken . $principalId;
+
+        $query = [
+            'partner_id' => (int) $this->partnerId($store),
+            'timestamp' => $timestamp,
+            'access_token' => $accessToken,
+            'principal_id' => $principalId,
+            'sign' => hash_hmac('sha256', $baseString, $this->partnerKey($store)),
+        ];
+
+        $response = Http::connectTimeout(10)
+            ->timeout(30)
+            ->post($this->baseUrl($store) . $path . '?' . http_build_query($query), $body);
+
+        return $this->withHttpMeta($response);
+    }
+
+    /**
      * Bungkus response HTTP mentah menjadi array payload Shopee, ditambah metadata
      * HTTP internal aplikasi di key `_meta` (http_status, retry_after).
      *

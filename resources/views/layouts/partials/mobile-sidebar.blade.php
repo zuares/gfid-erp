@@ -351,6 +351,8 @@
     $hasSocialMediaInstagram = $router->has('social-media.instagram');
     $hasMarketplaceIndex = $router->has('marketplace.orders');
     $hasMarketplaceSalesReport = $router->has('marketplace.reports.sales');
+    $hasMarketplacePrincipalSalesPerformance = $router->has('marketplace.reports.principal-sales-performance');
+    $hasMarketplaceAmsPerformance = $router->has('marketplace.reports.ams-performance');
     $hasMarketplaceProfitReport = $isOwner && $router->has('marketplace.reports.profit');
     $hasMarketplaceFinancialStatement = $isOwner && $router->has('marketplace.reports.financial-statement');
     $hasMarketplaceFinancialClosing = $isOwner && $router->has('marketplace.reports.financial-closing');
@@ -438,6 +440,7 @@
     $hasCashBasisReportIndex = $router->has('accounting.cash-basis-report.index');
     $hasCashReceiptsIndex = $router->has('accounting.cash-receipts.index');
     $hasSupplierLoansIndex = $router->has('accounting.supplier-loans.index');
+    $hasEmployeeSavingsIndex = $router->has('accounting.employee-savings.index');
     $hasCashTransfersIndex = $router->has('accounting.cash-transfers.index');
     $hasMarketplacePayoutsIndex = !$isAdmin && $router->has('accounting.marketplace-payouts.index');
     $hasApReportIndex           = $router->has('accounting.ap-report.index');
@@ -528,7 +531,7 @@
         $hasAccountingIndex = $hasCashBasisReportIndex = $hasCashReceiptsIndex = false;
         $hasJournalsIndex = $hasAccountsIndex = $hasOpeningBalancesIndex = false;
         $hasOpeningBalancesBatchIndex = $hasCashTransfersIndex = false;
-        $hasSupplierApOpeningsIndex = $hasSupplierLoansIndex = false;
+        $hasSupplierApOpeningsIndex = $hasSupplierLoansIndex = $hasEmployeeSavingsIndex = false;
     }
 
     if (!$canModule('payroll')) {
@@ -671,6 +674,7 @@
         request()->routeIs('accounting.marketplace-payouts.*') ||
         request()->routeIs('accounting.cash-transfers.*') ||
         request()->routeIs('accounting.supplier-loans.*') ||
+        request()->routeIs('accounting.employee-savings.*') ||
         request()->routeIs('accounting.opening-balances.*') ||
         request()->routeIs('accounting.opening-balances-batch.*') ||
         request()->routeIs('accounting.supplier-ap-openings.*') ||
@@ -892,7 +896,7 @@
                         </li>
                     @endif
 
-                    @if ($isAdmin && ($hasMarketplaceIndex || $hasMarketplaceSalesReport || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex))
+                    @if ($isAdmin && ($hasMarketplaceIndex || $hasMarketplaceSalesReport || $hasMarketplacePrincipalSalesPerformance || $hasMarketplaceAmsPerformance || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex))
                         <div class="mobile-sidebar-section-label">Toko Online</div>
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}"
@@ -950,7 +954,7 @@
                                     </div>
                                 @endif
 
-                                @if ($hasMarketplaceSalesReport || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
+                                @if ($hasMarketplaceSalesReport || $hasMarketplacePrincipalSalesPerformance || $hasMarketplaceAmsPerformance || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
                                     <button class="mobile-sidebar-link mobile-sidebar-toggle mobile-sidebar-nested-toggle {{ $marketplaceFinanceGroupOpen ? 'is-open' : '' }}"
                                             type="button" data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminFinanceMobile"
                                             aria-expanded="{{ $marketplaceFinanceGroupOpen ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminFinanceMobile">
@@ -960,6 +964,16 @@
                                         @if ($hasMarketplaceSalesReport)
                                             <a href="{{ route('marketplace.reports.sales') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.sales') ? 'active' : '' }}">
                                                 <span class="icon"><i class="bi bi-graph-up"></i></span><span>Ringkasan Penjualan</span>
+                                            </a>
+                                        @endif
+                                        @if ($hasMarketplacePrincipalSalesPerformance)
+                                            <a href="{{ route('marketplace.reports.principal-sales-performance') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.principal-sales-performance') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-globe2"></i></span><span>Performa Principal Shopee</span>
+                                            </a>
+                                        @endif
+                                        @if ($hasMarketplaceAmsPerformance)
+                                            <a href="{{ route('marketplace.reports.ams-performance') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.ams-performance') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-person-hearts"></i></span><span>AMS Performance &amp; Report</span>
                                             </a>
                                         @endif
                                         @if ($hasMarketplaceFinance)
@@ -1343,7 +1357,7 @@
                     @endif
 
                     {{-- Keuangan (admin / operating) --}}
-                    @if ($hasAccountingIndex || $hasCashExpensesIndex || $hasCashTransfersIndex || $hasCashReceiptsIndex || $hasSupplierLoansIndex || $hasCashBasisReportIndex || $hasJournalsIndex || $hasAccountsIndex || $hasOpeningBalancesIndex || $hasOpeningBalancesBatchIndex || $hasSupplierApOpeningsIndex)
+                    @if ($hasAccountingIndex || $hasCashExpensesIndex || $hasCashTransfersIndex || $hasCashReceiptsIndex || $hasSupplierLoansIndex || $hasEmployeeSavingsIndex || $hasCashBasisReportIndex || $hasJournalsIndex || $hasAccountsIndex || $hasOpeningBalancesIndex || $hasOpeningBalancesBatchIndex || $hasSupplierApOpeningsIndex)
                         <div class="mobile-sidebar-section-label">Keuangan</div>
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $accountingOpen ? 'is-open' : '' }}"
@@ -1395,6 +1409,11 @@
                                 @if ($hasSupplierLoansIndex)
                                     <a href="{{ route('accounting.supplier-loans.index') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.supplier-loans.*') ? 'active' : '' }}">
                                         <span class="icon">🤝</span><span>Dana Supplier</span>
+                                    </a>
+                                @endif
+                                @if ($hasEmployeeSavingsIndex)
+                                    <a href="{{ route('accounting.employee-savings.index') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.employee-savings.*') ? 'active' : '' }}">
+                                        <span class="icon">💳</span><span>Tabungan Karyawan</span>
                                     </a>
                                 @endif
                                 @if ($hasJournalsIndex)
@@ -2504,6 +2523,12 @@
                                 <a href="{{ route('accounting.supplier-loans.index') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.supplier-loans.*') ? 'active' : '' }}">
                                     <span class="icon">🤝</span><span>Dana Supplier</span>
+                                </a>
+                            @endif
+                            @if ($hasEmployeeSavingsIndex)
+                                <a href="{{ route('accounting.employee-savings.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.employee-savings.*') ? 'active' : '' }}">
+                                    <span class="icon">💳</span><span>Tabungan Karyawan</span>
                                 </a>
                             @endif
 
