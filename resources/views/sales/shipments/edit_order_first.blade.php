@@ -255,6 +255,18 @@
         gap: .65rem;
     }
 
+    .sr-scan-card.mode-order {
+        --scan-accent: #2563eb;
+        --scan-accent-soft: #eff6ff;
+        --scan-accent-ring: rgba(37, 99, 235, .18);
+    }
+
+    .sr-scan-card.mode-item {
+        --scan-accent: #059669;
+        --scan-accent-soft: #ecfdf5;
+        --scan-accent-ring: rgba(5, 150, 105, .18);
+    }
+
     .sr-mode-row {
         display: flex;
         align-items: center;
@@ -275,6 +287,14 @@
         letter-spacing: .06em;
     }
 
+    .sr-scan-card.mode-order .sr-mode {
+        background: #2563eb;
+    }
+
+    .sr-scan-card.mode-item .sr-mode {
+        background: #059669;
+    }
+
     .sr-current {
         color: #64748b;
         font-size: .8rem;
@@ -285,7 +305,8 @@
     .sr-scan-input {
         min-height: 72px;
         border-radius: 10px !important;
-        border: 2px solid rgba(37, 99, 235, .18) !important;
+        border: 2px solid var(--scan-accent-ring, rgba(148, 163, 184, .22)) !important;
+        background: var(--scan-accent-soft, #f8fafc);
         font-size: 1.35rem;
         font-weight: 800;
         letter-spacing: .03em;
@@ -294,8 +315,8 @@
     }
 
     .sr-scan-input:focus {
-        border-color: var(--sr-accent) !important;
-        box-shadow: 0 0 0 .18rem var(--sr-accent-bg) !important;
+        border-color: var(--scan-accent, var(--sr-accent)) !important;
+        box-shadow: 0 0 0 .18rem var(--scan-accent-ring, var(--sr-accent-bg)) !important;
     }
 
     .sr-order-section { min-height: 180px; }
@@ -323,18 +344,24 @@
     }
 
     .sr-empty {
-        padding: 1rem;
+        min-height: 150px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.25rem;
+        border: 1px dashed rgba(148, 163, 184, .35);
         border-radius: 8px;
-        background: #f8fafc;
-        color: #94a3b8;
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        color: #64748b;
         font-size: .86rem;
+        font-weight: 650;
         text-align: center;
     }
 
     .sr-order {
-        border: 1px solid rgba(148, 163, 184, .15);
+        border: 1px solid rgba(96, 165, 250, .35);
         border-radius: 8px;
-        background: #fff;
+        background: #eff6ff;
         overflow: hidden;
     }
 
@@ -349,6 +376,7 @@
         align-items: center;
         gap: .5rem;
         padding: .55rem .7rem;
+        background: #eaf2ff;
         cursor: pointer;
     }
 
@@ -392,16 +420,30 @@
         padding: .4rem .55rem .55rem;
         display: grid;
         gap: .35rem;
+        background: rgba(255, 255, 255, .58);
     }
 
     .sr-item-row {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: auto minmax(0, 1fr) auto;
         align-items: center;
         gap: .5rem;
         padding: .45rem .55rem;
         border-radius: 7px;
-        background: #f8fafc;
+        background: #fff;
+    }
+
+    .sr-item-index {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.5rem;
+        height: 1.5rem;
+        border-radius: 6px;
+        background: #dbeafe;
+        color: #1d4ed8;
+        font-size: .72rem;
+        font-weight: 850;
     }
 
     .sr-item-code {
@@ -712,7 +754,7 @@
         @if ($shipment->status === 'draft')
             <div class="sr-panel">
                 <div class="sr-panel-body">
-                    <div class="sr-scan-card">
+                    <div class="sr-scan-card mode-order" id="scanCard">
                         <div class="sr-mode-row">
                             <span class="sr-mode" id="modeBadge">SCAN ORDER</span>
                             <span class="sr-current" id="currentLabel">Belum ada pesanan aktif</span>
@@ -775,6 +817,7 @@
     const lastScanStack = [];
 
     const scanInput = document.getElementById('scanInput');
+    const scanCard = document.getElementById('scanCard');
     const modeBadge = document.getElementById('modeBadge');
     const currentLabel = document.getElementById('currentLabel');
     const workflowStepper = document.getElementById('shipmentWorkflowStepper');
@@ -1022,6 +1065,11 @@
     function setMode(mode) {
         state.mode = mode === 'item' ? 'item' : 'order';
 
+        if (scanCard) {
+            scanCard.classList.toggle('mode-order', state.mode === 'order');
+            scanCard.classList.toggle('mode-item', state.mode === 'item');
+        }
+
         if (modeBadge) {
             modeBadge.textContent = state.mode === 'order' ? 'SCAN ORDER' : 'SCAN ITEM';
         }
@@ -1137,8 +1185,9 @@
             const expanded = state.expanded === order.code || isActive;
 
             const rows = items.length
-                ? items.map(item => `
+                ? items.map((item, index) => `
                     <div class="sr-item-row">
+                        <span class="sr-item-index" aria-label="Item ${index + 1}">${index + 1}</span>
                         <div>
                             <div class="sr-item-code">${esc(item.code || '-')}</div>
                             <div class="sr-item-name">${esc(item.name || '')}</div>

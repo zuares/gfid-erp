@@ -2553,6 +2553,9 @@ class ShipmentController extends Controller
         }
 
         try {
+            // SQLite hanya mengizinkan satu writer. Posting gelombang dapat
+            // berpapasan dengan request scan/reserve yang baru selesai, jadi
+            // ulangi seluruh transaksi jika lock transien terjadi.
             $wave = DB::transaction(function () use ($shipment, $warehouse) {
                 $locked = Shipment::query()->lockForUpdate()->findOrFail($shipment->id);
                 $wave = $this->ensureOpenShipmentWave($locked);
@@ -2653,7 +2656,7 @@ class ShipmentController extends Controller
                 }
 
                 return $wave->fresh();
-            });
+            }, 3);
         } catch (\Throwable $e) {
             return redirect()->route('sales.shipments.confirm_orders', $shipment)
                 ->with('status', 'error')

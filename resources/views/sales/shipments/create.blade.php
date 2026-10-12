@@ -693,7 +693,7 @@ body[data-theme="dark"] .shp-topbar {
 
             <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;margin-bottom:.4rem;font-weight:700;">Tipe Shipment</div>
             <div class="shp-mode-grid" style="margin-bottom:1rem" role="radiogroup" aria-label="Tipe Shipment">
-                <button type="button" class="shp-mode-card type-btn" data-shipment-type="marketplace" role="radio" aria-checked="false" @if(auth()->user()->role === 'admin') disabled style="opacity: 0.5; cursor: not-allowed;" title="Dinonaktifkan sementara untuk Admin" @endif>
+                <button type="button" class="shp-mode-card type-btn" data-shipment-type="marketplace" role="radio" aria-checked="false">
                     <div class="shp-mode-title">Marketplace</div>
                     <div class="shp-mode-sub">Wajib scan order/resi marketplace. Order yang tidak ditemukan akan ditolak.</div>
                 </button>
