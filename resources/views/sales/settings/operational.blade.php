@@ -175,6 +175,29 @@
             <div class="alert alert-danger mb-0">❌ {{ session('error') }}</div>
         @endif
 
+        <div class="sos-card">
+            <div class="sos-card-head">
+                <div>
+                    <div class="sos-title">Dokumen Scanner</div>
+                    <div class="sos-sub">Preview dan cetak panduan scanner serta barcode kontrol operasional.</div>
+                </div>
+            </div>
+            <div class="sos-doc-grid">
+                @foreach($scanDocuments as $document)
+                    @php $documentUrl = route('sales.settings.operational.documents', $document['key']); @endphp
+                    <div class="sos-box" style="margin-top:1rem">
+                        <div class="sos-box-title">{{ $document['title'] }}</div>
+                        <div class="sos-sub">{{ $document['description'] }} · {{ $document['pages'] }} halaman</div>
+                        <iframe class="sos-doc-frame" src="{{ $documentUrl }}#toolbar=1&navpanes=0&view=FitH" title="Preview {{ $document['title'] }}"></iframe>
+                        <div class="sos-doc-actions">
+                            <a class="sos-button sos-button-light" href="{{ $documentUrl }}" target="_blank" rel="noopener">Preview penuh</a>
+                            <button type="button" class="sos-button" data-print-pdf="{{ $documentUrl }}">Cetak PDF</button>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
         <form method="POST" action="{{ route('sales.settings.operational.update') }}" enctype="multipart/form-data" id="sos-form">
             @csrf
             <input type="hidden" name="shipment_scan_sound_enabled" id="sos-sound-value" value="{{ $soundEnabled ? '1' : '0' }}">
@@ -357,28 +380,6 @@
             <div class="sos-note">Record-only tetap bisa dipakai untuk scan dan pencatatan order. Pilih “Lookup saat konfirmasi” jika order perlu dicari dan ditautkan setelah proses scan selesai.</div>
         </div>
 
-        <div class="sos-card">
-            <div class="sos-card-head">
-                <div>
-                    <div class="sos-title">Dokumen Scanner</div>
-                    <div class="sos-sub">Preview dan cetak panduan scanner serta barcode kontrol operasional.</div>
-                </div>
-            </div>
-            <div class="sos-doc-grid">
-                @foreach($scanDocuments as $document)
-                    @php $documentUrl = route('sales.settings.operational.documents', $document['key']); @endphp
-                    <div class="sos-box" style="margin-top:1rem">
-                        <div class="sos-box-title">{{ $document['title'] }}</div>
-                        <div class="sos-sub">{{ $document['description'] }} · {{ $document['pages'] }} halaman</div>
-                        <iframe class="sos-doc-frame" src="{{ $documentUrl }}#toolbar=1&navpanes=0&view=FitH" title="Preview {{ $document['title'] }}"></iframe>
-                        <div class="sos-doc-actions">
-                            <a class="sos-button sos-button-light" href="{{ $documentUrl }}" target="_blank" rel="noopener">Preview penuh</a>
-                            <button type="button" class="sos-button" data-print-pdf="{{ $documentUrl }}">Cetak PDF</button>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-        </div>
     </div>
 </div>
 @endsection
