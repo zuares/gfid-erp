@@ -3702,7 +3702,7 @@
                                                 <span class="sales-product-image-preview-title">{{ $watchProductTitle }}</span>
                                             </span>
                                             <span class="min-w-0">
-                                                <button type="button" class="sales-watchlist-product sales-watchlist-product-trigger" data-sales-product-name="{{ $watchProductTitle }}" data-sales-product-sku="{{ $watchProductSku }}" data-sales-product-internal-item-id="" title="Lihat pesanan produk: {{ $watchProductTitle }}">{{ $watchProductTitle }}</button>
+                                                <button type="button" class="sales-watchlist-product sales-watchlist-product-trigger" data-sales-product-name="{{ $watchProductTitle }}" data-sales-product-sku="{{ $watchProductSku }}" data-sales-product-internal-item-id="" data-sales-product-external-item-id="{{ trim((string) ($watchProduct->external_item_id ?? '')) }}" data-sales-product-ad-internal-item-id="{{ (int) ($watchProduct->internal_item_id ?? 0) }}" data-sales-product-hpp-total="{{ (float) ($watchProduct->hpp_total ?? 0) }}" title="Lihat pesanan produk: {{ $watchProductTitle }}">{{ $watchProductTitle }}</button>
                                                 <span class="sales-watchlist-meta">{{ $watchProductCode !== '' ? $watchProductCode : 'Kode belum tersedia' }}</span>
                                             </span>
                                         </div>
@@ -5364,6 +5364,9 @@
                 const name = trigger.dataset.salesProductName || '';
                 const sku = trigger.dataset.salesProductSku || '';
                 const internalItemId = trigger.dataset.salesProductInternalItemId || '';
+                const externalItemId = trigger.dataset.salesProductExternalItemId || '';
+                const adInternalItemId = trigger.dataset.salesProductAdInternalItemId || '';
+                const hppTotal = trigger.dataset.salesProductHppTotal || '';
                 const query = new URLSearchParams({
                     name: name,
                     sku: sku,
@@ -5371,6 +5374,9 @@
                     date_to: @json($filters['date_to']),
                 });
                 if (internalItemId) query.set('internal_item_id', internalItemId);
+                if (externalItemId) query.set('external_item_id', externalItemId);
+                if (adInternalItemId && adInternalItemId !== '0') query.set('ad_internal_item_id', adInternalItemId);
+                if (hppTotal) query.set('hpp_total', hppTotal);
                 @if ($filters['store_id'])
                     query.set('store_id', @json($filters['store_id']));
                 @endif
@@ -5404,6 +5410,9 @@
                     const money = function (value) {
                         return 'Rp ' + new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Number(value || 0));
                     };
+                    const optionalMoney = function (value) {
+                        return value === null || value === undefined ? '—' : money(value);
+                    };
                     const count = function (value) {
                         return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Number(value || 0));
                     };
@@ -5420,10 +5429,12 @@
                                 + '<td class="text-end">' + money(order.sales) + '</td>'
                                 + '<td class="text-end">' + money(order.buyer_payment) + '</td>'
                                 + '<td class="text-end">' + money(order.estimated_payout) + '</td>'
+                                + '<td class="text-end">' + money(order.ad_spend) + '</td>'
+                                + '<td class="text-end ' + (Number(order.net_profit) < 0 ? 'text-danger' : 'text-success') + '">' + optionalMoney(order.net_profit) + '</td>'
                                 + '<td><span class="badge text-bg-light">' + escapeHtml(order.order_status) + '</span></td>'
                                 + '</tr>';
                         }).join('')
-                        : '<tr><td colspan="7" class="text-center text-muted py-4">Belum ada pesanan untuk produk ini pada periode aktif.</td></tr>';
+                        : '<tr><td colspan="9" class="text-center text-muted py-4">Belum ada pesanan untuk produk ini pada periode aktif.</td></tr>';
                     const summary = payload.summary || {};
                     const kpi = function (label, value, tone) {
                         return '<div class="col-6 col-md"><div class="border rounded-3 bg-light-subtle px-3 py-2 h-100 text-start">'
@@ -5436,13 +5447,15 @@
                         + kpi('Penjualan Netto', money(summary.sales))
                         + kpi('Pembayaran Pembeli', money(summary.buyer_payment))
                         + kpi('Estimasi Payout', money(summary.estimated_payout), 'text-success')
+                        + kpi('Biaya Iklan', money(summary.ad_spend), 'text-danger')
+                        + kpi('Laba Bersih', optionalMoney(summary.net_profit), summary.net_profit < 0 ? 'text-danger' : 'text-success')
                         + '</div>';
 
                     Swal.fire({
                         title: 'Pesanan produk',
                         html: '<div class="text-start mb-3"><strong>' + escapeHtml(name) + '</strong>' + (sku && sku !== '-' ? '<div class="small text-muted">SKU: ' + escapeHtml(sku) + '</div>' : '') + '</div>'
                             + summaryHtml
-                            + '<div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 text-start"><thead><tr><th>Order</th><th>Pembeli</th><th class="text-end">Qty</th><th class="text-end">Penjualan Netto</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Estimasi Payout</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>',
+                            + '<div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 text-start"><thead><tr><th>Order</th><th>Pembeli</th><th class="text-end">Qty</th><th class="text-end">Penjualan Netto</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Estimasi Payout</th><th class="text-end">Biaya Iklan</th><th class="text-end">Laba Bersih</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>',
                         width: Math.min(window.innerWidth - 32, 1100),
                         confirmButtonText: 'Tutup',
                     });
