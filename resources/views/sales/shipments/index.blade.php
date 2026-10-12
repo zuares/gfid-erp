@@ -198,6 +198,8 @@
     .code-link:hover{ color:#0f172a!important; background:rgba(148,163,184,.22); border-color:rgba(148,163,184,.4); }
     .shipment-inline{ display:flex; flex-direction:column; align-items:flex-start; gap:.14rem; min-width:0; white-space:normal; }
     .shipment-document-head{ display:flex; align-items:center; flex-wrap:wrap; gap:.3rem .4rem; }
+    .shipment-document-meta{ display:flex; align-items:center; flex-wrap:wrap; gap:.25rem .4rem; }
+    .shipment-channel-inline{ color:#94a3b8; font-size:.66rem; line-height:1.2; white-space:nowrap; max-width:190px; overflow:hidden; text-overflow:ellipsis; }
     .shipment-timestamps{ display:flex; align-items:center; flex-wrap:wrap; gap:.18rem .45rem; color:#64748b; font-size:.7rem; }
     .shipment-timestamps span + span::before{ content:'·'; margin-right:.45rem; color:#cbd5e1; }
     .shipment-store{ color:#475569; font-size:.72rem; }
@@ -722,9 +724,12 @@
     .shipment-channel-type{ color:#374151; font-size:.72rem; font-weight:700; }
     .shipment-channel-store{ color:#94a3b8; font-size:.68rem; }
     .shipment-created-cell{ color:#64748b; font-size:.72rem; white-space:nowrap; }
-    .shipment-created-stack{ display:flex; flex-direction:column; gap:.16rem; line-height:1.25; }
-    .shipment-created-date{ color:#4b5563; font-weight:650; }
+    .shipment-created-stack{ display:flex; flex-direction:column; gap:.1rem; line-height:1.2; }
+    .shipment-created-head{ display:flex; align-items:center; gap:.35rem; }
+    .shipment-created-date{ color:#111827; font-size:.78rem; font-weight:750; letter-spacing:-.01em; }
     .shipment-created-status{ display:flex; align-items:center; }
+    .shipment-created-status .badge-status{ padding:.1rem .32rem; font-size:.54rem; opacity:.82; }
+    .shipment-created-updated{ color:#9ca3af; font-size:.56rem; letter-spacing:0; }
     .package-number-cell{ color:#475569; font-size:.74rem; font-weight:650; font-variant-numeric:tabular-nums; }
     .shipment-dispatch-cell{ white-space:nowrap; }
     .dispatch-badge{
@@ -759,8 +764,10 @@
     body[data-theme="dark"] .shipment-time-stack span+span{ border-top-color:#273449; }
     body[data-theme="dark"] .shipment-channel-type{ color:#e5e7eb; }
     body[data-theme="dark"] .shipment-channel-store{ color:#94a3b8; }
+    body[data-theme="dark"] .shipment-channel-inline{ color:#94a3b8; }
     body[data-theme="dark"] .shipment-created-cell{ color:#94a3b8; }
-    body[data-theme="dark"] .shipment-created-date{ color:#cbd5e1; }
+    body[data-theme="dark"] .shipment-created-date{ color:#f3f4f6; }
+    body[data-theme="dark"] .shipment-created-updated{ color:#64748b; }
     body[data-theme="dark"] .package-number-cell{ color:#cbd5e1; }
     body[data-theme="dark"] .dispatch-badge{ color:#cbd5e1; background:#1f2937; border-color:#4b5563; }
     body[data-theme="dark"] .dispatch-daily{ color:#f3f4f6; background:#374151; }
@@ -805,11 +812,79 @@
     .ship-row-action .btn-outline-danger.action-button .action-button-text{ color:#b45353; }
     .ship-row-action .btn-outline-danger.action-button:hover .action-button-text{ color:#991b1b; }
 
+    /* Pagination: compact, quiet, and aligned with the table */
+    .list-footer{ align-items:center; }
+    .list-footer > .muted{ color:#94a3b8; font-size:.68rem; white-space:nowrap; }
+    .list-footer nav{ display:flex; align-items:center; }
+    .list-footer .pagination{
+        display:flex;
+        align-items:center;
+        flex-wrap:wrap;
+        gap:.25rem;
+    }
+    .list-footer .pagination .page-item{ margin:0; }
+    .list-footer .pagination .page-link{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        min-width:30px;
+        height:30px;
+        padding:.2rem .45rem;
+        border:1px solid #e5e7eb;
+        border-radius:6px!important;
+        background:#fff;
+        color:#64748b;
+        font-size:.7rem;
+        font-weight:650;
+        line-height:1;
+        box-shadow:none;
+        transition:background-color .12s ease, border-color .12s ease, color .12s ease;
+    }
+    .list-footer .pagination .page-link:hover{
+        background:#f3f4f6;
+        border-color:#d1d5db;
+        color:#111827;
+    }
+    .list-footer .pagination .page-item.active .page-link{
+        background:#111827;
+        border-color:#111827;
+        color:#fff;
+    }
+    .list-footer .pagination .page-item.disabled .page-link{
+        background:#f8fafc;
+        border-color:#eef0f3;
+        color:#cbd5e1;
+    }
+    body[data-theme="dark"] .list-footer > .muted{ color:#64748b; }
+    body[data-theme="dark"] .list-footer .pagination .page-link{
+        background:#111827;
+        border-color:#374151;
+        color:#94a3b8;
+    }
+    body[data-theme="dark"] .list-footer .pagination .page-link:hover{
+        background:#1f2937;
+        border-color:#4b5563;
+        color:#f3f4f6;
+    }
+    body[data-theme="dark"] .list-footer .pagination .page-item.active .page-link{
+        background:#f3f4f6;
+        border-color:#f3f4f6;
+        color:#111827;
+    }
+    body[data-theme="dark"] .list-footer .pagination .page-item.disabled .page-link{
+        background:#172033;
+        border-color:#273449;
+        color:#475569;
+    }
+
     @media (max-width:768px){
         .ship-row-action{ min-width:0; }
         .ship-row-action .d-flex{ width:100%; display:grid!important; grid-template-columns:repeat(auto-fit, minmax(0, 1fr)); }
         .ship-row-action form{ width:100%; }
         .ship-row-action .action-button{ width:100%!important; min-height:37px; }
+        .list-footer > .muted{ display:block; }
+        .list-footer nav{ margin-top:.6rem; overflow-x:auto; padding-bottom:.1rem; }
+        .list-footer .pagination{ flex-wrap:nowrap; }
     }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -1044,8 +1119,8 @@
                                         <td class="shipment-created-cell" aria-label="Tanggal dibuat dan kanal">
                                             <div class="shipment-created-stack">
                                                 <span class="shipment-created-date">{{ $fmtDate($shipment->created_at, 'd M Y') }}</span>
-                                                <span class="shipment-created-status">
-                                                    <span class="badge-status {{ $statusClass }}">{{ $statusLabel }}</span>
+                                                <span class="shipment-created-updated">
+                                                    {{ $fmtDate($shipment->updated_at ?? $shipment->created_at, 'd M Y H:i') }} WIB
                                                 </span>
                                             </div>
                                         </td>
@@ -1062,19 +1137,12 @@
                                                     <a class="code-link" href="{{ $actionRoute }}">
                                                         {{ $shipment->code }}
                                                     </a>
-                                                    @if(!$isAdmin)
-                                                        <span class="badge-status {{ $statusClass }}">{{ $statusLabel }}</span>
-                                                    @endif
                                                 </div>
 
-                                                @if($isAdmin)
-                                                    <span class="shipment-store">{{ $typeLabel }}@if($shipment->store) · {{ $shipment->store->name ?: $shipment->store->code }}@endif</span>
-                                                @else
-                                                    @if($shipment->store)
-                                                        <span class="shipment-store">{{ $shipment->store->name ?: $shipment->store->code }}</span>
-                                                    @endif
-                                                    <span class="shipment-store">{{ $typeLabel }}</span>
-                                                @endif
+                                                <div class="shipment-document-meta">
+                                                    <span class="badge-status {{ $statusClass }}">{{ $statusLabel }}</span>
+                                                    <span class="shipment-channel-inline">{{ $typeLabel }}@if($shipment->store) · {{ $shipment->store->name ?: $shipment->store->code }}@endif</span>
+                                                </div>
 
                                                 <div class="ship-row-meta d-md-none">
                                                     <span>{{ number_format($orderCount, 0, ',', '.') }} order</span>
