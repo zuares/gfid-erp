@@ -254,6 +254,11 @@ class MarketplaceSyncService
             throw new \RuntimeException('Gagal mengambil detail dari seluruh order API.');
         }
 
+        // Shopee sering hanya mengirim package_number dari get_order_detail.
+        // AWB/tracking_number baru tersedia di get_package_detail, sehingga
+        // wajib diperkaya sebelum dry-run maupun penyimpanan ke database.
+        $this->hydratePackageTrackingNumbers($store, $details);
+
         // 3. Simpan ke DB
         $report(92, 'Menyimpan pesanan ke database…');
         $stats  = $this->upsertOrders($store, $details, $dryRun);
@@ -540,6 +545,8 @@ class MarketplaceSyncService
             return ['found' => count($orderSnList), 'new' => 0, 'updated' => 0];
         }
 
+        $this->hydratePackageTrackingNumbers($store, $details);
+
         $stats = $this->upsertOrders($store, $details);
         $this->autoCreateFulfillments($store);
         $this->log($store, 'sync_orders_by_sn', 'success', "Backfill order kilat: {$stats['new']} baru + {$stats['updated']} update dari " . count($orderSnList) . " order_sn.", [
@@ -549,6 +556,117 @@ class MarketplaceSyncService
         ]);
 
         return ['found' => count($orderSnList), 'new' => $stats['new'], 'updated' => $stats['updated']];
+    }
+
+    /**
+     * Lengkapi AWB Shopee dari detail paket.
+     *
+     * get_order_detail tidak selalu mengembalikan tracking_number pada
+     * package_list. Untuk order SHIPPED seperti SPX, package_number tetap ada
+     * dan get_package_detail mengembalikan AWB secara konsisten. Endpoint ini
+     * mendukung maksimal 50 package per request, jadi ambil secara batch agar
+     * tidak menambah satu request per order.
+     *
+     * @param array<int,array<string,mixed>> $details
+     */
+    private function hydratePackageTrackingNumbers(Store $store, array &$details): void
+    {
+        if ($store->channel?->code !== 'shopee') {
+            return;
+        }
+
+        $packageRefs = [];
+
+        foreach ($details as $detailIndex => &$detail) {
+            foreach (($detail['package_list'] ?? []) as $packageIndex => $package) {
+                $tracking = trim((string) ($package['tracking_number'] ?? $package['tracking_no'] ?? ''));
+                $packageNumber = trim((string) ($package['package_number'] ?? ''));
+
+                if ($tracking !== '' || $packageNumber === '') {
+                    continue;
+                }
+
+                $packageRefs[$packageNumber][] = [$detailIndex, $packageIndex];
+            }
+        }
+        unset($detail);
+
+        if (empty($packageRefs)) {
+            return;
+        }
+
+        foreach (array_chunk(array_keys($packageRefs), 50) as $packageNumbers) {
+            try {
+                $response = $this->gateway->getPackageDetail($store, implode(',', $packageNumbers));
+                if (! empty($response['error'])) {
+                    Log::warning('Gagal mengambil detail paket Shopee untuk AWB', [
+                        'store_id' => $store->id,
+                        'packages' => $packageNumbers,
+                        'message' => $response['message'] ?? $response['error'],
+                    ]);
+                    continue;
+                }
+
+                foreach (data_get($response, 'response.package_list', []) as $package) {
+                    $packageNumber = trim((string) ($package['package_number'] ?? ''));
+                    $tracking = trim((string) ($package['tracking_number'] ?? $package['tracking_no'] ?? ''));
+
+                    if ($packageNumber === '' || $tracking === '' || empty($packageRefs[$packageNumber])) {
+                        continue;
+                    }
+
+                    foreach ($packageRefs[$packageNumber] as [$detailIndex, $packageIndex]) {
+                        $details[$detailIndex]['package_list'][$packageIndex]['tracking_number'] = $tracking;
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Exception mengambil detail paket Shopee untuk AWB', [
+                    'store_id' => $store->id,
+                    'packages' => $packageNumbers,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Fallback untuk paket yang belum mengembalikan AWB dari
+        // get_package_detail. Shopee mendokumentasikan bahwa tracking number
+        // dapat terlambat dari 3PL, sehingga endpoint ini dipanggil hanya
+        // untuk order yang sudah berada di tahap pengiriman.
+        foreach ($details as $detailIndex => &$detail) {
+            $hasTracking = collect($detail['package_list'] ?? [])->contains(function ($package) {
+                return trim((string) ($package['tracking_number'] ?? $package['tracking_no'] ?? '')) !== '';
+            });
+
+            if ($hasTracking || empty($detail['order_sn'])) {
+                continue;
+            }
+
+            $status = strtoupper((string) ($detail['order_status'] ?? ''));
+            if (! in_array($status, ['PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'TO_CONFIRM_RECEIVE', 'COMPLETED'], true)) {
+                continue;
+            }
+
+            try {
+                $response = $this->gateway->getTrackingNumber($store, $detail['order_sn']);
+                $tracking = trim((string) data_get($response, 'response.tracking_number', ''));
+                if ($tracking === '') {
+                    continue;
+                }
+
+                if (! empty($detail['package_list'])) {
+                    $detail['package_list'][0]['tracking_number'] = $tracking;
+                } else {
+                    $detail['package_list'] = [['tracking_number' => $tracking]];
+                }
+            } catch (\Throwable $e) {
+                Log::notice('AWB Shopee belum tersedia dari get_tracking_number', [
+                    'store_id' => $store->id,
+                    'order_sn' => $detail['order_sn'],
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+        unset($detail);
     }
 
     /**

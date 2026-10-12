@@ -74,6 +74,40 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         ]);
     }
 
+    public function test_shopee_mengambil_awb_dari_detail_paket_bila_order_detail_hanya_memberi_package_number(): void
+    {
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('getPackageDetail')
+                ->once()
+                ->withArgs(function (Store $store, string $packageNumbers): bool {
+                    return $store->id === $this->store->id
+                        && $packageNumbers === 'OFG-TRACKING-1';
+                })
+                ->andReturn([
+                    'response' => [
+                        'package_list' => [[
+                            'package_number' => 'OFG-TRACKING-1',
+                            'tracking_number' => 'SPXID06081986532A',
+                        ]],
+                    ],
+                ]);
+            $mock->shouldNotReceive('getTrackingNumber');
+        });
+
+        $details = [[
+            'order_sn' => 'ORDER-TRACKING-1',
+            'order_status' => 'SHIPPED',
+            'package_list' => [[
+                'package_number' => 'OFG-TRACKING-1',
+            ]],
+        ]];
+
+        $method = new \ReflectionMethod(MarketplaceSyncService::class, 'hydratePackageTrackingNumbers');
+        $method->invokeArgs(app(MarketplaceSyncService::class), [$this->store, &$details]);
+
+        $this->assertSame('SPXID06081986532A', $details[0]['package_list'][0]['tracking_number']);
+    }
+
     public function test_preview_tidak_mengubah_data(): void
     {
         $order = $this->createOrder('REPAIR-PREVIEW');
