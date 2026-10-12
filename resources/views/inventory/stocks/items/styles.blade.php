@@ -175,6 +175,16 @@
         color: var(--ok-tx);
     }
 
+    .pill--danger {
+        border-color: rgba(220, 38, 38, .35);
+        background: rgba(220, 38, 38, .10);
+        color: #b91c1c;
+    }
+
+    body[data-theme="dark"] .pill--danger {
+        color: #fca5a5;
+    }
+
     /* ====== CONTROLS ====== */
     /* .sticky {
         position: sticky;

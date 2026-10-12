@@ -119,3 +119,82 @@ it('returns available stock for a specific item and warehouse', function () {
     $response->assertJsonPath('stock.allocated_qty', 4);
     $response->assertJsonPath('stock.available_qty', 8);
 });
+
+it('filters the admin finished goods page by current zero stock', function () {
+    $user = User::factory()->create([
+        'name' => 'Admin Stock Test',
+        'employee_code' => 'ADMIN-STOCK-OUT',
+        'role' => 'admin',
+    ]);
+
+    $warehouse = Warehouse::create([
+        'code' => 'WH-RTS',
+        'name' => 'Warehouse RTS',
+        'type' => 'internal',
+        'active' => true,
+    ]);
+
+    $outItem = Item::create([
+        'code' => 'TEST-FG-OUT',
+        'name' => 'Finished Good Out',
+        'unit' => 'pcs',
+        'type' => 'finished_good',
+        'hpp' => 1000,
+        'active' => true,
+    ]);
+
+    $availableItem = Item::create([
+        'code' => 'TEST-FG-AVAILABLE',
+        'name' => 'Finished Good Available',
+        'unit' => 'pcs',
+        'type' => 'finished_good',
+        'hpp' => 1000,
+        'active' => true,
+    ]);
+
+    InventoryMutation::create([
+        'date' => now()->toDateString(),
+        'warehouse_id' => $warehouse->id,
+        'item_id' => $outItem->id,
+        'qty_change' => 5,
+        'direction' => 'in',
+        'source_type' => 'adjustment',
+        'source_id' => 10,
+    ]);
+
+    InventoryMutation::create([
+        'date' => now()->toDateString(),
+        'warehouse_id' => $warehouse->id,
+        'item_id' => $availableItem->id,
+        'qty_change' => 5,
+        'direction' => 'in',
+        'source_type' => 'adjustment',
+        'source_id' => 11,
+    ]);
+
+    InventoryStock::create([
+        'warehouse_id' => $warehouse->id,
+        'item_id' => $outItem->id,
+        'qty' => 0,
+        'allocated_qty' => 0,
+    ]);
+
+    InventoryStock::create([
+        'warehouse_id' => $warehouse->id,
+        'item_id' => $availableItem->id,
+        'qty' => 2,
+        'allocated_qty' => 0,
+    ]);
+
+    $response = $this->actingAs($user)
+        ->withHeader('Accept', 'application/json')
+        ->get(route('inventory.stocks.items', [
+            'type' => 'finished_good',
+            'stock_status' => 'out',
+        ]));
+
+    $response->assertOk();
+    $response->assertJsonPath('meta.total', 1);
+    $response->assertJsonPath('rows.0.item_code', 'TEST-FG-OUT');
+    $response->assertJsonPath('rows.0.total_qty', 0);
+});

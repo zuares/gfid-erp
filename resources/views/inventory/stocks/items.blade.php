@@ -48,6 +48,8 @@
         };
 
         $activeSearch = trim($filters['search'] ?? '');
+        $activeType = trim($filters['type'] ?? '');
+        $activeStockStatus = trim($filters['stock_status'] ?? '');
         $sortVal = $filters['sort'] ?? 'code';
         $dirVal = $filters['dir'] ?? 'asc';
 
@@ -145,6 +147,14 @@
                         <span class="pill" id="activeSearchPill" @if (!$activeSearch) hidden @endif>
                             <i class="bi bi-search"></i><span id="activeSearchLabel">{{ $activeSearch }}</span>
                         </span>
+                        @if ($activeType === 'finished_good')
+                            <span class="pill"><i class="bi bi-box-seam"></i>Barang Jadi</span>
+                        @elseif ($activeType === 'material')
+                            <span class="pill"><i class="bi bi-droplet"></i>Bahan Baku</span>
+                        @endif
+                        @if ($activeStockStatus === 'out')
+                            <span class="pill pill--danger"><i class="bi bi-exclamation-octagon"></i>Stok Habis</span>
+                        @endif
                     </div>
                 </div>
 
@@ -242,6 +252,8 @@
         <div class="cardx sticky mb-2" id="controlsCard">
             <div class="cardx-b">
                 <form method="GET" action="{{ route('inventory.stocks.items') }}" id="stockFilterForm">
+                    @if ($activeType)<input type="hidden" name="type" value="{{ $activeType }}">@endif
+                    @if ($activeStockStatus)<input type="hidden" name="stock_status" value="{{ $activeStockStatus }}">@endif
                     <div class="controls {{ $canViewAllWarehouses ? 'is-owner' : '' }}">
                         <div>
                             <div class="meta mb-1">Search</div>

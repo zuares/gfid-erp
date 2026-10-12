@@ -69,6 +69,16 @@ class InventoryStockController extends Controller
         $searchRaw = trim((string) $request->input('search', ''));
         $search = strtoupper($searchRaw);
 
+        $typeFilter = strtolower(trim((string) $request->input('type', '')));
+        if (!in_array($typeFilter, ['finished_good', 'material'], true)) {
+            $typeFilter = '';
+        }
+
+        $stockStatus = strtolower(trim((string) $request->input('stock_status', '')));
+        if ($stockStatus !== 'out') {
+            $stockStatus = '';
+        }
+
         $sort = (string) $request->input('sort', 'code');
         $dir = strtolower((string) $request->input('dir', 'asc')) === 'desc' ? 'desc' : 'asc';
 
@@ -105,7 +115,7 @@ class InventoryStockController extends Controller
             if ($request->has('warehouse_id')) {
                 $warehouseId = $request->filled('warehouse_id') ? (int) $request->input('warehouse_id') : null;
             } else {
-                if ($role === 'admin') {
+                if ($role === 'admin' && $stockStatus !== 'out') {
                     $rts = $warehouses->firstWhere('code', 'WH-RTS');
                     $warehouseId = $rts ? $rts->id : null;
                 }
@@ -137,12 +147,21 @@ class InventoryStockController extends Controller
             $base->where('m.warehouse_id', $warehouseId);
         }
 
-        $base->selectRaw('
+        if ($stockStatus === 'out') {
+            $base->where('w.code', 'not like', 'REJ%')
+                ->where('w.code', '!=', 'REJECT');
+        }
+
+        $baseQtyExpression = $stockStatus === 'out'
+            ? 'MAX(COALESCE(st.qty, 0))'
+            : 'SUM(m.qty_change)';
+
+        $base->selectRaw("
         m.item_id,
         w.code AS wh_code,
-        SUM(m.qty_change) AS qty,
+        {$baseQtyExpression} AS qty,
         MAX(st.allocated_qty) AS allocated_qty
-    ')
+    ")
             ->groupBy('m.item_id', 'w.code');
 
         // =========================
@@ -164,6 +183,10 @@ class InventoryStockController extends Controller
                         ->orWhere('items.name', 'like', $like);
                 }
             });
+        }
+
+        if ($typeFilter !== '') {
+            $q->where('items.type', $typeFilter);
         }
 
         // ✅ Mapping FG/WIP sesuai gudangmu
@@ -221,6 +244,10 @@ class InventoryStockController extends Controller
                 'items.hpp',
                 'items.avg_daily_sales'
             );
+
+        if ($stockStatus === 'out') {
+            $q->havingRaw('COALESCE(SUM(s.qty), 0) <= 0');
+        }
 
         // Sorting
         switch ($sort) {
@@ -351,6 +378,8 @@ class InventoryStockController extends Controller
                 'sort' => $sort,
                 'dir' => $dir,
                 'warehouse_id' => $warehouseId,
+                'type' => $typeFilter,
+                'stock_status' => $stockStatus,
             ],
             'warehouses' => $warehouses,
             'hppSummary' => $hppSummary,

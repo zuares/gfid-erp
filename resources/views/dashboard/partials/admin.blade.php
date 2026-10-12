@@ -45,7 +45,7 @@
         'label' => 'Barang Jadi Habis', 'icon' => 'bi-exclamation-octagon', 'color' => $d['stock_out_fg'] > 0 ? 'red' : '',
         'value' => number_format($d['stock_out_fg'], 0, ',', '.'),
         'sub' => 'Model kosong, bisa ganggu jualan',
-        'url' => $r('inventory.stocks.items'), 'cta' => 'Cek stok',
+        'url' => $r('inventory.stocks.items', ['type' => 'finished_good', 'stock_status' => 'out']), 'cta' => 'Cek stok',
     ])
     @include('dashboard.partials._kpi', [
         'label' => 'Barang Jadi Siap', 'icon' => 'bi-bag-check', 'color' => 'green',
