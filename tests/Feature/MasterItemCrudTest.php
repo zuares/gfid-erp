@@ -150,6 +150,13 @@ class MasterItemCrudTest extends TestCase
             ->assertDontSee('Penerimaan Marketplace')
             ->assertDontSee('Impor')
             ->assertDontSee('Import Toko Online Income');
+
+        $html = $response->getContent();
+        $this->assertLessThan(
+            strpos($html, 'Persediaan'),
+            strpos($html, 'Master Item'),
+            'Master Item harus tampil sebelum menu operasional lain setelah Beranda.'
+        );
     }
 
     public function test_operating_sidebar_groups_inventory_and_production(): void

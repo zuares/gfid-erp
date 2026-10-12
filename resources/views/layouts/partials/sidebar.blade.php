@@ -817,6 +817,15 @@
                     Beranda
                 </x-sidebar.simple-link>
             </li>
+            @if ($isAdmin && $hasMasterItemsIndex)
+                <x-sidebar.label text="Master" />
+                <li>
+                    <x-sidebar.simple-link href="{{ route('master.items.index') }}" icon="bi bi-box-seam"
+                        :active="request()->routeIs('master.items.*')">
+                        Master Item
+                    </x-sidebar.simple-link>
+                </li>
+            @endif
             @if (($hasAiIndexRoute || $hasAiAgentRoute) && $canOpenAiAgent)
                 <x-sidebar.label text="AI" />
                 <li>
@@ -1535,17 +1544,6 @@
                             </div>
                         @endif
                     </div>
-                </li>
-            @endif
-
-            {{-- Master Item (admin dapat mengelola item tanpa membuka seluruh Master Data) --}}
-            @if ($isAdmin && $hasMasterItemsIndex)
-                <x-sidebar.label text="Data Master" />
-                <li class="simple-group">
-                    <x-sidebar.simple-link href="{{ route('master.items.index') }}" icon="bi bi-box-seam"
-                        :active="request()->routeIs('master.items.*')">
-                        Master Item
-                    </x-sidebar.simple-link>
                 </li>
             @endif
 

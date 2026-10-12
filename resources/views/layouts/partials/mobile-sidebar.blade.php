@@ -812,6 +812,16 @@
                         </li>
                     @endif
 
+                    @if ($isAdmin && $hasMasterItemsIndex)
+                        <div class="mobile-sidebar-section-label">Master</div>
+                        <li>
+                            <a href="{{ route('master.items.index') }}"
+                               class="mobile-sidebar-link {{ request()->routeIs('master.items.*') ? 'active' : '' }}">
+                                <span class="icon">📦</span><span>Master Item</span>
+                            </a>
+                        </li>
+                    @endif
+
                     @if (($hasAiIndexRoute || $hasAiAgentRoute) && $canOpenAiAgent)
                         <div class="mobile-sidebar-section-label">AI</div>
                         @if ($hasAiIndexRoute)
@@ -1448,18 +1458,6 @@
                     @endif
 
                     {{-- Komunikasi/WhatsApp tidak ditampilkan untuk admin. --}}
-
-                    {{-- MASTER ITEM (admin) --}}
-                    @if ($isAdmin && $hasMasterItemsIndex)
-                        <div class="mobile-sidebar-section-label">Data Master</div>
-                        <li>
-                            <a href="{{ route('master.items.index') }}"
-                               class="mobile-sidebar-link {{ request()->routeIs('master.items.*') ? 'active' : '' }}">
-                                <span class="icon">📦</span><span>Master Item</span>
-                            </a>
-                        </li>
-                    @endif
-
 
                 {{-- ============================
                     3) OWNER (FULL like desktop)
