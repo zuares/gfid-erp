@@ -189,10 +189,10 @@
     width:100%;
     min-width:0;
     margin-left:0;
-    overflow-x:hidden;
+    overflow-x:clip;
   }
 
-  html, body{ overflow-x:hidden; }
+  html, body{ overflow-x:clip; }
 
   .page-wrap{
     width:100%;

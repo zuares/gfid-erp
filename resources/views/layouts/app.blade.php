@@ -36,7 +36,8 @@
     *,*::before,*::after{ box-sizing:inherit; }
 
     body{
-      overflow-y:auto !important;
+      /* Biarkan root dokumen menjadi satu-satunya vertical scroll container. */
+      overflow-y:visible !important;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       font-size:14px;
       line-height:1.4;
@@ -107,12 +108,12 @@
 
     /* ✅ Mobile: anti horizontal scroll + ganjel konten di atas bottom-nav */
     @media (max-width: 767.98px){
-      html,body{ overflow-x:hidden; }
+      html,body{ overflow-x:clip; }
 
       .app-shell,
       .app-main,
       .app-main .page-wrap{
-        overflow-x:hidden;
+        overflow-x:clip;
       }
 
       .app-main .page-wrap{
