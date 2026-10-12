@@ -2315,6 +2315,21 @@ class ShipmentController extends Controller
         }
 
         $shipment->load('orderScans');
+
+        // Tombol Sync Resi juga harus memperkaya order lokal yang sudah ada
+        // tetapi AWB-nya kosong sebelum proses auto-link mencari berdasarkan
+        // nomor resi hasil scan.
+        if ($shipment->store_id && $shipment->store) {
+            try {
+                app(\App\Services\MarketplaceSyncService::class)
+                    ->syncMissingAwbs($shipment->store, 15);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning(
+                    "Shipment AWB resync failed [{$shipment->id}]: " . $e->getMessage()
+                );
+            }
+        }
+
         $result = [
             'checked' => 0,
             'linked' => 0,

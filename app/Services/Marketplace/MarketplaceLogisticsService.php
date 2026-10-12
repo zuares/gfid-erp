@@ -66,6 +66,19 @@ class MarketplaceLogisticsService
                         if (!empty($remoteRaw['package_list'][0]['tracking_number'])) {
                             $awb = $remoteRaw['package_list'][0]['tracking_number'];
                         }
+
+                        // Shopee get_order_detail bisa hanya mengembalikan
+                        // package_number. Ambil AWB dari detail paket agar
+                        // tombol Sync Resi tetap bisa menautkan order SHIPPED.
+                        if (!$awb
+                            && $store->channel?->code === 'shopee'
+                            && !empty($remoteRaw['package_list'][0]['package_number'])) {
+                            $packageResponse = $this->gateway->getPackageDetail(
+                                $store,
+                                (string) $remoteRaw['package_list'][0]['package_number']
+                            );
+                            $awb = $packageResponse['response']['package_list'][0]['tracking_number'] ?? null;
+                        }
                     }
                 }
             }

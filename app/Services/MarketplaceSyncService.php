@@ -559,6 +559,79 @@ class MarketplaceSyncService
     }
 
     /**
+     * Isi AWB order Shopee yang sudah ada di database tetapi masih kosong.
+     * Dipakai oleh tombol Sync Resi sebelum rekonsiliasi shipment dijalankan.
+     * Tidak menarik daftar order baru dan tidak membuat fulfillment baru.
+     */
+    public function syncMissingAwbs(Store $store, int $days = 15): array
+    {
+        if ($store->channel?->code !== 'shopee') {
+            return ['checked' => 0, 'updated' => 0];
+        }
+
+        $orders = MarketplaceOrder::query()
+            ->where('store_id', $store->id)
+            ->where(function ($query) {
+                $query->whereNull('shipping_awb_no')
+                    ->orWhere('shipping_awb_no', '');
+            })
+            ->whereIn('order_status', [
+                'PROCESSED',
+                'READY_TO_HANDOVER',
+                'SHIPPED',
+                'TO_CONFIRM_RECEIVE',
+                'COMPLETED',
+            ])
+            ->where(function ($query) use ($days) {
+                $from = now()->subDays(max(1, $days));
+                $query->where('ordered_at', '>=', $from)
+                    ->orWhere(function ($fallback) use ($from) {
+                        $fallback->whereNull('ordered_at')
+                            ->where('order_date', '>=', $from);
+                    });
+            })
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return ['checked' => 0, 'updated' => 0];
+        }
+
+        $details = $orders->map(function (MarketplaceOrder $order): array {
+            $detail = is_array($order->raw_json) ? $order->raw_json : [];
+            $detail['order_sn'] = $order->channel_order_id;
+            $detail['order_status'] = $order->order_status ?: ($detail['order_status'] ?? null);
+            $detail['package_list'] = is_array($detail['package_list'] ?? null)
+                ? $detail['package_list']
+                : [];
+
+            return $detail;
+        })->values()->all();
+
+        $this->hydratePackageTrackingNumbers($store, $details);
+
+        $updated = 0;
+        foreach ($orders as $index => $order) {
+            $tracking = trim((string) data_get($details[$index] ?? [], 'package_list.0.tracking_number', ''));
+            if ($tracking === '') {
+                continue;
+            }
+
+            $order->update([
+                'shipping_awb_no' => $tracking,
+                'shipping_courier_code' => data_get($details[$index], 'package_list.0.shipping_carrier')
+                    ?: $order->shipping_courier_code,
+                'shipping_carrier' => data_get($details[$index], 'package_list.0.shipping_carrier')
+                    ?: $order->shipping_carrier,
+                'raw_json' => $details[$index],
+                'synced_at' => now(),
+            ]);
+            $updated++;
+        }
+
+        return ['checked' => $orders->count(), 'updated' => $updated];
+    }
+
+    /**
      * Lengkapi AWB Shopee dari detail paket.
      *
      * get_order_detail tidak selalu mengembalikan tracking_number pada

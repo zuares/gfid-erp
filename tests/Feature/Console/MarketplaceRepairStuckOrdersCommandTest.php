@@ -108,6 +108,42 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         $this->assertSame('SPXID06081986532A', $details[0]['package_list'][0]['tracking_number']);
     }
 
+    public function test_sync_missing_awbs_memperbarui_order_lokal_dari_detail_paket(): void
+    {
+        $order = $this->createOrder('ORDER-LOCAL-TRACKING', 'SHIPPED');
+        $order->update([
+            'ordered_at' => now(),
+            'raw_json' => [
+                'order_sn' => 'ORDER-LOCAL-TRACKING',
+                'package_list' => [[
+                    'package_number' => 'OFG-LOCAL-TRACKING-1',
+                ]],
+            ],
+        ]);
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('getPackageDetail')
+                ->once()
+                ->andReturn([
+                    'response' => [
+                        'package_list' => [[
+                            'package_number' => 'OFG-LOCAL-TRACKING-1',
+                            'tracking_number' => 'SPXID-LOCAL-TRACKING-1',
+                        ]],
+                    ],
+                ]);
+        });
+
+        $result = app(MarketplaceSyncService::class)->syncMissingAwbs($this->store);
+
+        $this->assertSame(1, $result['checked']);
+        $this->assertSame(1, $result['updated']);
+        $this->assertDatabaseHas('marketplace_orders', [
+            'id' => $order->id,
+            'shipping_awb_no' => 'SPXID-LOCAL-TRACKING-1',
+        ]);
+    }
+
     public function test_preview_tidak_mengubah_data(): void
     {
         $order = $this->createOrder('REPAIR-PREVIEW');
