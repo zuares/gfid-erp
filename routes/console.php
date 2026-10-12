@@ -117,6 +117,16 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-bookings'))
     ->name('sync-bookings')
     ->withoutOverlapping();
 
+// Periksa tahap perjalanan booking SHIPPED secara bertahap agar status tiba di
+// gudang dapat dibedakan tanpa memanggil API saat daftar pesanan dibuka.
+Schedule::command('marketplace:sync-booking-tracking', [
+        '--limit' => 30,
+        '--stale-minutes' => 60,
+    ])
+    ->everyTenMinutes()
+    ->name('sync-booking-tracking')
+    ->withoutOverlapping();
+
 Schedule::call(fn () => Artisan::call('marketplace:sync-returns'))
     ->hourlyAt(37) // digeser dari :00 agar tidak tabrakan dengan sync lain
     ->name('sync-returns')

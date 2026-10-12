@@ -9,6 +9,7 @@ class MarketplaceBooking extends Model
     protected $fillable = [
         'store_id', 'booking_sn', 'order_sn', 'booking_status', 'shipping_carrier',
         'tracking_number', 'package_number', 'shipping_document_status',
+        'tracking_logistics_status', 'tracking_checked_at',
         'create_time', 'update_time', 'items', 'raw_json', 'meta',
         'print_count', 'printed_at', // statistik cetak resi (migration 2026_07_27_060000)
     ];
@@ -17,6 +18,7 @@ class MarketplaceBooking extends Model
         'items'    => 'array',
         'raw_json' => 'array',
         'meta'     => 'array',
+        'tracking_checked_at' => 'datetime',
     ];
 
     public function store()

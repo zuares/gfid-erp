@@ -61,7 +61,12 @@ class BookingListingService
                 WHEN listing_stage = 'shipped' THEN 'shipped_to_warehouse'
                 WHEN listing_stage = 'ready' AND listing_ready_sub = 'ready_ship' THEN 'ready_ship'
                 WHEN listing_stage = 'waiting' AND listing_status IN ('MATCHED', 'PENDING') THEN 'shipped_to_buyer'
-                ELSE NULL END as listing_warehouse_sub");
+                ELSE NULL END as listing_warehouse_sub")
+            ->selectRaw("CASE
+                WHEN listing_stage <> 'warehouse' THEN NULL
+                WHEN UPPER(COALESCE(tracking_logistics_status, '')) IN ('LOGISTICS_DELIVERY_DONE', 'LOGISTICS_READY') THEN 'arrived'
+                WHEN UPPER(COALESCE(tracking_logistics_status, '')) IN ('LOGISTICS_PICKUP_DONE', 'LOGISTICS_SHIPPED') THEN 'in_transit'
+                ELSE 'unknown' END as listing_warehouse_arrival");
 
         return MarketplaceBooking::query()->fromSub($classified, 'marketplace_bookings');
     }
@@ -71,10 +76,11 @@ class BookingListingService
         $counts = array_fill_keys(['all', 'ready', 'waiting', 'warehouse', 'shipped', 'cancelled'], 0);
         $ready = array_fill_keys(['all', 'to_arrange', 'packing', 'ready_ship'], 0);
         $warehouse = array_fill_keys(['all', 'ready_ship', 'shipped_to_warehouse', 'waiting_purchase', 'shipped_to_buyer'], 0);
+        $warehouseArrival = array_fill_keys(['all', 'arrived', 'in_transit', 'unknown'], 0);
         $groups = (clone $query)->toBase()
-            ->select('listing_stage', 'listing_seller_visible', 'listing_ready_sub', 'listing_warehouse_sub')
+            ->select('listing_stage', 'listing_seller_visible', 'listing_ready_sub', 'listing_warehouse_sub', 'listing_warehouse_arrival')
             ->selectRaw('COUNT(*) as total')
-            ->groupBy('listing_stage', 'listing_seller_visible', 'listing_ready_sub', 'listing_warehouse_sub')->get();
+            ->groupBy('listing_stage', 'listing_seller_visible', 'listing_ready_sub', 'listing_warehouse_sub', 'listing_warehouse_arrival')->get();
 
         foreach ($groups as $group) {
             $total = (int) $group->total;
@@ -91,10 +97,19 @@ class BookingListingService
                 $warehouse['all'] += $total;
                 $warehouse[$group->listing_warehouse_sub] += $total;
             }
+            if ($group->listing_warehouse_sub === 'waiting_purchase') {
+                $warehouseArrival['all'] += $total;
+                $warehouseArrival[$group->listing_warehouse_arrival] += $total;
+            }
         }
 
         $counts['warehouse'] = $warehouse['all'];
 
-        return ['counts' => $counts, 'ready_counts' => $ready, 'warehouse_counts' => $warehouse];
+        return [
+            'counts' => $counts,
+            'ready_counts' => $ready,
+            'warehouse_counts' => $warehouse,
+            'warehouse_arrival_counts' => $warehouseArrival,
+        ];
     }
 }

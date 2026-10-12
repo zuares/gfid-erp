@@ -112,6 +112,14 @@
         <button class="ord-subtab" data-sub="shipped_to_buyer" onclick="switchSubTabWarehouse('shipped_to_buyer', this)">Dikirim dari Gudang Shopee <span class="ord-badge bg-secondary" id="badge-sub-warehouse-shipped_to_buyer">—</span></button>
     </div>
 
+    <div id="subTabWarehouseArrivalContainer" class="kilat-subtabs" style="display:none">
+        <span style="align-self:center;color:#64748b;font-size:.8rem;font-weight:600">Status Menunggu Pembelian:</span>
+        <button class="ord-subtab active" data-arrival="all" onclick="switchSubTabWarehouseArrival('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-warehouse-arrival-all">—</span></button>
+        <button class="ord-subtab" data-arrival="arrived" onclick="switchSubTabWarehouseArrival('arrived', this)">Sudah Sampai Gudang Shopee <span class="ord-badge bg-secondary" id="badge-warehouse-arrival-arrived">—</span></button>
+        <button class="ord-subtab" data-arrival="in_transit" onclick="switchSubTabWarehouseArrival('in_transit', this)">Masih Dalam Perjalanan ke Gudang Shopee <span class="ord-badge bg-secondary" id="badge-warehouse-arrival-in_transit">—</span></button>
+        <button class="ord-subtab" data-arrival="unknown" onclick="switchSubTabWarehouseArrival('unknown', this)">Belum Ada Status Tracking <span class="ord-badge bg-secondary" id="badge-warehouse-arrival-unknown">—</span></button>
+    </div>
+
     <div class="card-main">
         <div class="table-responsive">
             <table class="ord-table">
@@ -342,10 +350,12 @@
     let selectedStore = '';
     let subReady = 'all';
     let subWarehouse = 'all';
+    let subWarehouseArrival = 'all';
     let currentPage = 1;
     let counts = {};
     let readyCounts = {};
     let warehouseCounts = {};
+    let warehouseArrivalCounts = {};
     let pagination = {};
     let loadController = null;
     let loadVersion = 0;
@@ -379,9 +389,16 @@
             shipped_to_warehouse: ['Dikirim ke Gudang Shopee', 'fstatus-pending'],
             waiting_purchase: ['Menunggu Pembelian', 'fstatus-pending'],
             shipped_to_buyer: ['Dikirim dari Gudang Shopee', 'fstatus-done'],
+            arrived: ['Sudah Sampai Gudang Shopee', 'fstatus-done'],
+            in_transit: ['Menuju Gudang Shopee', 'fstatus-pending'],
+            unknown: ['Status Gudang Belum Diketahui', 'fstatus-none'],
         };
-        const [label, cls] = warehouseLabels[booking?.warehouse_sub] || STATUS_LABEL[s] || [s.replace(/_/g,' '), 'fstatus-pending'];
-        return `<span class="fstatus ${cls}" title="${s}">${label}</span>`;
+        const warehouseStatus = booking?.warehouse_sub === 'waiting_purchase'
+            ? booking?.warehouse_arrival_status
+            : booking?.warehouse_sub;
+        const [label, cls] = warehouseLabels[warehouseStatus] || STATUS_LABEL[s] || [s.replace(/_/g,' '), 'fstatus-pending'];
+        const detail = [s, booking?.tracking_logistics_status, booking?.tracking_checked_at].filter(Boolean).join(' · ');
+        return `<span class="fstatus ${cls}" title="${escHtml(detail)}">${label}</span>`;
     }
     // Bisa dilacak jika barang sudah bergerak (dikirim ke DC / ke pembeli) atau punya resi.
     function isTrackable(b){
@@ -515,6 +532,8 @@
         if (sc) sc.style.display = (tabName === 'ready') ? 'inline-flex' : 'none';
         const warehouseTabs = document.getElementById('subTabWarehouseContainer');
         warehouseTabs.style.display = (tabName === 'warehouse') ? 'inline-flex' : 'none';
+        const warehouseArrivalTabs = document.getElementById('subTabWarehouseArrivalContainer');
+        warehouseArrivalTabs.style.display = (tabName === 'warehouse' && subWarehouse === 'waiting_purchase') ? 'inline-flex' : 'none';
         currentPage = 1;
         load();
     };
@@ -531,6 +550,17 @@
         subWarehouse = sub;
         document.querySelectorAll('#subTabWarehouseContainer .ord-subtab').forEach(b => b.classList.remove('active'));
         if(el) el.classList.add('active');
+        if (sub !== 'waiting_purchase') subWarehouseArrival = 'all';
+        document.getElementById('subTabWarehouseArrivalContainer').style.display = sub === 'waiting_purchase' && currentTab === 'warehouse' ? 'inline-flex' : 'none';
+        document.querySelectorAll('#subTabWarehouseArrivalContainer .ord-subtab').forEach(b => b.classList.toggle('active', b.dataset.arrival === subWarehouseArrival));
+        currentPage = 1;
+        load();
+    };
+
+    window.switchSubTabWarehouseArrival = function(arrival, el) {
+        subWarehouseArrival = arrival;
+        document.querySelectorAll('#subTabWarehouseArrivalContainer .ord-subtab').forEach(b => b.classList.remove('active'));
+        if(el) el.classList.add('active');
         currentPage = 1;
         load();
     };
@@ -546,6 +576,9 @@
         }
         for (const sub of ['all', 'ready_ship', 'shipped_to_warehouse', 'waiting_purchase', 'shipped_to_buyer']) {
             document.getElementById('badge-sub-warehouse-' + sub).textContent = warehouseCounts[sub] ?? 0;
+        }
+        for (const status of ['all', 'arrived', 'in_transit', 'unknown']) {
+            document.getElementById('badge-warehouse-arrival-' + status).textContent = warehouseArrivalCounts[status] ?? 0;
         }
     }
 
@@ -674,6 +707,7 @@
             if(selectedStore) params.set('store_id', selectedStore);
             params.set('tab', currentTab);
             params.set('sub', currentTab === 'warehouse' ? subWarehouse : currentTab === 'ready' ? subReady : 'all');
+            params.set('arrival', currentTab === 'warehouse' && subWarehouse === 'waiting_purchase' ? subWarehouseArrival : 'all');
             params.set('page', currentPage);
             params.set('per_page', 50);
             const res = await api('/api/marketplace/bookings/stored?' + params.toString(), {signal: loadController.signal});
@@ -682,6 +716,7 @@
             counts = res.counts ?? {};
             readyCounts = res.ready_counts ?? {};
             warehouseCounts = res.warehouse_counts ?? {};
+            warehouseArrivalCounts = res.warehouse_arrival_counts ?? {};
             pagination = res.pagination ?? {};
             currentPage = pagination.current_page ?? 1;
             render();
@@ -1021,6 +1056,7 @@
         bootstrap.Modal.getOrCreateInstance(trackModalEl).show();
         try {
             const d = await api(`/api/marketplace/stores/${storeId}/bookings/${sn}/tracking`);
+            await load({background: true});
             el('trkLoading').style.display = 'none';
             el('trkNo').innerHTML = resiActionsHtml(d.tracking_number);
             const list = (d.tracking_info || []).slice().sort((a,b) => (b.update_time||0) - (a.update_time||0));

@@ -92,6 +92,10 @@ class MarketplaceBookingController extends Controller
             if (in_array($sub, ['ready_ship', 'shipped_to_warehouse', 'waiting_purchase', 'shipped_to_buyer'], true)) {
                 $q->where('listing_warehouse_sub', $sub);
             }
+            $arrival = $request->query('arrival', 'all');
+            if ($sub === 'waiting_purchase' && in_array($arrival, ['arrived', 'in_transit', 'unknown'], true)) {
+                $q->where('listing_warehouse_arrival', $arrival);
+            }
         } elseif (in_array($tab, ['waiting', 'shipped', 'cancelled'], true)) {
             $q->where('listing_stage', $tab);
         }
@@ -103,6 +107,9 @@ class MarketplaceBookingController extends Controller
             : ($counts['counts'][$tab] ?? $counts['counts']['all']);
         if ($tab === 'warehouse' && in_array($sub, ['ready_ship', 'shipped_to_warehouse', 'waiting_purchase', 'shipped_to_buyer'], true)) {
             $total = $counts['warehouse_counts'][$sub];
+        }
+        if ($tab === 'warehouse' && $sub === 'waiting_purchase' && in_array($request->query('arrival'), ['arrived', 'in_transit', 'unknown'], true)) {
+            $total = $counts['warehouse_arrival_counts'][$request->query('arrival')];
         }
         $lastPage = max(1, (int) ceil($total / $perPage));
         $page = min($page, $lastPage);
@@ -142,6 +149,9 @@ class MarketplaceBookingController extends Controller
                 'seller_process_visible'   => (bool) $b->listing_seller_visible,
                 'ready_sub'                => $b->listing_seller_visible ? $b->listing_ready_sub : null,
                 'warehouse_sub'            => $b->listing_warehouse_sub,
+                'warehouse_arrival_status' => $b->listing_warehouse_arrival,
+                'tracking_logistics_status'=> $b->tracking_logistics_status,
+                'tracking_checked_at'      => $b->tracking_checked_at?->toIso8601String(),
                 'items'                    => (!empty($b->items) && is_array($b->items)) ? $b->items : (optional($od)->items?->toArray() ?? []),
                 'fulfillment_status'       => optional($od)->fulfillment?->status,
                 // Data finansial mengikuti sumber yang sama dengan halaman Orders.
@@ -422,6 +432,12 @@ class MarketplaceBookingController extends Controller
                     $resp            = $res['response'] ?? [];
                     $trackingInfo    = $resp['tracking_info'] ?? [];
                     $logisticsStatus = $resp['logistics_status'] ?? null;
+                    if ($booking && is_string($logisticsStatus) && trim($logisticsStatus) !== '') {
+                        $booking->forceFill([
+                            'tracking_logistics_status' => strtoupper(trim($logisticsStatus)),
+                            'tracking_checked_at' => now(),
+                        ])->save();
+                    }
                 } else {
                     $message = $res['message'] ?? $res['error'];
                 }
