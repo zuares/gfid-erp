@@ -41,7 +41,6 @@
 .sd-copy-value{display:inline-flex;align-items:center;gap:.3rem;max-width:100%;padding:0;border:0;background:transparent;color:inherit;font:inherit;line-height:inherit;text-align:left;overflow-wrap:anywhere;cursor:pointer}
 .sd-copy-value:hover{text-decoration:underline;text-decoration-style:dotted;text-underline-offset:.18em}
 .sd-copy-value:focus-visible{outline:2px solid #64748b;outline-offset:3px;border-radius:2px}
-.sd-copy-icon{font-size:.72em;opacity:.55;flex:0 0 auto}
 .sd-copy-identifier{padding:.12rem .3rem;border:1px solid rgba(148,163,184,.35);border-radius:5px;background:rgba(255,255,255,.7);font-size:.68rem}
 .sd-copy-identifier:hover{border-color:#94a3b8;background:#fff;text-decoration:none}
 .sd-copy-action,.sd-copy-confirmation{display:inline-flex;align-items:center;gap:.18rem;font-family:inherit;font-size:.62rem;font-weight:700;white-space:nowrap}
@@ -1102,7 +1101,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 <div class="sd-order-lead">
                                     <div>
                                         <div class="sd-order-no">
-                                            <button type="button" class="sd-copy-value" data-copy-value="{{ $scan->order_no }}" data-copy-label="{{ $scanCopyLabel }}" title="Salin {{ strtolower($scanCopyLabel) }}" aria-label="Salin {{ strtolower($scanCopyLabel) }} {{ $scan->order_no }}"><span>{{ $scan->order_no }}</span><i class="bi bi-copy sd-copy-icon" aria-hidden="true"></i></button>
+                                            <button type="button" class="sd-copy-value sd-copy-scan" data-copy-value="{{ $scan->order_no }}" data-copy-label="{{ $scanCopyLabel }}" title="Salin {{ strtolower($scanCopyLabel) }}" aria-label="Salin {{ strtolower($scanCopyLabel) }} {{ $scan->order_no }}"><span>{{ $scan->order_no }}</span><span class="sd-copy-action" data-copy-action><i class="bi bi-copy" aria-hidden="true"></i> Salin</span><span class="sd-copy-confirmation" data-copy-feedback hidden><i class="bi bi-check2" aria-hidden="true"></i> Disalin</span></button>
                                             @if($duplicateCount > 0)<span class="sd-duplicate-badge" title="Order ini discan lebih dari sekali">Duplikat</span>@endif
                                             @if($hasNoItems)<span class="sd-missing-item-badge" title="Order belum memiliki item">Belum ada item</span>@endif
                                         </div>
