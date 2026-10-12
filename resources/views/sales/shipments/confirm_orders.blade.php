@@ -25,6 +25,9 @@
 .sd-head-actions form{margin:0}
 .sd-sync-btn{color:#1e40af;background:#eff6ff;border-color:#bfdbfe;font-weight:850}
 .sd-sync-btn:hover{color:#1e3a8a;background:#dbeafe;border-color:#93c5fd}
+.sd-sync-btn.is-loading{cursor:wait;color:#1e40af;background:#dbeafe;border-color:#93c5fd}
+.sd-sync-spinner{width:.85em;height:.85em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sd-sync-spin .7s linear infinite;flex:0 0 auto}
+@keyframes sd-sync-spin{to{transform:rotate(360deg)}}
 .sd-title{font-weight:900;color:#334155}
 .sd-body{padding:.75rem .85rem}
 .sd-order-search{padding:.6rem .85rem;border-bottom:1px solid rgba(148,163,184,.12)}.sd-order-search input{width:100%;min-height:36px;border:1px solid rgba(148,163,184,.3);border-radius:7px;padding:.35rem .6rem;color:#334155;background:var(--card,#fff);font-size:.78rem}.sd-order-search input:focus{outline:0;border-color:#334155;box-shadow:0 0 0 .16rem rgba(51,65,85,.1)}
@@ -1356,6 +1359,24 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                 if (button) button.disabled = false;
                 window.alert(error.message || 'Gagal menghapus item.');
             });
+        });
+    });
+
+    document.querySelectorAll('form').forEach(function(form){
+        var syncButton = form.querySelector('.sd-sync-btn');
+        if (!syncButton) return;
+
+        form.addEventListener('submit', function(event){
+            if (form.dataset.syncing === '1') {
+                event.preventDefault();
+                return;
+            }
+
+            form.dataset.syncing = '1';
+            syncButton.disabled = true;
+            syncButton.classList.add('is-loading');
+            syncButton.setAttribute('aria-busy', 'true');
+            syncButton.innerHTML = '<span class="sd-sync-spinner" aria-hidden="true"></span><span>Menyinkronkan...</span>';
         });
     });
 
