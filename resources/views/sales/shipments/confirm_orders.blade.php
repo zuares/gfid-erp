@@ -1043,7 +1043,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 <div class="sd-order-summary {{ $canSeeCogs ? 'sd-summary-has-cogs' : '' }}">
                                     <span class="sd-order-summary-item"><span>Item</span><strong>{{ number_format($ungroupedLines->count(), 0, ',', '.') }}</strong></span>
                                     <span class="sd-order-summary-item"><span>Jenis</span><strong>{{ number_format($ungroupedItemTypes, 0, ',', '.') }}</strong></span>
-                                    <span class="sd-order-summary-item"><span>Qty</span><strong>{{ number_format($ungroupedQty, 0, ',', '.') }}</strong></span>
+                                    <span class="sd-order-summary-item"><span>Qty</span><strong>{{ number_format((int) $ungroupedLines->sum('qty_scanned'), 0, ',', '.') }}</strong></span>
                                     @if($canSeeCogs)
                                         <span class="sd-order-summary-item"><span>COGS</span><strong>Rp{{ number_format($ungroupedCogs, 0, ',', '.') }}</strong></span>
                                     @endif
