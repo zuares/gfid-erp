@@ -1372,7 +1372,11 @@
         $matrixKey = $highSales
             ? ($highContribution ? 'scale' : 'protect')
             : ($highContribution ? 'grow' : 'review');
-        $productAnalysisMatrix[$matrixKey]['products'] = $productAnalysisMatrix[$matrixKey]['products']->concat($marketplaceProducts);
+        $matrixRow = $productAnalysisMatrix->get($matrixKey, []);
+        $matrixRow['products'] = collect($matrixRow['products'] ?? [])
+            ->concat($marketplaceProducts)
+            ->values();
+        $productAnalysisMatrix->put($matrixKey, $matrixRow);
     }
     $productAnalysisMatrixRows = $productAnalysisMatrix->map(function ($row) use ($productAnalysisNetSales, $productAnalysisAdSales, $marketplaceProductCount) {
         $products = $row['products'];
