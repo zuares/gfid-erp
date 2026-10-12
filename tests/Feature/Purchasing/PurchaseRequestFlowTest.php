@@ -48,6 +48,20 @@ class PurchaseRequestFlowTest extends TestCase
         $this->assertTrue($purchaseRequest->isConvertible());
     }
 
+    public function test_purchase_request_add_row_reinitializes_item_autosuggest(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'employee_code' => 'ADMIN-PR-AUTOSUGGEST',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('purchasing.purchase_requests.create'))
+            ->assertOk()
+            ->assertSee("window.initItemSuggestInputs(clone)", false)
+            ->assertDontSee("window.initItemSuggest(clone)", false);
+    }
+
     public function test_purchase_request_estimated_price_prefers_latest_po_then_latest_posted_grn(): void
     {
         $admin = User::factory()->create([

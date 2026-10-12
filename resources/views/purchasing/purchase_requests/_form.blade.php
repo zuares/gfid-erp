@@ -713,9 +713,9 @@
         tbody.appendChild(clone);
         reindex();
 
-        // Re-init item-suggest jika ada globalInit
-        if (typeof window.initItemSuggest === 'function') {
-            window.initItemSuggest(clone);
+        // Re-init item-suggest pada baris baru.
+        if (typeof window.initItemSuggestInputs === 'function') {
+            window.initItemSuggestInputs(clone);
         }
 
         // Focus ke item input baru
