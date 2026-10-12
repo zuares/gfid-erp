@@ -27,7 +27,7 @@
 
 @push('head')
 <style>
-    .item-page { max-width: 1040px; margin: 0 auto; padding: .75rem .75rem 4rem; color: #0f172a; }
+    .item-page { max-width: 1280px; margin: 0 auto; padding: .75rem .75rem 4rem; color: #0f172a; }
     .item-hero, .item-card { border: 1px solid rgba(148,163,184,.18); border-radius: 8px; background: #fff; box-shadow: none; }
     .item-hero { display:flex; justify-content:space-between; align-items:center; gap:.6rem; padding:.45rem .75rem; margin-inline:-.75rem; margin-bottom:.65rem; border-width:0 0 1px; }
     .item-hero-main { display:flex; align-items:center; gap:13px; min-width:0; }
@@ -38,6 +38,10 @@
     .item-actions, .item-row-actions { display:flex; flex-wrap:wrap; gap:7px; align-items:center; justify-content:flex-end; }
     .item-actions .btn, .item-row-actions .btn, .item-card .btn { border-radius:7px; font-weight:600; display:inline-flex; align-items:center; gap:6px; }
     .item-primary { color:#fff!important; background:linear-gradient(135deg,#0f172a,#334155)!important; border-color:transparent!important; }
+    .item-primary .action-label,
+    .item-primary:hover .action-label,
+    .item-primary:focus .action-label,
+    .item-primary:active .action-label { color:#fff!important; }
     .item-soft { color:#334155!important; background:#fff!important; border:1px solid #cbd5e1!important; }
     .item-soft:hover { background:#f8fafc!important; }
     .item-kpis { display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.35rem; margin-bottom:0; }
@@ -142,7 +146,7 @@
     }
 
     /* Final desktop pass: keep the page readable inside the application shell. */
-    .item-page { max-width: none; width: 100%; padding: 1rem 1.1rem 4rem; }
+    .item-page { max-width: 1280px; width: 100%; margin-inline: auto; padding: 1rem 1.1rem 4rem; }
     .item-hero {
         align-items: center;
         flex-wrap: nowrap;
@@ -175,6 +179,12 @@
     .item-actions .btn { min-height: 38px; padding-inline: .85rem; border-radius: 10px; }
     .item-primary { background: linear-gradient(135deg, #111827, #000000) !important; box-shadow: 0 6px 14px rgba(15,23,42,.18); }
     .item-soft { border-color: #dbe3ee !important; }
+    .item-row-actions .item-soft,
+    .item-mobile-card-actions .item-soft { color: #fff !important; background: #111827 !important; border-color: #111827 !important; }
+    .item-row-actions .item-soft:hover,
+    .item-row-actions .item-soft:focus,
+    .item-mobile-card-actions .item-soft:hover,
+    .item-mobile-card-actions .item-soft:focus { color: #fff !important; background: #000 !important; border-color: #000 !important; }
     .item-kpis { display: flex; flex: 0 0 auto; align-items: stretch; gap: .45rem; margin-top: 0; }
     .item-kpi { display: block; padding: .55rem .65rem; border-radius: 11px; background: rgba(255,255,255,.78); border-color: #e2e8f0; }
     .item-kpi-label { display: block; color: #64748b; font-size: .62rem; line-height: 1.2; }

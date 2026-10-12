@@ -97,6 +97,9 @@ class MasterItemCrudTest extends TestCase
             ->assertOk()
             ->assertSee('Edit Nama Item')
             ->assertSee('Nama item')
+            ->assertSee('data-select-all-name', false)
+            ->assertDontSee('Role admin hanya dapat mengubah nama item')
+            ->assertDontSee('Field lain terkunci')
             ->assertDontSee('Kode item');
 
         $this->actingAs($admin)
