@@ -35,6 +35,14 @@
         .ce-kpi-grid {
             display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: .75rem;
+            position: sticky;
+            top: calc(var(--app-navbar-offset, 58px) + 68px);
+            align-self: start;
+            z-index: 20;
+            padding: .35rem 0;
+            background: color-mix(in srgb, var(--bg, #f8fafc) 94%, transparent);
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
         }
         .ce-kpi {
             border: 1px solid rgba(15, 23, 42, .08); border-radius: 12px;
@@ -113,7 +121,15 @@
             .gf-master-actions { flex: 1 1 100%; }
             .ce-header-actions { justify-content: stretch; }
             .ce-header-actions .ce-btn { flex: 1 1 auto; }
-            .ce-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
+            .ce-kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: .55rem;
+                position: static;
+                padding: 0;
+                background: transparent;
+                -webkit-backdrop-filter: none;
+                backdrop-filter: none;
+            }
             .ce-kpi { padding: .7rem .75rem; }
             .ce-kpi-value { font-size: 1.05rem; }
             .ce-filter { grid-template-columns: 1fr 1fr; }
@@ -179,6 +195,115 @@
                 flex: 1 1 0;
             }
         }
+
+        /* Ledger/Jurnal-aligned header and compact filter */
+        .gf-master-section {
+            gap: .75rem
+        }
+
+        .gf-master-header {
+            position: sticky;
+            top: var(--app-navbar-offset, 58px);
+            z-index: 30;
+            padding: .7rem .85rem;
+            border-color: rgba(148, 163, 184, .22);
+            background: color-mix(in srgb, var(--bg) 92%, transparent);
+            -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(12px)
+        }
+
+        .gf-master-title {
+            font-size: clamp(1.08rem, 2vw, 1.24rem);
+            font-weight: 900
+        }
+
+        .gf-master-desc {
+            display: none
+        }
+
+        .ce-header-actions {
+            gap: .35rem
+        }
+
+        .ce-header-actions .ce-btn,
+        .ce-header-filter .ce-btn {
+            min-height: 36px;
+            padding: .36rem .58rem;
+            border-radius: 10px;
+            font-size: .78rem
+        }
+
+        .ce-header-filter {
+            display: flex;
+            align-items: flex-end;
+            gap: .45rem;
+            margin-top: .65rem;
+            padding-top: .65rem;
+            border-top: 1px solid rgba(148, 163, 184, .14)
+        }
+
+        .ce-date-range-field {
+            width: 14.5rem;
+            max-width: 100%
+        }
+
+        .ce-header-filter .form-control,
+        .ce-header-filter .form-select {
+            min-height: 36px;
+            padding: .36rem .55rem;
+            border-radius: 10px;
+            border-color: rgba(148, 163, 184, .35);
+            background: var(--card, #fff);
+            color: var(--text, #0f172a);
+            font-size: .8rem;
+            box-shadow: none
+        }
+
+        .ce-header-filter .form-select {
+            width: 9.5rem
+        }
+
+        @media (max-width: 768px) {
+            .gf-master-header-layout {
+                align-items: stretch
+            }
+
+            .gf-master-header-copy,
+            .gf-master-actions {
+                min-width: 0;
+                width: 100%
+            }
+
+            .ce-header-actions {
+                justify-content: stretch
+            }
+
+            .ce-header-actions .ce-btn {
+                flex: 1 1 0
+            }
+
+            .ce-header-filter {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                align-items: end;
+                margin-top: .55rem;
+                padding-top: .55rem
+            }
+
+            .ce-date-range-field {
+                width: auto
+            }
+
+            .ce-header-filter .form-select {
+                width: auto;
+                min-width: 0
+            }
+
+            .ce-header-filter .ce-btn {
+                grid-column: 2;
+                width: auto
+            }
+        }
     </style>
 @endpush
 
@@ -189,11 +314,37 @@
         description="Catat dan pantau pengeluaran harian dengan alur draft, posting, dan void.">
         <x-slot:actions>
             <div class="ce-header-actions">
+                <a class="ce-btn" href="{{ route('accounting.accounts.index') }}">
+                    <i class="bi bi-wallet2" aria-hidden="true"></i> Akun
+                </a>
                 <button class="ce-btn ce-btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#cashExpenseCreateModal">
-                    + Tambah Pengeluaran
+                    <i class="bi bi-plus-lg" aria-hidden="true"></i> Tambah
                 </button>
             </div>
         </x-slot:actions>
+
+        <x-slot:header>
+            @php $st = request('status'); @endphp
+            <form id="ce-filter-form" class="ce-header-filter" method="GET" action="{{ route('accounting.cash-expenses.index') }}">
+                <div class="ce-date-range-field">
+                    <input id="ce-date-range" class="form-control" type="text" placeholder="Pilih periode" autocomplete="off"
+                        data-from="{{ request('from') }}" data-to="{{ request('to') }}">
+                </div>
+
+                <select class="form-select" name="status" aria-label="Status">
+                    <option value="">Semua status</option>
+                    <option value="draft" @selected($st === 'draft')>Draft</option>
+                    <option value="posted" @selected($st === 'posted')>Tercatat</option>
+                    <option value="void" @selected($st === 'void')>Dibatalkan</option>
+                </select>
+
+                @if (request()->query())
+                    <a class="ce-btn" href="{{ route('accounting.cash-expenses.index') }}" aria-label="Reset filter">
+                        <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="ce-filter-action-text">Reset</span>
+                    </a>
+                @endif
+            </form>
+        </x-slot:header>
 
         <div class="ce-page">
             <div class="ce-kpi-grid">
@@ -219,25 +370,7 @@
                 </div>
             </div>
 
-            <x-gf.panel title="Daftar Pengeluaran" subtitle="Gunakan filter untuk melihat status dan periode tertentu.">
-                <form class="ce-filter mb-3" method="GET" action="{{ route('accounting.cash-expenses.index') }}">
-                    @php $st = request('status'); @endphp
-                    <select class="form-select" name="status" aria-label="Status">
-                        <option value="">Semua status</option>
-                        <option value="draft" @selected($st === 'draft')>Draft</option>
-                        <option value="posted" @selected($st === 'posted')>Tercatat</option>
-                        <option value="void" @selected($st === 'void')>Dibatalkan</option>
-                    </select>
-
-                    <input class="form-control" type="text" name="from" value="{{ request('from') }}" data-ce-date aria-label="Dari tanggal" autocomplete="off" placeholder="Dari tanggal">
-                    <input class="form-control" type="text" name="to" value="{{ request('to') }}" data-ce-date aria-label="Sampai tanggal" autocomplete="off" placeholder="Sampai tanggal">
-
-                    <div class="ce-filter-actions">
-                        <button class="ce-btn" type="submit">Filter</button>
-                        <a class="ce-btn" href="{{ route('accounting.cash-expenses.index') }}">Reset</a>
-                    </div>
-                </form>
-
+            <x-gf.panel title="Daftar Pengeluaran">
                 @if (session('message'))
                     <div class="gf-mpl-insight">
                         <span class="gf-mpl-insight-ico">✓</span>
@@ -270,8 +403,7 @@
                                     <tr class="ce-click-row" data-href="{{ route('accounting.cash-expenses.show', $x) }}" tabindex="0" aria-label="Buka detail pengeluaran {{ $x->id }}">
                                         <td>
                                             <div class="ce-date">
-                                                <span class="ce-date-main">{{ $date->format('d/m/Y') }}</span>
-                                                <span class="ce-date-sub">{{ $date->translatedFormat('D') }}</span>
+                                                <span class="ce-date-main">{{ $date->locale('id')->translatedFormat('l, d/m/Y') }}</span>
                                             </div>
                                         </td>
                                         <td class="ce-main">
@@ -313,7 +445,7 @@
                                         <a class="ce-mobile-title" href="{{ route('accounting.cash-expenses.show', $x) }}">
                                             {{ $x->description ?: 'Pengeluaran' }}
                                         </a>
-                                        <div class="ce-meta">{{ $date->format('d/m/Y') }} · ID #{{ $x->id }}</div>
+                                        <div class="ce-meta">{{ $date->locale('id')->translatedFormat('l, d/m/Y') }} · ID #{{ $x->id }}</div>
                                     </div>
                                     <div class="ce-mobile-amount">Rp {{ $fmt($x->amount) }}</div>
                                 </div>
@@ -369,6 +501,53 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const filterForm = document.getElementById('ce-filter-form');
+            const dateRange = document.getElementById('ce-date-range');
+
+            if (filterForm && dateRange && window.GFID?.initDateRange) {
+                let selectedFrom = dateRange.dataset.from || '';
+                let selectedTo = dateRange.dataset.to || '';
+                let datePickerReady = false;
+
+                filterForm.addEventListener('submit', () => {
+                    filterForm.querySelectorAll('.ce-period-submit').forEach((field) => field.remove());
+
+                    [['from', selectedFrom], ['to', selectedTo]].forEach(([name, value]) => {
+                        const field = document.createElement('input');
+                        field.type = 'hidden';
+                        field.name = name;
+                        field.value = value;
+                        field.className = 'ce-period-submit';
+                        filterForm.appendChild(field);
+                    });
+                });
+
+                window.GFID.initDateRange(dateRange, {
+                    mode: 'range',
+                    showMonths: 1,
+                    altInput: false,
+                    dateFormat: 'd M Y',
+                    altFormat: 'd M Y',
+                    rangeSeparator: ' – ',
+                    defaultDate: [selectedFrom, selectedTo].filter(Boolean),
+                    onChange: (selectedDates) => {
+                        selectedFrom = selectedDates[0]
+                            ? window.flatpickr.formatDate(selectedDates[0], 'Y-m-d')
+                            : '';
+                        selectedTo = selectedDates[1]
+                            ? window.flatpickr.formatDate(selectedDates[1], 'Y-m-d')
+                            : '';
+
+                        if (datePickerReady && (selectedDates.length === 2 || selectedDates.length === 0)) {
+                            filterForm.requestSubmit();
+                        }
+                    }
+                });
+
+                window.setTimeout(() => { datePickerReady = true; }, 0);
+                filterForm.querySelector('select[name="status"]')?.addEventListener('change', () => filterForm.requestSubmit());
+            }
+
             document.querySelectorAll('[data-href]').forEach((el) => {
                 el.addEventListener('click', (event) => {
                     if (event.target.closest('a,button,input,select,textarea,form')) return;

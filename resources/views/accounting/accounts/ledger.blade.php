@@ -11,14 +11,22 @@
         }
 
         .lg-top {
+            position: sticky;
+            top: var(--app-navbar-offset, 58px);
+            z-index: 30;
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
             gap: .75rem;
+            row-gap: .75rem;
             align-items: center;
             justify-content: space-between;
             margin: .1rem 0 .85rem;
+            padding-top: .65rem;
             padding-bottom: .8rem;
-            border-bottom: 1px solid rgba(148, 163, 184, .18)
+            border-bottom: 1px solid rgba(148, 163, 184, .18);
+            background: color-mix(in srgb, var(--bg) 92%, transparent);
+            -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(12px)
         }
 
         .lg-heading {
@@ -40,6 +48,26 @@
             gap: .45rem;
             flex-wrap: wrap;
             margin-top: 0
+        }
+
+        .lg-header-back {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            flex: 0 0 auto;
+            border: 1px solid rgba(148, 163, 184, .28);
+            border-radius: 9px;
+            color: var(--muted);
+            text-decoration: none;
+            transition: .18s ease
+        }
+
+        .lg-header-back:hover {
+            border-color: rgba(100, 116, 139, .45);
+            color: var(--text);
+            background: rgba(148, 163, 184, .08)
         }
 
         .lg-title {
@@ -104,6 +132,24 @@
             padding: .38rem .62rem;
             border-radius: 10px;
             font-size: .8rem
+        }
+
+        .lg-actions .lg-filter-form {
+            display: flex;
+            align-items: flex-end;
+            gap: .35rem;
+            flex-wrap: nowrap;
+            width: auto
+        }
+
+        .lg-actions .lg-period-field {
+            width: 14.5rem
+        }
+
+        .lg-actions .lg-filter-form .lg-btn {
+            flex: 0 0 auto;
+            width: auto;
+            white-space: nowrap
         }
 
         .lg-period {
@@ -178,7 +224,8 @@
             align-items: flex-end;
             gap: .5rem;
             flex-wrap: wrap;
-            justify-content: flex-end
+            justify-content: flex-end;
+            width: 100%
         }
 
         .lg-field {
@@ -186,6 +233,21 @@
             flex-direction: column;
             gap: .2rem;
             min-width: 8.75rem
+        }
+
+        .lg-period-field {
+            width: 14.5rem;
+            min-width: 0;
+            max-width: 100%
+        }
+
+        .lg-actions .lg-period-field .lg-in {
+            padding: .38rem .52rem;
+            font-size: .78rem
+        }
+
+        .lg-period-hidden {
+            display: none !important
         }
 
         .lg-field span {
@@ -336,8 +398,8 @@
         }
 
         .lg-bal {
-            font-weight: 900;
-            letter-spacing: -.02em
+            font-weight: 700;
+            letter-spacing: -.01em
         }
 
         .lg-bal.pos {
@@ -471,6 +533,25 @@
             color: var(--muted)
         }
 
+        .lg-created-by {
+            display: flex;
+            align-items: center;
+            gap: .25rem;
+            margin-top: .2rem;
+            color: var(--muted);
+            font-size: .7rem;
+            line-height: 1.2
+        }
+
+        .lg-created-by i {
+            font-size: .68rem;
+            opacity: .78
+        }
+
+        .lg-created-by-role {
+            color: color-mix(in srgb, var(--muted) 78%, var(--text) 22%)
+        }
+
         .lg-transaction-title {
             overflow: hidden;
             text-overflow: ellipsis;
@@ -525,6 +606,24 @@
                 justify-content: center
             }
 
+            .lg-actions .lg-filter-form {
+                order: 3;
+                flex: 1 1 100%;
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                width: 100%;
+                align-items: end
+            }
+
+            .lg-actions .lg-period-field {
+                width: auto;
+                min-width: 0
+            }
+
+            .lg-actions .lg-filter-form .lg-btn {
+                justify-content: center
+            }
+
             .lg-quick-card {
                 align-items: stretch;
                 flex-direction: column;
@@ -566,13 +665,23 @@
 
             .lg-filter-form {
                 display: grid;
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: minmax(0, 1fr) auto;
                 gap: .5rem;
-                margin-top: .7rem
+                margin-top: 0;
+                width: 100%
+            }
+
+            .lg-top > .lg-filterbar .lg-filter-form {
+                width: 100%
             }
 
             .lg-filter-form .lg-field {
                 min-width: 0
+            }
+
+            .lg-filter-form .lg-period-field {
+                grid-column: 1;
+                width: 100%
             }
 
             .lg-filter-form .lg-in,
@@ -583,7 +692,20 @@
 
             .lg-filter-form button[type="submit"],
             .lg-filter-form a.lg-btn {
-                grid-column: 1 / -1
+                grid-column: 2;
+                width: auto;
+                min-width: 0;
+                white-space: nowrap
+            }
+
+            .lg-actions .lg-filter-form .lg-period-field {
+                grid-column: 1;
+                width: auto
+            }
+
+            .lg-actions .lg-filter-form a.lg-btn {
+                grid-column: 2;
+                width: auto
             }
 
             .lg-table-toolbar {
@@ -642,16 +764,61 @@
             }
 
             .lg-table tbody tr td:nth-child(1) {
-                font-size: .78rem;
-                color: var(--muted)
+                order: 1;
+                grid-column: 1
             }
 
-            .lg-posted-time,
+            .lg-table tbody tr td:nth-child(5) {
+                order: 2;
+                grid-column: 2;
+                justify-self: end;
+                width: max-content;
+                max-width: 100%;
+                padding-left: 0;
+                border-left: 0;
+                text-align: right
+            }
+
+            .lg-table tbody tr td:nth-child(5)::before {
+                margin-bottom: .1rem;
+                font-size: .62rem;
+                font-weight: 700;
+                text-align: right
+            }
+
+            .lg-table tbody tr td:nth-child(1) {
+                font-size: .8rem;
+                color: var(--text)
+            }
+
+            .lg-datetime {
+                display: flex;
+                align-items: baseline;
+                gap: .35rem;
+                white-space: nowrap
+            }
+
             .lg-line-id {
                 display: none
             }
 
+            .lg-date {
+                display: block;
+                font-weight: 800;
+                font-variant-numeric: tabular-nums
+            }
+
+            .lg-posted-time {
+                display: inline;
+                margin-top: 0;
+                color: var(--muted);
+                font-size: .76rem;
+                font-weight: 800;
+                font-variant-numeric: tabular-nums
+            }
+
             .lg-table tbody tr td:nth-child(2) {
+                order: 3;
                 padding-bottom: .15rem;
                 border-bottom: 1px solid rgba(148, 163, 184, .16)
             }
@@ -678,13 +845,25 @@
             }
 
             .lg-table tbody tr td:nth-child(5)::before {
-                content: 'Saldo'
+                display: none;
+                content: none
             }
 
             .lg-table tbody tr td:nth-child(3),
             .lg-table tbody tr td:nth-child(4),
             .lg-table tbody tr td:nth-child(5) {
                 text-align: left
+            }
+
+            /* Mobile: tanggal dan saldo berada di baris informasi utama. */
+            .lg-table tbody tr td:nth-child(3) {
+                order: 4;
+                grid-column: 1
+            }
+
+            .lg-table tbody tr td:nth-child(4) {
+                order: 5;
+                grid-column: 2
             }
 
             .lg-amount {
@@ -694,14 +873,13 @@
                 text-align: right
             }
 
-            .lg-table tbody tr td:nth-child(5) {
-                padding-left: .65rem;
-                border-left: 1px solid rgba(148, 163, 184, .18)
-            }
-
             .lg-table tbody tr td:nth-child(5) .lg-bal {
                 display: block;
-                text-align: right
+                text-align: right;
+                font-size: .82rem;
+                font-weight: 600;
+                letter-spacing: 0;
+                opacity: .66
             }
 
             .lg-table tbody tr td[colspan] {
@@ -721,6 +899,9 @@
             <div class="lg-heading">
                 <div class="lg-kicker">Buku besar</div>
                 <div class="lg-title-line">
+                    <a class="lg-header-back" href="{{ route('accounting.accounts.index') }}" title="Kembali ke akun" aria-label="Kembali ke akun">
+                        <i class="bi bi-arrow-left" aria-hidden="true"></i>
+                    </a>
                     <h1 class="lg-title">{{ $account->name }}</h1>
                     <span class="lg-account-code">{{ $account->code }}</span>
                 </div>
@@ -741,33 +922,35 @@
             </div>
 
             <div class="lg-actions">
-                <a class="lg-btn" href="{{ route('accounting.accounts.index') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i><span>Akun</span></a>
                 <a class="lg-btn" href="{{ route('accounting.accounts.edit', $account) }}"><i class="bi bi-pencil" aria-hidden="true"></i><span>Edit</span></a>
                 @if ($account->code === '2104' && Route::has('accounting.employee-savings.create'))
                     <a class="lg-btn primary" href="{{ route('accounting.employee-savings.create') }}">Bayar tabungan</a>
                 @endif
                 <a class="lg-btn primary" href="{{ route('accounting.journals.index') }}"><i class="bi bi-journal-text" aria-hidden="true"></i><span>Jurnal</span></a>
-            </div>
-        </div>
-
-        @if ($account->is_cash && $account->is_active)
-            <div class="lg-quick-card" aria-label="Tambah transaksi kas">
-                <div class="lg-quick-copy">
-                    <span class="lg-quick-icon" aria-hidden="true"><i class="bi bi-wallet2"></i></span>
-                    <div>
-                        <div class="lg-quick-title">Tambah transaksi kas</div>
-                    </div>
-                </div>
-                <div class="lg-quick-actions">
+                @if ($account->is_cash && $account->is_active)
                     <a class="lg-btn lg-quick-btn expense" href="{{ route('accounting.cash-expenses.create', ['cash_account_id' => $account->id]) }}">
-                        <i class="bi bi-arrow-down-circle" aria-hidden="true"></i> Pengeluaran
+                        <i class="bi bi-arrow-down-circle" aria-hidden="true"></i><span>Pengeluaran</span>
                     </a>
                     <a class="lg-btn lg-quick-btn receipt" href="{{ route('accounting.cash-receipts.create', ['cash_account_id' => $account->id]) }}">
-                        <i class="bi bi-arrow-up-circle" aria-hidden="true"></i> Penerimaan
+                        <i class="bi bi-arrow-up-circle" aria-hidden="true"></i><span>Penerimaan</span>
                     </a>
-                </div>
+                @endif
+                <form class="lg-filter-form" method="GET" action="{{ route('accounting.accounts.ledger', $account) }}">
+                    <label class="lg-field lg-period-field">
+                        <input class="lg-in" type="text" id="lg-period-picker"
+                            placeholder="Pilih periode" autocomplete="off">
+                        <input type="hidden" class="lg-period-hidden" name="from" id="lg-period-from" value="{{ $from ?? '' }}">
+                        <input type="hidden" class="lg-period-hidden" name="to" id="lg-period-to" value="{{ $to ?? '' }}">
+                    </label>
+                    @if ($showLegacy)
+                        <input type="hidden" name="show_legacy" value="1">
+                    @endif
+                    @if (request()->filled('from') || request()->filled('to') || $showLegacy)
+                        <a class="lg-btn" href="{{ route('accounting.accounts.ledger', $account) }}">Reset</a>
+                    @endif
+                </form>
             </div>
-        @endif
+        </div>
 
         {{-- Summary --}}
         <div class="lg-card" style="margin-bottom:.75rem">
@@ -783,30 +966,6 @@
                     @php $cb = (float)$currentBalance; @endphp
                     <div class="lg-metric-value">Rp {{ number_format($cb, 0, ',', '.') }}</div>
                 </div>
-            </div>
-
-            <div class="lg-filterbar">
-                <div>
-                    <div class="lg-filter-title">Periode</div>
-                </div>
-
-                <form class="lg-filter-form" method="GET" action="{{ route('accounting.accounts.ledger', $account) }}">
-                    <label class="lg-field">
-                        <span>Dari</span>
-                        <input class="lg-in" type="date" name="from" value="{{ $from ?? '' }}">
-                    </label>
-                    <label class="lg-field">
-                        <span>Sampai</span>
-                        <input class="lg-in" type="date" name="to" value="{{ $to ?? '' }}">
-                    </label>
-                    @if ($showLegacy)
-                        <input type="hidden" name="show_legacy" value="1">
-                    @endif
-                    <button class="lg-btn primary" type="submit">Terapkan</button>
-                    @if (request()->filled('from') || request()->filled('to') || $showLegacy)
-                        <a class="lg-btn" href="{{ route('accounting.accounts.ledger', $account) }}">Reset</a>
-                    @endif
-                </form>
             </div>
 
             <div class="lg-b" style="padding:0">
@@ -852,6 +1011,16 @@
                                 $fullDescription = trim((string) ($l->grn_supplier_name ?: ($l->journal_description ?? '-')));
                                 $fullDescription = preg_replace('/\s+via\s+.+$/i', '', $fullDescription) ?: '-';
                                 $description = \Illuminate\Support\Str::limit($fullDescription, 72);
+                                $creatorName = trim((string) ($l->creator_name ?? '')) ?: 'Sistem';
+                                $creatorRole = strtolower(trim((string) ($l->creator_role ?? '')));
+                                $creatorRoleLabels = [
+                                    'owner' => 'Owner',
+                                    'admin' => 'Admin',
+                                    'accounting' => 'Accounting',
+                                    'operating' => 'Operasional',
+                                    'nta' => 'NTA',
+                                ];
+                                $creatorRoleLabel = $creatorRoleLabels[$creatorRole] ?? ($creatorRole ? ucfirst($creatorRole) : null);
                                 $postedAt = $l->posted_at
                                     ? \Carbon\Carbon::parse($l->posted_at)->format('H:i')
                                     : null;
@@ -859,10 +1028,19 @@
                             <tr class="lg-click-row" data-href="{{ $relatedUrl }}" tabindex="0" role="link"
                                 aria-label="{{ $relatedLabel }}">
                                 <td>
-                                    <div>{{ \Carbon\Carbon::parse($l->date)->format('d/m/Y') }}</div>
+                                    <div class="lg-datetime">
+                                        <span class="lg-date">{{ \Carbon\Carbon::parse($l->date)->locale('id')->translatedFormat('l, d/m/Y') }}</span>
                                     @if ($postedAt)
-                                        <div class="lg-muted lg-posted-time" style="font-size:.76rem">{{ $postedAt }}</div>
+                                            <span class="lg-posted-time">{{ $postedAt }}</span>
                                     @endif
+                                    </div>
+                                    <div class="lg-created-by" title="Diinput oleh {{ $creatorName }}{{ $creatorRoleLabel ? ' · ' . $creatorRoleLabel : '' }}">
+                                        <i class="bi bi-person" aria-hidden="true"></i>
+                                        <span>Diinput oleh {{ $creatorName }}</span>
+                                        @if ($creatorRoleLabel)
+                                            <span class="lg-created-by-role">· {{ $creatorRoleLabel }}</span>
+                                        @endif
+                                    </div>
                                 </td>
                                 <td>
                                     <a class="lg-row-link" href="{{ $relatedUrl }}" tabindex="-1" title="{{ $fullDescription }}">
@@ -915,7 +1093,7 @@
                         @if ($lines->count())
                             <tr>
                                 <td class="lg-muted">
-                                    {{ request('from') ? \Carbon\Carbon::parse(request('from'))->format('d/m/Y') : '-' }}</td>
+                                    {{ request('from') ? \Carbon\Carbon::parse(request('from'))->locale('id')->translatedFormat('l, d/m/Y') : '-' }}</td>
                                 <td class="lg-muted">Saldo awal</td>
                                 <td class="lg-right lg-muted">—</td>
                                 <td class="lg-right lg-muted">—</td>
@@ -935,6 +1113,37 @@
     </div>
 
     <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const periodPicker = document.getElementById('lg-period-picker');
+            const periodFrom = document.getElementById('lg-period-from');
+            const periodTo = document.getElementById('lg-period-to');
+            let periodReady = false;
+
+            window.setTimeout(() => { periodReady = true; }, 0);
+
+            if (periodPicker && periodFrom && periodTo && window.GFID?.initDateRange) {
+                window.GFID.initDateRange(periodPicker, {
+                    mode: 'range',
+                    showMonths: 1,
+                    altFormat: 'd M Y',
+                    rangeSeparator: ' – ',
+                    defaultDate: [periodFrom.value, periodTo.value].filter(Boolean),
+                    onChange: (selectedDates) => {
+                        periodFrom.value = selectedDates[0]
+                            ? window.flatpickr.formatDate(selectedDates[0], 'Y-m-d')
+                            : '';
+                        periodTo.value = selectedDates[1]
+                            ? window.flatpickr.formatDate(selectedDates[1], 'Y-m-d')
+                            : '';
+
+                        if (periodReady && selectedDates.length === 2) {
+                            periodPicker.form?.requestSubmit();
+                        }
+                    }
+                });
+            }
+        });
+
         document.querySelectorAll('.lg-click-row').forEach((row) => {
             row.addEventListener('click', (event) => {
                 if (event.target.closest('a')) return;

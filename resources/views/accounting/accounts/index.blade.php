@@ -20,19 +20,67 @@
 @endphp
 
 @push('head')
+@include('production.dashboard.partials._gf-styles')
 <style>
-.coa-wrap { max-width: 900px; margin: 0 auto; display: grid; gap: 1.5rem; }
+.coa-shell { gap: .75rem; }
+.coa-wrap { width: 100%; max-width: 1120px; margin: 0 auto; display: grid; gap: 1rem; }
 
 /* Header */
-.coa-topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.coa-header-actions { display: flex; justify-content: flex-end; gap: .35rem; flex-wrap: wrap; }
 .coa-title  { font-size: 1.35rem; font-weight: 950; color: #0f172a; letter-spacing: -.025em; }
+.coa-header-btn,
 .coa-add-btn {
     display: inline-flex; align-items: center; gap: .4rem;
-    padding: .5rem 1rem; border-radius: 999px;
-    background: #0f172a; color: #fff; font-size: .84rem; font-weight: 850;
-    text-decoration: none; border: none; cursor: pointer;
+    min-height: 36px; padding: .36rem .62rem; border-radius: 10px;
+    background: #0f172a; color: #fff; border: 1px solid #0f172a;
+    font-size: .78rem; font-weight: 850; text-decoration: none; cursor: pointer;
 }
-.coa-add-btn:hover { background: #1e293b; color: #fff; }
+.coa-header-btn:hover,
+.coa-header-btn:focus-visible,
+.coa-add-btn:hover,
+.coa-add-btn:focus-visible {
+    background: #1e293b;
+    color: #fff !important;
+}
+.coa-header-btn,
+.coa-header-btn span,
+.coa-header-btn i,
+.coa-add-btn,
+.coa-add-btn span,
+.coa-add-btn i {
+    color: #fff !important;
+}
+.coa-add-btn { background: #0f172a; color: #fff; border-color: #0f172a; }
+
+.gf-master-header {
+    position: sticky;
+    top: var(--app-navbar-offset, 58px);
+    z-index: 30;
+    padding: .7rem .85rem;
+    border-color: rgba(148, 163, 184, .22);
+    background: color-mix(in srgb, var(--bg, #f8fafc) 92%, transparent);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+}
+.gf-master-title { font-size: clamp(1.08rem, 2vw, 1.24rem); font-weight: 900; }
+.gf-master-desc { display: none; }
+.coa-header-tools {
+    display: flex; align-items: center; gap: .65rem; flex-wrap: wrap;
+    margin-top: .65rem; padding-top: .65rem;
+    border-top: 1px solid rgba(148, 163, 184, .14);
+}
+.coa-cutoff {
+    display: flex; align-items: center; gap: .6rem; flex: 1 1 360px;
+    min-width: 0; color: #475569; font-size: .78rem; line-height: 1.35;
+}
+.coa-cutoff i { color: #64748b; font-size: .9rem; }
+.coa-cutoff strong { color: #1e3a8a; }
+.coa-cutoff-toggle {
+    display: inline-flex; align-items: center; gap: .35rem; flex: 0 0 auto;
+    color: #334155; font-size: .76rem; font-weight: 800; white-space: nowrap;
+}
+.coa-cutoff-toggle input { accent-color: #0f172a; }
+.coa-header-tools .coa-filter-pills { flex: 0 1 auto; margin-left: auto; }
 
 /* Type filter pills */
 .coa-filter-pills { display: flex; gap: .4rem; flex-wrap: wrap; }
@@ -114,6 +162,21 @@
 .coa-kpi-val.neg { color: #b91c1c; }
 
 @media (max-width: 640px) {
+    .gf-master-header { padding: 12px 14px; border-radius: 14px; }
+    .gf-master-header-layout { align-items: stretch; }
+    .gf-master-header-copy, .gf-master-actions { min-width: 0; width: 100%; }
+    .coa-header-actions { justify-content: stretch; }
+    .coa-header-actions .coa-header-btn,
+    .coa-header-actions .coa-add-btn { flex: 1 1 0; justify-content: center; }
+    .coa-header-tools { display: grid; gap: .55rem; }
+    .coa-cutoff { align-items: flex-start; flex-wrap: wrap; }
+    .coa-cutoff-toggle { margin-left: 1.5rem; }
+    .coa-header-tools .coa-filter-pills {
+        margin-left: 0; flex-wrap: nowrap; overflow-x: auto; padding-bottom: .1rem;
+        scrollbar-width: thin;
+    }
+    .coa-header-tools .coa-pill { flex: 0 0 auto; }
+    .coa-wrap { gap: .75rem; }
     .coa-row { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 0 .5rem; }
     .coa-row-txn { display: none; }
     .coa-kpis { grid-template-columns: repeat(2, 1fr); }
@@ -124,36 +187,59 @@
 @endpush
 
 @section('content')
-<div class="container py-4">
-<div class="coa-wrap">
+<x-gf.page class="coa-shell" eyebrow="Accounting" title="Daftar Akun" description="Kelola akun, saldo, dan akses buku besar.">
+    <x-slot:actions>
+        <div class="coa-header-actions">
+            <a class="coa-header-btn" href="{{ route('accounting.journals.index') }}">
+                <i class="bi bi-journal-text" aria-hidden="true"></i><span>Jurnal</span>
+            </a>
+            <a class="coa-add-btn" href="{{ route('accounting.accounts.create') }}">
+                <i class="bi bi-plus-lg" aria-hidden="true"></i><span>Akun Baru</span>
+            </a>
+        </div>
+    </x-slot:actions>
 
-    {{-- Top bar --}}
-    <div class="coa-topbar">
-        <span class="coa-title">Chart of Accounts</span>
-        <a class="coa-add-btn" href="{{ route('accounting.accounts.create') }}">+ Akun Baru</a>
-    </div>
-
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2"
-         style="padding:.65rem .85rem;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1e3a8a;font-size:.8rem;">
-        <span>
-            @if($cutoffDate && !$showLegacy)
-                Saldo akun menampilkan sistem baru mulai <strong>{{ \Illuminate\Support\Carbon::parse($cutoffDate)->format('d-m-Y') }}</strong>.
-            @else
-                Saldo akun menampilkan seluruh histori jurnal.
-            @endif
-        </span>
-        @if($cutoffDate)
-            <form method="GET" class="d-flex align-items-center gap-2 mb-0">
-                @if(request('type'))
-                    <input type="hidden" name="type" value="{{ request('type') }}">
+    <x-slot:header>
+        <div class="coa-header-tools">
+            <div class="coa-cutoff">
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                <span>
+                    @if($cutoffDate && !$showLegacy)
+                        Saldo mulai {{ \Illuminate\Support\Carbon::parse($cutoffDate)->format('d/m/Y') }}.
+                    @else
+                        Menampilkan seluruh histori jurnal.
+                    @endif
+                </span>
+                @if($cutoffDate)
+                    <form method="GET" class="mb-0">
+                        @if(request('type'))
+                            <input type="hidden" name="type" value="{{ request('type') }}">
+                        @endif
+                        <label class="coa-cutoff-toggle">
+                            <input type="checkbox" name="show_legacy" value="1" @checked($showLegacy) onchange="this.form.submit()">
+                            Legacy
+                        </label>
+                    </form>
                 @endif
-                <label class="d-flex align-items-center gap-1 mb-0" style="font-weight:800;white-space:nowrap;">
-                    <input type="checkbox" name="show_legacy" value="1" @checked($showLegacy) onchange="this.form.submit()">
-                    Tampilkan legacy
-                </label>
-            </form>
-        @endif
-    </div>
+            </div>
+
+            @php $legacyQuery = $showLegacy ? ['show_legacy' => 1] : []; @endphp
+            <div class="coa-filter-pills" aria-label="Filter tipe akun">
+                <a class="coa-pill {{ $filterType === '' ? 'active' : '' }}"
+                   href="{{ route('accounting.accounts.index', $legacyQuery) }}">Semua</a>
+                @foreach ($typeOrder as $t)
+                    @if (isset($typeLabel[$t]))
+                        <a class="coa-pill {{ $filterType === $t ? 'active' : '' }}"
+                           href="{{ route('accounting.accounts.index', ['type' => $t] + $legacyQuery) }}">
+                            {{ $typeLabel[$t]['label'] }}
+                        </a>
+                    @endif
+                @endforeach
+            </div>
+        </div>
+    </x-slot:header>
+
+<div class="coa-wrap">
 
     {{-- KPI strip --}}
     @php
@@ -177,21 +263,6 @@
             @php $displayTotalLiab = -$totalLiab; @endphp
             <div class="coa-kpi-val {{ $displayTotalLiab < 0 ? 'neg' : 'pos' }}">Rp {{ $fmt($displayTotalLiab) }}</div>
         </div>
-    </div>
-
-    {{-- Type filter pills --}}
-    <div class="coa-filter-pills">
-        @php $legacyQuery = $showLegacy ? ['show_legacy' => 1] : []; @endphp
-        <a class="coa-pill {{ $filterType === '' ? 'active' : '' }}"
-           href="{{ route('accounting.accounts.index', $legacyQuery) }}">Semua</a>
-        @foreach ($typeOrder as $t)
-            @if (isset($typeLabel[$t]))
-                <a class="coa-pill {{ $filterType === $t ? 'active' : '' }}"
-                   href="{{ route('accounting.accounts.index', ['type' => $t] + $legacyQuery) }}">
-                    {{ $typeLabel[$t]['label'] }}
-                </a>
-            @endif
-        @endforeach
     </div>
 
     {{-- Account groups --}}
@@ -260,5 +331,5 @@
     @endforelse
 
 </div>
-</div>
+</x-gf.page>
 @endsection

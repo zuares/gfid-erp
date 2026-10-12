@@ -18,11 +18,11 @@
 @push('head')
     @include('production.dashboard.partials._gf-styles')
     <style>
-        .ce-detail-page { display: grid; gap: 1rem; }
-        .ce-actions { display: flex; justify-content: flex-end; gap: .5rem; flex-wrap: wrap; }
+        .ce-detail-page { display: grid; gap: .75rem; }
+        .ce-actions { display: flex; justify-content: flex-end; gap: .35rem; flex-wrap: wrap; }
         .ce-btn {
             display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
-            min-height: 40px; padding: .55rem .95rem; border-radius: 999px;
+            min-height: 40px; padding: .55rem .85rem; border-radius: 999px;
             border: 1px solid rgba(15, 23, 42, .10); background: #fff;
             color: #0f172a; text-decoration: none; font-size: .84rem; font-weight: 850;
         }
@@ -32,6 +32,16 @@
         .ce-btn-danger { color: #b91c1c; border-color: #fecaca; background: #fff5f5; }
         .ce-btn-danger:hover { color: #991b1b; background: #fee2e2; }
         .ce-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; }
+        .ce-kpi-grid {
+            position: sticky;
+            top: calc(var(--app-navbar-offset, 58px) + 68px);
+            align-self: start;
+            z-index: 20;
+            padding: .35rem 0;
+            background: color-mix(in srgb, var(--bg, #f8fafc) 94%, transparent);
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+        }
         .ce-kpi {
             border: 1px solid rgba(15, 23, 42, .08); border-radius: 12px;
             background: #fff; padding: .85rem .95rem;
@@ -77,15 +87,54 @@
         }
         .ce-history-row:last-child { border-bottom: 0; padding-bottom: 0; }
         .ce-history-meta { color: #64748b; font-size: .76rem; margin-top: .18rem; }
+
+        .gf-master-header {
+            position: sticky;
+            top: var(--app-navbar-offset, 58px);
+            z-index: 30;
+            padding: .7rem .85rem;
+            border-color: rgba(148, 163, 184, .22);
+            background: color-mix(in srgb, var(--bg) 92%, transparent);
+            -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(12px);
+        }
+        .gf-master-section { gap: .75rem; }
+        .gf-master-title { font-size: clamp(1.08rem, 2vw, 1.24rem); font-weight: 900; }
+        .gf-master-desc { display: none; }
+        .ce-detail-page > .ce-kpi-grid { order: 1; }
+        .ce-detail-page > .ce-owner-layout { order: 2; }
+        .ce-detail-page > .ce-post-panel { order: 3; }
+        .ce-detail-page > .ce-journal-panel { order: 4; }
+        .ce-detail-page > .ce-history-panel { order: 5; }
+        .ce-actions .ce-btn {
+            min-height: 36px;
+            padding: .36rem .6rem;
+            border-radius: 10px;
+            font-size: .78rem;
+        }
+        .ce-action-icon { font-size: .9rem; }
+        .ce-post-panel .gf-panel-header { padding-bottom: .65rem; }
+        .ce-post-panel .gf-panel-title { font-size: .94rem; }
+        .ce-post-note { flex: 1 1 260px; }
+        .ce-owner-row span:last-child { overflow-wrap: anywhere; }
         @media (max-width: 768px) {
             .gf-master-header { padding: 12px 14px; border-radius: 14px; }
             .gf-master-title { font-size: 18px; }
             .gf-master-desc { font-size: 11.5px; }
             .gf-master-actions { flex: 1 1 100%; }
+            .gf-master-header-layout { align-items: stretch; }
+            .gf-master-header-copy, .gf-master-actions { min-width: 0; width: 100%; }
             .ce-actions { justify-content: stretch; }
-            .ce-actions .ce-btn, .ce-actions form { flex: 1 1 auto; }
+            .ce-actions .ce-btn, .ce-actions form { flex: 1 1 0; }
             .ce-actions form .ce-btn { width: 100%; }
             .ce-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
+            .ce-kpi-grid {
+                position: static;
+                padding: 0;
+                background: transparent;
+                -webkit-backdrop-filter: none;
+                backdrop-filter: none;
+            }
             .ce-kpi { padding: .7rem .75rem; }
             .ce-kpi-value { font-size: 1.02rem; }
             .ce-info-grid { grid-template-columns: 1fr; }
@@ -106,6 +155,7 @@
             background: #fff;
             overflow: hidden;
             box-shadow: 0 14px 34px rgba(15, 23, 42, .10);
+            order: 2;
         }
         .ce-proof-focus-head {
             display: flex;
@@ -161,6 +211,7 @@
             border-radius: 16px;
             background: #fff;
             padding: 1rem;
+            order: 1;
         }
         .ce-owner-mini-title {
             font-size: .82rem;
@@ -205,17 +256,24 @@
 @section('content')
     <x-gf.page
         eyebrow="Accounting"
-        title="Detail Pengeluaran"
-        description="{{ $cashExpense->description ?: 'Pengeluaran kas harian' }}">
+        title="Pengeluaran #{{ $cashExpense->id }}"
+        description="Detail transaksi pengeluaran kas">
         <x-slot:actions>
             <div class="ce-actions">
+                <a class="ce-btn" href="{{ route('accounting.accounts.index') }}">
+                    <i class="bi bi-wallet2 ce-action-icon" aria-hidden="true"></i><span>Akun</span>
+                </a>
+                <a class="ce-btn" href="{{ route('accounting.cash-expenses.index') }}">
+                    <i class="bi bi-list-ul ce-action-icon" aria-hidden="true"></i><span>Daftar</span>
+                </a>
                 <a class="ce-btn ce-btn-primary"
                     href="{{ route('accounting.cash-expenses.index', ['open_modal' => 1]) }}">
-                    + Tambah Pengeluaran
+                    <i class="bi bi-plus-lg ce-action-icon" aria-hidden="true"></i><span>Tambah</span>
                 </a>
-                <a class="ce-btn" href="{{ route('accounting.cash-expenses.index') }}">Daftar Pengeluaran</a>
                 @if ($cashExpense->status === 'draft')
-                    <a class="ce-btn" href="{{ route('accounting.cash-expenses.edit', $cashExpense) }}">Edit</a>
+                    <a class="ce-btn" href="{{ route('accounting.cash-expenses.edit', $cashExpense) }}">
+                        <i class="bi bi-pencil ce-action-icon" aria-hidden="true"></i><span>Edit</span>
+                    </a>
                     <form method="POST"
                         action="{{ route('accounting.cash-expenses.destroy', $cashExpense) }}"
                         data-gf-confirm
@@ -225,22 +283,24 @@
                         data-gf-confirm-ok="Ya, hapus">
                         @csrf
                         @method('DELETE')
-                        <button class="ce-btn ce-btn-danger" type="submit">Hapus</button>
+                        <button class="ce-btn ce-btn-danger" type="submit">
+                            <i class="bi bi-trash3 ce-action-icon" aria-hidden="true"></i><span>Hapus</span>
+                        </button>
                     </form>
                 @endif
             </div>
         </x-slot:actions>
 
         <div class="ce-detail-page">
-            <x-gf.panel title="Aksi Berikutnya" subtitle="Draft bisa diposting. Transaksi tercatat bisa dibatalkan dengan void/reversal.">
+            <x-gf.panel class="ce-post-panel" title="Tindakan" subtitle="Kelola status transaksi.">
                 <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
                     <div class="ce-post-note">
                         @if ($cashExpense->status === 'draft')
-                            Posting akan mengunci transaksi dan membuat jurnal: debit biaya, kredit kas/bank.
+                            Posting membuat jurnal dan mengunci transaksi.
                         @elseif ($cashExpense->status === 'posted')
-                            Jika salah, gunakan Void. Sistem akan membuat jurnal pembalik agar saldo kembali netral.
+                            Void membalik transaksi.
                         @else
-                            Transaksi ini sudah dibatalkan.
+                            Transaksi sudah dibatalkan.
                         @endif
                     </div>
 
@@ -252,13 +312,15 @@
                             data-gf-confirm-text="Setelah posting, transaksi akan terkunci dan jurnal dibuat."
                             data-gf-confirm-ok="Ya, posting">
                             @csrf
-                            <button class="ce-btn ce-btn-primary" type="submit">Posting</button>
+                            <button class="ce-btn ce-btn-primary" type="submit">
+                                <i class="bi bi-check2-circle ce-action-icon" aria-hidden="true"></i> Posting
+                            </button>
                         </form>
                     @endif
 
                     @if ($cashExpense->status === 'posted')
                         <button class="ce-btn" type="button" data-bs-toggle="modal" data-bs-target="#cashExpenseReclassifyModal">
-                            Ubah Kategori
+                            <i class="bi bi-arrow-repeat ce-action-icon" aria-hidden="true"></i> Kategori
                         </button>
                         <form method="POST"
                             action="{{ route('accounting.cash-expenses.void', $cashExpense) }}"
@@ -270,7 +332,9 @@
                             data-gf-confirm-ok="Ya, void">
                             @csrf
                             <input class="ce-reason" type="text" name="reason" maxlength="255" placeholder="Alasan batal (opsional)">
-                            <button class="ce-btn ce-btn-danger" type="submit">Void</button>
+                            <button class="ce-btn ce-btn-danger" type="submit">
+                                <i class="bi bi-x-circle ce-action-icon" aria-hidden="true"></i> Void
+                            </button>
                         </form>
                     @endif
                 </div>
@@ -362,14 +426,14 @@
                 <div class="ce-proof-focus">
                     <div class="ce-proof-focus-head">
                         <div>
-                            <p class="ce-proof-focus-title">📌 Preview Bukti Foto</p>
-                            <div class="ce-proof-focus-sub">Focal point untuk cek struk / bukti pembayaran.</div>
+                            <p class="ce-proof-focus-title">Bukti Transaksi</p>
+                            <div class="ce-proof-focus-sub">Struk atau bukti pembayaran.</div>
                         </div>
 
                         @if ($proofUrl)
-                            <div class="ce-proof-focus-badge">Ada bukti</div>
+                            <div class="ce-proof-focus-badge">Tersedia</div>
                         @else
-                            <div class="ce-proof-focus-badge" style="background:#fffbeb;color:#b45309;">Belum ada</div>
+                            <div class="ce-proof-focus-badge" style="background:#fffbeb;color:#b45309;">Tidak ada</div>
                         @endif
                     </div>
 
@@ -377,12 +441,12 @@
                         <a href="{{ $proofUrl }}" target="_blank" rel="noopener">
                             <img class="ce-proof-focus-img"
                                 src="{{ $proofUrl }}"
-                                alt="Bukti foto pengeluaran">
+                                alt="Bukti transaksi pengeluaran">
                         </a>
 
                         <div class="ce-proof-focus-actions">
                             <a class="ce-btn ce-btn-primary" href="{{ $proofUrl }}" target="_blank" rel="noopener">
-                                🔍 Buka Foto Penuh
+                                <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> Buka Bukti
                             </a>
                         </div>
                     @else
@@ -433,7 +497,7 @@
             </div>
 
             @if ($cashExpense->journal)
-                <x-gf.panel title="Bukti Jurnal" subtitle="Jurnal dibuat otomatis saat transaksi diposting.">
+                <x-gf.panel class="ce-journal-panel" title="Bukti Jurnal" subtitle="Jurnal otomatis saat posting.">
                     <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
                         <div>
                             <div class="fw-bold text-dark">Jurnal #{{ $cashExpense->journal->id }}</div>
@@ -445,7 +509,7 @@
             @endif
 
             @if ($cashExpense->reclassifications->isNotEmpty())
-                <x-gf.panel title="Riwayat Reklasifikasi" subtitle="Perubahan kategori dicatat melalui jurnal koreksi.">
+                <x-gf.panel class="ce-history-panel" title="Riwayat Reklasifikasi" subtitle="Perubahan kategori dan jurnal koreksi.">
                     @foreach ($cashExpense->reclassifications as $reclassification)
                         <div class="ce-history-row">
                             <div>

@@ -380,6 +380,278 @@
                 padding: .52rem .52rem
             }
         }
+
+        /* Ledger-aligned header and compact filter */
+        .jx-wrap {
+            max-width: 1180px;
+            padding: clamp(.75rem, 2vw, 1.5rem) clamp(.75rem, 2vw, 1.25rem) 3rem
+        }
+
+        .jx-top {
+            position: sticky;
+            top: var(--app-navbar-offset, 58px);
+            z-index: 30;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: .7rem;
+            align-items: center;
+            margin: .1rem 0 .85rem;
+            padding: .65rem 0 .8rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .18);
+            background: color-mix(in srgb, var(--bg) 92%, transparent);
+            -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(12px)
+        }
+
+        .jx-heading,
+        .jx-title-row {
+            min-width: 0
+        }
+
+        .jx-kicker {
+            margin-bottom: .2rem;
+            color: var(--muted);
+            font-size: .64rem;
+            font-weight: 850;
+            letter-spacing: .1em;
+            text-transform: uppercase
+        }
+
+        .jx-title-row {
+            display: flex;
+            align-items: baseline;
+            gap: .5rem;
+            flex-wrap: wrap
+        }
+
+        .jx-title {
+            font-size: clamp(1.08rem, 2vw, 1.24rem);
+            font-weight: 900;
+            letter-spacing: -.02em
+        }
+
+        .jx-count {
+            color: var(--muted);
+            font-size: .76rem;
+            font-variant-numeric: tabular-nums
+        }
+
+        .jx-actions {
+            align-items: center;
+            gap: .35rem
+        }
+
+        .jx-actions .jx-btn,
+        .jx-filter .jx-btn {
+            min-height: 36px;
+            padding: .36rem .58rem;
+            border-radius: 10px;
+            font-size: .78rem
+        }
+
+        .jx-btn.primary {
+            border-color: color-mix(in srgb, var(--accent) 52%, rgba(148, 163, 184, .35));
+            background: color-mix(in srgb, var(--accent) 10%, var(--card) 90%)
+        }
+
+        .jx-top > .jx-filterbar {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            padding: .65rem 0 0;
+            border-top: 1px solid rgba(148, 163, 184, .14);
+            border-bottom: 0;
+            background: transparent
+        }
+
+        .jx-filterbar .jx-cutoff-note {
+            flex: 0 0 auto;
+            font-size: .68rem
+        }
+
+        .jx-filter {
+            display: grid;
+            grid-template-columns: minmax(14.5rem, 1.15fr) minmax(125px, .85fr) minmax(115px, .75fr) minmax(180px, 1.2fr) auto auto;
+            align-items: end;
+            gap: .45rem;
+            width: 100%
+        }
+
+        .jx-date-range-field {
+            width: 14.5rem;
+            max-width: 100%
+        }
+
+        .jx-filter-field {
+            min-width: 0
+        }
+
+        .jx-in,
+        .jx-sel {
+            min-height: 36px;
+            padding: .36rem .55rem;
+            border-radius: 10px;
+            font-size: .8rem
+        }
+
+        .jx-filter-option {
+            min-height: 36px;
+            gap: .35rem;
+            font-size: .7rem;
+            white-space: nowrap
+        }
+
+        .jx-filter-option input {
+            width: .9rem;
+            height: .9rem
+        }
+
+        .jx-filter .jx-btn {
+            width: auto;
+            white-space: nowrap
+        }
+
+        @media (max-width:720px) {
+            .jx-top {
+                grid-template-columns: 1fr;
+                gap: .6rem;
+                padding-bottom: .7rem
+            }
+
+            .jx-actions {
+                width: 100%
+            }
+
+            .jx-actions .jx-btn {
+                flex: 1 1 0;
+                min-width: 0;
+                justify-content: center
+            }
+
+            .jx-top > .jx-filterbar {
+                display: block;
+                padding: .6rem 0 0
+            }
+
+            .jx-filterbar .jx-cutoff-note {
+                display: inline-flex;
+                margin-bottom: .45rem
+            }
+
+            .jx-filter {
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                gap: .45rem
+            }
+
+            .jx-date-range-field {
+                width: auto
+            }
+
+            .jx-date-range-field,
+            .jx-search-field,
+            .jx-filter-option {
+                grid-column: 1 / -1
+            }
+
+            .jx-filter .jx-btn {
+                width: 100%;
+                justify-content: center
+            }
+
+            .jx-action-text {
+                display: none
+            }
+
+            .jx-card {
+                border-radius: 13px
+            }
+
+            .jx-table,
+            .jx-table tbody {
+                display: block
+            }
+
+            .jx-table thead {
+                display: none
+            }
+
+            .jx-table tbody tr {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                gap: .42rem .6rem;
+                margin: .6rem;
+                padding: .7rem .75rem;
+                border: 1px solid rgba(148, 163, 184, .22);
+                border-radius: 12px;
+                background: color-mix(in srgb, var(--card) 94%, var(--bg) 6%);
+                box-shadow: 0 4px 12px rgba(15, 23, 42, .045)
+            }
+
+            .jx-table tbody tr:last-child {
+                margin-bottom: .6rem
+            }
+
+            .jx-table tbody tr td {
+                display: block;
+                min-width: 0;
+                padding: 0;
+                border: 0
+            }
+
+            .jx-table tbody tr td:nth-child(1) {
+                grid-column: 1;
+                grid-row: 1;
+                color: var(--text);
+                font-size: .78rem;
+                font-weight: 800;
+                font-variant-numeric: tabular-nums
+            }
+
+            .jx-table tbody tr td:nth-child(2) {
+                grid-column: 1 / -1;
+                grid-row: 2;
+                padding-top: .1rem;
+                border-top: 1px solid rgba(148, 163, 184, .16)
+            }
+
+            .jx-table tbody tr td:nth-child(3),
+            .jx-table tbody tr td:nth-child(4) {
+                display: none
+            }
+
+            .jx-table tbody tr td:nth-child(5) {
+                grid-column: 2;
+                grid-row: 1;
+                text-align: right
+            }
+
+            .jx-table tbody tr td[colspan] {
+                grid-column: 1 / -1;
+                grid-row: auto;
+                padding: .8rem
+            }
+
+            .jx-desc {
+                min-width: 0
+            }
+
+            .jx-desc .t {
+                display: -webkit-box;
+                overflow: hidden;
+                -webkit-box-orient: vertical;
+                -webkit-line-clamp: 2
+            }
+
+            .jx-desc .m {
+                gap: .28rem;
+                font-size: .72rem
+            }
+
+            .jx-chip {
+                font-size: .68rem
+            }
+        }
     </style>
 @endpush
 
@@ -411,83 +683,73 @@
     <div class="jx-wrap">
 
         <div class="jx-top">
-            <h4 class="jx-title">Jurnal</h4>
+            <div class="jx-heading">
+                <div class="jx-kicker">Akuntansi</div>
+                <div class="jx-title-row">
+                    <h1 class="jx-title">Jurnal</h1>
+                    <span class="jx-count">{{ number_format($journals->total(), 0, ',', '.') }} entri</span>
+                </div>
+            </div>
 
             <div class="jx-actions">
+                @if (Route::has('accounting.accounts.index'))
+                    <a class="jx-btn" href="{{ route('accounting.accounts.index') }}"><i class="bi bi-wallet2" aria-hidden="true"></i><span>Akun</span></a>
+                @endif
                 @if (Route::has('accounting.cash-expenses.index'))
-                    <a class="jx-btn" href="{{ route('accounting.cash-expenses.index') }}">💸 Pengeluaran</a>
+                    <a class="jx-btn" href="{{ route('accounting.cash-expenses.index') }}"><i class="bi bi-arrow-down-circle" aria-hidden="true"></i><span>Pengeluaran</span></a>
                 @endif
                 @if (Route::has('accounting.cash-transfers.index'))
-                    <a class="jx-btn" href="{{ route('accounting.cash-transfers.index') }}">↔️ Transfer Kas/Bank</a>
+                    <a class="jx-btn" href="{{ route('accounting.cash-transfers.index') }}"><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span>Transfer</span></a>
                 @endif
                 @if (Route::has('accounting.opening-balances.index'))
-                    <a class="jx-btn" href="{{ route('accounting.opening-balances.index') }}">🟢 Saldo Awal</a>
+                    <a class="jx-btn" href="{{ route('accounting.opening-balances.index') }}"><i class="bi bi-wallet2" aria-hidden="true"></i><span>Saldo awal</span></a>
                 @endif
             </div>
-        </div>
 
-        <div class="jx-filter-card">
-            <div class="jx-filter-head">
-                <div>
-                    <h5 class="jx-filter-title"><i class="bi bi-funnel" aria-hidden="true"></i> Filter jurnal</h5>
-                    <p class="jx-filter-note">Pilih periode, status, sumber, atau cari berdasarkan catatan dan akun.</p>
-                </div>
-
+            <div class="jx-filterbar">
                 @if (($cutoff['active'] ?? false) && !request()->filled('from'))
-                    <span class="jx-cutoff-note"><i class="bi bi-info-circle" aria-hidden="true"></i> Mulai dari cutoff {{ $cutoff['date'] }}</span>
+                    <span class="jx-cutoff-note"><i class="bi bi-info-circle" aria-hidden="true"></i> Cutoff {{ $cutoff['date'] }}</span>
                 @endif
-            </div>
 
-            <form id="jx-filter-form" method="GET" action="{{ route('accounting.journals.index') }}" class="jx-filter">
-                <div class="jx-date-range">
-                    <div class="jx-filter-field">
-                        <label class="jx-filter-label" for="jx-from">Dari tanggal</label>
-                        <input id="jx-from" class="jx-in" type="date" name="from" value="{{ request('from') }}">
+                <form id="jx-filter-form" method="GET" action="{{ route('accounting.journals.index') }}" class="jx-filter">
+                    <div class="jx-filter-field jx-date-range-field">
+                        <input id="jx-date-range" class="jx-in" type="text" placeholder="Pilih periode" autocomplete="off"
+                            data-from="{{ request('from') }}" data-to="{{ request('to') }}">
                     </div>
+
                     <div class="jx-filter-field">
-                        <label class="jx-filter-label" for="jx-to">Sampai tanggal</label>
-                        <input id="jx-to" class="jx-in" type="date" name="to" value="{{ request('to') }}">
+                        <select id="jx-source-type" class="jx-sel" name="source_type" aria-label="Sumber">
+                            <option value="">Semua sumber</option>
+                            @foreach ($sourceTypes as $st)
+                                <option value="{{ $st }}" @selected(request('source_type') === $st)>
+                                    {{ $sourceTypeOptions->get($st, $typeLabel($st)) }}
+                                </option>
+                            @endforeach
+                        </select>
                     </div>
-                </div>
 
-                <div class="jx-filter-field">
-                    <label class="jx-filter-label" for="jx-source-type">Sumber</label>
-                    <select id="jx-source-type" class="jx-sel" name="source_type">
-                        <option value="">Semua sumber</option>
-                        @foreach ($sourceTypes as $st)
-                            <option value="{{ $st }}" @selected(request('source_type') === $st)>
-                                {{ $sourceTypeOptions->get($st, $typeLabel($st)) }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
+                    <div class="jx-filter-field">
+                        <select id="jx-status" class="jx-sel" name="status" aria-label="Status">
+                            <option value="">Semua status</option>
+                            <option value="final" @selected(request('status') === 'final')>Final</option>
+                            <option value="draft" @selected(request('status') === 'draft')>Draft</option>
+                            <option value="voided" @selected(request('status') === 'voided')>Void</option>
+                        </select>
+                    </div>
 
-                <div class="jx-filter-field">
-                    <label class="jx-filter-label" for="jx-status">Status</label>
-                    <select id="jx-status" class="jx-sel" name="status">
-                        <option value="">Semua status</option>
-                        <option value="final" @selected(request('status') === 'final')>Final</option>
-                        <option value="draft" @selected(request('status') === 'draft')>Draft</option>
-                        <option value="voided" @selected(request('status') === 'voided')>Void</option>
-                    </select>
-                </div>
+                    <div class="jx-filter-field jx-search-field">
+                        <input id="jx-q" class="jx-in" type="search" name="q" value="{{ request('q') }}" placeholder="Cari jurnal atau akun" aria-label="Cari jurnal atau akun">
+                    </div>
 
-                <div class="jx-filter-field">
-                    <label class="jx-filter-label" for="jx-q">Pencarian</label>
-                    <input id="jx-q" class="jx-in" type="search" name="q" value="{{ request('q') }}" placeholder="Catatan, akun, atau ID sumber...">
-                </div>
-            </form>
+                    <label class="jx-filter-option" for="jx-show-legacy">
+                        <input id="jx-show-legacy" type="checkbox" name="show_legacy" value="1" @checked(request()->boolean('show_legacy'))>
+                        Sebelum cutoff
+                    </label>
 
-            <div class="jx-filter-footer">
-                <label class="jx-filter-option" for="jx-show-legacy">
-                    <input id="jx-show-legacy" type="checkbox" name="show_legacy" value="1" form="jx-filter-form" @checked(request()->boolean('show_legacy'))>
-                    Tampilkan data sebelum cutoff
-                </label>
-
-                <div class="jx-filter-actions">
-                    <button class="jx-btn" type="submit" form="jx-filter-form"><i class="bi bi-funnel" aria-hidden="true"></i> Terapkan filter</button>
-                    <a class="jx-btn" href="{{ route('accounting.journals.index') }}"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Reset</a>
-                </div>
+                    @if (request()->query())
+                        <a class="jx-btn" href="{{ route('accounting.journals.index') }}" aria-label="Reset filter"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="jx-action-text">Reset</span></a>
+                    @endif
+                </form>
             </div>
         </div>
 
@@ -530,7 +792,7 @@
                             @endphp
 
                             <tr>
-                                <td class="text-nowrap">{{ \Illuminate\Support\Carbon::parse($j->date)->format('Y-m-d') }}
+                                <td class="text-nowrap">{{ \Illuminate\Support\Carbon::parse($j->date)->locale('id')->translatedFormat('l, d/m/Y') }}
                                 </td>
 
                                 <td>
@@ -616,4 +878,75 @@
                 {{ $journals->links() }}
             </div>
         </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                const picker = document.getElementById('jx-date-range');
+                const form = document.getElementById('jx-filter-form');
+
+                if (!picker || !form || !window.GFID?.initDateRange) return;
+
+                let selectedFrom = picker.dataset.from || '';
+                let selectedTo = picker.dataset.to || '';
+                let datePickerReady = false;
+                let searchTimer;
+
+                const submitFilters = () => form?.requestSubmit();
+
+                form.addEventListener('submit', () => {
+                    form.querySelectorAll('.jx-period-submit').forEach((field) => field.remove());
+
+                    [['from', selectedFrom], ['to', selectedTo]].forEach(([name, value]) => {
+                        const field = document.createElement('input');
+                        field.type = 'hidden';
+                        field.name = name;
+                        field.value = value;
+                        field.className = 'jx-period-submit';
+                        form.appendChild(field);
+                    });
+                });
+
+                window.GFID.initDateRange(picker, {
+                    mode: 'range',
+                    showMonths: 1,
+                    altInput: false,
+                    dateFormat: 'd M Y',
+                    altFormat: 'd M Y',
+                    rangeSeparator: ' – ',
+                    defaultDate: [selectedFrom, selectedTo].filter(Boolean),
+                    onChange: (selectedDates) => {
+                        selectedFrom = selectedDates[0]
+                            ? window.flatpickr.formatDate(selectedDates[0], 'Y-m-d')
+                            : '';
+                        selectedTo = selectedDates[1]
+                            ? window.flatpickr.formatDate(selectedDates[1], 'Y-m-d')
+                            : '';
+
+                        if (datePickerReady && (selectedDates.length === 2 || selectedDates.length === 0)) {
+                            submitFilters();
+                        }
+                    }
+                });
+
+                window.setTimeout(() => { datePickerReady = true; }, 0);
+
+                form?.querySelectorAll('select, input[type="checkbox"]').forEach((field) => {
+                    field.addEventListener('change', submitFilters);
+                });
+
+                const search = document.getElementById('jx-q');
+                search?.addEventListener('input', () => {
+                    window.clearTimeout(searchTimer);
+                    searchTimer = window.setTimeout(submitFilters, 450);
+                });
+
+                search?.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        window.clearTimeout(searchTimer);
+                        submitFilters();
+                    }
+                });
+            });
+        </script>
     @endsection

@@ -244,6 +244,7 @@ class AccountController extends Controller
         // Lines (filter by date, exclude void)
         $q = JournalLine::query()
             ->join('journals', 'journals.id', '=', 'journal_lines.journal_id')
+            ->leftJoin('users', 'users.id', '=', 'journals.created_by')
             ->where('journal_lines.account_id', $account->id)
             ->whereNull('journals.voided_at')
             ->whereNotIn('journals.source_type', self::EXCLUDED_BALANCE_SOURCES)
@@ -255,6 +256,8 @@ class AccountController extends Controller
                 'journals.description as journal_description',
                 'journals.source_type',
                 'journals.source_id',
+                'users.name as creator_name',
+                'users.role as creator_role',
                 'journal_lines.debit',
                 'journal_lines.credit',
             ])
