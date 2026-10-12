@@ -137,8 +137,8 @@ class MarketplaceBookingController extends Controller
                 // Kirim stage ter-normalisasi agar UI tidak perlu menebak dari
                 // beberapa kode status yang berbeda.
                 'fulfillment_stage'        => $b->listing_stage,
-                // AWB yang sudah terbit tetap perlu diproses/di-scan di Shipments,
-                // walaupun status booking Shopee sudah READY_TO_HANDOVER/SHIPPED.
+                // AWB pada tahap gudang tetap tampil di tab Gudang Shopee untuk
+                // pelacakan, tetapi tidak dihitung lagi sebagai proses penjual.
                 'seller_process_visible'   => (bool) $b->listing_seller_visible,
                 'ready_sub'                => $b->listing_seller_visible ? $b->listing_ready_sub : null,
                 'warehouse_sub'            => $b->listing_warehouse_sub,

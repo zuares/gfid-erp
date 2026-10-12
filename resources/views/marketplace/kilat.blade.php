@@ -102,7 +102,6 @@
         <button class="ord-subtab active" data-sub="all" onclick="switchSubTabReady('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-ready-all">—</span></button>
         <button class="ord-subtab" data-sub="to_arrange" onclick="switchSubTabReady('to_arrange', this)">Perlu Diatur <span class="ord-badge bg-secondary urgent" id="badge-sub-ready-arrange">—</span></button>
         <button class="ord-subtab" data-sub="packing" onclick="switchSubTabReady('packing', this)">📦 Sedang Dikemas <span class="ord-badge bg-secondary" id="badge-sub-ready-packing">—</span></button>
-        <button class="ord-subtab" data-sub="ready_ship" onclick="switchSubTabReady('ready_ship', this)">Siap Kirim <span class="ord-badge bg-secondary" id="badge-sub-ready-ship">—</span></button>
     </div>
 
     <div id="subTabWarehouseContainer" class="kilat-subtabs" style="display:none">
@@ -542,7 +541,7 @@
             document.getElementById('badge-' + tab).textContent = counts[tab] ?? 0;
         }
         document.getElementById('badge-ready').classList.toggle('urgent', (counts.ready ?? 0) > 0);
-        for (const [suffix, key] of Object.entries({all: 'all', arrange: 'to_arrange', packing: 'packing', ship: 'ready_ship'})) {
+        for (const [suffix, key] of Object.entries({all: 'all', arrange: 'to_arrange', packing: 'packing'})) {
             document.getElementById('badge-sub-ready-' + suffix).textContent = readyCounts[key] ?? 0;
         }
         for (const sub of ['all', 'ready_ship', 'shipped_to_warehouse', 'waiting_purchase', 'shipped_to_buyer']) {

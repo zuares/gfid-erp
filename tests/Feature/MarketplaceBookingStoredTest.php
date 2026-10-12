@@ -109,12 +109,12 @@ class MarketplaceBookingStoredTest extends TestCase
         }
 
         $result = $this->stored(['tab' => 'ready', 'per_page' => 1]);
-        $this->assertSame(7, $result['pagination']['total']);
-        $this->assertSame(['all' => 7, 'to_arrange' => 2, 'packing' => 2, 'ready_ship' => 3], $result['ready_counts']);
-        $this->assertSame(3, $result['counts']['warehouse']);
+        $this->assertSame(4, $result['pagination']['total']);
+        $this->assertSame(['all' => 4, 'to_arrange' => 2, 'packing' => 2, 'ready_ship' => 0], $result['ready_counts']);
+        $this->assertSame(5, $result['counts']['warehouse']);
         $this->assertSame(2, $result['counts']['shipped']);
         $this->assertSame(3, $result['counts']['cancelled']);
-        foreach (['to_arrange', 'packing', 'ready_ship'] as $sub) {
+        foreach (['to_arrange', 'packing'] as $sub) {
             $result = $this->stored(['tab' => 'ready', 'sub' => $sub]);
             $expected = array_column(array_filter($cases, fn ($row) => $row[3] === $sub), 0);
             $this->assertEqualsCanonicalizing($expected, array_column($result['data'], 'booking_sn'));
@@ -192,7 +192,7 @@ class MarketplaceBookingStoredTest extends TestCase
         $waiting = $this->stored(['tab' => 'warehouse', 'sub' => 'waiting_purchase']);
         $this->assertSame(['BOOKING-SHIPPED'], array_column($waiting['data'], 'booking_sn'));
         $this->assertSame('waiting_purchase', $waiting['data'][0]['warehouse_sub']);
-        $this->assertTrue($waiting['data'][0]['seller_process_visible']);
+        $this->assertFalse($waiting['data'][0]['seller_process_visible']);
 
         $outbound = $this->stored(['tab' => 'warehouse', 'sub' => 'shipped_to_buyer', 'per_page' => 1, 'page' => 2]);
         $this->assertSame(2, $outbound['pagination']['total']);
@@ -259,7 +259,7 @@ class MarketplaceBookingStoredTest extends TestCase
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame('warehouse', $response->getData(true)['data'][0]['fulfillment_stage']);
-        $this->assertTrue($response->getData(true)['data'][0]['seller_process_visible']);
+        $this->assertFalse($response->getData(true)['data'][0]['seller_process_visible']);
     }
 
     public function test_stored_endpoint_exposes_financial_data_from_linked_order(): void

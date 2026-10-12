@@ -174,6 +174,7 @@ test('warehouse milestones appear as separate subtabs, including ready to ship',
     window.switchTab('warehouse');
     assert.equal(requests[1].params.get('tab'), 'warehouse');
     assert.match(document.querySelector('#subTabWarehouseContainer [data-sub="ready_ship"]').textContent, /Siap Kirim/);
+    assert.equal(document.querySelector('#subTabReadyContainer [data-sub="ready_ship"]'), null);
     assert.match(document.querySelector('#subTabWarehouseContainer [data-sub="shipped_to_warehouse"]').textContent, /Dikirim ke Gudang Shopee/);
     assert.match(document.querySelector('#subTabWarehouseContainer [data-sub="waiting_purchase"]').textContent, /Menunggu Pembelian/);
     assert.match(document.querySelector('#subTabWarehouseContainer [data-sub="shipped_to_buyer"]').textContent, /Dikirim dari Gudang Shopee/);

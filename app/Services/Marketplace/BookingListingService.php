@@ -54,7 +54,7 @@ class BookingListingService
                 ELSE 'packing' END as listing_ready_sub");
 
         $classified = DB::query()->fromSub($stages, 'b')->select('b.*')
-            ->selectRaw("CASE WHEN listing_stage = 'ready' OR has_seller_awb = 1 THEN 1 ELSE 0 END as listing_seller_visible")
+            ->selectRaw("CASE WHEN listing_stage = 'ready' AND listing_ready_sub <> 'ready_ship' THEN 1 ELSE 0 END as listing_seller_visible")
             // Keep each Shopee warehouse milestone available in one parent tab.
             // Explicit stage checks take precedence over AWB-based seller visibility.
             ->selectRaw("CASE WHEN listing_stage = 'warehouse' THEN 'waiting_purchase'
