@@ -1700,6 +1700,11 @@ SQL;
         $name = trim((string) $request->query('name', ''));
         $sku = trim((string) $request->query('sku', ''));
         $internalItemId = $request->integer('internal_item_id') ?: null;
+        $adInternalItemId = $request->integer('ad_internal_item_id') ?: null;
+        $externalItemId = trim((string) $request->query('external_item_id', ''));
+        $hppTotalInput = $request->has('hpp_total') && is_numeric($request->query('hpp_total'))
+            ? max(0, (float) $request->query('hpp_total'))
+            : null;
 
         if ($name === '' && $internalItemId === null) {
             return response()->json(['message' => 'Nama produk wajib diisi.'], 422);
@@ -1769,6 +1774,9 @@ SQL;
                 'oi.price_after_discount',
                 'oi.line_net_amount',
                 'oi.line_gross_amount',
+                'oi.hpp_total_snapshot',
+                'oi.hpp_snapshot',
+                'oi.hpp_unit_snapshot',
             ])
             ->selectRaw("{$dateExpression} as order_at")
             ->selectRaw("{$nameExpression} as product_name")
@@ -1809,6 +1817,23 @@ SQL;
                 $orderItemValue = (float) ($first->order_item_value ?? 0);
                 $allocation = $orderItemValue > 0 ? min(1, max(0, $sales / $orderItemValue)) : 1;
                 $estimatedPayout = (float) ($first->order_payout ?? 0) * $allocation;
+                $hppAvailable = true;
+                $hpp = (float) $items->sum(function ($item) use (&$hppAvailable) {
+                    $qty = max(0, (int) ($item->qty ?? 0));
+                    $hppTotal = (float) ($item->hpp_total_snapshot ?? 0);
+                    if ($hppTotal > 0) {
+                        return $hppTotal;
+                    }
+
+                    $hppUnit = max((float) ($item->hpp_unit_snapshot ?? 0), (float) ($item->hpp_snapshot ?? 0));
+                    if ($hppUnit > 0 && $qty > 0) {
+                        return $hppUnit * $qty;
+                    }
+
+                    $hppAvailable = false;
+
+                    return 0.0;
+                });
 
                 return [
                     'id' => (int) $first->id,
@@ -1819,11 +1844,64 @@ SQL;
                     'sales' => $sales,
                     'buyer_payment' => $buyerPayment * $allocation,
                     'estimated_payout' => $estimatedPayout,
+                    'hpp' => $hpp,
+                    'hpp_available' => $hppAvailable,
                     'payment_status' => $first->payment_status ?: 'Belum ditentukan',
                     'order_status' => $first->order_status ?: ($first->status ?: 'Belum ditentukan'),
                 ];
             })
             ->values();
+
+        $storesForAds = Store::query()
+            ->where('is_active', true)
+            ->with('channel')
+            ->get();
+        $adStoreIds = $storesForAds
+            ->filter(function ($store) use ($platformCode) {
+                $channelCode = $this->normalizePlatformCode($store->channel->code ?? null);
+
+                return $channelCode === 'SHOPEE'
+                    && (! $platformCode || $channelCode === $platformCode);
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+        $productAdMetrics = app(AdsDashboardService::class)->getProductAdMetrics(
+            $adStoreIds,
+            $storeId,
+            $from->toDateString(),
+            $to->toDateString(),
+        );
+        $externalAdMetrics = $externalItemId !== ''
+            ? $productAdMetrics['external']->get($externalItemId)
+            : null;
+        $internalAdMetrics = $adInternalItemId !== null
+            ? $productAdMetrics['internal']->get((string) $adInternalItemId)
+            : null;
+        $selectedAdMetrics = $externalAdMetrics ?: $internalAdMetrics;
+        $productAdSpend = $selectedAdMetrics ? (float) ($selectedAdMetrics['spend'] ?? 0) : 0.0;
+        $productSales = (float) $orders->sum('sales');
+        $productHppAvailable = $hppTotalInput !== null
+            ? $hppTotalInput > 0
+            : $orders->isNotEmpty() && $orders->every(fn ($order) => $order['hpp_available']);
+        $productHpp = $hppTotalInput !== null
+            ? $hppTotalInput
+            : ($productHppAvailable ? (float) $orders->sum('hpp') : null);
+        $orders = $orders->map(function (array $order) use ($productAdSpend, $productSales, $productHpp, $productHppAvailable) {
+            $allocation = $productSales > 0 ? (float) $order['sales'] / $productSales : 0.0;
+            $orderAdSpend = $productAdSpend * $allocation;
+            $orderHpp = $productHpp !== null
+                ? $productHpp * $allocation
+                : ($order['hpp_available'] ? (float) $order['hpp'] : null);
+
+            return $order + [
+                'ad_spend' => $orderAdSpend,
+                'net_profit' => $productHppAvailable && $orderHpp !== null
+                    ? (float) $order['estimated_payout'] - $orderHpp - $orderAdSpend
+                    : null,
+            ];
+        })->values();
 
         $orderSummary = [
             'orders' => $orders->count(),
@@ -1831,6 +1909,8 @@ SQL;
             'sales' => (float) $orders->sum('sales'),
             'buyer_payment' => (float) $orders->sum('buyer_payment'),
             'estimated_payout' => (float) $orders->sum('estimated_payout'),
+            'ad_spend' => (float) $orders->sum('ad_spend'),
+            'net_profit' => $productHppAvailable ? (float) $orders->sum('net_profit') : null,
         ];
 
         return response()->json([
