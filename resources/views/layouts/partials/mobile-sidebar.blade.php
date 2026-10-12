@@ -830,6 +830,36 @@
                         </li>
                     @endif
 
+                    @if ($isAdmin && $router->has('whatsapp.index'))
+                        <div class="mobile-sidebar-section-label">Komunikasi</div>
+                        <li class="mb-1">
+                            <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $whatsappOpen ? 'is-open' : '' }}"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#navCommunicationAdminMobile"
+                                    aria-expanded="{{ $whatsappOpen ? 'true' : 'false' }}"
+                                    aria-controls="navCommunicationAdminMobile">
+                                <span class="icon">💬</span><span>WhatsApp</span><span class="chevron">▸</span>
+                            </button>
+                            <div class="collapse {{ $whatsappOpen ? 'show' : '' }}" id="navCommunicationAdminMobile">
+                                <a href="{{ route('whatsapp.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('whatsapp.*') ? 'active' : '' }}">
+                                    <span class="icon">📨</span><span>WhatsApp Center</span>
+                                </a>
+                            </div>
+                        </li>
+                    @endif
+
+                    @if (($isAdmin || $isOperating) && $hasSocialMediaInstagram)
+                        <div class="mobile-sidebar-section-label">Social Media</div>
+                        <li>
+                            <a href="{{ route('social-media.instagram') }}"
+                               class="mobile-sidebar-link {{ request()->routeIs('social-media.*') ? 'active' : '' }}">
+                                <span class="icon"><i class="bi bi-instagram"></i></span><span>Instagram</span>
+                            </a>
+                        </li>
+                    @endif
+
                     @if (($hasAiIndexRoute || $hasAiAgentRoute) && $canOpenAiAgent)
                         <div class="mobile-sidebar-section-label">AI</div>
                         @if ($hasAiIndexRoute)
@@ -1009,16 +1039,6 @@
                                     </div>
                                 @endif
                             </div>
-                        </li>
-                    @endif
-
-                    @if ($hasSocialMediaInstagram)
-                        <div class="mobile-sidebar-section-label">Social Media</div>
-                        <li>
-                            <a href="{{ route('social-media.instagram') }}"
-                               class="mobile-sidebar-link {{ request()->routeIs('social-media.*') ? 'active' : '' }}">
-                                <span class="icon"><i class="bi bi-instagram"></i></span><span>Instagram</span>
-                            </a>
                         </li>
                     @endif
 
@@ -1487,28 +1507,6 @@
                         </li>
                     @endif
 
-                    {{-- Komunikasi (admin hanya WhatsApp) --}}
-
-                    @if ($isAdmin && $router->has('whatsapp.index'))
-                        <div class="mobile-sidebar-section-label">Komunikasi</div>
-                        <li class="mb-1">
-                            <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $whatsappOpen ? 'is-open' : '' }}"
-                                    type="button"
-                                    data-bs-toggle="collapse"
-                                    data-bs-target="#navCommunicationAdminMobile"
-                                    aria-expanded="{{ $whatsappOpen ? 'true' : 'false' }}"
-                                    aria-controls="navCommunicationAdminMobile">
-                                <span class="icon">💬</span><span>WhatsApp</span><span class="chevron">▸</span>
-                            </button>
-                            <div class="collapse {{ $whatsappOpen ? 'show' : '' }}" id="navCommunicationAdminMobile">
-                                <a href="{{ route('whatsapp.index') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('whatsapp.*') ? 'active' : '' }}">
-                                    <span class="icon">📨</span><span>WhatsApp Center</span>
-                                </a>
-                            </div>
-                        </li>
-                    @endif
-
                 {{-- ============================
                     3) OWNER (FULL like desktop)
                 ============================= --}}
@@ -1562,35 +1560,6 @@
                             </a>
                         </li>
                     @endif
-                    @if ($router->has('whatsapp.index') || $router->has('settings.whatsapp.index'))
-                        <div class="mobile-sidebar-section-label">Komunikasi</div>
-                        <li class="mb-1">
-                            <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $whatsappOpen ? 'is-open' : '' }}"
-                                    type="button"
-                                    data-bs-toggle="collapse"
-                                    data-bs-target="#navCommunicationOwnerMobile"
-                                    aria-expanded="{{ $whatsappOpen ? 'true' : 'false' }}"
-                                    aria-controls="navCommunicationOwnerMobile">
-                                <span class="icon">💬</span><span>WhatsApp</span><span class="chevron">▸</span>
-                            </button>
-                            <div class="collapse {{ $whatsappOpen ? 'show' : '' }}" id="navCommunicationOwnerMobile">
-                                @if ($router->has('whatsapp.index'))
-                                    <a href="{{ route('whatsapp.index') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('whatsapp.*') ? 'active' : '' }}">
-                                        <span class="icon">📨</span><span>WhatsApp Center</span>
-                                    </a>
-                                @endif
-                                @if ($router->has('settings.whatsapp.index'))
-                                    <a href="{{ route('settings.whatsapp.index') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('settings.whatsapp.*') ? 'active' : '' }}">
-                                        <span class="icon">⚙️</span><span>Pengaturan WhatsApp</span>
-                                    </a>
-                                @endif
-                            </div>
-                        </li>
-                    @endif
-
-
                     @if ($hasAdminCatalogProducts || $hasAdminCatalogCategories)
                         <div class="mobile-sidebar-section-label">Website</div>
                         <li class="mb-1">
@@ -1749,6 +1718,44 @@
                             @endif
                         </div>
                     </li>
+
+                    @if ($router->has('whatsapp.index') || $router->has('settings.whatsapp.index'))
+                        <div class="mobile-sidebar-section-label">Komunikasi</div>
+                        <li class="mb-1">
+                            <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $whatsappOpen ? 'is-open' : '' }}"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#navCommunicationOwnerMobile"
+                                    aria-expanded="{{ $whatsappOpen ? 'true' : 'false' }}"
+                                    aria-controls="navCommunicationOwnerMobile">
+                                <span class="icon">💬</span><span>WhatsApp</span><span class="chevron">▸</span>
+                            </button>
+                            <div class="collapse {{ $whatsappOpen ? 'show' : '' }}" id="navCommunicationOwnerMobile">
+                                @if ($router->has('whatsapp.index'))
+                                    <a href="{{ route('whatsapp.index') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('whatsapp.*') ? 'active' : '' }}">
+                                        <span class="icon">📨</span><span>WhatsApp Center</span>
+                                    </a>
+                                @endif
+                                @if ($router->has('settings.whatsapp.index'))
+                                    <a href="{{ route('settings.whatsapp.index') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('settings.whatsapp.*') ? 'active' : '' }}">
+                                        <span class="icon">⚙️</span><span>Pengaturan WhatsApp</span>
+                                    </a>
+                                @endif
+                            </div>
+                        </li>
+                    @endif
+
+                    @if ($hasSocialMediaInstagram)
+                        <div class="mobile-sidebar-section-label">Social Media</div>
+                        <li>
+                            <a href="{{ route('social-media.instagram') }}"
+                               class="mobile-sidebar-link {{ request()->routeIs('social-media.*') ? 'active' : '' }}">
+                                <span class="icon"><i class="bi bi-instagram"></i></span><span>Instagram</span>
+                            </a>
+                        </li>
+                    @endif
 
                     {{-- PURCHASING --}}
                     @if ($hasPurchasingDashboard || $hasPrIndex || $hasMaterialShortageIndex || $hasSupplierItemsIndex || $hasPoIndex || $hasPoCreate || $hasGrnIndex || $hasGrnCreate || $hasPurchaseReturnIndex || $hasSupplierInvoiceIndex || $hasPurchasePaymentsIndex)
@@ -2116,16 +2123,6 @@
                             @endif
                         </div>
                     </li>
-                    @endif
-
-                    @if ($hasSocialMediaInstagram)
-                        <div class="mobile-sidebar-section-label">Social Media</div>
-                        <li>
-                            <a href="{{ route('social-media.instagram') }}"
-                               class="mobile-sidebar-link {{ request()->routeIs('social-media.*') ? 'active' : '' }}">
-                                <span class="icon"><i class="bi bi-instagram"></i></span><span>Instagram</span>
-                            </a>
-                        </li>
                     @endif
 
                     @if ($hasSalesInvoicesIndex || $hasSalesInvoicesCreate || $hasSalesShipmentsIndex || $hasSalesShipmentsCreate || $hasSalesShipmentReturnsIndex || $hasSalesOperationalSettings || $hasSalesShipmentsReport || $hasSalesReportItemProfit || $hasSalesReportChannelProfit || $hasSalesReportShipmentAnalytics)
