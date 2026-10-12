@@ -190,6 +190,7 @@ class StorefrontWebsiteSettingsController extends Controller
             'block_duplicate' => true,
             'allow_unlinked_submit' => false,
             'allow_mixed_linkage' => false,
+            'validate_order_items' => false,
             'status_timing' => 'on_post',
             'record_only_daily_sales' => false,
         ];
@@ -241,6 +242,7 @@ class StorefrontWebsiteSettingsController extends Controller
             'block_duplicate' => SystemSetting::get(SystemSetting::KEY_SALES_LOOKUP_BLOCK_DUPLICATE, '1') !== '0',
             'allow_unlinked_submit' => SystemSetting::get(SystemSetting::KEY_SALES_ALLOW_UNLINKED_SUBMIT, '0') !== '0',
             'allow_mixed_linkage' => SystemSetting::get(SystemSetting::KEY_SALES_ALLOW_MIXED_LINKAGE, '0') === '1',
+            'validate_order_items' => SystemSetting::get(SystemSetting::KEY_SALES_VALIDATE_ORDER_ITEMS, '0') === '1',
             'status_timing' => in_array($statusTiming, ['never', 'on_link', 'on_post'], true)
                 ? $statusTiming
                 : $defaults['status_timing'],
@@ -258,6 +260,7 @@ class StorefrontWebsiteSettingsController extends Controller
             'sales_lookup_block_duplicate',
             'sales_allow_unlinked_submit',
             'sales_allow_mixed_linkage',
+            'sales_validate_order_items',
             'sales_marketplace_status_timing',
             'sales_record_only_daily_sales',
         ])) {
@@ -299,6 +302,7 @@ class StorefrontWebsiteSettingsController extends Controller
         SystemSetting::set(SystemSetting::KEY_SALES_LOOKUP_BLOCK_DUPLICATE, $request->boolean('sales_lookup_block_duplicate') ? '1' : '0', 'Blokir order aktif ganda di shipment', auth()->id());
         SystemSetting::set(SystemSetting::KEY_SALES_ALLOW_UNLINKED_SUBMIT, $request->boolean('sales_allow_unlinked_submit') ? '1' : '0', 'Boleh submit order tanpa tautan', auth()->id());
         SystemSetting::set(SystemSetting::KEY_SALES_ALLOW_MIXED_LINKAGE, $request->boolean('sales_allow_mixed_linkage') ? '1' : '0', 'Boleh campur order tertaut dan record-only', auth()->id());
+        SystemSetting::set(SystemSetting::KEY_SALES_VALIDATE_ORDER_ITEMS, $request->boolean('sales_validate_order_items') ? '1' : '0', 'Validasi SKU dan qty shipment terhadap order marketplace', auth()->id());
         SystemSetting::set(SystemSetting::KEY_SALES_STATUS_TIMING, $data['sales_marketplace_status_timing'], 'Waktu update status marketplace', auth()->id());
         SystemSetting::set(SystemSetting::KEY_SALES_RECORD_ONLY_DAILY_SALES, $request->boolean('sales_record_only_daily_sales') ? '1' : '0', 'Catat Daily Sales untuk record-only', auth()->id());
     }
@@ -313,6 +317,7 @@ class StorefrontWebsiteSettingsController extends Controller
         SystemSetting::set(SystemSetting::KEY_SALES_LOOKUP_BLOCK_DUPLICATE, '1', 'Blokir order aktif ganda di shipment', auth()->id());
         SystemSetting::set(SystemSetting::KEY_SALES_ALLOW_UNLINKED_SUBMIT, '0', 'Boleh submit order tanpa tautan', auth()->id());
         SystemSetting::set(SystemSetting::KEY_SALES_ALLOW_MIXED_LINKAGE, '0', 'Boleh campur order tertaut dan record-only', auth()->id());
+        SystemSetting::set(SystemSetting::KEY_SALES_VALIDATE_ORDER_ITEMS, '0', 'Validasi SKU dan qty shipment terhadap order marketplace', auth()->id());
         SystemSetting::set(SystemSetting::KEY_SALES_STATUS_TIMING, 'on_post', 'Waktu update status marketplace', auth()->id());
         SystemSetting::set(SystemSetting::KEY_SALES_RECORD_ONLY_DAILY_SALES, '0', 'Catat Daily Sales untuk record-only', auth()->id());
     }
@@ -536,6 +541,7 @@ class StorefrontWebsiteSettingsController extends Controller
             'sales_lookup_block_duplicate',
             'sales_allow_unlinked_submit',
             'sales_allow_mixed_linkage',
+            'sales_validate_order_items',
             'sales_marketplace_status_timing',
             'sales_record_only_daily_sales',
             'reset_sales_operational_defaults',

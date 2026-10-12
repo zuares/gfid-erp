@@ -59,6 +59,94 @@
 .sos-doc-actions { display: flex; gap: .45rem; flex-wrap: wrap; margin-top: .7rem; }
 @media(max-width:640px){ .sos-card { padding: 1rem; } .sos-card-head, .sos-row { align-items: flex-start; flex-direction: column; } .sos-toggle, .sos-actions, .sos-button { width: 100%; } .sos-event, .sos-upload-grid { grid-template-columns: 1fr; } .sos-library-row { align-items: flex-start; flex-direction: column; } audio { width: 100% !important; } }
 @media(max-width:760px){ .sos-choice-grid, .sos-setting-grid, .sos-doc-grid { grid-template-columns: 1fr; } .sos-doc-frame { height: 430px; } }
+
+/* Keep operational settings in the same compact visual system as Shipments. */
+.sos-page {
+    width: 100%;
+    max-width: 1040px;
+    margin-inline: auto;
+    padding: .7rem .75rem 1.5rem;
+    gap: .65rem;
+}
+.sos-head {
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: .55rem;
+    padding: .6rem .75rem;
+    border: 1px solid #dbe3ee;
+    border-radius: 9px;
+    background: var(--card, #fff);
+    box-shadow: 0 1px 8px rgba(15, 23, 42, .04);
+}
+.sos-head h1 { font-size: 1rem; color: #111827; }
+.sos-head p { margin: .2rem 0 0; font-size: .76rem; }
+.sos-card {
+    padding: .75rem .8rem;
+    border-color: #dbe3ee;
+    border-radius: 9px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, .035);
+}
+.sos-card-head {
+    margin: -.75rem -.8rem .75rem;
+    padding: .7rem .8rem;
+    border-bottom: 1px solid #dbe3ee;
+    background: #fff;
+}
+.sos-title { font-size: .9rem; color: #111827; }
+.sos-sub { font-size: .74rem; }
+.sos-status { padding: .22rem .55rem; font-size: .68rem; }
+.sos-row {
+    margin-top: .75rem;
+    padding: .7rem .75rem;
+    border-color: #dbe3ee;
+    border-radius: 8px;
+}
+.sos-row-label { font-size: .78rem; }
+.sos-toggle { min-height: 34px; border-radius: 7px; font-size: .72rem; }
+.sos-actions { margin-top: .75rem; }
+.sos-button {
+    min-height: 34px;
+    border-radius: 7px;
+    padding: .35rem .65rem;
+    background: #334155;
+    font-size: .72rem;
+}
+.sos-button-light { border-color: rgba(148, 163, 184, .3); background: transparent; color: #475569; }
+.sos-map { gap: .7rem; margin-top: 1rem; }
+.sos-event {
+    padding: .6rem .7rem;
+    border-color: #dbe3ee;
+    border-radius: 8px;
+}
+.sos-select, .sos-input, .sos-file { border-color: #dbe3ee; border-radius: 7px; }
+.sos-box {
+    margin-top: .75rem;
+    padding: .75rem;
+    border-color: #cbd5e1;
+    border-radius: 9px;
+}
+.sos-library-row, .sos-choice label, .sos-check {
+    border-color: #dbe3ee;
+    border-radius: 8px;
+}
+.sos-choice-grid, .sos-setting-grid { margin-top: .7rem; }
+.sos-setting-grid { gap: .5rem; }
+.sos-check { padding: .6rem .65rem; }
+.sos-note { margin-top: .75rem; border-radius: 8px; }
+.sos-doc-grid { gap: .65rem; }
+.sos-doc-frame { border-color: #dbe3ee; border-radius: 8px; }
+.sos-page > .alert {
+    margin: 0;
+    border-radius: 8px;
+    padding: .65rem .8rem;
+    font-size: .76rem;
+}
+@media(max-width:640px){
+    .sos-page { padding: .6rem 0 1.25rem; }
+    .sos-card { padding: .7rem; }
+    .sos-card-head { margin: -.7rem -.7rem .7rem; padding: .65rem .7rem; }
+}
 </style>
 @endpush
 
@@ -73,7 +161,7 @@
         ? route('sales.settings.operational.reset-lookup')
         : $operationalUpdateRoute;
 @endphp
-<div class="container-fluid py-4">
+<div class="sos-shell">
     <div class="sos-page">
         <div class="sos-head">
             <h1>⚙️ Pengaturan Operasional Penjualan</h1>
@@ -250,6 +338,7 @@
                     <label class="sos-check"><input type="hidden" name="sales_lookup_block_duplicate" value="0"><input type="checkbox" name="sales_lookup_block_duplicate" value="1" {{ $lookupSettings['block_duplicate'] ? 'checked' : '' }}><span><strong>Blokir order aktif ganda</strong><span>Order yang masih diproses di shipment lain ditolak.</span></span></label>
                     <label class="sos-check"><input type="hidden" name="sales_allow_unlinked_submit" value="0"><input type="checkbox" name="sales_allow_unlinked_submit" value="1" {{ $lookupSettings['allow_unlinked_submit'] ? 'checked' : '' }}><span><strong>Boleh submit record-only</strong><span>Order tetap dapat dicatat dan stok diproses tanpa tautan marketplace.</span></span></label>
                     <label class="sos-check"><input type="hidden" name="sales_allow_mixed_linkage" value="0"><input type="checkbox" name="sales_allow_mixed_linkage" value="1" {{ $lookupSettings['allow_mixed_linkage'] ? 'checked' : '' }}><span><strong>Boleh campur linked &amp; record-only</strong><span>Nonaktifkan untuk menjaga satu shipment tetap konsisten.</span></span></label>
+                    <label class="sos-check"><input type="hidden" name="sales_validate_order_items" value="0"><input type="checkbox" name="sales_validate_order_items" value="1" {{ $lookupSettings['validate_order_items'] ? 'checked' : '' }}><span><strong>Validasi SKU &amp; qty sesuai order</strong><span>Blokir shipment jika SKU atau jumlah scan berbeda dari detail order marketplace.</span></span></label>
                     <label class="sos-check"><input type="hidden" name="sales_record_only_daily_sales" value="0"><input type="checkbox" name="sales_record_only_daily_sales" value="1" {{ $lookupSettings['record_only_daily_sales'] ? 'checked' : '' }}><span><strong>Catat Daily Sales untuk record-only</strong><span>Default OFF agar pencatatan belum dianggap penjualan terkonfirmasi.</span></span></label>
                 </div>
 

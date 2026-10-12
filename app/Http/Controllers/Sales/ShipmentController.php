@@ -357,6 +357,7 @@ class ShipmentController extends Controller
             'block_duplicate' => SystemSetting::KEY_SALES_LOOKUP_BLOCK_DUPLICATE,
             'allow_unlinked_submit' => SystemSetting::KEY_SALES_ALLOW_UNLINKED_SUBMIT,
             'allow_mixed_linkage' => SystemSetting::KEY_SALES_ALLOW_MIXED_LINKAGE,
+            'validate_order_items' => SystemSetting::KEY_SALES_VALIDATE_ORDER_ITEMS,
             'status_timing' => SystemSetting::KEY_SALES_STATUS_TIMING,
             'record_only_daily_sales' => SystemSetting::KEY_SALES_RECORD_ONLY_DAILY_SALES,
         ];
@@ -377,7 +378,7 @@ class ShipmentController extends Controller
             return is_array($decoded) ? $decoded : (is_array($default) ? $default : []);
         }
 
-        if (in_array($key, ['same_store', 'block_duplicate', 'allow_unlinked_submit', 'allow_mixed_linkage', 'record_only_daily_sales'], true)) {
+        if (in_array($key, ['same_store', 'block_duplicate', 'allow_unlinked_submit', 'allow_mixed_linkage', 'validate_order_items', 'record_only_daily_sales'], true)) {
             return (string) $value === '1';
         }
 
@@ -2411,7 +2412,7 @@ class ShipmentController extends Controller
         }
 
         // ===================================================
-        // VALIDASI MISMATCH QTY FULFILLMENT VS SHIPMENT
+        // VALIDASI MAPPING DASAR SEBELUM POSTING
         // ===================================================
         if ($locked->shipment_type === \App\Models\Shipment::TYPE_MARKETPLACE) {
             $mappingErrors = $this->shipmentMappingErrors($locked);
@@ -2464,7 +2465,7 @@ class ShipmentController extends Controller
                 abort(422, "Shipment Marketplace wajib memiliki minimal 1 order scan valid.");
             }
 
-            if (!$recordOnlyBatch) {
+            if ($this->salesOperationalSetting('validate_order_items', false) && !$recordOnlyBatch) {
                 $expectedItems = \App\Models\OrderFulfillmentLine::whereIn('fulfillment_id', $fulfillmentIds)
                     ->whereNotNull('item_id')
                     ->where('qty_fulfilled', '>', 0)
@@ -2499,6 +2500,7 @@ class ShipmentController extends Controller
                     }
                 }
             }
+
         }
 
         $totalQty = 0;
@@ -3498,9 +3500,7 @@ class ShipmentController extends Controller
                 continue;
             }
 
-            if (!$scan->fulfillment_id) {
-                // Order external/manual boleh dikirim saat marketplace belum
-                // tersinkron, tetapi tetap wajib punya order number + mapping.
+            if (!$this->salesOperationalSetting('validate_order_items', false) || !$scan->fulfillment_id) {
                 continue;
             }
 

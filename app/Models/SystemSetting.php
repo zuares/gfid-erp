@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Cache;
  *  - shipment_scan_sound_enabled : 1/0 — default suara scan pengiriman
  *  - shipment_scan_sound_map : JSON mapping event scan ke preset/ringtone
  *  - sales_lookup_* : kebijakan lookup dan tautan order operasional penjualan
+ *  - sales_validate_order_items : 1/0 — validasi SKU dan qty shipment terhadap order marketplace
  *
  * @property string      $key
  * @property string|null $value
@@ -45,6 +46,7 @@ class SystemSetting extends Model
     public const KEY_SALES_LOOKUP_BLOCK_DUPLICATE = 'sales_lookup_block_duplicate';
     public const KEY_SALES_ALLOW_UNLINKED_SUBMIT = 'sales_allow_unlinked_submit';
     public const KEY_SALES_ALLOW_MIXED_LINKAGE = 'sales_allow_mixed_linkage';
+    public const KEY_SALES_VALIDATE_ORDER_ITEMS = 'sales_validate_order_items';
     public const KEY_SALES_STATUS_TIMING = 'sales_marketplace_status_timing';
     public const KEY_SALES_RECORD_ONLY_DAILY_SALES = 'sales_record_only_daily_sales';
     public const KEY_WHATSAPP_TEST_NUMBER = 'whatsapp_test_number';
