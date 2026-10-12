@@ -108,20 +108,20 @@
     .mobile-sidebar-link {
         display: flex;
         align-items: center;
-        gap: .55rem;
-        padding: .65rem .45rem;
+        gap: .48rem;
+        padding: .56rem .4rem;
         border-radius: 12px;
         text-decoration: none;
         color: var(--text);
-        font-size: .92rem;
+        font-size: .86rem;
         margin-bottom: .15rem;
         transition: background .16s ease, color .16s ease, transform .08s ease;
         position: relative;
     }
 
     .mobile-sidebar-link span.icon {
-        font-size: 1.15rem;
-        width: 24px;
+        font-size: 1.02rem;
+        width: 22px;
         text-align: center;
     }
 
@@ -141,13 +141,21 @@
     }
 
     .mobile-sidebar-section-label {
-        font-size: .74rem;
+        font-size: .7rem;
         text-transform: uppercase;
         letter-spacing: .08em;
         color: var(--muted);
-        margin-top: .9rem;
+        margin-top: .75rem;
         margin-bottom: .2rem;
         padding-inline: .2rem;
+    }
+
+    .mobile-sidebar-section-label-nested {
+        padding-left: 1rem;
+    }
+
+    .mobile-sidebar-section-label[style*="margin-top:.55rem"] {
+        padding-left: 1rem;
     }
 
     .mobile-sidebar-footer {
@@ -195,7 +203,7 @@
     .mobile-sidebar-nested-toggle {
         margin-top: .15rem;
         padding-left: .8rem;
-        font-size: .82rem;
+        font-size: .78rem;
         color: var(--muted);
         border: 0;
         background: transparent;
@@ -203,7 +211,7 @@
 
     .mobile-sidebar-nested-toggle .icon {
         width: 20px;
-        font-size: 1rem;
+        font-size: .92rem;
     }
 
     .mobile-sidebar-nested-toggle.is-open,
@@ -220,14 +228,14 @@
 
     .mobile-sidebar-link-sub {
         position: relative;
-        font-size: .86rem;
-        padding: .5rem .5rem .5rem 2.4rem;
+        font-size: .8rem;
+        padding: .44rem .42rem .44rem 2.2rem;
         margin-bottom: .1rem;
     }
 
     .mobile-sidebar-link-sub .icon {
-        width: 18px;
-        font-size: .95rem;
+        width: 17px;
+        font-size: .88rem;
     }
 
     .mobile-sidebar-link-sub.active {
@@ -1027,7 +1035,25 @@
                         </button>
 
                         <div class="collapse {{ $invOpen ? 'show' : '' }}" id="navPersediaanAdminMobile">
-                            <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Stok</div>
+                            @if ($hasInvIntelligence || $hasWhIntelligence)
+                                <div class="mobile-sidebar-section-label mobile-sidebar-section-label-nested" style="margin-top:.55rem;">Ringkasan</div>
+
+                                @if ($hasInvIntelligence)
+                                    <a href="{{ route('inventory.intelligence') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.intelligence') || request()->routeIs('inventory.intelligence.*') ? 'active' : '' }}">
+                                        <span class="icon">🧠</span><span>Ringkasan Stok</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasWhIntelligence)
+                                    <a href="{{ route('inventory.warehouse_intelligence') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('inventory.warehouse_intelligence') || request()->routeIs('inventory.warehouse_intelligence.*') ? 'active' : '' }}">
+                                        <span class="icon">📦</span><span>Stok Gudang</span>
+                                    </a>
+                                @endif
+                            @endif
+
+                            <div class="mobile-sidebar-section-label mobile-sidebar-section-label-nested" style="margin-top:.55rem;">Stok</div>
 
                             @if ($hasInvStocksItems)
                                 <a href="{{ route('inventory.stocks.items') }}"
@@ -1043,7 +1069,7 @@
                                 </a>
                             @endif
 
-                            <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Operasional</div>
+                            <div class="mobile-sidebar-section-label mobile-sidebar-section-label-nested" style="margin-top:.55rem;">Operasional</div>
 
                             @if ($hasInvOpnamesIndex)
                                 <a href="{{ route('inventory.stock_opnames.index') }}"
@@ -1096,6 +1122,7 @@
                                 <span class="icon">🛒</span><span>Permintaan Stok</span><span class="chevron">▸</span>
                             </button>
                             <div class="collapse {{ $stockReqOpen ? 'show' : '' }}" id="navStockRequestsAdminMobile">
+                                <div class="mobile-sidebar-section-label mobile-sidebar-section-label-nested" style="margin-top:.55rem;">Permintaan</div>
                                 @if ($hasRtsStockReqIndex)
                                     <a href="{{ route('rts.stock-requests.index') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('rts.stock-requests.*') ? 'active' : '' }}"
@@ -1138,6 +1165,7 @@
                                     <span class="icon">🚚</span><span>Penjualan</span><span class="chevron">▸</span>
                                 </button>
                                 <div class="collapse {{ $salesOpen ? 'show' : '' }}" id="navSalesAdminMobile">
+                                    <div class="mobile-sidebar-section-label mobile-sidebar-section-label-nested" style="margin-top:.55rem;">Pengiriman</div>
                                     @if ($hasSalesShipmentsIndex)
                                         <a href="{{ route('sales.shipments.index') }}"
                                            class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('sales.shipments.*') ? 'active' : '' }}">
@@ -1168,7 +1196,7 @@
                                 </button>
                                 <div class="collapse {{ $purchasingOpen ? 'show' : '' }}" id="navPurchasingAdminMobile">
                                     @if ($hasPrIndex)
-                                        <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Permintaan Pembelian</div>
+                                        <div class="mobile-sidebar-section-label mobile-sidebar-section-label-nested" style="margin-top:.55rem;">Permintaan Pembelian</div>
                                         <a href="{{ route('purchasing.purchase_requests.index') }}"
                                            class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('purchasing.purchase_requests.index') ? 'active' : '' }}">
                                             <span class="icon">📋</span><span>Permintaan Beli</span>
@@ -1182,7 +1210,7 @@
                                     @endif
 
                                     @if ($hasPoIndex || $hasPoCreate)
-                                        <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Purchase Order</div>
+                                        <div class="mobile-sidebar-section-label mobile-sidebar-section-label-nested" style="margin-top:.55rem;">Purchase Order</div>
                                         @if ($hasPoIndex)
                                             <a href="{{ route('purchasing.purchase_orders.index') }}"
                                                class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('purchasing.purchase_orders.index') ? 'active' : '' }}">
@@ -1199,7 +1227,7 @@
                                     @endif
 
                                     @if ($hasGrnIndex || $hasGrnCreate)
-                                        <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Penerimaan</div>
+                                        <div class="mobile-sidebar-section-label mobile-sidebar-section-label-nested" style="margin-top:.55rem;">Penerimaan</div>
                                         @if ($hasGrnIndex)
                                             <a href="{{ route('purchasing.purchase_receipts.index') }}"
                                                class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('purchasing.purchase_receipts.index') ? 'active' : '' }}">
@@ -1232,6 +1260,7 @@
                                 <span class="icon">⚙️</span><span>Produksi</span><span class="chevron">▸</span>
                             </button>
                             <div class="collapse {{ $prodOpen ? 'show' : '' }}" id="navProductionAdminMobile">
+                                <div class="mobile-sidebar-section-label mobile-sidebar-section-label-nested" style="margin-top:.55rem;">Operasional</div>
                                 @if ($hasProdSewReturnsCreate)
                                     <a href="{{ route('production.sewing.returns.create') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.sewing.returns.*') ? 'active' : '' }}">
@@ -1393,6 +1422,7 @@
                                 <span class="icon">🧾</span><span>{{ $isAdmin ? 'Akuntansi' : 'Keuangan' }}</span><span class="chevron">▸</span>
                             </button>
                             <div class="collapse {{ $accountingOpen ? 'show' : '' }}" id="navAccountingAdminMobile">
+                                <div class="mobile-sidebar-section-label mobile-sidebar-section-label-nested" style="margin-top:.55rem;">Akuntansi</div>
                                 @if ($hasAccountingIndex)
                                     <a href="{{ route('accounting.index') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('accounting.index') ? 'active' : '' }}">
                                         <span class="icon">▦</span><span>Ringkasan Keuangan</span>

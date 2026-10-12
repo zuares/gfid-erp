@@ -519,7 +519,7 @@
     // QUICK HELPERS
     // =========================================================
     $subhead = function (string $text) {
-        echo '<div class="sidebar-subhead">' . e($text) . '</div>';
+        echo '<div class="sidebar-subhead sidebar-subhead-nested">' . e($text) . '</div>';
     };
 
     $canShow = fn (...$flags) => collect($flags)->contains(true);
@@ -576,22 +576,22 @@
         }
         .sidebar-modern .sidebar-link,
         .sidebar-modern .sidebar-toggle {
-            font-size: .82rem;
-            padding: .52rem .7rem;
-            gap: .4rem;
+            font-size: .78rem;
+            padding: .46rem .62rem;
+            gap: .35rem;
         }
         .sidebar-modern .sidebar-link .icon,
         .sidebar-modern .sidebar-toggle .icon {
             width: 18px;
-            font-size: .95rem;
+            font-size: .88rem;
         }
         .sidebar-modern .sidebar-link-sub {
-            font-size: .78rem;
-            padding: .38rem .65rem .38rem 1.6rem;
+            font-size: .74rem;
+            padding: .34rem .6rem .34rem 1.5rem;
         }
         .sidebar-modern .sidebar-link-sub .icon {
             width: 14px;
-            font-size: .8rem;
+            font-size: .76rem;
         }
     }
 
@@ -622,22 +622,22 @@
         }
         .sidebar-modern .sidebar-link,
         .sidebar-modern .sidebar-toggle {
-            font-size: .93rem;
-            padding: .6rem .9rem;
-            gap: .55rem;
+            font-size: .86rem;
+            padding: .52rem .8rem;
+            gap: .5rem;
         }
         .sidebar-modern .sidebar-link .icon,
         .sidebar-modern .sidebar-toggle .icon {
             width: 22px;
-            font-size: 1.05rem;
+            font-size: .96rem;
         }
         .sidebar-modern .sidebar-link-sub {
-            font-size: .86rem;
-            padding: .42rem .9rem .42rem 2.3rem;
+            font-size: .8rem;
+            padding: .38rem .8rem .38rem 2.1rem;
         }
         .sidebar-modern .sidebar-link-sub .icon {
             width: 18px;
-            font-size: .9rem;
+            font-size: .84rem;
         }
     }
 
@@ -754,6 +754,10 @@
         text-transform:uppercase;
         color: var(--muted);
         opacity:.9;
+    }
+
+    .sidebar-subhead-nested {
+        padding-left: 1.05rem;
     }
 
     .simple-group { margin-top: .4rem; }
@@ -1120,7 +1124,7 @@
                         <span class="chevron">▸</span>
                     </button>
                     <div class="collapse {{ $openStockRequests ? 'show' : '' }}" id="navStockRequestsAdmin">
-                        <div class="sidebar-subhead">Permintaan</div>
+                        <div class="sidebar-subhead sidebar-subhead-nested">Permintaan</div>
                         @if ($hasRtsStockReqIndex)
                             <x-sidebar.sub-link href="{{ route('rts.stock-requests.index') }}" icon="bi bi-cart3"
                                 :active="request()->routeIs('rts.stock-requests.*')"
@@ -1414,20 +1418,20 @@
                         <span class="chevron">▸</span>
                     </button>
                     <div class="collapse {{ $openSales ? 'show' : '' }}" id="navSalesAdmin">
-                        <div class="sidebar-subhead">Pengiriman</div>
+                        <div class="sidebar-subhead sidebar-subhead-nested">Pengiriman</div>
                         <div class="simple-group">
                     @if ($hasSalesShipmentsIndex)
-                        <x-sidebar.simple-link href="{{ route('sales.shipments.index') }}" icon="bi bi-truck"
+                        <x-sidebar.sub-link href="{{ route('sales.shipments.index') }}" icon="bi bi-truck"
                             :active="request()->routeIs('sales.shipments.*')">
                             Pengiriman
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($hasSalesShipmentReturnsIndex)
-                        <x-sidebar.simple-link href="{{ route('sales.shipment_returns.index') }}" icon="bi bi-arrow-repeat"
+                        <x-sidebar.sub-link href="{{ route('sales.shipment_returns.index') }}" icon="bi bi-arrow-repeat"
                             :active="request()->routeIs('sales.shipment_returns.*')">
                             Retur Pengiriman
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
                         </div>
                     </div>
@@ -1451,27 +1455,27 @@
                         <span class="chevron">▸</span>
                     </button>
                     <div class="collapse {{ $openProduction ? 'show' : '' }}" id="navProductionAdmin">
-                        <div class="sidebar-subhead">Operasional</div>
+                        <div class="sidebar-subhead sidebar-subhead-nested">Operasional</div>
                         <div class="simple-group">
                     @if ($adminHasSewReturns)
-                        <x-sidebar.simple-link href="{{ route('production.sewing.returns.create') }}" icon="bi bi-inbox"
+                        <x-sidebar.sub-link href="{{ route('production.sewing.returns.create') }}" icon="bi bi-inbox"
                             :active="request()->routeIs('production.sewing.returns.*')">
                             Setor Jahit
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($adminHasRejectReturns)
-                        <x-sidebar.simple-link href="{{ route('production.sewing.reject_returns.index') }}" icon="bi bi-arrow-clockwise"
+                        <x-sidebar.sub-link href="{{ route('production.sewing.reject_returns.index') }}" icon="bi bi-arrow-clockwise"
                             :active="request()->routeIs('production.sewing.reject_returns.*')">
                             Setor Reject Jahit
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($adminHasQc)
-                        <x-sidebar.simple-link href="{{ $prodQcHref }}" icon="bi bi-check-circle"
+                        <x-sidebar.sub-link href="{{ $prodQcHref }}" icon="bi bi-check-circle"
                             :active="request()->routeIs('production.qc.*')">
                             {{ $prodQcLabel }}
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                         </div>
@@ -1493,53 +1497,53 @@
                     </button>
                     <div class="collapse {{ $openPembelian ? 'show' : '' }}" id="navPurchasingAdmin">
                         @if ($hasPrIndex)
-                            <div class="sidebar-subhead">Permintaan Pembelian</div>
+                            <div class="sidebar-subhead sidebar-subhead-nested">Permintaan Pembelian</div>
                             <div class="simple-group">
-                                <x-sidebar.simple-link href="{{ route('purchasing.purchase_requests.index') }}" icon="bi bi-list-ul"
+                                <x-sidebar.sub-link href="{{ route('purchasing.purchase_requests.index') }}" icon="bi bi-list-ul"
                                     :active="request()->routeIs('purchasing.purchase_requests.index')">
                                     Permintaan Beli
-                                </x-sidebar.simple-link>
+                                </x-sidebar.sub-link>
                                 @if ($hasPrCreate)
-                                    <x-sidebar.simple-link href="{{ route('purchasing.purchase_requests.create') }}" icon="bi bi-plus-circle"
+                                    <x-sidebar.sub-link href="{{ route('purchasing.purchase_requests.create') }}" icon="bi bi-plus-circle"
                                         :active="request()->routeIs('purchasing.purchase_requests.create')">
                                         Buat Permintaan Beli
-                                    </x-sidebar.simple-link>
+                                    </x-sidebar.sub-link>
                                 @endif
                             </div>
                         @endif
 
                         @if ($hasPoIndex || $hasPoCreate)
-                            <div class="sidebar-subhead">Purchase Order</div>
+                            <div class="sidebar-subhead sidebar-subhead-nested">Purchase Order</div>
                             <div class="simple-group">
                                 @if ($hasPoIndex)
-                                    <x-sidebar.simple-link href="{{ route('purchasing.purchase_orders.index') }}" icon="bi bi-list-ul"
+                                    <x-sidebar.sub-link href="{{ route('purchasing.purchase_orders.index') }}" icon="bi bi-list-ul"
                                         :active="request()->routeIs('purchasing.purchase_orders.index')">
                                         Daftar PO
-                                    </x-sidebar.simple-link>
+                                    </x-sidebar.sub-link>
                                 @endif
                                 @if ($hasPoCreate)
-                                    <x-sidebar.simple-link href="{{ route('purchasing.purchase_orders.create') }}" icon="bi bi-plus-circle"
+                                    <x-sidebar.sub-link href="{{ route('purchasing.purchase_orders.create') }}" icon="bi bi-plus-circle"
                                         :active="request()->routeIs('purchasing.purchase_orders.create')">
                                         Buat PO
-                                    </x-sidebar.simple-link>
+                                    </x-sidebar.sub-link>
                                 @endif
                             </div>
                         @endif
 
                         @if ($hasGrnIndex || $hasGrnCreate)
-                            <div class="sidebar-subhead">Penerimaan</div>
+                            <div class="sidebar-subhead sidebar-subhead-nested">Penerimaan</div>
                             <div class="simple-group">
                                 @if ($hasGrnIndex)
-                                    <x-sidebar.simple-link href="{{ route('purchasing.purchase_receipts.index') }}" icon="bi bi-list-ul"
+                                    <x-sidebar.sub-link href="{{ route('purchasing.purchase_receipts.index') }}" icon="bi bi-list-ul"
                                         :active="request()->routeIs('purchasing.purchase_receipts.index')">
                                         Daftar Penerimaan
-                                    </x-sidebar.simple-link>
+                                    </x-sidebar.sub-link>
                                 @endif
                                 @if ($hasGrnCreate)
-                                    <x-sidebar.simple-link href="{{ route('purchasing.purchase_receipts.create') }}" icon="bi bi-box-seam"
+                                    <x-sidebar.sub-link href="{{ route('purchasing.purchase_receipts.create') }}" icon="bi bi-box-seam"
                                         :active="request()->routeIs('purchasing.purchase_receipts.create')">
                                         Buat Penerimaan
-                                    </x-sidebar.simple-link>
+                                    </x-sidebar.sub-link>
                                 @endif
                             </div>
                         @endif
@@ -1570,7 +1574,7 @@
                         <span class="chevron">▸</span>
                     </button>
                     <div class="collapse {{ $openProduction ? 'show' : '' }}" id="navProductionOperating">
-                        <div class="sidebar-subhead">Operasional</div>
+                        <div class="sidebar-subhead sidebar-subhead-nested">Operasional</div>
                         <div class="simple-group">
                     @if ($hasProdDashboard)
                         <x-sidebar.simple-link href="{{ route('production.dashboard') }}" icon="bi bi-bar-chart"
@@ -1716,110 +1720,110 @@
                         <span class="chevron">▸</span>
                     </button>
                     <div class="collapse {{ $openAccounting ? 'show' : '' }}" id="navAccountingAdmin">
-                        <div class="sidebar-subhead">Akuntansi</div>
+                        <div class="sidebar-subhead sidebar-subhead-nested">Akuntansi</div>
                         <div class="simple-group">
                     @if ($hasAccountingIndex)
-                        <x-sidebar.simple-link href="{{ route('accounting.index') }}" icon="bi bi-grid-1x2"
+                        <x-sidebar.sub-link href="{{ route('accounting.index') }}" icon="bi bi-grid-1x2"
                             :active="request()->routeIs('accounting.index')">
                             Ringkasan Keuangan
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
                     @if ($hasCashBasisReportIndex)
-                        <x-sidebar.simple-link href="{{ route('accounting.cash-basis-report.index') }}" icon="bi bi-bar-chart"
+                        <x-sidebar.sub-link href="{{ route('accounting.cash-basis-report.index') }}" icon="bi bi-bar-chart"
                             :active="request()->routeIs('accounting.cash-basis-report.*')">
                             Laporan Kas
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($hasCashExpensesIndex)
-                        <x-sidebar.simple-link href="{{ route('accounting.cash-expenses.index') }}" icon="bi bi-cash"
+                        <x-sidebar.sub-link href="{{ route('accounting.cash-expenses.index') }}" icon="bi bi-cash"
                             :active="request()->routeIs('accounting.cash-expenses.*')">
                             Pengeluaran Kas
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($hasCashTransfersIndex)
-                        <x-sidebar.simple-link href="{{ route('accounting.cash-transfers.index') }}" icon="bi bi-arrow-left-right"
+                        <x-sidebar.sub-link href="{{ route('accounting.cash-transfers.index') }}" icon="bi bi-arrow-left-right"
                             :active="request()->routeIs('accounting.cash-transfers.*')">
                             Transfer Kas/Bank
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($hasCashReceiptsIndex)
-                        <x-sidebar.simple-link href="{{ route('accounting.cash-receipts.index') }}" icon="bi bi-coin"
+                        <x-sidebar.sub-link href="{{ route('accounting.cash-receipts.index') }}" icon="bi bi-coin"
                             :active="request()->routeIs('accounting.cash-receipts.*')">
                             Penerimaan Kas
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($hasLoansIndex)
-                        <x-sidebar.simple-link href="{{ route('accounting.loans.index') }}" icon="bi bi-bank"
+                        <x-sidebar.sub-link href="{{ route('accounting.loans.index') }}" icon="bi bi-bank"
                             :active="request()->routeIs('accounting.loans.*') || request()->routeIs('accounting.loans.repayments.*')">
                             Pinjaman
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($hasSupplierLoansIndex)
-                        <x-sidebar.simple-link href="{{ route('accounting.supplier-loans.index') }}" icon="bi bi-person-check"
+                        <x-sidebar.sub-link href="{{ route('accounting.supplier-loans.index') }}" icon="bi bi-person-check"
                             :active="request()->routeIs('accounting.supplier-loans.*')">
                             Dana Supplier
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($hasEmployeeLoansIndex)
-                        <x-sidebar.simple-link href="{{ route('accounting.employee-loans.index') }}" icon="bi bi-person-vcard"
+                        <x-sidebar.sub-link href="{{ route('accounting.employee-loans.index') }}" icon="bi bi-person-vcard"
                             :active="request()->routeIs('accounting.employee-loans.*')">
                             Pinjaman Karyawan
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($hasEmployeeSavingsIndex)
-                        <x-sidebar.simple-link href="{{ route('accounting.employee-savings.index') }}" icon="bi bi-wallet2"
+                        <x-sidebar.sub-link href="{{ route('accounting.employee-savings.index') }}" icon="bi bi-wallet2"
                             :active="request()->routeIs('accounting.employee-savings.*')">
                             Tabungan Karyawan
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($hasMarketplacePayoutsIndex)
-                        <x-sidebar.simple-link href="{{ route('accounting.marketplace-payouts.index') }}" icon="bi bi-cart3"
+                        <x-sidebar.sub-link href="{{ route('accounting.marketplace-payouts.index') }}" icon="bi bi-cart3"
                             :active="request()->routeIs('accounting.marketplace-payouts.*')">
                             Penerimaan Marketplace
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($hasJournalsIndex)
-                        <x-sidebar.simple-link href="{{ route('accounting.journals.index') }}" icon="bi bi-journal-text"
+                        <x-sidebar.sub-link href="{{ route('accounting.journals.index') }}" icon="bi bi-journal-text"
                             :active="request()->routeIs('accounting.journals.*')">
                             Jurnal
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($hasAccountsIndex)
-                        <x-sidebar.simple-link href="{{ route('accounting.accounts.index') }}" icon="bi bi-folder2-open"
+                        <x-sidebar.sub-link href="{{ route('accounting.accounts.index') }}" icon="bi bi-folder2-open"
                             :active="request()->routeIs('accounting.accounts.*')">
                             Akun (COA)
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($hasOpeningBalancesIndex)
-                        <x-sidebar.simple-link href="{{ route('accounting.opening-balances.index') }}" icon="bi bi-circle-fill"
+                        <x-sidebar.sub-link href="{{ route('accounting.opening-balances.index') }}" icon="bi bi-circle-fill"
                             :active="request()->routeIs('accounting.opening-balances.*')">
                             Saldo Awal
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($hasOpeningBalancesBatchIndex)
-                        <x-sidebar.simple-link href="{{ route('accounting.opening-balances-batch.index') }}" icon="bi bi-basket"
+                        <x-sidebar.sub-link href="{{ route('accounting.opening-balances-batch.index') }}" icon="bi bi-basket"
                             :active="request()->routeIs('accounting.opening-balances-batch.*')">
                             Batch Saldo Awal
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
 
                     @if ($hasSupplierApOpeningsIndex)
-                        <x-sidebar.simple-link href="{{ route('accounting.supplier-ap-openings.index') }}" icon="bi bi-person-lines-fill"
+                        <x-sidebar.sub-link href="{{ route('accounting.supplier-ap-openings.index') }}" icon="bi bi-person-lines-fill"
                             :active="request()->routeIs('accounting.supplier-ap-openings.*')">
                             Saldo Awal Hutang Supplier
-                        </x-sidebar.simple-link>
+                        </x-sidebar.sub-link>
                     @endif
                         </div>
                     </div>
