@@ -1352,16 +1352,27 @@
         ['key' => 'grow', 'label' => 'Grow', 'class' => 'grow'],
         ['key' => 'review', 'label' => 'Review', 'class' => 'review'],
     ])->mapWithKeys(fn ($row) => [$row['key'] => $row + ['products' => collect()] ]);
-    foreach ($productAnalysisProducts as $product) {
-        $productSales = (float) ($product->net_sales ?? 0);
+    $productAnalysisMarketplaceGroups = $productAnalysisProducts->groupBy(function ($product) {
+        $marketplaceCode = trim((string) ($product->external_item_id ?? ''));
+
+        return $marketplaceCode !== ''
+            ? 'code:'.$marketplaceCode
+            : 'title:'.(trim((string) ($product->marketplace_name ?: $product->name)) ?: 'Produk tanpa nama');
+    });
+    foreach ($productAnalysisMarketplaceGroups as $marketplaceProducts) {
+        $productSales = (float) $marketplaceProducts->sum('net_sales');
+        $contributionProfit = (float) $marketplaceProducts
+            ->filter(fn ($product) => $product->contribution_profit !== null)
+            ->sum('contribution_profit');
+        $contributionMargin = $productSales > 0 ? ($contributionProfit / $productSales) * 100 : null;
         $highSales = $productSales >= $productAnalysisSalesMedian;
-        $highContribution = $product->contribution_margin !== null
+        $highContribution = $contributionMargin !== null
             && $productAnalysisContributionMarginMedian > 0
-            && (float) $product->contribution_margin >= $productAnalysisContributionMarginMedian;
+            && $contributionMargin >= $productAnalysisContributionMarginMedian;
         $matrixKey = $highSales
             ? ($highContribution ? 'scale' : 'protect')
             : ($highContribution ? 'grow' : 'review');
-        $productAnalysisMatrix[$matrixKey]['products']->push($product);
+        $productAnalysisMatrix[$matrixKey]['products'] = $productAnalysisMatrix[$matrixKey]['products']->concat($marketplaceProducts);
     }
     $productAnalysisMatrixRows = $productAnalysisMatrix->map(function ($row) use ($productAnalysisNetSales, $productAnalysisAdSales, $marketplaceProductCount) {
         $products = $row['products'];
@@ -4027,8 +4038,28 @@
                         </thead>
                         <tbody>
                             @php
+                                $marketplaceGroupKey = function ($product) {
+                                    $productCode = trim((string) ($product->external_item_id ?? ''));
+
+                                    return $productCode !== ''
+                                        ? 'code:'.$productCode
+                                        : 'title:'.(trim((string) ($product->marketplace_name ?: $product->name)) ?: 'Produk tanpa nama');
+                                };
+                                $marketplaceCategoryNames = $products
+                                    ->groupBy($marketplaceGroupKey)
+                                    ->map(function ($marketplaceProducts) {
+                                        $categories = $marketplaceProducts
+                                            ->map(fn ($product) => trim((string) ($product->category_name ?? '')) ?: 'Tanpa kategori')
+                                            ->unique()
+                                            ->values();
+
+                                        return $categories->count() > 1 ? 'Multi kategori' : ($categories->first() ?: 'Tanpa kategori');
+                                    });
                                 $productGroups = $products
-                                    ->groupBy(fn ($product) => $product->category_name ?: 'Tanpa kategori')
+                                    ->groupBy(fn ($product) => $marketplaceCategoryNames->get(
+                                        $marketplaceGroupKey($product),
+                                        trim((string) ($product->category_name ?? '')) ?: 'Tanpa kategori',
+                                    ))
                                     ->sortByDesc(fn ($group) => (float) $group->sum('sales'));
                             @endphp
                             @foreach ($productGroups as $categoryName => $categoryProducts)
@@ -4053,7 +4084,7 @@
                                         ->values();
                                     $categoryItemIds = $marketplaceGroups->keys()->map(fn ($index) => $categoryKey.'-marketplace-'.$index)->implode(' ');
                                     $category = $categoryProducts->first();
-                                    $categoryCode = trim((string) ($category->category_code ?? ''));
+                                    $categoryCode = $categoryName === 'Multi kategori' ? '' : trim((string) ($category->category_code ?? ''));
                                     $categoryOrders = $uniqueOrderKeys($categoryProducts)->count();
                                     $categoryQty = (int) $categoryProducts->sum('qty');
                                     $categorySales = (float) $categoryProducts->sum('sales');
