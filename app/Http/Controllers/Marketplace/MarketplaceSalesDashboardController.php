@@ -1873,20 +1873,25 @@ SQL;
             ->map(fn ($id) => (int) $id)
             ->values()
             ->all();
-        $productAdMetrics = app(AdsDashboardService::class)->getProductAdMetrics(
+        $productAdMetricsByDay = app(AdsDashboardService::class)->getProductAdMetricsByDay(
             $adStoreIds,
             $storeId,
             $from->toDateString(),
             $to->toDateString(),
         );
-        $externalAdMetrics = $externalItemId !== ''
-            ? $productAdMetrics['external']->get($externalItemId)
-            : null;
-        $internalAdMetrics = $adInternalItemId !== null
-            ? $productAdMetrics['internal']->get((string) $adInternalItemId)
-            : null;
-        $selectedAdMetrics = $externalAdMetrics ?: $internalAdMetrics;
-        $productAdSpend = $selectedAdMetrics ? (float) ($selectedAdMetrics['spend'] ?? 0) : 0.0;
+        $externalAdMetricsByDay = $externalItemId !== ''
+            ? $productAdMetricsByDay['external']->get($externalItemId, collect())
+            : collect();
+        $internalAdMetricsByDay = $adInternalItemId !== null
+            ? $productAdMetricsByDay['internal']->get((string) $adInternalItemId, collect())
+            : collect();
+        $selectedAdMetricsByDay = $externalAdMetricsByDay instanceof Collection && $externalAdMetricsByDay->isNotEmpty()
+            ? $externalAdMetricsByDay
+            : $internalAdMetricsByDay;
+        $productAdSpendByDay = $selectedAdMetricsByDay instanceof Collection
+            ? $selectedAdMetricsByDay->map(fn ($metrics) => (float) ($metrics['spend'] ?? 0))
+            : collect();
+        $productAdSpend = (float) $productAdSpendByDay->sum();
         $productSales = (float) $orders->sum('sales');
         $productHppAvailable = $hppTotalInput !== null
             ? $hppTotalInput > 0
@@ -1894,11 +1899,21 @@ SQL;
         $productHpp = $hppTotalInput !== null
             ? $hppTotalInput
             : ($productHppAvailable ? (float) $orders->sum('hpp') : null);
-        $orders = $orders->map(function (array $order) use ($productAdSpend, $productSales, $productHpp, $productHppAvailable) {
-            $allocation = $productSales > 0 ? (float) $order['sales'] / $productSales : 0.0;
-            $orderAdSpend = $productAdSpend * $allocation;
+        $orderSalesByDay = $orders
+            ->groupBy(fn (array $order) => substr((string) ($order['order_at'] ?? ''), 0, 10))
+            ->map(fn ($dayOrders) => (float) $dayOrders->sum('sales'));
+        $orders = $orders->map(function (array $order) use ($productAdSpend, $productSales, $productAdSpendByDay, $orderSalesByDay, $productHpp, $productHppAvailable) {
+            $orderDay = substr((string) ($order['order_at'] ?? ''), 0, 10);
+            $daySales = (float) $orderSalesByDay->get($orderDay, 0);
+            $dailyAdSpend = (float) $productAdSpendByDay->get($orderDay, 0);
+            $hasDailyAdMetrics = $productAdSpendByDay->isNotEmpty();
+            $dailyAllocation = $daySales > 0 ? (float) $order['sales'] / $daySales : 0.0;
+            $productAllocation = $productSales > 0 ? (float) $order['sales'] / $productSales : 0.0;
+            $orderAdSpend = $hasDailyAdMetrics
+                ? $dailyAdSpend * $dailyAllocation
+                : $productAdSpend * $productAllocation;
             $orderHpp = $productHpp !== null
-                ? $productHpp * $allocation
+                ? $productHpp * $productAllocation
                 : ($order['hpp_available'] ? (float) $order['hpp'] : null);
 
             return $order + [

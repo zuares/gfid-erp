@@ -363,6 +363,166 @@ class AdsDashboardService
         ];
     }
 
+    /**
+     * Metrik iklan per item dan per hari untuk drill-down pesanan.
+     * Biaya harian dipertahankan supaya biaya iklan tidak diratakan ke seluruh
+     * order dalam periode yang panjang.
+     *
+     * @return array{internal: Collection<string, Collection<string, array{spend: float, sales: float, conversions: int}>>, external: Collection<string, Collection<string, array{spend: float, sales: float, conversions: int}>>}
+     */
+    public function getProductAdMetricsByDay(array $storeIds, int|string|null $storeId, string $dateFrom, string $dateTo): array
+    {
+        $storeIds = array_values(array_filter(array_map('intval', $storeIds)));
+        if ($storeId !== null && $storeId !== 'all') {
+            $selectedStoreId = (int) $storeId;
+            $storeIds = in_array($selectedStoreId, $storeIds, true) ? [$selectedStoreId] : [];
+        }
+
+        if ($storeIds === []) {
+            return ['internal' => collect(), 'external' => collect()];
+        }
+
+        $internalSpend = collect();
+        $externalSpend = collect();
+        $addMetrics = static function (Collection $target, int|string|null $key, string $day, float $spend, float $sales, int $conversions): void {
+            if ($key === null || (string) $key === '' || $day === '') {
+                return;
+            }
+
+            $normalizedKey = (string) $key;
+            $daily = $target->get($normalizedKey, collect());
+            if (! $daily instanceof Collection) {
+                $daily = collect($daily);
+            }
+
+            $current = $daily->get($day, [
+                'spend' => 0.0,
+                'sales' => 0.0,
+                'conversions' => 0,
+            ]);
+            $daily->put($day, [
+                'spend' => (float) $current['spend'] + $spend,
+                'sales' => (float) $current['sales'] + $sales,
+                'conversions' => (int) $current['conversions'] + $conversions,
+            ]);
+            $target->put($normalizedKey, $daily);
+        };
+
+        $campaignRows = DB::table('marketplace_ad_campaign_dailies as daily')
+            ->join('marketplace_ad_campaigns as campaign', function ($join) {
+                $join->on('campaign.store_id', '=', 'daily.store_id')
+                    ->on('campaign.channel_campaign_id', '=', 'daily.channel_campaign_id');
+            })
+            ->whereIn('daily.store_id', $storeIds)
+            ->whereNotLike('daily.channel_campaign_id', 'GMS-%')
+            ->whereBetween('daily.date', [$dateFrom, $dateTo])
+            ->where(function ($query) {
+                $query->whereNotNull('campaign.internal_item_id')
+                    ->orWhereNotNull('campaign.channel_item_id');
+            })
+            ->select([
+                'daily.date',
+                'daily.store_id',
+                'campaign.channel_item_id',
+                'campaign.internal_item_id',
+            ])
+            ->selectRaw('COALESCE(SUM(daily.expense), 0) as spend')
+            ->selectRaw('COALESCE(SUM(daily.broad_gmv), 0) as sales')
+            ->selectRaw('COALESCE(SUM(daily.broad_order), 0) as conversions')
+            ->groupBy('daily.date', 'daily.store_id', 'campaign.channel_item_id', 'campaign.internal_item_id')
+            ->get();
+
+        foreach ($campaignRows as $row) {
+            $day = substr((string) $row->date, 0, 10);
+            $spend = (float) ($row->spend ?? 0);
+            $sales = (float) ($row->sales ?? 0);
+            $conversions = (int) ($row->conversions ?? 0);
+            $addMetrics($internalSpend, $row->internal_item_id, $day, $spend, $sales, $conversions);
+            $addMetrics($externalSpend, $row->channel_item_id, $day, $spend, $sales, $conversions);
+        }
+
+        $gmsRows = DB::table('marketplace_ads_item_dailies as daily')
+            ->whereIn('daily.store_id', $storeIds)
+            ->whereLike('daily.channel_campaign_id', 'GMS-%')
+            ->whereBetween('daily.date', [$dateFrom, $dateTo])
+            ->whereNotNull('daily.channel_item_id')
+            ->select('daily.date', 'daily.store_id', 'daily.channel_item_id')
+            ->selectRaw('COALESCE(SUM(daily.expense), 0) as spend')
+            ->selectRaw('COALESCE(SUM(daily.broad_gmv), 0) as sales')
+            ->selectRaw('COALESCE(SUM(daily.broad_order), 0) as conversions')
+            ->groupBy('daily.date', 'daily.store_id', 'daily.channel_item_id')
+            ->get();
+
+        $gmsParentSpendByStoreDay = DB::table('marketplace_ad_campaign_dailies as daily')
+            ->whereIn('daily.store_id', $storeIds)
+            ->whereLike('daily.channel_campaign_id', 'GMS-%')
+            ->whereBetween('daily.date', [$dateFrom, $dateTo])
+            ->select('daily.date', 'daily.store_id')
+            ->selectRaw('COALESCE(SUM(daily.expense), 0) as spend')
+            ->groupBy('daily.date', 'daily.store_id')
+            ->get()
+            ->mapWithKeys(fn ($row) => [
+                (int) $row->store_id.'|'.substr((string) $row->date, 0, 10) => (float) ($row->spend ?? 0),
+            ]);
+        $gmsItemSpendByStoreDay = $gmsRows
+            ->groupBy(fn ($row) => (int) $row->store_id.'|'.substr((string) $row->date, 0, 10))
+            ->map(fn (Collection $rows) => (float) $rows->sum('spend'));
+        $gmsSpendScaleByStoreDay = $gmsItemSpendByStoreDay->mapWithKeys(function (float $itemSpend, $key) use ($gmsParentSpendByStoreDay) {
+            $parentSpend = (float) ($gmsParentSpendByStoreDay[$key] ?? 0);
+            if ($itemSpend <= 0 || abs($parentSpend - $itemSpend) <= 0.001) {
+                return [$key => 1.0];
+            }
+
+            return [$key => max(0.0, $parentSpend) / $itemSpend];
+        });
+
+        foreach ($gmsRows as $row) {
+            $day = substr((string) $row->date, 0, 10);
+            $scale = (float) ($gmsSpendScaleByStoreDay[(int) $row->store_id.'|'.$day] ?? 1.0);
+            $addMetrics(
+                $externalSpend,
+                $row->channel_item_id,
+                $day,
+                (float) ($row->spend ?? 0) * $scale,
+                (float) ($row->sales ?? 0),
+                (int) ($row->conversions ?? 0),
+            );
+        }
+
+        $manualMaps = DB::table('marketplace_ad_item_maps')
+            ->whereIn('store_id', $storeIds)
+            ->whereNotNull('channel_item_id')
+            ->whereNotNull('internal_item_id')
+            ->select('store_id', 'channel_item_id', 'internal_item_id')
+            ->get()
+            ->mapWithKeys(fn ($row) => [
+                $row->store_id.'|'.(string) $row->channel_item_id => (int) $row->internal_item_id,
+            ]);
+
+        foreach ($gmsRows as $row) {
+            $internalItemId = $manualMaps->get($row->store_id.'|'.(string) $row->channel_item_id);
+            if ($internalItemId === null) {
+                continue;
+            }
+
+            $day = substr((string) $row->date, 0, 10);
+            $scale = (float) ($gmsSpendScaleByStoreDay[(int) $row->store_id.'|'.$day] ?? 1.0);
+            $addMetrics(
+                $internalSpend,
+                $internalItemId,
+                $day,
+                (float) ($row->spend ?? 0) * $scale,
+                (float) ($row->sales ?? 0),
+                (int) ($row->conversions ?? 0),
+            );
+        }
+
+        return [
+            'internal' => $internalSpend,
+            'external' => $externalSpend,
+        ];
+    }
+
     public function buildDashboardData(
         Collection $stores,
         int|string|null $storeId,
