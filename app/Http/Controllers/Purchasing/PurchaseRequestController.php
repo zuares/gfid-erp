@@ -718,7 +718,7 @@ class PurchaseRequestController extends Controller
             $select[] = 'product_category_id';
         }
 
-        return Item::query()
+        $items = Item::query()
             ->with([
                 'category:id,name,kind',
                 'productCategory:id,name,kind',
@@ -726,6 +726,70 @@ class PurchaseRequestController extends Controller
             ->where('active', true)
             ->orderBy('code')
             ->get($select);
+
+        $historyPrices = $this->latestPurchaseRequestItemPrices($items->pluck('id')->all());
+
+        return $items->each(function (Item $item) use ($historyPrices): void {
+            $item->setAttribute('suggested_purchase_price', $historyPrices[(int) $item->id] ?? null);
+        });
+    }
+
+    /**
+     * Harga Est. PR: PO terakhir menjadi prioritas, lalu GRN posted terakhir.
+     * Keduanya memakai unit harga pembelian agar cocok dengan line PR/PO.
+     * Master item tetap menjadi fallback di suggestPurchaseRequestItemPrice().
+     *
+     * @return array<int, float>
+     */
+    protected function latestPurchaseRequestItemPrices(array $itemIds): array
+    {
+        $itemIds = collect($itemIds)
+            ->map(fn ($itemId) => (int) $itemId)
+            ->filter(fn (int $itemId) => $itemId > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($itemIds)) {
+            return [];
+        }
+
+        $validPoStatuses = ['approved', 'done', 'open', 'processing', 'closed'];
+        $poPrices = DB::table('purchase_order_lines as pol')
+            ->join('purchase_orders as po', 'po.id', '=', 'pol.purchase_order_id')
+            ->whereIn('pol.item_id', $itemIds)
+            ->whereIn('po.status', $validPoStatuses)
+            ->whereRaw('CAST(pol.unit_price AS REAL) > 0')
+            ->orderByDesc('po.date')
+            ->orderByDesc('po.id')
+            ->orderByDesc('pol.id')
+            ->get(['pol.item_id', 'pol.unit_price'])
+            ->groupBy('item_id')
+            ->map(fn ($rows) => (float) $rows->first()->unit_price);
+
+        $missingItemIds = collect($itemIds)
+            ->reject(fn (int $itemId) => $poPrices->has($itemId))
+            ->values()
+            ->all();
+
+        if (empty($missingItemIds)) {
+            return $poPrices->all();
+        }
+
+        $grnPrices = DB::table('purchase_receipt_lines as prl')
+            ->join('purchase_receipts as pr', 'pr.id', '=', 'prl.purchase_receipt_id')
+            ->whereIn('prl.item_id', $missingItemIds)
+            ->where('pr.status', 'posted')
+            ->whereRaw('COALESCE(prl.stock_qty_received, prl.qty_received * COALESCE(prl.conversion_factor, 1)) > 0')
+            ->whereRaw('CAST(prl.unit_price AS REAL) > 0')
+            ->orderByDesc('pr.date')
+            ->orderByDesc('pr.id')
+            ->orderByDesc('prl.id')
+            ->get(['prl.item_id', 'prl.unit_price'])
+            ->groupBy('item_id')
+            ->map(fn ($rows) => (float) $rows->first()->unit_price);
+
+        return $poPrices->union($grnPrices)->all();
     }
 
     /**
@@ -787,6 +851,11 @@ class PurchaseRequestController extends Controller
             return null;
         }
 
+        $directPrice = (float) ($targetItem->suggested_purchase_price ?? 0);
+        if ($directPrice > 0) {
+            return $directPrice;
+        }
+
         $directPrice = (float) ($targetItem->last_purchase_price ?? 0);
         if ($directPrice > 0) {
             return $directPrice;
@@ -796,7 +865,7 @@ class PurchaseRequestController extends Controller
 
         $bestItem = $items
             ->filter(fn (Item $candidate) => (int) $candidate->id !== (int) $targetItem->id)
-            ->filter(fn (Item $candidate) => (float) ($candidate->last_purchase_price ?? 0) > 0)
+            ->filter(fn (Item $candidate) => $this->purchaseRequestItemSuggestedPrice($candidate) > 0)
             ->map(function (Item $candidate) use ($targetItem, $targetSignature) {
                 return [
                     'item' => $candidate,
@@ -810,7 +879,14 @@ class PurchaseRequestController extends Controller
             return null;
         }
 
-        return (float) ($bestItem['item']->last_purchase_price ?? 0);
+        return $this->purchaseRequestItemSuggestedPrice($bestItem['item']);
+    }
+
+    protected function purchaseRequestItemSuggestedPrice(Item $item): float
+    {
+        $historyPrice = (float) ($item->suggested_purchase_price ?? 0);
+
+        return $historyPrice > 0 ? $historyPrice : (float) ($item->last_purchase_price ?? 0);
     }
 
     protected function itemPriceMatchScore(Item $targetItem, Item $candidate, ?array $targetSignature = null): int

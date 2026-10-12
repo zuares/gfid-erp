@@ -69,6 +69,9 @@
                 'product_category_name' => optional($it->productCategory)->name,
                 'product_category_kind' => optional($it->productCategory)->kind,
                 'last_purchase_price' => (float) ($it->last_purchase_price ?? 0),
+                'suggested_purchase_price' => $it->suggested_purchase_price !== null
+                    ? (float) $it->suggested_purchase_price
+                    : null,
             ],
         )
         ->values();

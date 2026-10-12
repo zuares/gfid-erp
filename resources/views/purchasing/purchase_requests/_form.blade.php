@@ -582,7 +582,7 @@
     function findSuggestedPrice(item, items) {
         if (!item) return null;
 
-        const directPrice = Number(item.last_purchase_price ?? 0);
+        const directPrice = Number(item.suggested_purchase_price ?? item.last_purchase_price ?? 0);
         if (Number.isFinite(directPrice) && directPrice > 0) {
             return directPrice;
         }
@@ -592,7 +592,7 @@
 
         items.forEach(candidate => {
             if (String(candidate.id) === String(item.id)) return;
-            const price = Number(candidate.last_purchase_price ?? 0);
+            const price = Number(candidate.suggested_purchase_price ?? candidate.last_purchase_price ?? 0);
             if (!Number.isFinite(price) || price <= 0) return;
             if (!sameFamily(item, candidate)) return;
 
@@ -603,7 +603,7 @@
             }
         });
 
-        const fallbackPrice = Number(best?.last_purchase_price ?? 0);
+        const fallbackPrice = Number(best?.suggested_purchase_price ?? best?.last_purchase_price ?? 0);
         return Number.isFinite(fallbackPrice) && fallbackPrice > 0 ? fallbackPrice : null;
     }
 
