@@ -54,28 +54,16 @@ class MasterItemCrudTest extends TestCase
             ->assertSee('Tambah Item Lagi');
     }
 
-    public function test_admin_can_access_master_item_crud_without_access_to_other_master_pages(): void
+    public function test_admin_can_view_master_items_but_cannot_modify_them(): void
     {
         $admin = User::factory()->create([
             'role' => 'admin',
             'employee_code' => 'ITEM-ADMIN',
         ]);
 
-        $this->actingAs($admin)
-            ->get(route('master.items.index'))
-            ->assertOk();
-
-        $this->actingAs($admin)
-            ->get(route('master.items.create'))
-            ->assertOk();
-
-        $this->actingAs($admin)
-            ->get(route('master.item_boms.create'))
-            ->assertForbidden();
-
-        $response = $this->actingAs($admin)->post(route('master.items.store'), [
-            'code' => 'admin crud 001',
-            'name' => 'Item Admin CRUD',
+        $this->actingAs($this->owner)->post(route('master.items.store'), [
+            'code' => 'admin view 001',
+            'name' => 'Item Admin View',
             'unit' => 'pcs',
             'type' => 'material',
             'item_category_id' => '',
@@ -86,8 +74,28 @@ class MasterItemCrudTest extends TestCase
             'barcodes' => [],
         ]);
 
-        $item = Item::where('code', 'ADMIN-CRUD-001')->firstOrFail();
-        $response->assertRedirect(route('master.items.show', $item));
+        $item = Item::where('code', 'ADMIN-VIEW-001')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get(route('master.items.index'))
+            ->assertOk()
+            ->assertSee('Item')
+            ->assertSee('Harga Terakhir')
+            ->assertSee('Lihat')
+            ->assertDontSee('Tambah Item')
+            ->assertDontSee('Edit item');
+
+        $this->actingAs($admin)
+            ->get(route('master.items.show', $item))
+            ->assertOk();
+
+        $this->actingAs($admin)
+            ->get(route('master.items.create'))
+            ->assertForbidden();
+
+        $this->actingAs($admin)
+            ->get(route('master.item_boms.create'))
+            ->assertForbidden();
 
         $this->actingAs($admin)
             ->put(route('master.items.update', $item), [
@@ -103,13 +111,11 @@ class MasterItemCrudTest extends TestCase
                 'active' => 1,
                 'barcodes' => [],
             ])
-            ->assertRedirect(route('master.items.show', $item));
-
-        $this->assertSame('Item Admin CRUD Updated', $item->fresh()->name);
+            ->assertForbidden();
 
         $this->actingAs($admin)
             ->delete(route('master.items.destroy', $item))
-            ->assertRedirect(route('master.items.index'));
+            ->assertForbidden();
 
         $this->actingAs($admin)
             ->get(route('master.suppliers.index'))

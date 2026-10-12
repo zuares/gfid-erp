@@ -16,6 +16,19 @@ class EnsureMasterItemAccess
 
         $isAdmin = strtolower((string) $user->role) === 'admin';
 
+        // Admin memiliki akses baca saja pada Master Item. Developer tetap
+        // diperlakukan sebagai owner dan tidak terkena pembatasan ini.
+        if ($isAdmin && ! $user->isDeveloper()) {
+            abort_unless(
+                in_array($request->route()?->getName(), [
+                    'master.items.index',
+                    'master.items.show',
+                ], true),
+                403,
+                'Role admin hanya memiliki akses lihat pada Master Items.'
+            );
+        }
+
         abort_unless(
             $user->isOwner() || $isAdmin || $user->canAccessModule('master'),
             403,

@@ -29,15 +29,12 @@ class ItemController extends Controller
         $filteredQuery = $this->itemQueryFor($request);
         $query = (clone $filteredQuery)
             ->with('category')
-            ->with(['itemTypeOption', 'purchaseTreatment'])
-            ->withCount('barcodes')
             ->with(['costSnapshots' => function ($q) {
                 $q->active()
                     ->orderByDesc('snapshot_date')
                     ->orderByDesc('id')
                     ->limit(1);
-            }])
-            ->withCount(['boms as active_boms_count' => fn ($q) => $q->where('active', true)]);
+            }]);
 
         $items = $query
             ->orderBy('code')
@@ -63,7 +60,8 @@ class ItemController extends Controller
                 $q->where('is_active', true)->where('unit_cost', '>', 0);
             })->count(),
         ];
-        $supplyItems = Item::query()->whereIn('type', ['finished_good', 'wip']);
+        // Keep the supply overview consistent with the filtered item list.
+        $supplyItems = (clone $filteredQuery)->whereIn('type', ['finished_good', 'wip']);
         $supplySummary = [
             'total' => (clone $supplyItems)->count(),
             'hybrid' => (clone $supplyItems)->where('can_buy', true)->where('can_make', true)->count(),

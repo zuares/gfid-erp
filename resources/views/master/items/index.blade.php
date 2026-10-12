@@ -14,7 +14,9 @@
         'missing_hpp' => 0,
     ];
     $hasFilters = request()->hasAny(['q', 'type', 'category_kind', 'item_category_id', 'supply_mode']);
-    $canManageMasterData = auth()->user()?->canAccessModule('master') ?? false;
+    $user = auth()->user();
+    $isAdminRole = $user && strtolower((string) $user->role) === 'admin' && ! $user->isDeveloper();
+    $canManageMasterData = ! $isAdminRole && ($user?->canAccessModule('master') ?? false);
     $supplyModes = [
         'buy' => 'Beli jadi saja',
         'make' => 'Produksi sendiri saja',
@@ -138,34 +140,155 @@
         .item-bulk .btn { flex:1 1 auto; }
         .item-bulk #bulkClear { flex:0 0 auto; }
     }
+
+    /* Final desktop pass: keep the page readable inside the application shell. */
+    .item-page { max-width: none; width: 100%; padding: 1rem 1.1rem 4rem; }
+    .item-hero {
+        align-items: center;
+        flex-wrap: nowrap;
+        gap: 1rem;
+        margin: 0 0 1rem;
+        padding: 1.1rem 1.2rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 18px;
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        box-shadow: 0 10px 28px rgba(15,23,42,.05);
+    }
+    .item-hero-main { align-items: flex-start; gap: 12px; flex: 1 1 280px; min-width: 220px; }
+    .item-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 40px;
+        width: 40px;
+        height: 40px;
+        margin-top: 2px;
+        border-radius: 13px;
+        color: #111827;
+        background: #f3f4f6;
+        font-size: 1.1rem;
+    }
+    .item-eyebrow { color: #111827; font-size: .65rem; letter-spacing: .09em; }
+    .item-title { font-size: 1.3rem; letter-spacing: -.03em; }
+    .item-subtitle { max-width: 360px; margin-top: 3px; font-size: .78rem; }
+    .item-actions { flex: 0 0 auto; align-self: center; padding-top: 0; }
+    .item-actions .btn { min-height: 38px; padding-inline: .85rem; border-radius: 10px; }
+    .item-primary { background: linear-gradient(135deg, #111827, #000000) !important; box-shadow: 0 6px 14px rgba(15,23,42,.18); }
+    .item-soft { border-color: #dbe3ee !important; }
+    .item-kpis { display: flex; flex: 0 0 auto; align-items: stretch; gap: .45rem; margin-top: 0; }
+    .item-kpi { display: block; padding: .55rem .65rem; border-radius: 11px; background: rgba(255,255,255,.78); border-color: #e2e8f0; }
+    .item-kpi-label { display: block; color: #64748b; font-size: .62rem; line-height: 1.2; }
+    .item-kpi-value { display: block; margin-top: .2rem; color: #0f172a; font-size: .95rem; font-weight: 800; }
+    .item-card { border-radius: 18px; border-color: #e5e7eb; box-shadow: 0 10px 28px rgba(15,23,42,.045); }
+    .item-filter { grid-template-columns: minmax(220px, 1.45fr) repeat(4, minmax(118px, 1fr)) auto; gap: 10px; padding: 13px 15px; background: #fbfdff; }
+    .item-filter-search {
+        position: relative;
+        grid-column: span 2;
+        padding: 0;
+    }
+    .item-filter-search .item-label { color: #111827; margin-bottom: 6px; line-height: 1; }
+    .item-filter-search::before { content: '\F52A'; position: absolute; z-index: 2; left: 13px; bottom: 12px; color: #111827; font-family: 'bootstrap-icons'; font-size: .9rem; }
+    .item-label { height: 12px; margin-bottom: 6px; color: #64748b; font-size: .64rem; line-height: 1; letter-spacing: .08em; }
+    .item-filter .form-control, .item-filter .form-select { height: 40px; min-height: 40px; border-radius: 10px; background-color: #fff; font-size: .78rem; line-height: 1.2; }
+    .item-filter-search .form-control { padding-left: 36px; border: 1.5px solid #111827; border-radius: 10px; font-size: .84rem; font-weight: 650; box-shadow: 0 0 0 2px rgba(15,23,42,.04); }
+    .item-filter-search .form-control:focus { border-color: #111827; box-shadow: 0 0 0 3px rgba(15,23,42,.09); }
+    .item-filter .form-control::placeholder { color: #94a3b8; }
+    .item-filter > div:not(.item-filter-search), .item-filter-actions { min-width: 0; align-self: end; }
+    .item-filter-actions .btn { height: 40px; min-height: 40px; border-radius: 10px; }
+    .item-filter-actions .btn[type="submit"] { min-width: 40px; }
+    .item-filter.is-loading { opacity: .78; }
+    .item-filter.is-loading .item-filter-actions .btn[type="submit"] { pointer-events: none; }
+    .item-results { transition: opacity .16s ease; }
+    .item-results.is-loading { opacity: .42; pointer-events: none; }
+    .item-overview { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; padding: .65rem .9rem; border-bottom: 1px solid #eef2f7; background: #fff; }
+    .item-overview-label { margin-right: .25rem; color: #64748b; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+    .item-overview-stat { display: inline-flex; align-items: center; gap: .35rem; padding: .3rem .55rem; border-radius: 999px; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; font-size: .7rem; font-weight: 700; }
+    .item-overview-stat strong { color: #0f172a; font-size: .78rem; }
+    .item-bulk { padding: 10px 14px; background: #f8fbff; border-bottom-color: #e5e7eb; }
+    .item-bulk .btn { border-radius: 9px; }
+    .item-table-wrap { max-height: calc(100vh - 292px); }
+    .item-table { min-width: 1020px; font-size: .76rem; }
+    .item-page-admin .item-table { min-width: 0; }
+    .item-page-admin .item-table th:last-child,
+    .item-page-admin .item-table td:last-child { min-width: 88px; }
+    .item-page-admin .item-mobile-card-meta { grid-template-columns: 1fr; }
+    .item-table thead th { padding: .7rem .7rem; background: #fff; font-size: .61rem; vertical-align: middle; }
+    .item-table tbody td { padding: .72rem .7rem; font-size: .75rem; }
+    .item-table th:last-child, .item-table td:last-child { position: sticky; right: 0; z-index: 3; background: #fff; box-shadow: -8px 0 16px rgba(15,23,42,.06); }
+    .item-table thead th:last-child { z-index: 11; }
+    .item-table tbody tr:hover td:last-child { background: #f8fafc; }
+    .item-row-actions { gap: 5px; flex-wrap: nowrap; }
+    .item-row-actions .btn { min-width: 32px; min-height: 32px; padding: .3rem .48rem; border-radius: 9px; }
+    .item-row-actions .dropdown-menu { min-width: 160px; }
+    .item-footer { padding: 12px 14px; }
+    @media (max-width:1399.98px) and (min-width:701px) { .item-row-actions .action-label { display: none !important; } }
+    @media (max-width:1100px) and (min-width:901px) {
+        .item-kpis { display: grid; grid-template-columns: repeat(2, minmax(100px, 1fr)); width: 100%; }
+        .item-hero { flex-direction: column; align-items: stretch; }
+        .item-hero-main { flex-basis: auto; }
+        .item-actions { width: 100%; justify-content: flex-end; }
+        .item-filter { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .item-filter-search { grid-column: 1 / -1; }
+    }
+    @media (max-width:900px) and (min-width:701px) {
+        .item-kpis { display: grid; grid-template-columns: repeat(2, minmax(100px, 1fr)); width: 100%; }
+        .item-hero { flex-direction: column; align-items: stretch; }
+        .item-hero-main { flex-basis: auto; }
+        .item-actions { width: 100%; justify-content: flex-end; }
+        .item-filter { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .item-filter-search, .item-filter-actions { grid-column: 1 / -1; }
+    }
+    @media (max-width:700px) {
+        .item-page { padding: .65rem .55rem 4rem; }
+        .item-hero { padding: .9rem; border-radius: 15px; }
+        .item-icon { flex-basis: 34px; width: 34px; height: 34px; border-radius: 10px; }
+        .item-title { font-size: 1.12rem; }
+        .item-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: .7rem; }
+        .item-kpi-value { font-size: .88rem; }
+        .item-filter { grid-template-columns: 1fr; }
+        .item-filter-search, .item-filter-actions { grid-column: auto; }
+        .item-overview { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+        .item-overview::-webkit-scrollbar { display: none; }
+        .item-overview-label { flex: 0 0 auto; }
+        .item-overview-stat { flex: 0 0 auto; }
+        .item-table-wrap { max-height: none; }
+    }
+    body[data-theme="dark"] .item-hero { background: linear-gradient(135deg, #0f172a 0%, #111827 100%); border-color: #334155; }
+    body[data-theme="dark"] .item-icon { color: #f8fafc; background: #1f2937; }
+    body[data-theme="dark"] .item-kpi, body[data-theme="dark"] .item-overview-stat { background: rgba(15,23,42,.72); border-color: #334155; }
+    body[data-theme="dark"] .item-kpi-value, body[data-theme="dark"] .item-overview-stat strong { color: #f8fafc; }
+    body[data-theme="dark"] .item-filter, body[data-theme="dark"] .item-overview { background: #0f172a; border-color: #334155; }
+    body[data-theme="dark"] .item-filter-search .item-label, body[data-theme="dark"] .item-filter-search::before { color: #e2e8f0; }
+    body[data-theme="dark"] .item-filter-search .form-control { background: #0f172a; border-color: #cbd5e1; color: #f8fafc; box-shadow: none; }
+    body[data-theme="dark"] .item-filter .form-control, body[data-theme="dark"] .item-filter .form-select, body[data-theme="dark"] .item-table th:last-child, body[data-theme="dark"] .item-table td:last-child { background: #0f172a; }
+    body[data-theme="dark"] .item-table tbody tr:hover td:last-child { background: #111827; }
 </style>
 @endpush
 
 @section('content')
-<div class="item-page">
+<div class="item-page {{ $isAdminRole ? 'item-page-admin' : '' }}">
     <div class="item-hero">
         <div class="item-hero-main">
             <div class="item-icon"><i class="bi bi-box-seam"></i></div>
             <div>
                 <div class="item-eyebrow"><i class="bi bi-database-check"></i> Master Data</div>
                 <h1 class="item-title">Master Item</h1>
-                <div class="item-subtitle">Kelola item, satuan stok, satuan pembelian, HPP, dan metode pasok.</div>
-                <div class="item-kpis">
-                    <div class="item-kpi"><div class="item-kpi-label">Total Item</div><div class="item-kpi-value">{{ $fmt($stats['total']) }}</div></div>
-                    <div class="item-kpi"><div class="item-kpi-label">Aktif</div><div class="item-kpi-value">{{ $fmt($stats['active']) }}</div></div>
-                    <div class="item-kpi"><div class="item-kpi-label">Bisa Dibeli</div><div class="item-kpi-value">{{ $fmt($stats['can_buy']) }}</div></div>
-                    <div class="item-kpi"><div class="item-kpi-label">Bisa Dibuat</div><div class="item-kpi-value">{{ $fmt($stats['can_make']) }}</div></div>
-                    <div class="item-kpi"><div class="item-kpi-label">Hybrid</div><div class="item-kpi-value">{{ $fmt($stats['hybrid']) }}</div></div>
-                    <div class="item-kpi"><div class="item-kpi-label">HPP Kosong</div><div class="item-kpi-value">{{ $fmt($stats['missing_hpp']) }}</div></div>
-                </div>
             </div>
         </div>
-        <div class="item-actions">
-            @if($canManageMasterData)
-                <a href="{{ route('master.item_categories.index') }}" class="btn item-soft btn-sm"><i class="bi bi-tags"></i>Kategori</a>
-            @endif
-            <a href="{{ route('master.items.create') }}" class="btn item-primary btn-sm"><i class="bi bi-plus-lg"></i>Tambah Item</a>
-        </div>
+        @unless($isAdminRole)
+            <div class="item-kpis" aria-label="Ringkasan item">
+                <div class="item-kpi"><div class="item-kpi-label">Total Item</div><div class="item-kpi-value">{{ $fmt($stats['total']) }}</div></div>
+                <div class="item-kpi"><div class="item-kpi-label">Aktif</div><div class="item-kpi-value">{{ $fmt($stats['active']) }}</div></div>
+                <div class="item-kpi"><div class="item-kpi-label">HPP Kosong</div><div class="item-kpi-value">{{ $fmt($stats['missing_hpp']) }}</div></div>
+                <div class="item-kpi"><div class="item-kpi-label">Perlu Ditinjau</div><div class="item-kpi-value">{{ $fmt($supplySummary['review'] ?? 0) }}</div></div>
+            </div>
+            <div class="item-actions">
+                @if($canManageMasterData)
+                    <a href="{{ route('master.item_categories.index') }}" class="btn item-soft btn-sm"><i class="bi bi-tags"></i>Kategori</a>
+                @endif
+                <a href="{{ route('master.items.create') }}" class="btn item-primary btn-sm"><i class="bi bi-plus-lg"></i>Tambah Item</a>
+            </div>
+        @endunless
     </div>
 
     @if(session('success'))
@@ -182,7 +305,7 @@
         <form method="GET" action="{{ route('master.items.index') }}" class="item-filter">
             <div class="item-filter-search">
                 <label class="item-label" for="item-search">Cari item</label>
-                <input id="item-search" type="search" name="q" value="{{ request('q') }}" class="form-control" autocomplete="off">
+                <input id="item-search" type="search" name="q" value="{{ request('q') }}" class="form-control" autocomplete="off" placeholder="Kode, nama, atau SKU">
             </div>
             <div>
                 <label class="item-label" for="item-type">Tipe</label>
@@ -221,86 +344,111 @@
                 </select>
             </div>
             <div class="item-filter-actions">
-                <button class="btn item-primary btn-sm" type="submit"><i class="bi bi-search"></i>Cari</button>
-                @if($hasFilters)
-                    <a href="{{ route('master.items.index') }}" class="btn item-soft btn-sm" title="Hapus semua filter"><i class="bi bi-x-lg"></i><span class="d-none d-xl-inline">Reset</span></a>
-                @endif
+                <a href="{{ route('master.items.index') }}" class="btn item-soft btn-sm item-reset-filter {{ $hasFilters ? '' : 'd-none' }}" title="Hapus semua filter" aria-label="Reset filter"><i class="bi bi-x-lg"></i><span class="d-none d-xl-inline">Reset</span></a>
             </div>
         </form>
-        <div id="bulkToolbar" class="item-bulk d-none">
-            <strong><span id="selectedCount">0</span> item dipilih</strong>
-            <span class="item-muted">Aksi massal:</span>
-            <button type="button" class="btn item-soft btn-sm" data-bs-toggle="modal" data-bs-target="#bulkCategoryModal"><i class="bi bi-tags"></i>Kategori</button>
-            <button type="button" class="btn item-soft btn-sm" data-bs-toggle="modal" data-bs-target="#bulkTypeModal"><i class="bi bi-diagram-3"></i>Tipe</button>
-            <button type="button" class="btn item-soft btn-sm" data-bs-toggle="modal" data-bs-target="#bulkHppModal"><i class="bi bi-cash-stack"></i>Set HPP</button>
-            <button type="button" class="btn btn-link btn-sm text-muted ms-auto" id="bulkClear">Batal</button>
-        </div>
+        <div id="itemResults" class="item-results" aria-live="polite">
+            @if(! $isAdminRole && ($supplySummary['total'] ?? 0) > 0)
+                <div class="item-overview" aria-label="Ringkasan metode pasok">
+                    <span class="item-overview-label"><i class="bi bi-bar-chart-line me-1"></i>Ringkasan pasok</span>
+                    <span class="item-overview-stat"><strong>{{ $fmt($supplySummary['hybrid'] ?? 0) }}</strong> Hybrid</span>
+                    <span class="item-overview-stat"><strong>{{ $fmt($supplySummary['make_only'] ?? 0) }}</strong> Produksi</span>
+                    <span class="item-overview-stat"><strong>{{ $fmt($supplySummary['buy_only'] ?? 0) }}</strong> Beli</span>
+                    <span class="item-overview-stat"><strong>{{ $fmt($supplySummary['review'] ?? 0) }}</strong> Perlu ditinjau</span>
+                </div>
+            @endif
+        @unless($isAdminRole)
+            <div id="bulkToolbar" class="item-bulk d-none">
+                <strong><span id="selectedCount">0</span> item dipilih</strong>
+                <span class="item-muted">Aksi massal:</span>
+                <button type="button" class="btn item-soft btn-sm" data-bs-toggle="modal" data-bs-target="#bulkCategoryModal"><i class="bi bi-tags"></i>Kategori</button>
+                <button type="button" class="btn item-soft btn-sm" data-bs-toggle="modal" data-bs-target="#bulkTypeModal"><i class="bi bi-diagram-3"></i>Tipe</button>
+                <button type="button" class="btn item-soft btn-sm" data-bs-toggle="modal" data-bs-target="#bulkHppModal"><i class="bi bi-cash-stack"></i>Set HPP</button>
+                <button type="button" class="btn btn-link btn-sm text-muted ms-auto" id="bulkClear">Batal</button>
+            </div>
+        @endunless
 
         @if($items->count())
             <div class="item-table-wrap">
                 <table class="table table-hover align-middle item-table">
                     <thead>
                         <tr>
-                            <th class="text-center" style="width:38px;"><input type="checkbox" class="form-check-input" id="checkAll" aria-label="Pilih semua"></th>
-                            <th style="min-width:245px;">Item</th>
-                            <th style="min-width:185px;">Klasifikasi</th>
-                            <th style="min-width:190px;">Metode Pasok</th>
-                            <th style="min-width:145px;">HPP / Barcode</th>
-                            <th style="width:105px;">Status</th>
-                            <th class="text-end" style="width:190px;">Aksi</th>
+                            @unless($isAdminRole)
+                                <th class="text-center" style="width:38px;"><input type="checkbox" class="form-check-input" id="checkAll" aria-label="Pilih semua"></th>
+                            @endunless
+                            <th style="min-width:220px;">Item</th>
+                            @unless($isAdminRole)
+                                <th style="min-width:155px;">Klasifikasi</th>
+                                <th style="min-width:165px;">Metode Pasok</th>
+                                <th class="text-end" style="min-width:110px;">HPP</th>
+                            @endunless
+                            <th class="text-end" style="min-width:125px;">Harga Terakhir</th>
+                            @unless($isAdminRole)
+                                <th style="width:88px;">Status</th>
+                            @endunless
+                            <th class="text-end" style="width:132px;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($items as $item)
                             @php
                                 $hpp = (float) ($item->active_unit_cost ?? $item->effective_unit_cost ?? $item->hpp ?? 0);
-                                $barcodeCount = (int) ($item->barcodes_count ?? 0);
+                                $lastPurchasePrice = (float) ($item->last_purchase_price ?? 0);
                                 $modeClass = $item->isHybrid() ? 'item-status-hybrid' : ($item->canMake() ? 'item-status-make' : ($item->canBuy() ? 'item-status-buy' : 'item-status-undefined'));
                             @endphp
                             <tr>
-                                <td class="text-center"><input type="checkbox" class="form-check-input row-check" value="{{ $item->id }}" aria-label="Pilih {{ $item->code }}"></td>
+                                @unless($isAdminRole)
+                                    <td class="text-center"><input type="checkbox" class="form-check-input row-check" value="{{ $item->id }}" aria-label="Pilih {{ $item->code }}"></td>
+                                @endunless
                                 <td>
                                     <div><a class="item-code text-decoration-none" href="{{ route('master.items.show', $item) }}">{{ $item->code }}</a></div>
                                     <div class="item-name mt-1">{{ $item->name }}</div>
-                                    <div class="item-meta">SKU: {{ $item->sku ?: 'mengikuti kode' }} · stok {{ $item->stockUnit() }} · beli {{ $item->purchaseUnit() }}@if($item->purchaseConversionFactor() != 1) · 1 = {{ decimal_id($item->purchaseConversionFactor(), 6) }} {{ $item->stockUnit() }}@endif</div>
                                 </td>
-                                <td>
-                                    <span class="item-type">{{ $item->itemTypeOption?->name ?? ($typeLabels[$item->type] ?? $item->type) }}</span>
-                                    <div class="item-meta">{{ $item->category?->code ?? 'Tanpa kategori' }}{{ $item->category ? ' · '.$item->category->name : '' }}</div>
-                                    @if(($item->active_boms_count ?? 0) > 0)
-                                        <span class="item-bom-badge"><i class="bi bi-diagram-3"></i>{{ $item->active_boms_count }} BOM aktif</span>
-                                    @endif
+                                @unless($isAdminRole)
+                                    <td>
+                                        <span class="item-type">{{ $typeLabels[$item->type] ?? $item->type }}</span>
+                                        @if($item->category?->code)
+                                            <div class="item-meta">{{ $item->category->code }}</div>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if(in_array($item->type, ['finished_good', 'wip'], true))
+                                            <span class="item-status {{ $modeClass }}">{{ $item->supply_mode_label }}</span>
+                                        @else
+                                            <span class="item-muted">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="item-name">{{ $hpp > 0 ? 'Rp '.$fmt($hpp) : '—' }}</div>
+                                    </td>
+                                @endunless
+                                <td class="text-end">
+                                    <div class="item-name">{{ $lastPurchasePrice > 0 ? 'Rp '.$fmt($lastPurchasePrice) : '—' }}</div>
                                 </td>
-                                <td>
-                                    @if(in_array($item->type, ['finished_good', 'wip'], true))
-                                        <span class="item-status {{ $modeClass }}">{{ $item->supply_mode_label }}</span>
-                                        <div class="item-meta">Default: {{ $item->default_supply_source_label }}</div>
-                                    @else
-                                        <span class="item-muted">Tidak berlaku untuk material</span>
-                                    @endif
-                                </td>
-                                <td>
-                                    <div class="item-name">{{ $hpp > 0 ? 'Rp '.$fmt($hpp) : 'Belum di-set' }}</div>
-                                    <div class="item-meta"><i class="bi bi-upc-scan me-1"></i>{{ $barcodeCount }} barcode</div>
-                                </td>
-                                <td><span class="item-status {{ $item->active ? 'item-status-active' : 'item-status-off' }}">{{ $item->active ? 'Aktif' : 'Nonaktif' }}</span></td>
+                                @unless($isAdminRole)
+                                    <td><span class="item-status {{ $item->active ? 'item-status-active' : 'item-status-off' }}">{{ $item->active ? 'Aktif' : 'Nonaktif' }}</span></td>
+                                @endunless
                                 <td class="text-end">
                                     <div class="item-row-actions">
-                                        <a href="{{ route('master.items.show', $item) }}" class="btn item-soft btn-sm" title="Lihat detail"><i class="bi bi-eye"></i><span class="d-none d-xl-inline">Lihat</span></a>
-                                        <a href="{{ route('master.items.edit', $item) }}" class="btn item-primary btn-sm" title="Edit item"><i class="bi bi-pencil"></i><span class="d-none d-xl-inline">Edit</span></a>
-                                        <div class="dropdown">
-                                            <button type="button" class="btn item-soft btn-sm px-2" data-bs-toggle="dropdown" aria-expanded="false" title="Aksi lainnya"><i class="bi bi-three-dots"></i></button>
-                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                                                <li><a class="dropdown-item small" href="{{ route('master.items.hpp_temp.edit', $item) }}"><i class="bi bi-cash-coin me-2"></i>Set HPP</a></li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li>
-                                                    <form method="POST" action="{{ route('master.items.destroy', $item) }}" onsubmit="return confirm('Hapus item {{ addslashes($item->code) }}?');">
-                                                        @csrf @method('DELETE')
-                                                        <button type="submit" class="dropdown-item small text-danger"><i class="bi bi-trash3 me-2"></i>Hapus item</button>
-                                                    </form>
-                                                </li>
-                                            </ul>
-                                        </div>
+                                        @if($isAdminRole)
+                                            <a href="{{ route('master.items.show', $item) }}" class="btn item-soft btn-sm" title="Lihat detail" aria-label="Lihat detail {{ $item->code }}"><i class="bi bi-eye"></i><span class="action-label">Lihat</span></a>
+                                        @else
+                                            <a href="{{ route('master.items.show', $item) }}" class="btn item-soft btn-sm" title="Lihat detail" aria-label="Lihat detail {{ $item->code }}"><i class="bi bi-eye"></i><span class="action-label d-none d-xl-inline">Lihat</span></a>
+                                            <a href="{{ route('master.items.edit', $item) }}" class="btn item-primary btn-sm" title="Edit item" aria-label="Edit item {{ $item->code }}"><i class="bi bi-pencil"></i><span class="action-label d-none d-xl-inline">Edit</span></a>
+                                            <div class="dropdown">
+                                                <button type="button" class="btn item-soft btn-sm px-2" data-bs-toggle="dropdown" aria-expanded="false" title="Aksi lainnya"><i class="bi bi-three-dots"></i></button>
+                                                <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                                    <li><a class="dropdown-item small" href="{{ route('master.items.hpp_temp.edit', $item) }}"><i class="bi bi-cash-coin me-2"></i>Set HPP</a></li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li>
+                                                        <form method="POST" action="{{ route('master.items.destroy', $item) }}" onsubmit="return confirm('Hapus item {{ addslashes($item->code) }}?');">
+                                                            @csrf @method('DELETE')
+                                                            <button type="submit" class="dropdown-item small text-danger"><i class="bi bi-trash3 me-2"></i>Hapus item</button>
+                                                        </form>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>
@@ -312,45 +460,55 @@
                 @foreach($items as $item)
                     @php
                         $hpp = (float) ($item->active_unit_cost ?? $item->effective_unit_cost ?? $item->hpp ?? 0);
-                        $barcodeCount = (int) ($item->barcodes_count ?? 0);
+                        $lastPurchasePrice = (float) ($item->last_purchase_price ?? 0);
                         $modeClass = $item->isHybrid() ? 'item-status-hybrid' : ($item->canMake() ? 'item-status-make' : ($item->canBuy() ? 'item-status-buy' : 'item-status-undefined'));
                     @endphp
                     <article class="item-mobile-card">
                         <div class="item-mobile-card-head">
                             <div class="d-flex align-items-start gap-2 min-w-0">
-                                <input type="checkbox" class="form-check-input row-check mt-1" value="{{ $item->id }}" aria-label="Pilih {{ $item->code }}">
+                                @unless($isAdminRole)
+                                    <input type="checkbox" class="form-check-input row-check mt-1" value="{{ $item->id }}" aria-label="Pilih {{ $item->code }}">
+                                @endunless
                                 <div class="item-mobile-card-title">
                                     <a class="item-code text-decoration-none" href="{{ route('master.items.show', $item) }}">{{ $item->code }}</a>
                                     <div class="item-name mt-1">{{ $item->name }}</div>
-                                    <div class="item-meta">SKU: {{ $item->sku ?: 'mengikuti kode' }} · stok {{ $item->stockUnit() }} · beli {{ $item->purchaseUnit() }}@if($item->purchaseConversionFactor() != 1) · 1 = {{ decimal_id($item->purchaseConversionFactor(), 6) }} {{ $item->stockUnit() }}@endif</div>
                                 </div>
                             </div>
-                            <span class="item-status {{ $item->active ? 'item-status-active' : 'item-status-off' }}">{{ $item->active ? 'Aktif' : 'Nonaktif' }}</span>
+                            @unless($isAdminRole)
+                                <span class="item-status {{ $item->active ? 'item-status-active' : 'item-status-off' }}">{{ $item->active ? 'Aktif' : 'Nonaktif' }}</span>
+                            @endunless
                         </div>
                         <div class="item-mobile-card-meta">
-                            <div><div class="item-mobile-card-label">Tipe</div><div class="item-mobile-card-value">{{ $item->itemTypeOption?->name ?? ($typeLabels[$item->type] ?? $item->type) }}</div></div>
-                            <div><div class="item-mobile-card-label">Kategori</div><div class="item-mobile-card-value">{{ $item->category?->code ?? 'Tanpa kategori' }} @if(($item->active_boms_count ?? 0) > 0)<span class="item-bom-badge"><i class="bi bi-diagram-3"></i>{{ $item->active_boms_count }} BOM</span>@endif</div></div>
-                            <div><div class="item-mobile-card-label">Pasok</div><div class="item-mobile-card-value">@if(in_array($item->type, ['finished_good', 'wip'], true))<span class="item-status {{ $modeClass }}">{{ $item->supply_mode_label }}</span>@else-@endif</div></div>
-                            <div><div class="item-mobile-card-label">HPP / Barcode</div><div class="item-mobile-card-value">{{ $hpp > 0 ? 'Rp '.$fmt($hpp) : 'Belum di-set' }} · {{ $barcodeCount }}</div></div>
+                            @unless($isAdminRole)
+                                <div><div class="item-mobile-card-label">Tipe</div><div class="item-mobile-card-value">{{ $typeLabels[$item->type] ?? $item->type }}</div></div>
+                                <div><div class="item-mobile-card-label">Kategori</div><div class="item-mobile-card-value">{{ $item->category?->code ?? '—' }}</div></div>
+                                <div><div class="item-mobile-card-label">Pasok</div><div class="item-mobile-card-value">@if(in_array($item->type, ['finished_good', 'wip'], true))<span class="item-status {{ $modeClass }}">{{ $item->supply_mode_label }}</span>@else—@endif</div></div>
+                                <div><div class="item-mobile-card-label">HPP</div><div class="item-mobile-card-value">{{ $hpp > 0 ? 'Rp '.$fmt($hpp) : '—' }}</div></div>
+                            @endunless
+                            <div><div class="item-mobile-card-label">Harga terakhir</div><div class="item-mobile-card-value">{{ $lastPurchasePrice > 0 ? 'Rp '.$fmt($lastPurchasePrice) : '—' }}</div></div>
                         </div>
                         <div class="item-mobile-card-footer">
                             <div class="item-mobile-card-actions">
                                 <a href="{{ route('master.items.show', $item) }}" class="btn item-soft btn-sm"><i class="bi bi-eye"></i>Lihat</a>
-                                <a href="{{ route('master.items.edit', $item) }}" class="btn item-primary btn-sm"><i class="bi bi-pencil"></i>Edit</a>
+                                @unless($isAdminRole)
+                                    <a href="{{ route('master.items.edit', $item) }}" class="btn item-primary btn-sm"><i class="bi bi-pencil"></i>Edit</a>
+                                @endunless
                             </div>
-                            <div class="dropdown">
-                                <button type="button" class="btn item-soft btn-sm px-2" data-bs-toggle="dropdown" aria-expanded="false" title="Aksi lainnya"><i class="bi bi-three-dots"></i></button>
-                                <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                                    <li><a class="dropdown-item small" href="{{ route('master.items.hpp_temp.edit', $item) }}"><i class="bi bi-cash-coin me-2"></i>Set HPP</a></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li>
-                                        <form method="POST" action="{{ route('master.items.destroy', $item) }}" onsubmit="return confirm('Hapus item {{ addslashes($item->code) }}?');">
-                                            @csrf @method('DELETE')
-                                            <button type="submit" class="dropdown-item small text-danger"><i class="bi bi-trash3 me-2"></i>Hapus item</button>
-                                        </form>
-                                    </li>
-                                </ul>
-                            </div>
+                            @unless($isAdminRole)
+                                <div class="dropdown">
+                                    <button type="button" class="btn item-soft btn-sm px-2" data-bs-toggle="dropdown" aria-expanded="false" title="Aksi lainnya"><i class="bi bi-three-dots"></i></button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                        <li><a class="dropdown-item small" href="{{ route('master.items.hpp_temp.edit', $item) }}"><i class="bi bi-cash-coin me-2"></i>Set HPP</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <form method="POST" action="{{ route('master.items.destroy', $item) }}" onsubmit="return confirm('Hapus item {{ addslashes($item->code) }}?');">
+                                                @csrf @method('DELETE')
+                                                <button type="submit" class="dropdown-item small text-danger"><i class="bi bi-trash3 me-2"></i>Hapus item</button>
+                                            </form>
+                                        </li>
+                                    </ul>
+                                </div>
+                            @endunless
                         </div>
                     </article>
                 @endforeach
@@ -361,12 +519,14 @@
                 <div class="item-empty-icon"><i class="bi bi-search"></i></div>
                 <div class="fw-bold">Tidak ada item yang cocok</div>
                 <div class="small mt-1">Coba ubah kata pencarian atau reset filter.</div>
-                @if($hasFilters)<a href="{{ route('master.items.index') }}" class="btn item-soft btn-sm mt-3">Reset filter</a>@endif
+                @if($hasFilters)<a href="{{ route('master.items.index') }}" class="btn item-soft btn-sm mt-3 item-reset-filter">Reset filter</a>@endif
             </div>
         @endif
+        </div>
     </div>
 </div>
 
+@unless($isAdminRole)
 <div class="modal fade" id="bulkCategoryModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <form method="POST" action="{{ route('master.items.bulk_update') }}" class="modal-content bulk-form">
@@ -402,38 +562,146 @@
         </form>
     </div>
 </div>
+@endunless
 @endsection
 
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const checkAll = document.getElementById('checkAll');
-    const toolbar = document.getElementById('bulkToolbar');
-    const selectedCount = document.getElementById('selectedCount');
-    const clearButton = document.getElementById('bulkClear');
-    const rowChecks = () => Array.from(document.querySelectorAll('.row-check'));
-    const selectedChecks = () => rowChecks().filter(input => input.checked);
-    function refreshBulkUi() {
-        const rows = rowChecks(), selected = selectedChecks();
-        if (toolbar) toolbar.classList.toggle('d-none', selected.length === 0);
-        if (selectedCount) selectedCount.textContent = selected.length;
-        document.querySelectorAll('.sel-count').forEach(node => node.textContent = selected.length);
-        if (checkAll) { checkAll.checked = rows.length > 0 && selected.length === rows.length; checkAll.indeterminate = selected.length > 0 && selected.length < rows.length; }
-    }
-    checkAll?.addEventListener('change', () => { rowChecks().forEach(input => input.checked = checkAll.checked); refreshBulkUi(); });
-    rowChecks().forEach(input => input.addEventListener('change', refreshBulkUi));
-    clearButton?.addEventListener('click', () => { rowChecks().forEach(input => input.checked = false); refreshBulkUi(); });
-    document.querySelectorAll('.bulk-form').forEach(form => form.addEventListener('submit', function (event) {
-        const selected = selectedChecks();
-        if (!selected.length) { event.preventDefault(); window.alert('Pilih minimal satu item terlebih dahulu.'); return; }
-        const container = form.querySelector('.ids-container');
-        if (!container) return;
-        container.replaceChildren(...selected.map(input => { const hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = 'item_ids[]'; hidden.value = input.value; return hidden; }));
-    }));
     const filterForm = document.querySelector('.item-filter');
-    document.getElementById('item-search')?.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); filterForm?.submit(); } });
-    filterForm?.querySelectorAll('select').forEach(select => select.addEventListener('change', () => filterForm.submit()));
-    refreshBulkUi();
+    const results = () => document.getElementById('itemResults');
+    let filterTimer = null;
+    let activeRequest = null;
+
+    function selectedIds() {
+        return [...new Set(Array.from(document.querySelectorAll('#itemResults .row-check:checked')).map(input => input.value))];
+    }
+
+    function refreshBulkUi() {
+        const rows = Array.from(document.querySelectorAll('#itemResults .row-check'));
+        const ids = selectedIds();
+        const toolbar = document.getElementById('bulkToolbar');
+        const checkAll = document.getElementById('checkAll');
+        const selectedCount = document.getElementById('selectedCount');
+        if (toolbar) toolbar.classList.toggle('d-none', ids.length === 0);
+        if (selectedCount) selectedCount.textContent = ids.length;
+        document.querySelectorAll('#itemResults .sel-count').forEach(node => node.textContent = ids.length);
+        if (checkAll) {
+            const rowIds = [...new Set(rows.map(input => input.value))];
+            checkAll.checked = rowIds.length > 0 && rowIds.every(id => ids.includes(id));
+            checkAll.indeterminate = ids.length > 0 && !checkAll.checked;
+        }
+    }
+
+    function bindBulkControls() {
+        const checkAll = document.getElementById('checkAll');
+        const clearButton = document.getElementById('bulkClear');
+        document.querySelectorAll('#itemResults .row-check').forEach(input => input.addEventListener('change', () => {
+            document.querySelectorAll(`#itemResults .row-check[value="${CSS.escape(input.value)}"]`).forEach(peer => peer.checked = input.checked);
+            refreshBulkUi();
+        }));
+        checkAll?.addEventListener('change', () => {
+            document.querySelectorAll('#itemResults .row-check').forEach(input => input.checked = checkAll.checked);
+            refreshBulkUi();
+        });
+        clearButton?.addEventListener('click', () => {
+            document.querySelectorAll('#itemResults .row-check').forEach(input => input.checked = false);
+            refreshBulkUi();
+        });
+        document.querySelectorAll('#itemResults .bulk-form').forEach(form => form.addEventListener('submit', function (event) {
+            const ids = selectedIds();
+            if (!ids.length) {
+                event.preventDefault();
+                window.alert('Pilih minimal satu item terlebih dahulu.');
+                return;
+            }
+            const container = form.querySelector('.ids-container');
+            if (!container) return;
+            container.replaceChildren(...ids.map(id => {
+                const hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.name = 'item_ids[]';
+                hidden.value = id;
+                return hidden;
+            }));
+        }));
+        refreshBulkUi();
+    }
+
+    function buildFilterUrl() {
+        const url = new URL(filterForm.action, window.location.href);
+        const data = new FormData(filterForm);
+        for (const [key, value] of data.entries()) {
+            if (String(value).trim() !== '') url.searchParams.set(key, value);
+        }
+        url.searchParams.delete('page');
+        return url;
+    }
+
+    function syncFilterChrome(url) {
+        document.querySelectorAll('.item-reset-filter').forEach(link => link.classList.toggle('d-none', !['q', 'type', 'category_kind', 'item_category_id', 'supply_mode'].some(key => url.searchParams.get(key))));
+    }
+
+    async function refreshItems(url) {
+        activeRequest?.abort();
+        const requestController = new AbortController();
+        activeRequest = requestController;
+        filterForm.classList.add('is-loading');
+        results()?.classList.add('is-loading');
+        const submitButton = document.getElementById('itemFilterSubmit');
+        if (submitButton) submitButton.disabled = true;
+
+        try {
+            const response = await fetch(url.toString(), {
+                signal: requestController.signal,
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
+            });
+            if (!response.ok) throw new Error(`Filter request failed: ${response.status}`);
+            const html = await response.text();
+            const incoming = new DOMParser().parseFromString(html, 'text/html').querySelector('#itemResults');
+            const current = results();
+            if (!incoming || !current) throw new Error('Hasil filter tidak ditemukan.');
+            current.replaceWith(incoming);
+            window.history.replaceState({}, '', url.toString());
+            syncFilterChrome(url);
+            bindBulkControls();
+        } catch (error) {
+            if (error.name !== 'AbortError') console.error(error);
+        } finally {
+            if (activeRequest === requestController) {
+                filterForm.classList.remove('is-loading');
+                results()?.classList.remove('is-loading');
+                if (submitButton) submitButton.disabled = false;
+            }
+        }
+    }
+
+    filterForm?.addEventListener('submit', event => {
+        event.preventDefault();
+        clearTimeout(filterTimer);
+        refreshItems(buildFilterUrl());
+    });
+    document.getElementById('item-search')?.addEventListener('input', () => {
+        clearTimeout(filterTimer);
+        filterTimer = setTimeout(() => refreshItems(buildFilterUrl()), 280);
+    });
+    filterForm?.querySelectorAll('select').forEach(select => select.addEventListener('change', () => refreshItems(buildFilterUrl())));
+    document.addEventListener('click', event => {
+        const link = event.target.closest('.item-reset-filter');
+        if (!link) return;
+        event.preventDefault();
+        filterForm.reset();
+        refreshItems(new URL(link.href, window.location.href));
+    });
+    document.addEventListener('click', event => {
+        const pageLink = event.target.closest('#itemResults .pagination a');
+        if (!pageLink) return;
+        event.preventDefault();
+        refreshItems(new URL(pageLink.href, window.location.href));
+    });
+
+    bindBulkControls();
+    syncFilterChrome(new URL(window.location.href));
 });
 </script>
 @endpush
