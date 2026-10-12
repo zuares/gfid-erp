@@ -41,7 +41,6 @@
       font-size:14px;
       line-height:1.4;
       margin:0;
-      height:100%;
       touch-action: pan-x pan-y;
     }
 
@@ -104,7 +103,7 @@
       --vv-kbd: 0px;   /* estimasi tinggi keyboard untuk dorong bottom nav */
     }
 
-    #app.app-root{ min-height: var(--app-vh); }
+    #app.app-root{ min-height: max(0px, calc(var(--app-vh) - var(--app-navbar-offset, 58px))); }
 
     /* ✅ Mobile: anti horizontal scroll + ganjel konten di atas bottom-nav */
     @media (max-width: 767.98px){
@@ -117,7 +116,7 @@
       }
 
       .app-main .page-wrap{
-        padding-bottom: 9rem; /* > tinggi bottom nav */
+        padding-bottom: var(--mobile-bottom-nav-clearance, calc(70px + env(safe-area-inset-bottom, 0px) + 1rem));
       }
     }
 

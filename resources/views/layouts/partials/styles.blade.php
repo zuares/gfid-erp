@@ -51,6 +51,12 @@
     /* Android baseline viewport helper (dipakai layout kamu) */
     --app-vh: 100vh;
     --vv-kbd: 0px;
+
+    /* Navbar fixed tetap membutuhkan ruang di flow dokumen. */
+    --app-navbar-offset: 58px;
+
+    /* Clearance konten dari mobile bottom navigation yang fixed. */
+    --mobile-bottom-nav-clearance: calc(70px + env(safe-area-inset-bottom, 0px) + 1rem);
   }
 
   /* ========= THEME RESOLVER ========= */
@@ -168,7 +174,16 @@
      eksplisit setelah ruang sidebar dikurangi. Tanpa ini, width:100% +
      margin-left membuat konten melebar melewati viewport dan tertutup sidebar.
   */
-  #app.app-root{ min-height:var(--app-vh); width:100%; min-width:0; }
+  /*
+     body punya padding-top untuk navbar fixed. Kurangi offset tersebut dari
+     tinggi minimum app agar tinggi dokumen tidak menjadi 1 viewport + tinggi
+     navbar (yang terlihat sebagai ruang kosong ekstra di mobile).
+  */
+  #app.app-root{
+    min-height:max(0px, calc(var(--app-vh) - var(--app-navbar-offset)));
+    width:100%;
+    min-width:0;
+  }
   .app-shell{ min-height:0; width:100%; min-width:0; }
   .app-main{
     width:100%;
@@ -188,6 +203,8 @@
   }
 
   @media (min-width:768px) and (max-width:991.98px){
+    :root{ --app-navbar-offset:62px; }
+
     .app-main{
       width:calc(100% - var(--sidebar-width-tablet));
       margin-left:var(--sidebar-width-tablet);
@@ -195,6 +212,8 @@
   }
 
   @media (min-width:992px){
+    :root{ --app-navbar-offset:62px; }
+
     .app-main{
       width:calc(100% - var(--sidebar-width-desktop));
       margin-left:var(--sidebar-width-desktop);
@@ -203,8 +222,8 @@
 
   @media (max-width: 767.98px){
     .app-main .page-wrap{
-      /* ruang aman dari bottom nav */
-      padding-bottom: 9rem;
+      /* ruang aman secukupnya dari bottom nav */
+      padding-bottom:var(--mobile-bottom-nav-clearance);
     }
   }
 
