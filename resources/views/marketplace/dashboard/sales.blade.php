@@ -3534,15 +3534,60 @@
             );
             $watchlistLowMarginThreshold = 20;
             $watchlistRoasThreshold = 2;
-            $watchlistLossProducts = $productAnalysisProducts->filter(fn ($product) => $product->net_profit !== null && (float) $product->net_profit < 0);
-            $watchlistLowMarginProducts = $productAnalysisProducts->filter(function ($product) use ($watchlistLowMarginThreshold) {
+            $watchlistProductGroups = $productAnalysisProducts->groupBy(function ($product) {
+                $marketplaceCode = trim((string) ($product->external_item_id ?? ''));
+
+                return $marketplaceCode !== ''
+                    ? 'code:'.$marketplaceCode
+                    : 'title:'.mb_strtolower(trim((string) ($product->marketplace_name ?: $product->name)) ?: 'produk tanpa nama');
+            });
+            $watchlistAnalysisProducts = $watchlistProductGroups->map(function ($products) {
+                $watchProduct = clone $products->first();
+                $sumFields = [
+                    'qty', 'orders', 'buyers', 'sales', 'net_sales', 'buyer_payment',
+                    'estimated_payout', 'ad_spend', 'ad_sales', 'ad_conversions', 'hpp_total',
+                ];
+                foreach ($sumFields as $field) {
+                    $watchProduct->{$field} = $products->sum(fn ($product) => (float) ($product->{$field} ?? 0));
+                }
+
+                $hasCompleteHpp = $products->every(fn ($product) => $product->gross_profit !== null);
+                $hasCompletePayout = $products->every(fn ($product) => $product->net_profit !== null);
+                $watchProduct->gross_profit = $hasCompleteHpp
+                    ? (float) $products->sum(fn ($product) => (float) $product->gross_profit)
+                    : null;
+                $watchProduct->contribution_profit = $hasCompleteHpp
+                    ? (float) $products->sum(fn ($product) => (float) ($product->contribution_profit ?? 0))
+                    : null;
+                $watchProduct->net_profit = $hasCompletePayout
+                    ? (float) $products->sum(fn ($product) => (float) $product->net_profit)
+                    : null;
+                $watchProduct->gross_margin = $watchProduct->gross_profit !== null && $watchProduct->net_sales > 0
+                    ? ($watchProduct->gross_profit / $watchProduct->net_sales) * 100
+                    : null;
+                $watchProduct->contribution_margin = $watchProduct->contribution_profit !== null && $watchProduct->net_sales > 0
+                    ? ($watchProduct->contribution_profit / $watchProduct->net_sales) * 100
+                    : null;
+                $watchProduct->net_margin = $watchProduct->net_profit !== null && $watchProduct->estimated_payout > 0
+                    ? ($watchProduct->net_profit / $watchProduct->estimated_payout) * 100
+                    : null;
+                $watchProduct->ad_spend_matched = $products->contains(fn ($product) => (bool) ($product->ad_spend_matched ?? false));
+                $watchProduct->watchlist_mapping_complete = $products->every(fn ($product) => (int) ($product->internal_item_id ?? 0) > 0);
+                $watchProduct->internal_item_id = $watchProduct->watchlist_mapping_complete
+                    ? (int) ($products->first()->internal_item_id ?? 0)
+                    : 0;
+
+                return $watchProduct;
+            })->values();
+            $watchlistLossProducts = $watchlistAnalysisProducts->filter(fn ($product) => $product->net_profit !== null && (float) $product->net_profit < 0);
+            $watchlistLowMarginProducts = $watchlistAnalysisProducts->filter(function ($product) use ($watchlistLowMarginThreshold) {
                 return $product->net_profit !== null
                     && (float) $product->net_profit >= 0
                     && $product->net_margin !== null
                     && (float) ($product->estimated_payout ?? 0) > 0
                     && (float) $product->net_margin < $watchlistLowMarginThreshold;
             });
-            $watchlistAdRiskProducts = $productAnalysisProducts->filter(function ($product) use ($watchlistRoasThreshold) {
+            $watchlistAdRiskProducts = $watchlistAnalysisProducts->filter(function ($product) use ($watchlistRoasThreshold) {
                 $adSpend = (float) ($product->ad_spend ?? 0);
                 $adSales = (float) ($product->ad_sales ?? 0);
 
@@ -3550,9 +3595,9 @@
                     && $adSpend > 0
                     && ($adSales <= 0 || ($adSales / $adSpend) < $watchlistRoasThreshold);
             });
-            $watchlistMissingHppProducts = $productAnalysisProducts->filter(fn ($product) => $product->gross_profit === null);
-            $watchlistUnmappedProducts = $productAnalysisProducts->filter(fn ($product) => (int) ($product->internal_item_id ?? 0) <= 0);
-            $watchlistProducts = $productAnalysisProducts
+            $watchlistMissingHppProducts = $watchlistAnalysisProducts->filter(fn ($product) => $product->gross_profit === null);
+            $watchlistUnmappedProducts = $watchlistAnalysisProducts->filter(fn ($product) => ! ($product->watchlist_mapping_complete ?? ((int) ($product->internal_item_id ?? 0) > 0)));
+            $watchlistProducts = $watchlistAnalysisProducts
                 ->map(function ($product) use ($watchlistLowMarginThreshold, $watchlistRoasThreshold) {
                     $issues = [];
                     $issueKeys = [];
@@ -3695,9 +3740,10 @@
                                     $watchProductCode = trim((string) ($watchProduct->external_item_id ?? '')) ?: trim((string) ($watchProduct->sku ?? ''));
                                     $watchNetMargin = $watchProduct->net_margin !== null ? (float) $watchProduct->net_margin : null;
                                     $watchNetProfit = $watchProduct->net_profit !== null ? (float) $watchProduct->net_profit : null;
+                                    $watchMappingComplete = (bool) ($watchProduct->watchlist_mapping_complete ?? ((int) ($watchProduct->internal_item_id ?? 0) > 0));
                                     $watchStatus = $watchProduct->gross_profit === null
                                         ? 'HPP belum lengkap'
-                                        : ((int) ($watchProduct->internal_item_id ?? 0) > 0 ? 'Mapped' : 'Belum mapping');
+                                        : ($watchMappingComplete ? 'Mapped' : 'Belum mapping');
                                 @endphp
                                 <tr data-watchlist-row data-watchlist-issues="{{ implode('|', $watchRow['issue_keys']) }}">
                                     <td><span class="sales-watchlist-badge {{ $watchTone }}">{{ $watchRow['priority'] >= 4 ? 'Tinggi' : ($watchRow['priority'] >= 3 ? 'Sedang' : 'Pantau') }}</span></td>
@@ -3726,8 +3772,8 @@
                                     <td class="text-end sales-watchlist-number">{{ ($watchProduct->ad_spend ?? 0) > 0 ? $multipleDisplay(($watchProduct->ad_sales ?? 0) / $watchProduct->ad_spend) : '—' }}</td>
                                     <td>
                                         <div class="d-flex align-items-center gap-2 flex-wrap">
-                                            <span class="sales-watchlist-badge {{ $watchProduct->gross_profit === null || (int) ($watchProduct->internal_item_id ?? 0) <= 0 ? 'is-warning' : 'is-muted' }}">{{ $watchStatus }}</span>
-                                            @if ((int) ($watchProduct->internal_item_id ?? 0) <= 0 && $watchProductSku !== '' && $watchProductSku !== '-')
+                                            <span class="sales-watchlist-badge {{ $watchProduct->gross_profit === null || ! $watchMappingComplete ? 'is-warning' : 'is-muted' }}">{{ $watchStatus }}</span>
+                                            @if (! $watchMappingComplete && $watchProductSku !== '' && $watchProductSku !== '-')
                                                 <button type="button" class="btn btn-outline-primary sales-watchlist-map" data-watchlist-map data-watchlist-map-sku="{{ $watchProductSku }}" title="Mapping SKU marketplace ke item internal">Map</button>
                                             @endif
                                         </div>
