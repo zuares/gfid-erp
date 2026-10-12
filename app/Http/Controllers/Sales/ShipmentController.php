@@ -998,9 +998,22 @@ class ShipmentController extends Controller
     {
         $stores = Store::orderBy('code')->get();
         $whRts = $this->whRts();
-        $initialShipmentType = $request->query('type') === Shipment::TYPE_AFFILIATE
-            ? Shipment::TYPE_AFFILIATE
-            : Shipment::TYPE_MANUAL;
+        $requestedType = (string) $request->query('type', '');
+        $initialShipmentType = in_array($requestedType, [
+            Shipment::TYPE_MARKETPLACE,
+            Shipment::TYPE_MANUAL,
+            Shipment::TYPE_AFFILIATE,
+        ], true)
+            ? $requestedType
+            : ($request->user()?->role === 'admin'
+                ? Shipment::TYPE_MARKETPLACE
+                : Shipment::TYPE_MANUAL);
+        $initialScanMode = in_array($initialShipmentType, [
+            Shipment::TYPE_MARKETPLACE,
+            Shipment::TYPE_AFFILIATE,
+        ], true)
+            ? 'order_first'
+            : 'item_first';
 
         $invoice = null;
         if ($request->filled('sales_invoice_id')) {
@@ -1034,7 +1047,8 @@ class ShipmentController extends Controller
             'invoice',
             'kpi',
             'latestDraft',
-            'initialShipmentType'
+            'initialShipmentType',
+            'initialScanMode'
         ));
     }
 

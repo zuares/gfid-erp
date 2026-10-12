@@ -127,6 +127,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Shipment belum siap dikirim')
             ->assertSee('belum terhubung ke order')
             ->assertSee('Order & Item')
+            ->assertSee('Item First Test')
             ->assertDontSee('data-sd-tab="rekon"', false)
             ->assertDontSee('sd-tab-rekon', false)
             ->assertDontSee('sd-tab-unlinked', false);
@@ -417,6 +418,24 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Detail shipment')
             ->assertSee('Batalkan shipment')
             ->assertDontSee('<th style="width: 170px;">Waktu</th>', false);
+    }
+
+    public function test_admin_create_defaults_to_marketplace_and_order_first(): void
+    {
+        [$owner] = $this->shipmentContext();
+        $admin = User::factory()->create([
+            'employee_code' => 'SIF-ADMIN-CREATE-' . strtoupper(substr(uniqid(), -8)),
+            'role' => 'admin',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('sales.shipments.create'))
+            ->assertOk()
+            ->assertSee('name="shipment_type" id="shipmentTypeInput" value="marketplace"', false)
+            ->assertSee('name="scan_mode" id="scanModeInput" value="order_first"', false)
+            ->assertSee('data-shipment-type="marketplace"', false)
+            ->assertSee('data-scan-mode="order_first"', false)
+            ->assertDontSee('Dinonaktifkan sementara untuk Admin', false);
     }
 
     public function test_unknown_item_is_rejected_before_creating_daily_wave(): void

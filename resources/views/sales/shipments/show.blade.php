@@ -107,6 +107,98 @@
   .sd-name,.sd-mobile-muted{display:none}
   .sd-total{display:none!important}
 }
+
+/* Shipment detail: satu skala visual dengan index dan scan-order. */
+.sd-wrap{
+  max-width:960px;
+  padding:.55rem .7rem 3.5rem;
+}
+.sd-topbar{
+  position:sticky;
+  top:0;
+  z-index:250;
+  margin:0 0 .6rem;
+  padding:.55rem .7rem;
+  border:1px solid #dbe3ee;
+  border-radius:10px;
+  background:linear-gradient(135deg,#fff 0%,#f8fbff 100%);
+  box-shadow:0 2px 10px rgba(15,23,42,.035);
+}
+.sd-code{font-size:1rem;font-weight:750;color:#172554}
+.sd-btn,.sd-pill{
+  min-height:32px;
+  padding:.28rem .58rem;
+  border-radius:7px;
+  font-size:.7rem;
+  font-weight:650;
+  line-height:1.2;
+}
+.sd-btn .bi,.sd-pill .bi{font-size:.82rem;line-height:1;vertical-align:-.08em}
+.sd-pill{gap:.28rem}
+.sd-status{font-size:.66rem;font-weight:700}
+.sd-flow{
+  gap:.28rem;
+  margin:.4rem 0 .55rem;
+  padding:.2rem 0;
+  border:0;
+  background:transparent;
+}
+.sd-step{padding:.16rem .45rem;border-radius:6px;font-size:.66rem;font-weight:650}
+.sd-sep{font-size:.64rem}
+.sd-grid{gap:.4rem;margin-bottom:.55rem}
+.sd-card{margin-bottom:.55rem;border-color:#dbe3ee;border-radius:10px;box-shadow:0 2px 10px rgba(15,23,42,.035)}
+.sd-kpi{padding:.55rem .65rem}
+.sd-label{font-size:.62rem;font-weight:700;letter-spacing:.06em}
+.sd-value{margin-top:.08rem;font-size:1rem;font-weight:750}
+.sd-head{padding:.58rem .7rem}
+.sd-title{font-size:.78rem;font-weight:750}
+.sd-muted{font-size:.7rem}
+.sd-body{padding:.65rem .7rem}
+.sd-tabs{gap:.15rem;margin-bottom:.55rem}
+.sd-tab{gap:.3rem;padding:.45rem .65rem;font-size:.72rem;font-weight:700}
+.sd-tab-count{min-width:1.2rem;height:1.2rem;font-size:.64rem}
+.sd-order{gap:.55rem;padding:.5rem .58rem;border-color:#e2e8f0}
+.sd-order-no{font-size:.78rem}
+.sd-order-num{min-width:1.35rem;height:1.35rem;font-size:.7rem}
+.sd-order-qty{min-width:38px;padding:.16rem .4rem;font-size:.7rem}
+.sd-order-items{margin:.45rem 0 0 1.9rem;padding:.15rem .5rem 0}
+.sd-order-item{gap:.5rem;padding:.42rem 0}
+.sd-order-item-code{font-size:.74rem}
+.sd-order-item-name{font-size:.7rem}
+.sd-order-item-qty{font-size:.72rem}
+.sd-badge{padding:.14rem .42rem;font-size:.64rem;font-weight:700}
+.sd-table-wrap{border-color:#e2e8f0;border-radius:8px}
+.sd-table th,.sd-table td{padding:.48rem .58rem}
+.sd-table th{font-size:.64rem;font-weight:750}
+.sd-table td{font-size:.76rem}
+.sd-name{font-size:.7rem}
+.sd-group-cat{font-size:.68rem}
+.sd-group-count{font-size:.62rem}
+.sd-wave{gap:.55rem;padding:.52rem .6rem}
+.sd-wave-title{font-size:.74rem}
+.sd-wave-meta{font-size:.68rem}
+.sd-wave-status{font-size:.64rem;padding:.16rem .42rem}
+
+body[data-theme="dark"] .sd-topbar,
+body[data-theme="dark"] .sd-card,
+body[data-theme="dark"] .sd-table tr{
+  border-color:rgba(71,85,105,.75);
+  background:#111827;
+  box-shadow:none;
+}
+body[data-theme="dark"] .sd-topbar{background:#111827}
+body[data-theme="dark"] .sd-code,
+body[data-theme="dark"] .sd-value,
+body[data-theme="dark"] .sd-order-no,
+body[data-theme="dark"] .sd-order-item-code{color:#f1f5f9}
+
+@media(max-width:860px){
+  .sd-wrap{padding:.5rem .5rem 3.5rem}
+  .sd-topbar{margin:0 0 .55rem;padding:.5rem .55rem}
+  .sd-btn,.sd-pill{font-size:.68rem}
+  .sd-code{font-size:.94rem}
+  .sd-body{padding:.58rem .6rem}
+}
 </style>
 @endpush
 
@@ -145,27 +237,27 @@
 </div>
 @endif
 
+<div class="sd-wrap">
 <div class="sd-topbar">
-        <a href="{{ route('sales.shipments.index') }}" class="sd-btn">Kembali</a>
+        <a href="{{ route('sales.shipments.index') }}" class="sd-btn"><i class="bi bi-arrow-left" aria-hidden="true"></i> Kembali</a>
     @if(app()->environment(['local', 'testing']))
     <button class="sd-btn" style="background:#fff3cd;color:#856404;border-color:#ffeeba" onclick="window.location.search = '?dummy=1'">🧪 Test Dummy</button>
     @endif
     <span class="sd-code">{{ $shipment->code }}</span>
     <span class="sd-pill sd-status {{ $statusKey }}">{{ $statusLabel }}</span>
     <span class="sd-spacer"></span>
-    <span class="sd-pill">Qty <b>{{ number_format($totalQty,0,',','.') }}</b></span>
-    <span class="sd-pill">Pesanan <b>{{ number_format($orderScans->count(),0,',','.') }}</b></span>
+    <span class="sd-pill"><i class="bi bi-box-seam" aria-hidden="true"></i> Qty <b>{{ number_format($totalQty,0,',','.') }}</b></span>
+    <span class="sd-pill"><i class="bi bi-receipt" aria-hidden="true"></i> Pesanan <b>{{ number_format($orderScans->count(),0,',','.') }}</b></span>
     @if($shipment->lines->isNotEmpty())
-        <a href="{{ route('sales.shipments.export_lines', $shipment) }}" class="sd-btn sd-hide-mobile">Export CSV</a>
+        <a href="{{ route('sales.shipments.export_lines', $shipment) }}" class="sd-btn sd-hide-mobile"><i class="bi bi-download" aria-hidden="true"></i> Export CSV</a>
     @endif
     @if($statusKey === 'draft')
-        <a href="{{ route('sales.shipments.edit', $shipment) }}" class="sd-btn sd-primary">Lanjut Scan</a>
+        <a href="{{ route('sales.shipments.edit', $shipment) }}" class="sd-btn sd-primary"><i class="bi bi-upc-scan" aria-hidden="true"></i> Lanjut Scan</a>
     @endif
 </div>
 
-<div class="sd-wrap">
     <div class="sd-flow">
-        <span class="sd-step {{ in_array($flowStage, ['scan_order','confirm','done'], true) ? 'done' : 'active' }}">Scan Barang</span><span class="sd-sep">-&gt;</span>
+        <span class="sd-step {{ in_array($flowStage, ['scan_order','confirm','done'], true) ? 'done' : 'active' }}">Scan Item</span><span class="sd-sep">-&gt;</span>
         <span class="sd-step {{ in_array($flowStage, ['confirm','done'], true) ? 'done' : ($flowStage === 'scan_order' ? 'active' : '') }}">Scan Pesanan</span><span class="sd-sep">-&gt;</span>
         <span class="sd-step {{ $flowStage === 'done' ? 'done' : ($flowStage === 'confirm' ? 'active' : '') }}">Konfirmasi Pesanan</span><span class="sd-sep">-&gt;</span>
         <span class="sd-step {{ $flowStage === 'done' ? 'active' : '' }}">Simpan &amp; Kurangi Stok</span>
@@ -256,7 +348,7 @@
                     Belum ada nomor pesanan yang dikonfirmasi.
                     @if($statusKey === 'draft')
                         <div style="margin-top:.55rem">
-                            <a href="{{ route('sales.shipments.scan_order', $shipment) }}" class="sd-btn sd-primary">Scan Pesanan</a>
+                            <a href="{{ route('sales.shipments.scan_order', $shipment) }}" class="sd-btn sd-primary"><i class="bi bi-upc-scan" aria-hidden="true"></i> Scan Pesanan</a>
                         </div>
                     @endif
                 </div>

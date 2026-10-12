@@ -553,6 +553,24 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 }
 .sd-action-delete:hover { border-color: #fda4af; background: #ffe4e6; }
 .sd-action-delete:disabled { opacity: .55; cursor: wait; }
+.sd-order-item-code,
+.sd-item-code {
+  line-height: 1.2;
+}
+.sd-order-item-name,
+.sd-item-name,
+.sd-marketplace-item-name {
+  display: block;
+  margin-top: .12rem;
+  color: #94a3b8;
+  font-size: .68rem;
+  font-weight: 450;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sd-marketplace-item-name { margin-top: .08rem; font-size: .66rem; }
 @media(max-width:600px){
   .sd-items-head,
   .sd-order-item,
@@ -790,7 +808,10 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                             @forelse($ungroupedLines as $line)
                                 <div class="sd-order-item {{ $itemGridClass }}">
                                     <span class="sd-order-item-num">{{ $loop->iteration }}</span>
-                                    <div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div>
+                                    <div>
+                                        <div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div>
+                                        <div class="sd-order-item-name">{{ $line->item?->name ?? 'Nama item belum tersedia' }}</div>
+                                    </div>
                                     <div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>
                                     @if($canSeeCogs)
                                         <div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div>
@@ -897,7 +918,10 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                         @forelse($orderLines as $line)
                                             <div class="sd-order-item {{ $itemGridClass }}">
                                                 <span class="sd-order-item-num">{{ $loop->iteration }}</span>
-                                                <div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div>
+                                                <div>
+                                                    <div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div>
+                                                    <div class="sd-order-item-name">{{ $line->item?->name ?? 'Nama item belum tersedia' }}</div>
+                                                </div>
                                                 <div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>
                                                 @if($canSeeCogs)
                                                     <div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div>
@@ -959,7 +983,10 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                         @endphp
                                                         <tr>
                                                             <td class="sd-marketplace-code">{{ $marketplaceLine->marketplace_sku ?: $marketplaceLine->item_sku ?: $marketplaceLine->model_sku ?: '—' }}</td>
-                                                            <td>{{ $internalItem?->code ?: ($marketplaceLine->item_code_snapshot ?: 'Belum mapped') }}</td>
+                                                            <td>
+                                                                <div class="sd-marketplace-code">{{ $internalItem?->code ?: ($marketplaceLine->item_code_snapshot ?: 'Belum mapped') }}</div>
+                                                                @if($internalItem?->name)<div class="sd-marketplace-item-name">{{ $internalItem->name }}</div>@endif
+                                                            </td>
                                                             <td class="sd-marketplace-number">{{ number_format($qtyOrder, 0, ',', '.') }}</td>
                                                             <td class="sd-marketplace-number">{{ number_format($qtyShipment, 0, ',', '.') }}</td>
                                                             <td class="sd-marketplace-number {{ $difference === 0 ? 'sd-marketplace-ok' : 'sd-marketplace-short' }}">{{ $difference > 0 ? '+' : '' }}{{ number_format($difference, 0, ',', '.') }}</td>
@@ -983,7 +1010,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 <div class="sd-order-items">
                                     <div class="sd-items-head {{ $itemGridClass }}"><span>No</span><span>Kode Item</span><span>Qty</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                                     @foreach($ungroupedLines as $line)
-                                        <div class="sd-order-item {{ $itemGridClass }}"><span class="sd-order-item-num">{{ $loop->iteration }}</span><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div><div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>@if($canSeeCogs)<div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div><div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>@endif @if($canDeleteShipmentRows)<span class="sd-line-action"><form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">@csrf @method('DELETE')<button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button></form></span>@endif</div>
+                                        <div class="sd-order-item {{ $itemGridClass }}"><span class="sd-order-item-num">{{ $loop->iteration }}</span><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div><div class="sd-order-item-name">{{ $line->item?->name ?? 'Nama item belum tersedia' }}</div></div><div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>@if($canSeeCogs)<div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div><div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>@endif @if($canDeleteShipmentRows)<span class="sd-line-action"><form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">@csrf @method('DELETE')<button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button></form></span>@endif</div>
                                     @endforeach
                                 </div>
                                 <div class="sd-order-summary {{ $canSeeCogs ? 'sd-summary-has-cogs' : '' }}">
