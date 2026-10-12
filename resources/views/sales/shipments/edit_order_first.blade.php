@@ -401,9 +401,11 @@
     .sr-marketplace-tab[data-order-marketplace-tab="shopee"]::before { background: #f97316; }
     .sr-marketplace-tab[data-order-marketplace-tab="tiktok"]::before { background: #0f8f8c; }
     .sr-marketplace-tab[data-order-marketplace-tab="anomaly"]::before { background: #d97706; }
+    .sr-marketplace-tab[data-order-marketplace-tab="problem"]::before { background: #dc2626; }
     .sr-marketplace-tab[data-order-marketplace-tab="shopee"].active { color: #c2410c; border-color: #fed7aa; background: #fff7ed; }
     .sr-marketplace-tab[data-order-marketplace-tab="tiktok"].active { color: #0f716e; border-color: #bfe9e4; background: #f0fdfa; }
     .sr-marketplace-tab[data-order-marketplace-tab="anomaly"].active { color: #a16207; border-color: #fde68a; background: #fffbeb; }
+    .sr-marketplace-tab[data-order-marketplace-tab="problem"].active { color: #b91c1c; border-color: #fecaca; background: #fff1f2; }
 
     .sr-order-search {
         min-height: 42px;
@@ -1237,6 +1239,9 @@
                     <button type="button" class="sr-marketplace-tab" data-order-marketplace-tab="anomaly" role="tab" aria-selected="false">
                         <span>Anomali</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="anomaly">0</span>
                     </button>
+                    <button type="button" class="sr-marketplace-tab" data-order-marketplace-tab="problem" role="tab" aria-selected="false">
+                        <span>Order Bermasalah</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="problem">0</span>
+                    </button>
                 </div>
             </div>
             <div class="sr-panel-body sr-order-panel-body">
@@ -1645,7 +1650,8 @@
     function filteredOrders() {
         const query = normalize(state.search);
         return state.orders.filter(order => {
-            if (state.marketplaceTab !== 'all' && marketplaceGroup(order.code) !== state.marketplaceTab) return false;
+            if (state.marketplaceTab === 'problem' && Number(order.duplicateCount || 0) <= 0 && (order.items || []).length > 0) return false;
+            if (state.marketplaceTab !== 'all' && state.marketplaceTab !== 'problem' && marketplaceGroup(order.code) !== state.marketplaceTab) return false;
             if (!query) return true;
             if (order.code.includes(query)) return true;
             return Object.values(order.items || {}).some(item => {
@@ -1655,9 +1661,10 @@
     }
 
     function updateMarketplaceTabs(visibleOrders) {
-        const counts = { all: state.orders.length, shopee: 0, tiktok: 0, anomaly: 0 };
+        const counts = { all: state.orders.length, shopee: 0, tiktok: 0, anomaly: 0, problem: 0 };
         state.orders.forEach(order => {
             counts[marketplaceGroup(order.code)] += 1;
+            if (Number(order.duplicateCount || 0) > 0 || (order.items || []).length === 0) counts.problem += 1;
         });
 
         marketplaceTabs.forEach(tab => {

@@ -132,9 +132,11 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-marketplace-tab[data-order-marketplace-tab="shopee"]::before { background:#f97316; }
 .sd-marketplace-tab[data-order-marketplace-tab="tiktok"]::before { background:#0f8f8c; }
 .sd-marketplace-tab[data-order-marketplace-tab="anomaly"]::before { background:#d97706; }
+.sd-marketplace-tab[data-order-marketplace-tab="problem"]::before { background:#dc2626; }
 .sd-marketplace-tab[data-order-marketplace-tab="shopee"].active { color:#c2410c; border-color:#fed7aa; background:#fff7ed; }
 .sd-marketplace-tab[data-order-marketplace-tab="tiktok"].active { color:#0f716e; border-color:#bfe9e4; background:#f0fdfa; }
 .sd-marketplace-tab[data-order-marketplace-tab="anomaly"].active { color:#a16207; border-color:#fde68a; background:#fffbeb; }
+.sd-marketplace-tab[data-order-marketplace-tab="problem"].active { color:#b91c1c; border-color:#fecaca; background:#fff1f2; }
 .sd-item-list { display:grid; gap:.45rem; }
 .sd-item-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.65rem; align-items:center; padding:.6rem .65rem; border:1px solid rgba(148,163,184,.18); border-radius:8px; }
 .sd-item-code { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#334155; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.8rem; font-weight:500; }
@@ -640,9 +642,13 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
         }
         return 'anomaly';
     };
-    $marketplaceCounts = ['all' => (int) $orderScans->count(), 'shopee' => 0, 'tiktok' => 0, 'anomaly' => 0];
+    $marketplaceCounts = ['all' => (int) $orderScans->count(), 'shopee' => 0, 'tiktok' => 0, 'anomaly' => 0, 'problem' => 0];
     foreach ($orderScans as $orderScan) {
         $marketplaceCounts[$marketplaceGroup($orderScan->order_no)]++;
+        $orderScanLines = $orderScan->lines->merge($singleOrderFallbackLines);
+        if ((int) data_get($orderScan->raw_payload, 'duplicate_count', 0) > 0 || $orderScanLines->isEmpty()) {
+            $marketplaceCounts['problem']++;
+        }
     }
     if ($orderScans->count() > 1 && $ungroupedLines->isNotEmpty()) {
         $marketplaceCounts['all']++;
@@ -782,6 +788,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                     'shopee' => ['label' => 'Shopee', 'icon' => 'bi-bag'],
                     'tiktok' => ['label' => 'TikTok', 'icon' => 'bi-play-circle'],
                     'anomaly' => ['label' => 'Anomali', 'icon' => 'bi-exclamation-triangle'],
+                    'problem' => ['label' => 'Order Bermasalah', 'icon' => 'bi-exclamation-octagon'],
                 ] as $tab => $tabMeta)
                     <button type="button"
                             class="sd-marketplace-tab {{ $tab === 'all' ? 'active' : '' }}"
@@ -884,7 +891,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 $orderCogs = (float) $orderLines->sum(fn ($line) => $lineCogs($line));
                                 $hasNoItems = $orderLines->isEmpty();
                             @endphp
-                            <div class="sd-order sd-order-group {{ $orderTheme }}" data-order-card data-order-marketplace="{{ $marketplaceGroupKey }}" data-order-search="{{ strtolower($scan->order_no . ' ' . ($scan->source ?: '')) }}">
+                            <div class="sd-order sd-order-group {{ $orderTheme }}" data-order-card data-order-marketplace="{{ $marketplaceGroupKey }}" data-order-problem="{{ $duplicateCount > 0 || $hasNoItems ? 'true' : 'false' }}" data-order-search="{{ strtolower($scan->order_no . ' ' . ($scan->source ?: '')) }}">
                                 <div class="sd-order-lead">
                                     <div>
                                         <div class="sd-order-no">
@@ -1112,7 +1119,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
             var searchable = (card.dataset.orderSearch || '').toLowerCase();
             var marketplace = card.dataset.orderMarketplace || 'anomaly';
             var visible = (!query || searchable.indexOf(query) !== -1)
-                && (activeMarketplaceTab === 'all' || marketplace === activeMarketplaceTab);
+                && (activeMarketplaceTab === 'all'
+                    || (activeMarketplaceTab === 'problem' ? card.dataset.orderProblem === 'true' : marketplace === activeMarketplaceTab));
             card.hidden = !visible;
             if (visible) visibleCount++;
         });
