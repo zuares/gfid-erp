@@ -42,6 +42,12 @@
 .sd-copy-value:hover{text-decoration:underline;text-decoration-style:dotted;text-underline-offset:.18em}
 .sd-copy-value:focus-visible{outline:2px solid #64748b;outline-offset:3px;border-radius:2px}
 .sd-copy-icon{font-size:.72em;opacity:.55;flex:0 0 auto}
+.sd-copy-identifier{padding:.12rem .3rem;border:1px solid rgba(148,163,184,.35);border-radius:5px;background:rgba(255,255,255,.7);font-size:.68rem}
+.sd-copy-identifier:hover{border-color:#94a3b8;background:#fff;text-decoration:none}
+.sd-copy-action,.sd-copy-confirmation{display:inline-flex;align-items:center;gap:.18rem;font-family:inherit;font-size:.62rem;font-weight:700;white-space:nowrap}
+.sd-copy-action{color:#64748b}
+.sd-copy-confirmation{color:#15803d}
+.sd-copy-action[hidden],.sd-copy-confirmation[hidden]{display:none}
 .sd-copy-toast{position:fixed;right:1rem;bottom:1rem;z-index:1000;padding:.45rem .65rem;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#334155;box-shadow:0 6px 20px rgba(15,23,42,.12);font-size:.75rem;font-weight:650}
 .sd-copy-toast[hidden]{display:none}
 .sd-order-num{display:inline-flex;align-items:center;justify-content:center;min-width:1.5rem;height:1.5rem;padding:0 .35rem;border-radius:6px;background:rgba(148,163,184,.12);color:#475569;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;font-size:.78rem;flex-shrink:0}
@@ -1102,8 +1108,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                         </div>
                                         @if($bookingNumber !== '' || $marketplaceOrderNumber !== '')
                                             <div class="sd-order-identifiers">
-                                                @if($bookingNumber !== '')<span class="sd-order-identifier"><span>Booking</span><span class="sd-order-identifier-value">{{ $bookingNumber }}</span></span>@endif
-                                                @if($marketplaceOrderNumber !== '')<span class="sd-order-identifier"><span>No. pesanan</span><button type="button" class="sd-copy-value sd-order-identifier-value" data-copy-value="{{ $marketplaceOrderNumber }}" data-copy-label="No. pesanan" title="Salin nomor pesanan" aria-label="Salin nomor pesanan {{ $marketplaceOrderNumber }}"><span>{{ $marketplaceOrderNumber }}</span><i class="bi bi-copy sd-copy-icon" aria-hidden="true"></i></button></span>@endif
+                                                @if($bookingNumber !== '')<span class="sd-order-identifier"><span>Booking</span><button type="button" class="sd-copy-value sd-copy-identifier" data-copy-value="{{ $bookingNumber }}" data-copy-label="No. booking" title="Salin nomor booking" aria-label="Salin nomor booking {{ $bookingNumber }}"><span class="sd-order-identifier-value">{{ $bookingNumber }}</span><span class="sd-copy-action" data-copy-action><i class="bi bi-copy" aria-hidden="true"></i> Salin</span><span class="sd-copy-confirmation" data-copy-feedback hidden><i class="bi bi-check2" aria-hidden="true"></i> Disalin</span></button></span>@endif
+                                                @if($marketplaceOrderNumber !== '')<span class="sd-order-identifier"><span>No. pesanan</span><button type="button" class="sd-copy-value sd-copy-identifier" data-copy-value="{{ $marketplaceOrderNumber }}" data-copy-label="No. pesanan" title="Salin nomor pesanan" aria-label="Salin nomor pesanan {{ $marketplaceOrderNumber }}"><span class="sd-order-identifier-value">{{ $marketplaceOrderNumber }}</span><span class="sd-copy-action" data-copy-action><i class="bi bi-copy" aria-hidden="true"></i> Salin</span><span class="sd-copy-confirmation" data-copy-feedback hidden><i class="bi bi-check2" aria-hidden="true"></i> Disalin</span></button></span>@endif
                                             </div>
                                         @endif
                                         @if($canSeeScanDiagnostics)
@@ -1377,6 +1383,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 (function(){
     var copyToast = document.getElementById('sdCopyToast');
     var copyToastTimer;
+    var copyButtonTimer;
+    var lastCopiedButton;
 
     function legacyCopyText(value){
         var previousFocus = document.activeElement;
@@ -1417,12 +1425,32 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
         copyToastTimer = setTimeout(function(){ copyToast.hidden = true; }, 1800);
     }
 
+    function resetCopyButton(button){
+        if (!button) return;
+        var action = button.querySelector('[data-copy-action]');
+        var feedback = button.querySelector('[data-copy-feedback]');
+        if (action) action.hidden = false;
+        if (feedback) feedback.hidden = true;
+    }
+
+    function showCopySuccess(button){
+        clearTimeout(copyButtonTimer);
+        resetCopyButton(lastCopiedButton);
+        var action = button.querySelector('[data-copy-action]');
+        var feedback = button.querySelector('[data-copy-feedback]');
+        if (action) action.hidden = true;
+        if (feedback) feedback.hidden = false;
+        lastCopiedButton = button;
+        copyButtonTimer = setTimeout(function(){ resetCopyButton(button); lastCopiedButton = null; }, 1800);
+        showCopyToast((button.dataset.copyLabel || 'Nomor') + ' berhasil disalin');
+    }
+
     document.querySelectorAll('[data-copy-value]').forEach(function(button){
         button.addEventListener('click', function(){
             var value = button.dataset.copyValue || '';
             if (!value) return;
             copyText(value)
-                .then(function(){ showCopyToast((button.dataset.copyLabel || 'Nomor') + ' tersalin'); })
+                .then(function(){ showCopySuccess(button); })
                 .catch(function(){ showCopyToast('Gagal menyalin nomor'); });
         });
     });
