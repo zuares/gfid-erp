@@ -162,8 +162,8 @@ class PurchaseRequestController extends Controller
         });
 
         return redirect()
-            ->route('purchasing.purchase_requests.show', $pr->id)
-            ->with('success', "PR {$pr->code} berhasil dibuat.");
+            ->route('purchasing.purchase_requests.allocate_suppliers', $pr->id)
+            ->with('success', "PR {$pr->code} berhasil dibuat. Silakan pilih supplier untuk membuat PO draft.");
     }
 
     // =========================================================

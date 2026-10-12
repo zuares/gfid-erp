@@ -109,7 +109,7 @@ class PurchaseRequest extends Model
      */
     public function isConvertible(): bool
     {
-        return $this->status === 'approved'
+        return in_array($this->status, ['draft', 'approved'], true)
             && !$this->lines()->whereNotNull('purchase_order_id')->exists();
     }
 }
