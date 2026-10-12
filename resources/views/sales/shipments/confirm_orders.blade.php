@@ -610,6 +610,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     $isItemFirst = ($shipment->scan_mode ?? 'item_first') === 'item_first';
     $isDaily = (bool) ($isDaily ?? (($shipment->dispatch_mode ?? 'single') === 'daily'));
     $currentWave = $currentWave ?? null;
+    $kilatMatches = $kilatMatches ?? [];
     $mappedLines = $lines->filter(fn ($line) => !empty($line->shipment_order_scan_id))->values();
     $unmappedLines = $lines->filter(fn ($line) => empty($line->shipment_order_scan_id))->values();
     $mappedQty = (int) $mappedLines->sum('qty_scanned');
@@ -862,6 +863,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                     $scan->fulfillment?->marketplaceOrder
                                     || $scan->source === 'marketplace'
                                     || data_get($scan->raw_payload, 'linked_source') === 'marketplace_order'
+                                    || !empty($kilatMatches[$scan->id])
                                 );
                                 $scanIsUnlinked = !$hasMarketplaceLink;
                                 $matchMethod = $scan->match_method ?: data_get($scan->raw_payload, 'match_method');

@@ -4,6 +4,7 @@ namespace Tests\Feature\Sales;
 
 use App\Models\Channel;
 use App\Models\Item;
+use App\Models\MarketplaceBooking;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\OrderFulfillment;
@@ -600,6 +601,39 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Scan Order')
             ->assertSee('ORDER-TO-REKON-001')
             ->assertSee('ORDER-TO-REKON-001', false);
+    }
+
+    public function test_kilat_booking_is_shown_as_linked_on_the_shipment_check_page(): void
+    {
+        [$user, $store] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-KILAT-LINK-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $bookingNo = 'KILAT-BOOKING-001';
+
+        MarketplaceBooking::create([
+            'store_id' => $store->id,
+            'booking_sn' => $bookingNo,
+            'booking_status' => 'READY_TO_SHIP',
+        ]);
+        ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => $bookingNo,
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('sd-badge linked', false)
+            ->assertSee('Tertaut');
     }
 
     public function test_auto_link_reconciles_an_existing_awb_and_persists_the_match(): void

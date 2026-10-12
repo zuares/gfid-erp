@@ -38,6 +38,15 @@ class ShipmentController extends Controller
         'SHIPPED',
     ];
 
+    protected function isReconciliationMarketplaceStatus(?string $status): bool
+    {
+        return in_array(
+            strtoupper(trim((string) $status)),
+            self::RECONCILIATION_MARKETPLACE_STATUSES,
+            true
+        );
+    }
+
     private function isShipmentNextCommand(?string $code): bool
     {
         $code = mb_strtoupper(trim((string) $code));
@@ -1329,7 +1338,7 @@ class ShipmentController extends Controller
         if ($lookupMode === 'auto_link_on_scan' && $shipment->shipment_type !== Shipment::TYPE_AFFILIATE) {
             $marketplaceOrder = $this->marketplaceOrderQuery($orderNo, $shipment)->first();
             if ($marketplaceOrder) {
-                if ($shipment->shipment_type !== 'manual' && !in_array($marketplaceOrder->order_status, self::RECONCILIATION_MARKETPLACE_STATUSES, true)) {
+                if ($shipment->shipment_type !== 'manual' && !$this->isReconciliationMarketplaceStatus($marketplaceOrder->order_status)) {
                     $existingFulfillment = \App\Models\OrderFulfillment::query()
                         ->where('marketplace_order_id', $marketplaceOrder->id)
                         ->first();
@@ -2109,6 +2118,23 @@ class ShipmentController extends Controller
         });
     }
 
+    protected function marketplaceBookingQuery(string $scanCode, ?Shipment $shipment = null)
+    {
+        $scanCode = mb_strtoupper(trim($scanCode));
+        $query = \App\Models\MarketplaceBooking::query();
+
+        if ($shipment && $this->salesOperationalSetting('same_store', true) && !empty($shipment->store_id)) {
+            $query->where('store_id', $shipment->store_id);
+        }
+
+        return $query->where(function ($query) use ($scanCode) {
+            $query
+                ->whereRaw('UPPER(TRIM(booking_sn)) = ?', [$scanCode])
+                ->orWhereRaw('UPPER(TRIM(order_sn)) = ?', [$scanCode])
+                ->orWhereRaw('UPPER(TRIM(tracking_number)) = ?', [$scanCode]);
+        });
+    }
+
     /**
      * Cari order aktif dari nomor order, booking SN, atau AWB.
      *
@@ -2123,7 +2149,10 @@ class ShipmentController extends Controller
         bool $eligibleOnly = true,
     ): ?\App\Models\MarketplaceOrder {
         $findOrder = fn () => $this->marketplaceOrderQuery($scanCode, $shipment)
-            ->when($eligibleOnly, fn ($query) => $query->whereIn('order_status', self::RECONCILIATION_MARKETPLACE_STATUSES))
+            ->when($eligibleOnly, fn ($query) => $query->whereIn(
+                \Illuminate\Support\Facades\DB::raw('UPPER(order_status)'),
+                self::RECONCILIATION_MARKETPLACE_STATUSES
+            ))
             ->with(['items.internalItem', 'store'])
             ->first();
 
@@ -2132,17 +2161,7 @@ class ShipmentController extends Controller
             return $marketplaceOrder;
         }
 
-        $booking = \App\Models\MarketplaceBooking::query()
-            ->where(function ($query) use ($scanCode) {
-                $query
-                    ->whereRaw('UPPER(TRIM(booking_sn)) = ?', [$scanCode])
-                    ->orWhereRaw('UPPER(TRIM(order_sn)) = ?', [$scanCode])
-                    ->orWhereRaw('UPPER(TRIM(tracking_number)) = ?', [$scanCode]);
-            })
-            ->when(
-                $shipment && $this->salesOperationalSetting('same_store', true) && !empty($shipment->store_id),
-                fn ($query) => $query->where('store_id', $shipment->store_id)
-            )
+        $booking = $this->marketplaceBookingQuery($scanCode, $shipment)
             ->with('store')
             ->first();
 
@@ -2270,7 +2289,7 @@ class ShipmentController extends Controller
                 continue;
             }
 
-            if (!in_array($marketplaceOrder->order_status, self::RECONCILIATION_MARKETPLACE_STATUSES, true)) {
+            if (!$this->isReconciliationMarketplaceStatus($marketplaceOrder->order_status)) {
                 $reason = 'status_' . strtolower((string) $marketplaceOrder->order_status);
                 $result['unmatched']++;
                 $this->shipmentMarketplaceLinker->markUnmatched($scan, $reason);
@@ -3851,6 +3870,15 @@ class ShipmentController extends Controller
             'waves',
         ]);
 
+        $kilatMatches = [];
+        foreach ($shipment->orderScans as $scan) {
+            if ($scan->source === 'marketplace' || $scan->fulfillment?->marketplaceOrder) {
+                continue;
+            }
+
+            $kilatMatches[$scan->id] = $this->marketplaceBookingQuery($scan->order_no, $shipment)->exists();
+        }
+
         $warehouse = $this->whRts();
         $stockInsufficient = $warehouse
             ? $this->checkStockSufficiency($shipment, $warehouse)
@@ -3863,7 +3891,8 @@ class ShipmentController extends Controller
             'currentWave',
             'isDaily',
             'stockInsufficient',
-            'mappingErrors'
+            'mappingErrors',
+            'kilatMatches',
         ));
     }
 
@@ -3993,7 +4022,7 @@ class ShipmentController extends Controller
 
         // Order dari tab Belum Packing (READY_TO_SHIP) maupun Sedang Dikemas
         // (PROCESSED) boleh masuk workflow scan dan dipromosikan setelah match.
-        if ($shipment->shipment_type !== 'manual' && !in_array($marketplaceOrder->order_status, self::RECONCILIATION_MARKETPLACE_STATUSES, true)) {
+        if ($shipment->shipment_type !== 'manual' && !$this->isReconciliationMarketplaceStatus($marketplaceOrder->order_status)) {
             $fulfillment = \App\Models\OrderFulfillment::query()
                 ->where('marketplace_order_id', $marketplaceOrder->id)
                 ->first();
@@ -4225,7 +4254,7 @@ class ShipmentController extends Controller
                     }
 
                     if ($shipment->shipment_type !== 'manual'
-                        && !in_array($marketplaceOrder->order_status, self::RECONCILIATION_MARKETPLACE_STATUSES, true)) {
+                        && !$this->isReconciliationMarketplaceStatus($marketplaceOrder->order_status)) {
                         abort(422, "Order/resi {$orderNo} berstatus {$marketplaceOrder->order_status} dan belum boleh masuk shipment.");
                     }
 
