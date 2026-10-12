@@ -758,6 +758,12 @@ class MarketplaceSalesDashboardController extends Controller
             $product->contribution_margin = $product->contribution_profit !== null && (float) ($product->net_sales ?? 0) > 0
                 ? ($product->contribution_profit / (float) $product->net_sales) * 100
                 : null;
+            $product->net_profit = $product->hpp_available && $product->estimated_payout !== null
+                ? (float) $product->estimated_payout - $product->hpp_total - $product->ad_spend
+                : null;
+            $product->net_margin = $product->net_profit !== null && (float) ($product->estimated_payout ?? 0) > 0
+                ? ($product->net_profit / (float) $product->estimated_payout) * 100
+                : null;
 
             return $product;
         });
@@ -1897,6 +1903,7 @@ SQL;
 
             return $order + [
                 'ad_spend' => $orderAdSpend,
+                'cogs' => $orderHpp,
                 'net_profit' => $productHppAvailable && $orderHpp !== null
                     ? (float) $order['estimated_payout'] - $orderHpp - $orderAdSpend
                     : null,
@@ -1907,7 +1914,7 @@ SQL;
             'orders' => $orders->count(),
             'qty' => (int) $orders->sum('qty'),
             'sales' => (float) $orders->sum('sales'),
-            'buyer_payment' => (float) $orders->sum('buyer_payment'),
+            'cogs' => $productHppAvailable ? (float) $orders->sum('cogs') : null,
             'estimated_payout' => (float) $orders->sum('estimated_payout'),
             'ad_spend' => (float) $orders->sum('ad_spend'),
             'net_profit' => $productHppAvailable ? (float) $orders->sum('net_profit') : null,

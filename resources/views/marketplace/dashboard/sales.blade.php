@@ -3519,13 +3519,13 @@
             );
             $watchlistLowMarginThreshold = 20;
             $watchlistRoasThreshold = 2;
-            $watchlistLossProducts = $productAnalysisProducts->filter(fn ($product) => $product->contribution_profit !== null && (float) $product->contribution_profit < 0);
+            $watchlistLossProducts = $productAnalysisProducts->filter(fn ($product) => $product->net_profit !== null && (float) $product->net_profit < 0);
             $watchlistLowMarginProducts = $productAnalysisProducts->filter(function ($product) use ($watchlistLowMarginThreshold) {
-                return $product->contribution_profit !== null
-                    && (float) $product->contribution_profit >= 0
-                    && $product->contribution_margin !== null
-                    && (float) ($product->net_sales ?? 0) > 0
-                    && (float) $product->contribution_margin < $watchlistLowMarginThreshold;
+                return $product->net_profit !== null
+                    && (float) $product->net_profit >= 0
+                    && $product->net_margin !== null
+                    && (float) ($product->estimated_payout ?? 0) > 0
+                    && (float) $product->net_margin < $watchlistLowMarginThreshold;
             });
             $watchlistAdRiskProducts = $productAnalysisProducts->filter(function ($product) use ($watchlistRoasThreshold) {
                 $adSpend = (float) ($product->ad_spend ?? 0);
@@ -3542,16 +3542,16 @@
                     $issues = [];
                     $issueKeys = [];
                     $priority = 0;
-                    $contributionProfit = $product->contribution_profit !== null ? (float) $product->contribution_profit : null;
-                    $contributionMargin = $product->contribution_margin !== null ? (float) $product->contribution_margin : null;
+                    $netProfit = $product->net_profit !== null ? (float) $product->net_profit : null;
+                    $netMargin = $product->net_margin !== null ? (float) $product->net_margin : null;
                     $adSpend = (float) ($product->ad_spend ?? 0);
                     $adSales = (float) ($product->ad_sales ?? 0);
 
-                    if ($contributionProfit !== null && $contributionProfit < 0) {
+                    if ($netProfit !== null && $netProfit < 0) {
                         $issues[] = 'Produk rugi';
                         $issueKeys[] = 'loss';
                         $priority = max($priority, 4);
-                    } elseif ($contributionProfit !== null && $contributionMargin !== null && $contributionMargin < $watchlistLowMarginThreshold) {
+                    } elseif ($netProfit !== null && $netMargin !== null && $netMargin < $watchlistLowMarginThreshold) {
                         $issues[] = 'Margin rendah';
                         $issueKeys[] = 'low_margin';
                         $priority = max($priority, 2);
@@ -3587,7 +3587,7 @@
                     'key' => 'loss',
                     'label' => 'Produk rugi',
                     'count' => $watchlistLossProducts->count(),
-                    'impact' => $fmt(abs((float) $watchlistLossProducts->sum('contribution_profit'))).' kontribusi negatif',
+                    'impact' => $fmt(abs((float) $watchlistLossProducts->sum('net_profit'))).' laba bersih negatif',
                     'class' => 'danger',
                     'icon' => 'bi-graph-down-arrow',
                 ],
@@ -3662,7 +3662,7 @@
                                 <th style="width: 25%">Produk</th>
                                 <th style="width: 19%">Indikasi</th>
                                 <th class="text-end" style="width: 10%">Penjualan Netto</th>
-                                <th class="text-end" style="width: 9%">Margin</th>
+                                <th class="text-end" style="width: 9%">Margin Bersih</th>
                                 <th class="text-end" style="width: 11%">Laba Bersih</th>
                                 <th class="text-end" style="width: 10%">Biaya Iklan</th>
                                 <th class="text-end" style="width: 7%">ROAS</th>
@@ -3678,12 +3678,8 @@
                                     $watchProductImage = trim((string) ($watchProduct->image_url ?? ''));
                                     $watchProductSku = trim((string) ($watchProduct->marketplace_sku ?? $watchProduct->sku ?? ''));
                                     $watchProductCode = trim((string) ($watchProduct->external_item_id ?? '')) ?: trim((string) ($watchProduct->sku ?? ''));
-                                    $watchContributionMargin = $watchProduct->contribution_margin !== null ? (float) $watchProduct->contribution_margin : null;
-                                    $watchNetProfit = $watchProduct->estimated_payout !== null
-                                        ? (float) $watchProduct->estimated_payout
-                                            - (float) ($watchProduct->hpp_total ?? ((float) ($watchProduct->hpp ?? 0) * (int) ($watchProduct->qty ?? 0)))
-                                            - (float) ($watchProduct->ad_spend ?? 0)
-                                        : null;
+                                    $watchNetMargin = $watchProduct->net_margin !== null ? (float) $watchProduct->net_margin : null;
+                                    $watchNetProfit = $watchProduct->net_profit !== null ? (float) $watchProduct->net_profit : null;
                                     $watchStatus = $watchProduct->gross_profit === null
                                         ? 'HPP belum lengkap'
                                         : ((int) ($watchProduct->internal_item_id ?? 0) > 0 ? 'Mapped' : 'Belum mapping');
@@ -3709,7 +3705,7 @@
                                     </td>
                                     <td><span class="sales-watchlist-badge {{ $watchTone }}">{{ implode(' · ', $watchRow['issues']) }}</span></td>
                                     <td class="text-end sales-watchlist-number">{{ $fmt($watchProduct->net_sales ?? 0) }}</td>
-                                    <td class="text-end sales-watchlist-number">{{ $watchContributionMargin === null ? '—' : $percentDisplay($watchContributionMargin) }}</td>
+                                    <td class="text-end sales-watchlist-number">{{ $watchNetMargin === null ? '—' : $percentDisplay($watchNetMargin) }}</td>
                                     <td class="text-end sales-watchlist-number {{ ($watchNetProfit ?? 0) < 0 ? 'text-danger' : '' }}">{{ $watchNetProfit === null ? '—' : $fmt($watchNetProfit) }}</td>
                                     <td class="text-end sales-watchlist-number">{{ ($watchProduct->ad_spend_matched ?? false) ? $fmt($watchProduct->ad_spend ?? 0) : '—' }}</td>
                                     <td class="text-end sales-watchlist-number">{{ ($watchProduct->ad_spend ?? 0) > 0 ? $multipleDisplay(($watchProduct->ad_sales ?? 0) / $watchProduct->ad_spend) : '—' }}</td>
@@ -5427,8 +5423,8 @@
                                 + '<td>' + escapeHtml(order.buyer) + '</td>'
                                 + '<td class="text-end">' + Number(order.qty || 0).toLocaleString('id-ID') + '</td>'
                                 + '<td class="text-end">' + money(order.sales) + '</td>'
-                                + '<td class="text-end">' + money(order.buyer_payment) + '</td>'
                                 + '<td class="text-end">' + money(order.estimated_payout) + '</td>'
+                                + '<td class="text-end">' + optionalMoney(order.cogs) + '</td>'
                                 + '<td class="text-end">' + money(order.ad_spend) + '</td>'
                                 + '<td class="text-end ' + (Number(order.net_profit) < 0 ? 'text-danger' : 'text-success') + '">' + optionalMoney(order.net_profit) + '</td>'
                                 + '<td><span class="badge text-bg-light">' + escapeHtml(order.order_status) + '</span></td>'
@@ -5445,8 +5441,8 @@
                         + kpi('Pesanan', count(summary.orders))
                         + kpi('Unit', count(summary.qty))
                         + kpi('Penjualan Netto', money(summary.sales))
-                        + kpi('Pembayaran Pembeli', money(summary.buyer_payment))
                         + kpi('Estimasi Payout', money(summary.estimated_payout), 'text-success')
+                        + kpi('COGS', optionalMoney(summary.cogs))
                         + kpi('Biaya Iklan', money(summary.ad_spend), 'text-danger')
                         + kpi('Laba Bersih', optionalMoney(summary.net_profit), summary.net_profit < 0 ? 'text-danger' : 'text-success')
                         + '</div>';
@@ -5455,7 +5451,7 @@
                         title: 'Pesanan produk',
                         html: '<div class="text-start mb-3"><strong>' + escapeHtml(name) + '</strong>' + (sku && sku !== '-' ? '<div class="small text-muted">SKU: ' + escapeHtml(sku) + '</div>' : '') + '</div>'
                             + summaryHtml
-                            + '<div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 text-start"><thead><tr><th>Order</th><th>Pembeli</th><th class="text-end">Qty</th><th class="text-end">Penjualan Netto</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Estimasi Payout</th><th class="text-end">Biaya Iklan</th><th class="text-end">Laba Bersih</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>',
+                            + '<div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 text-start"><thead><tr><th>Order</th><th>Pembeli</th><th class="text-end">Qty</th><th class="text-end">Penjualan Netto</th><th class="text-end">Estimasi Payout</th><th class="text-end">COGS</th><th class="text-end">Biaya Iklan</th><th class="text-end">Laba Bersih</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>',
                         width: Math.min(window.innerWidth - 32, 1100),
                         confirmButtonText: 'Tutup',
                     });
