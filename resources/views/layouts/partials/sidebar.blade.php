@@ -90,6 +90,7 @@
     $hasSupplierInvoiceIndex   = $router->has('purchasing.supplier_invoices.index');
     $hasPurchasePaymentsIndex  = $router->has('purchasing.purchase_payments.index');
     $hasPrIndex                = $router->has('purchasing.purchase_requests.index');
+    $hasPrCreate               = $router->has('purchasing.purchase_requests.create');
     $hasMaterialShortageIndex  = $router->has('purchasing.material_shortages.index');
     $hasSupplierItemsIndex     = $router->has('purchasing.supplier_items.index');
 
@@ -1470,7 +1471,7 @@
 
 
             {{-- Pembelian (admin only) --}}
-            @if ($isAdmin && $canShow($hasPoIndex, $hasPoCreate, $hasGrnIndex, $hasGrnCreate))
+            @if ($isAdmin && $canShow($hasPrIndex, $hasPrCreate, $hasPoIndex, $hasPoCreate, $hasGrnIndex, $hasGrnCreate))
                 <x-sidebar.label text="Pengadaan" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openPembelian ? 'is-open' : '' }}" type="button"
@@ -1481,6 +1482,22 @@
                         <span class="chevron">▸</span>
                     </button>
                     <div class="collapse {{ $openPembelian ? 'show' : '' }}" id="navPurchasingAdmin">
+                        @if ($hasPrIndex)
+                            <div class="sidebar-subhead">Permintaan Pembelian</div>
+                            <div class="simple-group">
+                                <x-sidebar.simple-link href="{{ route('purchasing.purchase_requests.index') }}" icon="bi bi-list-ul"
+                                    :active="request()->routeIs('purchasing.purchase_requests.*')">
+                                    Permintaan Beli
+                                </x-sidebar.simple-link>
+                                @if ($hasPrCreate)
+                                    <x-sidebar.simple-link href="{{ route('purchasing.purchase_requests.create') }}" icon="bi bi-plus-circle"
+                                        :active="request()->routeIs('purchasing.purchase_requests.create')">
+                                        Buat Permintaan Beli
+                                    </x-sidebar.simple-link>
+                                @endif
+                            </div>
+                        @endif
+
                         <div class="sidebar-subhead">PO & Penerimaan</div>
                         <div class="simple-group">
                     @if ($hasPoIndex)
@@ -1682,13 +1699,13 @@
                 $hasSupplierApOpeningsIndex,
                 $hasAccountingIndex
             ))
-                <x-sidebar.label text="Keuangan" />
+                <x-sidebar.label :text="$isAdmin ? 'Akuntansi' : 'Keuangan'" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openAccounting ? 'is-open' : '' }}" type="button"
                         data-bs-toggle="collapse" data-bs-target="#navAccountingAdmin"
                         aria-expanded="{{ $openAccounting ? 'true' : 'false' }}" aria-controls="navAccountingAdmin">
                         <span class="icon"><i class="bi bi-calculator"></i></span>
-                        <span>Keuangan</span>
+                        <span>{{ $isAdmin ? 'Akuntansi' : 'Keuangan' }}</span>
                         <span class="chevron">▸</span>
                     </button>
                     <div class="collapse {{ $openAccounting ? 'show' : '' }}" id="navAccountingAdmin">

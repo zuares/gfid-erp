@@ -325,6 +325,7 @@
     $hasSupplierInvoiceIndex   = $router->has('purchasing.supplier_invoices.index');
     $hasPurchasePaymentsIndex  = $router->has('purchasing.purchase_payments.index');
     $hasPrIndex                = $router->has('purchasing.purchase_requests.index');
+    $hasPrCreate               = $router->has('purchasing.purchase_requests.create');
     $hasMaterialShortageIndex  = $router->has('purchasing.material_shortages.index');
     $hasSupplierItemsIndex     = $router->has('purchasing.supplier_items.index');
 
@@ -1142,7 +1143,7 @@
                             </li>
                         @endif
 
-                        @if ($hasPoIndex || $hasPoCreate || $hasGrnIndex || $hasGrnCreate)
+                        @if ($hasPrIndex || $hasPrCreate || $hasPoIndex || $hasPoCreate || $hasGrnIndex || $hasGrnCreate)
                             <div class="mobile-sidebar-section-label">Pengadaan</div>
                             <li class="mb-1">
                                 <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $purchasingOpen ? 'is-open' : '' }}"
@@ -1154,6 +1155,21 @@
                                     <span class="icon">🧾</span><span>Pengadaan</span><span class="chevron">▸</span>
                                 </button>
                                 <div class="collapse {{ $purchasingOpen ? 'show' : '' }}" id="navPurchasingAdminMobile">
+                                    @if ($hasPrIndex)
+                                        <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Permintaan Pembelian</div>
+                                        <a href="{{ route('purchasing.purchase_requests.index') }}"
+                                           class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('purchasing.purchase_requests.*') ? 'active' : '' }}">
+                                            <span class="icon">📋</span><span>Permintaan Beli</span>
+                                        </a>
+                                        @if ($hasPrCreate)
+                                            <a href="{{ route('purchasing.purchase_requests.create') }}"
+                                               class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('purchasing.purchase_requests.create') ? 'active' : '' }}">
+                                                <span class="icon">➕</span><span>Buat Permintaan Beli</span>
+                                            </a>
+                                        @endif
+                                    @endif
+
+                                    <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">PO &amp; Penerimaan</div>
                                     @if ($hasPoIndex)
                                         <a href="{{ route('purchasing.purchase_orders.index') }}"
                                            class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('purchasing.purchase_orders.index') ? 'active' : '' }}">
@@ -1352,12 +1368,12 @@
 
                     {{-- Keuangan (admin / operating) --}}
                     @if ($hasAccountingIndex || $hasCashExpensesIndex || $hasCashTransfersIndex || $hasCashReceiptsIndex || $hasSupplierLoansIndex || $hasEmployeeSavingsIndex || $hasCashBasisReportIndex || $hasJournalsIndex || $hasAccountsIndex || $hasOpeningBalancesIndex || $hasOpeningBalancesBatchIndex || $hasSupplierApOpeningsIndex)
-                        <div class="mobile-sidebar-section-label">Keuangan</div>
+                        <div class="mobile-sidebar-section-label">{{ $isAdmin ? 'Akuntansi' : 'Keuangan' }}</div>
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $accountingOpen ? 'is-open' : '' }}"
                                     type="button" data-bs-toggle="collapse" data-bs-target="#navAccountingAdminMobile"
                                     aria-expanded="{{ $accountingOpen ? 'true' : 'false' }}" aria-controls="navAccountingAdminMobile">
-                                <span class="icon">🧾</span><span>Keuangan</span><span class="chevron">▸</span>
+                                <span class="icon">🧾</span><span>{{ $isAdmin ? 'Akuntansi' : 'Keuangan' }}</span><span class="chevron">▸</span>
                             </button>
                             <div class="collapse {{ $accountingOpen ? 'show' : '' }}" id="navAccountingAdminMobile">
                                 @if ($hasAccountingIndex)

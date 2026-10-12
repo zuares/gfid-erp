@@ -12,42 +12,139 @@
 @push('head')
 <style>
     .pr-card {
-        background: var(--card);
-        border-radius: 18px;
-        border: 1px solid var(--line);
-        margin-bottom: 1rem;
+        background: var(--card, #fff);
+        border-radius: 8px;
+        border: 1px solid rgba(148,163,184,.18);
+        box-shadow: 0 1px 6px rgba(15,23,42,.07);
+        margin-bottom: .85rem;
         overflow: visible;
     }
+    body[data-theme="dark"] .pr-card {
+        border-color: rgba(30,64,175,.55);
+        box-shadow: 0 12px 36px rgba(15,23,42,.8);
+    }
     .pr-card .card-body {
-        padding: 1.25rem 1.5rem 1.35rem;
+        padding: .9rem 1rem;
     }
-    .pr-card .card-header {
-        padding: .9rem 1.5rem;
+    .pr-table-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+        padding: .85rem 1.25rem .7rem;
+        border-bottom: 1px solid rgba(148,163,184,.14);
     }
-    .pr-label {
-        font-size: .75rem;
+    body[data-theme="dark"] .pr-table-head { border-bottom-color: rgba(51,65,85,.8); }
+    .pr-table-title {
+        color: #9ca3af;
+        font-size: .68rem;
         font-weight: 700;
+        letter-spacing: .1em;
         text-transform: uppercase;
-        letter-spacing: .06em;
+    }
+    .pr-section-copy {
         color: var(--muted);
-        margin-bottom: .25rem;
+        font-size: .75rem;
+        margin-top: .1rem;
+    }
+    .pr-focal-fields {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+        gap: 1rem;
+        align-items: start;
+    }
+    .pr-card-content { padding: 1.1rem 1.25rem .9rem; }
+    .pr-label {
+        color: var(--muted);
+        font-size: .72rem;
+        font-weight: 700;
+        letter-spacing: .08em;
+        margin-bottom: .3rem;
+        text-transform: uppercase;
     }
     .pr-field {
-        border-radius: 12px;
-        font-size: .9rem;
+        border-radius: 10px;
+        font-size: .95rem;
+    }
+    .pr-card textarea.pr-field { min-height: 72px; }
+    .pr-hint {
+        color: #94a3b8;
+        font-size: .7rem;
+        margin-top: .3rem;
+    }
+    .pr-head-actions { display: flex; align-items: center; gap: .5rem; }
+    .pr-head-actions .btn { min-height: 36px; }
+    .pr-add-btn {
+        background: #2563eb !important;
+        border-color: #2563eb !important;
+        border-radius: 8px !important;
+        color: #fff !important;
+        font-weight: 700;
+    }
+    .pr-add-btn:hover,
+    .pr-add-btn:focus-visible {
+        background: #1d4ed8 !important;
+        border-color: #1d4ed8 !important;
+        color: #fff !important;
     }
     .pr-lines-table thead th {
-        font-size: .75rem;
-        text-transform: uppercase;
-        letter-spacing: .07em;
+        background: color-mix(in srgb, var(--card) 90%, var(--bg) 10%);
+        border-bottom-color: var(--line);
         color: var(--muted);
+        font-size: .68rem;
+        letter-spacing: .06em;
+        padding: .58rem .65rem;
+        text-transform: uppercase;
         white-space: nowrap;
-        border-bottom-width: 1px;
     }
+    .pr-lines-table { --bs-table-bg: transparent; }
+    .pr-lines-table tbody tr:nth-child(even) { background: rgba(249,250,251,.7); }
+    body[data-theme="dark"] .pr-lines-table tbody tr:nth-child(even) { background: rgba(15,23,42,.8); }
     .pr-lines-table tbody td {
-        vertical-align: middle;
-        padding: .65rem 1rem;
+        border-bottom-color: var(--line);
+        padding: .62rem .65rem;
+        vertical-align: top;
     }
+    .pr-lines-table .js-item-suggest-input,
+    .pr-lines-table .pr-field {
+        min-height: 38px;
+        padding: .375rem .75rem;
+        border-radius: 10px;
+        line-height: 1.5;
+    }
+    .pr-table-wrapper { overflow-x: auto; overflow-y: visible; -webkit-overflow-scrolling: touch; }
+    .pr-lines-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+        padding: .75rem 1rem;
+        border-top: 1px solid var(--line);
+        background: color-mix(in srgb, var(--card) 96%, var(--bg) 4%);
+    }
+    .pr-lines-summary {
+        color: var(--muted);
+        font-size: .8rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .pr-total-live { color: #2563eb; font-size: 1.05rem; font-weight: 900; }
+    .pr-btn-remove-line {
+        width: 32px;
+        height: 32px;
+        align-items: center;
+        background: transparent;
+        border: 0;
+        border-radius: 10px !important;
+        color: #ef4444;
+        display: inline-flex;
+        justify-content: center;
+        padding: 0;
+        transition: all .15s;
+    }
+    .pr-btn-remove-line:hover { background: rgba(239,68,68,.1); color: #dc2626; }
     .pr-col-no { width: 4%; min-width: 32px; }
     .pr-col-qty { width: 12%; min-width: 90px; }
     .pr-col-price { width: 15%; min-width: 110px; }
@@ -55,9 +152,12 @@
     .pr-col-action { width: 5%; min-width: 48px; }
 
     @media (max-width: 768px) {
-        .pr-card .card-body { padding: 1rem; }
-        .pr-card .card-header { padding: .8rem 1rem; }
+        .pr-card .card-body,
+        .pr-card-content { padding: .75rem; }
+        .pr-table-head { padding: .7rem .75rem; }
+        .pr-focal-fields { grid-template-columns: 1fr; gap: .75rem; }
         .pr-lines-table thead { display: none; }
+        .pr-table-wrapper { overflow-x: visible; }
         .pr-lines-table tbody tr {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -79,28 +179,21 @@
         .pr-td-price   { grid-area: price; }
         .pr-td-notes   { grid-area: linenotes; }
         .pr-td-action  { grid-area: action; text-align: center; }
+        .pr-lines-footer { justify-content: center; padding: .7rem .75rem; }
     }
 </style>
 @endpush
 
 {{-- HEADER --}}
-<div class="pr-card">
-    <div class="card-body">
-        <div class="row g-3">
-            <div class="col-12 col-md-3">
-                <div class="pr-label">Tanggal</div>
-                <input type="text" name="date"
-                    value="{{ old('date', isset($pr) ? $pr->date?->format('d/m/Y') : now()->format('d/m/Y')) }}"
-                    class="form-control pr-field gf-date-input @error('date') is-invalid @enderror"
-                    data-gf-date autocomplete="off">
-                @error('date')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
-
-            <div class="col-12 col-md-9">
-                <div class="pr-label">Supplier Awal</div>
-                <select name="supplier_id" class="form-select pr-field @error('supplier_id') is-invalid @enderror">
+<div class="pr-card pr-supplier-card">
+    <div class="pr-table-head">
+        <div class="pr-table-title">Informasi Purchase Request</div>
+    </div>
+    <div class="pr-card-content">
+        <div class="pr-focal-fields">
+            <div>
+                <div class="pr-label">Supplier Awal <span class="fw-normal text-muted">(opsional)</span></div>
+                <select name="supplier_id" id="pr-supplier" class="form-select pr-field @error('supplier_id') is-invalid @enderror">
                     <option value="">Otomatis per barang / kategori</option>
                     @foreach ($suppliers as $sup)
                         <option value="{{ $sup->id }}"
@@ -112,32 +205,36 @@
                 @error('supplier_id')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
+                <div class="pr-hint"><i class="bi bi-info-circle me-1"></i>Supplier dapat ditentukan otomatis per barang saat PR dikonversi menjadi PO.</div>
             </div>
 
-            <div class="col-12">
-                <div class="pr-label">Catatan <span class="fw-normal text-muted">(opsional)</span></div>
-                <textarea name="notes" rows="2"
-                    class="form-control pr-field @error('notes') is-invalid @enderror"
-                    placeholder="Kebutuhan khusus atau informasi tambahan">{{ old('notes', $pr?->notes ?? '') }}</textarea>
-                @error('notes')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            <div>
+                <div class="pr-label">Tanggal Dokumen</div>
+                <input type="text" id="pr-document-date" name="date"
+                    value="{{ old('date', isset($pr) ? $pr->date?->format('d/m/Y') : now()->format('d/m/Y')) }}"
+                    class="form-control pr-field gf-date-input @error('date') is-invalid @enderror"
+                    data-gf-date autocomplete="off">
+                @error('date')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
             </div>
         </div>
+
     </div>
 </div>
 
 {{-- LINES --}}
 <div class="pr-card">
-    <div class="card-header d-flex justify-content-between align-items-center"
-        style="background:transparent; border-bottom:1px solid var(--line); padding:.85rem 1rem;">
-        <div class="fw-semibold" style="font-size:.95rem;">Detail Barang</div>
-        <button type="button" id="btn-add-pr-line" class="btn btn-sm btn-outline-primary" style="border-radius:12px;">
-            + Tambah Baris
-        </button>
+    <div class="pr-table-head">
+        <div>
+            <div class="pr-table-title">Detail Barang</div>
+            <div class="pr-section-copy">Isi item dan jumlah kebutuhan yang ingin diajukan.</div>
+        </div>
     </div>
 
-    <div class="table-responsive">
+    <div class="table-responsive pr-table-wrapper">
         <table class="table table-sm mb-0 pr-lines-table" id="pr-lines-table">
-            <thead class="table-light">
+            <thead>
                 <tr>
                     <th class="pr-col-no text-center">No</th>
                     <th>Item</th>
@@ -271,9 +368,15 @@
         </table>
     </div>
 
-    <div class="text-center py-2 d-md-none">
-        <button type="button" id="btn-add-pr-line-bottom" class="btn btn-sm btn-outline-primary"
-            style="border-radius:12px;">+ Tambah Baris</button>
+    <div class="pr-lines-footer">
+        <button type="button" id="btn-add-pr-line-bottom" class="btn btn-sm pr-add-btn">
+            <i class="bi bi-plus-lg me-1"></i>Tambah Barang
+        </button>
+        <div class="pr-lines-summary">
+            <span class="mono pr-total-live" id="pr-live-lines">0</span> item
+            <span class="mx-2">·</span>
+            <span class="mono pr-total-live" id="pr-live-qty">0</span> qty kebutuhan
+        </div>
     </div>
 </div>
 
@@ -299,6 +402,26 @@
             tr.querySelectorAll('[name]').forEach(el => {
                 el.name = el.name.replace(/lines\[\d+\]/, `lines[${idx}]`);
             });
+        });
+        updateSummary();
+    }
+
+    function updateSummary() {
+        const rows = Array.from(tbody.querySelectorAll('tr.pr-line-row'));
+        let totalQty = 0;
+
+        rows.forEach((tr) => {
+            const raw = tr.querySelector('.pr-qty-raw');
+            const display = tr.querySelector('.pr-qty-display');
+            totalQty += toNum(raw?.value || display?.value || '');
+        });
+
+        const itemCount = document.getElementById('pr-live-lines');
+        const qtyCount = document.getElementById('pr-live-qty');
+        if (itemCount) itemCount.textContent = rows.length.toLocaleString('id-ID');
+        if (qtyCount) qtyCount.textContent = totalQty.toLocaleString('id-ID', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
         });
     }
 
@@ -616,6 +739,8 @@
     form?.addEventListener('submit', function () {
         tbody.querySelectorAll('tr.pr-line-row').forEach(tr => syncRaw(tr));
     });
+
+    reindex();
 
 })();
 </script>
