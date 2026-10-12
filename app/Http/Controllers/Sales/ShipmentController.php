@@ -2181,6 +2181,7 @@ class ShipmentController extends Controller
         bool $promoteBooking = false,
         bool $eligibleOnly = true,
         ?bool $includeCompleted = null,
+        bool $completedRecentOnly = false,
     ): ?\App\Models\MarketplaceOrder {
         $reconciliationStatuses = self::RECONCILIATION_MARKETPLACE_STATUSES;
         if ($includeCompleted === false) {
@@ -2195,6 +2196,27 @@ class ShipmentController extends Controller
                 \Illuminate\Support\Facades\DB::raw("UPPER(COALESCE(NULLIF(order_status, ''), status, ''))"),
                 [...$reconciliationStatuses, 'PROCESS']
             ))
+            ->when($completedRecentOnly, function ($query) {
+                $statusExpression = \Illuminate\Support\Facades\DB::raw(
+                    "UPPER(COALESCE(NULLIF(order_status, ''), status, ''))"
+                );
+                $dateExpression = \Illuminate\Support\Facades\DB::raw(
+                    "COALESCE(NULLIF(ordered_at, ''), NULLIF(order_date, ''), created_at)"
+                );
+
+                return $query->where(function ($dateQuery) use ($statusExpression, $dateExpression) {
+                    $dateQuery
+                        ->where($statusExpression, '<>', 'COMPLETED')
+                        ->orWhere(function ($completedQuery) use ($statusExpression, $dateExpression) {
+                            $completedQuery
+                                ->where($statusExpression, 'COMPLETED')
+                                ->whereBetween($dateExpression, [
+                                    now()->subDay()->startOfDay(),
+                                    now()->endOfDay(),
+                                ]);
+                        });
+                });
+            })
             ->with(['items.internalItem', 'store'])
             ->first();
 
@@ -2302,6 +2324,7 @@ class ShipmentController extends Controller
             'errors' => [],
             'details' => [],
         ];
+        $completedRecentOnly = $request->input('completed_window') === 'recent';
 
         foreach ($shipment->orderScans->sortBy('id') as $scan) {
             $result['checked']++;
@@ -2323,7 +2346,14 @@ class ShipmentController extends Controller
                 continue;
             }
 
-            $marketplaceOrder = $this->findReconciliationMarketplaceOrder($orderNo, $shipment, true, false);
+            $marketplaceOrder = $this->findReconciliationMarketplaceOrder(
+                $orderNo,
+                $shipment,
+                true,
+                false,
+                null,
+                $completedRecentOnly,
+            );
             if (!$marketplaceOrder) {
                 $result['unmatched']++;
                 $this->shipmentMarketplaceLinker->markUnmatched($scan, 'order_not_found');
@@ -2378,7 +2408,7 @@ class ShipmentController extends Controller
         }
 
         $message = sprintf(
-            'Auto-link selesai: %d tertaut, %d belum ditemukan, %d sudah tertaut.',
+            'Sync resi selesai: %d tertaut, %d belum ditemukan, %d sudah tertaut.',
             $result['linked'],
             $result['unmatched'],
             $result['already_linked']

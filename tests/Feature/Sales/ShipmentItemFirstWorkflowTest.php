@@ -599,6 +599,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee(route('sales.shipments.scan_order', $shipment), false)
             ->assertSee('Scan Order')
+            ->assertSee('Sync Resi')
             ->assertSee('ORDER-TO-REKON-001')
             ->assertSee('ORDER-TO-REKON-001', false);
     }
@@ -776,6 +777,67 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $this->assertDatabaseHas('order_fulfillments', [
             'marketplace_order_id' => $order->id,
         ]);
+    }
+
+    public function test_sync_resi_only_checks_recent_completed_orders(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-AUTO-LINK-RECENT-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 2,
+            'allocated_qty' => 2,
+        ]);
+
+        foreach ([
+            ['code' => 'RECENT', 'date' => now()->subDay()->setTime(10, 0)],
+            ['code' => 'OLD', 'date' => now()->subDays(3)],
+        ] as $case) {
+            $order = MarketplaceOrder::create([
+                'store_id' => $store->id,
+                'external_order_id' => 'ORDER-COMPLETED-' . $case['code'],
+                'channel_order_id' => 'ORDER-COMPLETED-' . $case['code'],
+                'shipping_awb_no' => 'SPX-COMPLETED-' . $case['code'],
+                'order_status' => 'COMPLETED',
+                'order_date' => $case['date'],
+                'ordered_at' => $case['date'],
+            ]);
+            MarketplaceOrderItem::create([
+                'order_id' => $order->id,
+                'marketplace_order_id' => $order->id,
+                'item_id' => $item->id,
+                'internal_item_id' => $item->id,
+                'item_name' => $item->name,
+                'item_sku' => $item->code,
+                'model_sku' => $item->code,
+                'qty' => 1,
+            ]);
+            ShipmentOrderScan::create([
+                'shipment_id' => $shipment->id,
+                'order_no' => 'SPX-COMPLETED-' . $case['code'],
+                'status' => 'pending',
+                'source' => 'scanner',
+                'raw_payload' => ['mode' => 'record_only'],
+            ]);
+        }
+
+        $response = $this->actingAs($user)
+            ->postJson(route('sales.shipments.rekon_auto_link', $shipment), [
+                'completed_window' => 'recent',
+            ])
+            ->assertOk();
+
+        $response->assertJsonPath('result.linked', 1)
+            ->assertJsonPath('result.unmatched', 1);
+        $this->assertDatabaseCount('order_fulfillments', 1);
     }
 
     public function test_auto_link_marks_an_unknown_scan_with_a_reason(): void

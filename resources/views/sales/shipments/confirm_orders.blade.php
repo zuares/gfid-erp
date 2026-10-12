@@ -21,6 +21,10 @@
 .sd-card{background:var(--card,#fff);border:1px solid rgba(148,163,184,.18);border-radius:8px;overflow:hidden;margin-bottom:.65rem}
 .sd-muted{color:#64748b;font-size:.8rem}
 .sd-head{display:flex;align-items:center;gap:.55rem;justify-content:space-between;padding:.7rem .85rem;border-bottom:1px solid rgba(148,163,184,.12)}
+.sd-head-actions{display:flex;align-items:center;justify-content:flex-end;gap:.4rem;flex-wrap:wrap}
+.sd-head-actions form{margin:0}
+.sd-sync-btn{color:#1e40af;background:#eff6ff;border-color:#bfdbfe;font-weight:850}
+.sd-sync-btn:hover{color:#1e3a8a;background:#dbeafe;border-color:#93c5fd}
 .sd-title{font-weight:900;color:#334155}
 .sd-body{padding:.75rem .85rem}
 .sd-order-search{padding:.6rem .85rem;border-bottom:1px solid rgba(148,163,184,.12)}.sd-order-search input{width:100%;min-height:36px;border:1px solid rgba(148,163,184,.3);border-radius:7px;padding:.35rem .6rem;color:#334155;background:var(--card,#fff);font-size:.78rem}.sd-order-search input:focus{outline:0;border-color:#334155;box-shadow:0 0 0 .16rem rgba(51,65,85,.1)}
@@ -818,7 +822,18 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                     <div class="sd-title">{{ $isItemFirst ? 'Order & Item' : 'Order' }}</div>
                     <div class="sd-muted">{{ $isItemFirst ? 'Order dan item yang sudah dimapping.' : 'Order dan item yang siap dikonfirmasi.' }}</div>
                 </div>
-                <span class="sd-pill">{{ number_format($pendingOrders, 0, ',', '.') }} pending</span>
+                <div class="sd-head-actions">
+                    <span class="sd-pill">{{ number_format($pendingOrders, 0, ',', '.') }} pending</span>
+                    @if($statusKey === 'draft' && $orderScans->isNotEmpty())
+                        <form action="{{ route('sales.shipments.rekon_auto_link', $shipment) }}" method="POST">
+                            @csrf
+                            <input type="hidden" name="completed_window" value="recent">
+                            <button type="submit" class="sd-btn sd-sync-btn" title="Sinkronkan ulang nomor resi dengan order marketplace">
+                                <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Sync Resi
+                            </button>
+                        </form>
+                    @endif
+                </div>
             </div>
             <div class="sd-order-search">
                 <input type="search" id="orderSearchInput" placeholder="Cari nomor order atau resi" autocomplete="off">
