@@ -115,8 +115,7 @@
 
 <div class="sif-page">
     <div class="sif-topbar">
-        <a href="{{ route('sales.shipments.edit', $shipment) }}" class="sif-btn">← Scan Item</a>
-        <a href="{{ route('sales.shipments.index') }}" class="sif-btn">Daftar Shipment</a>
+        <a href="{{ route('sales.shipments.index') }}" class="sif-btn">← Kembali ke Index</a>
         <span class="sif-code">{{ $shipment->code }}</span>
         <span class="sif-spacer"></span>
         <span class="sif-pill">{{ $totalLines }} SKU</span>

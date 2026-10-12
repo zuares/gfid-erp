@@ -911,7 +911,7 @@
             letter-spacing: .02em;
         }
         .sr-sub,
-        .sr-top-actions .sr-btn[href] {
+        .sr-top-actions .sr-btn[href]:not(.sr-back-index) {
             display: none;
         }
         .sr-top-actions {
@@ -1136,8 +1136,7 @@
             @if ($shipment->status === 'draft')
                 <a href="{{ route('sales.shipments.cancel_form', $shipment) }}" class="sr-btn sr-btn-danger"><i class="bi bi-x-circle" aria-hidden="true"></i> Batalkan</a>
             @endif
-            <a href="{{ route('sales.shipments.edit', $shipment) }}" class="sr-btn"><i class="bi bi-upc-scan" aria-hidden="true"></i> Scan Item</a>
-            <a href="{{ route('sales.shipments.show', $shipment) }}" class="sr-btn"><i class="bi bi-info-circle" aria-hidden="true"></i> Detail</a>
+            <a href="{{ route('sales.shipments.index') }}" class="sr-btn sr-back-index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Kembali ke Index</a>
         </div>
     </div>
 
@@ -1259,8 +1258,7 @@
                    id="submitBtn"
                    aria-disabled="true"><i class="bi bi-clipboard-check" aria-hidden="true"></i> Cek Shipment</a>
             @else
-                <a href="{{ route('sales.shipments.show', $shipment) }}" class="sr-btn"><i class="bi bi-info-circle" aria-hidden="true"></i> Detail</a>
-                <a href="{{ route('sales.shipments.index') }}" class="sr-btn sr-btn-primary"><i class="bi bi-list-ul" aria-hidden="true"></i> Daftar Shipment</a>
+                <a href="{{ route('sales.shipments.index') }}" class="sr-btn sr-btn-primary"><i class="bi bi-arrow-left" aria-hidden="true"></i> Kembali ke Index</a>
             @endif
         </div>
     </div>
