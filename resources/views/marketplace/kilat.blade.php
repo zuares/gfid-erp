@@ -369,6 +369,13 @@
         return 'waiting'; // MATCHED, PENDING, atau status lain yang belum diproses
     }
 
+    // Booking yang sudah punya AWB tetap perlu terlihat di tab ini agar bisa
+    // dipindai/dicek oleh modul Shipments. Status aslinya tetap dihitung untuk
+    // tab gudang atau dikirim, jadi informasi tidak hilang.
+    function isSellerProcessVisible(b){
+        return bucketOf(b) === 'ready' || b.seller_process_visible === true;
+    }
+
     // Bisa dilacak jika barang sudah bergerak (dikirim ke DC / ke pembeli) atau punya resi.
     function isTrackable(b){
         const s = (b.booking_status||'').toUpperCase();
@@ -390,6 +397,65 @@
         const track = url ? `<a href="${url}" target="_blank" rel="noopener" class="btn-toolbar" style="margin-left:.5rem">🔎 Lacak di SPX</a>` : '';
         const copy  = `<button class="btn-toolbar" style="margin-left:.35rem" onclick="navigator.clipboard.writeText('${resi}').then(()=>{this.textContent='✅ Tersalin'})">📋 Salin</button>`;
         return `<span style="font-family:monospace; font-weight:700">${resi}</span>${track}${copy}`;
+    }
+
+    const escHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
+    }[char]));
+    const fmtRp = value => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
+
+    function paymentHtml(b){
+        const p = b.payment_breakdown;
+        const income = b.income;
+        if (!p && !income && !b.payment_method) {
+            return '<div class="ord-payment-summary"><span class="ord-payment-empty">Data pembayaran belum tersedia</span></div>';
+        }
+
+        const method = b.payment_method || b.payment_status || 'Belum tercatat';
+        const line = (label, value, negative = false) => {
+            if (value === null || value === undefined || value === '') return '';
+            const amount = fmtRp(Math.abs(Number(value)));
+            return `<div class="ord-payment-breakdown-line"><span>${label}</span><strong>${negative && Number(value) > 0 ? '-' : ''}${amount}</strong></div>`;
+        };
+        const incomeValue = income?.is_actual ? income.actual : income?.estimated;
+        const incomeLabel = income?.is_actual ? 'ACT' : 'EST';
+
+        return `<div class="ord-payment-summary">
+            <div class="ord-payment-method">💳 ${escHtml(method)}</div>
+            <div class="ord-payment-breakdown" title="Rincian nominal pembayaran">
+                ${line('Subtotal', p?.subtotal)}
+                ${line('Ongkir', p?.shipping)}
+                ${line('V Shopee', p?.voucher_platform, true)}
+                ${line('V Toko', p?.voucher_store, true)}
+                ${line('Layanan', p?.buyer_service_fee)}
+                ${line('Dibayar', p?.buyer_paid, false)}
+            </div>
+            <div class="ord-payment-income">
+                <span class="ord-payment-income-label">Penghasilan</span>
+                ${incomeValue !== null && incomeValue !== undefined
+                    ? `<span class="ord-income-value ${income?.is_actual ? 'actual' : 'estimated'}"><span class="ord-income-status">${incomeLabel}</span><strong>${fmtRp(incomeValue)}</strong></span>`
+                    : '<span class="ord-payment-empty">—</span>'}
+            </div>
+        </div>`;
+    }
+
+    function voucherHtml(b){
+        const s = b.settlement;
+        const p = b.payment_breakdown;
+        if (!s && !(p?.voucher_store > 0)) return '<span class="ord-payment-empty">—</span>';
+        const amount = (key, fallback = 0) => s?.[key] ?? fallback;
+        return `<div class="ord-voucher-summary" title="Voucher dan diskon">
+            <span class="ord-voucher-chip seller">🏷️ Toko <strong>${fmtRp(amount('voucher_toko_total', p?.voucher_store))}</strong></span>
+            <span class="ord-voucher-chip shopee">🛍️ Shopee <strong>${fmtRp(amount('voucher_platform_total'))}</strong></span>
+            <span class="ord-voucher-chip bundle">🎁 Bundle <strong>${fmtRp(amount('bundle_discount_total'))}</strong></span>
+        </div>`;
+    }
+
+    function amsHtml(b){
+        const value = b.settlement?.ams_total;
+        return value === null || value === undefined
+            ? '<span class="ord-payment-empty">—</span>'
+            : `<span class="ord-ams-value" title="Biaya aktivitas / AMS dari settlement">${fmtRp(value)}</span>`;
     }
 
     function renderEmpty(filteredCount = 0) {
@@ -452,6 +518,7 @@
 
     // Sub-bucket di dalam "Perlu Proses Penjual".
     function readySub(b){
+        if (b.seller_process_visible === true) return 'ready_ship';
         if (b.fulfillment_status === 'confirmed') return 'ready_ship';               // Siap Kirim
         if (b.needs_shipping) return 'to_arrange';                                  // Perlu Diatur
         if ((b.booking_status||'').toUpperCase() === 'PROCESSED') return 'packing';  // Sedang Dikemas
@@ -461,7 +528,7 @@
     function filterBookings(arr) {
         let out = selectedStore ? arr.filter(b => String(b.store_id) === String(selectedStore)) : arr;
         if (currentTab === 'all') return out;
-        out = out.filter(b => bucketOf(b) === currentTab);
+        out = out.filter(b => currentTab === 'ready' ? isSellerProcessVisible(b) : bucketOf(b) === currentTab);
         if (currentTab === 'ready' && subReady !== 'all') {
             out = out.filter(b => readySub(b) === subReady);
         }
@@ -471,6 +538,7 @@
     function updateBadges() {
         const cnt = { waiting: 0, ready: 0, shipped: 0, warehouse: 0, cancelled: 0 };
         bookings.forEach(b => { cnt[bucketOf(b)]++; });
+        cnt.ready = bookings.filter(isSellerProcessVisible).length;
         document.getElementById('badge-all').textContent = bookings.length;
         document.getElementById('badge-waiting').textContent = cnt.waiting;
         document.getElementById('badge-ready').textContent = cnt.ready;
@@ -485,7 +553,7 @@
         // Badge sub-tab "Perlu Proses Penjual".
         let sAll = 0, sArrange = 0, sPacking = 0, sReadyShip = 0;
         bookings.forEach(b => {
-            if (bucketOf(b) !== 'ready') return;
+            if (!isSellerProcessVisible(b)) return;
             sAll++;
             const sub = readySub(b);
             if (sub === 'packing') sPacking++; 
@@ -589,9 +657,9 @@
                 </td>`;
             tr.innerHTML += `
                 <td>${itemsHtml}</td>
-                <td><div class="ord-payment-summary"><span class="ord-payment-empty">Data pembayaran belum tersedia</span><span class="ord-payment-empty">Penghasilan —</span></div></td>
-                <td><span class="ord-payment-empty">Voucher belum tersedia</span></td>
-                <td class="ord-ams-cell"><span class="ord-payment-empty">—</span></td>
+                <td>${paymentHtml(b)}</td>
+                <td class="ord-voucher-cell">${voucherHtml(b)}</td>
+                <td class="ord-ams-cell">${amsHtml(b)}</td>
                 <td class="ord-track-print-cell"><div class="ord-track-print-stack">${shippingHtml}${shippingStatusHtml}${metaStatusHtml}<div class="ord-action-stack">${aksi}</div></div></td>`;
             tbody.appendChild(tr);
         });

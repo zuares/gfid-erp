@@ -7,6 +7,7 @@ use App\Services\Marketplace\MarketplaceLogisticsService;
 use Illuminate\Http\Request;
 use App\Models\Store;
 use App\Models\MarketplaceBooking;
+use App\Models\MarketplaceOrder;
 use App\Services\Channels\ChannelManager;
 use Illuminate\Support\Facades\Cache;
 
@@ -64,10 +65,13 @@ class MarketplaceBookingController extends Controller
         }
 
         $bookings = $q->orderByDesc('create_time')->limit(1000)->get();
+        $orders = $this->linkedOrdersForBookings($bookings);
 
-        $data = $bookings->map(function ($b) {
-            // Ambil order tertaut SEKALI saja (accessor ini query DB tiap akses).
-            $od = $b->order_data;
+        $data = $bookings->map(function ($b) use ($orders) {
+            // Order sudah diambil sekaligus di atas agar endpoint tidak N+1 query.
+            $od = $this->orderForBooking($b, $orders);
+            $financial = $this->bookingFinancialPayload($od);
+            $trackingNumber = $b->tracking_number ?: optional($od)->shipping_awb_no;
             return [
                 'store_id'                 => $b->store_id,
                 'store_name'               => optional($b->store)->name,
@@ -77,9 +81,7 @@ class MarketplaceBookingController extends Controller
                 // Kurir & resi: pakai milik booking, jika kosong ambil dari order tertaut.
                 // (MarketplaceOrder menyimpan AWB di shipping_awb_no, sebagian juga di booking_sn.)
                 'shipping_carrier'         => $b->shipping_carrier ?: optional($od)->shipping_carrier,
-                'tracking_number'          => $b->tracking_number
-                    ?: optional($od)->shipping_awb_no
-                    ?: optional($od)->booking_sn,
+                'tracking_number'          => $trackingNumber,
                 'package_number'           => $b->package_number,
                 'shipping_document_status' => $b->shipping_document_status,
                 'needs_shipping'           => $b->needsShipping(),
@@ -91,8 +93,15 @@ class MarketplaceBookingController extends Controller
                 // Kirim stage ter-normalisasi agar UI tidak perlu menebak dari
                 // beberapa kode status yang berbeda.
                 'fulfillment_stage'        => $this->bookingFulfillmentStage($b),
-                'items'                    => (!empty($b->items) && is_array($b->items)) ? $b->items : (optional($od)->items ?? []),
+                // AWB yang sudah terbit tetap perlu diproses/di-scan di Shipments,
+                // walaupun status booking Shopee sudah READY_TO_HANDOVER/SHIPPED.
+                'seller_process_visible'   => $this->sellerProcessVisible($b, $trackingNumber),
+                'items'                    => (!empty($b->items) && is_array($b->items)) ? $b->items : (optional($od)->items?->toArray() ?? []),
                 'fulfillment_status'       => optional($od)->fulfillment?->status,
+                // Data finansial mengikuti sumber yang sama dengan halaman Orders.
+                // Jangan mengisi nilai kosong dengan 0: nol adalah angka valid dan
+                // harus dibedakan dari data yang belum tersedia.
+                ...$financial,
             ];
         })->toArray();
 
@@ -102,6 +111,178 @@ class MarketplaceBookingController extends Controller
             'source'         => 'db',
             'stores_queried' => $storeIds->count(),
         ]);
+    }
+
+    protected function sellerProcessVisible(MarketplaceBooking $booking, ?string $trackingNumber): bool
+    {
+        return filled($trackingNumber)
+            && in_array(strtoupper((string) $booking->booking_status), ['READY_TO_HANDOVER', 'SHIPPED'], true);
+    }
+
+    /**
+     * Ambil order yang tertaut ke booking dalam satu query, bukan satu query per
+     * baris. Booking lama biasanya hanya punya booking_sn; booking yang sudah
+     * MATCHED punya order_sn sekaligus.
+     */
+    protected function linkedOrdersForBookings($bookings)
+    {
+        $storeIds = $bookings->pluck('store_id')->filter()->unique()->values();
+        $bookingSns = $bookings->pluck('booking_sn')->filter()->unique()->values();
+        $orderSns = $bookings->pluck('order_sn')->filter()->unique()->values();
+
+        if ($storeIds->isEmpty() || ($bookingSns->isEmpty() && $orderSns->isEmpty())) {
+            return collect();
+        }
+
+        return MarketplaceOrder::with(['settlement', 'incomeEstimate', 'items', 'fulfillment'])
+            ->whereIn('store_id', $storeIds)
+            ->where(function ($query) use ($bookingSns, $orderSns) {
+                if ($orderSns->isNotEmpty()) {
+                    $query->whereIn('channel_order_id', $orderSns);
+                }
+                if ($bookingSns->isNotEmpty()) {
+                    $method = $orderSns->isNotEmpty() ? 'orWhereIn' : 'whereIn';
+                    $query->{$method}('booking_sn', $bookingSns);
+                }
+            })
+            ->get()
+            ->sortByDesc(fn (MarketplaceOrder $order) => $order->updated_at?->getTimestamp() ?? 0)
+            ->values();
+    }
+
+    protected function orderForBooking(MarketplaceBooking $booking, $orders): ?MarketplaceOrder
+    {
+        $sameOrder = $orders->first(function (MarketplaceOrder $order) use ($booking) {
+            if ((int) $order->store_id !== (int) $booking->store_id) {
+                return false;
+            }
+
+            return $booking->order_sn && $order->channel_order_id === $booking->order_sn;
+        });
+
+        if ($sameOrder) {
+            return $sameOrder;
+        }
+
+        return $orders->first(function (MarketplaceOrder $order) use ($booking) {
+            return (int) $order->store_id === (int) $booking->store_id
+                && $booking->booking_sn
+                && $order->booking_sn === $booking->booking_sn;
+        });
+    }
+
+    /** Data finansial yang dipakai tabel Pesanan Kilat. */
+    protected function bookingFinancialPayload(?MarketplaceOrder $order): array
+    {
+        if (! $order) {
+            return [
+                'payment_method' => null,
+                'payment_status' => null,
+                'payment_breakdown' => null,
+                'settlement' => null,
+                'income' => null,
+                'financial_data_status' => null,
+            ];
+        }
+
+        $rawOrder = is_array($order->raw_json) ? $order->raw_json : [];
+        $orderDetail = data_get($rawOrder, 'order_list.0', []);
+        if (! is_array($orderDetail) || $orderDetail === []) {
+            $orderDetail = data_get($rawOrder, 'response.order_list.0', []);
+        }
+        $incomeRaw = is_array(data_get($orderDetail, 'income_details'))
+            ? data_get($orderDetail, 'income_details')
+            : [];
+        $settlementRaw = is_array($order->settlement?->raw_json) ? $order->settlement->raw_json : [];
+        $incomeRaw = array_replace($incomeRaw, $settlementRaw);
+
+        $settlement = $order->settlement;
+        $voucherStore = $this->firstNumeric($settlementRaw, [
+            'voucher_toko_total', 'voucher_from_seller', 'seller_voucher',
+        ], $settlement?->seller_voucher);
+        $voucherPlatform = $this->firstNumeric($settlementRaw, [
+            'voucher_platform_total', 'voucher_from_shopee',
+        ]);
+        $voucherExternal = $this->firstNumeric($settlementRaw, [
+            'voucher_external_total', 'voucher_from_external_party',
+        ]);
+        $bundleDiscount = $this->firstNumeric($settlementRaw, [
+            'bundle_discount_total', 'bundle_discount', 'bundle_discount_amount',
+        ]);
+
+        // Jika escrow belum masuk, voucher toko dari order masih merupakan
+        // sumber yang valid. Voucher platform tidak boleh ditebak dari total.
+        if ($voucherStore <= 0 && (float) $order->voucher_discount > 0) {
+            $voucherStore = (float) $order->voucher_discount;
+        }
+
+        $subtotal = (float) ($incomeRaw['order_discounted_price'] ?? $order->subtotal_items ?? 0);
+        $shipping = (float) ($incomeRaw['buyer_paid_shipping_fee']
+            ?? $incomeRaw['estimated_shipping_fee']
+            ?? $order->shipping_fee_customer
+            ?? 0);
+        $buyerPaid = (float) ($incomeRaw['buyer_total_amount']
+            ?? $incomeRaw['buyer_paid_amount']
+            ?? $order->total_paid_customer
+            ?? $order->total_amount
+            ?? 0);
+        $buyerServiceFee = max(0, $buyerPaid - ($subtotal + $shipping - $voucherStore - $voucherPlatform - $bundleDiscount));
+
+        $actualIncome = $settlement?->settlement_time && $settlement->final_income !== null
+            ? (float) $settlement->final_income
+            : null;
+        $estimatedIncome = $order->incomeEstimate?->estimated_escrow_amount !== null
+            ? (float) $order->incomeEstimate->estimated_escrow_amount
+            : ((float) $order->net_payout_estimated > 0 ? (float) $order->net_payout_estimated : null);
+
+        // Kirim hanya field yang dipakai tabel. raw_json escrow bisa berukuran
+        // besar dan tidak perlu dibuka di halaman daftar.
+        $settlementPayload = $settlement ? [
+            'settlement_time' => $settlement->settlement_time?->toIso8601String(),
+        ] : null;
+        if ($settlementPayload) {
+            $settlementPayload['voucher_toko_total'] = $voucherStore;
+            $settlementPayload['voucher_platform_total'] = $voucherPlatform;
+            $settlementPayload['voucher_external_total'] = $voucherExternal;
+            $settlementPayload['bundle_discount_total'] = $bundleDiscount;
+            $settlementPayload['ams_total'] = $this->firstNumeric($settlementRaw, [
+                'order_ams_commission_fee', 'ams_commission_fee',
+            ], $settlement->activity_fee);
+        }
+
+        return [
+            'payment_method' => $order->payment_method ?: $order->incomeEstimate?->payment_method,
+            'payment_status' => $order->payment_status,
+            'payment_breakdown' => [
+                'subtotal' => max(0, $subtotal),
+                'shipping' => max(0, $shipping),
+                'voucher_platform' => max(0, $voucherPlatform),
+                'voucher_store' => max(0, $voucherStore),
+                'buyer_service_fee' => $buyerPaid > 0 ? $buyerServiceFee : null,
+                'buyer_paid' => $buyerPaid > 0 ? $buyerPaid : null,
+            ],
+            'settlement' => $settlementPayload,
+            'income' => [
+                'actual' => $actualIncome,
+                'estimated' => $estimatedIncome,
+                'is_actual' => $actualIncome !== null,
+            ],
+            'financial_data_status' => $order->financial_data_status,
+        ];
+    }
+
+    protected function firstNumeric(array $source, array $keys, mixed $fallback = null): ?float
+    {
+        foreach ($keys as $key) {
+            $value = data_get($source, $key);
+            if ($value !== null && $value !== '' && is_numeric($value)) {
+                return (float) $value;
+            }
+        }
+
+        return $fallback !== null && $fallback !== '' && is_numeric($fallback)
+            ? (float) $fallback
+            : null;
     }
 
     protected function bookingFulfillmentStage(MarketplaceBooking $booking): string
