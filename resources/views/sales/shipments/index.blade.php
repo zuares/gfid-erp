@@ -296,6 +296,9 @@
             border:0;
             padding:0;
         }
+        .shipment-time-cell{ margin-top:.42rem; padding-top:.42rem!important; border-top:1px solid #edf1f6!important; font-size:.72rem; }
+        .shipment-time-stack{ flex-direction:row; flex-wrap:wrap; gap:.18rem .65rem; }
+        .shipment-time-stack small{ min-width:auto; margin-right:.15rem; }
         .table-list tbody td.mobile-hide{ display:none; }
         .ship-row-main{
             display:flex;
@@ -452,6 +455,308 @@
     body[data-theme="dark"] .ms-modal-content { background: #1e293b; }
     body[data-theme="dark"] .ms-modal-header h3 { color: #f1f5f9; }
     body[data-theme="dark"] .ms-modal-header, body[data-theme="dark"] .ms-modal-footer { border-color: rgba(51,65,85,.6); }
+
+    /* Shipment index: aligned with the compact scan/confirm surfaces */
+    .page-wrap{
+        max-width:960px;
+        padding:.55rem .7rem 3.5rem;
+    }
+    .ship-topbar{
+        position:relative;
+        top:auto;
+        margin:0 0 .65rem;
+        padding:.7rem .8rem;
+        border:1px solid #dbe3ee;
+        border-radius:10px;
+        box-shadow:0 2px 10px rgba(15,23,42,.035);
+    }
+    .ship-topbar .sub{ margin-top:.15rem; color:#94a3b8; }
+    .kpis{ gap:.35rem; margin-top:.5rem; }
+    .kpi{
+        min-height:28px;
+        padding:.18rem .5rem;
+        border-color:#e2e8f0;
+        background:#f8fafc;
+    }
+    .kpi .lbl{ color:#64748b; }
+    .kpi .val{ color:#334155; }
+    .header-actions{ gap:.35rem; }
+    .header-actions .btn{ min-height:32px; }
+
+    .filter-bar{
+        margin-bottom:.65rem;
+        padding:.6rem;
+        border-color:#dbe3ee;
+        border-radius:10px;
+        box-shadow:0 1px 7px rgba(15,23,42,.025);
+    }
+    .shipment-filter-main{ gap:.4rem; }
+    .shipment-filter-main .filter-input,
+    .shipment-filter-main .filter-select{
+        min-height:34px;
+        border-color:#dbe3ee;
+        background:#fff;
+        color:#334155;
+    }
+    .shipment-filter-main .filter-input:focus,
+    .shipment-filter-main .filter-select:focus{
+        border-color:#94a3b8;
+        box-shadow:0 0 0 3px rgba(148,163,184,.14);
+    }
+    .shipment-date-control .date-section{
+        height:34px!important;
+        border-color:#dbe3ee!important;
+        background:#fff;
+        box-shadow:none;
+    }
+    .shipment-date-control .rts-date-picker.flatpickr-input{
+        height:34px!important;
+        color:#334155;
+    }
+    .filter-summary{
+        margin-bottom:.45rem!important;
+        color:#94a3b8;
+    }
+    .filter-summary strong{ color:#64748b; font-weight:700; }
+
+    .card-main{
+        border-color:#dbe3ee;
+        border-radius:10px;
+        box-shadow:0 2px 10px rgba(15,23,42,.035);
+    }
+    .table-responsive{ max-height:64vh; }
+    .table-list thead th{
+        padding:.65rem .75rem;
+        color:#64748b;
+        background:#f8fafc;
+        border-bottom-color:#e2e8f0;
+        font-size:.62rem;
+        font-weight:750;
+    }
+    .table-list tbody td{
+        padding:.62rem .75rem;
+        border-top-color:#edf1f6;
+    }
+    .table-list tbody tr:hover{ background:#fbfdff!important; }
+    .shipment-time-cell{ color:#64748b; font-size:.7rem; white-space:nowrap; }
+    .shipment-time-stack{ display:flex; flex-direction:column; gap:.18rem; line-height:1.25; }
+    .shipment-time-stack small{ display:inline-block; min-width:38px; color:#94a3b8; font-size:.62rem; font-weight:700; }
+    .code-link{
+        padding:.18rem .45rem;
+        border-color:#e2e8f0;
+        background:#f8fafc;
+        color:#334155!important;
+    }
+    .package-main{ font-weight:700; }
+    .badge-status{ padding:.18rem .5rem; }
+    .list-footer{ padding:.6rem .75rem .7rem; border-top-color:#edf1f6; }
+    .action-icon{ width:31px; height:31px; }
+
+    body[data-theme="dark"] .ship-topbar,
+    body[data-theme="dark"] .filter-bar,
+    body[data-theme="dark"] .card-main{
+        border-color:rgba(71,85,105,.75);
+        box-shadow:none;
+    }
+    body[data-theme="dark"] .kpi,
+    body[data-theme="dark"] .shipment-filter-main .filter-input,
+    body[data-theme="dark"] .shipment-filter-main .filter-select,
+    body[data-theme="dark"] .shipment-date-control .date-section,
+    body[data-theme="dark"] .table-list thead th,
+    body[data-theme="dark"] .code-link{
+        background:#111827;
+        border-color:rgba(71,85,105,.75);
+    }
+    body[data-theme="dark"] .table-list tbody td,
+    body[data-theme="dark"] .list-footer{ border-color:rgba(51,65,85,.75); }
+
+    @media (max-width:768px){
+        .page-wrap{ max-width:none; padding:.5rem .5rem 3.5rem; }
+        .ship-topbar{ margin:0 -.5rem .6rem; padding:.65rem; border-radius:0 0 10px 10px; }
+        .filter-bar{ padding:.55rem; }
+        .shipment-filter-main .filter-input,
+        .shipment-filter-main .filter-select,
+        .shipment-date-control .date-section{ min-height:40px; }
+        .shipment-date-control .date-section{ height:40px!important; }
+        .shipment-date-control .rts-date-picker.flatpickr-input{ height:40px!important; }
+        .card-main{ border-radius:9px; }
+    }
+
+    /* Soft color accents: clear grouping without visual noise */
+    .ship-topbar{
+        background:linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+        border-top-color:#bfdbfe;
+        border-left:3px solid #60a5fa;
+    }
+    .ship-topbar .title{ color:#172554; }
+    .kpi{ background:#f8fafc; }
+    .kpi .val{ color:#334155; }
+    .kpi:first-child{ background:#eff6ff; border-color:#bfdbfe; }
+    .kpi:first-child .val{ color:#2563eb; }
+    .kpi-draft{ background:#fffbeb; border-color:#fde68a; }
+    .kpi-draft .val{ color:#b45309; }
+    .kpi-submitted{ background:#f5f3ff; border-color:#ddd6fe; }
+    .kpi-submitted .val{ color:#6d28d9; }
+    .kpi-posted{ background:#ecfdf5; border-color:#bbf7d0; }
+    .kpi-posted .val{ color:#15803d; }
+    .filter-bar{ background:linear-gradient(135deg, #ffffff 0%, #fbfdff 100%); }
+    .filter-input-wrap > i{ color:#60a5fa; }
+    .filter-input:focus{ border-color:#93c5fd!important; box-shadow:0 0 0 3px rgba(96,165,250,.13)!important; }
+    .filter-select:focus{ border-color:#c4b5fd!important; box-shadow:0 0 0 3px rgba(139,92,246,.12)!important; }
+    .shipment-date-control .date-section{ border-color:#bfdbfe!important; background:#f8fbff; }
+    .table-list thead th{ background:#f7faff; color:#536987; }
+    .table-list tbody tr:nth-child(even){ background:#fcfdff; }
+    .table-list tbody tr:nth-child(even):hover,
+    .table-list tbody tr:hover{ background:#f1f7ff!important; }
+    .code-link{ background:#eef5ff; border-color:#cfe1ff; color:#1d4ed8!important; }
+    .code-link:hover{ background:#e0edff; border-color:#b8d2ff; color:#1e40af!important; }
+    .mode-item{ color:#0f766e; background:#ecfdf5; border-color:#99f6e4; }
+    .mode-order{ color:#6d28d9; background:#f5f3ff; border-color:#ddd6fe; }
+    .list-count{ background:#eff6ff; border-color:#bfdbfe; color:#2563eb; }
+    .empty-icon{ background:#eff6ff; color:#2563eb; }
+    .btn-ship-primary{ background:#2563eb!important; border-color:#2563eb!important; }
+    .btn-ship-primary:hover{ background:#1d4ed8!important; border-color:#1d4ed8!important; }
+    .btn-ship-outline{ color:#475569!important; border-color:#cbd5e1!important; }
+    .btn-ship-outline:hover{ color:#1d4ed8!important; background:#eff6ff!important; border-color:#bfdbfe!important; }
+
+    body[data-theme="dark"] .ship-topbar{
+        background:linear-gradient(135deg, #111827 0%, #172554 100%);
+        border-top-color:#1d4ed8;
+        border-left-color:#60a5fa;
+    }
+    body[data-theme="dark"] .ship-topbar .title{ color:#dbeafe; }
+    body[data-theme="dark"] .kpi:first-child{ background:rgba(30,64,175,.25); border-color:rgba(96,165,250,.4); }
+    body[data-theme="dark"] .kpi-draft{ background:rgba(120,53,15,.25); border-color:rgba(245,158,11,.35); }
+    body[data-theme="dark"] .kpi-submitted{ background:rgba(76,29,149,.25); border-color:rgba(167,139,250,.35); }
+    body[data-theme="dark"] .kpi-posted{ background:rgba(20,83,45,.25); border-color:rgba(74,222,128,.35); }
+    body[data-theme="dark"] .filter-bar{ background:linear-gradient(135deg, #111827 0%, #172033 100%); }
+    body[data-theme="dark"] .shipment-date-control .date-section{ background:#172033; border-color:rgba(96,165,250,.45)!important; }
+    body[data-theme="dark"] .table-list thead th{ background:#172033; }
+    body[data-theme="dark"] .table-list tbody tr:nth-child(even){ background:rgba(30,41,59,.35); }
+    body[data-theme="dark"] .table-list tbody tr:nth-child(even):hover,
+    body[data-theme="dark"] .table-list tbody tr:hover{ background:rgba(30,64,175,.18)!important; }
+    body[data-theme="dark"] .code-link{ background:rgba(30,64,175,.25); border-color:rgba(96,165,250,.4); color:#bfdbfe!important; }
+
+    /* Neutral primary accent */
+    .ship-topbar{
+        background:linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+        border-top-color:#d1d5db;
+        border-left-color:#111827;
+    }
+    .ship-topbar .title{ color:#111827; }
+    .filter-bar{ background:linear-gradient(135deg, #ffffff 0%, #fafafa 100%); }
+    .filter-input-wrap > i{ color:#111827; }
+    .filter-input:focus,
+    .filter-select:focus{ border-color:#6b7280!important; box-shadow:0 0 0 3px rgba(17,24,39,.1)!important; }
+    .shipment-date-control .date-section{ border-color:#d1d5db!important; background:#fff; }
+    .table-list thead th{ background:#fafafa; color:#4b5563; }
+    .table-list tbody tr:nth-child(even):hover,
+    .table-list tbody tr:hover{ background:#f5f5f5!important; }
+    .code-link{ background:#f3f4f6; border-color:#d1d5db; color:#111827!important; }
+    .code-link:hover{ background:#e5e7eb; border-color:#9ca3af; color:#030712!important; }
+    .list-count{ background:#f3f4f6; border-color:#d1d5db; color:#111827; }
+    .empty-icon{ background:#f3f4f6; color:#111827; }
+    .btn-ship-primary{ background:#111827!important; border-color:#111827!important; }
+    .btn-ship-primary:hover{ background:#000!important; border-color:#000!important; }
+    .btn-ship-outline{ color:#374151!important; border-color:#cbd5e1!important; }
+    .btn-ship-outline:hover{ color:#111827!important; background:#f3f4f6!important; border-color:#9ca3af!important; }
+
+    body[data-theme="dark"] .ship-topbar{
+        background:linear-gradient(135deg, #111827 0%, #0f172a 100%);
+        border-top-color:#374151;
+        border-left-color:#f3f4f6;
+    }
+    body[data-theme="dark"] .ship-topbar .title{ color:#f9fafb; }
+    body[data-theme="dark"] .filter-bar{ background:linear-gradient(135deg, #111827 0%, #0f172a 100%); }
+    body[data-theme="dark"] .filter-input-wrap > i{ color:#f3f4f6; }
+    body[data-theme="dark"] .shipment-date-control .date-section{ border-color:#4b5563!important; background:#172033; }
+    body[data-theme="dark"] .table-list thead th{ background:#111827; }
+    body[data-theme="dark"] .table-list tbody tr:nth-child(even):hover,
+    body[data-theme="dark"] .table-list tbody tr:hover{ background:rgba(255,255,255,.06)!important; }
+    body[data-theme="dark"] .code-link{ background:#1f2937; border-color:#4b5563; color:#f3f4f6!important; }
+    body[data-theme="dark"] .list-count,
+    body[data-theme="dark"] .empty-icon{ background:#1f2937; border-color:#4b5563; color:#f3f4f6; }
+    body[data-theme="dark"] .shipment-time-cell{ color:#94a3b8; }
+    body[data-theme="dark"] .shipment-time-stack small{ color:#64748b; }
+
+    /* Final enterprise polish */
+    .ship-topbar,
+    .filter-bar,
+    .card-main{
+        background:#fff;
+        border-radius:8px;
+        box-shadow:0 1px 4px rgba(15,23,42,.035);
+    }
+    .ship-topbar{ border-left-width:1px; padding:.75rem .85rem; }
+    .ship-topbar .title{ font-size:1.05rem; letter-spacing:-.01em; }
+    .ship-topbar .sub{ font-size:.74rem; }
+    .filter-bar{ padding:.55rem; }
+    .filter-summary{ font-size:.7rem; letter-spacing:.01em; }
+    .filter-summary strong{ font-weight:650; }
+    .table-list thead th{ background:#f8fafc; font-weight:700; }
+    .table-list tbody tr{ transition:background-color .12s ease; }
+    .table-list tbody td{ padding-top:.65rem; padding-bottom:.65rem; }
+    .shipment-time-stack span+span{
+        padding-top:.18rem;
+        border-top:1px solid #eef0f3;
+    }
+    .shipment-time-cell{ color:#4b5563; }
+    .shipment-time-stack{ letter-spacing:.005em; }
+    .badge-status{ border-radius:6px; font-weight:650; }
+    .action-icon{ border-radius:6px!important; }
+
+    body[data-theme="dark"] .ship-topbar,
+    body[data-theme="dark"] .filter-bar,
+    body[data-theme="dark"] .card-main{ background:#111827; box-shadow:none; }
+    body[data-theme="dark"] .table-list thead th{ background:#172033; }
+    body[data-theme="dark"] .shipment-time-stack span+span{ border-top-color:#273449; }
+
+    /* Action column: explicit labels with compact enterprise controls */
+    .ship-row-action{ min-width:160px; }
+    .ship-row-action .d-flex{ gap:.3rem!important; align-items:center; }
+    .ship-row-action form{ display:inline-flex; }
+    .action-button{
+        display:inline-flex!important;
+        align-items:center;
+        justify-content:center;
+        gap:.3rem;
+        min-width:68px;
+        min-height:31px;
+        padding:.2rem .55rem!important;
+        border-radius:6px!important;
+        font-size:.7rem;
+        font-weight:650;
+        line-height:1;
+        white-space:nowrap;
+        transition:background-color .12s ease, border-color .12s ease, color .12s ease, transform .12s ease;
+    }
+    .action-button i{ margin:0!important; font-size:.8rem; }
+    .action-button:hover{ transform:translateY(-1px); }
+    .action-button-text{ display:inline; margin:0; }
+    .ship-row-action .btn-ship-outline.action-button{ color:#64748b!important; }
+    .ship-row-action .btn-ship-outline.action-button .action-button-text{ color:#64748b; }
+    .ship-row-action .btn-ship-outline.action-button:hover,
+    .ship-row-action .btn-ship-outline.action-button:hover .action-button-text{ color:#334155!important; }
+    .ship-row-action .btn-ship-primary.action-button .action-button-text{ color:#fff; }
+    .ship-row-action .btn-outline-danger.action-button{
+        color:#b45353!important;
+        background:#fffafa!important;
+        border-color:#f1d0d0!important;
+    }
+    .ship-row-action .btn-outline-danger.action-button:hover{
+        color:#991b1b!important;
+        background:#fef2f2!important;
+        border-color:#e8b4b4!important;
+    }
+    .ship-row-action .btn-outline-danger.action-button .action-button-text{ color:#b45353; }
+    .ship-row-action .btn-outline-danger.action-button:hover .action-button-text{ color:#991b1b; }
+
+    @media (max-width:768px){
+        .ship-row-action{ min-width:0; }
+        .ship-row-action .d-flex{ width:100%; display:grid!important; grid-template-columns:repeat(auto-fit, minmax(0, 1fr)); }
+        .ship-row-action form{ width:100%; }
+        .ship-row-action .action-button{ width:100%!important; min-height:37px; }
+    }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 @endpush
@@ -507,7 +812,6 @@
     <div class="ship-topbar">
         <div class="ship-heading">
             <div class="title">Daftar Shipment</div>
-            <div class="sub">Pilih shipment untuk melanjutkan scan atau melihat detail.</div>
 
             <div class="kpis">
                 <span class="kpi"><span class="lbl">Semua</span><span class="val">{{ number_format($kpi['total'], 0, ',', '.') }}</span></span>
@@ -592,7 +896,7 @@
 
     @if($shipments->count() > 0)
         <div class="filter-summary mb-2 px-1">
-            Shipment terakhir dibuat: <strong>{{ $fmtDate($shipments->first()->created_at, 'd M Y H:i') }} WIB</strong>
+            Terakhir dibuat <strong>{{ $fmtDate($shipments->first()->created_at, 'd M Y H:i') }} WIB</strong>
         </div>
     @endif
 
@@ -613,11 +917,11 @@
                         <thead>
                             <tr>
                                 <th style="width: 46px;">#</th>
-                                <th style="min-width: 220px;"><a class="table-sort {{ $sort === 'code' ? 'active' : '' }}" href="{{ $sortUrl('code') }}">Dokumen &amp; Waktu <span class="table-sort-icon">{{ $sortIcon('code') }}</span></a></th>
-                                <th style="width: 125px;">Mode Scan</th>
+                                <th style="min-width: 150px;"><a class="table-sort {{ $sort === 'code' ? 'active' : '' }}" href="{{ $sortUrl('code') }}">Dokumen <span class="table-sort-icon">{{ $sortIcon('code') }}</span></a></th>
+                                <th style="width: 170px;">Waktu</th>
                                 <th style="width: 145px;"><a class="table-sort {{ $sort === 'lines_count' ? 'active' : '' }}" href="{{ $sortUrl('lines_count') }}">Isi Paket <span class="table-sort-icon">{{ $sortIcon('lines_count') }}</span></a></th>
                                 <th style="width: 130px;"><a class="table-sort {{ $sort === 'status' ? 'active' : '' }}" href="{{ $sortUrl('status') }}">Status <span class="table-sort-icon">{{ $sortIcon('status') }}</span></a></th>
-                                <th style="width: 125px;">Aksi</th>
+                                <th class="text-end" style="width: 160px;">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -648,16 +952,15 @@
                                     // Mode scan adalah pilihan awal shipment. Jumlah order yang
                                     // sudah tercatat tidak boleh mengubah label mode menjadi order_first.
                                     $isOrderFirst = ($shipment->scan_mode ?? 'item_first') === 'order_first';
-                                    $modeLabel = $isOrderFirst ? 'Order dulu' : 'Item dulu';
                                     $typeLabel = match ($shipment->shipment_type) {
                                         'affiliate' => 'Afiliasi',
                                         'marketplace' => 'Marketplace',
                                         default => 'Manual',
                                     };
                                     $stockBlocked = !empty($shipment->stock_insufficient_calc);
-                                    $draftActionRoute = $shipment->shipment_type === 'affiliate'
+                                    $draftActionRoute = ($shipment->shipment_type === 'affiliate' || $isOrderFirst)
                                         ? 'sales.shipments.scan_order'
-                                        : ($isOrderFirst ? 'sales.shipments.confirm_orders' : 'sales.shipments.edit');
+                                        : 'sales.shipments.edit';
                                     $actionRoute = $uiStatus === 'draft'
                                         ? route($draftActionRoute, $shipment)
                                         : route('sales.shipments.show', $shipment);
@@ -678,21 +981,12 @@
                                                     {{ $shipment->code }}
                                                 </a>
 
-                                                <div class="shipment-timestamps" aria-label="Tanggal shipment">
-                                                    <span>Dibuat {{ $fmtDate($shipment->created_at, 'd M Y H:i') }} WIB</span>
-                                                    @if($shipment->posted_at)
-                                                        <span>Posted {{ $fmtDate($shipment->posted_at, 'd M Y H:i') }} WIB</span>
-                                                    @elseif($shipment->updated_at)
-                                                        <span>Update {{ $fmtDate($shipment->updated_at, 'd M Y H:i') }} WIB</span>
-                                                    @endif
-                                                </div>
                                                 @if($shipment->store)
                                                     <span class="shipment-store">{{ $shipment->store->name ?: $shipment->store->code }}</span>
                                                 @endif
                                                 <span class="shipment-store">{{ $typeLabel }}</span>
 
                                                 <div class="ship-row-meta d-md-none">
-                                                    <span>{{ $modeLabel }}</span>
                                                     <span>{{ number_format($itemCount, 0, ',', '.') }} item</span>
                                                     <span>{{ number_format($qty, 0, ',', '.') }} qty</span>
                                                     <span>{{ number_format($orderCount, 0, ',', '.') }} order</span>
@@ -701,8 +995,15 @@
                                         </div>
                                     </td>
 
-                                    <td class="mobile-hide">
-                                        <span class="mode-badge {{ $isOrderFirst ? 'mode-order' : 'mode-item' }}">{{ $modeLabel }}</span>
+                                    <td class="shipment-time-cell">
+                                        <div class="shipment-time-stack" aria-label="Waktu shipment">
+                                            <span>{{ $fmtDate($shipment->created_at, 'd M Y H:i') }} WIB</span>
+                                            @if($shipment->posted_at)
+                                                <span>{{ $fmtDate($shipment->posted_at, 'd M Y H:i') }} WIB</span>
+                                            @elseif($shipment->updated_at)
+                                                <span>{{ $fmtDate($shipment->updated_at, 'd M Y H:i') }} WIB</span>
+                                            @endif
+                                        </div>
                                     </td>
 
                                     <td class="mobile-hide">
@@ -734,7 +1035,7 @@
                                                 ])->toJson();
                                             @endphp
                                             <div class="d-flex justify-content-end gap-1 flex-wrap">
-                                                <button type="button" class="btn btn-sm btn-ship-outline btn-pill action-icon"
+                                                <button type="button" class="btn btn-sm btn-ship-outline btn-pill action-button"
                                                     data-code="{{ $shipment->code }}"
                                                     data-date="{{ $fmtDate($shipment->date, 'd M Y') }}"
                                                     data-nama="{{ $recv['nama'] }}"
@@ -743,6 +1044,7 @@
                                                     data-items="{{ $linesJson }}"
                                                     onclick="openPreview(this)" title="Preview label" aria-label="Preview label">
                                                     <i class="bi bi-printer" aria-hidden="true"></i>
+                                                    <span class="action-button-text">Preview</span>
                                                 </button>
                                                 
                                                 @if($uiStatus === 'draft')
@@ -754,22 +1056,25 @@
                                                           data-gf-confirm-ok="Kirim"
                                                           data-gf-confirm-cancel="Batal">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-sm btn-ship-primary btn-pill action-icon" title="{{ $stockBlocked ? 'Stok WH-RTS tidak cukup' : 'Kirim/Post' }}" aria-label="{{ $stockBlocked ? 'Stok WH-RTS tidak cukup' : 'Kirim paket' }}" @disabled($stockBlocked)>
+                                                        <button type="submit" class="btn btn-sm btn-ship-primary btn-pill action-button" title="{{ $stockBlocked ? 'Stok WH-RTS tidak cukup' : 'Kirim/Post' }}" aria-label="{{ $stockBlocked ? 'Stok WH-RTS tidak cukup' : 'Kirim paket' }}" @disabled($stockBlocked)>
                                                             <i class="bi bi-send" aria-hidden="true"></i>
+                                                            <span class="action-button-text">Kirim</span>
                                                         </button>
                                                     </form>
                                                     
                                                     <form action="{{ route('sales.shipments.manual.destroy', $shipment) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus paket manual ini?');">
                                                         @csrf @method('DELETE')
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger btn-pill action-icon" style="border-color:#fecaca;" title="Hapus shipment" aria-label="Hapus shipment">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger btn-pill action-button" style="border-color:#fecaca;" title="Hapus shipment" aria-label="Hapus shipment">
                                                             <i class="bi bi-trash" aria-hidden="true"></i>
+                                                            <span class="action-button-text">Hapus</span>
                                                         </button>
                                                     </form>
                                                 @endif
                                             </div>
                                         @else
-                                            <a href="{{ $actionRoute }}" class="btn btn-sm {{ $uiStatus === 'draft' ? 'btn-ship-primary' : 'btn-ship-outline' }} btn-pill action-icon" title="{{ $actionLabel }}" aria-label="{{ $actionLabel }} {{ $shipment->code }}">
+                                            <a href="{{ $actionRoute }}" class="btn btn-sm {{ $uiStatus === 'draft' ? 'btn-ship-primary' : 'btn-ship-outline' }} btn-pill action-button" title="{{ $actionLabel }}" aria-label="{{ $actionLabel }} {{ $shipment->code }}">
                                                 <i class="bi {{ $uiStatus === 'draft' ? 'bi-upc-scan' : 'bi-eye' }}" aria-hidden="true"></i>
+                                                <span class="action-button-text">{{ $uiStatus === 'draft' ? 'Lanjut scan' : 'Lihat detail' }}</span>
                                             </a>
                                         @endif
                                     </td>

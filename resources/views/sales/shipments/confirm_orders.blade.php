@@ -595,6 +595,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     $editShipmentUrl = route('sales.shipments.scan_order', $shipment);
     $canDeleteShipmentRows = auth()->user()?->role === 'owner';
     $canSeeCogs = auth()->user()?->role === 'owner';
+    $canSeeScanDiagnostics = auth()->user()?->role !== 'admin';
     $itemGridClass = trim(implode(' ', array_filter([
         $canDeleteShipmentRows ? 'sd-has-actions' : null,
         $canSeeCogs ? 'sd-has-cogs' : null,
@@ -862,16 +863,18 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 <div class="sd-order-lead">
                                     <div>
                                         <div class="sd-order-no">{{ $scan->order_no }}</div>
-                                        <div class="sd-muted">
-                                            @if(!$scanIsUnlinked)
-                                                {{ $matchMethodLabel ?: ($scan->source ?: 'Tertaut') }}
-                                                @if($scan->created_at) · @endif
+                                        @if($canSeeScanDiagnostics)
+                                            <div class="sd-muted">
+                                                @if(!$scanIsUnlinked)
+                                                    {{ $matchMethodLabel ?: ($scan->source ?: 'Tertaut') }}
+                                                    @if($scan->created_at) · @endif
+                                                @endif
+                                                @if($scan->created_at)Scan: {{ $scan->created_at->format('d M Y H:i') }}@endif
+                                                @if($scan->confirmed_at) · Confirmed: {{ $scan->confirmed_at->format('d M Y H:i') }}@endif
+                                            </div>
+                                            @if($scanIsUnlinked && $matchReasonLabel)
+                                                <div class="sd-muted" title="{{ $matchReason }}">{{ $matchReasonLabel }}</div>
                                             @endif
-                                            @if($scan->created_at)Scan: {{ $scan->created_at->format('d M Y H:i') }}@endif
-                                            @if($scan->confirmed_at) · Confirmed: {{ $scan->confirmed_at->format('d M Y H:i') }}@endif
-                                        </div>
-                                        @if($scanIsUnlinked && $matchReasonLabel)
-                                            <div class="sd-muted" title="{{ $matchReason }}">{{ $matchReasonLabel }}</div>
                                         @endif
                                     </div>
                                     <div class="sd-order-head-side">
