@@ -65,7 +65,9 @@ class BookingListingService
             ->selectRaw("CASE
                 WHEN listing_stage <> 'warehouse' THEN NULL
                 WHEN UPPER(COALESCE(tracking_logistics_status, '')) IN ('LOGISTICS_DELIVERY_DONE', 'LOGISTICS_READY') THEN 'arrived'
-                WHEN UPPER(COALESCE(tracking_logistics_status, '')) IN ('LOGISTICS_PICKUP_DONE', 'LOGISTICS_SHIPPED') THEN 'in_transit'
+                WHEN UPPER(COALESCE(tracking_logistics_status, '')) = 'LOGISTICS_PICKUP_DONE' THEN 'in_transit'
+                WHEN UPPER(COALESCE(tracking_logistics_status, '')) = 'LOGISTICS_REQUEST_CREATED' THEN 'awaiting_handover'
+                WHEN UPPER(COALESCE(tracking_logistics_status, '')) IN ('LOGISTICS_PICKUP_FAILED', 'LOGISTICS_INVALID', 'LOGISTICS_LOST', 'LOGISTICS_REQUEST_CANCELED') THEN 'issue'
                 ELSE 'unknown' END as listing_warehouse_arrival");
 
         return MarketplaceBooking::query()->fromSub($classified, 'marketplace_bookings');
@@ -76,7 +78,7 @@ class BookingListingService
         $counts = array_fill_keys(['all', 'ready', 'waiting', 'warehouse', 'shipped', 'cancelled'], 0);
         $ready = array_fill_keys(['all', 'to_arrange', 'packing', 'ready_ship'], 0);
         $warehouse = array_fill_keys(['all', 'ready_ship', 'shipped_to_warehouse', 'waiting_purchase', 'shipped_to_buyer'], 0);
-        $warehouseArrival = array_fill_keys(['all', 'arrived', 'in_transit', 'unknown'], 0);
+        $warehouseArrival = array_fill_keys(['all', 'arrived', 'in_transit', 'awaiting_handover', 'issue', 'unknown'], 0);
         $groups = (clone $query)->toBase()
             ->select('listing_stage', 'listing_seller_visible', 'listing_ready_sub', 'listing_warehouse_sub', 'listing_warehouse_arrival')
             ->selectRaw('COUNT(*) as total')

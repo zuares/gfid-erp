@@ -93,7 +93,7 @@ class MarketplaceBookingController extends Controller
                 $q->where('listing_warehouse_sub', $sub);
             }
             $arrival = $request->query('arrival', 'all');
-            if ($sub === 'waiting_purchase' && in_array($arrival, ['arrived', 'in_transit', 'unknown'], true)) {
+            if ($sub === 'waiting_purchase' && in_array($arrival, ['arrived', 'in_transit', 'awaiting_handover', 'issue', 'unknown'], true)) {
                 $q->where('listing_warehouse_arrival', $arrival);
             }
         } elseif (in_array($tab, ['waiting', 'shipped', 'cancelled'], true)) {
@@ -108,7 +108,7 @@ class MarketplaceBookingController extends Controller
         if ($tab === 'warehouse' && in_array($sub, ['ready_ship', 'shipped_to_warehouse', 'waiting_purchase', 'shipped_to_buyer'], true)) {
             $total = $counts['warehouse_counts'][$sub];
         }
-        if ($tab === 'warehouse' && $sub === 'waiting_purchase' && in_array($request->query('arrival'), ['arrived', 'in_transit', 'unknown'], true)) {
+        if ($tab === 'warehouse' && $sub === 'waiting_purchase' && in_array($request->query('arrival'), ['arrived', 'in_transit', 'awaiting_handover', 'issue', 'unknown'], true)) {
             $total = $counts['warehouse_arrival_counts'][$request->query('arrival')];
         }
         $lastPage = max(1, (int) ceil($total / $perPage));

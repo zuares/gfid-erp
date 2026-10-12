@@ -117,6 +117,8 @@
         <button class="ord-subtab active" data-arrival="all" onclick="switchSubTabWarehouseArrival('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-warehouse-arrival-all">—</span></button>
         <button class="ord-subtab" data-arrival="arrived" onclick="switchSubTabWarehouseArrival('arrived', this)">Sudah Sampai Gudang Shopee <span class="ord-badge bg-secondary" id="badge-warehouse-arrival-arrived">—</span></button>
         <button class="ord-subtab" data-arrival="in_transit" onclick="switchSubTabWarehouseArrival('in_transit', this)">Masih Dalam Perjalanan ke Gudang Shopee <span class="ord-badge bg-secondary" id="badge-warehouse-arrival-in_transit">—</span></button>
+        <button class="ord-subtab" data-arrival="awaiting_handover" onclick="switchSubTabWarehouseArrival('awaiting_handover', this)">Menunggu Diserahkan ke Kurir <span class="ord-badge bg-secondary" id="badge-warehouse-arrival-awaiting_handover">—</span></button>
+        <button class="ord-subtab" data-arrival="issue" onclick="switchSubTabWarehouseArrival('issue', this)">Bermasalah / Perlu Dicek <span class="ord-badge bg-secondary urgent" id="badge-warehouse-arrival-issue">—</span></button>
         <button class="ord-subtab" data-arrival="unknown" onclick="switchSubTabWarehouseArrival('unknown', this)">Belum Ada Status Tracking <span class="ord-badge bg-secondary" id="badge-warehouse-arrival-unknown">—</span></button>
     </div>
 
@@ -391,6 +393,8 @@
             shipped_to_buyer: ['Dikirim dari Gudang Shopee', 'fstatus-done'],
             arrived: ['Sudah Sampai Gudang Shopee', 'fstatus-done'],
             in_transit: ['Menuju Gudang Shopee', 'fstatus-pending'],
+            awaiting_handover: ['Menunggu Diserahkan ke Kurir', 'fstatus-pending'],
+            issue: ['Perlu Cek Status Tracking', 'fstatus-none'],
             unknown: ['Status Gudang Belum Diketahui', 'fstatus-none'],
         };
         const warehouseStatus = booking?.warehouse_sub === 'waiting_purchase'
@@ -577,7 +581,7 @@
         for (const sub of ['all', 'ready_ship', 'shipped_to_warehouse', 'waiting_purchase', 'shipped_to_buyer']) {
             document.getElementById('badge-sub-warehouse-' + sub).textContent = warehouseCounts[sub] ?? 0;
         }
-        for (const status of ['all', 'arrived', 'in_transit', 'unknown']) {
+        for (const status of ['all', 'arrived', 'in_transit', 'awaiting_handover', 'issue', 'unknown']) {
             document.getElementById('badge-warehouse-arrival-' + status).textContent = warehouseArrivalCounts[status] ?? 0;
         }
     }
