@@ -15,6 +15,7 @@ use App\Models\ShipmentLine;
 use App\Models\ShipmentOrderScan;
 use App\Models\Store;
 use App\Models\User;
+use App\Services\MarketplaceSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -250,6 +251,80 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'item_id' => $item->id,
             'qty_scanned' => 1,
         ]);
+    }
+
+    public function test_confirmation_does_not_call_shopee_for_an_unlinked_booking(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-CONFIRM-LOCAL-ONLY',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $awb = 'SPXID00000000099A';
+        MarketplaceBooking::create([
+            'store_id' => $store->id,
+            'booking_sn' => 'BOOKING-LOCAL-ONLY',
+            'tracking_number' => $awb,
+            'booking_status' => 'SHIPPED',
+        ]);
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => $awb,
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $this->mock(MarketplaceSyncService::class)
+            ->shouldNotReceive('promoteBookingToOrder');
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('Booking ditemukan');
+
+        $this->assertNull($scan->fresh()->fulfillment_id);
+    }
+
+    public function test_confirmation_finds_a_booking_with_legacy_whitespace_and_case(): void
+    {
+        [$user, $store] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-CONFIRM-LEGACY-BOOKING',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        MarketplaceBooking::create([
+            'store_id' => $store->id,
+            'booking_sn' => 'BOOKING-LEGACY',
+            'tracking_number' => ' spxid00000000098a ',
+            'booking_status' => 'SHIPPED',
+        ]);
+        ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => 'SPXID00000000098A',
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('Booking ditemukan');
     }
 
     public function test_daily_shipment_creates_wave_and_blocks_legacy_submit(): void

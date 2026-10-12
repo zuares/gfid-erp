@@ -3862,6 +3862,9 @@ class ShipmentController extends Controller
                     'order_no' => $scan->order_no,
                     'pool_used' => json_encode($poolUsed),
                     'include_completed' => false,
+                    // Rendering confirm only reconciles data already stored locally.
+                    // Remote booking promotion belongs to the explicit Sync Resi action.
+                    'promote_booking' => false,
                 ]);
                 $matchRequest->headers->set('Accept', 'application/json');
 
@@ -3924,7 +3927,7 @@ class ShipmentController extends Controller
 
             // Keep the confirm page responsive: historical completed orders
             // are checked only when the operator explicitly matches/scans.
-            $marketplaceOrder = $this->findReconciliationMarketplaceOrder($orderNo, $shipment, true, true, false);
+            $marketplaceOrder = $this->findReconciliationMarketplaceOrder($orderNo, $shipment, false, true, false);
 
             if (!$marketplaceOrder) {
                 continue;
@@ -3962,23 +3965,63 @@ class ShipmentController extends Controller
 
         $kilatMatches = [];
         $bookingMatches = [];
-        foreach ($shipment->orderScans as $scan) {
+        $bookingCandidates = $shipment->orderScans->filter(function ($scan) {
             // A stale SPX scan can retain source=marketplace without an order
             // relation. Check its booking so the confirm page shows the real state.
-            if ($scan->fulfillment?->marketplaceOrder
-                || ($scan->source === 'marketplace' && !str_starts_with(strtoupper(trim((string) $scan->order_no)), 'SPX'))) {
-                continue;
+            return !$scan->fulfillment?->marketplaceOrder
+                && !($scan->source === 'marketplace'
+                    && !str_starts_with(mb_strtoupper(trim((string) $scan->order_no)), 'SPX'));
+        });
+        $bookingCodes = $bookingCandidates
+            ->map(fn ($scan) => mb_strtoupper(trim((string) $scan->order_no)))
+            ->filter()
+            ->unique()
+            ->values();
+        $bookingsByCode = collect();
+        $bookingColumns = ['id', 'store_id', 'booking_sn', 'order_sn', 'tracking_number', 'booking_status', 'items'];
+        $scopeBookings = function () use ($shipment) {
+            $query = \App\Models\MarketplaceBooking::query();
+            if ($this->salesOperationalSetting('same_store', true) && !empty($shipment->store_id)) {
+                $query->where('store_id', $shipment->store_id);
             }
 
-            $bookingQuery = $this->marketplaceBookingQuery($scan->order_no, $shipment);
-            if (str_starts_with(strtoupper(trim((string) $scan->order_no)), 'SPX')) {
-                $booking = $bookingQuery->first(['id', 'store_id', 'booking_status', 'items']);
-                $kilatMatches[$scan->id] = $booking !== null;
-                if ($booking) {
-                    $bookingMatches[$scan->id] = $booking;
+            return $query;
+        };
+        $indexBookings = function ($bookings, $codes) use ($bookingsByCode) {
+            foreach ($bookings as $booking) {
+                foreach ([$booking->booking_sn, $booking->order_sn, $booking->tracking_number] as $identifier) {
+                    $code = mb_strtoupper(trim((string) $identifier));
+                    if ($code !== '' && $codes->contains($code) && !$bookingsByCode->has($code)) {
+                        $bookingsByCode->put($code, $booking);
+                    }
                 }
-            } else {
-                $kilatMatches[$scan->id] = $bookingQuery->exists();
+            }
+        };
+        foreach ($bookingCodes->chunk(200) as $codes) {
+            $bookings = $scopeBookings()->where(function ($query) use ($codes) {
+                $query->whereIn('booking_sn', $codes)
+                    ->orWhereIn('order_sn', $codes)
+                    ->orWhereIn('tracking_number', $codes);
+            })->orderBy('id')->get($bookingColumns);
+            $indexBookings($bookings, $codes);
+        }
+        // One normalized fallback query per batch handles legacy mixed-case or
+        // padded identifiers, without a full-table scan for every missing resi.
+        $missingBookingCodes = $bookingCodes->reject(fn ($code) => $bookingsByCode->has($code))->values();
+        foreach ($missingBookingCodes->chunk(200) as $codes) {
+            $bookings = $scopeBookings()->where(function ($query) use ($codes) {
+                $query->whereIn(\Illuminate\Support\Facades\DB::raw('UPPER(TRIM(booking_sn))'), $codes)
+                    ->orWhereIn(\Illuminate\Support\Facades\DB::raw('UPPER(TRIM(order_sn))'), $codes)
+                    ->orWhereIn(\Illuminate\Support\Facades\DB::raw('UPPER(TRIM(tracking_number))'), $codes);
+            })->orderBy('id')->get($bookingColumns);
+            $indexBookings($bookings, $codes);
+        }
+        foreach ($bookingCandidates as $scan) {
+            $code = mb_strtoupper(trim((string) $scan->order_no));
+            $booking = $bookingsByCode->get($code);
+            $kilatMatches[$scan->id] = $booking !== null;
+            if ($booking && str_starts_with($code, 'SPX')) {
+                $bookingMatches[$scan->id] = $booking;
             }
         }
 
@@ -4123,7 +4166,7 @@ class ShipmentController extends Controller
         $marketplaceOrder = $this->findReconciliationMarketplaceOrder(
             $no,
             $shipment,
-            true,
+            $request->boolean('promote_booking', true),
             false,
             $includeCompleted,
         );
