@@ -640,6 +640,167 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Tertaut');
     }
 
+    public function test_spx_booking_without_marketplace_order_is_not_labeled_as_linked(): void
+    {
+        [$user, $store] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-SPX-BOOKING-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $awb = 'SPXID00000000001A';
+        MarketplaceBooking::create([
+            'store_id' => $store->id,
+            'booking_sn' => 'BOOKING-SPX-001',
+            'tracking_number' => $awb,
+            'booking_status' => 'SHIPPED',
+        ]);
+        ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => $awb,
+            'status' => 'pending',
+            'source' => 'marketplace',
+            'raw_payload' => ['linked_source' => 'marketplace_order'],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('Booking ditemukan')
+            ->assertSee('data-order-link-state="unlinked"', false)
+            ->assertDontSee('sd-badge linked', false);
+    }
+
+    public function test_spx_confirmation_shows_order_sku_and_flags_a_different_scanned_item(): void
+    {
+        [$user, $store, $scannedItem] = $this->shipmentContext();
+        $marketplaceItem = Item::create([
+            'code' => 'TTD-BLK-M',
+            'name' => 'Tracktop Marketplace M',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+        $shipment = Shipment::create([
+            'code' => 'SHP-SPX-SKU-MISMATCH-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $awb = 'SPXID00000000002A';
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-SPX-SKU-MISMATCH',
+            'channel_order_id' => 'ORDER-SPX-SKU-MISMATCH',
+            'shipping_awb_no' => $awb,
+            'order_status' => 'SHIPPED',
+            'order_date' => now(),
+            'ordered_at' => now(),
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'item_id' => $marketplaceItem->id,
+            'internal_item_id' => $marketplaceItem->id,
+            'item_name' => $marketplaceItem->name,
+            'item_sku' => 'TTD-BLK',
+            'model_sku' => 'TTD-BLK-M',
+            'qty' => 1,
+        ]);
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => $awb,
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => $scan->id,
+            'item_id' => $scannedItem->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('TTD-BLK-M')
+            ->assertSee('Item berbeda')
+            ->assertSee('>Periksa</div>', false)
+            ->assertSee('sd-badge linked', false);
+    }
+
+    public function test_spx_confirmation_lists_unmatched_order_skus_without_pairing_multiple_items(): void
+    {
+        [$user, $store, $scannedItem] = $this->shipmentContext();
+        $secondScannedItem = Item::create([
+            'code' => 'SCAN-SECOND', 'name' => 'Second scanned item', 'unit' => 'pcs',
+            'type' => 'finished_good', 'active' => true,
+        ]);
+        $shipment = Shipment::create([
+            'code' => 'SHP-SPX-SKU-MISMATCH-002',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $awb = 'SPXID00000000003A';
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-SPX-MULTI-MISMATCH',
+            'channel_order_id' => 'ORDER-SPX-MULTI-MISMATCH',
+            'shipping_awb_no' => $awb,
+            'order_status' => 'SHIPPED',
+            'order_date' => now(),
+            'ordered_at' => now(),
+        ]);
+        foreach (['MARKETPLACE-SKU-A', 'MARKETPLACE-SKU-B'] as $sku) {
+            $marketplaceItem = Item::create([
+                'code' => $sku, 'name' => $sku, 'unit' => 'pcs',
+                'type' => 'finished_good', 'active' => true,
+            ]);
+            MarketplaceOrderItem::create([
+                'order_id' => $order->id,
+                'marketplace_order_id' => $order->id,
+                'item_id' => $marketplaceItem->id,
+                'internal_item_id' => $marketplaceItem->id,
+                'item_name' => $marketplaceItem->name,
+                'model_sku' => $sku,
+                'qty' => 1,
+            ]);
+        }
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => $awb,
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+        foreach ([$scannedItem, $secondScannedItem] as $item) {
+            ShipmentLine::create([
+                'shipment_id' => $shipment->id,
+                'shipment_order_scan_id' => $scan->id,
+                'item_id' => $item->id,
+                'qty_scanned' => 1,
+                'allocated_qty' => 1,
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('Item order belum cocok: MARKETPLACE-SKU-A, MARKETPLACE-SKU-B')
+            ->assertSee('Lihat SKU order')
+            ->assertSee('>Periksa</div>', false);
+    }
+
     public function test_ready_to_ship_and_processed_kilat_orders_are_linked_when_scanned(): void
     {
         [$user, $store, $item] = $this->shipmentContext();

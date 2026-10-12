@@ -3962,7 +3962,10 @@ class ShipmentController extends Controller
 
         $kilatMatches = [];
         foreach ($shipment->orderScans as $scan) {
-            if ($scan->source === 'marketplace' || $scan->fulfillment?->marketplaceOrder) {
+            // A stale SPX scan can retain source=marketplace without an order
+            // relation. Check its booking so the confirm page shows the real state.
+            if ($scan->fulfillment?->marketplaceOrder
+                || ($scan->source === 'marketplace' && !str_starts_with(strtoupper(trim((string) $scan->order_no)), 'SPX'))) {
                 continue;
             }
 

@@ -67,6 +67,9 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-badge.pending{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:#92400e}
 .sd-badge.linked{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
 .sd-badge.unlinked{background:#f8fafc;border-color:#cbd5e1;color:#64748b}
+.sd-sku-mismatch{display:block;margin-top:.12rem;color:#b45309;font-family:inherit;font-size:.65rem;font-weight:700;white-space:normal}
+.sd-order-item-marketplace-sku.is-mismatch{overflow:visible;white-space:normal}
+.sd-sku-unmatched{padding:.4rem .1rem .2rem;color:#92400e;font-size:.7rem}
 .sd-duplicate-badge{display:inline-flex;align-items:center;justify-content:center;margin-left:.35rem;border:1px solid #fcd34d;border-radius:999px;padding:.12rem .4rem;background:#fffbeb;color:#a16207;font-size:.62rem;font-weight:850;line-height:1;vertical-align:middle}
 .sd-missing-item-badge{display:inline-flex;align-items:center;justify-content:center;margin-left:.35rem;border:1px solid #cbd5e1;border-radius:999px;padding:.12rem .4rem;background:#f8fafc;color:#64748b;font-size:.62rem;font-weight:750;line-height:1;vertical-align:middle}
 .sd-empty{padding:1.6rem 1rem;text-align:center;color:#64748b;font-size:.84rem}
@@ -735,12 +738,14 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
         if ((int) data_get($orderScan->raw_payload, 'duplicate_count', 0) > 0 || $orderScanLines->isEmpty()) {
             $marketplaceCounts['problem']++;
         }
-        $hasMarketplaceLink = (bool) (
-            $orderScan->fulfillment?->marketplaceOrder
-            || $orderScan->source === 'marketplace'
-            || data_get($orderScan->raw_payload, 'linked_source') === 'marketplace_order'
-            || !empty($kilatMatches[$orderScan->id])
-        );
+        $hasMarketplaceLink = str_starts_with(strtoupper(trim((string) $orderScan->order_no)), 'SPX')
+            ? (bool) $orderScan->fulfillment?->marketplaceOrder
+            : (bool) (
+                $orderScan->fulfillment?->marketplaceOrder
+                || $orderScan->source === 'marketplace'
+                || data_get($orderScan->raw_payload, 'linked_source') === 'marketplace_order'
+                || !empty($kilatMatches[$orderScan->id])
+            );
         $linkCounts[$hasMarketplaceLink ? 'linked' : 'unlinked']++;
     }
     if ($orderScans->count() > 1 && $ungroupedLines->isNotEmpty()) {
@@ -982,12 +987,17 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                         @foreach($orderScans as $scan)
                             @php
                                 $scanStatus = $scan->status ?: 'pending';
-                                $hasMarketplaceLink = (bool) (
-                                    $scan->fulfillment?->marketplaceOrder
-                                    || $scan->source === 'marketplace'
-                                    || data_get($scan->raw_payload, 'linked_source') === 'marketplace_order'
-                                    || !empty($kilatMatches[$scan->id])
-                                );
+                                $orderCodeUpper = strtoupper(trim((string) $scan->order_no));
+                                $isSpxShopee = str_starts_with($orderCodeUpper, 'SPX');
+                                $hasMarketplaceLink = $isSpxShopee
+                                    ? (bool) $scan->fulfillment?->marketplaceOrder
+                                    : (bool) (
+                                        $scan->fulfillment?->marketplaceOrder
+                                        || $scan->source === 'marketplace'
+                                        || data_get($scan->raw_payload, 'linked_source') === 'marketplace_order'
+                                        || !empty($kilatMatches[$scan->id])
+                                    );
+                                $hasBookingOnly = $isSpxShopee && !$hasMarketplaceLink && !empty($kilatMatches[$scan->id]);
                                 $scanIsUnlinked = !$hasMarketplaceLink;
                                 $matchMethod = $scan->match_method ?: data_get($scan->raw_payload, 'match_method');
                                 $matchReason = $scan->match_reason ?: data_get($scan->raw_payload, 'match_reason') ?: data_get($scan->raw_payload, 'lookup_status');
@@ -1009,11 +1019,10 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 };
                                 $scanLabel = $scanStatus === 'skip'
                                     ? 'Diabaikan'
-                                    : ($scanIsUnlinked ? 'Belum Tertaut' : 'Tertaut');
+                                    : ($hasBookingOnly ? 'Booking ditemukan' : ($scanIsUnlinked ? 'Belum Tertaut' : 'Tertaut'));
                                 $scanBadgeClass = $scanStatus === 'skip'
                                     ? 'skip'
-                                    : ($hasMarketplaceLink ? 'linked' : 'unlinked');
-                                $orderCodeUpper = strtoupper(trim((string) $scan->order_no));
+                                    : ($hasBookingOnly ? 'pending' : ($hasMarketplaceLink ? 'linked' : 'unlinked'));
                                 $marketplaceGroupKey = $marketplaceGroup($scan->order_no);
                                 $duplicateCount = (int) data_get($scan->raw_payload, 'duplicate_count', 0);
                                 $orderTheme = str_starts_with($orderCodeUpper, 'SPX')
@@ -1043,7 +1052,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                 @if($scan->created_at)Scan: {{ $scan->created_at->format('d M Y H:i') }}@endif
                                                 @if($scan->confirmed_at) · Confirmed: {{ $scan->confirmed_at->format('d M Y H:i') }}@endif
                                             </div>
-                                            @if($scanIsUnlinked && $matchReasonLabel)
+                                            @if($scanIsUnlinked && !$hasBookingOnly && $matchReasonLabel)
                                                 <div class="sd-muted" title="{{ $matchReason }}">{{ $matchReasonLabel }}</div>
                                             @endif
                                         @endif
@@ -1100,6 +1109,9 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                         $pickedByItem = $orderLines->groupBy('item_id')->map(fn ($itemLines) => (int) $itemLines->sum('qty_scanned'));
                                         $cogsByItem = $orderLines->groupBy('item_id')->map(fn ($itemLines) => (float) $itemLines->sum(fn ($line) => $lineCogs($line)));
                                         $marketplaceStatus = strtoupper(str_replace('_', ' ', (string) ($marketplaceOrder->order_status ?: $marketplaceOrder->status ?: '')));
+                                        $unmatchedMarketplaceLines = $isSpxShopee && $orderLines->isNotEmpty()
+                                            ? $marketplaceLines->filter(fn ($candidate) => !$orderLines->contains(fn ($line) => (int) ($candidate->internal_item_id ?: $candidate->item_id) === (int) $line->item_id))
+                                            : collect();
                                     @endphp
                                     <div class="sd-marketplace-detail">
                                         <div class="sd-marketplace-head">
@@ -1137,15 +1149,20 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                 <div class="sd-items-head {{ $orderItemGridClass }} sd-qty-breakdown"><span>No</span><span>Kode Item</span><span>Order</span><span>Ship</span><span>Diff</span><span>SKU Marketplace</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                                                 @foreach($displayLines as $line)
                                                     @php
-                                                        $marketplaceLine = $line->marketplace_line ?? $marketplaceLines->first(function ($candidate) use ($line) {
+                                                        $matchedMarketplaceLine = $line->marketplace_line ?? $marketplaceLines->first(function ($candidate) use ($line) {
                                                             return (int) ($candidate->internal_item_id ?: $candidate->item_id) === (int) $line->item_id;
                                                         });
+                                                        // Satu item scan dan satu item order boleh ditampilkan berdampingan,
+                                                        // tetapi perbedaan item tidak boleh dianggap Diff 0.
+                                                        $itemMismatch = $isSpxShopee && !$matchedMarketplaceLine && $orderLines->isNotEmpty();
+                                                        $singleLineMismatch = $itemMismatch && $orderLines->count() === 1 && $marketplaceLines->count() === 1;
+                                                        $marketplaceLine = $matchedMarketplaceLine ?: ($singleLineMismatch ? $marketplaceLines->first() : null);
                                                         // Tampilkan SKU asli dari payload marketplace saja.
                                                         // Jangan gunakan marketplace_sku hasil mapping nama atau kode internal.
                                                         $marketplaceSku = $marketplaceLine?->model_sku ?: $marketplaceLine?->item_sku ?: '—';
-                                                        $qtyOrder = (int) ($marketplaceLine?->qty ?? $line->qty_scanned);
+                                                        $qtyOrder = $itemMismatch && !$singleLineMismatch ? null : (int) ($marketplaceLine?->qty ?? $line->qty_scanned);
                                                         $qtyShipment = (int) ($pickedByItem[$line->item_id] ?? $line->qty_scanned);
-                                                        $difference = $qtyShipment - $qtyOrder;
+                                                        $difference = $qtyShipment - (int) $qtyOrder;
                                                     @endphp
                                                     <div class="sd-order-item {{ $orderItemGridClass }} sd-qty-breakdown">
                                                         <span class="sd-order-item-num">{{ $loop->iteration }}</span>
@@ -1153,10 +1170,10 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                             <div class="sd-order-item-code">{{ $line->item?->code ?: ($marketplaceLine?->item_code_snapshot ?: '-') }}</div>
                                                             <div class="sd-order-item-name">{{ $line->item?->name ?: 'Nama item belum tersedia' }}</div>
                                                         </div>
-                                                        <div class="sd-order-item-qty">{{ number_format($qtyOrder, 0, ',', '.') }}</div>
+                                                        <div class="sd-order-item-qty">{{ $qtyOrder === null ? '—' : number_format($qtyOrder, 0, ',', '.') }}</div>
                                                         <div class="sd-order-item-qty">{{ number_format($qtyShipment, 0, ',', '.') }}</div>
-                                                        <div class="sd-order-item-diff {{ $difference === 0 ? 'sd-marketplace-ok' : 'sd-marketplace-short' }}">{{ $difference > 0 ? '+' : '' }}{{ number_format($difference, 0, ',', '.') }}</div>
-                                                        <div class="sd-order-item-marketplace-sku">{{ $marketplaceSku }}</div>
+                                                        <div class="sd-order-item-diff {{ !$itemMismatch && $difference === 0 ? 'sd-marketplace-ok' : 'sd-marketplace-short' }}">{{ $itemMismatch ? 'Periksa' : (($difference > 0 ? '+' : '') . number_format($difference, 0, ',', '.')) }}</div>
+                                                        <div class="sd-order-item-marketplace-sku {{ $itemMismatch ? 'is-mismatch' : '' }}">{{ $marketplaceSku }}@if($itemMismatch)<span class="sd-sku-mismatch">{{ $singleLineMismatch ? 'Item berbeda' : 'Lihat SKU order' }}</span>@endif</div>
                                                         @if($canSeeCogs)
                                                             <div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div>
                                                             <div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>
@@ -1173,6 +1190,9 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                     </div>
                                                 @endforeach
                                             </div>
+                                            @if($isSpxShopee && $unmatchedMarketplaceLines->isNotEmpty() && !($orderLines->count() === 1 && $marketplaceLines->count() === 1))
+                                                <div class="sd-sku-unmatched">Item order belum cocok: {{ $unmatchedMarketplaceLines->map(fn ($line) => $line->model_sku ?: $line->item_sku ?: 'SKU belum tersedia')->join(', ') }}</div>
+                                            @endif
                                         @else
                                             <div class="sd-muted">Detail item marketplace belum tersedia.</div>
                                         @endif
