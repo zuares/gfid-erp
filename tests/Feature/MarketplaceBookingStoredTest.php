@@ -89,4 +89,45 @@ class MarketplaceBookingStoredTest extends TestCase
         $this->assertSame(2500.0, (float) $booking['payment_breakdown']['voucher_store']);
         $this->assertSame(43000.0, (float) $booking['income']['estimated']);
     }
+
+    public function test_stored_endpoint_searches_awb_from_linked_order(): void
+    {
+        $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $store = Store::create([
+            'code' => 'SHOPEE-AWB-SEARCH-TEST',
+            'name' => 'Toko AWB Search Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $bookingSn = 'BOOKING-AWB-SEARCH-TEST';
+
+        MarketplaceBooking::create([
+            'store_id' => $store->id,
+            'booking_sn' => $bookingSn,
+            'order_sn' => 'ORDER-AWB-SEARCH-TEST',
+            'booking_status' => 'SHIPPED',
+        ]);
+        MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-AWB-SEARCH-TEST',
+            'channel_order_id' => 'ORDER-AWB-SEARCH-TEST',
+            'booking_sn' => $bookingSn,
+            'order_status' => 'SHIPPED',
+            'order_date' => now(),
+            'ordered_at' => now(),
+            'shipping_awb_no' => 'SPXID06902531824A',
+        ]);
+
+        $response = app(MarketplaceBookingController::class)->stored(
+            Request::create('/api/marketplace/bookings/stored', 'GET', [
+                'search' => 'SPXID06902531824A',
+            ])
+        );
+        $booking = collect($response->getData(true)['data'])
+            ->firstWhere('booking_sn', $bookingSn);
+
+        $this->assertNotNull($booking);
+        $this->assertSame('SPXID06902531824A', $booking['tracking_number']);
+    }
 }

@@ -59,9 +59,25 @@ class MarketplaceBookingController extends Controller
             $q->where('booking_status', $status);
         }
         if ($search !== '') {
-            $q->where(fn ($w) => $w->where('booking_sn', 'like', "%{$search}%")
-                ->orWhere('order_sn', 'like', "%{$search}%")
-                ->orWhere('tracking_number', 'like', "%{$search}%"));
+            $like = "%{$search}%";
+            $q->where(function ($w) use ($like) {
+                $w->where('booking_sn', 'like', $like)
+                    ->orWhere('order_sn', 'like', $like)
+                    ->orWhere('tracking_number', 'like', $like)
+                    ->orWhere('package_number', 'like', $like)
+                    // AWB kadang hanya tersimpan pada order yang tertaut,
+                    // bukan pada row marketplace_bookings.
+                    ->orWhereExists(function ($linked) use ($like) {
+                        $linked->selectRaw('1')
+                            ->from('marketplace_orders as linked_orders')
+                            ->whereColumn('linked_orders.store_id', 'marketplace_bookings.store_id')
+                            ->where(function ($orderSearch) use ($like) {
+                                $orderSearch->where('linked_orders.shipping_awb_no', 'like', $like)
+                                    ->orWhere('linked_orders.channel_order_id', 'like', $like)
+                                    ->orWhere('linked_orders.booking_sn', 'like', $like);
+                            });
+                    });
+            });
         }
 
         $bookings = $q->orderByDesc('create_time')->limit(1000)->get();
