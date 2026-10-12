@@ -811,6 +811,7 @@
 
         {{-- DASHBOARD --}}
         @if ($hasDashboardRoute)
+            <x-sidebar.label text="Dashboard" />
             <li>
                 <x-sidebar.simple-link href="{{ route('dashboard') }}" icon="bi bi-house" :active="request()->routeIs('dashboard')">
                     Beranda

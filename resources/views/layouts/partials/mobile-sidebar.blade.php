@@ -749,6 +749,7 @@
                 @if ($isOperatorRole)
 
                     @if ($hasDashboardRoute)
+                        <div class="mobile-sidebar-section-label">Dashboard</div>
                         <li>
                             <a href="{{ route('dashboard') }}"
                                class="mobile-sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
@@ -802,6 +803,7 @@
                 @elseif ($isAdmin || $isOperating)
 
                     @if ($hasDashboardRoute)
+                        <div class="mobile-sidebar-section-label">Dashboard</div>
                         <li>
                             <a href="{{ route('dashboard') }}"
                                class="mobile-sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
@@ -1466,6 +1468,7 @@
 
                     {{-- DASHBOARD --}}
                     @if ($hasDashboardRoute)
+                        <div class="mobile-sidebar-section-label">Dashboard</div>
                         <li>
                             <a href="{{ route('dashboard') }}"
                                class="mobile-sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
