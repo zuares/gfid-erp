@@ -89,7 +89,7 @@ class MarketplaceBookingController extends Controller
             }
         } elseif ($tab === 'warehouse') {
             $q->whereNotNull('listing_warehouse_sub');
-            if (in_array($sub, ['waiting_purchase', 'shipped_to_buyer'], true)) {
+            if (in_array($sub, ['ready_ship', 'shipped_to_warehouse', 'waiting_purchase', 'shipped_to_buyer'], true)) {
                 $q->where('listing_warehouse_sub', $sub);
             }
         } elseif (in_array($tab, ['waiting', 'shipped', 'cancelled'], true)) {
@@ -101,7 +101,7 @@ class MarketplaceBookingController extends Controller
         $total = $tab === 'ready' && in_array($sub, ['to_arrange', 'packing', 'ready_ship'], true)
             ? $counts['ready_counts'][$sub]
             : ($counts['counts'][$tab] ?? $counts['counts']['all']);
-        if ($tab === 'warehouse' && in_array($sub, ['waiting_purchase', 'shipped_to_buyer'], true)) {
+        if ($tab === 'warehouse' && in_array($sub, ['ready_ship', 'shipped_to_warehouse', 'waiting_purchase', 'shipped_to_buyer'], true)) {
             $total = $counts['warehouse_counts'][$sub];
         }
         $lastPage = max(1, (int) ceil($total / $perPage));

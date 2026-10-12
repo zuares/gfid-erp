@@ -111,7 +111,7 @@ class MarketplaceBookingStoredTest extends TestCase
         $result = $this->stored(['tab' => 'ready', 'per_page' => 1]);
         $this->assertSame(7, $result['pagination']['total']);
         $this->assertSame(['all' => 7, 'to_arrange' => 2, 'packing' => 2, 'ready_ship' => 3], $result['ready_counts']);
-        $this->assertSame(2, $result['counts']['warehouse']);
+        $this->assertSame(3, $result['counts']['warehouse']);
         $this->assertSame(2, $result['counts']['shipped']);
         $this->assertSame(3, $result['counts']['cancelled']);
         foreach (['to_arrange', 'packing', 'ready_ship'] as $sub) {
@@ -183,10 +183,10 @@ class MarketplaceBookingStoredTest extends TestCase
 
         $result = $this->stored(['tab' => 'warehouse', 'per_page' => 1]);
         $this->assertSame(10, $result['counts']['all']);
-        $this->assertSame(3, $result['counts']['warehouse']);
-        $this->assertSame(['all' => 3, 'waiting_purchase' => 1, 'shipped_to_buyer' => 2], $result['warehouse_counts']);
-        $this->assertSame(3, $result['pagination']['total']);
-        $this->assertSame(3, $result['pagination']['last_page']);
+        $this->assertSame(5, $result['counts']['warehouse']);
+        $this->assertSame(['all' => 5, 'ready_ship' => 0, 'shipped_to_warehouse' => 2, 'waiting_purchase' => 1, 'shipped_to_buyer' => 2], $result['warehouse_counts']);
+        $this->assertSame(5, $result['pagination']['total']);
+        $this->assertSame(5, $result['pagination']['last_page']);
         $this->assertCount(1, $result['data']);
 
         $waiting = $this->stored(['tab' => 'warehouse', 'sub' => 'waiting_purchase']);
@@ -198,7 +198,7 @@ class MarketplaceBookingStoredTest extends TestCase
         $this->assertSame(2, $outbound['pagination']['total']);
         $this->assertSame(2, $outbound['pagination']['current_page']);
         $this->assertSame('shipped_to_buyer', $outbound['data'][0]['warehouse_sub']);
-        $this->assertSame(['all' => 3, 'waiting_purchase' => 1, 'shipped_to_buyer' => 2], $outbound['warehouse_counts']);
+        $this->assertSame(['all' => 5, 'ready_ship' => 0, 'shipped_to_warehouse' => 2, 'waiting_purchase' => 1, 'shipped_to_buyer' => 2], $outbound['warehouse_counts']);
         $allOutbound = $this->stored(['tab' => 'warehouse', 'sub' => 'shipped_to_buyer']);
         $this->assertEqualsCanonicalizing(['BOOKING-MATCHED', 'BOOKING-PENDING'], array_column($allOutbound['data'], 'booking_sn'));
 
@@ -226,7 +226,7 @@ class MarketplaceBookingStoredTest extends TestCase
         ]);
         $this->assertSame(1, $result['pagination']['total']);
         $this->assertSame($store->id, $result['data'][0]['store_id']);
-        $this->assertSame(['all' => 1, 'waiting_purchase' => 0, 'shipped_to_buyer' => 1], $result['warehouse_counts']);
+        $this->assertSame(['all' => 1, 'ready_ship' => 0, 'shipped_to_warehouse' => 0, 'waiting_purchase' => 0, 'shipped_to_buyer' => 1], $result['warehouse_counts']);
 
         $empty = $this->stored(['tab' => 'warehouse', 'sub' => 'waiting_purchase', 'search' => 'AWB-MATCHED']);
         $this->assertSame([], $empty['data']);

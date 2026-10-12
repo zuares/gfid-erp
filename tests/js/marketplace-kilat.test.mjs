@@ -27,7 +27,7 @@ function response(sn, page = 1, total = 1007) {
         data: [{ booking_sn: sn, store_id: 1, booking_status: 'PROCESSED', tracking_number: 'SPXID06902531824A', items: [] }],
         counts: { all: 1007, ready: 107, waiting: 900, shipped: 0, warehouse: 0, cancelled: 0 },
         ready_counts: { all: 107, to_arrange: 7, packing: 100, ready_ship: 0 },
-        warehouse_counts: { all: 900, waiting_purchase: 200, shipped_to_buyer: 700 },
+        warehouse_counts: { all: 900, ready_ship: 50, shipped_to_warehouse: 100, waiting_purchase: 200, shipped_to_buyer: 550 },
         pagination: { current_page: page, last_page: Math.ceil(total / 50), total, from: (page - 1) * 50 + 1, to: Math.min(page * 50, total) },
     };
 }
@@ -166,27 +166,29 @@ test('warehouse subtabs have independent filters, counts and pagination', async 
     assert.equal(requests[7].params.get('tab'), 'warehouse');
 });
 
-test('delivery to Shopee warehouse has a separate tab from warehouse inventory and outbound delivery', async t => {
+test('warehouse milestones appear as separate subtabs, including ready to ship', async t => {
     const { window, document, requests } = setup(t);
     requests[0].reply(response('INITIAL'));
     await flush();
+    assert.equal(document.querySelector('[data-tab="shipped"]'), null);
     window.switchTab('warehouse');
+    assert.equal(requests[1].params.get('tab'), 'warehouse');
+    assert.match(document.querySelector('#subTabWarehouseContainer [data-sub="ready_ship"]').textContent, /Siap Kirim/);
+    assert.match(document.querySelector('#subTabWarehouseContainer [data-sub="shipped_to_warehouse"]').textContent, /Dikirim ke Gudang Shopee/);
+    assert.match(document.querySelector('#subTabWarehouseContainer [data-sub="waiting_purchase"]').textContent, /Menunggu Pembelian/);
+    assert.match(document.querySelector('#subTabWarehouseContainer [data-sub="shipped_to_buyer"]').textContent, /Dikirim dari Gudang Shopee/);
+    assert.doesNotMatch(document.getElementById('kiltHelp').textContent, /Dikirim ke DC/);
     requests[1].reply(response('WAREHOUSE'));
     await flush();
-    window.switchSubTabWarehouse('shipped_to_buyer');
-    requests[2].reply(response('OUTBOUND'));
-    await flush();
-
-    const inboundTab = document.querySelector('[data-tab="shipped"]');
-    assert.match(inboundTab.textContent, /Dikirim ke Gudang Shopee/);
-    assert.doesNotMatch(document.getElementById('kiltHelp').textContent, /Dikirim ke DC/);
-    window.switchTab('shipped', inboundTab);
-    assert.equal(requests[3].params.get('tab'), 'shipped');
-    assert.equal(requests[3].params.get('sub'), 'all');
-    assert.equal(requests[3].params.get('page'), '1');
-    assert.equal(document.getElementById('subTabWarehouseContainer').style.display, 'none');
-    assert.equal(document.getElementById('subTabReadyContainer').style.display, 'none');
-    requests[3].reply(response('INBOUND'));
+    assert.equal(document.getElementById('badge-sub-warehouse-ready_ship').textContent, '50');
+    assert.equal(document.getElementById('badge-sub-warehouse-shipped_to_warehouse').textContent, '100');
+    const toWarehouse = document.querySelector('#subTabWarehouseContainer [data-sub="shipped_to_warehouse"]');
+    window.switchSubTabWarehouse('shipped_to_warehouse', toWarehouse);
+    assert.equal(requests[2].params.get('sub'), 'shipped_to_warehouse');
+    assert.equal(requests[2].params.get('tab'), 'warehouse');
+    requests[2].reply(response('INBOUND'));
     await flush();
     assert.match(document.getElementById('kiltBody').textContent, /INBOUND/);
+    window.switchSubTabWarehouse('ready_ship');
+    assert.equal(requests[3].params.get('sub'), 'ready_ship');
 });

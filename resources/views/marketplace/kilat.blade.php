@@ -78,7 +78,7 @@
     {{-- Penjelasan singkat agar owner tidak bingung --}}
     <div id="kiltHelp" class="orders-help">
         <span style="font-size:1rem">💡</span>
-        <span>Pesanan <strong>Kilat</strong> dikelola gudang Shopee. Alur: <strong>Perlu Proses Penjual</strong> → <strong>Dikirim ke Gudang Shopee</strong> → <strong>Gudang Shopee</strong>. Di Gudang Shopee, pesanan dikelompokkan menjadi <strong>Menunggu Pembelian</strong> dan <strong>Dikirim dari Gudang Shopee</strong>.</span>
+        <span>Pesanan <strong>Kilat</strong> dikelola gudang Shopee. Subtab membedakan pesanan siap dikirim, dalam perjalanan ke gudang, menunggu pembelian, dan yang dikirim dari gudang Shopee.</span>
     </div>
 
     {{-- TABS (label mengikuti alur Pesanan Kilat, ramah-owner) --}}
@@ -89,10 +89,7 @@
         <button class="ord-tab active" data-tab="ready" onclick="switchTab('ready', this)" title="Penjual perlu memproses / menyerahkan barang (READY_TO_SHIP/PROCESSED)">
             📦 Perlu Proses Penjual <span class="ord-badge urgent" id="badge-ready">—</span>
         </button>
-        <button class="ord-tab" data-tab="shipped" onclick="switchTab('shipped', this)" title="Barang sedang dikirim dari penjual ke gudang Shopee (READY_TO_HANDOVER/COMPLETED)">
-            🚚 Dikirim ke Gudang Shopee <span class="ord-badge" id="badge-shipped" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">—</span>
-        </button>
-        <button class="ord-tab" data-tab="warehouse" onclick="switchTab('warehouse', this)" title="Menunggu pembelian atau dikirim dari gudang Shopee">
+        <button class="ord-tab" data-tab="warehouse" onclick="switchTab('warehouse', this)" title="Status pesanan dalam alur gudang Shopee">
             🏬 Gudang Shopee <span class="ord-badge" id="badge-warehouse" style="background:#f5f3ff;color:#7c3aed;border-color:#ddd6fe">—</span>
         </button>
         <button class="ord-tab" data-tab="cancelled" onclick="switchTab('cancelled', this)" title="Dibatalkan / gagal (CANCELLED/FAILED)">
@@ -110,6 +107,8 @@
 
     <div id="subTabWarehouseContainer" class="kilat-subtabs" style="display:none">
         <button class="ord-subtab active" data-sub="all" onclick="switchSubTabWarehouse('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-warehouse-all">—</span></button>
+        <button class="ord-subtab" data-sub="ready_ship" onclick="switchSubTabWarehouse('ready_ship', this)">Siap Kirim <span class="ord-badge bg-secondary" id="badge-sub-warehouse-ready_ship">—</span></button>
+        <button class="ord-subtab" data-sub="shipped_to_warehouse" onclick="switchSubTabWarehouse('shipped_to_warehouse', this)">Dikirim ke Gudang Shopee <span class="ord-badge bg-secondary" id="badge-sub-warehouse-shipped_to_warehouse">—</span></button>
         <button class="ord-subtab" data-sub="waiting_purchase" onclick="switchSubTabWarehouse('waiting_purchase', this)">Menunggu Pembelian <span class="ord-badge bg-secondary" id="badge-sub-warehouse-waiting_purchase">—</span></button>
         <button class="ord-subtab" data-sub="shipped_to_buyer" onclick="switchSubTabWarehouse('shipped_to_buyer', this)">Dikirim dari Gudang Shopee <span class="ord-badge bg-secondary" id="badge-sub-warehouse-shipped_to_buyer">—</span></button>
     </div>
@@ -367,15 +366,22 @@
         READY_TO_SHIP: ['Perlu Proses Penjual', 'fstatus-draft'],
         PROCESSED:     ['Sedang Diproses',      'fstatus-draft'],
         SHIPPED:       ['Menunggu Pembelian', 'fstatus-pending'],
-        COMPLETED:     ['Selesai',              'fstatus-done'],
+        READY_TO_HANDOVER: ['Dikirim ke Gudang Shopee', 'fstatus-pending'],
+        COMPLETED:     ['Dikirim ke Gudang Shopee', 'fstatus-pending'],
         CANCELLED:     ['Dibatalkan',           'fstatus-none'],
         FAILED:        ['Gagal',                'fstatus-none'],
     };
 
-    function statusBadge(s){
+    function statusBadge(s, booking = null){
         s = (s||'').toUpperCase();
         if(!s) return `<span class="fstatus fstatus-none">—</span>`;
-        const [label, cls] = STATUS_LABEL[s] || [s.replace(/_/g,' '), 'fstatus-pending'];
+        const warehouseLabels = {
+            ready_ship: ['Siap Kirim', 'fstatus-done'],
+            shipped_to_warehouse: ['Dikirim ke Gudang Shopee', 'fstatus-pending'],
+            waiting_purchase: ['Menunggu Pembelian', 'fstatus-pending'],
+            shipped_to_buyer: ['Dikirim dari Gudang Shopee', 'fstatus-done'],
+        };
+        const [label, cls] = warehouseLabels[booking?.warehouse_sub] || STATUS_LABEL[s] || [s.replace(/_/g,' '), 'fstatus-pending'];
         return `<span class="fstatus ${cls}" title="${s}">${label}</span>`;
     }
     // Bisa dilacak jika barang sudah bergerak (dikirim ke DC / ke pembeli) atau punya resi.
@@ -532,14 +538,14 @@
 
     // Counts include every matching booking, not just the current page.
     function updateBadges() {
-        for (const tab of ['all', 'ready', 'shipped', 'warehouse', 'cancelled']) {
+        for (const tab of ['all', 'ready', 'warehouse', 'cancelled']) {
             document.getElementById('badge-' + tab).textContent = counts[tab] ?? 0;
         }
         document.getElementById('badge-ready').classList.toggle('urgent', (counts.ready ?? 0) > 0);
         for (const [suffix, key] of Object.entries({all: 'all', arrange: 'to_arrange', packing: 'packing', ship: 'ready_ship'})) {
             document.getElementById('badge-sub-ready-' + suffix).textContent = readyCounts[key] ?? 0;
         }
-        for (const sub of ['all', 'waiting_purchase', 'shipped_to_buyer']) {
+        for (const sub of ['all', 'ready_ship', 'shipped_to_warehouse', 'waiting_purchase', 'shipped_to_buyer']) {
             document.getElementById('badge-sub-warehouse-' + sub).textContent = warehouseCounts[sub] ?? 0;
         }
     }
@@ -635,7 +641,7 @@
                     <div class="ord-id">${b.booking_sn ? `No. Booking: ${b.booking_sn}` : '<span class="kilat-placeholder">Nomor booking belum tersedia</span>'}</div>
                     ${(b.order_sn && b.order_sn !== b.booking_sn) ? `<div class="ord-date">No. Pesanan: ${b.order_sn}</div>` : `<div class="ord-date kilat-placeholder">No. Pesanan belum tertaut</div>`}
                     <div class="ord-order-context">
-                        ${statusBadge(b.booking_status)}
+                        ${statusBadge(b.booking_status, b)}
                         <span class="ord-order-store">🏪 ${store}</span>
                     </div>
                     <div class="ord-date" style="margin-top:4px">${b.create_time ? fmtDate(b.create_time) : '<span class="kilat-placeholder">Tanggal belum tersedia</span>'}</div>
