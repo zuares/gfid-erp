@@ -373,10 +373,14 @@
                 <table class="table table-hover align-middle item-table">
                     <thead>
                         <tr>
+                            <th class="text-center" style="width:52px;">No.</th>
                             @unless($isAdminRole)
                                 <th class="text-center" style="width:38px;"><input type="checkbox" class="form-check-input" id="checkAll" aria-label="Pilih semua"></th>
                             @endunless
                             <th style="min-width:220px;">Item</th>
+                            @if($isAdminRole)
+                                <th style="min-width:155px;">Klasifikasi</th>
+                            @endif
                             @unless($isAdminRole)
                                 <th style="min-width:155px;">Klasifikasi</th>
                                 <th style="min-width:165px;">Metode Pasok</th>
@@ -397,6 +401,7 @@
                                 $modeClass = $item->isHybrid() ? 'item-status-hybrid' : ($item->canMake() ? 'item-status-make' : ($item->canBuy() ? 'item-status-buy' : 'item-status-undefined'));
                             @endphp
                             <tr>
+                                <td class="text-center text-muted fw-semibold">{{ $items->firstItem() + $loop->index }}</td>
                                 @unless($isAdminRole)
                                     <td class="text-center"><input type="checkbox" class="form-check-input row-check" value="{{ $item->id }}" aria-label="Pilih {{ $item->code }}"></td>
                                 @endunless
@@ -404,6 +409,14 @@
                                     <div><a class="item-code text-decoration-none" href="{{ route('master.items.show', $item) }}">{{ $item->code }}</a></div>
                                     <div class="item-name mt-1">{{ $item->name }}</div>
                                 </td>
+                                @if($isAdminRole)
+                                    <td>
+                                        <span class="item-type">{{ $typeLabels[$item->type] ?? $item->type }}</span>
+                                        @if($item->category?->code)
+                                            <div class="item-meta">{{ $item->category->code }}</div>
+                                        @endif
+                                    </td>
+                                @endif
                                 @unless($isAdminRole)
                                     <td>
                                         <span class="item-type">{{ $typeLabels[$item->type] ?? $item->type }}</span>
@@ -431,7 +444,7 @@
                                 <td class="text-end">
                                     <div class="item-row-actions">
                                         @if($isAdminRole)
-                                            <a href="{{ route('master.items.show', $item) }}" class="btn item-soft btn-sm" title="Lihat detail" aria-label="Lihat detail {{ $item->code }}"><i class="bi bi-eye"></i><span class="action-label">Lihat</span></a>
+                                            <a href="{{ route('master.items.edit', $item) }}" class="btn item-primary btn-sm" title="Edit nama" aria-label="Edit nama {{ $item->code }}"><i class="bi bi-pencil"></i><span class="action-label">Edit Nama</span></a>
                                         @else
                                             <a href="{{ route('master.items.show', $item) }}" class="btn item-soft btn-sm" title="Lihat detail" aria-label="Lihat detail {{ $item->code }}"><i class="bi bi-eye"></i><span class="action-label d-none d-xl-inline">Lihat</span></a>
                                             <a href="{{ route('master.items.edit', $item) }}" class="btn item-primary btn-sm" title="Edit item" aria-label="Edit item {{ $item->code }}"><i class="bi bi-pencil"></i><span class="action-label d-none d-xl-inline">Edit</span></a>
@@ -479,6 +492,9 @@
                             @endunless
                         </div>
                         <div class="item-mobile-card-meta">
+                            @if($isAdminRole)
+                                <div><div class="item-mobile-card-label">Klasifikasi</div><div class="item-mobile-card-value">{{ $typeLabels[$item->type] ?? $item->type }}@if($item->category?->code) · {{ $item->category->code }}@endif</div></div>
+                            @endif
                             @unless($isAdminRole)
                                 <div><div class="item-mobile-card-label">Tipe</div><div class="item-mobile-card-value">{{ $typeLabels[$item->type] ?? $item->type }}</div></div>
                                 <div><div class="item-mobile-card-label">Kategori</div><div class="item-mobile-card-value">{{ $item->category?->code ?? '—' }}</div></div>
@@ -489,10 +505,12 @@
                         </div>
                         <div class="item-mobile-card-footer">
                             <div class="item-mobile-card-actions">
-                                <a href="{{ route('master.items.show', $item) }}" class="btn item-soft btn-sm"><i class="bi bi-eye"></i>Lihat</a>
-                                @unless($isAdminRole)
+                                @if($isAdminRole)
+                                    <a href="{{ route('master.items.edit', $item) }}" class="btn item-primary btn-sm"><i class="bi bi-pencil"></i>Edit Nama</a>
+                                @else
+                                    <a href="{{ route('master.items.show', $item) }}" class="btn item-soft btn-sm"><i class="bi bi-eye"></i>Lihat</a>
                                     <a href="{{ route('master.items.edit', $item) }}" class="btn item-primary btn-sm"><i class="bi bi-pencil"></i>Edit</a>
-                                @endunless
+                                @endif
                             </div>
                             @unless($isAdminRole)
                                 <div class="dropdown">

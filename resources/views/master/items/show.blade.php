@@ -9,6 +9,7 @@
     $bomEstimate = $bomEstimate ?? null;
     $modeClass = $item->isHybrid() ? 'item-detail-hybrid' : ($item->canMake() ? 'item-detail-make' : ($item->canBuy() ? 'item-detail-buy' : 'item-detail-undefined'));
     $typeLabel = $item->itemTypeOption?->name ?? ($typeLabels[$item->type] ?? $item->type);
+    $isAdminRole = auth()->user() && strtolower((string) auth()->user()->role) === 'admin' && ! auth()->user()->isDeveloper();
 @endphp
 
 @push('head')
@@ -87,17 +88,21 @@
             </div>
         </div>
         <div class="item-detail-actions">
-            <a href="{{ route('master.items.edit', $item) }}" class="btn item-detail-primary btn-sm"><i class="bi bi-pencil"></i>Edit Item</a>
-            <a href="{{ route('master.items.create') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-lg"></i>Tambah Item Lagi</a>
-            @if($canManageBom && in_array($item->type, ['finished_good', 'wip'], true) && $item->canMake())
-                @if($itemBom)
-                    <a href="{{ route('master.item_boms.edit', $itemBom) }}" class="btn btn-outline-success btn-sm"><i class="bi bi-diagram-3"></i>Kelola BOM</a>
-                @else
-                    <a href="{{ route('master.item_boms.create', ['item_id' => $item->id]) }}" class="btn btn-outline-success btn-sm"><i class="bi bi-diagram-3"></i>Atur BOM</a>
+            <a href="{{ route('master.items.edit', $item) }}" class="btn item-detail-primary btn-sm"><i class="bi bi-pencil"></i>{{ $isAdminRole ? 'Edit Nama' : 'Edit Item' }}</a>
+            @unless($isAdminRole)
+                <a href="{{ route('master.items.create') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-lg"></i>Tambah Item Lagi</a>
+                @if($canManageBom && in_array($item->type, ['finished_good', 'wip'], true) && $item->canMake())
+                    @if($itemBom)
+                        <a href="{{ route('master.item_boms.edit', $itemBom) }}" class="btn btn-outline-success btn-sm"><i class="bi bi-diagram-3"></i>Kelola BOM</a>
+                    @else
+                        <a href="{{ route('master.item_boms.create', ['item_id' => $item->id]) }}" class="btn btn-outline-success btn-sm"><i class="bi bi-diagram-3"></i>Atur BOM</a>
+                    @endif
                 @endif
-            @endif
+            @endunless
             <a href="{{ route('master.items.index') }}" class="btn item-detail-soft btn-sm"><i class="bi bi-arrow-left"></i>Kembali</a>
-            <a href="{{ route('master.items.hpp_temp.edit', $item) }}" class="btn btn-outline-success btn-sm"><i class="bi bi-cash-coin"></i>Set HPP</a>
+            @unless($isAdminRole)
+                <a href="{{ route('master.items.hpp_temp.edit', $item) }}" class="btn btn-outline-success btn-sm"><i class="bi bi-cash-coin"></i>Set HPP</a>
+            @endunless
         </div>
     </div>
 

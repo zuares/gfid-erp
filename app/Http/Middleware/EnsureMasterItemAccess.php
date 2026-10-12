@@ -23,6 +23,8 @@ class EnsureMasterItemAccess
                 in_array($request->route()?->getName(), [
                     'master.items.index',
                     'master.items.show',
+                    'master.items.edit',
+                    'master.items.update',
                 ], true),
                 403,
                 'Role admin hanya memiliki akses lihat pada Master Items.'

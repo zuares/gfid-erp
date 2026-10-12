@@ -54,7 +54,7 @@ class MasterItemCrudTest extends TestCase
             ->assertSee('Tambah Item Lagi');
     }
 
-    public function test_admin_can_view_master_items_but_cannot_modify_them(): void
+    public function test_admin_can_view_master_items_and_edit_only_the_name(): void
     {
         $admin = User::factory()->create([
             'role' => 'admin',
@@ -80,14 +80,24 @@ class MasterItemCrudTest extends TestCase
             ->get(route('master.items.index'))
             ->assertOk()
             ->assertSee('Item')
+            ->assertSee('Klasifikasi')
             ->assertSee('Harga Terakhir')
-            ->assertSee('Lihat')
+            ->assertSee('No.')
+            ->assertSee('Edit Nama')
+            ->assertDontSee('Lihat')
             ->assertDontSee('Tambah Item')
             ->assertDontSee('Edit item');
 
         $this->actingAs($admin)
             ->get(route('master.items.show', $item))
             ->assertOk();
+
+        $this->actingAs($admin)
+            ->get(route('master.items.edit', $item))
+            ->assertOk()
+            ->assertSee('Edit Nama Item')
+            ->assertSee('Nama item')
+            ->assertDontSee('Kode item');
 
         $this->actingAs($admin)
             ->get(route('master.items.create'))
@@ -99,19 +109,13 @@ class MasterItemCrudTest extends TestCase
 
         $this->actingAs($admin)
             ->put(route('master.items.update', $item), [
-                'code' => 'ADMIN-CRUD-001',
-                'sku' => 'ADMIN-CRUD-001',
-                'name' => 'Item Admin CRUD Updated',
-                'unit' => 'pcs',
-                'type' => 'material',
-                'item_category_id' => '',
-                'default_allocation' => 'hpp',
-                'supplier_ids' => [],
-                'primary_supplier_id' => '',
-                'active' => 1,
-                'barcodes' => [],
+                'code' => 'ADMIN-HACKED-CODE',
+                'name' => 'Item Admin Updated',
             ])
-            ->assertForbidden();
+            ->assertRedirect(route('master.items.show', $item));
+
+        $this->assertSame('Item Admin Updated', $item->fresh()->name);
+        $this->assertSame('ADMIN-VIEW-001', $item->fresh()->code);
 
         $this->actingAs($admin)
             ->delete(route('master.items.destroy', $item))
@@ -136,6 +140,8 @@ class MasterItemCrudTest extends TestCase
             ->assertSee(route('master.items.index'), false)
             ->assertSee('data-bs-target="#navPersediaanAdmin"', false)
             ->assertSee('data-bs-target="#navPersediaanAdminMobile"', false)
+            ->assertSee('Akuntansi')
+            ->assertDontSee('>Keuangan<', false)
             ->assertDontSee('AI Studio')
             ->assertDontSee('Connect OpenAI')
             ->assertDontSee('AI Agent')

@@ -402,6 +402,10 @@ class ItemController extends Controller
 
     public function edit(Item $item, ItemBomCostService $bomCostService)
     {
+        if ($this->isAdminReadOnly()) {
+            return view('master.items.admin_edit', compact('item'));
+        }
+
         $item->load(['barcodes', 'suppliers', 'itemTypeOption', 'purchaseTreatment']);
 
         $categories = $this->categoryOptions();
@@ -420,6 +424,18 @@ class ItemController extends Controller
 
     public function update(Request $request, Item $item)
     {
+        if ($this->isAdminReadOnly()) {
+            $data = $request->validate([
+                'name' => ['required', 'string', 'max:190'],
+            ]);
+
+            $item->update(['name' => trim($data['name'])]);
+
+            return redirect()
+                ->route('master.items.show', $item)
+                ->with('success', 'Nama item berhasil diperbarui.');
+        }
+
         $data = $this->validateRequest($request, $item);
         $latestGrn = $item->latestPostedGrnPurchase();
         if ($latestGrn) {
@@ -721,6 +737,15 @@ class ItemController extends Controller
     /**
      * Validasi request untuk store & update.
      */
+    protected function isAdminReadOnly(): bool
+    {
+        $user = Auth::user();
+
+        return $user
+            && strtolower((string) $user->role) === 'admin'
+            && ! $user->isDeveloper();
+    }
+
     protected function validateRequest(Request $request, ?Item $item = null): array
     {
         $idToIgnore = $item?->id;
