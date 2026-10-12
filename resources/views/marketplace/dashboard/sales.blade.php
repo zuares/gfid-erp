@@ -698,6 +698,9 @@
     .sales-dashboard .sales-watchlist-product-cell { display: flex; min-width: 0; align-items: center; gap: .5rem; }
     .sales-dashboard .sales-watchlist-thumb { flex: 0 0 2rem; width: 2rem; height: 2rem; }
     .sales-dashboard .sales-watchlist-product { display: block; max-width: 205px; overflow: hidden; font-weight: 700; text-overflow: ellipsis; }
+    .sales-dashboard .sales-watchlist-product-trigger { padding: 0; border: 0; background: transparent; color: var(--sales-ink); cursor: pointer; text-align: left; }
+    .sales-dashboard .sales-watchlist-product-trigger:hover,
+    .sales-dashboard .sales-watchlist-product-trigger:focus-visible { color: var(--sales-accent); text-decoration: underline; outline: none; }
     .sales-dashboard .sales-watchlist-meta { display: block; margin-top: .12rem; color: var(--sales-muted); font-size: .58rem; overflow: hidden; text-overflow: ellipsis; }
     .sales-dashboard .sales-watchlist-badge { display: inline-flex; align-items: center; padding: .2rem .38rem; border-radius: 999px; font-size: .56rem; font-weight: 800; line-height: 1.1; }
     .sales-dashboard .sales-watchlist-badge.is-danger { background: #fee2e2; color: #b91c1c; }
@@ -3673,7 +3676,7 @@
                                     $watchTone = $watchRow['priority'] >= 4 ? 'is-danger' : ($watchRow['priority'] >= 3 ? 'is-warning' : 'is-info');
                                     $watchProductTitle = trim((string) ($watchProduct->marketplace_name ?: $watchProduct->name)) ?: 'Produk tanpa nama';
                                     $watchProductImage = trim((string) ($watchProduct->image_url ?? ''));
-                                    $watchProductSku = trim((string) ($watchProduct->sku ?? ''));
+                                    $watchProductSku = trim((string) ($watchProduct->marketplace_sku ?? $watchProduct->sku ?? ''));
                                     $watchProductCode = trim((string) ($watchProduct->external_item_id ?? '')) ?: trim((string) ($watchProduct->sku ?? ''));
                                     $watchContributionMargin = $watchProduct->contribution_margin !== null ? (float) $watchProduct->contribution_margin : null;
                                     $watchNetProfit = $watchProduct->estimated_payout !== null
@@ -3699,7 +3702,7 @@
                                                 <span class="sales-product-image-preview-title">{{ $watchProductTitle }}</span>
                                             </span>
                                             <span class="min-w-0">
-                                                <span class="sales-watchlist-product" title="{{ $watchProductTitle }}">{{ $watchProductTitle }}</span>
+                                                <button type="button" class="sales-watchlist-product sales-watchlist-product-trigger" data-sales-product-name="{{ $watchProductTitle }}" data-sales-product-sku="{{ $watchProductSku }}" data-sales-product-internal-item-id="" title="Lihat pesanan produk: {{ $watchProductTitle }}">{{ $watchProductTitle }}</button>
                                                 <span class="sales-watchlist-meta">{{ $watchProductCode !== '' ? $watchProductCode : 'Kode belum tersedia' }}</span>
                                             </span>
                                         </div>
