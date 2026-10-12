@@ -359,6 +359,51 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_duplicate_order_scan_is_marked_with_a_badge(): void
+    {
+        [$user, $store] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'AFF-DUPLICATE-ORDER-001',
+            'shipment_type' => Shipment::TYPE_AFFILIATE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+
+        $orderNo = 'AFF-DUPLICATE-001';
+
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.scan_order_store', $shipment), [
+                'order_no' => $orderNo,
+            ])
+            ->assertOk()
+            ->assertJsonPath('duplicate', false)
+            ->assertJsonPath('duplicate_count', 0);
+
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.scan_order_store', $shipment), [
+                'order_no' => $orderNo,
+            ])
+            ->assertOk()
+            ->assertJsonPath('duplicate', true)
+            ->assertJsonPath('duplicate_count', 1);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.scan_order', $shipment))
+            ->assertOk()
+            ->assertSee('sr-duplicate-badge', false)
+            ->assertSee('sr-missing-item-badge', false)
+            ->assertSee('Duplikat');
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('sd-duplicate-badge', false)
+            ->assertSee('sd-missing-item-badge', false)
+            ->assertSee('Duplikat');
+    }
+
     public function test_admin_can_edit_item_qty_on_order_first_scan_page(): void
     {
         [$owner, $store, $item] = $this->shipmentContext();

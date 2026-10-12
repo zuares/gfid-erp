@@ -58,6 +58,8 @@ body[data-theme="dark"] .sd-marketplace-detail{background:rgba(30,64,175,.14);bo
 body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dark"] .sd-marketplace-table td{color:#cbd5e1}body[data-theme="dark"] .sd-marketplace-table .sd-marketplace-code{color:#f1f5f9}
 .sd-badge{display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid rgba(148,163,184,.25);padding:.16rem .48rem;font-size:.69rem;font-weight:900;color:#64748b;white-space:nowrap}
 .sd-badge.pending{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:#92400e}
+.sd-duplicate-badge{display:inline-flex;align-items:center;justify-content:center;margin-left:.35rem;border:1px solid #fcd34d;border-radius:999px;padding:.12rem .4rem;background:#fffbeb;color:#a16207;font-size:.62rem;font-weight:850;line-height:1;vertical-align:middle}
+.sd-missing-item-badge{display:inline-flex;align-items:center;justify-content:center;margin-left:.35rem;border:1px solid #cbd5e1;border-radius:999px;padding:.12rem .4rem;background:#f8fafc;color:#64748b;font-size:.62rem;font-weight:750;line-height:1;vertical-align:middle}
 .sd-empty{padding:1.6rem 1rem;text-align:center;color:#64748b;font-size:.84rem}
 .sd-stock-warning{margin-bottom:.65rem;border:1px solid rgba(220,38,38,.24);border-radius:8px;background:rgba(254,242,242,.72);overflow:hidden}
 .sd-stock-head{padding:.65rem .75rem;border-bottom:1px solid rgba(220,38,38,.16);color:#991b1b;font-size:.8rem;font-weight:900}
@@ -871,6 +873,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                     : ($scanIsUnlinked ? 'Belum Tertaut' : 'Tertaut');
                                 $orderCodeUpper = strtoupper(trim((string) $scan->order_no));
                                 $marketplaceGroupKey = $marketplaceGroup($scan->order_no);
+                                $duplicateCount = (int) data_get($scan->raw_payload, 'duplicate_count', 0);
                                 $orderTheme = str_starts_with($orderCodeUpper, 'SPX')
                                     ? 'sd-theme-shopee'
                                     : (str_starts_with($orderCodeUpper, 'JY') ? 'sd-theme-green' : '');
@@ -879,11 +882,16 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 $orderItemTypes = (int) $orderLines->map($itemTypeKey)->filter()->unique()->count();
                                 $orderQty = (int) $orderLines->sum('qty_scanned');
                                 $orderCogs = (float) $orderLines->sum(fn ($line) => $lineCogs($line));
+                                $hasNoItems = $orderLines->isEmpty();
                             @endphp
                             <div class="sd-order sd-order-group {{ $orderTheme }}" data-order-card data-order-marketplace="{{ $marketplaceGroupKey }}" data-order-search="{{ strtolower($scan->order_no . ' ' . ($scan->source ?: '')) }}">
                                 <div class="sd-order-lead">
                                     <div>
-                                        <div class="sd-order-no">{{ $scan->order_no }}</div>
+                                        <div class="sd-order-no">
+                                            {{ $scan->order_no }}
+                                            @if($duplicateCount > 0)<span class="sd-duplicate-badge" title="Order ini discan lebih dari sekali">Duplikat</span>@endif
+                                            @if($hasNoItems)<span class="sd-missing-item-badge" title="Order belum memiliki item">Belum ada item</span>@endif
+                                        </div>
                                         @if($canSeeScanDiagnostics)
                                             <div class="sd-muted">
                                                 @if(!$scanIsUnlinked)

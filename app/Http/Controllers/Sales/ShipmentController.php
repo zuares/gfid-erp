@@ -1251,6 +1251,7 @@ class ShipmentController extends Controller
                     'order_no' => $scan->order_no,
                     'status' => $scan->status,
                     'label' => $payload['label'] ?? 'Pencatatan order',
+                    'duplicate_count' => (int) ($payload['duplicate_count'] ?? 0),
                     'items' => $scanLines
                         ->map(fn ($line) => [
                             'line_id' => $line->id,
@@ -1401,10 +1402,12 @@ class ShipmentController extends Controller
                         'lookup_status' => $lookupFallbackStatus,
                         'match_reason' => $fulfillment ? null : ($lookupFallbackStatus ?: 'order_not_found'),
                         'sales_invoice_id' => $salesInvoice?->id,
+                        'duplicate_count' => 0,
                     ],
                 ]);
             } else {
                 $payload = is_array($scan->raw_payload) ? $scan->raw_payload : [];
+                $duplicateCount = (int) ($payload['duplicate_count'] ?? 0) + 1;
                 $scan->update([
                     'shipment_wave_id' => $currentWave?->id ?: $scan->shipment_wave_id,
                     'fulfillment_id' => $fulfillment?->id,
@@ -1419,6 +1422,7 @@ class ShipmentController extends Controller
                         'lookup_status' => $lookupFallbackStatus ?? ($payload['lookup_status'] ?? null),
                         'match_reason' => $fulfillment ? null : ($lookupFallbackStatus ?? ($payload['match_reason'] ?? 'order_not_found')),
                         'sales_invoice_id' => $salesInvoice?->id ?? ($payload['sales_invoice_id'] ?? null),
+                        'duplicate_count' => $duplicateCount,
                         'order' => array_merge(
                             is_array($payload['order'] ?? null) ? $payload['order'] : [],
                             ['order_no' => $orderNo]
@@ -1449,6 +1453,7 @@ class ShipmentController extends Controller
             'status' => 'ok',
             'created' => $scan->wasRecentlyCreated,
             'duplicate' => !$scan->wasRecentlyCreated,
+            'duplicate_count' => (int) data_get($scan->raw_payload, 'duplicate_count', 0),
             'message' => $lookupFallbackStatus !== null
                 ? "Order {$orderNo} dicatat sebagai manual/belum tertaut."
                 : ($scan->wasRecentlyCreated
@@ -1461,6 +1466,7 @@ class ShipmentController extends Controller
                     ? 'Tertaut otomatis'
                     : ($lookupFallbackStatus !== null ? 'Belum tertaut' : 'Pencatatan order'),
                 'linked_source' => $fulfillment ? 'marketplace_order' : ($salesInvoice ? 'sales_invoice' : null),
+                'duplicate_count' => (int) data_get($scan->raw_payload, 'duplicate_count', 0),
             ],
         ]);
     }

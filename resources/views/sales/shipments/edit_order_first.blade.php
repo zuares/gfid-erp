@@ -486,6 +486,45 @@
         white-space: nowrap;
     }
 
+    .sr-order-code-line {
+        display: flex;
+        align-items: center;
+        gap: .4rem;
+        min-width: 0;
+    }
+
+    .sr-duplicate-badge {
+        display: inline-flex;
+        align-items: center;
+        flex-shrink: 0;
+        min-height: 20px;
+        padding: .12rem .42rem;
+        border: 1px solid #fcd34d;
+        border-radius: 999px;
+        background: #fffbeb;
+        color: #a16207;
+        font-size: .62rem;
+        font-weight: 850;
+        letter-spacing: .01em;
+        line-height: 1;
+    }
+
+    .sr-missing-item-badge {
+        display: inline-flex;
+        align-items: center;
+        flex-shrink: 0;
+        min-height: 20px;
+        padding: .12rem .42rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: #f8fafc;
+        color: #64748b;
+        font-size: .62rem;
+        font-weight: 750;
+        letter-spacing: .01em;
+        line-height: 1;
+    }
+
     .sr-order-info {
         color: #94a3b8;
         font-size: .72rem;
@@ -1054,6 +1093,7 @@
             return [
                 'code' => strtoupper((string) ($scan['code'] ?? $scan['order_no'] ?? '')),
                 'label' => $scan['label'] ?? 'Pencatatan order',
+                'duplicateCount' => (int) ($scan['duplicate_count'] ?? 0),
                 'items' => $scan['items'] ?? [],
             ];
         })
@@ -1507,9 +1547,12 @@
             order = {
                 code,
                 label: meta.label || 'Manual',
+                duplicateCount: Number(meta.duplicateCount || 0),
                 items: Array.isArray(meta.items) ? meta.items : []
             };
             state.orders.push(order);
+        } else if (Number(meta.duplicateCount || 0) > Number(order.duplicateCount || 0)) {
+            order.duplicateCount = Number(meta.duplicateCount);
         }
 
         state.current = order.code;
@@ -1709,12 +1752,22 @@
             const deleteOrderButton = canDelete
                 ? `<button type="button" class="sr-delete-btn sr-order-delete" data-delete-order="${esc(order.code)}" title="Hapus order dan itemnya">×</button>`
                 : '';
+            const duplicateBadge = Number(order.duplicateCount || 0) > 0
+                ? `<span class="sr-duplicate-badge" title="Order ini discan lebih dari sekali">Duplikat</span>`
+                : '';
+            const missingItemBadge = items.length === 0
+                ? `<span class="sr-missing-item-badge" title="Order belum memiliki item">Belum ada item</span>`
+                : '';
 
             return `
                 <div class="sr-order ${isActive ? 'active' : ''} ${orderTheme(order.code)}" data-order-code="${esc(order.code)}">
                     <div class="sr-order-head" data-toggle-order="${esc(order.code)}">
                         <div>
-                            <div class="sr-order-code">${esc(order.code)}</div>
+                            <div class="sr-order-code-line">
+                                <div class="sr-order-code">${esc(order.code)}</div>
+                                ${duplicateBadge}
+                                ${missingItemBadge}
+                            </div>
                             <div class="sr-order-info">${esc(order.label || ('{{ $shipment->shipment_type ?? 'manual' }}' === 'marketplace' ? 'Marketplace' : 'Manual'))}</div>
                         </div>
                         <div class="sr-order-qty">${qty}</div>
@@ -2087,12 +2140,38 @@
         focusScan();
     }
 
+    function markDuplicateOrder(code, order) {
+        fetch(recordOrderUrl, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrf,
+            },
+            body: JSON.stringify({ order_no: code })
+        })
+            .then(response => response.json().catch(() => ({})))
+            .then(payload => {
+                const duplicateCount = Number(payload.duplicate_count || 0);
+                if (duplicateCount > Number(order.duplicateCount || 0)) {
+                    order.duplicateCount = duplicateCount;
+                    render();
+                }
+            })
+            .catch(() => {
+                // Badge lokal tetap ditampilkan jika pencatatan ulang gagal.
+            });
+    }
+
     function startOrder(code) {
         code = normalize(code);
         if (!code) return;
 
         const existingOrder = findOrder(code);
         if (existingOrder) {
+            existingOrder.duplicateCount = Number(existingOrder.duplicateCount || 0) + 1;
+            markDuplicateOrder(code, existingOrder);
             selectMarketplaceForOrder(existingOrder.code);
             render();
 
@@ -2146,7 +2225,10 @@
         }).then(payload => {
             const orderCode = normalize(payload.order?.code || payload.order?.order_no || code);
             if (!orderCode) throw new Error('Nomor order tidak tersedia. Scan ulang nomor order tersebut.');
-            ensureOrder(orderCode, { label: payload.order?.label || 'Pencatatan order' });
+            ensureOrder(orderCode, {
+                label: payload.order?.label || 'Pencatatan order',
+                duplicateCount: payload.duplicate ? Math.max(1, Number(payload.duplicate_count || 0)) : Number(payload.duplicate_count || 0),
+            });
             selectMarketplaceForOrder(orderCode);
             playTone(payload.created ? 'order' : 'orderRepeat');
             toast('ok', payload.message || `Order ${orderCode} tercatat`);
