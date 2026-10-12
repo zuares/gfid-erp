@@ -636,6 +636,86 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Tertaut');
     }
 
+    public function test_ready_to_ship_and_processed_kilat_orders_are_linked_when_scanned(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-STATUS-LINK-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 2,
+            'allocated_qty' => 2,
+        ]);
+
+        $readyOrder = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-READY-001',
+            'channel_order_id' => 'ORDER-READY-001',
+            'order_status' => 'READY_TO_SHIP',
+            'order_date' => now(),
+            'ordered_at' => now(),
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $readyOrder->id,
+            'marketplace_order_id' => $readyOrder->id,
+            'item_id' => $item->id,
+            'internal_item_id' => $item->id,
+            'item_name' => $item->name,
+            'item_sku' => $item->code,
+            'model_sku' => $item->code,
+            'qty' => 1,
+        ]);
+
+        $kilatBookingNo = 'KILAT-PROCESSED-001';
+        MarketplaceBooking::create([
+            'store_id' => $store->id,
+            'booking_sn' => $kilatBookingNo,
+            'order_sn' => 'ORDER-KILAT-001',
+            'booking_status' => 'PROCESSED',
+        ]);
+        $kilatOrder = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-KILAT-001',
+            'channel_order_id' => 'ORDER-KILAT-001',
+            'booking_sn' => $kilatBookingNo,
+            'order_status' => null,
+            'status' => 'PROCESS',
+            'order_date' => now(),
+            'ordered_at' => now(),
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $kilatOrder->id,
+            'marketplace_order_id' => $kilatOrder->id,
+            'item_id' => $item->id,
+            'internal_item_id' => $item->id,
+            'item_name' => $item->name,
+            'item_sku' => $item->code,
+            'model_sku' => $item->code,
+            'qty' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.scan_order_store', $shipment), [
+                'order_no' => 'ORDER-READY-001',
+            ])
+            ->assertOk()
+            ->assertJsonPath('order.label', 'Tertaut otomatis');
+
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.scan_order_store', $shipment), [
+                'order_no' => $kilatBookingNo,
+            ])
+            ->assertOk()
+            ->assertJsonPath('order.label', 'Tertaut otomatis');
+    }
+
     public function test_auto_link_reconciles_an_existing_awb_and_persists_the_match(): void
     {
         [$user, $store, $item] = $this->shipmentContext();
