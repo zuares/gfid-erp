@@ -143,6 +143,14 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-marketplace-tab[data-order-marketplace-tab="tiktok"].active { color:#0f716e; border-color:#bfe9e4; background:#f0fdfa; }
 .sd-marketplace-tab[data-order-marketplace-tab="anomaly"].active { color:#a16207; border-color:#fde68a; background:#fffbeb; }
 .sd-marketplace-tab[data-order-marketplace-tab="problem"].active { color:#b91c1c; border-color:#fecaca; background:#fff1f2; }
+.sd-link-tabs { display:flex; align-items:center; gap:.28rem; margin:-.28rem .75rem .65rem; padding:.18rem; border-bottom:1px solid #e2e8f0; overflow-x:auto; scrollbar-width:none; }
+.sd-link-tabs::-webkit-scrollbar { display:none; }
+.sd-link-tab { display:inline-flex; align-items:center; justify-content:center; gap:.3rem; min-height:29px; padding:.2rem .52rem; border:1px solid transparent; border-radius:6px; color:#94a3b8; background:transparent; font-size:.66rem; font-weight:750; white-space:nowrap; cursor:pointer; transition:background .12s ease,color .12s ease,border-color .12s ease; }
+.sd-link-tab:hover { color:#475569; background:#f8fafc; }
+.sd-link-tab.active { color:#334155; border-color:#dbe3ee; background:#fff; box-shadow:0 1px 2px rgba(15,23,42,.05); }
+.sd-link-tab[data-order-link-tab="linked"].active { color:#047857; border-color:#a7f3d0; background:#ecfdf5; }
+.sd-link-tab[data-order-link-tab="unlinked"].active { color:#b45309; border-color:#fde68a; background:#fffbeb; }
+.sd-link-tab-count { color:#94a3b8; font-size:.62rem; font-weight:850; }
 .sd-item-list { display:grid; gap:.45rem; }
 .sd-item-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.65rem; align-items:center; padding:.6rem .65rem; border:1px solid rgba(148,163,184,.18); border-radius:8px; }
 .sd-item-code { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#334155; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.8rem; font-weight:500; }
@@ -554,17 +562,6 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
-.sd-order-item-qty-meta {
-  margin-top: .12rem;
-  color: #94a3b8;
-  font-size: .58rem;
-  font-weight: 500;
-  line-height: 1.2;
-  text-align: right;
-  white-space: nowrap;
-}
-.sd-order-item-qty-meta .sd-marketplace-ok,
-.sd-order-item-qty-meta .sd-marketplace-short { font-weight: 700; }
 .sd-item-subtotal-cogs,
 .sd-order-item-subtotal-cogs { color: #334155; font-weight: 500; }
 .sd-line-action { display: inline-flex; justify-content: flex-end; min-width: 30px; }
@@ -610,6 +607,36 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sd-order-items-breakdown { overflow-x: auto; }
+.sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku,
+.sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku {
+  grid-template-columns: 26px minmax(180px,1fr) 48px 48px 48px 90px;
+  min-width: 500px;
+}
+.sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs,
+.sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs {
+  grid-template-columns: 26px minmax(180px,1fr) 48px 48px 48px 90px 76px 84px;
+  min-width: 680px;
+}
+.sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-actions,
+.sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-actions {
+  grid-template-columns: 26px minmax(180px,1fr) 48px 48px 48px 90px 28px;
+  min-width: 530px;
+}
+.sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions,
+.sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions {
+  grid-template-columns: 26px minmax(180px,1fr) 48px 48px 48px 90px 76px 84px 28px;
+  min-width: 720px;
+}
+.sd-qty-breakdown > .sd-order-item-qty,
+.sd-qty-breakdown > .sd-order-item-diff {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.sd-order-item-diff { color:#64748b; font-size:.75rem; font-weight:750; }
+.sd-order-item-diff.sd-marketplace-ok { color:#15803d; }
+.sd-order-item-diff.sd-marketplace-short { color:#b91c1c; }
 @media(max-width:600px){
   .sd-items-head,
   .sd-order-item,
@@ -631,6 +658,14 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
   .sd-order-item.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px minmax(0,1fr) 44px 90px 28px; }
   .sd-order-item.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px minmax(0,1fr) 44px 90px 76px 84px; }
   .sd-order-item.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px minmax(0,1fr) 44px 90px 76px 84px 28px; }
+  .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku,
+  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku { grid-template-columns: 26px minmax(180px,1fr) 48px 48px 48px 90px; }
+  .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs,
+  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px minmax(180px,1fr) 48px 48px 48px 90px 76px 84px; }
+  .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-actions,
+  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px minmax(180px,1fr) 48px 48px 48px 90px 28px; }
+  .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions,
+  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px minmax(180px,1fr) 48px 48px 48px 90px 76px 84px 28px; }
 }
 </style>
 @endpush
@@ -688,20 +723,31 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
         return 'anomaly';
     };
     $marketplaceCounts = ['all' => (int) $orderScans->count(), 'shopee' => 0, 'tiktok' => 0, 'anomaly' => 0, 'problem' => 0];
+    $linkCounts = ['all' => (int) $orderScans->count(), 'linked' => 0, 'unlinked' => 0];
     foreach ($orderScans as $orderScan) {
         $marketplaceCounts[$marketplaceGroup($orderScan->order_no)]++;
         $orderScanLines = $orderScan->lines->merge($singleOrderFallbackLines);
         if ((int) data_get($orderScan->raw_payload, 'duplicate_count', 0) > 0 || $orderScanLines->isEmpty()) {
             $marketplaceCounts['problem']++;
         }
+        $hasMarketplaceLink = (bool) (
+            $orderScan->fulfillment?->marketplaceOrder
+            || $orderScan->source === 'marketplace'
+            || data_get($orderScan->raw_payload, 'linked_source') === 'marketplace_order'
+            || !empty($kilatMatches[$orderScan->id])
+        );
+        $linkCounts[$hasMarketplaceLink ? 'linked' : 'unlinked']++;
     }
     if ($orderScans->count() > 1 && $ungroupedLines->isNotEmpty()) {
         $marketplaceCounts['all']++;
         $marketplaceCounts['anomaly']++;
+        $linkCounts['all']++;
+        $linkCounts['unlinked']++;
     }
     if ($orderScans->isEmpty() && $isItemFirst && $ungroupedLines->isNotEmpty()) {
         $marketplaceCounts['all'] = 1;
         $marketplaceCounts['anomaly'] = 1;
+        $linkCounts = ['all' => 1, 'linked' => 0, 'unlinked' => 1];
     }
 @endphp
 
@@ -857,9 +903,26 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                     </button>
                 @endforeach
             </div>
+            <div class="sd-link-tabs" role="tablist" aria-label="Filter status tautan order">
+                @foreach([
+                    'all' => ['label' => 'Semua', 'icon' => 'bi-list-ul'],
+                    'linked' => ['label' => 'Tertaut', 'icon' => 'bi-link-45deg'],
+                    'unlinked' => ['label' => 'Belum Tertaut', 'icon' => 'bi-link-45deg'],
+                ] as $tab => $tabMeta)
+                    <button type="button"
+                            class="sd-link-tab {{ $tab === 'all' ? 'active' : '' }}"
+                            data-order-link-tab="{{ $tab }}"
+                            role="tab"
+                            aria-selected="{{ $tab === 'all' ? 'true' : 'false' }}">
+                        <i class="bi {{ $tabMeta['icon'] }}" aria-hidden="true"></i>
+                        <span>{{ $tabMeta['label'] }}</span>
+                        <span class="sd-link-tab-count">{{ number_format((int) ($linkCounts[$tab] ?? 0), 0, ',', '.') }}</span>
+                    </button>
+                @endforeach
+            </div>
             <div class="sd-body">
                 @if($orderScans->isEmpty() && $isItemFirst)
-                    <div class="sd-order sd-order-group" data-order-card data-order-marketplace="anomaly" data-order-search="item shipment">
+                    <div class="sd-order sd-order-group" data-order-card data-order-marketplace="anomaly" data-order-link-state="unlinked" data-order-search="item shipment">
                         <div class="sd-order-lead">
                             <div>
                                 <div class="sd-order-no">ITEM SHIPMENT</div>
@@ -956,7 +1019,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 $orderCogs = (float) $orderLines->sum(fn ($line) => $lineCogs($line));
                                 $hasNoItems = $orderLines->isEmpty();
                             @endphp
-                            <div class="sd-order sd-order-group {{ $orderTheme }}" data-order-card data-order-marketplace="{{ $marketplaceGroupKey }}" data-order-problem="{{ $duplicateCount > 0 || $hasNoItems ? 'true' : 'false' }}" data-order-search="{{ strtolower($scan->order_no . ' ' . ($scan->source ?: '')) }}">
+                            <div class="sd-order sd-order-group {{ $orderTheme }}" data-order-card data-order-marketplace="{{ $marketplaceGroupKey }}" data-order-link-state="{{ $hasMarketplaceLink ? 'linked' : 'unlinked' }}" data-order-problem="{{ $duplicateCount > 0 || $hasNoItems ? 'true' : 'false' }}" data-order-search="{{ strtolower($scan->order_no . ' ' . ($scan->source ?: '')) }}">
                                 <div class="sd-order-lead">
                                     <div>
                                         <div class="sd-order-no">
@@ -1063,8 +1126,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                     });
                                                 }
                                             @endphp
-                                            <div class="sd-order-items">
-                                                <div class="sd-items-head {{ $orderItemGridClass }}"><span>No</span><span>Kode Item</span><span>Qty</span><span>SKU Marketplace</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
+                                            <div class="sd-order-items sd-order-items-breakdown">
+                                                <div class="sd-items-head {{ $orderItemGridClass }} sd-qty-breakdown"><span>No</span><span>Kode Item</span><span>Order</span><span>Ship</span><span>Diff</span><span>SKU Marketplace</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                                                 @foreach($displayLines as $line)
                                                     @php
                                                         $marketplaceLine = $line->marketplace_line ?? $marketplaceLines->first(function ($candidate) use ($line) {
@@ -1075,16 +1138,15 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                         $qtyShipment = (int) ($pickedByItem[$line->item_id] ?? $line->qty_scanned);
                                                         $difference = $qtyShipment - $qtyOrder;
                                                     @endphp
-                                                    <div class="sd-order-item {{ $orderItemGridClass }}">
+                                                    <div class="sd-order-item {{ $orderItemGridClass }} sd-qty-breakdown">
                                                         <span class="sd-order-item-num">{{ $loop->iteration }}</span>
                                                         <div>
                                                             <div class="sd-order-item-code">{{ $line->item?->code ?: ($marketplaceLine?->item_code_snapshot ?: '-') }}</div>
                                                             <div class="sd-order-item-name">{{ $line->item?->name ?: 'Nama item belum tersedia' }}</div>
                                                         </div>
-                                                        <div>
-                                                            <div class="sd-order-item-qty">{{ number_format($qtyShipment, 0, ',', '.') }}</div>
-                                                            <div class="sd-order-item-qty-meta">Order {{ number_format($qtyOrder, 0, ',', '.') }} · Ship {{ number_format($qtyShipment, 0, ',', '.') }} · Diff <span class="{{ $difference === 0 ? 'sd-marketplace-ok' : 'sd-marketplace-short' }}">{{ $difference > 0 ? '+' : '' }}{{ number_format($difference, 0, ',', '.') }}</span></div>
-                                                        </div>
+                                                        <div class="sd-order-item-qty">{{ number_format($qtyOrder, 0, ',', '.') }}</div>
+                                                        <div class="sd-order-item-qty">{{ number_format($qtyShipment, 0, ',', '.') }}</div>
+                                                        <div class="sd-order-item-diff {{ $difference === 0 ? 'sd-marketplace-ok' : 'sd-marketplace-short' }}">{{ $difference > 0 ? '+' : '' }}{{ number_format($difference, 0, ',', '.') }}</div>
                                                         <div class="sd-order-item-marketplace-sku">{{ $marketplaceSku }}</div>
                                                         @if($canSeeCogs)
                                                             <div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div>
@@ -1111,7 +1173,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                         @endforeach
 
                         @if($orderScans->count() > 1 && $ungroupedLines->isNotEmpty())
-                            <div class="sd-order sd-order-group" data-order-card data-order-marketplace="anomaly" data-order-search="belum dikelompokkan">
+                            <div class="sd-order sd-order-group" data-order-card data-order-marketplace="anomaly" data-order-link-state="unlinked" data-order-search="belum dikelompokkan">
                                 <div class="sd-order-lead"><div><div class="sd-order-no">SISA BELUM TERKELOMPOK</div><div class="sd-muted">Item menunggu nomor order atau belum cocok</div></div></div>
                                 <div class="sd-order-items">
                                     <div class="sd-items-head {{ $orderItemGridClass }}"><span>No</span><span>Kode Item</span><span>Qty</span><span>SKU Marketplace</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
@@ -1200,7 +1262,9 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     var orderSearchEmpty = document.getElementById('orderSearchEmpty');
     var orderCards = document.querySelectorAll('[data-order-card]');
     var marketplaceTabButtons = document.querySelectorAll('[data-order-marketplace-tab]');
+    var linkTabButtons = document.querySelectorAll('[data-order-link-tab]');
     var activeMarketplaceTab = 'all';
+    var activeLinkTab = 'all';
 
     function applyOrderFilters(){
         var query = (orderSearchInput?.value || '').trim().toLowerCase();
@@ -1209,9 +1273,11 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
         orderCards.forEach(function(card){
             var searchable = (card.dataset.orderSearch || '').toLowerCase();
             var marketplace = card.dataset.orderMarketplace || 'anomaly';
+            var linkState = card.dataset.orderLinkState || 'unlinked';
             var visible = (!query || searchable.indexOf(query) !== -1)
                 && (activeMarketplaceTab === 'all'
-                    || (activeMarketplaceTab === 'problem' ? card.dataset.orderProblem === 'true' : marketplace === activeMarketplaceTab));
+                    || (activeMarketplaceTab === 'problem' ? card.dataset.orderProblem === 'true' : marketplace === activeMarketplaceTab))
+                && (activeLinkTab === 'all' || linkState === activeLinkTab);
             card.hidden = !visible;
             if (visible) visibleCount++;
         });
@@ -1225,6 +1291,18 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
         button.addEventListener('click', function(){
             activeMarketplaceTab = button.dataset.orderMarketplaceTab || 'all';
             marketplaceTabButtons.forEach(function(tab){
+                var active = tab === button;
+                tab.classList.toggle('active', active);
+                tab.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            applyOrderFilters();
+        });
+    });
+
+    linkTabButtons.forEach(function(button){
+        button.addEventListener('click', function(){
+            activeLinkTab = button.dataset.orderLinkTab || 'all';
+            linkTabButtons.forEach(function(tab){
                 var active = tab === button;
                 tab.classList.toggle('active', active);
                 tab.setAttribute('aria-selected', active ? 'true' : 'false');

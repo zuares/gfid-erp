@@ -405,6 +405,9 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('sd-duplicate-badge', false)
             ->assertSee('sd-missing-item-badge', false)
             ->assertSee('data-order-marketplace-tab="problem"', false)
+            ->assertSee('data-order-link-tab="linked"', false)
+            ->assertSee('data-order-link-tab="unlinked"', false)
+            ->assertSee('Belum Tertaut')
             ->assertSee('Perlu Diperiksa')
             ->assertSee('Duplikat');
     }
@@ -945,6 +948,10 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
             ->assertSee('sd-badge linked', false)
+            ->assertSee('sd-qty-breakdown', false)
+            ->assertSee('<span>Order</span>', false)
+            ->assertSee('<span>Ship</span>', false)
+            ->assertSee('<span>Diff</span>', false)
             ->assertSee('Tertaut');
     }
 
