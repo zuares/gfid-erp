@@ -482,6 +482,14 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-order-item.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 30px; }
 .sd-order-item.sd-has-cogs { grid-template-columns: 30px minmax(0,1fr) 52px 86px 110px; }
 .sd-order-item.sd-has-cogs.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 86px 110px 30px; }
+.sd-items-head.sd-has-marketplace-sku { grid-template-columns: 30px minmax(0,1fr) 52px 112px; }
+.sd-items-head.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 112px 30px; }
+.sd-items-head.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 30px minmax(0,1fr) 52px 112px 86px 110px; }
+.sd-items-head.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 112px 86px 110px 30px; }
+.sd-order-item.sd-has-marketplace-sku { grid-template-columns: 30px minmax(0,1fr) 52px 112px; }
+.sd-order-item.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 112px 30px; }
+.sd-order-item.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 30px minmax(0,1fr) 52px 112px 86px 110px; }
+.sd-order-item.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 112px 86px 110px 30px; }
 .sd-item-row.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 30px; }
 .sd-item-row.sd-has-cogs { grid-template-columns: 30px minmax(0,1fr) 52px 86px 110px; }
 .sd-item-row.sd-has-cogs.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 86px 110px 30px; }
@@ -542,6 +550,17 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+.sd-order-item-qty-meta {
+  margin-top: .12rem;
+  color: #94a3b8;
+  font-size: .58rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: right;
+  white-space: nowrap;
+}
+.sd-order-item-qty-meta .sd-marketplace-ok,
+.sd-order-item-qty-meta .sd-marketplace-short { font-weight: 700; }
 .sd-item-subtotal-cogs,
 .sd-order-item-subtotal-cogs { color: #334155; font-weight: 500; }
 .sd-line-action { display: inline-flex; justify-content: flex-end; min-width: 30px; }
@@ -577,6 +596,16 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
   white-space: nowrap;
 }
 .sd-marketplace-item-name { margin-top: .08rem; font-size: .66rem; }
+.sd-order-item-marketplace-sku {
+  min-width: 0;
+  overflow: hidden;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .7rem;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 @media(max-width:600px){
   .sd-items-head,
   .sd-order-item,
@@ -590,6 +619,14 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
   .sd-items-head.sd-has-cogs.sd-has-actions,
   .sd-order-item.sd-has-cogs.sd-has-actions,
   .sd-item-row.sd-has-cogs.sd-has-actions { grid-template-columns: 26px minmax(0,1fr) 44px 76px 84px 28px; }
+  .sd-items-head.sd-has-marketplace-sku { grid-template-columns: 26px minmax(0,1fr) 44px 90px; }
+  .sd-items-head.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px minmax(0,1fr) 44px 90px 28px; }
+  .sd-items-head.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px minmax(0,1fr) 44px 90px 76px 84px; }
+  .sd-items-head.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px minmax(0,1fr) 44px 90px 76px 84px 28px; }
+  .sd-order-item.sd-has-marketplace-sku { grid-template-columns: 26px minmax(0,1fr) 44px 90px; }
+  .sd-order-item.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px minmax(0,1fr) 44px 90px 28px; }
+  .sd-order-item.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px minmax(0,1fr) 44px 90px 76px 84px; }
+  .sd-order-item.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px minmax(0,1fr) 44px 90px 76px 84px 28px; }
 }
 </style>
 @endpush
@@ -625,6 +662,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
         $canDeleteShipmentRows ? 'sd-has-actions' : null,
         $canSeeCogs ? 'sd-has-cogs' : null,
     ])));
+    $orderItemGridClass = trim($itemGridClass . ' sd-has-marketplace-sku');
     $lineUnitCogs = static function ($line): float {
         return (float) ($line->item?->latest_hpp ?? $line->item?->hpp ?? $line->item?->last_purchase_price ?? 0);
     };
@@ -940,16 +978,17 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 @if(!$scan->fulfillment?->marketplaceOrder)
                                     <div class="sd-order-items">
                                         @if($orderLines->isNotEmpty())
-                                            <div class="sd-items-head {{ $itemGridClass }}"><span>No</span><span>Kode Item</span><span>Qty</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
+                                            <div class="sd-items-head {{ $orderItemGridClass }}"><span>No</span><span>Kode Item</span><span>Qty</span><span>SKU Marketplace</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                                         @endif
                                         @forelse($orderLines as $line)
-                                            <div class="sd-order-item {{ $itemGridClass }}">
+                                            <div class="sd-order-item {{ $orderItemGridClass }}">
                                                 <span class="sd-order-item-num">{{ $loop->iteration }}</span>
                                                 <div>
                                                     <div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div>
                                                     <div class="sd-order-item-name">{{ $line->item?->name ?? 'Nama item belum tersedia' }}</div>
                                                 </div>
                                                 <div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>
+                                                <div class="sd-order-item-marketplace-sku">—</div>
                                                 @if($canSeeCogs)
                                                     <div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div>
                                                     <div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>
@@ -995,33 +1034,58 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                             </div>
                                         </div>
                                         @if($marketplaceLines->isNotEmpty())
-                                            <div style="overflow:auto">
-                                                <table class="sd-marketplace-table">
-                                                    <thead><tr><th>SKU</th><th>Internal</th><th class="sd-marketplace-number">Order</th><th class="sd-marketplace-number">Ship</th><th class="sd-marketplace-number">Diff</th>@if($canSeeCogs)<th class="sd-marketplace-number">COGS</th>@endif</tr></thead>
-                                                    <tbody>
-                                                    @foreach($marketplaceLines as $marketplaceLine)
-                                                        @php
-                                                            $internalItem = $marketplaceLine->internalItem;
-                                                            $itemId = $marketplaceLine->internal_item_id ?: $marketplaceLine->item_id;
-                                                            $qtyOrder = (int) $marketplaceLine->qty;
-                                                            $qtyShipment = (int) ($pickedByItem[$itemId] ?? 0);
-                                                            $difference = $qtyShipment - $qtyOrder;
-                                                            $itemCogs = (float) ($cogsByItem[$itemId] ?? 0);
-                                                        @endphp
-                                                        <tr>
-                                                            <td class="sd-marketplace-code">{{ $marketplaceLine->marketplace_sku ?: $marketplaceLine->item_sku ?: $marketplaceLine->model_sku ?: '—' }}</td>
-                                                            <td>
-                                                                <div class="sd-marketplace-code">{{ $internalItem?->code ?: ($marketplaceLine->item_code_snapshot ?: 'Belum mapped') }}</div>
-                                                                @if($internalItem?->name)<div class="sd-marketplace-item-name">{{ $internalItem->name }}</div>@endif
-                                                            </td>
-                                                            <td class="sd-marketplace-number">{{ number_format($qtyOrder, 0, ',', '.') }}</td>
-                                                            <td class="sd-marketplace-number">{{ number_format($qtyShipment, 0, ',', '.') }}</td>
-                                                            <td class="sd-marketplace-number {{ $difference === 0 ? 'sd-marketplace-ok' : 'sd-marketplace-short' }}">{{ $difference > 0 ? '+' : '' }}{{ number_format($difference, 0, ',', '.') }}</td>
-                                                            @if($canSeeCogs)<td class="sd-marketplace-number">Rp{{ number_format($itemCogs, 0, ',', '.') }}</td>@endif
-                                                        </tr>
-                                                    @endforeach
-                                                    </tbody>
-                                                </table>
+                                            @php
+                                                $displayLines = $orderLines;
+                                                if ($displayLines->isEmpty()) {
+                                                    $displayLines = $marketplaceLines->map(function ($marketplaceLine) {
+                                                        return (object) [
+                                                            'id' => null,
+                                                            'item_id' => $marketplaceLine->internal_item_id ?: $marketplaceLine->item_id,
+                                                            'item' => $marketplaceLine->internalItem,
+                                                            'qty_scanned' => (int) $marketplaceLine->qty,
+                                                            'marketplace_line' => $marketplaceLine,
+                                                        ];
+                                                    });
+                                                }
+                                            @endphp
+                                            <div class="sd-order-items">
+                                                <div class="sd-items-head {{ $orderItemGridClass }}"><span>No</span><span>Kode Item</span><span>Qty</span><span>SKU Marketplace</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
+                                                @foreach($displayLines as $line)
+                                                    @php
+                                                        $marketplaceLine = $line->marketplace_line ?? $marketplaceLines->first(function ($candidate) use ($line) {
+                                                            return (int) ($candidate->internal_item_id ?: $candidate->item_id) === (int) $line->item_id;
+                                                        });
+                                                        $marketplaceSku = $marketplaceLine?->marketplace_sku ?: $marketplaceLine?->item_sku ?: $marketplaceLine?->model_sku ?: '—';
+                                                        $qtyOrder = (int) ($marketplaceLine?->qty ?? $line->qty_scanned);
+                                                        $qtyShipment = (int) ($pickedByItem[$line->item_id] ?? $line->qty_scanned);
+                                                        $difference = $qtyShipment - $qtyOrder;
+                                                    @endphp
+                                                    <div class="sd-order-item {{ $orderItemGridClass }}">
+                                                        <span class="sd-order-item-num">{{ $loop->iteration }}</span>
+                                                        <div>
+                                                            <div class="sd-order-item-code">{{ $line->item?->code ?: ($marketplaceLine?->item_code_snapshot ?: '-') }}</div>
+                                                            <div class="sd-order-item-name">{{ $line->item?->name ?: 'Nama item belum tersedia' }}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div class="sd-order-item-qty">{{ number_format($qtyShipment, 0, ',', '.') }}</div>
+                                                            <div class="sd-order-item-qty-meta">Order {{ number_format($qtyOrder, 0, ',', '.') }} · Ship {{ number_format($qtyShipment, 0, ',', '.') }} · Diff <span class="{{ $difference === 0 ? 'sd-marketplace-ok' : 'sd-marketplace-short' }}">{{ $difference > 0 ? '+' : '' }}{{ number_format($difference, 0, ',', '.') }}</span></div>
+                                                        </div>
+                                                        <div class="sd-order-item-marketplace-sku">{{ $marketplaceSku }}</div>
+                                                        @if($canSeeCogs)
+                                                            <div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div>
+                                                            <div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>
+                                                        @endif
+                                                        @if($canDeleteShipmentRows && !empty($line->id))
+                                                            <span class="sd-line-action">
+                                                                <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
+                                                                    @csrf
+                                                                    @method('DELETE')
+                                                                    <button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button>
+                                                                </form>
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
                                             </div>
                                         @else
                                             <div class="sd-muted">Detail item marketplace belum tersedia.</div>
@@ -1035,9 +1099,9 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                             <div class="sd-order sd-order-group" data-order-card data-order-marketplace="anomaly" data-order-search="belum dikelompokkan">
                                 <div class="sd-order-lead"><div><div class="sd-order-no">SISA BELUM TERKELOMPOK</div><div class="sd-muted">Item menunggu nomor order atau belum cocok</div></div></div>
                                 <div class="sd-order-items">
-                                    <div class="sd-items-head {{ $itemGridClass }}"><span>No</span><span>Kode Item</span><span>Qty</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
+                                    <div class="sd-items-head {{ $orderItemGridClass }}"><span>No</span><span>Kode Item</span><span>Qty</span><span>SKU Marketplace</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                                     @foreach($ungroupedLines as $line)
-                                        <div class="sd-order-item {{ $itemGridClass }}"><span class="sd-order-item-num">{{ $loop->iteration }}</span><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div><div class="sd-order-item-name">{{ $line->item?->name ?? 'Nama item belum tersedia' }}</div></div><div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>@if($canSeeCogs)<div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div><div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>@endif @if($canDeleteShipmentRows)<span class="sd-line-action"><form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">@csrf @method('DELETE')<button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button></form></span>@endif</div>
+                                        <div class="sd-order-item {{ $orderItemGridClass }}"><span class="sd-order-item-num">{{ $loop->iteration }}</span><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div><div class="sd-order-item-name">{{ $line->item?->name ?? 'Nama item belum tersedia' }}</div></div><div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div><div class="sd-order-item-marketplace-sku">—</div>@if($canSeeCogs)<div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div><div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>@endif @if($canDeleteShipmentRows)<span class="sd-line-action"><form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">@csrf @method('DELETE')<button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button></form></span>@endif</div>
                                     @endforeach
                                 </div>
                                 <div class="sd-order-summary {{ $canSeeCogs ? 'sd-summary-has-cogs' : '' }}">
