@@ -38,6 +38,12 @@
 .sd-order-identifiers{display:flex;flex-wrap:wrap;gap:.1rem .65rem;margin-top:.18rem;color:#64748b;font-size:.68rem;line-height:1.4}
 .sd-order-identifier{display:inline-flex;align-items:baseline;gap:.25rem;min-width:0}
 .sd-order-identifier-value{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#475569;overflow-wrap:anywhere}
+.sd-copy-value{display:inline-flex;align-items:center;gap:.3rem;max-width:100%;padding:0;border:0;background:transparent;color:inherit;font:inherit;line-height:inherit;text-align:left;overflow-wrap:anywhere;cursor:pointer}
+.sd-copy-value:hover{text-decoration:underline;text-decoration-style:dotted;text-underline-offset:.18em}
+.sd-copy-value:focus-visible{outline:2px solid #64748b;outline-offset:3px;border-radius:2px}
+.sd-copy-icon{font-size:.72em;opacity:.55;flex:0 0 auto}
+.sd-copy-toast{position:fixed;right:1rem;bottom:1rem;z-index:1000;padding:.45rem .65rem;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#334155;box-shadow:0 6px 20px rgba(15,23,42,.12);font-size:.75rem;font-weight:650}
+.sd-copy-toast[hidden]{display:none}
 .sd-order-num{display:inline-flex;align-items:center;justify-content:center;min-width:1.5rem;height:1.5rem;padding:0 .35rem;border-radius:6px;background:rgba(148,163,184,.12);color:#475569;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;font-size:.78rem;flex-shrink:0}
 .sd-order-lead{display:flex;align-items:flex-start;gap:.55rem;min-width:0}
 .sd-order-group{display:block;padding:0;border:1px solid rgba(148,163,184,.2);border-radius:9px;overflow:hidden;background:#fff}
@@ -1012,6 +1018,9 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                     );
                                 $scanIsUnlinked = !$hasMarketplaceLink;
                                 $matchMethod = $scan->match_method ?: data_get($scan->raw_payload, 'match_method');
+                                $scanCopyLabel = $isSpxShopee || str_starts_with($orderCodeUpper, 'JY') || in_array($matchMethod, ['awb', 'awb_booking'], true)
+                                    ? 'No. resi'
+                                    : 'No. pesanan';
                                 $matchReason = $scan->match_reason ?: data_get($scan->raw_payload, 'match_reason') ?: data_get($scan->raw_payload, 'lookup_status');
                                 $matchMethodLabel = match ($matchMethod) {
                                     'awb' => 'AWB order',
@@ -1087,14 +1096,14 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 <div class="sd-order-lead">
                                     <div>
                                         <div class="sd-order-no">
-                                            {{ $scan->order_no }}
+                                            <button type="button" class="sd-copy-value" data-copy-value="{{ $scan->order_no }}" data-copy-label="{{ $scanCopyLabel }}" title="Salin {{ strtolower($scanCopyLabel) }}" aria-label="Salin {{ strtolower($scanCopyLabel) }} {{ $scan->order_no }}"><span>{{ $scan->order_no }}</span><i class="bi bi-copy sd-copy-icon" aria-hidden="true"></i></button>
                                             @if($duplicateCount > 0)<span class="sd-duplicate-badge" title="Order ini discan lebih dari sekali">Duplikat</span>@endif
                                             @if($hasNoItems)<span class="sd-missing-item-badge" title="Order belum memiliki item">Belum ada item</span>@endif
                                         </div>
                                         @if($bookingNumber !== '' || $marketplaceOrderNumber !== '')
                                             <div class="sd-order-identifiers">
                                                 @if($bookingNumber !== '')<span class="sd-order-identifier"><span>Booking</span><span class="sd-order-identifier-value">{{ $bookingNumber }}</span></span>@endif
-                                                @if($marketplaceOrderNumber !== '')<span class="sd-order-identifier"><span>No. pesanan</span><span class="sd-order-identifier-value">{{ $marketplaceOrderNumber }}</span></span>@endif
+                                                @if($marketplaceOrderNumber !== '')<span class="sd-order-identifier"><span>No. pesanan</span><button type="button" class="sd-copy-value sd-order-identifier-value" data-copy-value="{{ $marketplaceOrderNumber }}" data-copy-label="No. pesanan" title="Salin nomor pesanan" aria-label="Salin nomor pesanan {{ $marketplaceOrderNumber }}"><span>{{ $marketplaceOrderNumber }}</span><i class="bi bi-copy sd-copy-icon" aria-hidden="true"></i></button></span>@endif
                                             </div>
                                         @endif
                                         @if($canSeeScanDiagnostics)
@@ -1362,8 +1371,62 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     @endif
 </div>
 
+<div id="sdCopyToast" class="sd-copy-toast" role="status" aria-live="polite" hidden></div>
+
 <script>
 (function(){
+    var copyToast = document.getElementById('sdCopyToast');
+    var copyToastTimer;
+
+    function legacyCopyText(value){
+        var previousFocus = document.activeElement;
+        var input = document.createElement('textarea');
+        input.value = value;
+        input.setAttribute('readonly', '');
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.appendChild(input);
+        input.select();
+        try {
+            if (!document.execCommand('copy')) throw new Error('Copy failed');
+        } finally {
+            input.remove();
+            if (previousFocus && typeof previousFocus.focus === 'function') {
+                previousFocus.focus({preventScroll: true});
+            }
+        }
+    }
+
+    function copyText(value){
+        if (navigator.clipboard && window.isSecureContext) {
+            return navigator.clipboard.writeText(value).catch(function(){ legacyCopyText(value); });
+        }
+        try {
+            legacyCopyText(value);
+            return Promise.resolve();
+        } catch (error) {
+            return Promise.reject(error);
+        }
+    }
+
+    function showCopyToast(message){
+        if (!copyToast) return;
+        copyToast.textContent = message;
+        copyToast.hidden = false;
+        clearTimeout(copyToastTimer);
+        copyToastTimer = setTimeout(function(){ copyToast.hidden = true; }, 1800);
+    }
+
+    document.querySelectorAll('[data-copy-value]').forEach(function(button){
+        button.addEventListener('click', function(){
+            var value = button.dataset.copyValue || '';
+            if (!value) return;
+            copyText(value)
+                .then(function(){ showCopyToast((button.dataset.copyLabel || 'Nomor') + ' tersalin'); })
+                .catch(function(){ showCopyToast('Gagal menyalin nomor'); });
+        });
+    });
+
     var orderSearchInput = document.getElementById('orderSearchInput');
     var orderSearchEmpty = document.getElementById('orderSearchEmpty');
     var orderCards = document.querySelectorAll('[data-order-card]');

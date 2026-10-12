@@ -186,7 +186,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('sales.shipments.confirm_orders', $shipment))
-            ->assertOk();
+            ->assertOk()
+            ->assertSee('data-copy-value="ORDER-PREVIOUS-A" data-copy-label="No. pesanan"', false);
 
         $scans = ShipmentOrderScan::where('shipment_id', $shipment->id)->orderBy('id')->get();
         $this->assertCount(2, $scans);
@@ -751,6 +752,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Booking ditemukan')
             ->assertSee('>BOOKING-SPX-001</span>', false)
             ->assertSee('>ORDER-SPX-001</span>', false)
+            ->assertSee('data-copy-value="' . $awb . '" data-copy-label="No. resi"', false)
+            ->assertSee('data-copy-value="ORDER-SPX-001" data-copy-label="No. pesanan"', false)
             ->assertSee('SKU booking belum tersedia.')
             ->assertSee('data-order-marketplace="shopee" data-order-link-state="linked"', false)
             ->assertSee('data-order-link-state="linked"', false)
