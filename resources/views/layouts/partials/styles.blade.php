@@ -45,8 +45,8 @@
     --success-soft-dark:#064e3b;
 
     /* ========= GLOBAL SHELL DIMENSIONS ========= */
-    --sidebar-width-tablet:220px;
-    --sidebar-width-desktop:260px;
+    --sidebar-width-tablet:210px;
+    --sidebar-width-desktop:240px;
 
     /* Android baseline viewport helper (dipakai layout kamu) */
     --app-vh: 100vh;

@@ -540,7 +540,7 @@
             position: fixed;
             top: 0;
             left: 0;
-            width: 220px;
+            width: 210px;
             height: 100vh;
             padding: .8rem .65rem 1.4rem;
             display: flex;
@@ -558,7 +558,7 @@
             scrollbar-color: rgba(148, 163, 184, .35) transparent;
         }
 
-        .app-main { margin-left: 220px; }
+        .app-main { margin-left: 210px; }
 
         /* Kecilkan font dan padding sedikit agar tetap proporsional */
         .sidebar-modern .sidebar-brand {
@@ -576,35 +576,35 @@
         }
         .sidebar-modern .sidebar-link,
         .sidebar-modern .sidebar-toggle {
-            font-size: .78rem;
-            padding: .46rem .62rem;
-            gap: .35rem;
+            font-size: .74rem;
+            padding: .42rem .58rem;
+            gap: .32rem;
         }
         .sidebar-modern .sidebar-link .icon,
         .sidebar-modern .sidebar-toggle .icon {
             width: 18px;
-            font-size: .88rem;
+            font-size: .84rem;
         }
         .sidebar-modern .sidebar-link-sub {
-            font-size: .74rem;
-            padding: .34rem .6rem .34rem 1.5rem;
+            font-size: .7rem;
+            padding: .31rem .56rem .31rem 1.4rem;
         }
         .sidebar-modern .sidebar-link-sub .icon {
             width: 14px;
-            font-size: .76rem;
+            font-size: .72rem;
         }
     }
 
     /* Desktop (992px+): sidebar penuh 260px */
     @media (min-width: 992px) {
         .sidebar-modern {
-            width: 260px;
+            width: 240px;
             padding: 1rem 1rem 1.6rem;
             gap: 1rem;
             border-radius: 0 22px 22px 0;
         }
 
-        .app-main { margin-left: 260px; }
+        .app-main { margin-left: 240px; }
 
         /* Kembalikan ukuran font/padding ke default */
         .sidebar-modern .sidebar-brand {
@@ -622,22 +622,22 @@
         }
         .sidebar-modern .sidebar-link,
         .sidebar-modern .sidebar-toggle {
-            font-size: .86rem;
-            padding: .52rem .8rem;
-            gap: .5rem;
+            font-size: .82rem;
+            padding: .47rem .72rem;
+            gap: .44rem;
         }
         .sidebar-modern .sidebar-link .icon,
         .sidebar-modern .sidebar-toggle .icon {
             width: 22px;
-            font-size: .96rem;
+            font-size: .9rem;
         }
         .sidebar-modern .sidebar-link-sub {
-            font-size: .8rem;
-            padding: .38rem .8rem .38rem 2.1rem;
+            font-size: .76rem;
+            padding: .34rem .72rem .34rem 2rem;
         }
         .sidebar-modern .sidebar-link-sub .icon {
             width: 18px;
-            font-size: .84rem;
+            font-size: .8rem;
         }
     }
 
@@ -680,12 +680,12 @@
         border-radius: 12px;
         color: var(--text);
         text-decoration: none;
-        font-size: .93rem;
+        font-size: .88rem;
         transition: background .1s ease-out, box-shadow .1s ease-out, transform .1s ease-out, color .1s ease-out;
         position: relative;
     }
 
-    .sidebar-link .icon { width: 22px; font-size: 1.05rem; text-align: center; }
+    .sidebar-link .icon { width: 20px; font-size: .98rem; text-align: center; }
 
     .sidebar-link:hover {
         background: color-mix(in srgb, var(--accent-soft) 18%, var(--card) 82%);
@@ -708,8 +708,8 @@
 
     .sidebar-link-sub {
         position: relative;
-        font-size: .86rem;
-        padding: .38rem .85rem .38rem 2.15rem;
+        font-size: .82rem;
+        padding: .35rem .78rem .35rem 2rem;
         opacity: .95;
         border-radius: 8px;
         display: flex;
@@ -720,7 +720,7 @@
         transition: background .1s ease-out, box-shadow .1s ease-out, transform .1s ease-out, color .1s ease-out;
     }
 
-    .sidebar-link-sub .icon { width: 18px; font-size: .9rem; text-align: center; }
+    .sidebar-link-sub .icon { width: 17px; font-size: .84rem; text-align: center; }
 
     .sidebar-link-sub:hover {
         background: color-mix(in srgb, var(--accent-soft) 16%, var(--card) 84%);
@@ -1710,7 +1710,7 @@
                 $hasSupplierApOpeningsIndex,
                 $hasAccountingIndex
             ))
-                <x-sidebar.label :text="$isAdmin ? 'Akuntansi' : 'Keuangan'" />
+                <x-sidebar.label text="Keuangan" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openAccounting ? 'is-open' : '' }}" type="button"
                         data-bs-toggle="collapse" data-bs-target="#navAccountingAdmin"
@@ -1826,6 +1826,26 @@
                         </x-sidebar.sub-link>
                     @endif
                         </div>
+                    </div>
+                </li>
+            @endif
+
+            {{-- Komunikasi (admin hanya WhatsApp) --}}
+            @if ($isAdmin && $router->has('whatsapp.index'))
+                <x-sidebar.label text="Komunikasi" />
+                <li class="mb-1">
+                    <button class="sidebar-link sidebar-toggle {{ $openCommunication ? 'is-open' : '' }}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navCommunicationAdmin"
+                        aria-expanded="{{ $openCommunication ? 'true' : 'false' }}" aria-controls="navCommunicationAdmin">
+                        <span class="icon"><i class="bi bi-whatsapp"></i></span>
+                        <span>WhatsApp</span>
+                        <span class="chevron">▸</span>
+                    </button>
+                    <div class="collapse {{ $openCommunication ? 'show' : '' }}" id="navCommunicationAdmin">
+                        <x-sidebar.sub-link href="{{ route('whatsapp.index') }}" icon="bi bi-chat-left-text"
+                            :active="request()->routeIs('whatsapp.*')">
+                            WhatsApp Center
+                        </x-sidebar.sub-link>
                     </div>
                 </li>
             @endif

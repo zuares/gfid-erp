@@ -9,7 +9,7 @@
         position: fixed;
         top: 0;
         left: 0;
-        width: 250px;
+        width: 240px;
         height: 100vh;
         padding: 1rem 1rem 1.6rem;
         display: flex;
@@ -27,7 +27,7 @@
     }
 
     .app-main {
-        margin-left: 250px;
+        margin-left: 240px;
     }
 }
 

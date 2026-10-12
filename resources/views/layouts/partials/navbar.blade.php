@@ -519,6 +519,7 @@ if ($navShowBell) {
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
                                 aria-expanded="false">
                                 {{ Auth::user()->name ?? Auth::user()->email }}
+                                <span class="text-muted small">({{ ucfirst($navRole ?: 'user') }})</span>
                             </a>
                             <div class="dropdown-menu dropdown-menu-end">
                                 <form action="{{ route('logout') }}" method="POST">

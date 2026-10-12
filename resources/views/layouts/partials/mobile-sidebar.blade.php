@@ -35,7 +35,7 @@
         top: 0;
         left: 0;
         bottom: 0;
-        width: 270px;
+        width: 250px;
         max-width: 84%;
         background: var(--card);
         border-right: 1px solid var(--line);
@@ -108,20 +108,20 @@
     .mobile-sidebar-link {
         display: flex;
         align-items: center;
-        gap: .48rem;
-        padding: .56rem .4rem;
+        gap: .42rem;
+        padding: .52rem .36rem;
         border-radius: 12px;
         text-decoration: none;
         color: var(--text);
-        font-size: .86rem;
+        font-size: .8rem;
         margin-bottom: .15rem;
         transition: background .16s ease, color .16s ease, transform .08s ease;
         position: relative;
     }
 
     .mobile-sidebar-link span.icon {
-        font-size: 1.02rem;
-        width: 22px;
+        font-size: .94rem;
+        width: 21px;
         text-align: center;
     }
 
@@ -141,7 +141,7 @@
     }
 
     .mobile-sidebar-section-label {
-        font-size: .7rem;
+        font-size: .66rem;
         text-transform: uppercase;
         letter-spacing: .08em;
         color: var(--muted);
@@ -202,8 +202,8 @@
 
     .mobile-sidebar-nested-toggle {
         margin-top: .15rem;
-        padding-left: .8rem;
-        font-size: .78rem;
+        padding-left: .72rem;
+        font-size: .74rem;
         color: var(--muted);
         border: 0;
         background: transparent;
@@ -211,7 +211,7 @@
 
     .mobile-sidebar-nested-toggle .icon {
         width: 20px;
-        font-size: .92rem;
+        font-size: .86rem;
     }
 
     .mobile-sidebar-nested-toggle.is-open,
@@ -228,14 +228,14 @@
 
     .mobile-sidebar-link-sub {
         position: relative;
-        font-size: .8rem;
-        padding: .44rem .42rem .44rem 2.2rem;
+        font-size: .75rem;
+        padding: .4rem .38rem .4rem 2.05rem;
         margin-bottom: .1rem;
     }
 
     .mobile-sidebar-link-sub .icon {
         width: 17px;
-        font-size: .88rem;
+        font-size: .83rem;
     }
 
     .mobile-sidebar-link-sub.active {
@@ -1414,7 +1414,7 @@
 
                     {{-- Keuangan (admin / operating) --}}
                     @if ($hasAccountingIndex || $hasCashExpensesIndex || $hasCashTransfersIndex || $hasCashReceiptsIndex || $hasSupplierLoansIndex || $hasEmployeeSavingsIndex || $hasCashBasisReportIndex || $hasJournalsIndex || $hasAccountsIndex || $hasOpeningBalancesIndex || $hasOpeningBalancesBatchIndex || $hasSupplierApOpeningsIndex)
-                        <div class="mobile-sidebar-section-label">{{ $isAdmin ? 'Akuntansi' : 'Keuangan' }}</div>
+                        <div class="mobile-sidebar-section-label">Keuangan</div>
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $accountingOpen ? 'is-open' : '' }}"
                                     type="button" data-bs-toggle="collapse" data-bs-target="#navAccountingAdminMobile"
@@ -1487,7 +1487,27 @@
                         </li>
                     @endif
 
-                    {{-- Komunikasi/WhatsApp tidak ditampilkan untuk admin. --}}
+                    {{-- Komunikasi (admin hanya WhatsApp) --}}
+
+                    @if ($isAdmin && $router->has('whatsapp.index'))
+                        <div class="mobile-sidebar-section-label">Komunikasi</div>
+                        <li class="mb-1">
+                            <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $whatsappOpen ? 'is-open' : '' }}"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#navCommunicationAdminMobile"
+                                    aria-expanded="{{ $whatsappOpen ? 'true' : 'false' }}"
+                                    aria-controls="navCommunicationAdminMobile">
+                                <span class="icon">💬</span><span>WhatsApp</span><span class="chevron">▸</span>
+                            </button>
+                            <div class="collapse {{ $whatsappOpen ? 'show' : '' }}" id="navCommunicationAdminMobile">
+                                <a href="{{ route('whatsapp.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('whatsapp.*') ? 'active' : '' }}">
+                                    <span class="icon">📨</span><span>WhatsApp Center</span>
+                                </a>
+                            </div>
+                        </li>
+                    @endif
 
                 {{-- ============================
                     3) OWNER (FULL like desktop)
@@ -2721,7 +2741,7 @@
     <div class="mobile-sidebar-footer">
         <div class="d-flex justify-content-between">
             <span>{{ now()->format('d/m/Y') }}</span>
-            <span class="mono">{{ Auth::user()->name ?? '' }}</span>
+            <span class="mono">{{ Auth::user()->name ?? '' }} ({{ ucfirst($role ?: 'user') }})</span>
         </div>
     </div>
 </aside>
