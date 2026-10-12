@@ -3961,6 +3961,7 @@ class ShipmentController extends Controller
         ]);
 
         $kilatMatches = [];
+        $bookingMatches = [];
         foreach ($shipment->orderScans as $scan) {
             // A stale SPX scan can retain source=marketplace without an order
             // relation. Check its booking so the confirm page shows the real state.
@@ -3969,7 +3970,64 @@ class ShipmentController extends Controller
                 continue;
             }
 
-            $kilatMatches[$scan->id] = $this->marketplaceBookingQuery($scan->order_no, $shipment)->exists();
+            $bookingQuery = $this->marketplaceBookingQuery($scan->order_no, $shipment);
+            if (str_starts_with(strtoupper(trim((string) $scan->order_no)), 'SPX')) {
+                $booking = $bookingQuery->first(['id', 'store_id', 'items']);
+                $kilatMatches[$scan->id] = $booking !== null;
+                if ($booking) {
+                    $bookingMatches[$scan->id] = $booking;
+                }
+            } else {
+                $kilatMatches[$scan->id] = $bookingQuery->exists();
+            }
+        }
+
+        // Booking belum tentu sudah punya marketplace_order. Tampilkan hanya SKU
+        // asli booking, atau SKU cache produk dengan store_id + item_id/model_id
+        // yang sama; jangan mengarang SKU dari kode item internal.
+        $bookingProductIds = [];
+        foreach ($bookingMatches as $booking) {
+            foreach (is_array($booking->items) ? $booking->items : [] as $item) {
+                if (!is_array($item) || trim((string) ($item['model_sku'] ?? '')) !== '') {
+                    continue;
+                }
+                $itemId = trim((string) ($item['item_id'] ?? ''));
+                if ($itemId !== '') {
+                    $bookingProductIds[] = $itemId;
+                }
+            }
+        }
+        $bookingProducts = empty($bookingProductIds) ? collect() : \App\Models\MarketplaceProduct::query()
+            ->whereIn('store_id', collect($bookingMatches)->pluck('store_id')->unique()->all())
+            ->whereIn('item_id', array_unique($bookingProductIds))
+            ->get(['id', 'store_id', 'item_id', 'item_sku'])
+            ->keyBy(fn ($product) => $product->store_id . '|' . $product->item_id);
+        $bookingProductModels = $bookingProducts->isEmpty() ? collect() : \App\Models\MarketplaceProductModel::query()
+            ->whereIn('marketplace_product_id', $bookingProducts->pluck('id')->all())
+            ->get(['marketplace_product_id', 'model_id', 'model_sku'])
+            ->keyBy(fn ($model) => $model->marketplace_product_id . '|' . $model->model_id);
+        $bookingSkusByScan = [];
+        $bookingItemCountsByScan = [];
+        foreach ($bookingMatches as $scanId => $booking) {
+            $skus = [];
+            $bookingItems = is_array($booking->items) ? $booking->items : [];
+            $bookingItemCountsByScan[$scanId] = count(array_filter($bookingItems, 'is_array'));
+            foreach ($bookingItems as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $sku = trim((string) ($item['model_sku'] ?? ''));
+                if ($sku === '') {
+                    $product = $bookingProducts->get($booking->store_id . '|' . trim((string) ($item['item_id'] ?? '')));
+                    $modelId = trim((string) ($item['model_id'] ?? '0')) ?: '0';
+                    $model = $product ? $bookingProductModels->get($product->id . '|' . $modelId) : null;
+                    $sku = trim((string) ($model?->model_sku ?: ($item['item_sku'] ?? null) ?: $product?->item_sku ?: ''));
+                }
+                if ($sku !== '') {
+                    $skus[] = $sku;
+                }
+            }
+            $bookingSkusByScan[$scanId] = array_values(array_unique($skus));
         }
 
         $warehouse = $this->whRts();
@@ -3986,6 +4044,8 @@ class ShipmentController extends Controller
             'stockInsufficient',
             'mappingErrors',
             'kilatMatches',
+            'bookingSkusByScan',
+            'bookingItemCountsByScan',
         ));
     }
 

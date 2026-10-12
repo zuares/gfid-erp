@@ -695,6 +695,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     $isDaily = (bool) ($isDaily ?? (($shipment->dispatch_mode ?? 'single') === 'daily'));
     $currentWave = $currentWave ?? null;
     $kilatMatches = $kilatMatches ?? [];
+    $bookingSkusByScan = $bookingSkusByScan ?? [];
+    $bookingItemCountsByScan = $bookingItemCountsByScan ?? [];
     $mappedLines = $lines->filter(fn ($line) => !empty($line->shipment_order_scan_id))->values();
     $unmappedLines = $lines->filter(fn ($line) => empty($line->shipment_order_scan_id))->values();
     $mappedQty = (int) $mappedLines->sum('qty_scanned');
@@ -1034,6 +1036,10 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 $orderQty = (int) $orderLines->sum('qty_scanned');
                                 $orderCogs = (float) $orderLines->sum(fn ($line) => $lineCogs($line));
                                 $hasNoItems = $orderLines->isEmpty();
+                                $bookingSkus = $hasBookingOnly ? ($bookingSkusByScan[$scan->id] ?? []) : [];
+                                $showSingleBookingSku = count($bookingSkus) === 1
+                                    && ($bookingItemCountsByScan[$scan->id] ?? 0) === 1
+                                    && $orderLines->count() === 1;
                             @endphp
                             <div class="sd-order sd-order-group {{ $orderTheme }}" data-order-card data-order-marketplace="{{ $marketplaceGroupKey }}" data-order-link-state="{{ $hasMarketplaceLink ? 'linked' : 'unlinked' }}" data-order-problem="{{ $duplicateCount > 0 || $hasNoItems ? 'true' : 'false' }}" data-order-search="{{ strtolower($scan->order_no . ' ' . ($scan->source ?: '')) }}">
                                 <div class="sd-order-lead">
@@ -1082,7 +1088,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                     <div class="sd-order-item-name">{{ $line->item?->name ?? 'Nama item belum tersedia' }}</div>
                                                 </div>
                                                 <div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>
-                                                <div class="sd-order-item-marketplace-sku">—</div>
+                                                <div class="sd-order-item-marketplace-sku" @if($showSingleBookingSku) title="SKU Shopee dari booking atau produk toko; item scan belum diverifikasi" @endif>{{ $showSingleBookingSku ? $bookingSkus[0] : ($hasBookingOnly && $bookingSkus !== [] ? 'Lihat daftar' : '—') }}</div>
                                                 @if($canSeeCogs)
                                                     <div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div>
                                                     <div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>
@@ -1101,6 +1107,9 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                             <div class="sd-muted" style="padding:.45rem 0">Belum ada item.</div>
                                         @endforelse
                                     </div>
+                                    @if($hasBookingOnly && !$showSingleBookingSku)
+                                        <div class="sd-sku-unmatched">{{ $bookingSkus === [] ? 'SKU booking belum tersedia.' : 'SKU booking: ' . implode(', ', $bookingSkus) }}</div>
+                                    @endif
                                 @endif
                                 @if($scan->fulfillment?->marketplaceOrder)
                                     @php

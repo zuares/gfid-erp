@@ -7,6 +7,8 @@ use App\Models\Item;
 use App\Models\MarketplaceBooking;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
+use App\Models\MarketplaceProduct;
+use App\Models\MarketplaceProductModel;
 use App\Models\OrderFulfillment;
 use App\Models\Shipment;
 use App\Models\ShipmentLine;
@@ -670,8 +672,164 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
             ->assertSee('Booking ditemukan')
+            ->assertSee('SKU booking belum tersedia.')
             ->assertSee('data-order-link-state="unlinked"', false)
             ->assertDontSee('sd-badge linked', false);
+    }
+
+    public function test_spx_booking_shows_its_real_marketplace_sku_next_to_one_scanned_item(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-SPX-BOOKING-SKU-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $awb = 'SPXID00000000004A';
+        MarketplaceBooking::create([
+            'store_id' => $store->id,
+            'booking_sn' => 'BOOKING-SPX-SKU-001',
+            'tracking_number' => $awb,
+            'booking_status' => 'SHIPPED',
+            'items' => [['model_sku' => 'K5BLK-1', 'item_sku' => 'K5BLK']],
+        ]);
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => $awb,
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => $scan->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('Booking ditemukan')
+            ->assertSee('>K5BLK-1</div>', false)
+            ->assertDontSee('SKU booking belum tersedia.');
+    }
+
+    public function test_spx_booking_uses_same_store_product_model_sku_when_booking_sku_is_empty(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-SPX-BOOKING-SKU-002',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $product = MarketplaceProduct::create([
+            'store_id' => $store->id,
+            'item_id' => 'SHOPEE-ITEM-101',
+            'item_sku' => 'BASE-SKU',
+        ]);
+        MarketplaceProductModel::create([
+            'marketplace_product_id' => $product->id,
+            'model_id' => 'MODEL-22',
+            'model_sku' => 'MODEL-SKU-22',
+        ]);
+        $otherStore = Store::create([
+            'channel_id' => $store->channel_id,
+            'code' => 'SHP-OTHER-STORE',
+            'name' => 'Other Shopee Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $otherProduct = MarketplaceProduct::create([
+            'store_id' => $otherStore->id,
+            'item_id' => 'SHOPEE-ITEM-101',
+            'item_sku' => 'WRONG-STORE-SKU',
+        ]);
+        MarketplaceProductModel::create([
+            'marketplace_product_id' => $otherProduct->id,
+            'model_id' => 'MODEL-22',
+            'model_sku' => 'WRONG-STORE-MODEL',
+        ]);
+        $awb = 'SPXID00000000005A';
+        MarketplaceBooking::create([
+            'store_id' => $store->id,
+            'booking_sn' => 'BOOKING-SPX-SKU-002',
+            'tracking_number' => $awb,
+            'booking_status' => 'SHIPPED',
+            'items' => [['item_id' => 'SHOPEE-ITEM-101', 'model_id' => 'MODEL-22', 'item_sku' => 'BASE-SKU']],
+        ]);
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => $awb,
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => $scan->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('>MODEL-SKU-22</div>', false)
+            ->assertDontSee('>BASE-SKU</div>', false)
+            ->assertDontSee('WRONG-STORE-MODEL');
+    }
+
+    public function test_spx_booking_with_multiple_items_lists_skus_without_guessing_scanned_item_mapping(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-SPX-BOOKING-SKU-003',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $awb = 'SPXID00000000006A';
+        MarketplaceBooking::create([
+            'store_id' => $store->id,
+            'booking_sn' => 'BOOKING-SPX-SKU-003',
+            'tracking_number' => $awb,
+            'booking_status' => 'SHIPPED',
+            'items' => [
+                ['model_sku' => 'MARKETPLACE-A'],
+                ['model_sku' => 'MARKETPLACE-B'],
+            ],
+        ]);
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => $awb,
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => $scan->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('SKU booking: MARKETPLACE-A, MARKETPLACE-B')
+            ->assertDontSee('>MARKETPLACE-A</div>', false);
     }
 
     public function test_spx_confirmation_shows_order_sku_and_flags_a_different_scanned_item(): void
