@@ -146,10 +146,12 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-marketplace-tab[data-order-marketplace-tab="tiktok"].active { color:#0f716e; border-color:#bfe9e4; background:#f0fdfa; }
 .sd-marketplace-tab[data-order-marketplace-tab="anomaly"].active { color:#a16207; border-color:#fde68a; background:#fffbeb; }
 .sd-marketplace-tab[data-order-marketplace-tab="problem"].active { color:#b91c1c; border-color:#fecaca; background:#fff1f2; }
-.sd-link-tabs { display:flex; align-items:center; gap:.28rem; margin:-.28rem .75rem .65rem; padding:.18rem; border-bottom:1px solid #e2e8f0; overflow-x:auto; scrollbar-width:none; }
+.sd-filter-stack { margin:.1rem .75rem .65rem; padding:.22rem; border:1px solid #e2e8f0; border-radius:9px; background:#f8fafc; }
+.sd-filter-stack .sd-marketplace-tabs { margin:0; padding:0; border:0; background:transparent; }
+.sd-link-tabs { display:flex; align-items:center; gap:.3rem; margin:.32rem 0 0; padding:.32rem 0 0; border-top:1px solid #e2e8f0; overflow-x:auto; scrollbar-width:none; }
 .sd-link-tabs::-webkit-scrollbar { display:none; }
-.sd-link-tab { display:inline-flex; align-items:center; justify-content:center; gap:.3rem; min-height:29px; padding:.2rem .52rem; border:1px solid transparent; border-radius:6px; color:#94a3b8; background:transparent; font-size:.66rem; font-weight:750; white-space:nowrap; cursor:pointer; transition:background .12s ease,color .12s ease,border-color .12s ease; }
-.sd-link-tab:hover { color:#475569; background:#f8fafc; }
+.sd-link-tab { display:inline-flex; align-items:center; justify-content:center; gap:.3rem; min-height:32px; flex:1 0 0; padding:.24rem .58rem; border:1px solid transparent; border-radius:7px; color:#64748b; background:transparent; font-size:.68rem; font-weight:750; white-space:nowrap; cursor:pointer; transition:background .12s ease,color .12s ease,border-color .12s ease,box-shadow .12s ease; }
+.sd-link-tab:hover { color:#334155; background:#f1f5f9; }
 .sd-link-tab.active { color:#334155; border-color:#dbe3ee; background:#fff; box-shadow:0 1px 2px rgba(15,23,42,.05); }
 .sd-link-tab[data-order-link-tab="linked"].active { color:#047857; border-color:#a7f3d0; background:#ecfdf5; }
 .sd-link-tab[data-order-link-tab="unlinked"].active { color:#b45309; border-color:#fde68a; background:#fffbeb; }
@@ -887,6 +889,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
             <div class="sd-order-search">
                 <input type="search" id="orderSearchInput" placeholder="Cari nomor order atau resi" autocomplete="off">
             </div>
+            <div class="sd-filter-stack">
             <div class="sd-marketplace-tabs" role="tablist" aria-label="Filter order berdasarkan marketplace">
                 @foreach([
                     'all' => ['label' => 'Semua', 'icon' => 'bi-grid'],
@@ -922,6 +925,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                         <span class="sd-link-tab-count">{{ number_format((int) ($linkCounts[$tab] ?? 0), 0, ',', '.') }}</span>
                     </button>
                 @endforeach
+            </div>
             </div>
             <div class="sd-body">
                 @if($orderScans->isEmpty() && $isItemFirst)
@@ -1271,17 +1275,43 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     var activeMarketplaceTab = 'all';
     var activeLinkTab = 'all';
 
+    function matchesMarketplace(card){
+        var marketplace = card.dataset.orderMarketplace || 'anomaly';
+        return activeMarketplaceTab === 'all'
+            || (activeMarketplaceTab === 'problem'
+                ? card.dataset.orderProblem === 'true'
+                : marketplace === activeMarketplaceTab);
+    }
+
+    function updateLinkTabCounts(){
+        var counts = {all: 0, linked: 0, unlinked: 0};
+
+        orderCards.forEach(function(card){
+            if (!matchesMarketplace(card)) return;
+
+            counts.all++;
+            var linkState = card.dataset.orderLinkState || 'unlinked';
+            if (Object.prototype.hasOwnProperty.call(counts, linkState)) counts[linkState]++;
+        });
+
+        linkTabButtons.forEach(function(button){
+            var tab = button.dataset.orderLinkTab || 'all';
+            var count = button.querySelector('.sd-link-tab-count');
+            if (count) count.textContent = Number(counts[tab] || 0).toLocaleString('id-ID');
+        });
+    }
+
     function applyOrderFilters(){
         var query = (orderSearchInput?.value || '').trim().toLowerCase();
         var visibleCount = 0;
 
+        updateLinkTabCounts();
+
         orderCards.forEach(function(card){
             var searchable = (card.dataset.orderSearch || '').toLowerCase();
-            var marketplace = card.dataset.orderMarketplace || 'anomaly';
             var linkState = card.dataset.orderLinkState || 'unlinked';
             var visible = (!query || searchable.indexOf(query) !== -1)
-                && (activeMarketplaceTab === 'all'
-                    || (activeMarketplaceTab === 'problem' ? card.dataset.orderProblem === 'true' : marketplace === activeMarketplaceTab))
+                && matchesMarketplace(card)
                 && (activeLinkTab === 'all' || linkState === activeLinkTab);
             card.hidden = !visible;
             if (visible) visibleCount++;
