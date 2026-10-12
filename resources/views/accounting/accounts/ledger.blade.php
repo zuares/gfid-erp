@@ -5,9 +5,9 @@
 @push('head')
     <style>
         .lg-wrap {
-            max-width: 1100px;
+            max-width: 1180px;
             margin: 0 auto;
-            padding: .75rem .75rem 2.5rem
+            padding: clamp(.75rem, 2vw, 1.5rem) clamp(.75rem, 2vw, 1.25rem) 3rem
         }
 
         .lg-top {
@@ -167,12 +167,6 @@
             font-weight: 850
         }
 
-        .lg-filter-caption {
-            margin-top: .12rem;
-            color: var(--muted);
-            font-size: .75rem
-        }
-
         .lg-filter-form {
             display: flex;
             align-items: flex-end;
@@ -194,12 +188,6 @@
             font-weight: 800;
             letter-spacing: .05em;
             text-transform: uppercase
-        }
-
-        .lg-filter-count {
-            color: var(--muted);
-            font-size: .75rem;
-            white-space: nowrap
         }
 
         .lg-table-toolbar {
@@ -229,7 +217,9 @@
         .lg-btn {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: .4rem;
+            min-height: 40px;
             border: 1px solid rgba(148, 163, 184, .35);
             background: transparent;
             color: var(--text);
@@ -240,8 +230,87 @@
         }
 
         .lg-btn.primary {
-            border-color: color-mix(in srgb, var(--accent) 40%, rgba(148, 163, 184, .35));
-            background: color-mix(in srgb, var(--accent-soft) 18%, var(--card) 82%)
+            border-color: color-mix(in srgb, var(--accent) 52%, rgba(148, 163, 184, .35));
+            background: color-mix(in srgb, var(--accent) 10%, var(--card) 90%)
+        }
+
+        .lg-btn:hover {
+            border-color: color-mix(in srgb, var(--accent) 52%, rgba(148, 163, 184, .35));
+            color: var(--accent);
+        }
+
+        .lg-btn.primary:hover {
+            background: color-mix(in srgb, var(--accent) 16%, var(--card) 84%)
+        }
+
+        .lg-quick-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: .75rem;
+            padding: .9rem 1rem;
+            border: 1px solid color-mix(in srgb, var(--accent) 18%, rgba(148, 163, 184, .26));
+            border-radius: 16px;
+            background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 42%, var(--card) 58%), var(--card));
+            box-shadow: 0 8px 22px rgba(15, 23, 42, .045)
+        }
+
+        .lg-quick-copy {
+            display: flex;
+            align-items: flex-start;
+            gap: .65rem;
+            min-width: 0
+        }
+
+        .lg-quick-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 2.1rem;
+            width: 2.1rem;
+            height: 2.1rem;
+            border-radius: 11px;
+            background: color-mix(in srgb, var(--accent) 13%, var(--card) 87%);
+            color: var(--accent);
+            font-size: 1rem
+        }
+
+        .lg-quick-title {
+            font-size: .86rem;
+            font-weight: 900
+        }
+
+        .lg-quick-actions {
+            display: flex;
+            flex: 0 0 auto;
+            gap: .5rem;
+            flex-wrap: wrap;
+            justify-content: flex-end
+        }
+
+        .lg-quick-btn {
+            white-space: nowrap
+        }
+
+        .lg-quick-btn.expense {
+            border-color: rgba(239, 68, 68, .28);
+            background: rgba(239, 68, 68, .07)
+        }
+
+        .lg-quick-btn.expense:hover {
+            color: #dc2626;
+            background: rgba(239, 68, 68, .12)
+        }
+
+        .lg-quick-btn.receipt {
+            border-color: rgba(16, 185, 129, .3);
+            background: rgba(16, 185, 129, .08)
+        }
+
+        .lg-quick-btn.receipt:hover {
+            color: #047857;
+            background: rgba(16, 185, 129, .14)
         }
 
         .lg-in {
@@ -277,6 +346,11 @@
             width: 100%;
             border-collapse: separate;
             border-spacing: 0
+        }
+
+        .lg-table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch
         }
 
         .lg-table th {
@@ -409,9 +483,31 @@
                 width: 100%
             }
 
+            .lg-top .lg-actions .lg-btn:first-child {
+                flex: 0 0 auto
+            }
+
             .lg-actions .lg-btn {
                 flex: 1 1 0;
                 justify-content: center
+            }
+
+            .lg-quick-card {
+                align-items: stretch;
+                flex-direction: column;
+                gap: .75rem;
+                padding: .8rem
+            }
+
+            .lg-quick-actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                width: 100%
+            }
+
+            .lg-quick-btn {
+                width: 100%;
+                min-height: 44px
             }
 
             .lg-card {
@@ -585,39 +681,58 @@
     <div class="lg-wrap">
         <div class="lg-top">
             <div class="lg-heading">
-                <div class="lg-kicker">Buku besar · Detail akun</div>
+                <div class="lg-kicker">Buku besar</div>
                 <div class="lg-title-line">
                     <h1 class="lg-title">{{ $account->name }}</h1>
                     <span class="lg-account-code">{{ $account->code }}</span>
                 </div>
                 <div class="lg-sub">
                     <span class="lg-status {{ $account->is_active ? '' : 'inactive' }}">
-                        {{ $account->is_active ? 'Akun aktif' : 'Akun nonaktif' }}
+                        {{ $account->is_active ? 'Aktif' : 'Nonaktif' }}
                     </span>
-                    <span>· {{ strtoupper($account->type) }}</span>
+                    <span>· {{ ucfirst($account->type) }}</span>
                     @if ($account->is_cash)
-                        • Cash/Bank
+                        · Kas/Bank
                     @endif
                 </div>
                 @if ($cutoffDate && !$showLegacy)
                     <div class="lg-notice">
                         <span aria-hidden="true">ⓘ</span>
-                        <span>Batas sistem {{ \Carbon\Carbon::parse($cutoffDate)->format('d/m/Y') }} · Histori legacy tidak dihitung</span>
+                        <span>Data mulai {{ \Carbon\Carbon::parse($cutoffDate)->format('d/m/Y') }}</span>
                     </div>
                 @elseif ($cutoffDate)
                     <div class="lg-notice">
                         <span aria-hidden="true">ⓘ</span>
-                        <span>Seluruh histori jurnal sedang ditampilkan</span>
+                        <span>Semua histori</span>
                     </div>
                 @endif
             </div>
 
             <div class="lg-actions">
-                <a class="lg-btn" href="{{ route('accounting.accounts.index') }}">← Akun</a>
-                <a class="lg-btn" href="{{ route('accounting.accounts.edit', $account) }}">Edit akun</a>
-                <a class="lg-btn primary" href="{{ route('accounting.journals.index') }}">Jurnal</a>
+                <a class="lg-btn" href="{{ route('accounting.accounts.index') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i><span>Akun</span></a>
+                <a class="lg-btn" href="{{ route('accounting.accounts.edit', $account) }}"><i class="bi bi-pencil" aria-hidden="true"></i><span>Edit</span></a>
+                <a class="lg-btn primary" href="{{ route('accounting.journals.index') }}"><i class="bi bi-journal-text" aria-hidden="true"></i><span>Jurnal</span></a>
             </div>
         </div>
+
+        @if ($account->is_cash && $account->is_active)
+            <div class="lg-quick-card" aria-label="Tambah transaksi kas">
+                <div class="lg-quick-copy">
+                    <span class="lg-quick-icon" aria-hidden="true"><i class="bi bi-wallet2"></i></span>
+                    <div>
+                        <div class="lg-quick-title">Tambah transaksi kas</div>
+                    </div>
+                </div>
+                <div class="lg-quick-actions">
+                    <a class="lg-btn lg-quick-btn expense" href="{{ route('accounting.cash-expenses.create', ['cash_account_id' => $account->id]) }}">
+                        <i class="bi bi-arrow-down-circle" aria-hidden="true"></i> Pengeluaran
+                    </a>
+                    <a class="lg-btn lg-quick-btn receipt" href="{{ route('accounting.cash-receipts.create', ['cash_account_id' => $account->id]) }}">
+                        <i class="bi bi-arrow-up-circle" aria-hidden="true"></i> Penerimaan
+                    </a>
+                </div>
+            </div>
+        @endif
 
         {{-- Summary --}}
         <div class="lg-card" style="margin-bottom:.75rem">
@@ -631,14 +746,13 @@
                 <div class="lg-metric">
                     <div class="lg-metric-label">Saldo saat ini</div>
                     @php $cb = (float)$currentBalance; @endphp
-                    <div class="lg-metric-value">{{ number_format($cb, 0, ',', '.') }}</div>
+                    <div class="lg-metric-value">Rp {{ number_format($cb, 0, ',', '.') }}</div>
                 </div>
             </div>
 
             <div class="lg-filterbar">
                 <div>
-                    <div class="lg-filter-title">Filter tanggal posting</div>
-                    <div class="lg-filter-caption">Batasi transaksi berdasarkan tanggal jurnal</div>
+                    <div class="lg-filter-title">Periode</div>
                 </div>
 
                 <form class="lg-filter-form" method="GET" action="{{ route('accounting.accounts.ledger', $account) }}">
@@ -653,7 +767,7 @@
                     @if ($showLegacy)
                         <input type="hidden" name="show_legacy" value="1">
                     @endif
-                    <button class="lg-btn primary" type="submit">Terapkan filter</button>
+                    <button class="lg-btn primary" type="submit">Terapkan</button>
                     @if (request()->filled('from') || request()->filled('to') || $showLegacy)
                         <a class="lg-btn" href="{{ route('accounting.accounts.ledger', $account) }}">Reset</a>
                     @endif
@@ -663,11 +777,11 @@
             <div class="lg-b" style="padding:0">
                 <div class="lg-table-toolbar">
                     <div>
-                        <strong>Aktivitas jurnal</strong>
+                        <strong>Transaksi</strong>
                         <span class="lg-muted">{{ number_format($lines->total(), 0, ',', '.') }} entri</span>
                     </div>
-                    <span class="lg-filter-count">Nominal dalam IDR</span>
                 </div>
+                <div class="lg-table-wrap">
                 <table class="lg-table">
                     <thead>
                         <tr>
@@ -680,27 +794,13 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @php
-                            $running = (float) $openingBalance;
-                        @endphp
-
-                        {{-- Opening row --}}
-                        <tr>
-                            <td class="lg-muted">
-                                {{ request('from') ? \Carbon\Carbon::parse(request('from'))->format('d/m/Y') : '-' }}</td>
-                            <td class="lg-hide-sm lg-muted">—</td>
-                            <td class="lg-muted">Opening Balance</td>
-                            <td class="lg-right lg-muted">—</td>
-                            <td class="lg-right lg-muted">—</td>
-                            <td class="lg-right lg-bal {{ $running < 0 ? 'neg' : 'pos' }}">
-                                {{ number_format($running, 0, ',', '.') }}</td>
-                        </tr>
-
                         @forelse($lines as $l)
                             @php
                                 $d = (float) ($l->debit ?? 0);
                                 $c = (float) ($l->credit ?? 0);
-                                $running += $d - $c;
+                                $rowBalance = (float) $closingBalance
+                                    - (float) ($l->cumulative_net ?? 0)
+                                    + ($d - $c);
                                 $relatedUrl = $l->related_url ?? route('accounting.journals.show', $l->journal_id);
                                 $relatedLabel = $l->related_label ?? 'Buka detail jurnal';
                                 $ref = $l->source_type
@@ -725,7 +825,7 @@
                                     <a class="lg-row-link" href="{{ $relatedUrl }}" tabindex="-1">
                                         <div style="font-weight:700">{{ $l->grn_supplier_name ?: ($l->journal_description ?? '-') }}</div>
                                     </a>
-                                    <div class="lg-muted">Line #{{ $l->id }}</div>
+                                    <div class="lg-muted">#{{ $l->id }}</div>
                                     @if ($l->grn_items instanceof \Illuminate\Support\Collection && $l->grn_items->isNotEmpty())
                                         <div class="lg-grn-items">
                                             <div class="lg-grn-items-title">Item GRN</div>
@@ -757,16 +857,30 @@
                                         <span class="lg-muted">—</span>
                                     @endif
                                 </td>
-                                <td class="lg-right lg-bal {{ $running < 0 ? 'neg' : 'pos' }}">
-                                    {{ number_format($running, 0, ',', '.') }}</td>
+                                <td class="lg-right lg-bal {{ $rowBalance < 0 ? 'neg' : 'pos' }}">
+                                    {{ number_format($rowBalance, 0, ',', '.') }}</td>
                             </tr>
                         @empty
                             <tr>
                                 <td colspan="6" style="padding:1rem;color:var(--muted)">Belum ada transaksi.</td>
                             </tr>
                         @endforelse
+
+                        @if ($lines->count())
+                            <tr>
+                                <td class="lg-muted">
+                                    {{ request('from') ? \Carbon\Carbon::parse(request('from'))->format('d/m/Y') : '-' }}</td>
+                                <td class="lg-hide-sm lg-muted">—</td>
+                                <td class="lg-muted">Saldo awal</td>
+                                <td class="lg-right lg-muted">—</td>
+                                <td class="lg-right lg-muted">—</td>
+                                <td class="lg-right lg-bal {{ $openingBalance < 0 ? 'neg' : 'pos' }}">
+                                    {{ number_format($openingBalance, 0, ',', '.') }}</td>
+                            </tr>
+                        @endif
                     </tbody>
                 </table>
+                </div>
 
                 <div style="padding:.8rem .9rem">
                     {{ $lines->links() }}

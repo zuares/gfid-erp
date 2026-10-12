@@ -258,9 +258,13 @@ class AccountController extends Controller
                 'journal_lines.debit',
                 'journal_lines.credit',
             ])
-            ->orderBy('journals.date')
-            ->orderBy('journals.created_at')
-            ->orderBy('journal_lines.id');
+            ->selectRaw('SUM(journal_lines.debit - journal_lines.credit) OVER (
+                ORDER BY journals.date DESC, journals.created_at DESC, journal_lines.id DESC
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) as cumulative_net')
+            ->orderByDesc('journals.date')
+            ->orderByDesc('journals.created_at')
+            ->orderByDesc('journal_lines.id');
 
         if ($from) {
             $q->whereDate('journals.date', '>=', $from);
@@ -373,6 +377,18 @@ class AccountController extends Controller
                 ->value('s');
         }
 
+        // Titik awal saldo saat baris ledger ditampilkan dari transaksi
+        // terbaru ke transaksi terlama.
+        $closingBalance = (float) JournalLine::query()
+            ->join('journals', 'journals.id', '=', 'journal_lines.journal_id')
+            ->where('journal_lines.account_id', $account->id)
+            ->whereNull('journals.voided_at')
+            ->whereNotIn('journals.source_type', self::EXCLUDED_BALANCE_SOURCES)
+            ->when($cutoffDate && !$showLegacy, fn ($query) => $query->whereDate('journals.date', '>=', $cutoffDate))
+            ->when($to, fn ($query) => $query->whereDate('journals.date', '<=', $to))
+            ->selectRaw('COALESCE(SUM(journal_lines.debit - journal_lines.credit),0) as s')
+            ->value('s');
+
         // Current balance (all-time)
         $currentBalance = (float) JournalLine::query()
             ->join('journals', 'journals.id', '=', 'journal_lines.journal_id')
@@ -387,6 +403,7 @@ class AccountController extends Controller
             'account',
             'lines',
             'openingBalance',
+            'closingBalance',
             'currentBalance',
             'from',
             'to',

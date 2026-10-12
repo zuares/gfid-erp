@@ -1,5 +1,6 @@
 @php
     $isEdit = isset($cashReceipt) && $cashReceipt->exists;
+    $prefilledCashAccountId = $selectedCashAccountId ?? request('cash_account_id', 0);
 @endphp
 
 <div class="cr-form-grid">
@@ -21,7 +22,7 @@
         <select class="form-select cr-form-control" name="cash_account_id" required>
             <option value="">Pilih kas / bank</option>
             @foreach ($cashAccounts as $account)
-                <option value="{{ $account->id }}" @selected((int) old('cash_account_id', $cashReceipt->cash_account_id ?? 0) === (int) $account->id)>
+                <option value="{{ $account->id }}" @selected((int) old('cash_account_id', $cashReceipt->cash_account_id ?? $prefilledCashAccountId) === (int) $account->id)>
                     {{ $account->name }}{{ $account->code ? " · {$account->code}" : '' }}
                 </option>
             @endforeach

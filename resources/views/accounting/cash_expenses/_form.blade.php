@@ -4,7 +4,8 @@
     $isEdit = isset($cashExpense) && $cashExpense->exists;
     $selectedExpenseAccountId = old('expense_account_id', $cashExpense->expense_account_id ?? 0);
     $defaultCashAccountId = $cashAccounts->firstWhere('code', '1111')?->id ?? $cashAccounts->first()?->id;
-    $selectedCashAccountId = old('cash_account_id', $cashExpense->cash_account_id ?? ($isEdit ? 0 : $defaultCashAccountId));
+    $prefilledCashAccountId = $selectedCashAccountId ?? request('cash_account_id');
+    $selectedCashAccountId = old('cash_account_id', $cashExpense->cash_account_id ?? ($isEdit ? 0 : ($prefilledCashAccountId ?: $defaultCashAccountId)));
     $newCategoryName = old('category_new');
 @endphp
 

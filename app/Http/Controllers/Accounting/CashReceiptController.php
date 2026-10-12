@@ -57,11 +57,17 @@ class CashReceiptController extends Controller
         ));
     }
 
-    public function create()
+    public function create(Request $request)
     {
         [$sourceAccounts, $cashAccounts] = $this->cashReceiptAccountOptions();
+        $selectedCashAccountId = $cashAccounts
+            ->firstWhere('id', (int) $request->input('cash_account_id'))?->id;
 
-        return view('accounting.cash_receipts.create', compact('sourceAccounts', 'cashAccounts'));
+        return view('accounting.cash_receipts.create', compact(
+            'sourceAccounts',
+            'cashAccounts',
+            'selectedCashAccountId',
+        ));
     }
 
     public function store(Request $request)

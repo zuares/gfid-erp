@@ -59,11 +59,17 @@ class CashExpenseController extends Controller
         ));
     }
 
-    public function create()
+    public function create(Request $request)
     {
         [$expenseAccounts, $cashAccounts] = $this->cashBasisAccountOptions();
+        $selectedCashAccountId = $cashAccounts
+            ->firstWhere('id', (int) $request->input('cash_account_id'))?->id;
 
-        return view('accounting.cash_expenses.create', compact('expenseAccounts', 'cashAccounts'));
+        return view('accounting.cash_expenses.create', compact(
+            'expenseAccounts',
+            'cashAccounts',
+            'selectedCashAccountId',
+        ));
     }
 
     public function store(Request $request)
