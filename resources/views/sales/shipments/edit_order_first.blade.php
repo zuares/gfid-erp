@@ -1240,7 +1240,7 @@
                         <span>Anomali</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="anomaly">0</span>
                     </button>
                     <button type="button" class="sr-marketplace-tab" data-order-marketplace-tab="problem" role="tab" aria-selected="false">
-                        <span>Order Bermasalah</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="problem">0</span>
+                        <span>Perlu Diperiksa</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="problem">0</span>
                     </button>
                 </div>
             </div>

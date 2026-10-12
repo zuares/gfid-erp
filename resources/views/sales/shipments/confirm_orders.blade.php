@@ -788,7 +788,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                     'shopee' => ['label' => 'Shopee', 'icon' => 'bi-bag'],
                     'tiktok' => ['label' => 'TikTok', 'icon' => 'bi-play-circle'],
                     'anomaly' => ['label' => 'Anomali', 'icon' => 'bi-exclamation-triangle'],
-                    'problem' => ['label' => 'Order Bermasalah', 'icon' => 'bi-exclamation-octagon'],
+                    'problem' => ['label' => 'Perlu Diperiksa', 'icon' => 'bi-exclamation-octagon'],
                 ] as $tab => $tabMeta)
                     <button type="button"
                             class="sd-marketplace-tab {{ $tab === 'all' ? 'active' : '' }}"

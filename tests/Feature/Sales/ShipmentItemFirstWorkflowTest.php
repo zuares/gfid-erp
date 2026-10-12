@@ -395,7 +395,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('sr-duplicate-badge', false)
             ->assertSee('sr-missing-item-badge', false)
             ->assertSee('data-order-marketplace-tab="problem"', false)
-            ->assertSee('Order Bermasalah')
+            ->assertSee('Perlu Diperiksa')
             ->assertSee('Duplikat');
 
         $this->actingAs($user)
@@ -404,7 +404,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('sd-duplicate-badge', false)
             ->assertSee('sd-missing-item-badge', false)
             ->assertSee('data-order-marketplace-tab="problem"', false)
-            ->assertSee('Order Bermasalah')
+            ->assertSee('Perlu Diperiksa')
             ->assertSee('Duplikat');
     }
 
