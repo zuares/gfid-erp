@@ -3,9 +3,18 @@
 namespace App\Services\Marketplace\Source;
 
 use Carbon\Carbon;
+use App\Services\Marketplace\Promotion\MarketplacePromotionNormalizer;
 
 class TiktokApiSourceAdapter implements MarketplaceSourceAdapterInterface
 {
+    private MarketplacePromotionNormalizer $promotionNormalizer;
+
+    public function __construct(
+        ?MarketplacePromotionNormalizer $promotionNormalizer = null,
+    ) {
+        $this->promotionNormalizer = $promotionNormalizer ?: new MarketplacePromotionNormalizer();
+    }
+
     public function channel(): string
     {
         return 'tiktok';
@@ -38,15 +47,39 @@ class TiktokApiSourceAdapter implements MarketplaceSourceAdapterInterface
                 $tracking = $this->string($package['tracking_number'] ?? $package['tracking_no'] ?? $order['tracking_number'] ?? null);
                 $packageId = $this->string($package['package_id'] ?? $package['shipment_id'] ?? $package['id'] ?? null);
 
+                $rawItems = $this->listify($items);
                 $normalizedItems = [];
-                foreach ($this->listify($items) as $item) {
+                foreach ($rawItems as $item) {
                     if (! is_array($item)) {
                         continue;
                     }
 
                     $qty = (int) ($item['quantity'] ?? $item['qty'] ?? $item['model_quantity_purchased'] ?? 0);
-                    $unitPrice = (float) ($item['unit_price'] ?? $item['price'] ?? $item['sale_price'] ?? 0);
-                    $subtotal = (float) ($item['subtotal'] ?? $item['line_total'] ?? ($qty * $unitPrice));
+                    $unitPrice = $this->number($item, [
+                        'original_price',
+                        'model_original_price',
+                        'sku_unit_original_price',
+                        'unit_price',
+                        'price',
+                        'sale_price',
+                    ]);
+                    $discountedPrice = $this->number($item, [
+                        'discounted_price',
+                        'model_discounted_price',
+                        'sale_price',
+                        'selling_price',
+                        'unit_price',
+                        'price',
+                    ]);
+                    $subtotal = $this->number($item, [
+                        'subtotal',
+                        'line_total',
+                        'sku_subtotal_after_discount',
+                    ]);
+                    if ($subtotal <= 0) {
+                        $subtotal = $qty * ($discountedPrice > 0 ? $discountedPrice : $unitPrice);
+                    }
+                    $itemPromotion = $this->promotionNormalizer->normalizeTiktokApiItem($item);
 
                     $normalizedItems[] = [
                         'sku_code' => $this->string($item['seller_sku'] ?? $item['sku'] ?? $item['sku_code'] ?? $item['model_sku'] ?? null) ?: null,
@@ -56,9 +89,12 @@ class TiktokApiSourceAdapter implements MarketplaceSourceAdapterInterface
                         'qty' => $qty,
                         'unit_price' => $unitPrice,
                         'subtotal' => $subtotal,
+                        'promotion_breakdown' => $itemPromotion,
                         'raw_line' => $item,
                     ];
                 }
+
+                $promotion = $this->promotionNormalizer->normalizeTiktokApi($order, $rawItems);
 
                 $out[] = [
                     'store_id' => $storeId,
@@ -76,8 +112,8 @@ class TiktokApiSourceAdapter implements MarketplaceSourceAdapterInterface
                     'source_updated_at' => $this->timestamp($order['update_time'] ?? $order['updated_at'] ?? null),
                     'total_qty' => array_sum(array_map(fn ($item) => (int) ($item['qty'] ?? 0), $normalizedItems)),
                     'order_subtotal' => (float) ($order['subtotal'] ?? $order['item_subtotal'] ?? array_sum(array_map(fn ($item) => (float) ($item['subtotal'] ?? 0), $normalizedItems))),
-                    'discount_total' => (float) ($order['discount_total'] ?? $order['discount'] ?? 0),
-                    'shipping_fee' => (float) ($order['shipping_fee'] ?? $order['shipping_cost'] ?? 0),
+                    'discount_total' => $promotion['product_discount'] + $promotion['bundle_deal_discount'],
+                    'shipping_fee' => $promotion['shipping_fee_after_discount'],
                     'grand_total' => (float) ($order['total_amount'] ?? $order['grand_total'] ?? 0),
                     'currency' => $this->string($order['currency'] ?? 'IDR') ?: 'IDR',
                     'source_file' => null,
@@ -85,7 +121,9 @@ class TiktokApiSourceAdapter implements MarketplaceSourceAdapterInterface
                         'source' => $sourceType,
                         'order' => $order,
                         'package' => $package,
+                        'promotion_breakdown' => $promotion,
                     ],
+                    'promotion_breakdown' => $promotion,
                     'items' => $normalizedItems,
                 ];
             }
@@ -97,6 +135,17 @@ class TiktokApiSourceAdapter implements MarketplaceSourceAdapterInterface
     private function string(mixed $value): string
     {
         return trim((string) ($value ?? ''));
+    }
+
+    private function number(array $source, array $keys): float
+    {
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $source) && is_numeric($source[$key])) {
+                return max((float) $source[$key], 0);
+            }
+        }
+
+        return 0.0;
     }
 
     private function listify(mixed $value): array

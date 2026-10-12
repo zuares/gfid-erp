@@ -998,6 +998,9 @@ class ShipmentController extends Controller
     {
         $stores = Store::orderBy('code')->get();
         $whRts = $this->whRts();
+        $initialShipmentType = $request->query('type') === Shipment::TYPE_AFFILIATE
+            ? Shipment::TYPE_AFFILIATE
+            : Shipment::TYPE_MANUAL;
 
         $invoice = null;
         if ($request->filled('sales_invoice_id')) {
@@ -1025,13 +1028,20 @@ class ShipmentController extends Controller
                 ->first()
             : null;
 
-        return view('sales.shipments.create', compact('stores', 'whRts', 'invoice', 'kpi', 'latestDraft'));
+        return view('sales.shipments.create', compact(
+            'stores',
+            'whRts',
+            'invoice',
+            'kpi',
+            'latestDraft',
+            'initialShipmentType'
+        ));
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'shipment_type'    => ['required', 'in:marketplace,manual'],
+            'shipment_type'    => ['required', 'in:marketplace,manual,affiliate'],
             'store_id'         => ['nullable', 'exists:stores,id'],
             'date'             => ['required', 'date'],
             'notes'            => ['nullable', 'string'],
@@ -1040,10 +1050,10 @@ class ShipmentController extends Controller
         ]);
 
         // Store boleh null — diisi nanti saat rekonsiliasi dengan no pesanan
-        $store = $data['store_id'] ? Store::find($data['store_id']) : null;
+        $store = !empty($data['store_id']) ? Store::find($data['store_id']) : null;
 
-        $prefix = 'SHP';
-        if ($store) {
+        $prefix = $data['shipment_type'] === Shipment::TYPE_AFFILIATE ? 'AFF' : 'SHP';
+        if ($store && $data['shipment_type'] !== Shipment::TYPE_AFFILIATE) {
             $storeName = strtoupper(trim($store->name ?? ''));
             $storeCode = strtoupper(trim($store->code ?? ''));
             $storeKey  = $storeCode . ' ' . $storeName;
@@ -1062,11 +1072,14 @@ class ShipmentController extends Controller
         }
 
         $code = Shipment::generateCode($prefix);
+        $scanMode = $data['shipment_type'] === Shipment::TYPE_AFFILIATE
+            ? 'order_first'
+            : ($data['scan_mode'] ?? 'item_first');
 
         $shipment = Shipment::create([
             'code'             => $code,
             'shipment_type'    => $data['shipment_type'],
-            'scan_mode'        => $data['scan_mode'] ?? 'item_first',
+            'scan_mode'        => $scanMode,
             'dispatch_mode'    => $data['dispatch_mode'] ?? ($data['shipment_type'] === Shipment::TYPE_MARKETPLACE ? Shipment::DISPATCH_DAILY : Shipment::DISPATCH_SINGLE),
             'store_id'         => $data['store_id'] ?? null,
             'sales_invoice_id' => $data['sales_invoice_id'] ?? null,
@@ -1278,13 +1291,26 @@ class ShipmentController extends Controller
             ], 422);
         }
 
+        // Pada mode Scan Order, barcode SKU/item tidak boleh dianggap sebagai
+        // nomor order dan disimpan ke shipment_order_scans.
+        if ($this->finishedGoodItemQuery($orderNo)->exists()) {
+            return response()->json([
+                'status' => 'error',
+                'type' => 'item_scan_guard',
+                'message' => "Kode {$orderNo} terdeteksi sebagai item. Scan nomor order, bukan barcode item.",
+            ], 422);
+        }
+
         $lookupMode = (string) $this->salesOperationalSetting('lookup_mode', 'auto_link_on_scan');
         $marketplaceOrder = null;
         $salesInvoice = null;
         $fulfillment = null;
         $lookupFallbackStatus = null;
 
-        if ($lookupMode === 'auto_link_on_scan') {
+        // Paket afiliasi memakai nomor referensi/order sebagai pengelompokan
+        // internal. Jangan menautkan atau mengubah status order marketplace
+        // yang kebetulan memiliki nomor sama.
+        if ($lookupMode === 'auto_link_on_scan' && $shipment->shipment_type !== Shipment::TYPE_AFFILIATE) {
             $marketplaceOrder = $this->marketplaceOrderQuery($orderNo, $shipment)->first();
             if ($marketplaceOrder) {
                 if ($shipment->shipment_type !== 'manual' && !in_array($marketplaceOrder->order_status, self::RECONCILIATION_MARKETPLACE_STATUSES, true)) {
@@ -1427,6 +1453,10 @@ class ShipmentController extends Controller
 
     public function deleteOrderScan(Request $request, Shipment $shipment)
     {
+        if (($request->user()?->role ?? null) !== 'owner') {
+            abort(403);
+        }
+
         if ($shipment->status !== 'draft') {
             return response()->json([
                 'status' => 'error',
@@ -1445,15 +1475,57 @@ class ShipmentController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($shipment->id);
 
-            ShipmentOrderScan::query()
+            $scan = ShipmentOrderScan::query()
                 ->where('shipment_id', $shipment->id)
                 ->where('order_no', $orderNo)
-                ->delete();
+                ->lockForUpdate()
+                ->first();
+
+            if (!$scan) {
+                return;
+            }
+
+            $activeScanCount = ShipmentOrderScan::query()
+                ->where('shipment_id', $shipment->id)
+                ->where('status', '!=', 'skip')
+                ->count();
+
+            $lines = ShipmentLine::query()
+                ->where('shipment_id', $shipment->id)
+                ->where(function ($query) use ($scan, $activeScanCount) {
+                    $query->where('shipment_order_scan_id', $scan->id);
+
+                    // Kompatibilitas shipment lama: jika hanya ada satu order,
+                    // line tanpa grouping juga termasuk item order tersebut.
+                    if ($activeScanCount === 1) {
+                        $query->orWhereNull('shipment_order_scan_id');
+                    }
+                })
+                ->lockForUpdate()
+                ->get();
+
+            if ($lines->contains(fn ($line) => $line->wave?->isPosted())) {
+                throw new RuntimeException('Item pada gelombang yang sudah diposting tidak bisa dihapus.');
+            }
+
+            $warehouse = $this->whRts();
+            foreach ($lines as $line) {
+                if ($warehouse && $line->allocated_qty > 0) {
+                    app(\App\Services\Inventory\InventoryService::class)->releaseStock(
+                        $warehouse->id,
+                        $line->item_id,
+                        $line->allocated_qty
+                    );
+                }
+                $line->delete();
+            }
+
+            $scan->delete();
         });
 
         return response()->json([
             'status' => 'ok',
-            'message' => "Order {$orderNo} dihapus dari pencatatan shipment.",
+            'message' => "Order {$orderNo} beserta itemnya dihapus dari shipment.",
         ]);
     }
 
@@ -1572,8 +1644,6 @@ class ShipmentController extends Controller
                 ->with('status', 'error')->with('message', $message);
         }
 
-        $currentWave = $this->currentShipmentWave($shipment);
-
         $data = $request->validate([
             'scan_code' => ['required', 'string', 'max:255'],
             'qty' => ['nullable', 'integer', 'min:1'],
@@ -1589,20 +1659,6 @@ class ShipmentController extends Controller
             ->first();
 
         if (!$item) {
-            $marketplaceOrder = $this->marketplaceOrderQuery($scanCode, $shipment)
-                ->first(['id', 'channel_order_id', 'shipping_awb_no', 'booking_sn', 'external_order_id']);
-
-            if ($marketplaceOrder) {
-                $message = "Kode {$scanCode} terdeteksi sebagai nomor pesanan/resi, bukan item. Gunakan Scan Pesanan.";
-
-                if ($request->expectsJson() || $request->ajax()) {
-                    return response()->json(['status' => 'error', 'message' => $message], 422);
-                }
-
-                return redirect()->route('sales.shipments.edit', $shipment)
-                    ->with('status', 'error')->with('message', $message)->withInput();
-            }
-
             $message = "Item dengan kode/barcode {$scanCode} tidak ditemukan atau bukan finished_good.";
 
             if ($request->expectsJson() || $request->ajax()) {
@@ -1612,6 +1668,10 @@ class ShipmentController extends Controller
             return redirect()->route('sales.shipments.edit', $shipment)
                 ->with('status', 'error')->with('message', $message)->withInput();
         }
+
+        // Validasi item dilakukan sebelum membuka/mengubah gelombang harian,
+        // supaya barcode yang tidak ada di master langsung mendapat respons.
+        $currentWave = $this->currentShipmentWave($shipment);
 
         $autoOrderScan = $this->autoMapItemFirstLines($shipment);
         $autoOrderScanId = $autoOrderScan?->id;
@@ -1675,9 +1735,38 @@ class ShipmentController extends Controller
                     if ($request->expectsJson() || $request->ajax()) return response()->json(['status' => 'error', 'message' => $msg], 422);
                     return redirect()->back()->with('status', 'error')->with('message', $msg);
                 }
-            } elseif ($shipment->shipment_type !== 'marketplace') {
+            } elseif ($shipment->shipment_type === Shipment::TYPE_MANUAL) {
                 $orderNo = ''; 
             }
+        }
+
+        if ($shipment->shipment_type === Shipment::TYPE_AFFILIATE
+            && ($shipment->scan_mode ?? 'item_first') === 'order_first'
+            && $orderNo === '') {
+            $message = 'Scan order afiliasi terlebih dahulu sebelum scan item.';
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => $message], 422);
+            }
+
+            return redirect()->route('sales.shipments.scan_order', $shipment)
+                ->with('status', 'error')->with('message', $message);
+        }
+
+        if ($shipment->shipment_type === Shipment::TYPE_AFFILIATE
+            && ($shipment->scan_mode ?? 'item_first') === 'order_first'
+            && !ShipmentOrderScan::where('shipment_id', $shipment->id)
+                ->where('order_no', $orderNo)
+                ->where('status', '!=', 'skip')
+                ->exists()) {
+            $message = "Order {$orderNo} belum tercatat. Scan order afiliasi terlebih dahulu.";
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => $message], 422);
+            }
+
+            return redirect()->route('sales.shipments.scan_order', $shipment)
+                ->with('status', 'error')->with('message', $message);
         }
 
         $result = DB::transaction(function () use ($shipment, $currentWave, $item, $qty, $orderNo, $fulfillmentId, $autoOrderScanId) {
@@ -2278,6 +2367,20 @@ class ShipmentController extends Controller
 
         $locked->load(['lines.item', 'store']);
 
+        if ($locked->shipment_type === Shipment::TYPE_AFFILIATE) {
+            $activeScans = ShipmentOrderScan::where('shipment_id', $locked->id)
+                ->whereNotIn('status', ['skip'])
+                ->get();
+
+            if ($activeScans->isEmpty()) {
+                abort(422, 'Paket afiliasi wajib memiliki minimal satu nomor order.');
+            }
+
+            if ($locked->lines->contains(fn ($line) => empty($line->shipment_order_scan_id))) {
+                abort(422, 'Semua item paket afiliasi harus terhubung ke order.');
+            }
+        }
+
         if (($locked->scan_mode ?? 'item_first') === 'item_first') {
             // Satu order masih bisa dimapping otomatis untuk kompatibilitas
             // flow lama. Jika lebih dari satu order, mapping harus berasal
@@ -2487,8 +2590,30 @@ class ShipmentController extends Controller
 
         // ✅ lebih ringan dari count()
         if (!$shipment->lines()->exists()) {
-            return redirect()->route('sales.shipments.edit', $shipment)
+            return redirect()->route(
+                $shipment->shipment_type === Shipment::TYPE_AFFILIATE
+                    ? 'sales.shipments.scan_order'
+                    : 'sales.shipments.edit',
+                $shipment
+            )
                 ->with('status', 'error')->with('message', 'Tidak ada item di shipment ini.');
+        }
+
+        if ($shipment->shipment_type === Shipment::TYPE_AFFILIATE) {
+            $hasOrders = $shipment->orderScans()
+                ->where('status', '!=', 'skip')
+                ->exists();
+            $hasUnassignedLines = $shipment->lines()
+                ->whereNull('shipment_order_scan_id')
+                ->exists();
+
+            if (!$hasOrders || $hasUnassignedLines) {
+                return redirect()->route('sales.shipments.scan_order', $shipment)
+                    ->with('status', 'error')
+                    ->with('message', !$hasOrders
+                        ? 'Paket afiliasi wajib memiliki nomor order terlebih dahulu.'
+                        : 'Semua item paket afiliasi harus berada di dalam order.');
+            }
         }
 
         if ($this->usesDailyWaves($shipment)) {
@@ -2873,6 +2998,10 @@ class ShipmentController extends Controller
 
     public function destroyLine(Request $request, ShipmentLine $line)
     {
+        if (($request->user()?->role ?? null) !== 'owner') {
+            abort(403);
+        }
+
         $shipment = $line->shipment;
 
         if (!$shipment || $shipment->status !== 'draft') {
@@ -3644,7 +3773,11 @@ class ShipmentController extends Controller
         // dan simpan relasinya agar status yang terlihat sama dengan data DB.
         // Linker hanya membuat draft fulfillment; stok tetap belum dipotong
         // sampai shipment benar-benar disubmit/post.
-        foreach ($shipment->orderScans as $scan) {
+        $reconcileScans = $shipment->shipment_type === Shipment::TYPE_MARKETPLACE
+            ? $shipment->orderScans
+            : collect();
+
+        foreach ($reconcileScans as $scan) {
             if ($scan->status === 'skip' || $scan->source === 'sales_invoice') {
                 continue;
             }

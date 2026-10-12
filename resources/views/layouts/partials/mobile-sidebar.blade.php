@@ -351,7 +351,6 @@
     $hasSocialMediaInstagram = $router->has('social-media.instagram');
     $hasMarketplaceIndex = $router->has('marketplace.orders');
     $hasMarketplaceSalesReport = $router->has('marketplace.reports.sales');
-    $hasMarketplacePrincipalSalesPerformance = $router->has('marketplace.reports.principal-sales-performance');
     $hasMarketplaceAmsPerformance = $router->has('marketplace.reports.ams-performance');
     $hasMarketplaceProfitReport = $isOwner && $router->has('marketplace.reports.profit');
     $hasMarketplaceFinancialStatement = $isOwner && $router->has('marketplace.reports.financial-statement');
@@ -896,7 +895,7 @@
                         </li>
                     @endif
 
-                    @if ($isAdmin && ($hasMarketplaceIndex || $hasMarketplaceSalesReport || $hasMarketplacePrincipalSalesPerformance || $hasMarketplaceAmsPerformance || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex))
+                    @if ($isAdmin && ($hasMarketplaceIndex || $hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex))
                         <div class="mobile-sidebar-section-label">Toko Online</div>
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}"
@@ -954,7 +953,7 @@
                                     </div>
                                 @endif
 
-                                @if ($hasMarketplaceSalesReport || $hasMarketplacePrincipalSalesPerformance || $hasMarketplaceAmsPerformance || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
+                                @if ($hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
                                     <button class="mobile-sidebar-link mobile-sidebar-toggle mobile-sidebar-nested-toggle {{ $marketplaceFinanceGroupOpen ? 'is-open' : '' }}"
                                             type="button" data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminFinanceMobile"
                                             aria-expanded="{{ $marketplaceFinanceGroupOpen ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminFinanceMobile">
@@ -964,11 +963,6 @@
                                         @if ($hasMarketplaceSalesReport)
                                             <a href="{{ route('marketplace.reports.sales') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.sales') ? 'active' : '' }}">
                                                 <span class="icon"><i class="bi bi-graph-up"></i></span><span>Ringkasan Penjualan</span>
-                                            </a>
-                                        @endif
-                                        @if ($hasMarketplacePrincipalSalesPerformance)
-                                            <a href="{{ route('marketplace.reports.principal-sales-performance') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.reports.principal-sales-performance') ? 'active' : '' }}">
-                                                <span class="icon"><i class="bi bi-globe2"></i></span><span>Performa Principal Shopee</span>
                                             </a>
                                         @endif
                                         @if ($hasMarketplaceAmsPerformance)

@@ -10,6 +10,7 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
 use App\Models\PurchaseReceiptLine;
 use App\Models\PurchaseReturn;
+use App\Models\SystemSetting;
 use App\Models\Supplier;
 use App\Models\SupplierLoan;
 use App\Models\WhatsAppMessage;
@@ -425,6 +426,24 @@ class PurchaseOrderController extends Controller
                 END
             ")
             ->get();
+
+        // Saldo kas/bank mengikuti saldo berjalan COA: jurnal aktif saja,
+        // dengan histori legacy dikecualikan sesuai halaman accounting.
+        $cashAccountBalances = DB::table('journal_lines as jl')
+            ->join('journals as j', 'j.id', '=', 'jl.journal_id')
+            ->whereIn('jl.account_id', $cashAccounts->pluck('id'))
+            ->whereNull('j.voided_at')
+            ->whereNotIn('j.source_type', ['opening_balance_void', 'opening_balance_batch_void'])
+            ->when($cutoffDate = SystemSetting::cutoffDateString(), function ($query) use ($cutoffDate) {
+                $query->whereDate('j.date', '>=', $cutoffDate);
+            })
+            ->groupBy('jl.account_id')
+            ->selectRaw('jl.account_id, COALESCE(SUM(jl.debit - jl.credit), 0) as balance')
+            ->pluck('balance', 'account_id');
+
+        $cashAccounts->each(function (Account $account) use ($cashAccountBalances): void {
+            $account->current_balance = round((float) ($cashAccountBalances[$account->id] ?? 0), 2);
+        });
 
         // =========================================================
         // METRICS hutang berbasis GRN posted (tetap dulu, kamu bilang nanti)

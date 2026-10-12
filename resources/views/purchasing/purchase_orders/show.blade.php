@@ -937,7 +937,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                         @if ($cash1101)
                                             <option value="{{ $cash1101->id }}" data-code="1101"
                                                 @selected(old('cash_account_id') == $cash1101->id)>
-                                                1101 — {{ $cash1101->name }}
+                                                1101 — {{ $cash1101->name }} (Saldo: {{ rupiah($cash1101->current_balance ?? 0) }})
                                             </option>
                                         @endif
                                     </select>
@@ -950,7 +950,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                         @foreach ($transferBanks as $acc)
                                             <option value="{{ $acc->id }}" data-code="{{ $acc->code }}"
                                                 @selected(old('cash_account_id') == $acc->id)>
-                                                {{ $acc->code }} — {{ $acc->name }}
+                                                {{ $acc->code }} — {{ $acc->name }} (Saldo: {{ rupiah($acc->current_balance ?? 0) }})
                                             </option>
                                         @endforeach
                                     </select>

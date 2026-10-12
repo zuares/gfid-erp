@@ -78,7 +78,12 @@ class SupplierLoan extends Model
 
     public function getOutstandingAmountAttribute(): float
     {
-        return max(0, (float) $this->principal_amount - $this->posted_repayment_amount);
+        return max(
+            0,
+            (float) $this->principal_amount
+                - $this->posted_repayment_amount
+                - $this->allocated_amount
+        );
     }
 
     public function getAllocatedAmountAttribute(): float
@@ -87,11 +92,15 @@ class SupplierLoan extends Model
             return (float) $this->attributes['allocated_amount'];
         }
 
+        if ($this->relationLoaded('postedAllocations')) {
+            return (float) $this->postedAllocations->sum('amount');
+        }
+
         return (float) $this->postedAllocations()->sum('amount');
     }
 
     public function getAllocationAvailableAmountAttribute(): float
     {
-        return max(0, $this->outstanding_amount - $this->allocated_amount);
+        return $this->outstanding_amount;
     }
 }

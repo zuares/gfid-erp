@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Imports;
 
 use App\Http\Controllers\Controller;
 use App\Models\Channel;
+use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceImportBatch;
 use App\Models\MpShipment;
 use App\Models\Store;
@@ -478,6 +479,22 @@ class MarketplaceImportController extends Controller
                 ->map(static fn ($id): string => (string) $id)
                 ->all();
 
+            $bridgeOrderIds = MpShipment::query()
+                ->whereIn('id', $shipmentIds)
+                ->whereNotNull('marketplace_order_id')
+                ->pluck('marketplace_order_id')
+                ->unique()
+                ->values();
+            $ownedBridgeOrderIds = MarketplaceOrder::query()
+                ->whereIn('id', $bridgeOrderIds)
+                ->get(['id', 'meta'])
+                ->filter(fn (MarketplaceOrder $order): bool =>
+                    data_get($order->meta, 'source_type') === 'marketplace_shipment_import'
+                    && (string) data_get($order->meta, 'import_batch_id') === (string) $batch->id
+                )
+                ->pluck('id')
+                ->values();
+
             $shipmentItems = DB::table('mp_shipment_items')
                 ->whereIn('mp_shipment_id', $shipmentIds)
                 ->delete();
@@ -494,18 +511,40 @@ class MarketplaceImportController extends Controller
                 ->whereIn('id', $shipmentIds)
                 ->delete();
 
+            $marketplaceOrderItems = DB::table('marketplace_order_items')
+                ->where(function ($query) use ($ownedBridgeOrderIds): void {
+                    $query->whereIn('order_id', $ownedBridgeOrderIds)
+                        ->orWhereIn('marketplace_order_id', $ownedBridgeOrderIds);
+                })
+                ->delete();
+            $marketplaceOrders = MarketplaceOrder::query()
+                ->whereIn('id', $ownedBridgeOrderIds)
+                ->delete();
+
             $batches = MarketplaceImportBatch::query()
                 ->whereKey($batch->id)
                 ->delete();
 
-            return compact('shipments', 'shipmentItems', 'packetItems', 'reconciliations', 'batches');
+            return compact(
+                'shipments',
+                'shipmentItems',
+                'packetItems',
+                'reconciliations',
+                'marketplaceOrderItems',
+                'marketplaceOrders',
+                'batches',
+            );
         });
 
         Cache::increment('mp_shipments:kpi:ver');
 
         return redirect()
             ->route('imports.marketplace.index')
-            ->with('success', 'Import dihapus: ' . (int) $deleted['shipments'] . ' shipment.');
+            ->with(
+                'success',
+                'Import dihapus: ' . (int) $deleted['shipments'] . ' shipment'
+                    . ($deleted['marketplaceOrders'] ? ' dan ' . (int) $deleted['marketplaceOrders'] . ' order dashboard.' : '.'),
+            );
     }
 
     /* ============================================================

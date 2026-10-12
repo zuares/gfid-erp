@@ -7,6 +7,7 @@ use App\Models\MarketplaceImportBatch;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\Store;
+use App\Services\Marketplace\Promotion\MarketplacePromotionNormalizer;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -16,6 +17,14 @@ use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class MarketplaceCrmImportService
 {
+    private MarketplacePromotionNormalizer $promotionNormalizer;
+
+    public function __construct(
+        ?MarketplacePromotionNormalizer $promotionNormalizer = null,
+    ) {
+        $this->promotionNormalizer = $promotionNormalizer ?: new MarketplacePromotionNormalizer();
+    }
+
     /**
      * Import order export marketplace ke tabel order marketplace yang sudah ada.
      *
@@ -29,6 +38,10 @@ class MarketplaceCrmImportService
         $fileHash = is_file($path) ? hash_file('sha256', $path) : null;
         $batchId = (string) Str::uuid();
         $normalized = $this->parse($path, $storeId, $sourceFile);
+
+        if (($normalized['source_channel'] ?? null) === 'tiktok' && ! $this->isTikTokStore($store)) {
+            throw new \InvalidArgumentException('File ekspor TikTok harus diimpor ke toko dengan channel TikTok.');
+        }
 
         $stats = [
             'batch_id' => $batchId,
@@ -215,9 +228,11 @@ class MarketplaceCrmImportService
         // dengan pemisah koma. Nilai export tetap bisa dibaca dari cache file.
         $rows = $sheet->toArray(null, false, true, true);
         $headers = $this->headerMap($rows[1] ?? []);
-        if (! isset($headers['no. pesanan'])) {
-            throw new \InvalidArgumentException('Header "No. Pesanan" tidak ditemukan pada file marketplace.');
+        if (! isset($headers['no. pesanan']) && ! isset($headers['order id'])) {
+            throw new \InvalidArgumentException('Header "No. Pesanan" atau "Order ID" tidak ditemukan pada file marketplace.');
         }
+        $isTikTokExport = isset($headers['order id'])
+            && (isset($headers['seller sku']) || isset($headers['product name']));
 
         $orders = [];
         $rowCount = 0;
@@ -229,7 +244,13 @@ class MarketplaceCrmImportService
                 continue;
             }
 
-            $orderId = $this->text($this->value($row, $headers, ['no. pesanan', 'no pesanan', 'order id']));
+            $orderIdValue = $this->value($row, $headers, ['no. pesanan', 'no pesanan', 'order id']);
+            if ($isTikTokExport && $index === 2
+                && str_contains(mb_strtolower($this->text($orderIdValue)), 'platform unique order id')) {
+                continue;
+            }
+
+            $orderId = $this->cleanIncomingText($orderIdValue);
             if ($orderId === '') {
                 continue;
             }
@@ -249,40 +270,48 @@ class MarketplaceCrmImportService
                     'shipping_city' => null,
                     'shipping_province' => null,
                     'payment_method' => null,
+                    'purchase_channel' => null,
+                    'order_channel' => null,
                     'ordered_at' => null,
                     'paid_at' => null,
                     'completed_at' => null,
                     'shipping_fee' => 0,
                     'total_paid' => 0,
+                    'promotion_breakdown' => [],
                     'items' => [],
                 ];
             }
 
             $order = &$orders[$orderId];
-            $statusOriginal = $this->cleanIncomingText($this->value($row, $headers, ['status pesanan']));
+            $statusOriginal = $this->cleanIncomingText($this->value($row, $headers, ['status pesanan', 'order status']));
             $order['status_original'] = $order['status_original'] ?: $statusOriginal;
             if ($statusOriginal !== '') {
                 $order['status'] = $this->normalizeStatus($statusOriginal);
             }
-            $order['tracking_no'] = $this->firstValue($order['tracking_no'], $this->text($this->value($row, $headers, ['no. resi', 'no resi', 'resi'])));
-            $order['shipping_service'] = $this->firstValue($order['shipping_service'], $this->text($this->value($row, $headers, ['opsi pengiriman'])));
-            $order['buyer_username'] = $this->firstValue($order['buyer_username'], $this->text($this->value($row, $headers, ['username (pembeli)', 'username pembeli'])));
-            $order['buyer_name'] = $this->firstValue($order['buyer_name'], $this->text($this->value($row, $headers, ['nama penerima', 'nama pembeli'])));
-            $order['buyer_phone'] = $this->firstValue($order['buyer_phone'], $this->text($this->value($row, $headers, ['no. telepon', 'no telepon', 'nomor telepon'])));
-            $order['shipping_address'] = $this->firstValue($order['shipping_address'], $this->text($this->value($row, $headers, ['alamat pengiriman'])));
-            $order['shipping_city'] = $this->firstValue($order['shipping_city'], $this->text($this->value($row, $headers, ['kota/kabupaten', 'kota'])));
-            $order['shipping_province'] = $this->firstValue($order['shipping_province'], $this->text($this->value($row, $headers, ['provinsi'])));
+            $order['tracking_no'] = $this->firstValue($order['tracking_no'], $this->text($this->value($row, $headers, ['no. resi', 'no resi', 'resi', 'tracking id', 'tracking number'])));
+            $order['shipping_service'] = $this->firstValue($order['shipping_service'], $this->text($this->value($row, $headers, ['opsi pengiriman', 'shipping provider name', 'delivery option'])));
+            $order['buyer_username'] = $this->firstValue($order['buyer_username'], $this->text($this->value($row, $headers, ['username (pembeli)', 'username pembeli', 'buyer username'])));
+            $order['buyer_name'] = $this->firstValue($order['buyer_name'], $this->text($this->value($row, $headers, ['nama penerima', 'nama pembeli', 'recipient'])));
+            $order['buyer_phone'] = $this->firstValue($order['buyer_phone'], $this->cleanIncomingText($this->value($row, $headers, ['no. telepon', 'no telepon', 'nomor telepon', 'phone #', 'phone'])));
+            $address = $this->cleanIncomingText($this->value($row, $headers, ['alamat pengiriman', 'detail address']));
+            $additionalAddress = $this->cleanIncomingText($this->value($row, $headers, ['additional address information']));
+            $combinedAddress = trim(implode(' ', array_filter([$address, $additionalAddress])));
+            $order['shipping_address'] = $this->firstValue($order['shipping_address'], $combinedAddress);
+            $order['shipping_city'] = $this->firstValue($order['shipping_city'], $this->text($this->value($row, $headers, ['kota/kabupaten', 'kota', 'regency and city'])));
+            $order['shipping_province'] = $this->firstValue($order['shipping_province'], $this->text($this->value($row, $headers, ['provinsi', 'province'])));
             $order['payment_method'] = $this->firstValue($order['payment_method'], $this->text($this->value($row, $headers, [
                 'metode pembayaran pembeli',
                 'metode pembayaran',
                 'payment method',
             ])));
-            $order['ordered_at'] = $order['ordered_at'] ?: $this->date($this->value($row, $headers, ['waktu pesanan dibuat']));
-            $order['paid_at'] = $order['paid_at'] ?: $this->date($this->value($row, $headers, ['waktu pembayaran dilakukan']));
-            $order['completed_at'] = $order['completed_at'] ?: $this->date($this->value($row, $headers, ['waktu pesanan selesai']));
+            $order['purchase_channel'] = $this->firstValue($order['purchase_channel'], $this->text($this->value($row, $headers, ['purchase channel'])));
+            $order['order_channel'] = $this->firstValue($order['order_channel'], $this->text($this->value($row, $headers, ['order channel'])));
+            $order['ordered_at'] = $order['ordered_at'] ?: $this->date($this->value($row, $headers, ['waktu pesanan dibuat', 'created time', 'order created time']));
+            $order['paid_at'] = $order['paid_at'] ?: $this->date($this->value($row, $headers, ['waktu pembayaran dilakukan', 'paid time', 'payment time']));
+            $order['completed_at'] = $order['completed_at'] ?: $this->date($this->value($row, $headers, ['waktu pesanan selesai', 'completed time', 'delivered time']));
 
-            $shippingFee = $this->money($this->value($row, $headers, ['ongkos kirim dibayar oleh pembeli']));
-            $totalPaid = $this->money($this->value($row, $headers, ['total pembayaran']));
+            $shippingFee = $this->money($this->value($row, $headers, ['ongkos kirim dibayar oleh pembeli', 'shipping fee after discount', 'shipping fee']));
+            $totalPaid = $this->money($this->value($row, $headers, ['total pembayaran', 'order amount', 'grand total', 'total amount']));
             if ($shippingFee > 0) {
                 $order['shipping_fee'] = $shippingFee;
             }
@@ -290,20 +319,76 @@ class MarketplaceCrmImportService
                 $order['total_paid'] = $totalPaid;
             }
 
+            $promotion = $this->promotionNormalizer->normalizeTiktokFileRow([
+                'sku_platform_discount' => $this->money($this->value($row, $headers, ['sku platform discount'])),
+                'sku_seller_discount' => $this->money($this->value($row, $headers, ['sku seller discount'])),
+                'bundle_deal_discount' => $this->money($this->value($row, $headers, [
+                    'bundle deal discount',
+                    'bundle discount',
+                    'bundle discount amount',
+                ])),
+                'voucher_from_tiktok' => $this->money($this->value($row, $headers, [
+                    'voucher from tiktok',
+                    'voucher from platform',
+                    'platform voucher',
+                ])),
+                'voucher_from_seller' => $this->money($this->value($row, $headers, [
+                    'voucher from seller',
+                    'seller voucher',
+                    'seller voucher rebate',
+                ])),
+                'shipping_fee_platform_discount' => $this->money($this->value($row, $headers, ['shipping fee platform discount'])),
+                'shipping_fee_seller_discount' => $this->money($this->value($row, $headers, ['shipping fee seller discount'])),
+                'payment_platform_discount' => $this->money($this->value($row, $headers, ['payment platform discount'])),
+                'original_shipping_fee' => $this->money($this->value($row, $headers, ['original shipping fee'])),
+                'shipping_fee_after_discount' => $shippingFee,
+                'order_refund_amount' => $this->money($this->value($row, $headers, ['order refund amount', 'refund amount'])),
+                'buyer_service_fee' => $this->money($this->value($row, $headers, ['buyer service fee'])),
+                'handling_fee' => $this->money($this->value($row, $headers, ['handling fee'])),
+                'shipping_insurance' => $this->money($this->value($row, $headers, ['shipping insurance'])),
+                'item_insurance' => $this->money($this->value($row, $headers, ['item insurance'])),
+            ]);
+            if ($order['promotion_breakdown'] === []) {
+                $order['promotion_breakdown'] = $promotion['order'];
+            } else {
+                foreach (['platform_discount', 'seller_discount', 'product_discount', 'bundle_deal_discount'] as $field) {
+                    $order['promotion_breakdown'][$field] = (float) ($order['promotion_breakdown'][$field] ?? 0)
+                        + (float) ($promotion['line'][$field] ?? 0);
+                }
+            }
+
+            $quantity = (int) round($this->number($this->value($row, $headers, ['jumlah', 'qty', 'quantity'])));
+            $originalPrice = $this->money($this->value($row, $headers, ['harga awal', 'sku unit original price', 'unit price']));
+            $subtotalRaw = $this->value($row, $headers, [
+                'total harga produk',
+                'subtotal pesanan',
+                'subtotal',
+                'sku subtotal after discount',
+            ]);
+            $subtotal = $this->money($subtotalRaw);
+            $price = $this->money($this->value($row, $headers, ['harga setelah diskon', 'harga']));
+            if ($isTikTokExport) {
+                $price = $subtotal > 0 && $quantity > 0
+                    ? (int) round($subtotal / $quantity)
+                    : $originalPrice;
+            }
+            $lineDiscount = max(0, ($originalPrice - $price) * $quantity);
+            if ($isTikTokExport && $subtotalRaw !== null) {
+                $lineDiscount = max(0, ($originalPrice * $quantity) - $subtotal);
+            }
+
             $item = [
                 'sku' => $this->text($this->value($row, $headers, ['nomor referensi sku', 'seller sku', 'sku'])),
-                'parent_sku' => $this->text($this->value($row, $headers, ['sku induk'])),
-                'name' => $this->text($this->value($row, $headers, ['nama produk'])),
-                'variant' => $this->text($this->value($row, $headers, ['nama variasi', 'variasi'])),
-                'qty' => (int) round($this->number($this->value($row, $headers, ['jumlah', 'qty', 'quantity']))),
-                'returned_qty' => (int) round($this->number($this->value($row, $headers, ['returned quantity']))),
-                'original_price' => $this->money($this->value($row, $headers, ['harga awal'])),
-                'price' => $this->money($this->value($row, $headers, ['harga setelah diskon', 'harga'])),
-                'subtotal' => $this->money($this->value($row, $headers, [
-                    'total harga produk',
-                    'subtotal pesanan',
-                    'subtotal',
-                ])),
+                'parent_sku' => $this->text($this->value($row, $headers, ['sku induk', 'sku id'])),
+                'name' => $this->text($this->value($row, $headers, ['nama produk', 'product name'])),
+                'variant' => $this->text($this->value($row, $headers, ['nama variasi', 'variasi', 'variation', 'variant name'])),
+                'qty' => $quantity,
+                'returned_qty' => (int) round($this->number($this->value($row, $headers, ['returned quantity', 'sku quantity of return']))),
+                'original_price' => $originalPrice,
+                'price' => $price,
+                'subtotal' => $subtotal,
+                'line_discount' => $lineDiscount,
+                'promotion_breakdown' => $promotion['line'],
             ];
 
             if ($item['qty'] <= 0 && $item['name'] === '' && $item['sku'] === '') {
@@ -321,6 +406,7 @@ class MarketplaceCrmImportService
                 $order['items'][$lineKey]['qty'] += $item['qty'];
                 $order['items'][$lineKey]['returned_qty'] += $item['returned_qty'];
                 $order['items'][$lineKey]['subtotal'] += $item['subtotal'];
+                $order['items'][$lineKey]['line_discount'] += $item['line_discount'];
                 $collapsed++;
             } else {
                 $order['items'][$lineKey] = $item + ['line_key' => $lineKey];
@@ -347,7 +433,18 @@ class MarketplaceCrmImportService
             'items' => array_sum(array_map(fn ($o) => count($o['items']), $orders)),
             'collapsed_item_rows' => $collapsed,
             'warnings' => array_values(array_unique($warnings)),
+            'source_channel' => $isTikTokExport ? 'tiktok' : null,
         ];
+    }
+
+    private function isTikTokStore(Store $store): bool
+    {
+        $channel = mb_strtolower(trim(implode(' ', array_filter([
+            $store->channel?->code,
+            $store->channel?->name,
+        ]))));
+
+        return str_contains($channel, 'tiktok') || preg_match('/\bttk\b/', $channel) === 1;
     }
 
     private function orderPayload(array $data, ?Customer $customer, string $channel, string $sourceFile, ?string $fileHash, string $batchId): array
@@ -359,15 +456,19 @@ class MarketplaceCrmImportService
             'status' => $data['status'],
             'order_status' => $data['status_original'],
             'buyer_username' => $data['buyer_username'] ?: null,
-            'buyer_name' => $data['buyer_name'] ?: null,
-            'buyer_phone' => $this->normalizePhone($data['buyer_phone']),
-            'shipping_address' => $data['shipping_address'] ?: null,
-            'shipping_city' => $data['shipping_city'] ?: null,
-            'shipping_province' => $data['shipping_province'] ?: null,
+            'buyer_name' => $this->cleanIncomingText($data['buyer_name']) ?: null,
+            'buyer_phone' => $this->normalizePhone($this->cleanIncomingText($data['buyer_phone'])) ?: null,
+            'shipping_address' => $this->cleanIncomingText($data['shipping_address']) ?: null,
+            'shipping_city' => $this->cleanIncomingText($data['shipping_city']) ?: null,
+            'shipping_province' => $this->cleanIncomingText($data['shipping_province']) ?: null,
             'shipping_courier_code' => $data['shipping_service'] ?: null,
             'shipping_awb_no' => $data['tracking_no'] ?: null,
             'subtotal_items' => $subtotal,
-            'shipping_fee_customer' => $data['shipping_fee'],
+                'shipping_fee_customer' => $data['shipping_fee'],
+            'shipping_discount_platform' => (float) ($data['promotion_breakdown']['shipping_discount_platform'] ?? 0),
+            'voucher_discount' => (float) ($data['promotion_breakdown']['voucher_store'] ?? 0)
+                + (float) ($data['promotion_breakdown']['voucher_platform'] ?? 0),
+            'other_discount' => (float) ($data['promotion_breakdown']['other_discount'] ?? 0),
             'total_paid_customer' => $data['total_paid'],
             'total_amount' => $data['total_paid'],
             'currency' => 'IDR',
@@ -385,11 +486,14 @@ class MarketplaceCrmImportService
                 'source_file' => $sourceFile,
                 'file_hash' => $fileHash,
                 'import_batch_id' => $batchId,
+                'promotion_breakdown' => $data['promotion_breakdown'] ?? [],
             ],
             'meta' => [
                 'crm_source' => 'marketplace_import',
                 'shipping_service' => $data['shipping_service'],
                 'buyer_username' => $data['buyer_username'],
+                'purchase_channel' => $data['purchase_channel'],
+                'order_channel' => $data['order_channel'],
             ],
         ];
     }
@@ -413,7 +517,7 @@ class MarketplaceCrmImportService
             'price' => $item['price'],
             'price_original' => $item['original_price'],
             'price_after_discount' => $item['price'],
-            'line_discount' => max(0, ($item['original_price'] - $item['price']) * $item['qty']),
+            'line_discount' => $item['line_discount'] ?? max(0, ($item['original_price'] - $item['price']) * $item['qty']),
             'line_gross_amount' => $item['subtotal'],
             'line_net_amount' => $item['subtotal'],
             'raw_json' => ['source_file' => $sourceFile, 'line_key' => $item['line_key'], 'returned_qty' => $item['returned_qty']],
@@ -439,13 +543,14 @@ class MarketplaceCrmImportService
             'price' => $item['price'],
             'price_original' => $item['original_price'],
             'price_after_discount' => $item['price'],
-            'line_discount' => max(0, ($item['original_price'] - $item['price']) * $item['qty']),
+            'line_discount' => $item['line_discount'] ?? max(0, ($item['original_price'] - $item['price']) * $item['qty']),
             'line_gross_amount' => $item['subtotal'],
             'line_net_amount' => $item['subtotal'],
             'raw_json' => json_encode([
                 'source_file' => $sourceFile,
                 'line_key' => $item['line_key'],
                 'returned_qty' => $item['returned_qty'],
+                'promotion_breakdown' => $item['promotion_breakdown'] ?? null,
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'created_at' => $timestamp,
             'updated_at' => $timestamp,
@@ -809,7 +914,19 @@ class MarketplaceCrmImportService
             if (is_numeric($value) && (float) $value > 1) {
                 return Carbon::instance(ExcelDate::excelToDateTimeObject((float) $value))->toDateTimeString();
             }
-            return Carbon::parse((string) $value)->toDateTimeString();
+            $dateText = trim((string) $value);
+            foreach (['d/m/Y H:i:s', 'd/m/Y H:i', 'd/m/Y', 'Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d'] as $format) {
+                try {
+                    $parsed = Carbon::createFromFormat($format, $dateText);
+                    if ($parsed !== false) {
+                        return $parsed->toDateTimeString();
+                    }
+                } catch (\Throwable) {
+                    // Coba format tanggal berikutnya sebelum fallback parser umum.
+                }
+            }
+
+            return Carbon::parse($dateText)->toDateTimeString();
         } catch (\Throwable) {
             return null;
         }

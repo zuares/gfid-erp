@@ -2,10 +2,16 @@
 
 use App\Console\Commands\SendWeeklyCrmSummary;
 use App\Console\Commands\SeedProductionBoms;
+use App\Console\Commands\CreateServiceToken;
+use App\Console\Commands\RevokeServiceToken;
+use App\Http\Middleware\AuditMachineRequest;
+use App\Http\Middleware\EnsureServiceAbility;
 use App\Http\Middleware\EnsureMasterItemAccess;
 use App\Http\Middleware\EnsureModuleAccess;
 use App\Http\Middleware\RoleMiddleware;
 use App\Http\Middleware\TrackStorefrontVisitor;
+use App\Http\Middleware\ThrottleMachineInventoryRequests;
+use App\Http\Middleware\ThrottleMachineIpRequests;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -21,17 +27,31 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
+        $middleware->prependToPriorityList(
+            \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            ThrottleMachineIpRequests::class,
+        );
+        $middleware->prependToPriorityList(
+            ThrottleMachineIpRequests::class,
+            AuditMachineRequest::class,
+        );
         $middleware->alias([
             'access'           => EnsureModuleAccess::class,
             'master.items'     => EnsureMasterItemAccess::class,
             'role'             => RoleMiddleware::class,
             'track.storefront' => TrackStorefrontVisitor::class,
+            'service.ability'  => EnsureServiceAbility::class,
+            'machine.audit'    => AuditMachineRequest::class,
+            'machine.ip-limit' => ThrottleMachineIpRequests::class,
+            'machine.throttle' => ThrottleMachineInventoryRequests::class,
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);
     })
     ->withCommands([
         SeedProductionBoms::class,
         SendWeeklyCrmSummary::class,
+        CreateServiceToken::class,
+        RevokeServiceToken::class,
     ])
     ->withSchedule(function (Schedule $schedule) {
         // ✅ Ini yang bikin scheduler Laravel 12 aktif

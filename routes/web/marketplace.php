@@ -11,7 +11,6 @@ use App\Http\Controllers\Marketplace\MarketplaceProfitReportController;
 use App\Http\Controllers\Marketplace\MarketplaceFinancialStatementController;
 use App\Http\Controllers\Marketplace\MarketplaceFinancialClosingController;
 use App\Http\Controllers\Marketplace\MarketplaceFinanceController;
-use App\Http\Controllers\Marketplace\PrincipalSalesPerformanceController;
 use App\Http\Controllers\Marketplace\AmsPerformanceReportController;
 Route::middleware(['web', 'auth', 'access:marketplace'])
     ->prefix('marketplace')
@@ -43,9 +42,6 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
 
         Route::get('reports/sales', [MarketplaceOrderController::class, 'salesSummary'])
             ->name('reports.sales');
-
-        Route::get('reports/principal-sales-performance', [PrincipalSalesPerformanceController::class, 'index'])
-            ->name('reports.principal-sales-performance');
 
         Route::get('reports/ams-performance', [AmsPerformanceReportController::class, 'index'])
             ->name('reports.ams-performance');

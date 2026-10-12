@@ -124,7 +124,6 @@
 
     // Toko Online Laporan
     $hasMarketplaceSalesReport = !$isAdmin && $router->has('marketplace.reports.sales');
-    $hasMarketplacePrincipalSalesPerformance = $router->has('marketplace.reports.principal-sales-performance');
     $hasMarketplaceAmsPerformance = $router->has('marketplace.reports.ams-performance');
     $hasMarketplaceSalesExport = $router->has('marketplace.reports.sales.export');
     $hasMarketplaceProfitReport = $isOwner && $router->has('marketplace.reports.profit');
@@ -266,7 +265,6 @@
         $hasMarketplaceSalesDashboard = false;
         $hasMarketplaceIndex = $hasMarketplaceCreate = $hasMarketplaceShow = false;
         $hasMarketplaceSalesReport = $hasMarketplaceSalesExport = false;
-        $hasMarketplacePrincipalSalesPerformance = false;
         $hasMarketplaceAmsPerformance = false;
         $hasMarketplaceFinance = false;
         $hasMarketplaceReconcileQueue = $hasMarketplaceReconcileQueueBulk = false;
@@ -1211,7 +1209,7 @@
                             </div>
                         @endif
 
-                        @if ($hasMarketplaceSalesReport || $hasMarketplacePrincipalSalesPerformance || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
+                        @if ($hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
                             <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceFinanceGroup ? 'is-open' : '' }}" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminFinance"
                                 aria-expanded="{{ $openMarketplaceFinanceGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminFinance">
@@ -1230,12 +1228,6 @@
                                     <x-sidebar.sub-link href="{{ route('marketplace.reports.sales') }}" icon="bi bi-graph-up"
                                         :active="request()->routeIs('marketplace.reports.sales')">
                                         Laporan Penjualan
-                                    </x-sidebar.sub-link>
-                                @endif
-                                @if ($hasMarketplacePrincipalSalesPerformance)
-                                    <x-sidebar.sub-link href="{{ route('marketplace.reports.principal-sales-performance') }}" icon="bi bi-globe2"
-                                        :active="request()->routeIs('marketplace.reports.principal-sales-performance')">
-                                        Performa Principal Shopee
                                     </x-sidebar.sub-link>
                                 @endif
                                 @if ($hasMarketplaceAmsPerformance)
@@ -1833,7 +1825,6 @@
                 $hasMarketplaceProfit,
                 $hasMarketplaceFinance,
                 $hasMarketplaceSalesReport,
-                $hasMarketplacePrincipalSalesPerformance,
                 $hasMarketplaceAmsPerformance,
                 $hasMarketplaceProfitReport,
                 $hasMarketplaceFinancialStatement,
@@ -1983,7 +1974,7 @@
                             </div>
                         @endif
 
-                        @if ($hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialClosing || $hasMarketplaceSalesReport || $hasMarketplacePrincipalSalesPerformance || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceFinance)
+                        @if ($hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialClosing || $hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceFinance)
                             <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceFinanceGroup ? 'is-open' : '' }}" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerFinance"
                                 aria-expanded="{{ $openMarketplaceFinanceGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerFinance">
@@ -2053,12 +2044,6 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.reports.sales') }}" icon="bi bi-bar-chart-line"
                                 :active="request()->routeIs('marketplace.reports.sales')">
                                 Laporan Penjualan
-                            </x-sidebar.sub-link>
-                        @endif
-                        @if ($hasMarketplacePrincipalSalesPerformance)
-                            <x-sidebar.sub-link href="{{ route('marketplace.reports.principal-sales-performance') }}" icon="bi bi-globe2"
-                                :active="request()->routeIs('marketplace.reports.principal-sales-performance')">
-                                Performa Principal Shopee
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceAmsPerformance)

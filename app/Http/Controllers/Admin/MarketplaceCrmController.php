@@ -1209,6 +1209,10 @@ class MarketplaceCrmController extends Controller
             return 'formula pada file tidak kompatibel, silakan simpan ulang sebagai nilai biasa';
         }
 
+        if (str_contains($message, 'file ekspor tiktok harus diimpor')) {
+            return 'pilih toko dengan channel TikTok untuk file ini';
+        }
+
         return 'terjadi kesalahan';
     }
 

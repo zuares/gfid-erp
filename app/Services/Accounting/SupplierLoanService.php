@@ -58,6 +58,9 @@ class SupplierLoanService
             if ($locked->repayments()->where('status', 'posted')->exists()) {
                 throw ValidationException::withMessages(['status' => 'Dana supplier yang sudah memiliki pengembalian POSTED tidak boleh di-VOID.']);
             }
+            if ($locked->postedAllocations()->exists()) {
+                throw ValidationException::withMessages(['status' => 'Dana supplier yang sudah dialokasikan ke PO tidak boleh di-VOID. VOID alokasi PO terlebih dahulu.']);
+            }
 
             $this->journals->void($locked->journal, $reason);
             $locked->update([
@@ -94,7 +97,8 @@ class SupplierLoanService
             }
 
             $paid = (float) $locked->supplierLoan->repayments()->where('status', 'posted')->sum('amount');
-            $remaining = (float) $locked->supplierLoan->principal_amount - $paid;
+            $allocated = (float) $locked->supplierLoan->postedAllocations()->sum('amount');
+            $remaining = (float) $locked->supplierLoan->principal_amount - $paid - $allocated;
             if ($amount > $remaining + 0.01) {
                 throw ValidationException::withMessages(['amount' => 'Pengembalian melebihi sisa piutang supplier.']);
             }

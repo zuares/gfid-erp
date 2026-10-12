@@ -332,6 +332,108 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertJsonPath('message', 'Nomor order belum diisi.');
     }
 
+    public function test_order_first_rejects_item_scanned_as_order(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-ORDER-FIRST-GUARD-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.scan_order_store', $shipment), [
+                'order_no' => $item->code,
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('type', 'item_scan_guard')
+            ->assertJsonPath('message', "Kode {$item->code} terdeteksi sebagai item. Scan nomor order, bukan barcode item.");
+
+        $this->assertDatabaseMissing('shipment_order_scans', [
+            'shipment_id' => $shipment->id,
+            'order_no' => $item->code,
+        ]);
+    }
+
+    public function test_unknown_item_is_rejected_before_creating_daily_wave(): void
+    {
+        [$user, $store] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-UNKNOWN-ITEM-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'dispatch_mode' => Shipment::DISPATCH_DAILY,
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.scan_item', $shipment), [
+                'scan_code' => 'ITEM-NOT-IN-MASTER-001',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Item dengan kode/barcode ITEM-NOT-IN-MASTER-001 tidak ditemukan atau bukan finished_good.');
+
+        $this->assertDatabaseCount('shipment_waves', 0);
+    }
+
+    public function test_owner_can_delete_order_and_its_scanned_items(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'AFF-DELETE-ORDER-001',
+            'shipment_type' => Shipment::TYPE_AFFILIATE,
+            'scan_mode' => 'order_first',
+            'dispatch_mode' => Shipment::DISPATCH_SINGLE,
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+
+        $orderNo = 'AFF-DELETE-REF-001';
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.scan_order_store', $shipment), [
+                'order_no' => $orderNo,
+            ])
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.scan_item', $shipment), [
+                'scan_code' => $item->code,
+                'order_no' => $orderNo,
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('shipment_order_scans', [
+            'shipment_id' => $shipment->id,
+            'order_no' => $orderNo,
+        ]);
+        $this->assertDatabaseHas('shipment_lines', [
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.delete_order_scan', $shipment), [
+                'order_no' => $orderNo,
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'ok');
+
+        $this->assertDatabaseMissing('shipment_order_scans', [
+            'shipment_id' => $shipment->id,
+            'order_no' => $orderNo,
+        ]);
+        $this->assertDatabaseMissing('shipment_lines', [
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+        ]);
+    }
+
     public function test_scanned_order_is_available_on_the_shipment_check_page(): void
     {
         [$user, $store, $item] = $this->shipmentContext();
@@ -531,6 +633,78 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'qty_scanned' => 1,
         ]);
         $this->assertSame(OrderFulfillment::STATUS_PENDING_REVIEW, $fulfillment->status);
+    }
+
+    public function test_affiliate_shipment_defaults_to_order_first(): void
+    {
+        [$user, $store] = $this->shipmentContext();
+
+        $response = $this->actingAs($user)
+            ->postJson(route('sales.shipments.store'), [
+                'shipment_type' => Shipment::TYPE_AFFILIATE,
+                'date' => now()->toDateString(),
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('shipment.scan_mode', 'order_first');
+        $this->assertStringStartsWith('AFF-', (string) $response->json('shipment.code'));
+
+        $this->assertDatabaseHas('shipments', [
+            'shipment_type' => Shipment::TYPE_AFFILIATE,
+            'scan_mode' => 'order_first',
+            'store_id' => null,
+        ]);
+    }
+
+    public function test_affiliate_scans_order_before_item_without_marketplace_linking(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'AFF-ORDER-FIRST-001',
+            'shipment_type' => Shipment::TYPE_AFFILIATE,
+            'scan_mode' => 'order_first',
+            'dispatch_mode' => Shipment::DISPATCH_SINGLE,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+
+        $orderNo = 'AFF-REF-001';
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.scan_order_store', $shipment), [
+                'order_no' => $orderNo,
+            ])
+            ->assertOk()
+            ->assertJsonPath('order.code', $orderNo)
+            ->assertJsonPath('order.linked_source', null);
+
+        $scanId = ShipmentOrderScan::where('shipment_id', $shipment->id)
+            ->where('order_no', $orderNo)
+            ->value('id');
+
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.scan_item', $shipment), [
+                'scan_code' => $item->code,
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Scan order afiliasi terlebih dahulu sebelum scan item.');
+
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.scan_item', $shipment), [
+                'scan_code' => $item->code,
+                'order_no' => $orderNo,
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('shipment_lines', [
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => $scanId,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+        ]);
+        $this->assertDatabaseHas('shipment_order_scans', [
+            'id' => $scanId,
+            'fulfillment_id' => null,
+        ]);
     }
 
     private function shipmentContext(): array

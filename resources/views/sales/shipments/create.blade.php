@@ -684,8 +684,8 @@ body[data-theme="dark"] .shp-topbar {
 
         <form id="setupForm" autocomplete="off">
             @csrf
-            <input type="hidden" name="shipment_type" id="shipmentTypeInput" value="manual">
-            <input type="hidden" name="scan_mode" id="scanModeInput" value="item_first">
+            <input type="hidden" name="shipment_type" id="shipmentTypeInput" value="{{ $initialShipmentType ?? 'manual' }}">
+            <input type="hidden" name="scan_mode" id="scanModeInput" value="{{ ($initialShipmentType ?? 'manual') === 'affiliate' ? 'order_first' : 'item_first' }}">
             {{-- hidden: diisi JS dari hasil lookup --}}
             <input type="hidden" name="store_id"         id="hiddenStoreId">
             <input type="hidden" name="sales_invoice_id" id="hiddenInvoiceId"
@@ -697,19 +697,23 @@ body[data-theme="dark"] .shp-topbar {
                     <div class="shp-mode-title">Marketplace</div>
                     <div class="shp-mode-sub">Wajib scan order/resi marketplace. Order yang tidak ditemukan akan ditolak.</div>
                 </button>
-                <button type="button" class="shp-mode-card type-btn active" data-shipment-type="manual" role="radio" aria-checked="true">
+                <button type="button" class="shp-mode-card type-btn {{ ($initialShipmentType ?? 'manual') === 'manual' ? 'active' : '' }}" data-shipment-type="manual" role="radio" aria-checked="{{ ($initialShipmentType ?? 'manual') === 'manual' ? 'true' : 'false' }}">
                     <div class="shp-mode-title">Manual / B2B</div>
                     <div class="shp-mode-sub">Untuk pengiriman manual, B2B, atau invoice internal.</div>
+                </button>
+                <button type="button" class="shp-mode-card type-btn {{ ($initialShipmentType ?? 'manual') === 'affiliate' ? 'active' : '' }}" data-shipment-type="affiliate" role="radio" aria-checked="{{ ($initialShipmentType ?? 'manual') === 'affiliate' ? 'true' : 'false' }}">
+                    <div class="shp-mode-title">Paket Afiliasi</div>
+                    <div class="shp-mode-sub">Scan order/referensi afiliasi terlebih dahulu, lalu scan item paket.</div>
                 </button>
             </div>
 
             <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;margin-bottom:.4rem;font-weight:700;">Mode Scanner</div>
             <div class="shp-mode-grid" role="radiogroup" aria-label="Mode Scan Shipment">
-                <button type="button" class="shp-mode-card active" data-scan-mode="item_first" role="radio" aria-checked="true">
+                <button type="button" class="shp-mode-card {{ ($initialShipmentType ?? 'manual') !== 'affiliate' ? 'active' : '' }}" data-scan-mode="item_first" role="radio" aria-checked="{{ ($initialShipmentType ?? 'manual') !== 'affiliate' ? 'true' : 'false' }}">
                     <div class="shp-mode-title">Scan Barang Dulu</div>
                     <div class="shp-mode-sub">Flow sekarang: buat draft lalu scan item.</div>
                 </button>
-                <button type="button" class="shp-mode-card" data-scan-mode="order_first" role="radio" aria-checked="false" @if(auth()->user()->role === 'admin') disabled style="opacity: 0.5; cursor: not-allowed;" title="Dinonaktifkan sementara untuk Admin" @endif>
+                <button type="button" class="shp-mode-card {{ ($initialShipmentType ?? 'manual') === 'affiliate' ? 'active' : '' }}" data-scan-mode="order_first" role="radio" aria-checked="{{ ($initialShipmentType ?? 'manual') === 'affiliate' ? 'true' : 'false' }}" @if(auth()->user()->role === 'admin') disabled style="opacity: 0.5; cursor: not-allowed;" title="Dinonaktifkan sementara untuk Admin" @endif>
                     <div class="shp-mode-title">Scan Order Dulu</div>
                     <div class="shp-mode-sub">Scanner seperti retur: order aktif lalu item.</div>
                 </button>
@@ -939,6 +943,7 @@ body[data-theme="dark"] .shp-topbar {
 
     const CSRF = (document.querySelector('meta[name="csrf-token"]') || {}).content
               || @json(csrf_token());
+    const canDeleteRows = @json(auth()->user()?->role === 'owner');
 
     let _ship = null; // shipment JSON from server after create
     window.GFID?.bindScanSoundToggle(document.getElementById('gfidScanSoundToggle'));
@@ -1128,7 +1133,7 @@ body[data-theme="dark"] .shp-topbar {
     document.querySelectorAll('[data-scan-mode]').forEach((btn) => {
         btn.addEventListener('click', () => setSetupMode(btn.dataset.scanMode));
     });
-    setSetupMode('item_first');
+    setSetupMode(@json(($initialShipmentType ?? 'manual') === 'affiliate' ? 'order_first' : 'item_first'));
 
     function setOrderScannerMode(mode) {
         orderScanner.mode = mode === 'item' ? 'item' : 'order';
@@ -1498,7 +1503,7 @@ body[data-theme="dark"] .shp-topbar {
             this.setAttribute('aria-checked', 'true');
 
             // Default UX rule
-            if (type === 'marketplace') {
+            if (type === 'marketplace' || type === 'affiliate') {
                 selectScanMode('order_first');
             } else {
                 selectScanMode('item_first');
@@ -1679,9 +1684,11 @@ body[data-theme="dark"] .shp-topbar {
                         '<button type="button" class="btn btn-primary btn-sm qty-save" style="border-radius:999px;padding-inline:.5rem;font-size:.72rem;line-height:1.4">OK</button>' +
                     '</div>' +
                 '</td>' +
-                '<td class="text-end">' +
-                    '<button class="btn btn-sm btn-outline-danger del-btn" data-del-url="' + delUrl + '" title="Hapus baris">Hapus</button>' +
-                '</td>';
+                (canDeleteRows
+                    ? '<td class="text-end">' +
+                        '<button class="btn btn-sm btn-outline-danger del-btn" data-del-url="' + delUrl + '" title="Hapus baris">Hapus</button>' +
+                    '</td>'
+                    : '<td></td>');
 
             tbody.appendChild(row);
             bindRow(row);

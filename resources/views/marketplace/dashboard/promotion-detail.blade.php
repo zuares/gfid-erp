@@ -125,6 +125,7 @@
     $fmt = fn ($value) => 'Rp '.number_format((float) $value, 0, ',', '.');
     $dateLabel = $selectedDate->translatedFormat('d M Y');
     $dashboardQuery = ['date_from' => $selectedDate->toDateString(), 'date_to' => $selectedDate->toDateString()];
+    if (!empty($filters['platform'])) $dashboardQuery['platform'] = $filters['platform'];
     if ($filters['store_id']) $dashboardQuery['store_id'] = $filters['store_id'];
     if (!empty($filters['dummy'])) $dashboardQuery['dummy'] = 1;
 @endphp
@@ -158,6 +159,9 @@
                 </div>
                 @if (!empty($filters['dummy']))
                     <input type="hidden" name="dummy" value="1">
+                @endif
+                @if (!empty($filters['platform']))
+                    <input type="hidden" name="platform" value="{{ $filters['platform'] }}">
                 @endif
                 @if ($stores->isNotEmpty())
                     <div class="col-12 col-md-3">

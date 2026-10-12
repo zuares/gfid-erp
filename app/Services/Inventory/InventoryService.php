@@ -6,6 +6,7 @@ use App\Models\InventoryMutation;
 use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\ItemCostSnapshot;
+use App\Models\Warehouse;
 use App\Services\Inventory\LotCostService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -16,6 +17,43 @@ class InventoryService
     public function __construct(
         protected LotCostService $lotCost, // service moving average per LOT
     ) {}
+
+    /**
+     * Resolve stock by public SKU and optional active warehouse code, then
+     * delegate all position calculations to the existing read-only query.
+     *
+     * @return array{sku:string,warehouses:array,total:array}
+     *
+     * @throws StockPositionNotFoundException
+     */
+    public function getStockPositionForSku(string $sku, ?string $warehouseCode = null): array
+    {
+        $item = Item::query()
+            ->whereRaw('UPPER(code) = ?', [strtoupper($sku)])
+            ->first();
+
+        if (! $item) {
+            throw new StockPositionNotFoundException('sku');
+        }
+
+        $warehouse = null;
+
+        if ($warehouseCode !== null) {
+            $warehouse = Warehouse::query()
+                ->whereRaw('UPPER(code) = ?', [strtoupper($warehouseCode)])
+                ->where('active', true)
+                ->first();
+
+            if (! $warehouse) {
+                throw new StockPositionNotFoundException('warehouse');
+            }
+        }
+
+        return [
+            'sku' => (string) $item->code,
+            ...$this->getStockPosition((int) $item->id, $warehouse),
+        ];
+    }
 
     /**
      * Tambah stok (IN) ke suatu gudang/item.
@@ -775,6 +813,68 @@ class InventoryService
                 'available' => $available,
             ];
         })->values()->all();
+    }
+
+    /**
+     * Return the quantity position for an item, optionally scoped to one
+     * active warehouse. Availability is clamped per warehouse so stock in a
+     * different warehouse cannot offset an over-allocation here.
+     *
+     * @return array{
+     *   warehouses: array<int, array{warehouse_id:int,warehouse:string,on_hand:float,allocated:float,available:float}>,
+     *   total: array{on_hand:float,allocated:float,available:float}
+     * }
+     */
+    public function getStockPosition(int $itemId, ?Warehouse $warehouse = null): array
+    {
+        $rows = DB::table('inventory_stocks as s')
+            ->join('warehouses as w', 'w.id', '=', 's.warehouse_id')
+            ->where('s.item_id', $itemId)
+            ->where('w.active', 1)
+            ->when($warehouse, fn ($query) => $query->where('w.id', $warehouse->id))
+            ->groupBy('w.id', 'w.code')
+            ->orderBy('w.code')
+            ->selectRaw('
+                w.id as warehouse_id,
+                w.code as warehouse,
+                COALESCE(SUM(s.qty), 0) as on_hand,
+                COALESCE(SUM(s.allocated_qty), 0) as allocated
+            ')
+            ->get();
+
+        // A valid warehouse with no stock row still has a useful zero position.
+        if ($warehouse && $rows->isEmpty()) {
+            $rows = collect([(object) [
+                'warehouse_id' => $warehouse->id,
+                'warehouse' => $warehouse->code,
+                'on_hand' => 0,
+                'allocated' => 0,
+            ]]);
+        }
+
+        $positions = $rows->map(function ($row): array {
+            $onHand = (float) $row->on_hand;
+            $allocated = (float) $row->allocated;
+
+            return [
+                'warehouse_id' => (int) $row->warehouse_id,
+                'warehouse' => (string) $row->warehouse,
+                'on_hand' => $onHand,
+                'allocated' => $allocated,
+                'available' => max($onHand - $allocated, 0),
+            ];
+        })->values();
+
+        return [
+            'warehouses' => $positions->all(),
+            'total' => [
+                'on_hand' => (float) $positions->sum('on_hand'),
+                'allocated' => (float) $positions->sum('allocated'),
+                // Sum per-warehouse availability: quantities in separate
+                // warehouses are not fungible for ready-stock purposes.
+                'available' => (float) $positions->sum('available'),
+            ],
+        ];
     }
 
     /**

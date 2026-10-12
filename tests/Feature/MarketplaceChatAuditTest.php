@@ -264,6 +264,11 @@ class MarketplaceChatAuditTest extends TestCase
 
     public function test_webhook_log_detail_endpoint_returns_specific_log(): void
     {
+        $this->actingAs(User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'WEBHOOK-OWNER',
+        ]));
+
         $store = $this->createShopeeStore();
         $conversation = MarketplaceConversation::create([
             'store_id' => $store->id,

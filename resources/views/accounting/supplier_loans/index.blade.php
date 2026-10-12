@@ -38,7 +38,7 @@
         .sl-control:focus { border-color: #64748b; box-shadow: 0 0 0 .2rem rgba(15, 23, 42, .07); }
         .sl-filter-actions { display: flex; gap: .45rem; }
         .sl-table-wrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 14px; }
-        .sl-table { min-width: 760px; margin: 0; }
+        .sl-table { min-width: 860px; margin: 0; }
         .sl-table th { color: #64748b; background: #f8fafc; font-size: .68rem; text-transform: uppercase; letter-spacing: .045em; white-space: nowrap; }
         .sl-table td { vertical-align: middle; }
         .sl-table tbody tr:hover { background: #f8fafc; }
@@ -58,7 +58,7 @@
         .sl-mobile-name { min-width: 0; color: #0f172a; font-weight: 900; }
         .sl-mobile-code, .sl-mobile-foot { color: #64748b; font-size: .73rem; }
         .sl-mobile-code { margin-top: .12rem; }
-        .sl-mobile-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; margin: .85rem 0; padding: .7rem 0; border-top: 1px solid #eef2f7; border-bottom: 1px solid #eef2f7; }
+        .sl-mobile-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .55rem; margin: .85rem 0; padding: .7rem 0; border-top: 1px solid #eef2f7; border-bottom: 1px solid #eef2f7; }
         .sl-mobile-metric-label { display: block; color: #94a3b8; font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
         .sl-mobile-metric-value { display: block; margin-top: .2rem; color: #0f172a; font-size: .8rem; font-weight: 900; }
         .sl-mobile-foot strong { color: #2563eb; font-size: .74rem; }
@@ -118,13 +118,13 @@
             <x-gf.panel title="Daftar dana supplier" subtitle="Posting membentuk jurnal Dr Piutang Pinjaman Supplier — Cr Kas/Bank.">
                 <div class="sl-table-wrap">
                     <table class="table sl-table align-middle">
-                        <thead><tr><th>Tanggal</th><th>Supplier</th><th>Referensi</th><th class="text-end">Dana</th><th class="text-end">Sisa</th><th>Status</th><th class="text-end">Aksi</th></tr></thead>
+                        <thead><tr><th>Tanggal</th><th>Supplier</th><th>Referensi</th><th class="text-end">Dana</th><th class="text-end">Alokasi PO</th><th class="text-end">Sisa</th><th>Status</th><th class="text-end">Aksi</th></tr></thead>
                         <tbody>
                             @forelse ($loans as $loan)
-                                @php $repaid = (float) ($loan->posted_repayment_amount ?? 0); $remaining = max(0, (float) $loan->principal_amount - $repaid); @endphp
-                                <tr><td>{{ optional($loan->date)->format('d/m/Y') }}</td><td><a class="sl-link" href="{{ route('accounting.supplier-loans.show', $loan) }}">{{ $loan->supplier?->name ?? '-' }}</a><div class="small text-muted">{{ $loan->supplier?->code }}</div></td><td>{{ $loan->reference ?: '—' }}</td><td class="text-end fw-semibold">Rp {{ $fmt($loan->principal_amount) }}</td><td class="text-end fw-semibold">Rp {{ $fmt($remaining) }}</td><td><span class="sl-status sl-status-{{ $loan->status }}">{{ $labels[$loan->status] ?? $loan->status }}</span></td><td class="text-end"><a class="sl-btn" href="{{ route('accounting.supplier-loans.show', $loan) }}">Detail <i class="bi bi-arrow-right" aria-hidden="true"></i></a></td></tr>
+                                @php $allocated = $loan->allocated_amount; $remaining = $loan->outstanding_amount; @endphp
+                                <tr><td>{{ optional($loan->date)->format('d/m/Y') }}</td><td><a class="sl-link" href="{{ route('accounting.supplier-loans.show', $loan) }}">{{ $loan->supplier?->name ?? '-' }}</a><div class="small text-muted">{{ $loan->supplier?->code }}</div></td><td>{{ $loan->reference ?: '—' }}</td><td class="text-end fw-semibold">Rp {{ $fmt($loan->principal_amount) }}</td><td class="text-end fw-semibold">Rp {{ $fmt($allocated) }}</td><td class="text-end fw-semibold">Rp {{ $fmt($remaining) }}</td><td><span class="sl-status sl-status-{{ $loan->status }}">{{ $labels[$loan->status] ?? $loan->status }}</span></td><td class="text-end"><a class="sl-btn" href="{{ route('accounting.supplier-loans.show', $loan) }}">Detail <i class="bi bi-arrow-right" aria-hidden="true"></i></a></td></tr>
                             @empty
-                                <tr><td colspan="7" class="text-center text-muted py-5"><i class="bi bi-inbox d-block fs-3 mb-2" aria-hidden="true"></i>Belum ada dana supplier.</td></tr>
+                                <tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-inbox d-block fs-3 mb-2" aria-hidden="true"></i>Belum ada dana supplier.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -132,8 +132,8 @@
 
                 <div class="sl-mobile-list">
                     @forelse ($loans as $loan)
-                        @php $repaid = (float) ($loan->posted_repayment_amount ?? 0); $remaining = max(0, (float) $loan->principal_amount - $repaid); @endphp
-                        <a class="sl-mobile-card" href="{{ route('accounting.supplier-loans.show', $loan) }}"><div class="sl-mobile-head"><div><div class="sl-mobile-name">{{ $loan->supplier?->name ?? '-' }}</div><div class="sl-mobile-code">{{ $loan->supplier?->code }} · {{ optional($loan->date)->format('d/m/Y') }}</div></div><span class="sl-status sl-status-{{ $loan->status }}">{{ $labels[$loan->status] ?? $loan->status }}</span></div><div class="sl-mobile-metrics"><div><span class="sl-mobile-metric-label">Dana</span><strong class="sl-mobile-metric-value">Rp {{ $fmt($loan->principal_amount) }}</strong></div><div><span class="sl-mobile-metric-label">Sisa</span><strong class="sl-mobile-metric-value">Rp {{ $fmt($remaining) }}</strong></div></div><div class="sl-mobile-foot"><span>{{ $loan->reference ?: 'Tanpa referensi' }}</span><strong>Lihat detail <i class="bi bi-arrow-right" aria-hidden="true"></i></strong></div></a>
+                        @php $allocated = $loan->allocated_amount; $remaining = $loan->outstanding_amount; @endphp
+                        <a class="sl-mobile-card" href="{{ route('accounting.supplier-loans.show', $loan) }}"><div class="sl-mobile-head"><div><div class="sl-mobile-name">{{ $loan->supplier?->name ?? '-' }}</div><div class="sl-mobile-code">{{ $loan->supplier?->code }} · {{ optional($loan->date)->format('d/m/Y') }}</div></div><span class="sl-status sl-status-{{ $loan->status }}">{{ $labels[$loan->status] ?? $loan->status }}</span></div><div class="sl-mobile-metrics"><div><span class="sl-mobile-metric-label">Dana</span><strong class="sl-mobile-metric-value">Rp {{ $fmt($loan->principal_amount) }}</strong></div><div><span class="sl-mobile-metric-label">Alokasi PO</span><strong class="sl-mobile-metric-value">Rp {{ $fmt($allocated) }}</strong></div><div><span class="sl-mobile-metric-label">Sisa</span><strong class="sl-mobile-metric-value">Rp {{ $fmt($remaining) }}</strong></div></div><div class="sl-mobile-foot"><span>{{ $loan->reference ?: 'Tanpa referensi' }}</span><strong>Lihat detail <i class="bi bi-arrow-right" aria-hidden="true"></i></strong></div></a>
                     @empty
                         <div class="text-center text-muted py-4"><i class="bi bi-inbox d-block fs-3 mb-2" aria-hidden="true"></i>Belum ada dana supplier.</div>
                     @endforelse

@@ -1434,6 +1434,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     $isItemFirst       = ($shipment->scan_mode ?? 'item_first') === 'item_first';
     $isOrderFirst      = !$isItemFirst;
     $isDaily            = ($shipment->dispatch_mode ?? 'single') === 'daily';
+    $canDeleteShipmentRows = auth()->user()?->role === 'owner';
     $currentWave        = $currentWave ?? null;
     $postedWaveCount    = (int) ($postedWaveCount ?? 0);
     $nextScanUrl       = route('sales.shipments.scan_order', $shipment);
@@ -1739,14 +1740,16 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                                 </form>
                             </td>
                             <td class="text-end">
-                                <form action="{{ route('sales.shipments.destroy_line', $line) }}"
-                                      method="POST"
-                                      class="d-inline js-delete-line-form"
-                                      data-line-id="{{ $line->id }}">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn-del" title="Hapus">x</button>
-                                </form>
+                                @if ($canDeleteShipmentRows)
+                                    <form action="{{ route('sales.shipments.destroy_line', $line) }}"
+                                          method="POST"
+                                          class="d-inline js-delete-line-form"
+                                          data-line-id="{{ $line->id }}">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn-del" title="Hapus">x</button>
+                                    </form>
+                                @endif
                             </td>
                         </tr>
                     @empty
@@ -1876,7 +1879,6 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     const scanCameraClose   = document.getElementById('scanCameraClose');
     const scanCameraReader  = document.getElementById('scanCameraReader');
     const scanCameraStatus  = document.getElementById('scanCameraStatus');
-    const scanLookupUrl     = @json(route('sales.shipments.scan_lookup', $shipment));
     const linesWrapper      = document.getElementById('linesWrapper');
     const linesTbody        = document.getElementById('linesTbody');
     const itemFilterInput   = document.getElementById('itemFilterInput');
@@ -1886,6 +1888,7 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
     const btnJumpLast       = document.getElementById('btnJumpLast');
     const rekonBtn          = document.getElementById('rekonBtn');
     const isItemFirst       = @json($isItemFirst);
+    const canDeleteRows     = @json($canDeleteShipmentRows);
     const toastEl           = document.getElementById('scanToast');
     const summaryLines      = document.getElementById('summaryTotalLines');
     const summaryQty        = document.getElementById('summaryTotalQty');
@@ -2123,14 +2126,6 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         scanErrorMsg.textContent = msg;
         scanErrorBox.style.display = 'flex';
         setTimeout(() => { scanErrorBox.style.display = 'none'; }, 3500);
-    }
-
-    function lookupScanCode(code) {
-        if (!scanLookupUrl || !code) return Promise.resolve(null);
-
-        return fetch(`${scanLookupUrl}?code=${encodeURIComponent(code)}`, {
-            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        }).then(res => res.ok ? res.json() : null).catch(() => null);
     }
 
     /* ── camera barcode scanner ── */
@@ -2818,17 +2813,6 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                 return;
             }
 
-            const lookup = await lookupScanCode(code);
-            if (lookup && lookup.type === 'order') {
-                scanInput.value = '';
-                beepErr();
-                const msg = 'Yang discan adalah nomor pesanan/resi, bukan kode item. Gunakan Scan Item.';
-                showScanError(msg);
-                showToast('err', msg);
-                focusScan();
-                return;
-            }
-
             fetch(scanForm.action, {
                 method: 'POST',
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
@@ -2885,13 +2869,15 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
                                     '<button type="submit" class="btn btn-secondary btn-sm qty-edit-save-btn">OK</button>' +
                                 '</form>' +
                             '</td>' +
-                            '<td class="text-end">' +
-                                '<form action="' + delUrl + '" method="POST" class="d-inline js-delete-line-form" data-line-id="' + line.id + '">' +
-                                    '<input type="hidden" name="_token" value="' + csrf + '">' +
-                                    '<input type="hidden" name="_method" value="DELETE">' +
-                                    '<button type="submit" class="btn-del" title="Hapus">x</button>' +
-                                '</form>' +
-                            '</td>';
+                            (canDeleteRows
+                                ? '<td class="text-end">' +
+                                    '<form action="' + delUrl + '" method="POST" class="d-inline js-delete-line-form" data-line-id="' + line.id + '">' +
+                                        '<input type="hidden" name="_token" value="' + csrf + '">' +
+                                        '<input type="hidden" name="_method" value="DELETE">' +
+                                        '<button type="submit" class="btn-del" title="Hapus">x</button>' +
+                                    '</form>' +
+                                '</td>'
+                                : '<td></td>');
                         linesTbody.appendChild(row);
                     }
 

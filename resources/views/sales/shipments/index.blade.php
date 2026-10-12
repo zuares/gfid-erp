@@ -531,6 +531,9 @@
             <a href="{{ route('sales.shipments.create') }}" class="btn btn-sm btn-ship-primary btn-pill">
                 <i class="bi bi-plus-lg" aria-hidden="true"></i> Shipment Baru
             </a>
+            <a href="{{ route('sales.shipments.create', ['type' => 'affiliate']) }}" class="btn btn-sm btn-ship-outline btn-pill">
+                <i class="bi bi-people" aria-hidden="true"></i> Kirim Paket Afiliasi
+            </a>
         </div>
     </div>
 
@@ -647,9 +650,17 @@
                                     // sudah tercatat tidak boleh mengubah label mode menjadi order_first.
                                     $isOrderFirst = ($shipment->scan_mode ?? 'item_first') === 'order_first';
                                     $modeLabel = $isOrderFirst ? 'Order dulu' : 'Item dulu';
+                                    $typeLabel = match ($shipment->shipment_type) {
+                                        'affiliate' => 'Afiliasi',
+                                        'marketplace' => 'Marketplace',
+                                        default => 'Manual',
+                                    };
                                     $stockBlocked = !empty($shipment->stock_insufficient_calc);
+                                    $draftActionRoute = $shipment->shipment_type === 'affiliate'
+                                        ? 'sales.shipments.scan_order'
+                                        : ($isOrderFirst ? 'sales.shipments.confirm_orders' : 'sales.shipments.edit');
                                     $actionRoute = $uiStatus === 'draft'
-                                        ? route($isOrderFirst ? 'sales.shipments.confirm_orders' : 'sales.shipments.edit', $shipment)
+                                        ? route($draftActionRoute, $shipment)
                                         : route('sales.shipments.show', $shipment);
                                     $actionLabel = $uiStatus === 'draft' ? 'Lanjut scan' : 'Lihat detail';
                                 @endphp
@@ -679,6 +690,7 @@
                                                 @if($shipment->store)
                                                     <span class="shipment-store">{{ $shipment->store->name ?: $shipment->store->code }}</span>
                                                 @endif
+                                                <span class="shipment-store">{{ $typeLabel }}</span>
 
                                                 <div class="ship-row-meta d-md-none">
                                                     <span>{{ $modeLabel }}</span>

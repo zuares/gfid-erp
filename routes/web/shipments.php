@@ -40,7 +40,9 @@ Route::middleware(['web', 'auth', 'access:sales'])
                 Route::post('{shipment}/clear-lines', 'clearLines')->name('clear_lines');
                 Route::get('{shipment}/scan-lookup', 'scanLookup')->name('scan_lookup');
                 Route::post('{shipment}/scan-order', 'scanOrder')->name('scan_order_store');
-                Route::post('{shipment}/order-scans/delete', 'deleteOrderScan')->name('delete_order_scan');
+                Route::post('{shipment}/order-scans/delete', 'deleteOrderScan')
+                    ->name('delete_order_scan')
+                    ->middleware('role:owner');
                 Route::post('{shipment}/scan-item', 'scanItem')->name('scan_item');
 
                 Route::post('{shipment}/submit', 'submit')->name('submit');
@@ -82,7 +84,8 @@ Route::middleware(['web', 'auth', 'access:sales'])
             ->name('shipments.update_line_qty');
 
         Route::delete('shipments/lines/{line}', [ShipmentController::class, 'destroyLine'])
-            ->name('shipments.destroy_line');
+            ->name('shipments.destroy_line')
+            ->middleware('role:owner');
 
         /**
      * =========================

@@ -12,6 +12,7 @@ class Shipment extends Model
 
     public const TYPE_MARKETPLACE = 'marketplace';
     public const TYPE_MANUAL = 'manual';
+    public const TYPE_AFFILIATE = 'affiliate';
     public const DISPATCH_SINGLE = 'single';
     public const DISPATCH_DAILY = 'daily';
 

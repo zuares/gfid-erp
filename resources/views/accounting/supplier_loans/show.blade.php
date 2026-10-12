@@ -5,7 +5,8 @@
 @php
     $fmt = fn ($n) => number_format((float) $n, 0, ',', '.');
     $repaid = (float) $supplierLoan->repayments->where('status', 'posted')->sum('amount');
-    $remaining = max(0, (float) $supplierLoan->principal_amount - $repaid);
+    $allocated = (float) $supplierLoan->allocated_amount;
+    $remaining = $supplierLoan->outstanding_amount;
     $labels = ['draft' => 'Draft', 'posted' => 'Posted', 'settled' => 'Lunas', 'void' => 'Void'];
 @endphp
 
@@ -30,6 +31,7 @@
                 <div class="sl-card"><div class="sl-label">Status</div><div class="sl-value"><span class="sl-status sl-status-{{ $supplierLoan->status }}">{{ $labels[$supplierLoan->status] ?? $supplierLoan->status }}</span></div></div>
                 <div class="sl-card"><div class="sl-label">Dana</div><div class="sl-value">Rp {{ $fmt($supplierLoan->principal_amount) }}</div></div>
                 <div class="sl-card"><div class="sl-label">Sudah Kembali</div><div class="sl-value">Rp {{ $fmt($repaid) }}</div></div>
+                <div class="sl-card"><div class="sl-label">Dialokasikan ke PO</div><div class="sl-value">Rp {{ $fmt($allocated) }}</div></div>
                 <div class="sl-card"><div class="sl-label">Sisa Piutang</div><div class="sl-value">Rp {{ $fmt($remaining) }}</div></div>
             </div>
 
@@ -43,6 +45,16 @@
                     @if($supplierLoan->notes)<tr><th>Catatan</th><td>{{ $supplierLoan->notes }}</td></tr>@endif
                 </tbody></table></div>
             </x-gf.panel>
+
+            @if($supplierLoan->postedAllocations->isNotEmpty())
+                <x-gf.panel title="Riwayat Alokasi ke PO" subtitle="Alokasi aktif mengurangi sisa piutang dana supplier.">
+                    <div class="table-responsive"><table class="table sl-table align-middle mb-0"><thead><tr><th>Tanggal</th><th>PO</th><th>Catatan</th><th class="text-end">Nominal</th></tr></thead><tbody>
+                        @foreach($supplierLoan->postedAllocations as $allocation)
+                            <tr><td>{{ optional($allocation->date)->format('d/m/Y') }}</td><td>@if($allocation->purchaseOrder)<a href="{{ route('purchasing.purchase_orders.show', $allocation->purchaseOrder) }}">{{ $allocation->purchaseOrder->code }}</a>@else—@endif</td><td>{{ $allocation->notes ?: 'Alokasi saldo pinjaman supplier ke PO' }}</td><td class="text-end fw-semibold">Rp {{ $fmt($allocation->amount) }}</td></tr>
+                        @endforeach
+                    </tbody></table></div>
+                </x-gf.panel>
+            @endif
 
             @if(in_array($supplierLoan->status, ['posted', 'settled'], true) && $remaining > 0.009)
                 <x-gf.panel title="Catat Pengembalian Supplier" subtitle="Jurnal: Debit Kas/Bank — Kredit Piutang Pinjaman Supplier.">

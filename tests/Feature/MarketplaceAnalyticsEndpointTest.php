@@ -24,6 +24,8 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
         $page = $this->actingAs($user)->get('/marketplace/analytics?date_from=2099-01-01&date_to=2099-01-31');
 
         $page->assertOk()->assertViewIs('marketplace.analytics')
+            ->assertSee('Filter toko')
+            ->assertDontSee('Executive command center untuk omzet, pencairan, biaya, dan profit.')
             ->assertSee('Pesanan')
             ->assertSee('Masih dikirim')
             ->assertSee('Dana belum cair')

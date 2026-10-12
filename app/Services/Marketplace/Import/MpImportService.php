@@ -95,6 +95,7 @@ class MpImportService
             &$stats
         ) {
             $packetSync = app(MpPacketItemSyncService::class);
+            $salesOrderSync = app(ImportedMarketplaceOrderSyncService::class);
 
             foreach ($normalized as $s) {
                 $items = $s['items'] ?? [];
@@ -220,6 +221,20 @@ class MpImportService
                         'raw_line' => $it['raw_line'] ?? null,
                     ]);
                     $stats['inserted_items']++;
+                }
+
+                // Sales dashboard membaca marketplace_orders, sedangkan
+                // import manual utamanya menyimpan mp_shipments. Sinkronkan
+                // snapshot import ke order tables tanpa menimpa order API.
+                $salesOrder = $salesOrderSync->sync(
+                    $mp,
+                    $s,
+                    $items,
+                    $batchId,
+                    $now->toDateTimeString(),
+                );
+                if (! empty($salesOrder['order_id']) && (int) $mp->marketplace_order_id !== (int) $salesOrder['order_id']) {
+                    $mp->forceFill(['marketplace_order_id' => (int) $salesOrder['order_id']])->save();
                 }
 
                 $stats['warnings'] = array_values(array_unique(array_merge(

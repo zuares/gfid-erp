@@ -203,6 +203,24 @@ class MarketplaceAnalyticsSummaryService
             'date_from' => $filters['date_from'],
             'date_to' => $filters['date_to'],
         ])['items'];
+
+        // The profit report intentionally contains only orders which are
+        // ready for final profit recognition. Analytics must still show the
+        // product portfolio when an order is valid but its HPP is incomplete;
+        // the UI can then label that row as "HPP belum lengkap" instead of
+        // making the whole product tab look empty.
+        $items = collect(array_merge($items, $this->operationalProductItems($filters)))
+            ->groupBy('item_key')
+            ->map(function ($rows): array {
+                $merged = $rows->first();
+                foreach (['qty', 'gross_sales', 'payout', 'hpp', 'ad_cost', 'ad_cost_settlement', 'gross_profit', 'operating_profit'] as $field) {
+                    $merged[$field] = (float) $rows->sum(fn (array $row) => (float) ($row[$field] ?? 0));
+                }
+
+                return $merged;
+            })
+            ->values()
+            ->all();
         $adsCost = (float) ($this->adsAggregate($filters)['ad_cost'] ?? 0);
         $totalGrossSales = (float) collect($items)->sum(fn (array $row) => (float) ($row['gross_sales'] ?? 0));
 
@@ -232,6 +250,90 @@ class MarketplaceAnalyticsSummaryService
                     'margin_pct' => $grossSales > 0 ? round(($operatingProfit / $grossSales) * 100, 2) : 0.0,
                 ];
             })->values()->all();
+    }
+
+    /**
+     * Return product rows from eligible orders which are not yet ready for
+     * final profit reporting. These rows intentionally carry zero HPP and
+     * payout when the source does not have those facts yet.
+     */
+    private function operationalProductItems(array $filters): array
+    {
+        $gross = 'COALESCE(NULLIF(ms.buyer_payment_amount, 0), NULLIF(mo.total_amount, 0), NULLIF(mo.total_paid_customer, 0), NULLIF(mo.subtotal_items, 0), 0)';
+
+        $query = DB::table('marketplace_order_items as oi')
+                ->join('marketplace_orders as mo', 'mo.id', '=', 'oi.marketplace_order_id')
+                ->leftJoin('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
+                ->whereNotNull('mo.ordered_at')
+                ->whereRaw($this->isRevenueStatus())
+                ->where(function ($query) {
+                    $query->whereNull('mo.financial_data_status')
+                        ->orWhere('mo.financial_data_status', '!=', MarketplaceFinancialDataQualityService::ORDER_READY);
+                })
+                ->where(function ($query) {
+                    $query->where('oi.data_status', 'valid')
+                        ->orWhereNull('oi.data_status');
+                })
+                ->select([
+                    'oi.id',
+                    'oi.marketplace_order_id as order_id',
+                    'oi.internal_item_id',
+                    'oi.item_name',
+                    'oi.item_name_snapshot',
+                    'oi.model_sku',
+                    'oi.item_sku',
+                    'oi.external_sku',
+                    'oi.qty',
+                    'oi.price',
+                    'oi.hpp_snapshot',
+                    'ms.final_income',
+                ])
+                ->selectRaw("{$gross} AS order_gross_sales");
+        $rows = $this->applyDateAndStoreFilters($query, $filters, 'mo')->get();
+
+        $productRows = [];
+        foreach ($rows->groupBy('order_id') as $orderRows) {
+            $lineSalesTotal = (float) $orderRows->sum(function ($row): float {
+                return max((float) ($row->price ?? 0), 0) * max((int) ($row->qty ?? 0), 0);
+            });
+            $rowCount = max($orderRows->count(), 1);
+            $orderGrossSales = (float) ($orderRows->first()->order_gross_sales ?? 0);
+            $orderPayout = (float) ($orderRows->first()->final_income ?? 0);
+
+            foreach ($orderRows as $row) {
+                $qty = max((int) ($row->qty ?? 0), 0);
+                $lineSales = max((float) ($row->price ?? 0), 0) * $qty;
+                $share = $lineSalesTotal > 0 ? $lineSales / $lineSalesTotal : 1 / $rowCount;
+                $key = (string) ($row->internal_item_id ?: $row->model_sku ?: $row->item_sku ?: $row->external_sku ?: $row->id);
+                $hpp = (float) ($row->hpp_snapshot ?? 0) * $qty;
+
+                $productRows[$key] ??= [
+                    'item_key' => $key,
+                    'item_name' => (string) ($row->item_name ?: $row->item_name_snapshot ?: '-'),
+                    'sku' => (string) ($row->model_sku ?: $row->item_sku ?: $row->external_sku ?: '-'),
+                    'qty' => 0,
+                    'gross_sales' => 0.0,
+                    'payout' => 0.0,
+                    'hpp' => 0.0,
+                    'ad_cost' => 0.0,
+                    'ad_cost_settlement' => 0.0,
+                    'gross_profit' => 0.0,
+                    'operating_profit' => 0.0,
+                    'margin_pct' => 0.0,
+                ];
+
+                $grossSales = $orderGrossSales * $share;
+                $payout = $orderPayout * $share;
+                $productRows[$key]['qty'] += $qty;
+                $productRows[$key]['gross_sales'] += $grossSales;
+                $productRows[$key]['payout'] += $payout;
+                $productRows[$key]['hpp'] += $hpp;
+                $productRows[$key]['gross_profit'] += $payout - $hpp;
+                $productRows[$key]['operating_profit'] += $payout - $hpp;
+            }
+        }
+
+        return array_values($productRows);
     }
 
     /**
@@ -1223,11 +1325,14 @@ class MarketplaceAnalyticsSummaryService
 
     private function cashBase(array $filters)
     {
+        $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
+
         return $this->applyDateAndStoreFilters(
             DB::table('marketplace_orders as mo')
                 ->join('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
                 ->whereNotNull('ms.settlement_time')
-                ->whereRaw($this->isRevenueStatus()),
+                ->whereRaw($this->isRevenueStatus())
+                ->whereRaw("{$status} <> 'TO_CONFIRM_RECEIVE'"),
             $filters,
             'mo'
         );
@@ -1251,11 +1356,16 @@ class MarketplaceAnalyticsSummaryService
 
     private function unsettledOrdersBase(array $filters)
     {
+        $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
+
         return $this->applyDateAndStoreFilters(
             DB::table('marketplace_orders as mo')
                 ->leftJoin('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
                 ->whereRaw($this->isRevenueStatus())
-                ->whereNull('ms.settlement_time'),
+                ->where(function ($query) use ($status) {
+                    $query->whereNull('ms.settlement_time')
+                        ->orWhereRaw("{$status} = 'TO_CONFIRM_RECEIVE'");
+                }),
             $filters,
             'mo'
         );

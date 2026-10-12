@@ -372,7 +372,7 @@
 
     .sr-order-head {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto auto;
+        grid-template-columns: minmax(0, 1fr) auto auto auto;
         align-items: center;
         gap: .5rem;
         padding: .55rem .7rem;
@@ -409,6 +409,27 @@
         font-weight: 800;
     }
 
+    .sr-delete-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        height: 28px;
+        padding: 0 .42rem;
+        border: 1px solid rgba(248, 113, 113, .35);
+        border-radius: 7px;
+        background: #fff1f2;
+        color: #be123c;
+        font-size: .78rem;
+        font-weight: 850;
+        cursor: pointer;
+    }
+
+    .sr-delete-btn:hover {
+        background: #ffe4e6;
+        border-color: rgba(225, 29, 72, .45);
+    }
+
     .sr-order-chevron {
         color: #94a3b8;
         font-size: .78rem;
@@ -425,7 +446,7 @@
 
     .sr-item-row {
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-columns: auto minmax(0, 1fr) auto auto;
         align-items: center;
         gap: .5rem;
         padding: .45rem .55rem;
@@ -684,13 +705,23 @@
             'qty' => (int) $line->qty_scanned,
         ])
         ->values();
+
+    $canDeleteShipmentRows = auth()->user()?->role === 'owner';
 @endphp
+
+    @php
+        $shipmentTypeLabel = match ($shipment->shipment_type ?? 'manual') {
+            'affiliate' => 'Paket Afiliasi',
+            'marketplace' => 'Marketplace',
+            default => 'Manual',
+        };
+    @endphp
 
 <div class="sr-scan-page">
     <div class="sr-topbar">
         <div class="sr-top-main">
             <h1 class="sr-title">{{ $shipment->code }}</h1>
-            <div class="sr-sub">Pencatatan shipment mandiri · scan order untuk mulai.</div>
+            <div class="sr-sub">{{ $shipmentTypeLabel }} · scan order terlebih dahulu untuk mulai.</div>
         </div>
         <div class="sr-top-actions">
             <button type="button" id="gfidScanSoundToggle" class="gf-scan-sound-toggle" aria-pressed="true">🔊 Suara ON</button>
@@ -718,7 +749,7 @@
                 <div class="sr-meta">
                     <div class="sr-meta-item sr-meta-store">
                         <div class="sr-meta-label">Tipe</div>
-                        <div class="sr-meta-value">{{ ucfirst($shipment->shipment_type ?? 'manual') }}</div>
+                        <div class="sr-meta-value">{{ $shipmentTypeLabel }}</div>
                     </div>
                     <div class="sr-meta-item sr-meta-store">
                         <div class="sr-meta-label">Channel</div>
@@ -810,6 +841,7 @@
     const deleteLineUrlTemplate = @json(route('sales.shipments.destroy_line', '__LINE_ID__'));
     const csrf = @json(csrf_token());
     const isDraft = @json($shipment->status === 'draft');
+    const canDelete = @json($canDeleteShipmentRows);
     const initialOrders = @json($initialOrders);
     const initialLines = @json($initialLines);
 
@@ -1185,17 +1217,28 @@
             const expanded = state.expanded === order.code || isActive;
 
             const rows = items.length
-                ? items.map((item, index) => `
-                    <div class="sr-item-row">
-                        <span class="sr-item-index" aria-label="Item ${index + 1}">${index + 1}</span>
-                        <div>
-                            <div class="sr-item-code">${esc(item.code || '-')}</div>
-                            <div class="sr-item-name">${esc(item.name || '')}</div>
+                ? items.map((item, index) => {
+                    const deleteButton = canDelete && item.line_id
+                        ? `<button type="button" class="sr-delete-btn sr-item-delete" data-delete-line="${esc(item.line_id)}" data-order-code="${esc(order.code)}" title="Hapus item">×</button>`
+                        : '';
+
+                    return `
+                        <div class="sr-item-row">
+                            <span class="sr-item-index" aria-label="Item ${index + 1}">${index + 1}</span>
+                            <div>
+                                <div class="sr-item-code">${esc(item.code || '-')}</div>
+                                <div class="sr-item-name">${esc(item.name || '')}</div>
+                            </div>
+                            <div class="sr-item-qty">x${Number(item.qty || 0)}</div>
+                            ${deleteButton}
                         </div>
-                        <div class="sr-item-qty">x${Number(item.qty || 0)}</div>
-                    </div>
-                `).join('')
+                    `;
+                }).join('')
                 : '<div class="sr-empty">Belum ada item untuk order ini.</div>';
+
+            const deleteOrderButton = canDelete
+                ? `<button type="button" class="sr-delete-btn sr-order-delete" data-delete-order="${esc(order.code)}" title="Hapus order dan itemnya">×</button>`
+                : '';
 
             return `
                 <div class="sr-order ${isActive ? 'active' : ''}" data-order-code="${esc(order.code)}">
@@ -1205,6 +1248,7 @@
                             <div class="sr-order-info">${esc(order.label || ('{{ $shipment->shipment_type ?? 'manual' }}' === 'marketplace' ? 'Marketplace' : 'Manual'))}</div>
                         </div>
                         <div class="sr-order-qty">${qty}</div>
+                        ${deleteOrderButton}
                         <div class="sr-order-chevron">${expanded ? '▲' : '▼'}</div>
                     </div>
                     ${expanded ? `<div class="sr-order-items">${rows}</div>` : ''}
@@ -1217,6 +1261,62 @@
                 const code = this.dataset.toggleOrder;
                 state.expanded = state.expanded === code ? null : code;
                 render();
+            });
+        });
+
+        ordersWrap.querySelectorAll('[data-delete-order]').forEach(el => {
+            el.addEventListener('click', function (event) {
+                event.stopPropagation();
+
+                const orderCode = this.dataset.deleteOrder;
+                if (!orderCode || !confirm(`Hapus order ${orderCode} beserta semua itemnya?`)) return;
+
+                this.disabled = true;
+                deleteOrderScan(orderCode)
+                    .then(() => {
+                        state.orders = state.orders.filter(order => order.code !== orderCode);
+                        for (let i = lastScanStack.length - 1; i >= 0; i--) {
+                            if (lastScanStack[i].orderCode === orderCode) lastScanStack.splice(i, 1);
+                        }
+
+                        if (state.current === orderCode) {
+                            state.current = null;
+                            state.expanded = null;
+                            setMode('order');
+                        } else {
+                            render();
+                        }
+
+                        toast('ok', `Order ${orderCode} dan itemnya dihapus`);
+                    })
+                    .catch(error => {
+                        this.disabled = false;
+                        alertError(error.message || 'Gagal menghapus order.', 'errorNetwork');
+                    });
+            });
+        });
+
+        ordersWrap.querySelectorAll('[data-delete-line]').forEach(el => {
+            el.addEventListener('click', function (event) {
+                event.stopPropagation();
+
+                const lineId = this.dataset.deleteLine;
+                const orderCode = this.dataset.orderCode;
+                if (!lineId || !confirm('Hapus item ini dari shipment?')) return;
+
+                this.disabled = true;
+                deleteLine(lineId)
+                    .then(() => {
+                        for (let i = lastScanStack.length - 1; i >= 0; i--) {
+                            if (String(lastScanStack[i].lineId || '') === String(lineId)) lastScanStack.splice(i, 1);
+                        }
+                        removeItemLocal(orderCode, lineId);
+                        toast('ok', 'Item berhasil dihapus');
+                    })
+                    .catch(error => {
+                        this.disabled = false;
+                        alertError(error.message || 'Gagal menghapus item.', 'errorNetwork');
+                    });
             });
         });
     }

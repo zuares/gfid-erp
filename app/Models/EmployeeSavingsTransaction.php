@@ -8,11 +8,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class EmployeeSavingsTransaction extends Model
 {
     public const TYPE_DEPOSIT = 'deposit';
+    public const TYPE_PAYMENT = 'payment';
     public const SOURCE_PAYROLL_BONUS = 'payroll_attendance_bonus';
+    public const SOURCE_PAYMENT = 'employee_savings_payment';
 
     protected $fillable = [
         'employee_id', 'payroll_period_id', 'date', 'amount', 'type', 'status',
-        'journal_id', 'source_type', 'source_id', 'created_by', 'notes',
+        'journal_id', 'cash_account_id', 'reference', 'source_type', 'source_id', 'created_by', 'notes',
     ];
 
     protected $casts = [
@@ -33,5 +35,10 @@ class EmployeeSavingsTransaction extends Model
     public function journal(): BelongsTo
     {
         return $this->belongsTo(Journal::class);
+    }
+
+    public function cashAccount(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'cash_account_id');
     }
 }

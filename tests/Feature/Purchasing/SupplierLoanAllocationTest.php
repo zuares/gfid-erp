@@ -117,6 +117,7 @@ class SupplierLoanAllocationTest extends TestCase
         $this->assertSame('partial', $order->fresh()->payment_status);
         $this->assertSame(400000.0, (float) $order->fresh()->paid_amount);
         $this->assertSame(600000.0, $loan->fresh()->allocation_available_amount);
+        $this->assertSame(600000.0, $loan->fresh()->outstanding_amount);
 
         // Setelah GRN posted, alokasi pinjaman harus bisa di-offset ke AP.
         PurchaseReceipt::create([
@@ -169,6 +170,17 @@ class SupplierLoanAllocationTest extends TestCase
         $this->assertSame('paid', $order->fresh()->payment_status);
         $this->assertSame(800000.0, (float) $order->fresh()->paid_amount);
         $this->assertSame(200000.0, $loan->fresh()->allocation_available_amount);
+        $this->assertSame(200000.0, $loan->fresh()->outstanding_amount);
+
+        $this->actingAs($user)
+            ->get(route('accounting.supplier-loans.index'))
+            ->assertOk()
+            ->assertSee('200.000');
+        $this->actingAs($user)
+            ->get(route('accounting.supplier-loans.show', $loan))
+            ->assertOk()
+            ->assertSee('800.000')
+            ->assertSee('200.000');
     }
 
     public function test_supplier_loan_allocation_rejects_a_different_supplier(): void

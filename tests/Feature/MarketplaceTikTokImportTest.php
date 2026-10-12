@@ -43,6 +43,43 @@ class MarketplaceTikTokImportTest extends TestCase
         $this->assertSame('API-TRACK-001', $normalized[0]['tracking_no']);
         $this->assertSame('TTB-BLK-M', $normalized[0]['items'][0]['sku_code']);
         $this->assertSame(2, $normalized[0]['items'][0]['qty']);
+        $this->assertSame(0.0, $normalized[0]['promotion_breakdown']['voucher_store']);
+        $this->assertSame(0.0, $normalized[0]['promotion_breakdown']['bundle_deal_discount']);
+    }
+
+    public function test_tiktok_promotion_columns_are_normalized_without_mixing_vouchers_and_shipping(): void
+    {
+        $normalized = app(TiktokApiSourceAdapter::class)->normalize([
+            'data' => [
+                'orders' => [[
+                    'order_id' => 'API-PROMO-001',
+                    'platform_discount' => 5000,
+                    'seller_discount' => 7000,
+                    'voucher_from_seller' => 2000,
+                    'voucher_from_platform' => 1500,
+                    'shipping_fee_platform_discount' => 22000,
+                    'packages' => [[
+                        'items' => [[
+                            'seller_sku' => 'TTB-PROMO-M',
+                            'quantity' => 1,
+                            'original_price' => 100000,
+                            'discounted_price' => 86000,
+                            'platform_discount' => 5000,
+                            'seller_discount' => 7000,
+                        ]],
+                    ]],
+                ]],
+            ],
+        ], 7);
+
+        $promotion = $normalized[0]['promotion_breakdown'];
+        $this->assertSame(12000.0, $promotion['product_discount']);
+        $this->assertSame(5000.0, $promotion['platform_discount']);
+        $this->assertSame(7000.0, $promotion['seller_discount']);
+        $this->assertSame(2000.0, $promotion['voucher_store']);
+        $this->assertSame(1500.0, $promotion['voucher_platform']);
+        $this->assertSame(22000.0, $promotion['shipping_discount_platform']);
+        $this->assertSame(0.0, $promotion['bundle_deal_discount']);
     }
 
     public function test_owner_can_open_import_page_and_see_sidebar_link(): void
@@ -157,12 +194,16 @@ class MarketplaceTikTokImportTest extends TestCase
         $this->actingAs($owner)
             ->delete(route('imports.marketplace.batches.destroy', $batchId))
             ->assertRedirect(route('imports.marketplace.index'))
-            ->assertSessionHas('success', 'Import dihapus: 1 shipment.');
+            ->assertSessionHas('success', 'Import dihapus: 1 shipment dan 1 order dashboard.');
 
         $this->assertDatabaseMissing('marketplace_import_batches', ['id' => $batchId]);
         $this->assertDatabaseMissing('mp_shipments', [
             'platform_order_id' => 'ORDER-DELETE-001',
             'platform_shipment_id' => 'PKG-DELETE-001',
+        ]);
+        $this->assertDatabaseMissing('marketplace_orders', [
+            'channel_order_id' => 'ORDER-DELETE-001',
+            'store_id' => $store->id,
         ]);
     }
 
@@ -273,6 +314,12 @@ class MarketplaceTikTokImportTest extends TestCase
             'status_norm' => 'in_transit',
         ]);
 
+        $shipment = MpShipment::where('platform_order_id', 'ORDER-TEST-001')->firstOrFail();
+        $this->assertSame(9403.0, (float) data_get($shipment->raw_payload, 'promotion_breakdown.platform_discount'));
+        $this->assertSame(104472.0, (float) data_get($shipment->raw_payload, 'promotion_breakdown.seller_discount'));
+        $this->assertSame(0.0, (float) data_get($shipment->raw_payload, 'promotion_breakdown.voucher_store'));
+        $this->assertSame(0.0, (float) data_get($shipment->raw_payload, 'promotion_breakdown.bundle_deal_discount'));
+
         $this->assertSame(1, MpShipment::where('platform_order_id', 'ORDER-TEST-001')->count());
         $this->assertSame('completed', MarketplaceImportBatch::findOrFail($batchId)->status);
 
@@ -292,6 +339,77 @@ class MarketplaceTikTokImportTest extends TestCase
 
         $this->assertSame(1, MpShipment::where('platform_order_id', 'ORDER-TEST-001')->count());
         $this->assertSame(1, MarketplaceImportBatch::findOrFail($secondBatchId)->updated_shipments);
+    }
+
+    public function test_tiktok_full_export_skips_description_row(): void
+    {
+        $channel = Channel::updateOrCreate(
+            ['code' => 'TTK'],
+            [
+                'name' => 'Tiktok',
+                'status' => 'active',
+                'is_active' => true,
+            ]
+        );
+
+        $store = Store::create([
+            'code' => 'TTK-DESCRIPTION-ROW',
+            'name' => 'TikTok Description Row Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        $user = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'TTK-DESCRIPTION-' . uniqid(),
+        ]);
+
+        $csv = implode("\n", [
+            'Order ID,Order Status,Seller SKU,Product Name,Quantity,SKU Unit Original Price,SKU Subtotal After Discount,Order Amount,Created Time,Shipped Time,Tracking ID,Package ID',
+            'Platform unique order ID.,Current order status.,Seller sku input by the seller in the product system.,Platform product name.,SKU sold quantity in the order.,1 SKU original price.,It equals SKU Subtotal Before Discount - SKU Platform Discount - SKU Seller Discount.,Order total amount paid by the buyer.,Order created time.,The time when the order status changes to In Transit.,The order tracking number.,The order package ID',
+            '586443354048595556,Dikirim,TTC-BLK-XL,Tracktop Jacket,1,189950,94367,95311,06/10/2026 18:55:47,07/10/2026 12:43:06,JY1996684340,1213665526886401636',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('imports.marketplace.preview'), [
+                'channel_id' => $channel->id,
+                'store_id' => $store->id,
+                'file' => UploadedFile::fake()->createWithContent('tiktok-description-row.csv', $csv),
+            ])
+            ->assertOk()
+            ->assertViewIs('imports.marketplace.preview');
+
+        $this->assertSame(1, session('mp_import_preview.stats.shipments_parsed'));
+        $this->assertSame(1, session('mp_import_preview.stats.items_parsed'));
+
+        $this->actingAs($user)
+            ->post(route('imports.marketplace.commit'))
+            ->assertRedirect(route('imports.marketplace.index'));
+
+        $this->assertSame(1, MpShipment::where('store_id', $store->id)->count());
+        $this->assertDatabaseHas('mp_shipments', [
+            'store_id' => $store->id,
+            'platform_order_id' => '586443354048595556',
+            'platform_shipment_id' => '1213665526886401636',
+            'tracking_no' => 'JY1996684340',
+            'grand_total' => 95311,
+            'status_norm' => 'in_transit',
+        ]);
+        $this->assertDatabaseMissing('mp_shipments', [
+            'store_id' => $store->id,
+            'platform_order_id' => 'Platform unique order ID.',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('marketplace.dashboard.sales', [
+                'store_id' => $store->id,
+                'date_from' => '2026-10-06',
+                'date_to' => '2026-10-07',
+            ]))
+            ->assertOk()
+            ->assertSee('586443354048595556')
+            ->assertSee('Tracktop Jacket');
     }
 
     public function test_empty_or_wrong_template_cannot_be_committed(): void

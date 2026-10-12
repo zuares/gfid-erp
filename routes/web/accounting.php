@@ -9,6 +9,7 @@ use App\Http\Controllers\Accounting\CashTransferController;
 use App\Http\Controllers\Accounting\JournalController;
 use App\Http\Controllers\Accounting\LoanController;
 use App\Http\Controllers\Accounting\EmployeeLoanController;
+use App\Http\Controllers\Accounting\EmployeeSavingsController;
 use App\Http\Controllers\Accounting\MarketplacePayoutController;
 use App\Http\Controllers\Accounting\OpeningBalanceBatchController;
 use App\Http\Controllers\Accounting\OpeningBalanceController;
@@ -66,6 +67,14 @@ Route::middleware(['auth', 'access:accounting'])->prefix('accounting')->name('ac
     Route::post('employee-loans/{employeeLoan}/repayments', [EmployeeLoanController::class, 'storeRepayment'])->name('employee-loans.repayments.store');
     Route::post('employee-loan-repayments/{repayment}/post', [EmployeeLoanController::class, 'postRepayment'])->name('employee-loans.repayments.post');
     Route::post('employee-loan-repayments/{repayment}/void', [EmployeeLoanController::class, 'voidRepayment'])->name('employee-loans.repayments.void');
+
+    // Tabungan karyawan: pembayaran kewajiban Dr Tabungan Karyawan / Cr Kas-Bank.
+    Route::get('employee-savings', [EmployeeSavingsController::class, 'index'])->name('employee-savings.index');
+    Route::get('employee-savings/create', [EmployeeSavingsController::class, 'create'])->name('employee-savings.create');
+    Route::post('employee-savings', [EmployeeSavingsController::class, 'store'])->name('employee-savings.store');
+    Route::get('employee-savings/{employeeSavings}', [EmployeeSavingsController::class, 'show'])->name('employee-savings.show');
+    Route::post('employee-savings/{employeeSavings}/post', [EmployeeSavingsController::class, 'post'])->name('employee-savings.post');
+    Route::post('employee-savings/{employeeSavings}/void', [EmployeeSavingsController::class, 'void'])->name('employee-savings.void');
 
     // Dana yang dipinjamkan ke supplier: Dr Piutang Supplier / Cr Kas-Bank.
     Route::resource('supplier-loans', SupplierLoanController::class)->only([

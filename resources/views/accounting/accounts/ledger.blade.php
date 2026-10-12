@@ -11,11 +11,14 @@
         }
 
         .lg-top {
-            display: flex;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
             gap: .75rem;
-            align-items: flex-start;
+            align-items: center;
             justify-content: space-between;
-            margin: .25rem 0 .75rem
+            margin: .1rem 0 .85rem;
+            padding-bottom: .8rem;
+            border-bottom: 1px solid rgba(148, 163, 184, .18)
         }
 
         .lg-heading {
@@ -23,24 +26,25 @@
         }
 
         .lg-kicker {
+            margin-bottom: .25rem;
             color: var(--muted);
-            font-size: .68rem;
+            font-size: .64rem;
             font-weight: 850;
-            letter-spacing: .12em;
+            letter-spacing: .1em;
             text-transform: uppercase
         }
 
         .lg-title-line {
             display: flex;
             align-items: center;
-            gap: .55rem;
+            gap: .45rem;
             flex-wrap: wrap;
-            margin-top: .18rem
+            margin-top: 0
         }
 
         .lg-title {
             margin: 0;
-            font-size: 1.18rem;
+            font-size: clamp(1.08rem, 2vw, 1.24rem);
             font-weight: 900;
             letter-spacing: -.02em
         }
@@ -48,20 +52,24 @@
         .lg-account-code {
             display: inline-flex;
             align-items: center;
-            min-height: 1.55rem;
-            padding: .12rem .48rem;
+            min-height: 1.4rem;
+            padding: .1rem .42rem;
             border: 1px solid rgba(148, 163, 184, .3);
             border-radius: 7px;
             color: var(--muted);
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-            font-size: .76rem;
+            font-size: .72rem;
             font-weight: 800
         }
 
         .lg-sub {
-            margin: .2rem 0 0;
+            display: flex;
+            align-items: center;
+            gap: .35rem;
+            flex-wrap: wrap;
+            margin: .32rem 0 0;
             color: var(--muted);
-            font-size: .86rem
+            font-size: .76rem
         }
 
         .lg-status {
@@ -86,22 +94,20 @@
         .lg-actions {
             display: flex;
             align-items: center;
-            gap: .45rem;
+            gap: .35rem;
             flex-wrap: wrap;
             justify-content: flex-end
         }
 
-        .lg-notice {
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-            margin-top: .45rem;
-            padding: .32rem .5rem;
-            border: 1px solid rgba(148, 163, 184, .2);
-            border-radius: 7px;
-            background: color-mix(in srgb, var(--muted) 6%, transparent);
-            color: var(--muted);
-            font-size: .76rem
+        .lg-actions .lg-btn {
+            min-height: 36px;
+            padding: .38rem .62rem;
+            border-radius: 10px;
+            font-size: .8rem
+        }
+
+        .lg-period {
+            color: color-mix(in srgb, var(--muted) 82%, var(--text) 18%)
         }
 
         .lg-card {
@@ -442,6 +448,35 @@
             text-decoration: underline
         }
 
+        .lg-ref {
+            display: flex;
+            align-items: center;
+            gap: .35rem;
+            margin-top: .18rem;
+            color: var(--muted);
+            font-size: .72rem
+        }
+
+        .lg-ref-code {
+            display: inline-flex;
+            align-items: center;
+            padding: .08rem .35rem;
+            border: 1px solid rgba(148, 163, 184, .22);
+            border-radius: 6px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: .68rem
+        }
+
+        .lg-line-id {
+            color: var(--muted)
+        }
+
+        .lg-transaction-title {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap
+        }
+
         .lg-grn-items {
             margin-top: .42rem;
             padding: .42rem .55rem;
@@ -475,16 +510,14 @@
             }
 
             .lg-top {
-                flex-direction: column;
-                align-items: stretch
+                grid-template-columns: 1fr;
+                align-items: stretch;
+                gap: .65rem;
+                padding-bottom: .7rem
             }
 
             .lg-top .lg-actions {
                 width: 100%
-            }
-
-            .lg-top .lg-actions .lg-btn:first-child {
-                flex: 0 0 auto
             }
 
             .lg-actions .lg-btn {
@@ -583,9 +616,9 @@
             .lg-table tbody tr {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
-                gap: .55rem .65rem;
+                gap: .5rem .6rem;
                 margin-bottom: .65rem;
-                padding: .75rem;
+                padding: .7rem .75rem;
                 border: 1px solid rgba(148, 163, 184, .22);
                 border-radius: 12px;
                 background: color-mix(in srgb, var(--card) 94%, var(--bg) 6%);
@@ -604,7 +637,7 @@
             }
 
             .lg-table tbody tr td:nth-child(1),
-            .lg-table tbody tr td:nth-child(3) {
+            .lg-table tbody tr td:nth-child(2) {
                 grid-column: 1 / -1
             }
 
@@ -613,14 +646,19 @@
                 color: var(--muted)
             }
 
-            .lg-table tbody tr td:nth-child(3) {
+            .lg-posted-time,
+            .lg-line-id {
+                display: none
+            }
+
+            .lg-table tbody tr td:nth-child(2) {
                 padding-bottom: .15rem;
                 border-bottom: 1px solid rgba(148, 163, 184, .16)
             }
 
+            .lg-table tbody tr td:nth-child(3)::before,
             .lg-table tbody tr td:nth-child(4)::before,
-            .lg-table tbody tr td:nth-child(5)::before,
-            .lg-table tbody tr td:nth-child(6)::before {
+            .lg-table tbody tr td:nth-child(5)::before {
                 display: block;
                 margin-bottom: .18rem;
                 color: var(--muted);
@@ -631,21 +669,21 @@
                 text-transform: uppercase
             }
 
-            .lg-table tbody tr td:nth-child(4)::before {
+            .lg-table tbody tr td:nth-child(3)::before {
                 content: 'Debit'
             }
 
-            .lg-table tbody tr td:nth-child(5)::before {
+            .lg-table tbody tr td:nth-child(4)::before {
                 content: 'Credit'
             }
 
-            .lg-table tbody tr td:nth-child(6)::before {
+            .lg-table tbody tr td:nth-child(5)::before {
                 content: 'Saldo'
             }
 
+            .lg-table tbody tr td:nth-child(3),
             .lg-table tbody tr td:nth-child(4),
-            .lg-table tbody tr td:nth-child(5),
-            .lg-table tbody tr td:nth-child(6) {
+            .lg-table tbody tr td:nth-child(5) {
                 text-align: left
             }
 
@@ -656,12 +694,12 @@
                 text-align: right
             }
 
-            .lg-table tbody tr td:nth-child(6) {
+            .lg-table tbody tr td:nth-child(5) {
                 padding-left: .65rem;
                 border-left: 1px solid rgba(148, 163, 184, .18)
             }
 
-            .lg-table tbody tr td:nth-child(6) .lg-bal {
+            .lg-table tbody tr td:nth-child(5) .lg-bal {
                 display: block;
                 text-align: right
             }
@@ -692,25 +730,22 @@
                     </span>
                     <span>· {{ ucfirst($account->type) }}</span>
                     @if ($account->is_cash)
-                        · Kas/Bank
+                        <span>· Kas/Bank</span>
+                    @endif
+                    @if ($cutoffDate && !$showLegacy)
+                        <span class="lg-period">· Mulai {{ \Carbon\Carbon::parse($cutoffDate)->format('d/m/Y') }}</span>
+                    @elseif ($cutoffDate)
+                        <span class="lg-period">· Semua histori</span>
                     @endif
                 </div>
-                @if ($cutoffDate && !$showLegacy)
-                    <div class="lg-notice">
-                        <span aria-hidden="true">ⓘ</span>
-                        <span>Data mulai {{ \Carbon\Carbon::parse($cutoffDate)->format('d/m/Y') }}</span>
-                    </div>
-                @elseif ($cutoffDate)
-                    <div class="lg-notice">
-                        <span aria-hidden="true">ⓘ</span>
-                        <span>Semua histori</span>
-                    </div>
-                @endif
             </div>
 
             <div class="lg-actions">
                 <a class="lg-btn" href="{{ route('accounting.accounts.index') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i><span>Akun</span></a>
                 <a class="lg-btn" href="{{ route('accounting.accounts.edit', $account) }}"><i class="bi bi-pencil" aria-hidden="true"></i><span>Edit</span></a>
+                @if ($account->code === '2104' && Route::has('accounting.employee-savings.create'))
+                    <a class="lg-btn primary" href="{{ route('accounting.employee-savings.create') }}">Bayar tabungan</a>
+                @endif
                 <a class="lg-btn primary" href="{{ route('accounting.journals.index') }}"><i class="bi bi-journal-text" aria-hidden="true"></i><span>Jurnal</span></a>
             </div>
         </div>
@@ -786,8 +821,7 @@
                     <thead>
                         <tr>
                             <th>Tanggal</th>
-                            <th class="lg-hide-sm">Ref</th>
-                            <th>Keterangan</th>
+                            <th>Transaksi</th>
                             <th class="lg-right">Debit</th>
                             <th class="lg-right">Credit</th>
                             <th class="lg-right">Saldo</th>
@@ -803,9 +837,21 @@
                                     + ($d - $c);
                                 $relatedUrl = $l->related_url ?? route('accounting.journals.show', $l->journal_id);
                                 $relatedLabel = $l->related_label ?? 'Buka detail jurnal';
-                                $ref = $l->source_type
-                                    ? strtoupper($l->source_type) . ($l->source_id ? '#' . $l->source_id : '')
-                                    : '-';
+                                $sourceLabels = [
+                                    'purchase_payment' => 'Pembayaran PO',
+                                    'cash_expense' => 'Pengeluaran',
+                                    'cash_receipt' => 'Penerimaan',
+                                    'opening_balance' => 'Saldo awal',
+                                    'opening_balance_batch' => 'Saldo awal',
+                                    'grn' => 'Penerimaan barang',
+                                    'grn_inv' => 'Penerimaan barang',
+                                    'grn_exp' => 'Penerimaan barang',
+                                ];
+                                $ref = ($sourceLabels[$l->source_type] ?? 'Jurnal')
+                                    . ($l->source_id ? ' #' . $l->source_id : '');
+                                $fullDescription = trim((string) ($l->grn_supplier_name ?: ($l->journal_description ?? '-')));
+                                $fullDescription = preg_replace('/\s+via\s+.+$/i', '', $fullDescription) ?: '-';
+                                $description = \Illuminate\Support\Str::limit($fullDescription, 72);
                                 $postedAt = $l->posted_at
                                     ? \Carbon\Carbon::parse($l->posted_at)->format('H:i')
                                     : null;
@@ -815,17 +861,17 @@
                                 <td>
                                     <div>{{ \Carbon\Carbon::parse($l->date)->format('d/m/Y') }}</div>
                                     @if ($postedAt)
-                                        <div class="lg-muted" style="font-size:.76rem">{{ $postedAt }}</div>
+                                        <div class="lg-muted lg-posted-time" style="font-size:.76rem">{{ $postedAt }}</div>
                                     @endif
                                 </td>
-                                <td class="lg-hide-sm lg-muted">
-                                    <a class="lg-row-link" href="{{ $relatedUrl }}" tabindex="-1">{{ $ref }}</a>
-                                </td>
                                 <td>
-                                    <a class="lg-row-link" href="{{ $relatedUrl }}" tabindex="-1">
-                                        <div style="font-weight:700">{{ $l->grn_supplier_name ?: ($l->journal_description ?? '-') }}</div>
+                                    <a class="lg-row-link" href="{{ $relatedUrl }}" tabindex="-1" title="{{ $fullDescription }}">
+                                        <div class="lg-transaction-title" style="font-weight:700">{{ $description }}</div>
                                     </a>
-                                    <div class="lg-muted">#{{ $l->id }}</div>
+                                    <div class="lg-ref">
+                                        <span class="lg-ref-code">{{ $ref }}</span>
+                                        <span class="lg-line-id">Baris #{{ $l->id }}</span>
+                                    </div>
                                     @if ($l->grn_items instanceof \Illuminate\Support\Collection && $l->grn_items->isNotEmpty())
                                         <div class="lg-grn-items">
                                             <div class="lg-grn-items-title">Item GRN</div>
@@ -862,7 +908,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" style="padding:1rem;color:var(--muted)">Belum ada transaksi.</td>
+                                <td colspan="5" style="padding:1rem;color:var(--muted)">Belum ada transaksi.</td>
                             </tr>
                         @endforelse
 
@@ -870,7 +916,6 @@
                             <tr>
                                 <td class="lg-muted">
                                     {{ request('from') ? \Carbon\Carbon::parse(request('from'))->format('d/m/Y') : '-' }}</td>
-                                <td class="lg-hide-sm lg-muted">—</td>
                                 <td class="lg-muted">Saldo awal</td>
                                 <td class="lg-right lg-muted">—</td>
                                 <td class="lg-right lg-muted">—</td>

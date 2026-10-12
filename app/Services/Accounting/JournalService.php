@@ -35,6 +35,8 @@ class JournalService
 
     public const CODE_PAYROLL_PAYABLE = '2102';
 
+    public const CODE_EMPLOYEE_SAVINGS = '2104';
+
     public const CODE_HPP = '5101'; // Harga Pokok Penjualan
 
     public const CODE_ADV_PURCHASE = '1151'; // Uang Muka Pembelian
@@ -127,6 +129,8 @@ class JournalService
     public const SRC_EMPLOYEE_LOAN = 'employee_loan';
 
     public const SRC_EMPLOYEE_LOAN_REPAYMENT = 'employee_loan_repayment';
+
+    public const SRC_EMPLOYEE_SAVINGS_PAYMENT = 'employee_savings_payment';
 
     // public const SRC_PO_EXPENSE_APPROVE = 'purchase_order_expense_approve';
 

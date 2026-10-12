@@ -126,3 +126,28 @@ it('rejects bearer tokens without stock-read ability', function () {
 
     $response->assertStatus(403);
 });
+
+it('rejects expired Sanctum bearer tokens', function () {
+    $user = User::factory()->create([
+        'name' => 'Expired Stock Reader',
+        'employee_code' => 'EXPIRED-STOCK-READ',
+        'role' => 'owner',
+    ]);
+
+    $plainToken = Str::random(40);
+    $tokenId = DB::table('personal_access_tokens')->insertGetId([
+        'tokenable_type' => User::class,
+        'tokenable_id' => $user->id,
+        'name' => 'expired-stock-read',
+        'token' => hash('sha256', $plainToken),
+        'abilities' => json_encode(['stock-read']),
+        'last_used_at' => null,
+        'expires_at' => now()->subMinute(),
+        'created_at' => now()->subDays(2),
+        'updated_at' => now()->subDays(2),
+    ]);
+
+    $this->withHeader('Authorization', 'Bearer '.$tokenId.'|'.$plainToken)
+        ->postJson(route('stocks.ready'), ['item_codes' => ['SKU-A']])
+        ->assertUnauthorized();
+});

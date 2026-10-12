@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AccountSuggestController;
 use App\Http\Controllers\Api\CustomerController as ApiCustomerController;
 use App\Http\Controllers\Api\ItemController;
 use App\Http\Controllers\Api\StockApiController;
+use App\Http\Controllers\Api\InternalInventoryController;
 
 Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
     Route::get('/items', [ItemController::class, 'index']);
@@ -17,7 +18,7 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
 });
 
 Route::prefix('v1')
-    ->middleware('throttle:stock-read')
+    ->middleware(['auth:sanctum', 'throttle:stock-read'])
     ->group(function () {
         Route::post('/stocks/ready', [StockApiController::class, 'readyBatch'])
             ->name('stocks.ready');
@@ -33,13 +34,28 @@ Route::prefix('api')
         // ... route api lain (stock, items, dll)
     });
 
-// Webhook endpoints
+// The official Shopee callback remains public. Viewer/debug routes require the
+// same web session and marketplace access as the marketplace UI.
 Route::prefix('webhooks')->group(function () {
     Route::post('/shopee', [\App\Http\Controllers\WebhookController::class, 'shopee']);
-    Route::post('/simulate', [\App\Http\Controllers\WebhookController::class, 'simulate']);
-    Route::get('/logs', [\App\Http\Controllers\WebhookController::class, 'logs']);
-    Route::get('/logs/{log}', [\App\Http\Controllers\WebhookController::class, 'show']);
+
+    Route::middleware(['web', 'auth', 'access:marketplace'])->group(function () {
+        Route::post('/simulate', [\App\Http\Controllers\WebhookController::class, 'simulate'])
+            ->middleware('role:owner');
+        Route::get('/logs', [\App\Http\Controllers\WebhookController::class, 'logs']);
+        Route::get('/logs/{log}', [\App\Http\Controllers\WebhookController::class, 'show']);
+    });
 });
+
+Route::get('/internal/inventory/stock', [InternalInventoryController::class, 'stock'])
+    ->middleware([
+        'machine.audit',
+        'machine.ip-limit',
+        'auth:sanctum',
+        'machine.throttle',
+        'service.ability:mcp:inventory:read',
+    ])
+    ->name('api.internal.inventory.stock');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('customers', [ApiCustomerController::class, 'index'])

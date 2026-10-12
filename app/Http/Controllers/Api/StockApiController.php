@@ -150,19 +150,11 @@ class StockApiController extends Controller
      */
     public function readyBatch(Request $request): JsonResponse
     {
-        $bearerToken = trim((string) $request->bearerToken());
+        $token = $request->user()?->currentAccessToken();
 
-        if ($bearerToken === '') {
+        if (! $token instanceof PersonalAccessToken) {
             return response()->json([
                 'message' => 'Token bearer wajib digunakan.',
-            ], 401);
-        }
-
-        $token = PersonalAccessToken::findToken($bearerToken);
-
-        if (! $token) {
-            return response()->json([
-                'message' => 'Token tidak valid.',
             ], 401);
         }
 

@@ -19,6 +19,7 @@ class SupplierLoanController extends Controller
         $query = SupplierLoan::query()
             ->with(['supplier', 'cashAccount', 'receivableAccount'])
             ->withSum(['repayments as posted_repayment_amount' => fn ($q) => $q->where('status', 'posted')], 'amount')
+            ->withSum(['purchasePayments as allocated_amount' => fn ($q) => $q->where('type', 'loan_apply')->whereNull('voided_at')], 'amount')
             ->orderByDesc('date')
             ->orderByDesc('id');
 
@@ -37,13 +38,14 @@ class SupplierLoanController extends Controller
 
         $summaryRows = SupplierLoan::query()
             ->withSum(['repayments as posted_repayment_amount' => fn ($q) => $q->where('status', 'posted')], 'amount')
+            ->withSum(['purchasePayments as allocated_amount' => fn ($q) => $q->where('type', 'loan_apply')->whereNull('voided_at')], 'amount')
             ->whereIn('status', ['posted', 'settled'])
             ->get();
 
         $summary = [
             'total_funded' => (float) $summaryRows->sum('principal_amount'),
             'total_repaid' => (float) $summaryRows->sum('posted_repayment_amount'),
-            'outstanding' => (float) $summaryRows->sum(fn ($row) => max(0, (float) $row->principal_amount - (float) $row->posted_repayment_amount)),
+            'outstanding' => (float) $summaryRows->sum(fn ($row) => $row->outstanding_amount),
             'draft_docs' => SupplierLoan::where('status', 'draft')->count(),
         ];
 
@@ -81,6 +83,7 @@ class SupplierLoanController extends Controller
         $supplierLoan->load([
             'supplier', 'cashAccount', 'receivableAccount', 'journal',
             'repayments.cashAccount', 'repayments.journal',
+            'postedAllocations.purchaseOrder',
         ]);
 
         return view('accounting.supplier_loans.show', array_merge(

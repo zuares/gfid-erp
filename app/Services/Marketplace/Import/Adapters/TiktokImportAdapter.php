@@ -3,10 +3,19 @@
 namespace App\Services\Marketplace\Import\Adapters;
 
 use Carbon\Carbon;
+use App\Services\Marketplace\Promotion\MarketplacePromotionNormalizer;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class TiktokImportAdapter implements MpImportAdapterInterface
 {
+    private MarketplacePromotionNormalizer $promotionNormalizer;
+
+    public function __construct(
+        ?MarketplacePromotionNormalizer $promotionNormalizer = null,
+    ) {
+        $this->promotionNormalizer = $promotionNormalizer ?: new MarketplacePromotionNormalizer();
+    }
+
     public function channel(): string
     {
         return 'tiktok';
@@ -72,6 +81,14 @@ class TiktokImportAdapter implements MpImportAdapterInterface
                 continue;
             }
 
+            // TikTok full exports include a description row immediately after
+            // the header. It contains values such as "Platform unique order
+            // ID." and must never become a real shipment/order.
+            if ($i === $headerRowIndex + 1
+                && str_contains(mb_strtolower($orderId), 'platform unique order id')) {
+                continue;
+            }
+
             $status = $this->v($r, $map, ['order status', 'status']);
             $substatus = $this->v($r, $map, ['order substatus', 'substatus']);
             $tracking = $this->v($r, $map, ['tracking id', 'tracking no', 'tracking number', 'awb', 'resi']);
@@ -95,6 +112,44 @@ class TiktokImportAdapter implements MpImportAdapterInterface
             $orderAmount = (float) $this->num($this->v($r, $map, ['order amount', 'grand total', 'total amount']));
             $shippingFee = (float) $this->num($this->v($r, $map, ['shipping fee after discount', 'shipping fee']));
             $refundAmount = (float) $this->num($this->v($r, $map, ['order refund amount', 'refund amount']));
+
+            $promotion = $this->promotionNormalizer->normalizeTiktokFileRow([
+                'sku_platform_discount' => $linePlatformDiscount,
+                'sku_seller_discount' => $lineSellerDiscount,
+                'bundle_deal_discount' => $this->num($this->v($r, $map, [
+                    'bundle deal discount',
+                    'bundle discount',
+                    'bundle discount amount',
+                ])),
+                'voucher_from_tiktok' => $this->num($this->v($r, $map, [
+                    'voucher from tiktok',
+                    'voucher from platform',
+                    'platform voucher',
+                ])),
+                'voucher_from_seller' => $this->num($this->v($r, $map, [
+                    'voucher from seller',
+                    'seller voucher',
+                    'seller voucher rebate',
+                ])),
+                'shipping_fee_platform_discount' => $this->num($this->v($r, $map, [
+                    'shipping fee platform discount',
+                ])),
+                'shipping_fee_seller_discount' => $this->num($this->v($r, $map, [
+                    'shipping fee seller discount',
+                ])),
+                'payment_platform_discount' => $this->num($this->v($r, $map, [
+                    'payment platform discount',
+                ])),
+                'original_shipping_fee' => $this->num($this->v($r, $map, [
+                    'original shipping fee',
+                ])),
+                'shipping_fee_after_discount' => $shippingFee,
+                'order_refund_amount' => $refundAmount,
+                'buyer_service_fee' => $this->num($this->v($r, $map, ['buyer service fee'])),
+                'handling_fee' => $this->num($this->v($r, $map, ['handling fee'])),
+                'shipping_insurance' => $this->num($this->v($r, $map, ['shipping insurance'])),
+                'item_insurance' => $this->num($this->v($r, $map, ['item insurance'])),
+            ]);
 
             if ($subtotal <= 0 && $qty > 0) {
                 $subtotal = $qty * $unitPrice;
@@ -158,13 +213,16 @@ class TiktokImportAdapter implements MpImportAdapterInterface
                         'order_amount' => $orderAmount,
                         'shipping_fee_after_discount' => $shippingFee,
                         'refund_amount' => $refundAmount,
+                        'promotion_breakdown' => $promotion['order'],
                         'source' => 'full',
                     ],
+                    'promotion_breakdown' => $promotion['order'],
                     'items' => [],
                 ];
 
                 $shipments[$key]['order_subtotal'] = $lineBeforeDiscount > 0 ? $lineBeforeDiscount : ($qty * $unitPrice);
-                $shipments[$key]['discount_total'] = $linePlatformDiscount + $lineSellerDiscount;
+                $shipments[$key]['discount_total'] = $promotion['order']['product_discount']
+                    + $promotion['order']['bundle_deal_discount'];
                 $shipments[$key]['refund_total'] = $refundAmount;
             }
 
@@ -172,7 +230,12 @@ class TiktokImportAdapter implements MpImportAdapterInterface
             // mengulanginya pada setiap baris item.
             if (count($shipments[$key]['items']) > 0) {
                 $shipments[$key]['order_subtotal'] += $lineBeforeDiscount;
-                $shipments[$key]['discount_total'] += $linePlatformDiscount + $lineSellerDiscount;
+                $shipments[$key]['discount_total'] += $promotion['line']['product_discount']
+                    + $promotion['line']['bundle_deal_discount'];
+                foreach (['platform_discount', 'seller_discount', 'product_discount', 'bundle_deal_discount'] as $field) {
+                    $shipments[$key]['promotion_breakdown'][$field] = (float) ($shipments[$key]['promotion_breakdown'][$field] ?? 0)
+                        + (float) ($promotion['line'][$field] ?? 0);
+                }
             }
 
             // Only append item when it looks like a real line
@@ -185,6 +248,7 @@ class TiktokImportAdapter implements MpImportAdapterInterface
                     'qty' => $qty,
                     'unit_price' => $unitPrice,
                     'subtotal' => $subtotal,
+                    'promotion_breakdown' => $promotion['line'],
                     'raw_line' => $this->rawLine($r, $headerRow),
                 ];
             }
