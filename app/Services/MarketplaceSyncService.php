@@ -10,6 +10,8 @@ use App\Models\MarketplaceAdsBalanceLog;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderIncomeEstimate;
 use App\Models\MarketplaceOrderItem;
+use App\Models\MarketplaceProduct;
+use App\Models\MarketplaceProductModel;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\MarketplaceSyncLog;
 use App\Models\SkuMapping;
@@ -258,6 +260,7 @@ class MarketplaceSyncService
         // AWB/tracking_number baru tersedia di get_package_detail, sehingga
         // wajib diperkaya sebelum dry-run maupun penyimpanan ke database.
         $this->hydratePackageTrackingNumbers($store, $details);
+        $this->hydrateMarketplaceItemSkus($store, $details);
 
         // 3. Simpan ke DB
         $report(92, 'Menyimpan pesanan ke database…');
@@ -546,6 +549,7 @@ class MarketplaceSyncService
         }
 
         $this->hydratePackageTrackingNumbers($store, $details);
+        $this->hydrateMarketplaceItemSkus($store, $details);
 
         $stats = $this->upsertOrders($store, $details);
         $this->autoCreateFulfillments($store);
@@ -571,9 +575,20 @@ class MarketplaceSyncService
 
         $orders = MarketplaceOrder::query()
             ->where('store_id', $store->id)
+            ->with('items:id,marketplace_order_id,external_item_id,external_model_id,item_sku,model_sku')
             ->where(function ($query) {
-                $query->whereNull('shipping_awb_no')
-                    ->orWhere('shipping_awb_no', '');
+                $query->where(function ($awbQuery) {
+                    $awbQuery->whereNull('shipping_awb_no')
+                        ->orWhere('shipping_awb_no', '');
+                })->orWhereHas('items', function ($itemQuery) {
+                    $itemQuery
+                        ->where(function ($skuQuery) {
+                            $skuQuery->whereNull('model_sku')->orWhere('model_sku', '');
+                        })
+                        ->where(function ($skuQuery) {
+                            $skuQuery->whereNull('item_sku')->orWhere('item_sku', '');
+                        });
+                });
             })
             ->whereIn('order_status', [
                 'PROCESSED',
@@ -600,19 +615,42 @@ class MarketplaceSyncService
             $detail = is_array($order->raw_json) ? $order->raw_json : [];
             $detail['order_sn'] = $order->channel_order_id;
             $detail['order_status'] = $order->order_status ?: ($detail['order_status'] ?? null);
+            if (empty($detail['item_list']) && $order->items->isNotEmpty()) {
+                $detail['item_list'] = $order->items->map(fn (MarketplaceOrderItem $item): array => [
+                    'item_id' => $item->external_item_id,
+                    'model_id' => $item->external_model_id,
+                    'item_sku' => $item->item_sku,
+                    'model_sku' => $item->model_sku,
+                ])->all();
+            }
             $detail['package_list'] = is_array($detail['package_list'] ?? null)
                 ? $detail['package_list']
                 : [];
+
+            // Order yang AWB-nya sudah tersimpan tidak perlu memanggil API
+            // logistik lagi hanya untuk memperbaiki SKU item.
+            if (filled($order->shipping_awb_no)) {
+                foreach ($detail['package_list'] as $packageIndex => $package) {
+                    if (blank($package['tracking_number'] ?? null) && blank($package['tracking_no'] ?? null)) {
+                        $detail['package_list'][$packageIndex]['tracking_number'] = $order->shipping_awb_no;
+                    }
+                }
+            }
 
             return $detail;
         })->values()->all();
 
         $this->hydratePackageTrackingNumbers($store, $details);
+        $this->hydrateMarketplaceItemSkus($store, $details);
 
         $updated = 0;
         foreach ($orders as $index => $order) {
+            $skuUpdated = $this->persistMarketplaceItemSkus($order, $details[$index]['item_list'] ?? []);
             $tracking = trim((string) data_get($details[$index] ?? [], 'package_list.0.tracking_number', ''));
             if ($tracking === '') {
+                if ($skuUpdated) {
+                    $updated++;
+                }
                 continue;
             }
 
@@ -629,6 +667,140 @@ class MarketplaceSyncService
         }
 
         return ['checked' => $orders->count(), 'updated' => $updated];
+    }
+
+    /**
+     * Lengkapi SKU item order dari cache master produk marketplace.
+     *
+     * get_order_detail Shopee dapat mengembalikan item_id/model_id tanpa
+     * model_sku/item_sku. Cache produk menyimpan pasangan yang sama dan
+     * menjadi sumber fallback yang tetap scoped ke toko, sehingga SKU dari
+     * toko lain tidak pernah ikut terpakai.
+     *
+     * @param array<int,array<string,mixed>> $details
+     */
+    private function hydrateMarketplaceItemSkus(Store $store, array &$details): void
+    {
+        $references = [];
+
+        foreach ($details as $detailIndex => &$detail) {
+            foreach (($detail['item_list'] ?? []) as $itemIndex => $item) {
+                $itemId = trim((string) ($item['item_id'] ?? ''));
+                if ($itemId === '') {
+                    continue;
+                }
+
+                $references[$itemId][] = [
+                    $detailIndex,
+                    $itemIndex,
+                    trim((string) ($item['model_id'] ?? '0')) ?: '0',
+                ];
+            }
+        }
+        unset($detail);
+
+        if (empty($references)) {
+            return;
+        }
+
+        $products = MarketplaceProduct::query()
+            ->where('store_id', $store->id)
+            ->whereIn('item_id', array_keys($references))
+            ->get()
+            ->keyBy(fn (MarketplaceProduct $product) => (string) $product->item_id);
+
+        if ($products->isEmpty()) {
+            return;
+        }
+
+        $models = MarketplaceProductModel::query()
+            ->whereIn('marketplace_product_id', $products->pluck('id')->all())
+            ->get()
+            ->keyBy(fn (MarketplaceProductModel $model) => $model->marketplace_product_id . '|' . $model->model_id);
+
+        foreach ($references as $itemId => $itemReferences) {
+            $product = $products->get((string) $itemId);
+            if (! $product) {
+                continue;
+            }
+
+            foreach ($itemReferences as [$detailIndex, $itemIndex, $modelId]) {
+                $item = $details[$detailIndex]['item_list'][$itemIndex] ?? null;
+                if (! is_array($item)) {
+                    continue;
+                }
+
+                $model = $models->get($product->id . '|' . $modelId);
+                $rawModelSku = trim((string) ($item['model_sku'] ?? ''));
+                $rawItemSku = trim((string) ($item['item_sku'] ?? ''));
+
+                if ($rawModelSku === '' && $model && filled($model->model_sku)) {
+                    $details[$detailIndex]['item_list'][$itemIndex]['model_sku'] = (string) $model->model_sku;
+                }
+
+                if ($rawItemSku === '' && filled($product->item_sku)) {
+                    $details[$detailIndex]['item_list'][$itemIndex]['item_sku'] = (string) $product->item_sku;
+                }
+            }
+        }
+    }
+
+    /**
+     * Simpan SKU yang baru diperkaya ke order item saat tombol Sync Resi
+     * dijalankan. Jalur ini tidak melakukan overwrite pada SKU yang sudah ada.
+     *
+     * @param array<int,array<string,mixed>> $itemList
+     */
+    private function persistMarketplaceItemSkus(MarketplaceOrder $order, array $itemList): bool
+    {
+        $changed = false;
+
+        foreach ($itemList as $item) {
+            $itemId = trim((string) ($item['item_id'] ?? ''));
+            if ($itemId === '') {
+                continue;
+            }
+
+            $modelId = trim((string) ($item['model_id'] ?? '0')) ?: '0';
+            $modelSku = trim((string) ($item['model_sku'] ?? ''));
+            $itemSku = trim((string) ($item['item_sku'] ?? ''));
+
+            if ($modelSku === '' && $itemSku === '') {
+                continue;
+            }
+
+            $orderItem = MarketplaceOrderItem::query()
+                ->where('marketplace_order_id', $order->id)
+                ->where('external_item_id', $itemId)
+                ->where(function ($query) use ($modelId) {
+                    $query->where('external_model_id', $modelId)
+                        ->orWhereNull('external_model_id');
+                })
+                ->orderBy('line_no')
+                ->first();
+
+            if (! $orderItem) {
+                continue;
+            }
+
+            $updates = [];
+            if (blank($orderItem->model_sku) && $modelSku !== '') {
+                $updates['model_sku'] = $modelSku;
+            }
+            if (blank($orderItem->item_sku) && $itemSku !== '') {
+                $updates['item_sku'] = $itemSku;
+            }
+            if (blank($orderItem->marketplace_sku)) {
+                $updates['marketplace_sku'] = $modelSku !== '' ? $modelSku : $itemSku;
+            }
+
+            if ($updates !== []) {
+                $orderItem->update($updates);
+                $changed = true;
+            }
+        }
+
+        return $changed;
     }
 
     /**

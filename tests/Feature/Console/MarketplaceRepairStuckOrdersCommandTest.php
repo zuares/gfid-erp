@@ -5,6 +5,8 @@ namespace Tests\Feature\Console;
 use App\Models\Channel;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
+use App\Models\MarketplaceProduct;
+use App\Models\MarketplaceProductModel;
 use App\Models\MarketplaceBooking;
 use App\Models\OrderFulfillment;
 use App\Models\Store;
@@ -106,6 +108,38 @@ class MarketplaceRepairStuckOrdersCommandTest extends TestCase
         $method->invokeArgs(app(MarketplaceSyncService::class), [$this->store, &$details]);
 
         $this->assertSame('SPXID06081986532A', $details[0]['package_list'][0]['tracking_number']);
+    }
+
+    public function test_sku_order_dilengkapi_dari_master_produk_toko_yang_sama(): void
+    {
+        $product = MarketplaceProduct::create([
+            'store_id' => $this->store->id,
+            'item_id' => 'ITEM-123',
+            'item_name' => 'Jogger K5',
+            'item_sku' => 'K5-PARENT',
+            'has_model' => true,
+        ]);
+
+        MarketplaceProductModel::create([
+            'marketplace_product_id' => $product->id,
+            'model_id' => 'MODEL-456',
+            'model_name' => 'Hitam',
+            'model_sku' => 'K5BLK-MP',
+        ]);
+
+        $details = [[
+            'order_sn' => 'ORDER-SKU-HYDRATE',
+            'item_list' => [[
+                'item_id' => 'ITEM-123',
+                'model_id' => 'MODEL-456',
+            ]],
+        ]];
+
+        $method = new \ReflectionMethod(MarketplaceSyncService::class, 'hydrateMarketplaceItemSkus');
+        $method->invokeArgs(app(MarketplaceSyncService::class), [$this->store, &$details]);
+
+        $this->assertSame('K5BLK-MP', $details[0]['item_list'][0]['model_sku']);
+        $this->assertSame('K5-PARENT', $details[0]['item_list'][0]['item_sku']);
     }
 
     public function test_sync_missing_awbs_memperbarui_order_lokal_dari_detail_paket(): void
