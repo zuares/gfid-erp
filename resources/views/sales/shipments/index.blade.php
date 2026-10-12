@@ -197,6 +197,7 @@
     .code-link{ display:inline-block; color:#334155!important; font-size:.8rem; font-weight:800; text-decoration:none; background:rgba(148,163,184,.12); padding:.2rem .5rem; border-radius:6px; border:1px solid rgba(148,163,184,.25); white-space:nowrap; }
     .code-link:hover{ color:#0f172a!important; background:rgba(148,163,184,.22); border-color:rgba(148,163,184,.4); }
     .shipment-inline{ display:flex; flex-direction:column; align-items:flex-start; gap:.14rem; min-width:0; white-space:normal; }
+    .shipment-document-head{ display:flex; align-items:center; flex-wrap:wrap; gap:.3rem .4rem; }
     .shipment-timestamps{ display:flex; align-items:center; flex-wrap:wrap; gap:.18rem .45rem; color:#64748b; font-size:.7rem; }
     .shipment-timestamps span + span::before{ content:'·'; margin-right:.45rem; color:#cbd5e1; }
     .shipment-store{ color:#475569; font-size:.72rem; }
@@ -693,7 +694,22 @@
     .filter-bar{ padding:.55rem; }
     .filter-summary{ font-size:.7rem; letter-spacing:.01em; }
     .filter-summary strong{ font-weight:650; }
-    .table-list thead th{ background:#f8fafc; font-weight:700; }
+    .table-list thead th{
+        background:#f3f4f6;
+        color:#4b5563;
+        border-top:1px solid #e5e7eb;
+        border-bottom:1px solid #d1d5db;
+        padding-top:.7rem;
+        padding-bottom:.7rem;
+        font-size:.61rem;
+        font-weight:750;
+        letter-spacing:.06em;
+    }
+    .table-list thead th:first-child{ border-top-left-radius:6px; }
+    .table-list thead th:last-child{ border-top-right-radius:6px; }
+    .table-list thead .table-sort{ color:#4b5563; }
+    .table-list thead .table-sort:hover,
+    .table-list thead .table-sort.active{ color:#111827; }
     .table-list tbody tr{ transition:background-color .12s ease; }
     .table-list tbody td{ padding-top:.65rem; padding-bottom:.65rem; }
     .shipment-time-stack span+span{
@@ -702,14 +718,52 @@
     }
     .shipment-time-cell{ color:#4b5563; }
     .shipment-time-stack{ letter-spacing:.005em; }
+    .shipment-channel-stack{ display:flex; flex-direction:column; gap:.18rem; line-height:1.25; }
+    .shipment-channel-type{ color:#374151; font-size:.72rem; font-weight:700; }
+    .shipment-channel-store{ color:#94a3b8; font-size:.68rem; }
+    .shipment-created-cell{ color:#64748b; font-size:.72rem; white-space:nowrap; }
+    .shipment-created-stack{ display:flex; flex-direction:column; gap:.16rem; line-height:1.25; }
+    .shipment-created-date{ color:#4b5563; font-weight:650; }
+    .shipment-created-status{ display:flex; align-items:center; }
+    .package-number-cell{ color:#475569; font-size:.74rem; font-weight:650; font-variant-numeric:tabular-nums; }
+    .shipment-dispatch-cell{ white-space:nowrap; }
+    .dispatch-badge{
+        display:inline-flex;
+        align-items:center;
+        min-height:24px;
+        padding:.18rem .45rem;
+        border:1px solid #e5e7eb;
+        border-radius:5px;
+        font-size:.64rem;
+        font-weight:700;
+        color:#64748b;
+        background:#f8fafc;
+    }
+    .dispatch-daily{ color:#475569; background:#f3f4f6; border-color:#d1d5db; }
+    .dispatch-single{ color:#64748b; background:#fff; border-color:#e5e7eb; }
     .badge-status{ border-radius:6px; font-weight:650; }
     .action-icon{ border-radius:6px!important; }
 
     body[data-theme="dark"] .ship-topbar,
     body[data-theme="dark"] .filter-bar,
     body[data-theme="dark"] .card-main{ background:#111827; box-shadow:none; }
-    body[data-theme="dark"] .table-list thead th{ background:#172033; }
+    body[data-theme="dark"] .table-list thead th{
+        background:#1f2937;
+        color:#cbd5e1;
+        border-top-color:#374151;
+        border-bottom-color:#4b5563;
+    }
+    body[data-theme="dark"] .table-list thead .table-sort,
+    body[data-theme="dark"] .table-list thead .table-sort:hover,
+    body[data-theme="dark"] .table-list thead .table-sort.active{ color:#e5e7eb; }
     body[data-theme="dark"] .shipment-time-stack span+span{ border-top-color:#273449; }
+    body[data-theme="dark"] .shipment-channel-type{ color:#e5e7eb; }
+    body[data-theme="dark"] .shipment-channel-store{ color:#94a3b8; }
+    body[data-theme="dark"] .shipment-created-cell{ color:#94a3b8; }
+    body[data-theme="dark"] .shipment-created-date{ color:#cbd5e1; }
+    body[data-theme="dark"] .package-number-cell{ color:#cbd5e1; }
+    body[data-theme="dark"] .dispatch-badge{ color:#cbd5e1; background:#1f2937; border-color:#4b5563; }
+    body[data-theme="dark"] .dispatch-daily{ color:#f3f4f6; background:#374151; }
 
     /* Action column: explicit labels with compact enterprise controls */
     .ship-row-action{ min-width:160px; }
@@ -787,6 +841,8 @@
 
         $statusFilter = $statusFilter ?? request('status', 'all');
         $canSeeNominal = $canSeeNominal ?? ((auth()->user()->role ?? null) !== 'admin');
+        $isAdmin = (auth()->user()->role ?? null) === 'admin';
+        $canSeeShipmentTime = !$isAdmin;
         $canFreshShipments = $canFreshShipments ?? false;
 
         $sortUrl = function (string $column) use ($sort, $direction) {
@@ -916,11 +972,21 @@
                     <table class="table table-hover align-middle table-list">
                         <thead>
                             <tr>
-                                <th style="width: 46px;">#</th>
+                                @if($isAdmin)
+                                    <th style="width: 135px;">Dibuat</th>
+                                @else
+                                    <th style="width: 46px;">#</th>
+                                @endif
                                 <th style="min-width: 150px;"><a class="table-sort {{ $sort === 'code' ? 'active' : '' }}" href="{{ $sortUrl('code') }}">Dokumen <span class="table-sort-icon">{{ $sortIcon('code') }}</span></a></th>
-                                <th style="width: 170px;">Waktu</th>
-                                <th style="width: 145px;"><a class="table-sort {{ $sort === 'lines_count' ? 'active' : '' }}" href="{{ $sortUrl('lines_count') }}">Isi Paket <span class="table-sort-icon">{{ $sortIcon('lines_count') }}</span></a></th>
-                                <th style="width: 130px;"><a class="table-sort {{ $sort === 'status' ? 'active' : '' }}" href="{{ $sortUrl('status') }}">Status <span class="table-sort-icon">{{ $sortIcon('status') }}</span></a></th>
+                                @if($canSeeShipmentTime)
+                                    <th style="width: 170px;">Waktu</th>
+                                @endif
+                                @if($isAdmin)
+                                    <th style="width: 110px;">Pengiriman</th>
+                                @endif
+                                <th class="text-end" style="width: 72px;">Order</th>
+                                <th class="text-end" style="width: 72px;"><a class="table-sort {{ $sort === 'lines_count' ? 'active' : '' }}" href="{{ $sortUrl('lines_count') }}">Item <span class="table-sort-icon">{{ $sortIcon('lines_count') }}</span></a></th>
+                                <th class="text-end" style="width: 64px;">Qty</th>
                                 <th class="text-end" style="width: 160px;">Aksi</th>
                             </tr>
                         </thead>
@@ -957,6 +1023,10 @@
                                         'marketplace' => 'Marketplace',
                                         default => 'Manual',
                                     };
+                                    $dispatchLabel = ($shipment->dispatch_mode ?? 'single') === 'daily'
+                                        ? 'Daily Wave'
+                                        : 'Single';
+                                    $dispatchClass = $dispatchLabel === 'Daily Wave' ? 'dispatch-daily' : 'dispatch-single';
                                     $stockBlocked = !empty($shipment->stock_insufficient_calc);
                                     $draftActionRoute = ($shipment->shipment_type === 'affiliate' || $isOrderFirst)
                                         ? 'sales.shipments.scan_order'
@@ -970,52 +1040,78 @@
                                 <tr class="shipment-row-clickable {{ $uiStatus === 'draft' ? 'row-draft' : '' }}"
                                     data-row-href="{{ $actionRoute }}" tabindex="0" role="link"
                                     aria-label="{{ $actionLabel }} {{ $shipment->code }}">
-                                    <td class="text-muted small mobile-hide">
-                                        {{ ($shipments->currentPage() - 1) * $shipments->perPage() + $loop->iteration }}
-                                    </td>
+                                    @if($isAdmin)
+                                        <td class="shipment-created-cell" aria-label="Tanggal dibuat dan kanal">
+                                            <div class="shipment-created-stack">
+                                                <span class="shipment-created-date">{{ $fmtDate($shipment->created_at, 'd M Y') }}</span>
+                                                <span class="shipment-created-status">
+                                                    <span class="badge-status {{ $statusClass }}">{{ $statusLabel }}</span>
+                                                </span>
+                                            </div>
+                                        </td>
+                                    @else
+                                        <td class="text-muted small mobile-hide">
+                                            {{ ($shipments->currentPage() - 1) * $shipments->perPage() + $loop->iteration }}
+                                        </td>
+                                    @endif
 
                                     <td>
                                         <div class="ship-row-main">
                                             <div class="shipment-inline">
-                                                <a class="code-link" href="{{ $actionRoute }}">
-                                                    {{ $shipment->code }}
-                                                </a>
+                                                <div class="shipment-document-head">
+                                                    <a class="code-link" href="{{ $actionRoute }}">
+                                                        {{ $shipment->code }}
+                                                    </a>
+                                                    @if(!$isAdmin)
+                                                        <span class="badge-status {{ $statusClass }}">{{ $statusLabel }}</span>
+                                                    @endif
+                                                </div>
 
-                                                @if($shipment->store)
-                                                    <span class="shipment-store">{{ $shipment->store->name ?: $shipment->store->code }}</span>
+                                                @if($isAdmin)
+                                                    <span class="shipment-store">{{ $typeLabel }}@if($shipment->store) · {{ $shipment->store->name ?: $shipment->store->code }}@endif</span>
+                                                @else
+                                                    @if($shipment->store)
+                                                        <span class="shipment-store">{{ $shipment->store->name ?: $shipment->store->code }}</span>
+                                                    @endif
+                                                    <span class="shipment-store">{{ $typeLabel }}</span>
                                                 @endif
-                                                <span class="shipment-store">{{ $typeLabel }}</span>
 
                                                 <div class="ship-row-meta d-md-none">
+                                                    <span>{{ number_format($orderCount, 0, ',', '.') }} order</span>
                                                     <span>{{ number_format($itemCount, 0, ',', '.') }} item</span>
                                                     <span>{{ number_format($qty, 0, ',', '.') }} qty</span>
-                                                    <span>{{ number_format($orderCount, 0, ',', '.') }} order</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </td>
 
-                                    <td class="shipment-time-cell">
-                                        <div class="shipment-time-stack" aria-label="Waktu shipment">
-                                            <span>{{ $fmtDate($shipment->created_at, 'd M Y H:i') }} WIB</span>
-                                            @if($shipment->posted_at)
-                                                <span>{{ $fmtDate($shipment->posted_at, 'd M Y H:i') }} WIB</span>
-                                            @elseif($shipment->updated_at)
-                                                <span>{{ $fmtDate($shipment->updated_at, 'd M Y H:i') }} WIB</span>
-                                            @endif
-                                        </div>
-                                    </td>
+                                    @if($canSeeShipmentTime)
+                                        <td class="shipment-time-cell">
+                                            <div class="shipment-time-stack" aria-label="Waktu shipment">
+                                                <span>{{ $fmtDate($shipment->created_at, 'd M Y H:i') }} WIB</span>
+                                                @if($shipment->posted_at)
+                                                    <span>{{ $fmtDate($shipment->posted_at, 'd M Y H:i') }} WIB</span>
+                                                @elseif($shipment->updated_at)
+                                                    <span>{{ $fmtDate($shipment->updated_at, 'd M Y H:i') }} WIB</span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                    @endif
 
-                                    <td class="mobile-hide">
-                                        <div class="package-summary" aria-label="Isi paket">
-                                            <span class="package-main">{{ number_format($itemCount, 0, ',', '.') }} item</span>
-                                            <span class="package-sub">{{ number_format($qty, 0, ',', '.') }} qty</span>
-                                            <span class="package-sub">{{ number_format($orderCount, 0, ',', '.') }} order</span>
-                                        </div>
-                                    </td>
+                                    @if($isAdmin)
+                                        <td class="shipment-dispatch-cell">
+                                            <span class="dispatch-badge {{ $dispatchClass }}">{{ $dispatchLabel }}</span>
+                                        </td>
+                                    @endif
 
-                                    <td>
-                                        <span class="badge-status {{ $statusClass }}">{{ $statusLabel }}</span>
+                                    <td class="text-end mobile-hide package-number-cell" aria-label="Total order">
+                                        {{ number_format($orderCount, 0, ',', '.') }}
+                                    </td>
+                                    <td class="text-end mobile-hide package-number-cell" aria-label="Jumlah item">
+                                        {{ number_format($itemCount, 0, ',', '.') }}
+                                    </td>
+                                    <td class="text-end mobile-hide package-number-cell" aria-label="Total qty">
+                                        {{ number_format($qty, 0, ',', '.') }}
                                     </td>
 
                                     <td class="text-end ship-row-action">
