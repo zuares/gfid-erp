@@ -732,6 +732,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $booking = MarketplaceBooking::create([
             'store_id' => $store->id,
             'booking_sn' => 'BOOKING-SPX-001',
+            'order_sn' => 'ORDER-SPX-001',
             'tracking_number' => $awb,
             'booking_status' => 'SHIPPED',
         ]);
@@ -747,6 +748,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
             ->assertSee('Booking ditemukan')
+            ->assertSee('>BOOKING-SPX-001</span>', false)
+            ->assertSee('>ORDER-SPX-001</span>', false)
             ->assertSee('SKU booking belum tersedia.')
             ->assertSee('data-order-marketplace="shopee" data-order-link-state="linked"', false)
             ->assertSee('data-order-link-state="linked"', false)
@@ -968,6 +971,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'store_id' => $store->id,
             'external_order_id' => 'ORDER-SPX-SKU-MISMATCH',
             'channel_order_id' => 'ORDER-SPX-SKU-MISMATCH',
+            'booking_sn' => 'BOOKING-SPX-SKU-MISMATCH',
             'shipping_awb_no' => $awb,
             'order_status' => 'SHIPPED',
             'order_date' => now(),
@@ -1002,6 +1006,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
             ->assertSee('TTD-BLK-M')
+            ->assertSee('>BOOKING-SPX-SKU-MISMATCH</span>', false)
+            ->assertSee('>ORDER-SPX-SKU-MISMATCH</span>', false)
             ->assertSee('Item berbeda')
             ->assertSee('>Periksa</div>', false)
             ->assertSee('sd-badge linked', false);

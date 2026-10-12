@@ -35,6 +35,9 @@
 .sd-order{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.65rem;border:1px solid rgba(148,163,184,.18);border-radius:8px;padding:.58rem .65rem}
 .sd-order{background:transparent;border-color:transparent}
 .sd-order-no{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#111827;word-break:break-word}
+.sd-order-identifiers{display:flex;flex-wrap:wrap;gap:.1rem .65rem;margin-top:.18rem;color:#64748b;font-size:.68rem;line-height:1.4}
+.sd-order-identifier{display:inline-flex;align-items:baseline;gap:.25rem;min-width:0}
+.sd-order-identifier-value{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#475569;overflow-wrap:anywhere}
 .sd-order-num{display:inline-flex;align-items:center;justify-content:center;min-width:1.5rem;height:1.5rem;padding:0 .35rem;border-radius:6px;background:rgba(148,163,184,.12);color:#475569;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;font-size:.78rem;flex-shrink:0}
 .sd-order-lead{display:flex;align-items:flex-start;gap:.55rem;min-width:0}
 .sd-order-group{display:block;padding:0;border:1px solid rgba(148,163,184,.2);border-radius:9px;overflow:hidden;background:#fff}
@@ -701,6 +704,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     $bookingItemCountsByScan = $bookingItemCountsByScan ?? [];
     $bookingOrderQtyByScan = $bookingOrderQtyByScan ?? [];
     $bookingStatusesByScan = $bookingStatusesByScan ?? [];
+    $bookingIdentifiersByScan = $bookingIdentifiersByScan ?? [];
     $mappedLines = $lines->filter(fn ($line) => !empty($line->shipment_order_scan_id))->values();
     $unmappedLines = $lines->filter(fn ($line) => empty($line->shipment_order_scan_id))->values();
     $mappedQty = (int) $mappedLines->sum('qty_scanned');
@@ -1047,10 +1051,22 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                     && $orderLines->count() === 1;
                                 $bookingOrderQty = $hasSingleBookingItem ? ($bookingOrderQtyByScan[$scan->id] ?? null) : null;
                                 $bookingStatus = $hasBookingOnly ? ($bookingStatusesByScan[$scan->id] ?? '') : '';
+                                $bookingIdentifiers = $bookingIdentifiersByScan[$scan->id] ?? [];
+                                $linkedOrder = $scan->fulfillment?->marketplaceOrder;
+                                $bookingNumber = trim((string) ($linkedOrder?->booking_sn ?: ($bookingIdentifiers['booking_sn'] ?? '')));
+                                $marketplaceOrderNumber = trim((string) ($linkedOrder?->channel_order_id
+                                    ?: $linkedOrder?->external_order_id
+                                    ?: ($bookingIdentifiers['order_sn'] ?? '')));
+                                $orderSearchText = strtolower(trim(implode(' ', array_filter([
+                                    $scan->order_no,
+                                    $scan->source,
+                                    $bookingNumber,
+                                    $marketplaceOrderNumber,
+                                ]))));
                                 $showSingleBookingSku = count($bookingSkus) === 1
                                     && $hasSingleBookingItem;
                             @endphp
-                            <div class="sd-order sd-order-group {{ $orderTheme }}" data-order-card data-order-marketplace="{{ $marketplaceGroupKey }}" data-order-link-state="{{ $hasMarketplaceLink ? 'linked' : 'unlinked' }}" data-order-problem="{{ $duplicateCount > 0 || $hasNoItems ? 'true' : 'false' }}" data-order-search="{{ strtolower($scan->order_no . ' ' . ($scan->source ?: '')) }}">
+                            <div class="sd-order sd-order-group {{ $orderTheme }}" data-order-card data-order-marketplace="{{ $marketplaceGroupKey }}" data-order-link-state="{{ $hasMarketplaceLink ? 'linked' : 'unlinked' }}" data-order-problem="{{ $duplicateCount > 0 || $hasNoItems ? 'true' : 'false' }}" data-order-search="{{ $orderSearchText }}">
                                 <div class="sd-order-lead">
                                     <div>
                                         <div class="sd-order-no">
@@ -1058,6 +1074,12 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                             @if($duplicateCount > 0)<span class="sd-duplicate-badge" title="Order ini discan lebih dari sekali">Duplikat</span>@endif
                                             @if($hasNoItems)<span class="sd-missing-item-badge" title="Order belum memiliki item">Belum ada item</span>@endif
                                         </div>
+                                        @if($bookingNumber !== '' || $marketplaceOrderNumber !== '')
+                                            <div class="sd-order-identifiers">
+                                                @if($bookingNumber !== '')<span class="sd-order-identifier"><span>Booking</span><span class="sd-order-identifier-value">{{ $bookingNumber }}</span></span>@endif
+                                                @if($marketplaceOrderNumber !== '')<span class="sd-order-identifier"><span>No. pesanan</span><span class="sd-order-identifier-value">{{ $marketplaceOrderNumber }}</span></span>@endif
+                                            </div>
+                                        @endif
                                         @if($canSeeScanDiagnostics)
                                             <div class="sd-muted">
                                                 @if(!$scanIsUnlinked)

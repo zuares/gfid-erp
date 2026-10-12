@@ -4053,11 +4053,16 @@ class ShipmentController extends Controller
         $bookingItemCountsByScan = [];
         $bookingOrderQtyByScan = [];
         $bookingStatusesByScan = [];
+        $bookingIdentifiersByScan = [];
         foreach ($bookingMatches as $scanId => $booking) {
             $skus = [];
             $bookingItems = is_array($booking->items) ? $booking->items : [];
             $bookingItemCountsByScan[$scanId] = count(array_filter($bookingItems, 'is_array'));
             $bookingStatusesByScan[$scanId] = strtoupper(trim((string) $booking->booking_status));
+            $bookingIdentifiersByScan[$scanId] = [
+                'booking_sn' => trim((string) $booking->booking_sn),
+                'order_sn' => trim((string) $booking->order_sn),
+            ];
             $singleBookingItem = $bookingItemCountsByScan[$scanId] === 1
                 ? collect($bookingItems)->first(fn ($item) => is_array($item))
                 : null;
@@ -4104,6 +4109,7 @@ class ShipmentController extends Controller
             'bookingItemCountsByScan',
             'bookingOrderQtyByScan',
             'bookingStatusesByScan',
+            'bookingIdentifiersByScan',
         ));
     }
 
