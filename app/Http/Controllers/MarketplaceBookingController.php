@@ -87,7 +87,12 @@ class MarketplaceBookingController extends Controller
             if (in_array($sub, ['to_arrange', 'packing', 'ready_ship'], true)) {
                 $q->where('listing_ready_sub', $sub);
             }
-        } elseif (in_array($tab, ['waiting', 'warehouse', 'shipped', 'cancelled'], true)) {
+        } elseif ($tab === 'warehouse') {
+            $q->whereNotNull('listing_warehouse_sub');
+            if (in_array($sub, ['waiting_purchase', 'shipped_to_buyer'], true)) {
+                $q->where('listing_warehouse_sub', $sub);
+            }
+        } elseif (in_array($tab, ['waiting', 'shipped', 'cancelled'], true)) {
             $q->where('listing_stage', $tab);
         }
 
@@ -96,6 +101,9 @@ class MarketplaceBookingController extends Controller
         $total = $tab === 'ready' && in_array($sub, ['to_arrange', 'packing', 'ready_ship'], true)
             ? $counts['ready_counts'][$sub]
             : ($counts['counts'][$tab] ?? $counts['counts']['all']);
+        if ($tab === 'warehouse' && in_array($sub, ['waiting_purchase', 'shipped_to_buyer'], true)) {
+            $total = $counts['warehouse_counts'][$sub];
+        }
         $lastPage = max(1, (int) ceil($total / $perPage));
         $page = min($page, $lastPage);
         $bookings = $q->with('store')->orderByDesc('create_time')->orderByDesc('id')
@@ -133,6 +141,7 @@ class MarketplaceBookingController extends Controller
                 // walaupun status booking Shopee sudah READY_TO_HANDOVER/SHIPPED.
                 'seller_process_visible'   => (bool) $b->listing_seller_visible,
                 'ready_sub'                => $b->listing_seller_visible ? $b->listing_ready_sub : null,
+                'warehouse_sub'            => $b->listing_warehouse_sub,
                 'items'                    => (!empty($b->items) && is_array($b->items)) ? $b->items : (optional($od)->items?->toArray() ?? []),
                 'fulfillment_status'       => optional($od)->fulfillment?->status,
                 // Data finansial mengikuti sumber yang sama dengan halaman Orders.

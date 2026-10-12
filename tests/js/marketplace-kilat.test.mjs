@@ -27,6 +27,7 @@ function response(sn, page = 1, total = 1007) {
         data: [{ booking_sn: sn, store_id: 1, booking_status: 'PROCESSED', tracking_number: 'SPXID06902531824A', items: [] }],
         counts: { all: 1007, ready: 107, waiting: 900, shipped: 0, warehouse: 0, cancelled: 0 },
         ready_counts: { all: 107, to_arrange: 7, packing: 100, ready_ship: 0 },
+        warehouse_counts: { all: 900, waiting_purchase: 200, shipped_to_buyer: 700 },
         pagination: { current_page: page, last_page: Math.ceil(total / 50), total, from: (page - 1) * 50 + 1, to: Math.min(page * 50, total) },
     };
 }
@@ -114,4 +115,78 @@ test('background refresh keeps visible rows, including on temporary network fail
     assert.match(document.getElementById('kiltBody').textContent, /261011AAR6JZMLGXZRI/);
     assert.match(document.getElementById('paginationInfo').textContent, /Pembaruan gagal/);
     assert.equal(document.getElementById('btnRefresh').disabled, false);
+});
+
+test('warehouse subtabs have independent filters, counts and pagination', async t => {
+    const { window, document, requests } = setup(t);
+    requests[0].reply(response('INITIAL'));
+    await flush();
+    assert.equal(document.querySelector('[data-tab="waiting"]'), null);
+    assert.match(document.querySelector('[data-tab="warehouse"]').textContent, /Gudang Shopee/);
+    assert.equal(document.getElementById('subTabWarehouseContainer').style.display, 'none');
+
+    window.switchSubTabReady('packing');
+    requests[1].reply(response('PACKING'));
+    await flush();
+    window.switchTab('warehouse');
+    assert.equal(document.getElementById('subTabReadyContainer').style.display, 'none');
+    assert.equal(document.getElementById('subTabWarehouseContainer').style.display, 'inline-flex');
+    assert.equal(requests[2].params.get('tab'), 'warehouse');
+    assert.equal(requests[2].params.get('sub'), 'all');
+    requests[2].reply(response('WAREHOUSE', 3, 900));
+    await flush();
+    assert.equal(document.getElementById('badge-sub-warehouse-waiting_purchase').textContent, '200');
+    assert.equal(document.getElementById('badge-sub-warehouse-shipped_to_buyer').textContent, '700');
+
+    const outbound = document.querySelector('#subTabWarehouseContainer [data-sub="shipped_to_buyer"]');
+    window.switchSubTabWarehouse('shipped_to_buyer', outbound);
+    assert.equal(requests[3].params.get('sub'), 'shipped_to_buyer');
+    assert.equal(requests[3].params.get('page'), '1');
+    assert.equal(outbound.classList.contains('active'), true);
+    requests[3].reply(response('OUTBOUND', 1, 700));
+    await flush();
+    document.getElementById('pageNext').click();
+    assert.equal(requests[4].params.get('sub'), 'shipped_to_buyer');
+    assert.equal(requests[4].params.get('page'), '2');
+    requests[4].reply(response('OUTBOUND-PAGE-2', 2, 700));
+    await flush();
+
+    window.switchTab('ready');
+    assert.equal(requests[5].params.get('sub'), 'packing');
+    assert.equal(document.getElementById('subTabWarehouseContainer').style.display, 'none');
+    requests[5].reply(response('PACKING'));
+    await flush();
+    window.switchTab('warehouse');
+    assert.equal(requests[6].params.get('sub'), 'shipped_to_buyer');
+    assert.equal(requests[6].params.get('page'), '1');
+    requests[6].reply(response('OUTBOUND', 1, 700));
+    await flush();
+    window.switchSubTabWarehouse('waiting_purchase');
+    assert.equal(requests[7].params.get('sub'), 'waiting_purchase');
+    assert.equal(requests[7].params.get('tab'), 'warehouse');
+});
+
+test('delivery to Shopee warehouse has a separate tab from warehouse inventory and outbound delivery', async t => {
+    const { window, document, requests } = setup(t);
+    requests[0].reply(response('INITIAL'));
+    await flush();
+    window.switchTab('warehouse');
+    requests[1].reply(response('WAREHOUSE'));
+    await flush();
+    window.switchSubTabWarehouse('shipped_to_buyer');
+    requests[2].reply(response('OUTBOUND'));
+    await flush();
+
+    const inboundTab = document.querySelector('[data-tab="shipped"]');
+    assert.match(inboundTab.textContent, /Dikirim ke Gudang Shopee/);
+    assert.doesNotMatch(document.getElementById('kiltHelp').textContent, /Dikirim ke DC/);
+    window.switchTab('shipped', inboundTab);
+    assert.equal(requests[3].params.get('tab'), 'shipped');
+    assert.equal(requests[3].params.get('sub'), 'all');
+    assert.equal(requests[3].params.get('page'), '1');
+    assert.equal(document.getElementById('subTabWarehouseContainer').style.display, 'none');
+    assert.equal(document.getElementById('subTabReadyContainer').style.display, 'none');
+    requests[3].reply(response('INBOUND'));
+    await flush();
+    assert.match(document.getElementById('kiltBody').textContent, /INBOUND/);
 });

@@ -111,7 +111,7 @@ class MarketplaceBookingStoredTest extends TestCase
         $result = $this->stored(['tab' => 'ready', 'per_page' => 1]);
         $this->assertSame(7, $result['pagination']['total']);
         $this->assertSame(['all' => 7, 'to_arrange' => 2, 'packing' => 2, 'ready_ship' => 3], $result['ready_counts']);
-        $this->assertSame(1, $result['counts']['warehouse']);
+        $this->assertSame(2, $result['counts']['warehouse']);
         $this->assertSame(2, $result['counts']['shipped']);
         $this->assertSame(3, $result['counts']['cancelled']);
         foreach (['to_arrange', 'packing', 'ready_ship'] as $sub) {
@@ -166,6 +166,72 @@ class MarketplaceBookingStoredTest extends TestCase
         }
         $this->assertSame('AWB-EXPLICIT', $this->stored()['data'][0]['tracking_number']);
         $this->assertSame(0, $this->stored(['search' => 'AWB-FALLBACK'])['pagination']['total']);
+    }
+
+    public function test_warehouse_subtabs_group_waiting_purchase_and_outbound_bookings_before_pagination(): void
+    {
+        $store = $this->activeStore();
+        foreach (['SHIPPED', 'MATCHED', 'PENDING', 'READY_TO_SHIP', 'PROCESSED', 'READY_TO_HANDOVER', 'COMPLETED', 'CANCELLED', 'UNKNOWN'] as $status) {
+            MarketplaceBooking::create([
+                'store_id' => $store->id, 'booking_sn' => "BOOKING-{$status}",
+                'booking_status' => $status, 'tracking_number' => "AWB-{$status}",
+            ]);
+        }
+        MarketplaceBooking::create([
+            'store_id' => $store->id, 'booking_sn' => 'PENDING-SELLER-ACTION', 'booking_status' => 'PENDING',
+        ]);
+
+        $result = $this->stored(['tab' => 'warehouse', 'per_page' => 1]);
+        $this->assertSame(10, $result['counts']['all']);
+        $this->assertSame(3, $result['counts']['warehouse']);
+        $this->assertSame(['all' => 3, 'waiting_purchase' => 1, 'shipped_to_buyer' => 2], $result['warehouse_counts']);
+        $this->assertSame(3, $result['pagination']['total']);
+        $this->assertSame(3, $result['pagination']['last_page']);
+        $this->assertCount(1, $result['data']);
+
+        $waiting = $this->stored(['tab' => 'warehouse', 'sub' => 'waiting_purchase']);
+        $this->assertSame(['BOOKING-SHIPPED'], array_column($waiting['data'], 'booking_sn'));
+        $this->assertSame('waiting_purchase', $waiting['data'][0]['warehouse_sub']);
+        $this->assertTrue($waiting['data'][0]['seller_process_visible']);
+
+        $outbound = $this->stored(['tab' => 'warehouse', 'sub' => 'shipped_to_buyer', 'per_page' => 1, 'page' => 2]);
+        $this->assertSame(2, $outbound['pagination']['total']);
+        $this->assertSame(2, $outbound['pagination']['current_page']);
+        $this->assertSame('shipped_to_buyer', $outbound['data'][0]['warehouse_sub']);
+        $this->assertSame(['all' => 3, 'waiting_purchase' => 1, 'shipped_to_buyer' => 2], $outbound['warehouse_counts']);
+        $allOutbound = $this->stored(['tab' => 'warehouse', 'sub' => 'shipped_to_buyer']);
+        $this->assertEqualsCanonicalizing(['BOOKING-MATCHED', 'BOOKING-PENDING'], array_column($allOutbound['data'], 'booking_sn'));
+
+        $seller = $this->stored(['tab' => 'ready']);
+        $this->assertContains('PENDING-SELLER-ACTION', array_column($seller['data'], 'booking_sn'));
+        $this->assertContains('BOOKING-PROCESSED', array_column($seller['data'], 'booking_sn'));
+        $this->assertContains('BOOKING-READY_TO_SHIP', array_column($seller['data'], 'booking_sn'));
+    }
+
+    public function test_warehouse_counts_and_subtabs_respect_store_and_awb_search(): void
+    {
+        $store = $this->activeStore();
+        $other = $this->activeStore('OTHER');
+        foreach ([$store, $other] as $s) {
+            foreach (['SHIPPED', 'MATCHED'] as $status) {
+                MarketplaceBooking::create([
+                    'store_id' => $s->id, 'booking_sn' => "BOOKING-{$status}",
+                    'booking_status' => $status, 'tracking_number' => "AWB-{$status}",
+                ]);
+            }
+        }
+        $result = $this->stored([
+            'tab' => 'warehouse', 'sub' => 'shipped_to_buyer',
+            'store_id' => $store->id, 'search' => 'AWB-MATCHED',
+        ]);
+        $this->assertSame(1, $result['pagination']['total']);
+        $this->assertSame($store->id, $result['data'][0]['store_id']);
+        $this->assertSame(['all' => 1, 'waiting_purchase' => 0, 'shipped_to_buyer' => 1], $result['warehouse_counts']);
+
+        $empty = $this->stored(['tab' => 'warehouse', 'sub' => 'waiting_purchase', 'search' => 'AWB-MATCHED']);
+        $this->assertSame([], $empty['data']);
+        $this->assertSame(0, $empty['pagination']['total']);
+        $this->assertSame(2, $empty['warehouse_counts']['shipped_to_buyer']);
     }
 
     public function test_stored_endpoint_exposes_warehouse_stage_for_shipped_booking(): void

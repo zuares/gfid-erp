@@ -52,6 +52,11 @@ class BookingListingService
 
         $classified = DB::query()->fromSub($stages, 'b')->select('b.*')
             ->selectRaw("CASE WHEN listing_stage = 'ready' OR has_seller_awb = 1 THEN 1 ELSE 0 END as listing_seller_visible")
+            // Group the existing warehouse and buyer-delivery lifecycle under one tab.
+            // Pending bookings still needing seller action must stay in seller processing.
+            ->selectRaw("CASE WHEN listing_stage = 'warehouse' THEN 'waiting_purchase'
+                WHEN listing_stage = 'waiting' AND listing_status IN ('MATCHED', 'PENDING') THEN 'shipped_to_buyer'
+                ELSE NULL END as listing_warehouse_sub")
             ->selectRaw("CASE WHEN is_confirmed = 1 OR has_seller_awb = 1 THEN 'ready_ship'
                 WHEN listing_needs_shipping = 1 THEN 'to_arrange'
                 ELSE 'packing' END as listing_ready_sub");
@@ -63,10 +68,11 @@ class BookingListingService
     {
         $counts = array_fill_keys(['all', 'ready', 'waiting', 'warehouse', 'shipped', 'cancelled'], 0);
         $ready = array_fill_keys(['all', 'to_arrange', 'packing', 'ready_ship'], 0);
+        $warehouse = array_fill_keys(['all', 'waiting_purchase', 'shipped_to_buyer'], 0);
         $groups = (clone $query)->toBase()
-            ->select('listing_stage', 'listing_seller_visible', 'listing_ready_sub')
+            ->select('listing_stage', 'listing_seller_visible', 'listing_ready_sub', 'listing_warehouse_sub')
             ->selectRaw('COUNT(*) as total')
-            ->groupBy('listing_stage', 'listing_seller_visible', 'listing_ready_sub')->get();
+            ->groupBy('listing_stage', 'listing_seller_visible', 'listing_ready_sub', 'listing_warehouse_sub')->get();
 
         foreach ($groups as $group) {
             $total = (int) $group->total;
@@ -79,8 +85,14 @@ class BookingListingService
                 $ready['all'] += $total;
                 $ready[$group->listing_ready_sub] += $total;
             }
+            if ($group->listing_warehouse_sub !== null) {
+                $warehouse['all'] += $total;
+                $warehouse[$group->listing_warehouse_sub] += $total;
+            }
         }
 
-        return ['counts' => $counts, 'ready_counts' => $ready];
+        $counts['warehouse'] = $warehouse['all'];
+
+        return ['counts' => $counts, 'ready_counts' => $ready, 'warehouse_counts' => $warehouse];
     }
 }

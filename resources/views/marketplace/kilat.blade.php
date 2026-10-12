@@ -78,7 +78,7 @@
     {{-- Penjelasan singkat agar owner tidak bingung --}}
     <div id="kiltHelp" class="orders-help">
         <span style="font-size:1rem">💡</span>
-        <span>Pesanan <strong>Kilat</strong> dikelola gudang Shopee. Alur: <strong>Perlu Proses Penjual</strong> → <strong>Dikirim ke DC</strong> → <strong>Disimpan di Gudang Shopee</strong> → <strong>Dikirim ke Pembeli</strong>. Kolom di bawah menampilkan status tiap pesanan secara ringkas.</span>
+        <span>Pesanan <strong>Kilat</strong> dikelola gudang Shopee. Alur: <strong>Perlu Proses Penjual</strong> → <strong>Dikirim ke Gudang Shopee</strong> → <strong>Gudang Shopee</strong>. Di Gudang Shopee, pesanan dikelompokkan menjadi <strong>Menunggu Pembelian</strong> dan <strong>Dikirim dari Gudang Shopee</strong>.</span>
     </div>
 
     {{-- TABS (label mengikuti alur Pesanan Kilat, ramah-owner) --}}
@@ -89,14 +89,11 @@
         <button class="ord-tab active" data-tab="ready" onclick="switchTab('ready', this)" title="Penjual perlu memproses / menyerahkan barang (READY_TO_SHIP/PROCESSED)">
             📦 Perlu Proses Penjual <span class="ord-badge urgent" id="badge-ready">—</span>
         </button>
-        <button class="ord-tab" data-tab="shipped" onclick="switchTab('shipped', this)" title="Barang sedang dikirim ke DC Shopee (READY_TO_HANDOVER/COMPLETED)">
-            🚚 Dikirim ke DC <span class="ord-badge" id="badge-shipped" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">—</span>
+        <button class="ord-tab" data-tab="shipped" onclick="switchTab('shipped', this)" title="Barang sedang dikirim dari penjual ke gudang Shopee (READY_TO_HANDOVER/COMPLETED)">
+            🚚 Dikirim ke Gudang Shopee <span class="ord-badge" id="badge-shipped" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">—</span>
         </button>
-        <button class="ord-tab" data-tab="warehouse" onclick="switchTab('warehouse', this)" title="Barang sudah berada di gudang Shopee (SHIPPED)">
-            🏬 Disimpan di Gudang Shopee <span class="ord-badge" id="badge-warehouse" style="background:#f5f3ff;color:#7c3aed;border-color:#ddd6fe">—</span>
-        </button>
-        <button class="ord-tab" data-tab="waiting" onclick="switchTab('waiting', this)" title="Barang di gudang Shopee, dalam perjalanan ke pembeli (MATCHED/PENDING)">
-            🏠 Dikirim ke Pembeli <span class="ord-badge" id="badge-waiting" style="background:#f0fdf4;color:#16a34a;border-color:#bbf7d0">—</span>
+        <button class="ord-tab" data-tab="warehouse" onclick="switchTab('warehouse', this)" title="Menunggu pembelian atau dikirim dari gudang Shopee">
+            🏬 Gudang Shopee <span class="ord-badge" id="badge-warehouse" style="background:#f5f3ff;color:#7c3aed;border-color:#ddd6fe">—</span>
         </button>
         <button class="ord-tab" data-tab="cancelled" onclick="switchTab('cancelled', this)" title="Dibatalkan / gagal (CANCELLED/FAILED)">
             ✖️ Dibatalkan <span class="ord-badge" id="badge-cancelled" style="background:#fef2f2;color:#dc2626;border-color:#fecaca">—</span>
@@ -109,6 +106,12 @@
         <button class="ord-subtab" data-sub="to_arrange" onclick="switchSubTabReady('to_arrange', this)">Perlu Diatur <span class="ord-badge bg-secondary urgent" id="badge-sub-ready-arrange">—</span></button>
         <button class="ord-subtab" data-sub="packing" onclick="switchSubTabReady('packing', this)">📦 Sedang Dikemas <span class="ord-badge bg-secondary" id="badge-sub-ready-packing">—</span></button>
         <button class="ord-subtab" data-sub="ready_ship" onclick="switchSubTabReady('ready_ship', this)">Siap Kirim <span class="ord-badge bg-secondary" id="badge-sub-ready-ship">—</span></button>
+    </div>
+
+    <div id="subTabWarehouseContainer" class="kilat-subtabs" style="display:none">
+        <button class="ord-subtab active" data-sub="all" onclick="switchSubTabWarehouse('all', this)">Semua <span class="ord-badge bg-secondary" id="badge-sub-warehouse-all">—</span></button>
+        <button class="ord-subtab" data-sub="waiting_purchase" onclick="switchSubTabWarehouse('waiting_purchase', this)">Menunggu Pembelian <span class="ord-badge bg-secondary" id="badge-sub-warehouse-waiting_purchase">—</span></button>
+        <button class="ord-subtab" data-sub="shipped_to_buyer" onclick="switchSubTabWarehouse('shipped_to_buyer', this)">Dikirim dari Gudang Shopee <span class="ord-badge bg-secondary" id="badge-sub-warehouse-shipped_to_buyer">—</span></button>
     </div>
 
     <div class="card-main">
@@ -340,9 +343,11 @@
     let currentTab = 'ready';
     let selectedStore = '';
     let subReady = 'all';
+    let subWarehouse = 'all';
     let currentPage = 1;
     let counts = {};
     let readyCounts = {};
+    let warehouseCounts = {};
     let pagination = {};
     let loadController = null;
     let loadVersion = 0;
@@ -357,11 +362,11 @@
 
     // Label status ramah-owner (bukan kode mentah Shopee).
     const STATUS_LABEL = {
-        MATCHED:       ['Dikirim ke Pembeli',   'fstatus-done'],
-        PENDING:       ['Dikirim ke Pembeli',   'fstatus-done'],
+        MATCHED:       ['Dikirim dari Gudang Shopee', 'fstatus-done'],
+        PENDING:       ['Dikirim dari Gudang Shopee', 'fstatus-done'],
         READY_TO_SHIP: ['Perlu Proses Penjual', 'fstatus-draft'],
         PROCESSED:     ['Sedang Diproses',      'fstatus-draft'],
-        SHIPPED:       ['Disimpan di Gudang Shopee', 'fstatus-pending'],
+        SHIPPED:       ['Menunggu Pembelian', 'fstatus-pending'],
         COMPLETED:     ['Selesai',              'fstatus-done'],
         CANCELLED:     ['Dibatalkan',           'fstatus-none'],
         FAILED:        ['Gagal',                'fstatus-none'],
@@ -500,9 +505,11 @@
         document.querySelectorAll('.ord-tab').forEach(t => t.classList.remove('active'));
         if(el) el.classList.add('active');
         currentTab = tabName;
-        // Sub-tab hanya untuk "Perlu Proses Penjual".
+        // Each parent tab keeps its own selected subtab.
         const sc = document.getElementById('subTabReadyContainer');
         if (sc) sc.style.display = (tabName === 'ready') ? 'inline-flex' : 'none';
+        const warehouseTabs = document.getElementById('subTabWarehouseContainer');
+        warehouseTabs.style.display = (tabName === 'warehouse') ? 'inline-flex' : 'none';
         currentPage = 1;
         load();
     };
@@ -515,14 +522,25 @@
         load();
     };
 
+    window.switchSubTabWarehouse = function(sub, el) {
+        subWarehouse = sub;
+        document.querySelectorAll('#subTabWarehouseContainer .ord-subtab').forEach(b => b.classList.remove('active'));
+        if(el) el.classList.add('active');
+        currentPage = 1;
+        load();
+    };
+
     // Counts include every matching booking, not just the current page.
     function updateBadges() {
-        for (const tab of ['all', 'waiting', 'ready', 'shipped', 'warehouse', 'cancelled']) {
+        for (const tab of ['all', 'ready', 'shipped', 'warehouse', 'cancelled']) {
             document.getElementById('badge-' + tab).textContent = counts[tab] ?? 0;
         }
         document.getElementById('badge-ready').classList.toggle('urgent', (counts.ready ?? 0) > 0);
         for (const [suffix, key] of Object.entries({all: 'all', arrange: 'to_arrange', packing: 'packing', ship: 'ready_ship'})) {
             document.getElementById('badge-sub-ready-' + suffix).textContent = readyCounts[key] ?? 0;
+        }
+        for (const sub of ['all', 'waiting_purchase', 'shipped_to_buyer']) {
+            document.getElementById('badge-sub-warehouse-' + sub).textContent = warehouseCounts[sub] ?? 0;
         }
     }
 
@@ -650,7 +668,7 @@
             if(searchInput.value.trim()) params.set('search', searchInput.value.trim());
             if(selectedStore) params.set('store_id', selectedStore);
             params.set('tab', currentTab);
-            params.set('sub', subReady);
+            params.set('sub', currentTab === 'warehouse' ? subWarehouse : currentTab === 'ready' ? subReady : 'all');
             params.set('page', currentPage);
             params.set('per_page', 50);
             const res = await api('/api/marketplace/bookings/stored?' + params.toString(), {signal: loadController.signal});
@@ -658,6 +676,7 @@
             bookings = (res && res.data) ? res.data : [];
             counts = res.counts ?? {};
             readyCounts = res.ready_counts ?? {};
+            warehouseCounts = res.warehouse_counts ?? {};
             pagination = res.pagination ?? {};
             currentPage = pagination.current_page ?? 1;
             render();
