@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Marketplace\MarketplaceLogisticsService;
+use App\Services\Marketplace\BookingListingService;
 
 use Illuminate\Http\Request;
 use App\Models\Store;
@@ -53,7 +54,12 @@ class MarketplaceBookingController extends Controller
             ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
             ->pluck('id');
 
-        $q = MarketplaceBooking::with('store')->whereIn('store_id', $storeIds);
+        $listing = app(BookingListingService::class);
+        $q = $listing->query($storeIds);
+
+        if ($request->filled('store_id')) {
+            $q->where('store_id', $request->integer('store_id'));
+        }
 
         if ($status !== '') {
             $q->where('booking_status', $status);
@@ -65,29 +71,43 @@ class MarketplaceBookingController extends Controller
                     ->orWhere('order_sn', 'like', $like)
                     ->orWhere('tracking_number', 'like', $like)
                     ->orWhere('package_number', 'like', $like)
-                    // AWB kadang hanya tersimpan pada order yang tertaut,
-                    // bukan pada row marketplace_bookings.
-                    ->orWhereExists(function ($linked) use ($like) {
-                        $linked->selectRaw('1')
-                            ->from('marketplace_orders as linked_orders')
-                            ->whereColumn('linked_orders.store_id', 'marketplace_bookings.store_id')
-                            ->where(function ($orderSearch) use ($like) {
-                                $orderSearch->where('linked_orders.shipping_awb_no', 'like', $like)
-                                    ->orWhere('linked_orders.channel_order_id', 'like', $like)
-                                    ->orWhere('linked_orders.booking_sn', 'like', $like);
-                            });
-                    });
+                    ->orWhere('effective_tracking_number', 'like', $like)
+                    ->orWhere('linked_channel_order_id', 'like', $like);
             });
         }
 
-        $bookings = $q->orderByDesc('create_time')->limit(1000)->get();
-        $orders = $this->linkedOrdersForBookings($bookings);
+        $counts = $listing->counts($q);
+        $tab = $request->query('tab', 'all');
+        if (! in_array($tab, ['all', 'ready', 'waiting', 'warehouse', 'shipped', 'cancelled'], true)) {
+            $tab = 'all';
+        }
+        $sub = $request->query('sub', 'all');
+        if ($tab === 'ready') {
+            $q->where('listing_seller_visible', 1);
+            if (in_array($sub, ['to_arrange', 'packing', 'ready_ship'], true)) {
+                $q->where('listing_ready_sub', $sub);
+            }
+        } elseif (in_array($tab, ['waiting', 'warehouse', 'shipped', 'cancelled'], true)) {
+            $q->where('listing_stage', $tab);
+        }
+
+        $perPage = max(1, min(100, $request->integer('per_page', 50)));
+        $page = max(1, $request->integer('page', 1));
+        $total = $tab === 'ready' && in_array($sub, ['to_arrange', 'packing', 'ready_ship'], true)
+            ? $counts['ready_counts'][$sub]
+            : ($counts['counts'][$tab] ?? $counts['counts']['all']);
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $lastPage);
+        $bookings = $q->with('store')->orderByDesc('create_time')->orderByDesc('id')
+            ->forPage($page, $perPage)->get();
+        $orders = MarketplaceOrder::with(['settlement', 'incomeEstimate', 'items', 'fulfillment'])
+            ->whereIn('id', $bookings->pluck('linked_order_id')->filter()->unique())->get()->keyBy('id');
 
         $data = $bookings->map(function ($b) use ($orders) {
             // Order sudah diambil sekaligus di atas agar endpoint tidak N+1 query.
-            $od = $this->orderForBooking($b, $orders);
+            $od = $orders->get($b->linked_order_id);
             $financial = $this->bookingFinancialPayload($od);
-            $trackingNumber = $b->tracking_number ?: optional($od)->shipping_awb_no;
+            $trackingNumber = $b->effective_tracking_number;
             return [
                 'store_id'                 => $b->store_id,
                 'store_name'               => optional($b->store)->name,
@@ -100,7 +120,7 @@ class MarketplaceBookingController extends Controller
                 'tracking_number'          => $trackingNumber,
                 'package_number'           => $b->package_number,
                 'shipping_document_status' => $b->shipping_document_status,
-                'needs_shipping'           => $b->needsShipping(),
+                'needs_shipping'           => (bool) $b->listing_needs_shipping,
                 'create_time'              => $b->create_time,
                 'update_time'              => $b->update_time,
                 'meta'                     => $b->meta,
@@ -108,10 +128,11 @@ class MarketplaceBookingController extends Controller
                 // dari penjual dan berada di alur fulfillment gudang Shopee.
                 // Kirim stage ter-normalisasi agar UI tidak perlu menebak dari
                 // beberapa kode status yang berbeda.
-                'fulfillment_stage'        => $this->bookingFulfillmentStage($b),
+                'fulfillment_stage'        => $b->listing_stage,
                 // AWB yang sudah terbit tetap perlu diproses/di-scan di Shipments,
                 // walaupun status booking Shopee sudah READY_TO_HANDOVER/SHIPPED.
-                'seller_process_visible'   => $this->sellerProcessVisible($b, $trackingNumber),
+                'seller_process_visible'   => (bool) $b->listing_seller_visible,
+                'ready_sub'                => $b->listing_seller_visible ? $b->listing_ready_sub : null,
                 'items'                    => (!empty($b->items) && is_array($b->items)) ? $b->items : (optional($od)->items?->toArray() ?? []),
                 'fulfillment_status'       => optional($od)->fulfillment?->status,
                 // Data finansial mengikuti sumber yang sama dengan halaman Orders.
@@ -126,71 +147,16 @@ class MarketplaceBookingController extends Controller
             'count'          => count($data),
             'source'         => 'db',
             'stores_queried' => $storeIds->count(),
+            ...$counts,
+            'pagination' => [
+                'current_page' => $page,
+                'last_page' => $lastPage,
+                'per_page' => $perPage,
+                'total' => $total,
+                'from' => $total ? ($page - 1) * $perPage + 1 : null,
+                'to' => $total ? min($page * $perPage, $total) : null,
+            ],
         ]);
-    }
-
-    protected function sellerProcessVisible(MarketplaceBooking $booking, ?string $trackingNumber): bool
-    {
-        $status = strtoupper(trim((string) $booking->booking_status));
-
-        // READY_TO_SHIP/PROCESSED adalah pekerjaan penjual meskipun AWB belum
-        // terbit. Status setelahnya tetap ditampilkan bila sudah ada AWB agar
-        // modul Shipments dapat mengecek/memindai resi.
-        return in_array($status, ['READY_TO_SHIP', 'PROCESSED'], true)
-            || (filled($trackingNumber)
-                && in_array($status, ['READY_TO_HANDOVER', 'SHIPPED'], true));
-    }
-
-    /**
-     * Ambil order yang tertaut ke booking dalam satu query, bukan satu query per
-     * baris. Booking lama biasanya hanya punya booking_sn; booking yang sudah
-     * MATCHED punya order_sn sekaligus.
-     */
-    protected function linkedOrdersForBookings($bookings)
-    {
-        $storeIds = $bookings->pluck('store_id')->filter()->unique()->values();
-        $bookingSns = $bookings->pluck('booking_sn')->filter()->unique()->values();
-        $orderSns = $bookings->pluck('order_sn')->filter()->unique()->values();
-
-        if ($storeIds->isEmpty() || ($bookingSns->isEmpty() && $orderSns->isEmpty())) {
-            return collect();
-        }
-
-        return MarketplaceOrder::with(['settlement', 'incomeEstimate', 'items', 'fulfillment'])
-            ->whereIn('store_id', $storeIds)
-            ->where(function ($query) use ($bookingSns, $orderSns) {
-                if ($orderSns->isNotEmpty()) {
-                    $query->whereIn('channel_order_id', $orderSns);
-                }
-                if ($bookingSns->isNotEmpty()) {
-                    $method = $orderSns->isNotEmpty() ? 'orWhereIn' : 'whereIn';
-                    $query->{$method}('booking_sn', $bookingSns);
-                }
-            })
-            ->get()
-            ->sortByDesc(fn (MarketplaceOrder $order) => $order->updated_at?->getTimestamp() ?? 0)
-            ->values();
-    }
-
-    protected function orderForBooking(MarketplaceBooking $booking, $orders): ?MarketplaceOrder
-    {
-        $sameOrder = $orders->first(function (MarketplaceOrder $order) use ($booking) {
-            if ((int) $order->store_id !== (int) $booking->store_id) {
-                return false;
-            }
-
-            return $booking->order_sn && $order->channel_order_id === $booking->order_sn;
-        });
-
-        if ($sameOrder) {
-            return $sameOrder;
-        }
-
-        return $orders->first(function (MarketplaceOrder $order) use ($booking) {
-            return (int) $order->store_id === (int) $booking->store_id
-                && $booking->booking_sn
-                && $order->booking_sn === $booking->booking_sn;
-        });
     }
 
     /** Data finansial yang dipakai tabel Pesanan Kilat. */
@@ -305,17 +271,6 @@ class MarketplaceBookingController extends Controller
         return $fallback !== null && $fallback !== '' && is_numeric($fallback)
             ? (float) $fallback
             : null;
-    }
-
-    protected function bookingFulfillmentStage(MarketplaceBooking $booking): string
-    {
-        return match (strtoupper((string) $booking->booking_status)) {
-            'SHIPPED' => 'warehouse',
-            'READY_TO_HANDOVER', 'COMPLETED' => 'shipped',
-            'READY_TO_SHIP', 'PROCESSED' => 'ready',
-            'CANCELLED', 'CANCELLED_BEFORE_SHIPPING', 'FAILED' => 'cancelled',
-            default => $booking->needsShipping() ? 'ready' : 'waiting',
-        };
     }
 
     /** Tarik & simpan booking dari Shopee untuk SEMUA toko aktif. */

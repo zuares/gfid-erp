@@ -145,6 +145,13 @@
                 </tbody>
             </table>
         </div>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 p-3" aria-label="Pagination pesanan kilat">
+            <span id="paginationInfo" class="text-muted small" aria-live="polite">Memuat...</span>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn-toolbar" id="pagePrev" disabled>← Sebelumnya</button>
+                <button type="button" class="btn-toolbar" id="pageNext" disabled>Berikutnya →</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -332,7 +339,16 @@
     let loading = false;
     let currentTab = 'ready';
     let selectedStore = '';
-    let subReady = 'all'; // sub-tab di dalam "Perlu Proses Penjual": all | to_arrange | packing
+    let subReady = 'all';
+    let currentPage = 1;
+    let counts = {};
+    let readyCounts = {};
+    let pagination = {};
+    let loadController = null;
+    let loadVersion = 0;
+    const pagePrev = document.getElementById('pagePrev');
+    const pageNext = document.getElementById('pageNext');
+    const paginationInfo = document.getElementById('paginationInfo');
 
     function fmtDate(ts){
         if(!ts) return '—';
@@ -357,25 +373,6 @@
         const [label, cls] = STATUS_LABEL[s] || [s.replace(/_/g,' '), 'fstatus-pending'];
         return `<span class="fstatus ${cls}" title="${s}">${label}</span>`;
     }
-
-    // Satu sumber kebenaran pemetaan status → tab, supaya jumlah antar-tab pasti pas.
-    function bucketOf(b){
-        const s = (b.booking_status||'').toUpperCase();
-        if (b.fulfillment_stage) return b.fulfillment_stage;
-        if (s === 'CANCELLED' || s === 'FAILED') return 'cancelled';
-        if (s === 'SHIPPED') return 'warehouse';
-        if (s === 'READY_TO_HANDOVER' || s === 'COMPLETED') return 'shipped';
-        if (s === 'READY_TO_SHIP' || s === 'PROCESSED' || b.needs_shipping) return 'ready';
-        return 'waiting'; // MATCHED, PENDING, atau status lain yang belum diproses
-    }
-
-    // Booking yang sudah punya AWB tetap perlu terlihat di tab ini agar bisa
-    // dipindai/dicek oleh modul Shipments. Status aslinya tetap dihitung untuk
-    // tab gudang atau dikirim, jadi informasi tidak hilang.
-    function isSellerProcessVisible(b){
-        return bucketOf(b) === 'ready' || b.seller_process_visible === true;
-    }
-
     // Bisa dilacak jika barang sudah bergerak (dikirim ke DC / ke pembeli) atau punya resi.
     function isTrackable(b){
         const s = (b.booking_status||'').toUpperCase();
@@ -459,7 +456,7 @@
     }
 
     function renderEmpty(filteredCount = 0) {
-        if(filteredCount === 0 && bookings.length > 0) {
+        if(filteredCount === 0 && (counts.all > 0 || searchInput.value.trim() || selectedStore || currentTab !== 'all')) {
             return `<tr>
                 <td colspan="6">
                     <div class="ord-empty">
@@ -506,65 +503,35 @@
         // Sub-tab hanya untuk "Perlu Proses Penjual".
         const sc = document.getElementById('subTabReadyContainer');
         if (sc) sc.style.display = (tabName === 'ready') ? 'inline-flex' : 'none';
-        render();
+        currentPage = 1;
+        load();
     };
 
     window.switchSubTabReady = function(sub, el) {
         subReady = sub;
         document.querySelectorAll('#subTabReadyContainer .ord-subtab').forEach(b => b.classList.remove('active'));
         if(el) el.classList.add('active');
-        render();
+        currentPage = 1;
+        load();
     };
 
-    // Sub-bucket di dalam "Perlu Proses Penjual".
-    function readySub(b){
-        if (b.seller_process_visible === true) return 'ready_ship';
-        if (b.fulfillment_status === 'confirmed') return 'ready_ship';               // Siap Kirim
-        if (b.needs_shipping) return 'to_arrange';                                  // Perlu Diatur
-        if ((b.booking_status||'').toUpperCase() === 'PROCESSED') return 'packing';  // Sedang Dikemas
-        return 'to_arrange';
-    }
-
-    function filterBookings(arr) {
-        let out = selectedStore ? arr.filter(b => String(b.store_id) === String(selectedStore)) : arr;
-        if (currentTab === 'all') return out;
-        out = out.filter(b => currentTab === 'ready' ? isSellerProcessVisible(b) : bucketOf(b) === currentTab);
-        if (currentTab === 'ready' && subReady !== 'all') {
-            out = out.filter(b => readySub(b) === subReady);
-        }
-        return out;
-    }
-
+    // Counts include every matching booking, not just the current page.
     function updateBadges() {
-        const cnt = { waiting: 0, ready: 0, shipped: 0, warehouse: 0, cancelled: 0 };
-        bookings.forEach(b => { cnt[bucketOf(b)]++; });
-        cnt.ready = bookings.filter(isSellerProcessVisible).length;
-        document.getElementById('badge-all').textContent = bookings.length;
-        document.getElementById('badge-waiting').textContent = cnt.waiting;
-        document.getElementById('badge-ready').textContent = cnt.ready;
-        document.getElementById('badge-shipped').textContent = cnt.shipped;
-        document.getElementById('badge-warehouse').textContent = cnt.warehouse;
-        document.getElementById('badge-cancelled').textContent = cnt.cancelled;
+        for (const tab of ['all', 'waiting', 'ready', 'shipped', 'warehouse', 'cancelled']) {
+            document.getElementById('badge-' + tab).textContent = counts[tab] ?? 0;
+        }
+        document.getElementById('badge-ready').classList.toggle('urgent', (counts.ready ?? 0) > 0);
+        for (const [suffix, key] of Object.entries({all: 'all', arrange: 'to_arrange', packing: 'packing', ship: 'ready_ship'})) {
+            document.getElementById('badge-sub-ready-' + suffix).textContent = readyCounts[key] ?? 0;
+        }
+    }
 
-        // Sembunyikan badge "urgent" (merah) di tab Siap Kirim bila memang 0.
-        const readyBadge = document.getElementById('badge-ready');
-        if (readyBadge) readyBadge.classList.toggle('urgent', cnt.ready > 0);
-
-        // Badge sub-tab "Perlu Proses Penjual".
-        let sAll = 0, sArrange = 0, sPacking = 0, sReadyShip = 0;
-        bookings.forEach(b => {
-            if (!isSellerProcessVisible(b)) return;
-            sAll++;
-            const sub = readySub(b);
-            if (sub === 'packing') sPacking++; 
-            else if (sub === 'ready_ship') sReadyShip++;
-            else sArrange++;
-        });
-        const setTxt = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
-        setTxt('badge-sub-ready-all', sAll);
-        setTxt('badge-sub-ready-arrange', sArrange);
-        setTxt('badge-sub-ready-packing', sPacking);
-        setTxt('badge-sub-ready-ship', sReadyShip);
+    function updatePagination() {
+        paginationInfo.textContent = pagination.total
+            ? `${pagination.from}–${pagination.to} dari ${pagination.total} pesanan · Halaman ${pagination.current_page}/${pagination.last_page}`
+            : '0 pesanan';
+        pagePrev.disabled = loading || currentPage <= 1;
+        pageNext.disabled = loading || currentPage >= (pagination.last_page ?? 1);
     }
 
     // Sel AWB ringkas untuk tabel: nomor + ikon lacak SPX bila ada.
@@ -578,7 +545,7 @@
     function render(){
         updateBadges();
         
-        const filtered = filterBookings(bookings);
+        const filtered = bookings; // Server has already filtered before pagination.
 
         if(filtered.length === 0){
             tbody.innerHTML = renderEmpty(filtered.length);
@@ -665,35 +632,62 @@
         });
     }
 
-    async function load(){
-        if(loading) return;
+    async function load({background = false} = {}){
+        const version = ++loadVersion;
+        loadController?.abort();
+        loadController = new AbortController();
+        const keepRows = background && bookings.length > 0;
+        let refreshError = false;
         loading = true; btnRefresh.disabled = true; btnSync.disabled = true;
-        
-        if (bookings.length === 0) {
+        pagePrev.disabled = true; pageNext.disabled = true;
+        if (!keepRows) {
+            paginationInfo.textContent = 'Memuat...';
             tbody.innerHTML = renderLoading("Memuat Data...", "Sedang mengambil informasi pesanan kilat.");
         }
         
         try{
             const params = new URLSearchParams();
             if(searchInput.value.trim()) params.set('search', searchInput.value.trim());
-            const res = await api('/api/marketplace/bookings/stored?' + params.toString());
+            if(selectedStore) params.set('store_id', selectedStore);
+            params.set('tab', currentTab);
+            params.set('sub', subReady);
+            params.set('page', currentPage);
+            params.set('per_page', 50);
+            const res = await api('/api/marketplace/bookings/stored?' + params.toString(), {signal: loadController.signal});
+            if (version !== loadVersion) return;
             bookings = (res && res.data) ? res.data : [];
+            counts = res.counts ?? {};
+            readyCounts = res.ready_counts ?? {};
+            pagination = res.pagination ?? {};
+            currentPage = pagination.current_page ?? 1;
             render();
         }catch(e){
+            if (version !== loadVersion || e.name === 'AbortError') return;
+            if (keepRows) {
+                refreshError = true;
+                return;
+            }
+            pagination = {};
             tbody.innerHTML = `<tr>
                 <td colspan="6">
                     <div class="ord-empty" style="color:#dc2626">
                         <div class="ord-empty-icon">⚠️</div>
                         <div style="font-weight:600">Gagal memuat data</div>
-                        <div style="font-size:0.8rem; margin-top:4px">${e.message}</div>
+                        <div style="font-size:0.8rem; margin-top:4px">${escHtml(e.message)}</div>
                     </div>
                 </td>
             </tr>`;
         }finally{
-            loading = false; btnRefresh.disabled = false; btnSync.disabled = false;
+            if (version === loadVersion) {
+                loading = false; btnRefresh.disabled = false; btnSync.disabled = false;
+                updatePagination();
+                if (refreshError) paginationInfo.textContent += ' · Pembaruan gagal, menampilkan data sebelumnya. Klik Refresh untuk mencoba lagi.';
+            }
         }
     }
 
+    pagePrev.addEventListener('click', () => { if (!loading && currentPage > 1) { currentPage--; load(); } });
+    pageNext.addEventListener('click', () => { if (!loading && currentPage < pagination.last_page) { currentPage++; load(); } });
     btnRefresh.addEventListener('click', load);
     btnSync.addEventListener('click', async () => {
         btnSync.disabled = true;
@@ -713,16 +707,19 @@
         const hasValue = searchInput.value.trim().length > 0;
         searchClearBtn.classList.toggle('visible', hasValue);
         clearTimeout(t);
-        t = setTimeout(load, 400);
+        t = setTimeout(() => { currentPage = 1; load(); }, 400);
     });
     searchClearBtn.addEventListener('click', () => {
         searchInput.value = '';
         searchClearBtn.classList.remove('visible');
+        clearTimeout(t);
+        currentPage = 1;
         load();
     });
     storeFilter.addEventListener('change', () => {
         selectedStore = storeFilter.value;
-        render();
+        currentPage = 1;
+        load();
     });
 
     const detailModalEl = document.getElementById('detailModal');
@@ -1053,8 +1050,8 @@
         if (Date.now() - lastPollAt >= 15000) {
             lastPollAt = Date.now();
             // Hanya poll jika halaman sedang aktif/terlihat
-            if (!document.hidden) {
-                load();
+            if (!document.hidden && !loading) {
+                load({background: true});
             }
         }
     }, 5000);
