@@ -19,7 +19,7 @@
         margin: 0 auto;
         padding: 0 .75rem 6rem;
         color: var(--sr-text);
-        background: #f8fafc;
+        background: #f6f8fb;
     }
 
     .sr-topbar {
@@ -33,7 +33,7 @@
         margin: 0 -.75rem;
         padding: .5rem .85rem;
         border-bottom: 1px solid rgba(148, 163, 184, .16);
-        background: rgba(248, 250, 252, .92);
+        background: rgba(255, 255, 255, .94);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
     }
@@ -122,8 +122,7 @@
         color: #6b7280;
         font-size: .77rem;
         font-weight: 500;
-        letter-spacing: .05em;
-        text-transform: uppercase;
+        letter-spacing: 0;
         text-decoration: none;
         cursor: pointer;
         transition: background .12s, color .12s, border-color .12s;
@@ -176,11 +175,11 @@
     }
 
     .sr-panel {
-        border: 1px solid rgba(148, 163, 184, .12);
+        border: 1px solid #dbe3ee;
         border-radius: 8px;
         background: #fff;
         overflow: hidden;
-        box-shadow: none;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, .035);
     }
 
     .sr-panel-body { padding: .72rem .85rem; }
@@ -229,10 +228,11 @@
     }
 
     .sr-stat {
-        border: 1px solid rgba(148, 163, 184, .12);
+        border: 1px solid #dbe3ee;
         border-radius: 8px;
         padding: .55rem .7rem;
         background: #fff;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, .035);
     }
 
     .sr-stat-label {
@@ -256,15 +256,21 @@
     }
 
     .sr-scan-card.mode-order {
-        --scan-accent: #2563eb;
-        --scan-accent-soft: #eff6ff;
-        --scan-accent-ring: rgba(37, 99, 235, .18);
+        --scan-accent: #6d5dd3;
+        --scan-accent-soft: #f8f7ff;
+        --scan-accent-border: #dcd8f7;
+        --scan-accent-badge: #eeebff;
+        --scan-accent-badge-text: #5747b3;
+        --scan-accent-ring: rgba(109, 93, 211, .18);
     }
 
     .sr-scan-card.mode-item {
-        --scan-accent: #059669;
-        --scan-accent-soft: #ecfdf5;
-        --scan-accent-ring: rgba(5, 150, 105, .18);
+        --scan-accent: #0f8f8c;
+        --scan-accent-soft: #f0fdfa;
+        --scan-accent-border: #bfe9e4;
+        --scan-accent-badge: #d9f7f3;
+        --scan-accent-badge-text: #0f716e;
+        --scan-accent-ring: rgba(15, 143, 140, .18);
     }
 
     .sr-mode-row {
@@ -280,19 +286,12 @@
         min-height: 26px;
         border-radius: 999px;
         padding: .18rem .68rem;
-        background: var(--sr-accent);
-        color: #fff;
+        border: 1px solid var(--scan-accent-border);
+        background: var(--scan-accent-badge);
+        color: var(--scan-accent-badge-text);
         font-size: .7rem;
         font-weight: 800;
         letter-spacing: .06em;
-    }
-
-    .sr-scan-card.mode-order .sr-mode {
-        background: #2563eb;
-    }
-
-    .sr-scan-card.mode-item .sr-mode {
-        background: #059669;
     }
 
     .sr-current {
@@ -305,17 +304,20 @@
     .sr-scan-input {
         min-height: 72px;
         border-radius: 10px !important;
-        border: 2px solid var(--scan-accent-ring, rgba(148, 163, 184, .22)) !important;
+        border: 1px solid var(--scan-accent-border, rgba(148, 163, 184, .22)) !important;
+        border-left: 4px solid var(--scan-accent, var(--sr-accent)) !important;
         background: var(--scan-accent-soft, #f8fafc);
         font-size: 1.35rem;
         font-weight: 800;
         letter-spacing: .03em;
         padding: .8rem 1rem;
         text-transform: uppercase;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .03);
     }
 
     .sr-scan-input:focus {
         border-color: var(--scan-accent, var(--sr-accent)) !important;
+        border-left-color: var(--scan-accent, var(--sr-accent)) !important;
         box-shadow: 0 0 0 .18rem var(--scan-accent-ring, var(--sr-accent-bg)) !important;
     }
 
@@ -323,12 +325,89 @@
 
     .sr-order-tools {
         padding: .55rem .7rem;
-        border-bottom: 1px solid rgba(148, 163, 184, .1);
-        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        background: #fff;
     }
+
+    .sr-order-tools-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: .75rem;
+        margin-bottom: .55rem;
+    }
+
+    .sr-section-title {
+        color: #1e293b;
+        font-size: .86rem;
+        font-weight: 800;
+    }
+
+    .sr-section-help {
+        margin-top: .12rem;
+        color: #64748b;
+        font-size: .7rem;
+        line-height: 1.35;
+    }
+
+    .sr-order-tools-count {
+        flex: 0 0 auto;
+        padding: .22rem .45rem;
+        border: 1px solid #dbeafe;
+        border-radius: 999px;
+        color: #1d4ed8;
+        background: #eff6ff;
+        font-size: .68rem;
+        font-weight: 800;
+    }
+
+    .sr-marketplace-tabs {
+        display: flex;
+        gap: .3rem;
+        margin: 0 0 .05rem;
+        padding: .22rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 9px;
+        background: #f8fafc;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .sr-marketplace-tabs::-webkit-scrollbar { display: none; }
+
+    .sr-marketplace-tab {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: .32rem;
+        min-height: 32px;
+        flex: 1 0 0;
+        padding: .24rem .58rem;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        color: #64748b;
+        background: transparent;
+        font-size: .68rem;
+        font-weight: 750;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: background .12s ease, color .12s ease, border-color .12s ease, box-shadow .12s ease;
+    }
+
+    .sr-marketplace-tab:hover { background: #f1f5f9; color: #334155; }
+    .sr-marketplace-tab.active { color: #334155; border-color: #dbe3ee; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .06); }
+    .sr-marketplace-tab-count { color: #94a3b8; font-size: .64rem; font-weight: 850; }
+    .sr-marketplace-tab::before { content: ''; width: 5px; height: 5px; border-radius: 999px; background: #94a3b8; }
+    .sr-marketplace-tab[data-order-marketplace-tab="shopee"]::before { background: #f97316; }
+    .sr-marketplace-tab[data-order-marketplace-tab="tiktok"]::before { background: #0f8f8c; }
+    .sr-marketplace-tab[data-order-marketplace-tab="anomaly"]::before { background: #d97706; }
+    .sr-marketplace-tab[data-order-marketplace-tab="shopee"].active { color: #c2410c; border-color: #fed7aa; background: #fff7ed; }
+    .sr-marketplace-tab[data-order-marketplace-tab="tiktok"].active { color: #0f716e; border-color: #bfe9e4; background: #f0fdfa; }
+    .sr-marketplace-tab[data-order-marketplace-tab="anomaly"].active { color: #a16207; border-color: #fde68a; background: #fffbeb; }
 
     .sr-order-search {
         min-height: 42px;
+        margin: .2rem 0 .7rem;
         border-radius: 8px !important;
         font-size: .9rem;
     }
@@ -359,16 +438,31 @@
     }
 
     .sr-order {
-        border: 1px solid rgba(96, 165, 250, .35);
+        border: 1px solid #dbe3ee;
         border-radius: 8px;
-        background: #eff6ff;
+        background: #fff;
         overflow: hidden;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, .025);
     }
 
     .sr-order.active {
-        border-color: rgba(37, 99, 235, .35);
-        box-shadow: 0 0 0 2px rgba(37, 99, 235, .06);
+        border-color: rgba(37, 99, 235, .48);
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, .08);
     }
+
+    .sr-order.sr-theme-shopee .sr-order-head {
+        border-bottom-color: #fed7aa;
+        background: #fff7ed;
+    }
+
+    .sr-order.sr-theme-shopee .sr-order-code { color: #c2410c; }
+
+    .sr-order.sr-theme-green .sr-order-head {
+        border-bottom-color: #bbf7d0;
+        background: #f0fdf4;
+    }
+
+    .sr-order.sr-theme-green .sr-order-code { color: #15803d; }
 
     .sr-order-head {
         display: grid;
@@ -376,9 +470,12 @@
         align-items: center;
         gap: .5rem;
         padding: .55rem .7rem;
-        background: #eaf2ff;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
         cursor: pointer;
     }
+
+    .sr-order.active .sr-order-head { background: #eff6ff; }
 
     .sr-order-code {
         color: #0f172a;
@@ -438,20 +535,56 @@
 
     .sr-order-items {
         border-top: 1px solid rgba(148, 163, 184, .1);
-        padding: .4rem .55rem .55rem;
+        padding: 0;
         display: grid;
-        gap: .35rem;
-        background: rgba(255, 255, 255, .58);
+        gap: 0;
+        background: #fff;
     }
+
+    .sr-items-head {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto auto;
+        align-items: center;
+        gap: .5rem;
+        padding: .52rem .65rem;
+        border-bottom: 1px solid #dbe3ee;
+        background: #f8fafc;
+        color: #64748b;
+        font-size: .62rem;
+        font-weight: 850;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+    }
+
+    .sr-items-head span:nth-child(3) { text-align: center; }
 
     .sr-item-row {
         display: grid;
         grid-template-columns: auto minmax(0, 1fr) auto auto;
         align-items: center;
         gap: .5rem;
-        padding: .45rem .55rem;
-        border-radius: 7px;
+        padding: .58rem .65rem;
+        border-bottom: 1px solid #edf1f6;
+        border-radius: 0;
         background: #fff;
+        transition: background .12s ease;
+    }
+
+    .sr-item-row:hover { background: #f8fafc; }
+    .sr-item-row.is-scan-highlight {
+        background: #ecfdf5;
+        box-shadow: inset 3px 0 0 #0f8f8c;
+        animation: sr-item-scan-highlight 1.8s ease-out both;
+    }
+    .sr-item-row.is-scan-highlight .sr-item-index {
+        background: #ccfbf1;
+        color: #0f716e;
+    }
+    .sr-item-row:last-child { border-bottom: 0; }
+
+    @keyframes sr-item-scan-highlight {
+        0% { background: #ccfbf1; }
+        100% { background: #fff; }
     }
 
     .sr-item-index {
@@ -481,9 +614,109 @@
     }
 
     .sr-item-qty {
-        font-weight: 850;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: .32rem;
+        min-width: 64px;
+        padding: .28rem .5rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 7px;
         color: #334155;
-        font-size: .85rem;
+        background: #f8fafc;
+        font-size: .78rem;
+        font-weight: 850;
+        white-space: nowrap;
+    }
+
+    .sr-item-qty-label {
+        color: #64748b;
+        font-size: .62rem;
+        font-weight: 750;
+        letter-spacing: .03em;
+        text-transform: uppercase;
+    }
+
+    .sr-item-qty-value {
+        color: #0f172a;
+        font-size: .84rem;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sr-qty-edit {
+        display: inline-flex;
+        align-items: center;
+        gap: .18rem;
+        justify-self: end;
+        padding: .18rem .22rem .18rem .45rem;
+        border: 1px solid rgba(148, 163, 184, .28);
+        border-radius: 8px;
+        background: #f8fafc;
+    }
+
+    .sr-qty-cell {
+        justify-self: end;
+    }
+
+    .sr-qty-label {
+        color: #64748b;
+        font-size: .62rem;
+        font-weight: 850;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    .sr-qty-input {
+        width: 46px;
+        min-height: 30px;
+        padding: .2rem .25rem;
+        border: 0;
+        border-radius: 5px;
+        color: #334155;
+        background: #fff;
+        font-size: .78rem;
+        font-weight: 850;
+        text-align: right;
+    }
+
+    .sr-qty-input:focus {
+        outline: 2px solid rgba(37, 99, 235, .2);
+        outline-offset: 1px;
+    }
+
+    .sr-qty-save {
+        min-height: 30px;
+        padding: .2rem .55rem;
+        border: 1px solid #2563eb;
+        border-radius: 6px;
+        background: #2563eb;
+        color: #fff;
+        font-size: .7rem;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .sr-qty-save:hover { background: #1d4ed8; border-color: #1d4ed8; }
+    .sr-qty-save:disabled { opacity: .55; cursor: wait; }
+
+    .sr-qty-trigger {
+        border: 1px solid #cbd5e1;
+        cursor: pointer;
+        font: inherit;
+    }
+
+    .sr-qty-trigger:hover {
+        border-color: rgba(37, 99, 235, .3);
+        background: #eff6ff;
+        color: #1d4ed8;
+    }
+
+    @media (max-width: 640px) {
+        .sr-items-head { grid-template-columns: auto minmax(0, 1fr) auto; }
+        .sr-items-head span:last-child { display: none; }
+        .sr-item-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+        .sr-item-delete { grid-column: 3; grid-row: 2; justify-self: end; }
+        .sr-qty-cell { grid-column: 3; grid-row: 1; }
     }
 
     .sr-actions {
@@ -707,6 +940,7 @@
         ->values();
 
     $canDeleteShipmentRows = auth()->user()?->role === 'owner';
+    $canEditShipmentQty = auth()->user()?->role === 'owner';
 @endphp
 
     @php
@@ -804,7 +1038,34 @@
 
         <div class="sr-panel sr-order-section">
             <div class="sr-order-tools" id="orderTools">
+                <div class="sr-order-tools-head">
+                    <div>
+                        <div class="sr-section-title">Order tercatat</div>
+                        <div class="sr-section-help">
+                            @if($canEditShipmentQty)
+                                Klik qty item untuk mengubah jumlah.
+                            @else
+                                Pilih order untuk melihat item yang tercatat.
+                            @endif
+                        </div>
+                    </div>
+                    <span class="sr-order-tools-count" id="orderToolsCount">0 order</span>
+                </div>
                 <input type="search" id="orderSearch" class="form-control sr-order-search" placeholder="Cari order" autocomplete="off">
+                <div class="sr-marketplace-tabs" role="tablist" aria-label="Filter order berdasarkan marketplace">
+                    <button type="button" class="sr-marketplace-tab active" data-order-marketplace-tab="all" role="tab" aria-selected="true">
+                        <span>Semua</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="all">0</span>
+                    </button>
+                    <button type="button" class="sr-marketplace-tab" data-order-marketplace-tab="shopee" role="tab" aria-selected="false">
+                        <span>Shopee</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="shopee">0</span>
+                    </button>
+                    <button type="button" class="sr-marketplace-tab" data-order-marketplace-tab="tiktok" role="tab" aria-selected="false">
+                        <span>TikTok</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="tiktok">0</span>
+                    </button>
+                    <button type="button" class="sr-marketplace-tab" data-order-marketplace-tab="anomaly" role="tab" aria-selected="false">
+                        <span>Anomali</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="anomaly">0</span>
+                    </button>
+                </div>
             </div>
             <div class="sr-panel-body sr-order-panel-body">
                 <div class="sr-orders" id="ordersWrap">
@@ -842,11 +1103,13 @@
     const csrf = @json(csrf_token());
     const isDraft = @json($shipment->status === 'draft');
     const canDelete = @json($canDeleteShipmentRows);
+    const canEditQty = @json($canEditShipmentQty);
     const initialOrders = @json($initialOrders);
     const initialLines = @json($initialLines);
 
-    const state = { mode: 'order', current: null, expanded: null, search: '', orders: [] };
+    const state = { mode: 'order', current: null, expanded: null, search: '', marketplaceTab: 'all', highlightedItemKey: null, orders: [] };
     const lastScanStack = [];
+    let highlightTimer = null;
 
     const scanInput = document.getElementById('scanInput');
     const scanCard = document.getElementById('scanCard');
@@ -856,9 +1119,11 @@
     const nextOrderBtn = document.getElementById('nextOrderBtn');
     const orderSearch = document.getElementById('orderSearch');
     const ordersWrap = document.getElementById('ordersWrap');
+    const marketplaceTabs = document.querySelectorAll('[data-order-marketplace-tab]');
     const sumOrders = document.getElementById('sumOrders');
     const sumItems = document.getElementById('sumItems');
     const sumQty = document.getElementById('sumQty');
+    const orderToolsCount = document.getElementById('orderToolsCount');
     const submitBtn = document.getElementById('submitBtn');
     const toastEl = document.getElementById('toast');
 
@@ -871,6 +1136,41 @@
         const normalized = String(value ?? '').trim();
         if (!normalized || ['undefined', 'null', 'nan'].includes(normalized.toLowerCase())) return '';
         return normalized.toUpperCase();
+    }
+
+    function orderTheme(orderCode) {
+        const code = normalize(orderCode);
+        if (code.startsWith('SPX')) return 'sr-theme-shopee';
+        if (code.startsWith('JY')) return 'sr-theme-green';
+        return '';
+    }
+
+    function marketplaceGroup(orderCode) {
+        const code = normalize(orderCode);
+        if (code.startsWith('SPX') || code.startsWith('SHP') || code.includes('SHOPEE')) return 'shopee';
+        if (code.startsWith('JY') || code.startsWith('TTK') || code.includes('TIKTOK')) return 'tiktok';
+        return 'anomaly';
+    }
+
+    function itemHighlightKey(orderCode, itemOrLineId, itemCode = '') {
+        const lineId = typeof itemOrLineId === 'object'
+            ? (itemOrLineId.line_id || itemOrLineId.id || itemOrLineId.code || itemOrLineId.item_code || '')
+            : itemOrLineId;
+        return `${normalize(orderCode)}::${normalize(lineId || itemCode)}`;
+    }
+
+    function highlightScannedItem(orderCode, itemOrLineId, itemCode = '') {
+        state.highlightedItemKey = itemHighlightKey(orderCode, itemOrLineId, itemCode);
+        render();
+        clearTimeout(highlightTimer);
+        highlightTimer = setTimeout(() => {
+            state.highlightedItemKey = null;
+            render();
+        }, 1800);
+    }
+
+    function selectMarketplaceForOrder(orderCode) {
+        state.marketplaceTab = marketplaceGroup(orderCode);
     }
 
     function isNextOrderCommand(code) {
@@ -944,8 +1244,9 @@
                 { freq: 784, duration: 0.08, gap: 0.045 },
             ],
             orderRepeat: [
-                { freq: 659, duration: 0.055, gap: 0 },
-                { freq: 659, duration: 0.055, gap: 0.04 },
+                { freq: 440, duration: 0.07, gap: 0, type: 'triangle', volume: 0.27 },
+                { freq: 330, duration: 0.075, gap: 0.045, type: 'triangle', volume: 0.27 },
+                { freq: 440, duration: 0.06, gap: 0.04, type: 'triangle', volume: 0.27 },
             ],
             next: [
                 { freq: 523, duration: 0.06, gap: 0 },
@@ -1056,6 +1357,7 @@
             } catch (_) {
                 scanInput.focus();
             }
+
         }, 40);
     }
 
@@ -1167,13 +1469,31 @@
 
     function filteredOrders() {
         const query = normalize(state.search);
-        if (!query) return state.orders;
         return state.orders.filter(order => {
+            if (state.marketplaceTab !== 'all' && marketplaceGroup(order.code) !== state.marketplaceTab) return false;
+            if (!query) return true;
             if (order.code.includes(query)) return true;
             return Object.values(order.items || {}).some(item => {
                 return normalize(item.code).includes(query) || normalize(item.name).includes(query);
             });
         });
+    }
+
+    function updateMarketplaceTabs(visibleOrders) {
+        const counts = { all: state.orders.length, shopee: 0, tiktok: 0, anomaly: 0 };
+        state.orders.forEach(order => {
+            counts[marketplaceGroup(order.code)] += 1;
+        });
+
+        marketplaceTabs.forEach(tab => {
+            const key = tab.dataset.orderMarketplaceTab || 'all';
+            tab.classList.toggle('active', state.marketplaceTab === key);
+            tab.setAttribute('aria-selected', state.marketplaceTab === key ? 'true' : 'false');
+            const count = tab.querySelector('[data-order-marketplace-count]');
+            if (count) count.textContent = counts[key] ?? 0;
+        });
+
+        if (orderToolsCount) orderToolsCount.textContent = `${visibleOrders.length} order`;
     }
 
     function render() {
@@ -1191,6 +1511,10 @@
         if (sumOrders) {
             sumOrders.textContent = state.orders.filter(order => order.code !== 'BELUM DIKELOMPOKKAN').length;
         }
+        if (orderToolsCount) {
+            orderToolsCount.textContent = `${orders.length} order`;
+        }
+        updateMarketplaceTabs(orders);
         if (sumItems) sumItems.textContent = totalItems || initialLines.length || 0;
         if (sumQty) {
             const initialQty = (initialLines || []).reduce((total, line) => total + Number(line.qty || 0), 0);
@@ -1206,7 +1530,7 @@
         if (!ordersWrap) return;
 
         if (!orders.length) {
-            ordersWrap.innerHTML = '<div class="sr-empty">Belum ada item shipment.</div>';
+            ordersWrap.innerHTML = '<div class="sr-empty">Belum ada order pada tab ini.</div>';
             return;
         }
 
@@ -1221,15 +1545,29 @@
                     const deleteButton = canDelete && item.line_id
                         ? `<button type="button" class="sr-delete-btn sr-item-delete" data-delete-line="${esc(item.line_id)}" data-order-code="${esc(order.code)}" title="Hapus item">×</button>`
                         : '';
+                    const qtyControl = canEditQty && item.line_id
+                        ? `<div class="sr-qty-cell">
+                                <button type="button" class="sr-item-qty sr-qty-trigger" data-edit-qty-trigger data-line-id="${esc(item.line_id)}" aria-label="Edit qty ${esc(item.code || 'item')}" title="Klik untuk edit qty">
+                                    <strong class="sr-item-qty-value">${Number(item.qty || 0)}</strong>
+                                </button>
+                                <form class="sr-qty-edit" data-edit-qty data-line-id="${esc(item.line_id)}" data-order-code="${esc(order.code)}" hidden>
+                                    <span class="sr-qty-label">Qty</span>
+                                    <input type="number" class="sr-qty-input" min="0" value="${Math.max(0, Number(item.qty || 0))}" aria-label="Qty ${esc(item.code || 'item')}">
+                                    <button type="submit" class="sr-qty-save">Simpan</button>
+                                </form>
+                           </div>`
+                        : `<div class="sr-item-qty"><strong class="sr-item-qty-value">${Number(item.qty || 0)}</strong></div>`;
+
+                    const isScanHighlighted = state.highlightedItemKey === itemHighlightKey(order.code, item);
 
                     return `
-                        <div class="sr-item-row">
+                        <div class="sr-item-row ${isScanHighlighted ? 'is-scan-highlight' : ''}">
                             <span class="sr-item-index" aria-label="Item ${index + 1}">${index + 1}</span>
                             <div>
                                 <div class="sr-item-code">${esc(item.code || '-')}</div>
                                 <div class="sr-item-name">${esc(item.name || '')}</div>
                             </div>
-                            <div class="sr-item-qty">x${Number(item.qty || 0)}</div>
+                            ${qtyControl}
                             ${deleteButton}
                         </div>
                     `;
@@ -1241,7 +1579,7 @@
                 : '';
 
             return `
-                <div class="sr-order ${isActive ? 'active' : ''}" data-order-code="${esc(order.code)}">
+                <div class="sr-order ${isActive ? 'active' : ''} ${orderTheme(order.code)}" data-order-code="${esc(order.code)}">
                     <div class="sr-order-head" data-toggle-order="${esc(order.code)}">
                         <div>
                             <div class="sr-order-code">${esc(order.code)}</div>
@@ -1251,7 +1589,7 @@
                         ${deleteOrderButton}
                         <div class="sr-order-chevron">${expanded ? '▲' : '▼'}</div>
                     </div>
-                    ${expanded ? `<div class="sr-order-items">${rows}</div>` : ''}
+                    ${expanded ? `<div class="sr-order-items">${items.length ? '<div class="sr-items-head"><span>No</span><span>Kode Item</span><span>Qty</span><span>' + (canDelete ? 'Aksi' : '') + '</span></div>' : ''}${rows}</div>` : ''}
                 </div>
             `;
         }).join('');
@@ -1317,6 +1655,66 @@
                         this.disabled = false;
                         alertError(error.message || 'Gagal menghapus item.', 'errorNetwork');
                     });
+            });
+        });
+
+        ordersWrap.querySelectorAll('[data-edit-qty-trigger]').forEach(trigger => {
+            trigger.addEventListener('click', function (event) {
+                event.stopPropagation();
+
+                const cell = this.closest('.sr-qty-cell');
+                const form = cell?.querySelector('[data-edit-qty]');
+                const input = form?.querySelector('.sr-qty-input');
+                if (!form || !input) return;
+
+                this.hidden = true;
+                form.hidden = false;
+                input.focus();
+                input.select();
+            });
+        });
+
+        ordersWrap.querySelectorAll('[data-edit-qty]').forEach(form => {
+            form.addEventListener('click', event => event.stopPropagation());
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const lineId = this.dataset.lineId;
+                const orderCode = this.dataset.orderCode;
+                const input = this.querySelector('.sr-qty-input');
+                const qty = Number(input?.value);
+
+                if (!lineId || !Number.isInteger(qty) || qty < 0) {
+                    toast('err', 'Qty harus berupa angka 0 atau lebih.');
+                    return;
+                }
+
+                const button = this.querySelector('.sr-qty-save');
+                if (button) button.disabled = true;
+
+                updateLineQty(lineId, qty)
+                    .then(payload => {
+                        if (payload.deleted) {
+                            removeItemLocal(orderCode, lineId);
+                        } else {
+                            updateItemLocalQty(orderCode, lineId, qty);
+                        }
+                        toast('ok', payload.message || 'Qty berhasil diperbarui.');
+                        render();
+                    })
+                    .catch(error => {
+                        if (button) button.disabled = false;
+                        toast('err', error.message || 'Gagal memperbarui qty.');
+                    });
+            });
+
+            form.querySelector('.sr-qty-input')?.addEventListener('keydown', function (event) {
+                if (event.key !== 'Escape') return;
+
+                event.preventDefault();
+                form.hidden = true;
+                form.closest('.sr-qty-cell')?.querySelector('[data-edit-qty-trigger]')?.removeAttribute('hidden');
             });
         });
     }
@@ -1538,7 +1936,7 @@
             }
         }
 
-        return false;
+        return true;
     }
 
     function nextOrderCommand() {
@@ -1563,11 +1961,40 @@
 
         const existingOrder = findOrder(code);
         if (existingOrder) {
-            state.current = existingOrder.code;
-            state.expanded = existingOrder.code;
+            selectMarketplaceForOrder(existingOrder.code);
+            render();
+
+            const continueExistingOrder = () => {
+                state.current = existingOrder.code;
+                state.expanded = existingOrder.code;
+                toast('ok', `Kembali ke order ${existingOrder.code}`);
+                setMode('item');
+            };
+
             playTone('orderRepeat');
-            toast('ok', `Kembali ke order ${existingOrder.code}`);
-            setMode('item');
+
+            if (window.Swal) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Order sudah discan',
+                    text: `${existingOrder.code} sudah ada. Lanjut scan item untuk order ini?`,
+                    showCancelButton: true,
+                    confirmButtonText: 'Lanjut scan item',
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: '#2563eb',
+                    cancelButtonColor: '#64748b',
+                }).then(result => {
+                    if (result.isConfirmed) continueExistingOrder();
+                    else focusScan({ preventScroll: true });
+                });
+                return;
+            }
+
+            if (window.confirm(`Order ${existingOrder.code} sudah ada. Lanjut scan item untuk order ini?`)) {
+                continueExistingOrder();
+            } else {
+                focusScan({ preventScroll: true });
+            }
             return;
         }
 
@@ -1588,6 +2015,7 @@
             const orderCode = normalize(payload.order?.code || payload.order?.order_no || code);
             if (!orderCode) throw new Error('Nomor order tidak tersedia. Scan ulang nomor order tersebut.');
             ensureOrder(orderCode, { label: payload.order?.label || 'Pencatatan order' });
+            selectMarketplaceForOrder(orderCode);
             playTone(payload.created ? 'order' : 'orderRepeat');
             toast('ok', payload.message || `Order ${orderCode} tercatat`);
             setMode('item');
@@ -1652,13 +2080,14 @@
                 const line = payload.line || payload.data?.line || null;
 
                 if (line) {
+                    const scannedItemCode = line.item_code || line.code || code;
                     const beforeScanFound = findLocalOrderItem(order.code, line.id, line.item_code || line.code || code);
                     const beforeScanQty = readItemQty(beforeScanFound.item);
 
                     upsertItem(order.code, {
                         line_id: line.id,
                         item_id: line.item_id,
-                        code: line.item_code || line.code || code,
+                        code: scannedItemCode,
                         name: line.item_name || line.name || '',
                         qty: beforeScanQty + 1,
                     });
@@ -1667,10 +2096,12 @@
                     lastScanStack.push({
                         orderCode: order.code,
                         lineId: line.id,
-                        code: line.item_code || line.code || code,
+                        code: scannedItemCode,
                         qtyAfter: readItemQty(afterScanItem),
                         backendQtyAfter: Number(line.qty_scanned || line.qty || 1),
                     });
+
+                    highlightScannedItem(order.code, line.id, scannedItemCode);
 
                     playTone('item');
                     toast('ok', payload.message || `+1 ${line.item_code || line.code || code}`);
@@ -1680,6 +2111,8 @@
                         name: '',
                         qty: 1,
                     });
+
+                    highlightScannedItem(order.code, null, code);
 
                     playTone('item');
                     toast('ok', payload.message || `Berhasil scan ${code}`);
@@ -1851,13 +2284,27 @@
     });
 
     state.current = null;
-    state.expanded = state.orders[0]?.code || null;
+    const lastScannedOrder = state.orders
+        .filter(order => order.code !== 'BELUM DIKELOMPOKKAN')
+        .at(-1) || null;
+    if (lastScannedOrder) {
+        state.marketplaceTab = marketplaceGroup(lastScannedOrder.code);
+    }
+    state.expanded = lastScannedOrder?.code || null;
     state.search = '';
     render();
 
     orderSearch?.addEventListener('input', function () {
         state.search = this.value;
         render();
+    });
+
+    marketplaceTabs.forEach(tab => {
+        tab.addEventListener('click', function () {
+            state.marketplaceTab = this.dataset.orderMarketplaceTab || 'all';
+            state.expanded = null;
+            render();
+        });
     });
 
     if (isDraft) {

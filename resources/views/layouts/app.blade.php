@@ -715,7 +715,7 @@
         ok: [{freq:880,duration:.055,gap:0,type:'sine',volume:.25},{freq:1175,duration:.065,gap:.045,type:'sine',volume:.25}],
         item: [{freq:932,duration:.045,gap:0,type:'sine',volume:.25},{freq:1244,duration:.05,gap:.035,type:'sine',volume:.25}],
         order: [{freq:587,duration:.07,gap:0,type:'sine',volume:.25},{freq:784,duration:.08,gap:.045,type:'sine',volume:.25}],
-        orderRepeat: [{freq:659,duration:.055,gap:0,type:'sine',volume:.25},{freq:659,duration:.055,gap:.04,type:'sine',volume:.25}],
+        orderRepeat: [{freq:440,duration:.07,gap:0,type:'triangle',volume:.27},{freq:330,duration:.075,gap:.045,type:'triangle',volume:.27},{freq:440,duration:.06,gap:.04,type:'triangle',volume:.27}],
         next: [{freq:523,duration:.06,gap:0,type:'sine',volume:.22},{freq:698,duration:.06,gap:.035,type:'sine',volume:.22},{freq:880,duration:.075,gap:.035,type:'sine',volume:.22}],
         undo: [{freq:784,duration:.055,gap:0,type:'sine',volume:.25},{freq:523,duration:.075,gap:.04,type:'sine',volume:.25}],
         reset: [{freq:440,duration:.07,gap:0,type:'sine',volume:.25},{freq:330,duration:.07,gap:.05,type:'sine',volume:.25},{freq:220,duration:.09,gap:.05,type:'sine',volume:.25}],

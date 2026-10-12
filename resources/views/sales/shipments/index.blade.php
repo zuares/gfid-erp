@@ -75,7 +75,7 @@
     body[data-theme="dark"] .shipment-date-control .date-section{ background:#1e293b; border-color:rgba(96,165,250,.55)!important; box-shadow:0 2px 10px rgba(30,64,175,.18); }
     body[data-theme="dark"] .shipment-date-control .rts-date-picker.flatpickr-input{ color:#e2e8f0; }
     @media (min-width:769px){
-        .shipment-filter-main{ display:grid; grid-template-columns:minmax(220px,1fr) minmax(115px,.7fr) minmax(125px,.8fr) minmax(250px,1.2fr) auto auto; align-items:center; flex-wrap:nowrap; }
+        .shipment-filter-main{ display:grid; grid-template-columns:minmax(220px,1fr) minmax(115px,.7fr) minmax(125px,.8fr) minmax(250px,1.2fr) auto; align-items:center; flex-wrap:nowrap; }
         .shipment-filter-main .filter-input-wrap,
         .shipment-filter-main .filter-input,
         .shipment-filter-main .filter-select{ width:100%; min-width:0; }
@@ -583,7 +583,6 @@
                         :show-presets="false"
                     />
                 </div>
-                <button type="submit" class="btn btn-sm btn-ship-primary btn-pill">Terapkan</button>
                 @if($search || $statusFilter !== 'all' || $scanMode !== 'all' || $dateFrom || $dateTo || $period !== 'all')
                     <a href="{{ route('sales.shipments.index') }}" class="btn btn-sm btn-ship-outline btn-pill">Reset Filter</a>
                 @endif
@@ -891,6 +890,18 @@
 
 <script>
 let qrGenerated = false;
+
+const shipmentFilterForm = document.getElementById('shipment-filter-form');
+shipmentFilterForm?.querySelectorAll('select').forEach(function (select) {
+    select.addEventListener('change', function () {
+        shipmentFilterForm.requestSubmit();
+    });
+});
+shipmentFilterForm?.querySelector('input[name="q"]')?.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    shipmentFilterForm.requestSubmit();
+});
 
 function openPreview(btn) {
     const code = btn.getAttribute('data-code');
