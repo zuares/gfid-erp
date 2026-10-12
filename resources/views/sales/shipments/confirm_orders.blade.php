@@ -67,6 +67,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-badge.pending{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:#92400e}
 .sd-badge.linked{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
 .sd-badge.unlinked{background:#f8fafc;border-color:#cbd5e1;color:#64748b}
+.sd-link-status{display:flex;align-items:center;justify-content:flex-end;gap:.35rem;flex-wrap:wrap}
+.sd-booking-status{color:#9a3412;font-size:.67rem;font-weight:700;white-space:nowrap}
 .sd-sku-mismatch{display:block;margin-top:.12rem;color:#b45309;font-family:inherit;font-size:.65rem;font-weight:700;white-space:normal}
 .sd-order-item-marketplace-sku.is-mismatch{overflow:visible;white-space:normal}
 .sd-sku-unmatched{padding:.4rem .1rem .2rem;color:#92400e;font-size:.7rem}
@@ -697,6 +699,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     $kilatMatches = $kilatMatches ?? [];
     $bookingSkusByScan = $bookingSkusByScan ?? [];
     $bookingItemCountsByScan = $bookingItemCountsByScan ?? [];
+    $bookingOrderQtyByScan = $bookingOrderQtyByScan ?? [];
+    $bookingStatusesByScan = $bookingStatusesByScan ?? [];
     $mappedLines = $lines->filter(fn ($line) => !empty($line->shipment_order_scan_id))->values();
     $unmappedLines = $lines->filter(fn ($line) => empty($line->shipment_order_scan_id))->values();
     $mappedQty = (int) $mappedLines->sum('qty_scanned');
@@ -741,7 +745,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
             $marketplaceCounts['problem']++;
         }
         $hasMarketplaceLink = str_starts_with(strtoupper(trim((string) $orderScan->order_no)), 'SPX')
-            ? (bool) $orderScan->fulfillment?->marketplaceOrder
+            ? (bool) ($orderScan->fulfillment?->marketplaceOrder || !empty($kilatMatches[$orderScan->id]))
             : (bool) (
                 $orderScan->fulfillment?->marketplaceOrder
                 || $orderScan->source === 'marketplace'
@@ -991,15 +995,16 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 $scanStatus = $scan->status ?: 'pending';
                                 $orderCodeUpper = strtoupper(trim((string) $scan->order_no));
                                 $isSpxShopee = str_starts_with($orderCodeUpper, 'SPX');
+                                $hasMarketplaceOrder = (bool) $scan->fulfillment?->marketplaceOrder;
+                                $hasBookingOnly = $isSpxShopee && !$hasMarketplaceOrder && !empty($kilatMatches[$scan->id]);
                                 $hasMarketplaceLink = $isSpxShopee
-                                    ? (bool) $scan->fulfillment?->marketplaceOrder
+                                    ? ($hasMarketplaceOrder || $hasBookingOnly)
                                     : (bool) (
-                                        $scan->fulfillment?->marketplaceOrder
+                                        $hasMarketplaceOrder
                                         || $scan->source === 'marketplace'
                                         || data_get($scan->raw_payload, 'linked_source') === 'marketplace_order'
                                         || !empty($kilatMatches[$scan->id])
                                     );
-                                $hasBookingOnly = $isSpxShopee && !$hasMarketplaceLink && !empty($kilatMatches[$scan->id]);
                                 $scanIsUnlinked = !$hasMarketplaceLink;
                                 $matchMethod = $scan->match_method ?: data_get($scan->raw_payload, 'match_method');
                                 $matchReason = $scan->match_reason ?: data_get($scan->raw_payload, 'match_reason') ?: data_get($scan->raw_payload, 'lookup_status');
@@ -1037,9 +1042,13 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 $orderCogs = (float) $orderLines->sum(fn ($line) => $lineCogs($line));
                                 $hasNoItems = $orderLines->isEmpty();
                                 $bookingSkus = $hasBookingOnly ? ($bookingSkusByScan[$scan->id] ?? []) : [];
-                                $showSingleBookingSku = count($bookingSkus) === 1
+                                $hasSingleBookingItem = $hasBookingOnly
                                     && ($bookingItemCountsByScan[$scan->id] ?? 0) === 1
                                     && $orderLines->count() === 1;
+                                $bookingOrderQty = $hasSingleBookingItem ? ($bookingOrderQtyByScan[$scan->id] ?? null) : null;
+                                $bookingStatus = $hasBookingOnly ? ($bookingStatusesByScan[$scan->id] ?? '') : '';
+                                $showSingleBookingSku = count($bookingSkus) === 1
+                                    && $hasSingleBookingItem;
                             @endphp
                             <div class="sd-order sd-order-group {{ $orderTheme }}" data-order-card data-order-marketplace="{{ $marketplaceGroupKey }}" data-order-link-state="{{ $hasMarketplaceLink ? 'linked' : 'unlinked' }}" data-order-problem="{{ $duplicateCount > 0 || $hasNoItems ? 'true' : 'false' }}" data-order-search="{{ strtolower($scan->order_no . ' ' . ($scan->source ?: '')) }}">
                                 <div class="sd-order-lead">
@@ -1064,7 +1073,10 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                         @endif
                                     </div>
                                     <div class="sd-order-head-side">
-                                        <span class="sd-badge {{ $scanBadgeClass }}">{{ $scanLabel }}</span>
+                                        <div class="sd-link-status">
+                                            <span class="sd-badge {{ $scanBadgeClass }}">{{ $scanLabel }}</span>
+                                            @if($bookingStatus !== '')<span class="sd-booking-status" title="Status booking Shopee">{{ str_replace('_', ' ', $bookingStatus) }}</span>@endif
+                                        </div>
                                         <div class="sd-order-summary sd-order-summary-inline {{ $canSeeCogs ? 'sd-summary-has-cogs' : '' }}">
                                             <span class="sd-order-summary-item"><span>Item</span><strong>{{ number_format($orderItemCount, 0, ',', '.') }}</strong></span>
                                             <span class="sd-order-summary-item"><span>Jenis</span><strong>{{ number_format($orderItemTypes, 0, ',', '.') }}</strong></span>
@@ -1076,18 +1088,24 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                     </div>
                                 </div>
                                 @if(!$scan->fulfillment?->marketplaceOrder)
-                                    <div class="sd-order-items">
+                                    <div class="sd-order-items {{ $hasBookingOnly ? 'sd-order-items-breakdown' : '' }}">
                                         @if($orderLines->isNotEmpty())
-                                            <div class="sd-items-head {{ $orderItemGridClass }}"><span>No</span><span>Kode Item</span><span>Qty</span><span>SKU Marketplace</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
+                                            <div class="sd-items-head {{ $orderItemGridClass }} {{ $hasBookingOnly ? 'sd-qty-breakdown' : '' }}"><span>No</span><span>Kode Item</span>@if($hasBookingOnly)<span>Order</span><span>Ship</span><span>Diff</span>@else<span>Qty</span>@endif<span>SKU Marketplace</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                                         @endif
                                         @forelse($orderLines as $line)
-                                            <div class="sd-order-item {{ $orderItemGridClass }}">
+                                            <div class="sd-order-item {{ $orderItemGridClass }} {{ $hasBookingOnly ? 'sd-qty-breakdown' : '' }}">
                                                 <span class="sd-order-item-num">{{ $loop->iteration }}</span>
                                                 <div>
                                                     <div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div>
                                                     <div class="sd-order-item-name">{{ $line->item?->name ?? 'Nama item belum tersedia' }}</div>
                                                 </div>
-                                                <div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>
+                                                @if($hasBookingOnly)
+                                                    <div class="sd-order-item-qty">{{ $bookingOrderQty === null ? '—' : number_format($bookingOrderQty, 0, ',', '.') }}</div>
+                                                    <div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>
+                                                    <div class="sd-order-item-diff sd-marketplace-short" title="Item booking dan item scan belum diverifikasi">Periksa</div>
+                                                @else
+                                                    <div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>
+                                                @endif
                                                 <div class="sd-order-item-marketplace-sku" @if($showSingleBookingSku) title="SKU Shopee dari booking atau produk toko; item scan belum diverifikasi" @endif>{{ $showSingleBookingSku ? $bookingSkus[0] : ($hasBookingOnly && $bookingSkus !== [] ? 'Lihat daftar' : '—') }}</div>
                                                 @if($canSeeCogs)
                                                     <div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div>

@@ -3972,7 +3972,7 @@ class ShipmentController extends Controller
 
             $bookingQuery = $this->marketplaceBookingQuery($scan->order_no, $shipment);
             if (str_starts_with(strtoupper(trim((string) $scan->order_no)), 'SPX')) {
-                $booking = $bookingQuery->first(['id', 'store_id', 'items']);
+                $booking = $bookingQuery->first(['id', 'store_id', 'booking_status', 'items']);
                 $kilatMatches[$scan->id] = $booking !== null;
                 if ($booking) {
                     $bookingMatches[$scan->id] = $booking;
@@ -4008,10 +4008,23 @@ class ShipmentController extends Controller
             ->keyBy(fn ($model) => $model->marketplace_product_id . '|' . $model->model_id);
         $bookingSkusByScan = [];
         $bookingItemCountsByScan = [];
+        $bookingOrderQtyByScan = [];
+        $bookingStatusesByScan = [];
         foreach ($bookingMatches as $scanId => $booking) {
             $skus = [];
             $bookingItems = is_array($booking->items) ? $booking->items : [];
             $bookingItemCountsByScan[$scanId] = count(array_filter($bookingItems, 'is_array'));
+            $bookingStatusesByScan[$scanId] = strtoupper(trim((string) $booking->booking_status));
+            $singleBookingItem = $bookingItemCountsByScan[$scanId] === 1
+                ? collect($bookingItems)->first(fn ($item) => is_array($item))
+                : null;
+            $rawBookingQty = $singleBookingItem['quantity']
+                ?? $singleBookingItem['model_quantity_purchased']
+                ?? $singleBookingItem['qty']
+                ?? null;
+            $bookingOrderQtyByScan[$scanId] = is_numeric($rawBookingQty) && (int) $rawBookingQty > 0
+                ? (int) $rawBookingQty
+                : null;
             foreach ($bookingItems as $item) {
                 if (!is_array($item)) {
                     continue;
@@ -4046,6 +4059,8 @@ class ShipmentController extends Controller
             'kilatMatches',
             'bookingSkusByScan',
             'bookingItemCountsByScan',
+            'bookingOrderQtyByScan',
+            'bookingStatusesByScan',
         ));
     }
 

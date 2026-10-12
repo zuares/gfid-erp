@@ -642,7 +642,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Tertaut');
     }
 
-    public function test_spx_booking_without_marketplace_order_is_not_labeled_as_linked(): void
+    public function test_spx_booking_appears_in_linked_tab_without_claiming_an_order_link(): void
     {
         [$user, $store] = $this->shipmentContext();
         $shipment = Shipment::create([
@@ -654,7 +654,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'status' => 'draft',
         ]);
         $awb = 'SPXID00000000001A';
-        MarketplaceBooking::create([
+        $booking = MarketplaceBooking::create([
             'store_id' => $store->id,
             'booking_sn' => 'BOOKING-SPX-001',
             'tracking_number' => $awb,
@@ -673,8 +673,18 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee('Booking ditemukan')
             ->assertSee('SKU booking belum tersedia.')
-            ->assertSee('data-order-link-state="unlinked"', false)
+            ->assertSee('data-order-marketplace="shopee" data-order-link-state="linked"', false)
+            ->assertSee('data-order-link-state="linked"', false)
+            ->assertSee('sd-badge pending', false)
+            ->assertSee('<span class="sd-booking-status" title="Status booking Shopee">SHIPPED</span>', false)
             ->assertDontSee('sd-badge linked', false);
+
+        $booking->update(['booking_status' => 'COMPLETED']);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('<span class="sd-booking-status" title="Status booking Shopee">COMPLETED</span>', false);
     }
 
     public function test_spx_booking_shows_its_real_marketplace_sku_next_to_one_scanned_item(): void
@@ -694,7 +704,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'booking_sn' => 'BOOKING-SPX-SKU-001',
             'tracking_number' => $awb,
             'booking_status' => 'SHIPPED',
-            'items' => [['model_sku' => 'K5BLK-1', 'item_sku' => 'K5BLK']],
+            'items' => [['model_sku' => 'K5BLK-1', 'item_sku' => 'K5BLK', 'quantity' => 2]],
         ]);
         $scan = ShipmentOrderScan::create([
             'shipment_id' => $shipment->id,
@@ -707,16 +717,44 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'shipment_id' => $shipment->id,
             'shipment_order_scan_id' => $scan->id,
             'item_id' => $item->id,
-            'qty_scanned' => 1,
-            'allocated_qty' => 1,
+            'qty_scanned' => 2,
+            'allocated_qty' => 2,
         ]);
 
         $this->actingAs($user)
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
             ->assertSee('Booking ditemukan')
+            ->assertSee('<span>No</span><span>Kode Item</span><span>Order</span><span>Ship</span><span>Diff</span><span>SKU Marketplace</span><span>COGS</span><span>Subtotal COGS</span>', false)
+            ->assertSee('>Periksa</div>', false)
             ->assertSee('>K5BLK-1</div>', false)
             ->assertDontSee('SKU booking belum tersedia.');
+
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-SPX-BOOKING-SKU-001',
+            'channel_order_id' => 'ORDER-SPX-BOOKING-SKU-001',
+            'shipping_awb_no' => $awb,
+            'order_status' => 'SHIPPED',
+            'order_date' => now(),
+            'ordered_at' => now(),
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'item_id' => $item->id,
+            'internal_item_id' => $item->id,
+            'item_name' => $item->name,
+            'model_sku' => 'K5BLK-1',
+            'qty' => 2,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('sd-badge linked', false)
+            ->assertDontSee('Booking ditemukan')
+            ->assertSee('sd-marketplace-detail', false);
     }
 
     public function test_spx_booking_uses_same_store_product_model_sku_when_booking_sku_is_empty(): void
