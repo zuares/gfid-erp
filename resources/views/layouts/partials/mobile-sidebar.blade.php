@@ -1182,7 +1182,7 @@
                                     @endif
 
                                     @if ($hasPoIndex || $hasPoCreate)
-                                        <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">PO</div>
+                                        <div class="mobile-sidebar-section-label" style="margin-top:.55rem;">Purchase Order</div>
                                         @if ($hasPoIndex)
                                             <a href="{{ route('purchasing.purchase_orders.index') }}"
                                                class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('purchasing.purchase_orders.index') ? 'active' : '' }}">

@@ -1509,7 +1509,7 @@
                         @endif
 
                         @if ($hasPoIndex || $hasPoCreate)
-                            <div class="sidebar-subhead">PO</div>
+                            <div class="sidebar-subhead">Purchase Order</div>
                             <div class="simple-group">
                                 @if ($hasPoIndex)
                                     <x-sidebar.simple-link href="{{ route('purchasing.purchase_orders.index') }}" icon="bi bi-list-ul"
