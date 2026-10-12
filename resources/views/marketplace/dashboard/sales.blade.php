@@ -5416,19 +5416,59 @@
                         if (!value) return '—';
                         return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
                     };
+                    const dateGroup = function (value) {
+                        const parsed = new Date(value || '');
+                        if (Number.isNaN(parsed.getTime())) {
+                            return { key: 'unknown', label: 'Tanggal tidak tersedia' };
+                        }
+
+                        const key = [parsed.getFullYear(), String(parsed.getMonth() + 1).padStart(2, '0'), String(parsed.getDate()).padStart(2, '0')].join('-');
+                        const label = new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(parsed);
+                        return { key: key, label: label };
+                    };
+                    const sumField = function (items, field) {
+                        return items.reduce(function (total, item) {
+                            return total + Number(item[field] || 0);
+                        }, 0);
+                    };
+                    const optionalSum = function (items, field) {
+                        return items.some(function (item) { return item[field] !== null && item[field] !== undefined; })
+                            ? money(sumField(items, field))
+                            : '—';
+                    };
+                    const groupedOrders = orders.reduce(function (groups, order) {
+                        const group = dateGroup(order.order_at);
+                        if (!groups[group.key]) groups[group.key] = { label: group.label, orders: [] };
+                        groups[group.key].orders.push(order);
+                        return groups;
+                    }, {});
                     const rows = orders.length
-                        ? orders.map(function (order) {
-                            return '<tr>'
-                                + '<td><strong>' + escapeHtml(order.order_number) + '</strong><div class="small text-muted">' + escapeHtml(date(order.order_at)) + '</div></td>'
-                                + '<td>' + escapeHtml(order.buyer) + '</td>'
-                                + '<td class="text-end">' + Number(order.qty || 0).toLocaleString('id-ID') + '</td>'
-                                + '<td class="text-end">' + money(order.sales) + '</td>'
-                                + '<td class="text-end">' + money(order.estimated_payout) + '</td>'
-                                + '<td class="text-end">' + optionalMoney(order.cogs) + '</td>'
-                                + '<td class="text-end">' + money(order.ad_spend) + '</td>'
-                                + '<td class="text-end ' + (Number(order.net_profit) < 0 ? 'text-danger' : 'text-success') + '">' + optionalMoney(order.net_profit) + '</td>'
-                                + '<td><span class="badge text-bg-light">' + escapeHtml(order.order_status) + '</span></td>'
-                                + '</tr>';
+                        ? Object.values(groupedOrders).map(function (group) {
+                            const dailyNetProfit = group.orders.some(function (order) { return order.net_profit !== null && order.net_profit !== undefined; })
+                                ? sumField(group.orders, 'net_profit')
+                                : null;
+                            const dailyRows = group.orders.map(function (order) {
+                                return '<tr>'
+                                    + '<td><strong>' + escapeHtml(order.order_number) + '</strong><div class="small text-muted">' + escapeHtml(date(order.order_at)) + '</div></td>'
+                                    + '<td>' + escapeHtml(order.buyer) + '</td>'
+                                    + '<td class="text-end">' + Number(order.qty || 0).toLocaleString('id-ID') + '</td>'
+                                    + '<td class="text-end">' + money(order.sales) + '</td>'
+                                    + '<td class="text-end">' + money(order.estimated_payout) + '</td>'
+                                    + '<td class="text-end">' + optionalMoney(order.cogs) + '</td>'
+                                    + '<td class="text-end">' + money(order.ad_spend) + '</td>'
+                                    + '<td class="text-end ' + (Number(order.net_profit) < 0 ? 'text-danger' : 'text-success') + '">' + optionalMoney(order.net_profit) + '</td>'
+                                    + '<td><span class="badge text-bg-light">' + escapeHtml(order.order_status) + '</span></td>'
+                                    + '</tr>';
+                            }).join('');
+                            return '<tr class="table-light">'
+                                + '<td colspan="4"><strong>' + escapeHtml(group.label) + '</strong><div class="small text-muted">' + count(group.orders.length) + ' pesanan · ' + count(sumField(group.orders, 'qty')) + ' unit</div></td>'
+                                + '<td class="text-end fw-semibold">' + money(sumField(group.orders, 'estimated_payout')) + '</td>'
+                                + '<td class="text-end fw-semibold">' + optionalSum(group.orders, 'cogs') + '</td>'
+                                + '<td class="text-end fw-semibold text-danger">' + money(sumField(group.orders, 'ad_spend')) + '</td>'
+                                + '<td class="text-end fw-semibold ' + (dailyNetProfit !== null && dailyNetProfit < 0 ? 'text-danger' : 'text-success') + '">' + optionalMoney(dailyNetProfit) + '</td>'
+                                + '<td><span class="badge text-bg-secondary">Harian</span></td>'
+                                + '</tr>'
+                                + dailyRows;
                         }).join('')
                         : '<tr><td colspan="9" class="text-center text-muted py-4">Belum ada pesanan untuk produk ini pada periode aktif.</td></tr>';
                     const summary = payload.summary || {};
