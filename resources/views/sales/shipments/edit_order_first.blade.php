@@ -1136,7 +1136,7 @@
             @if ($shipment->status === 'draft')
                 <a href="{{ route('sales.shipments.cancel_form', $shipment) }}" class="sr-btn sr-btn-danger"><i class="bi bi-x-circle" aria-hidden="true"></i> Batalkan</a>
             @endif
-            <a href="{{ route('sales.shipments.index') }}" class="sr-btn sr-back-index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Kembali ke Index</a>
+            <a href="{{ route('sales.shipments.index') }}" class="sr-btn sr-back-index"><i class="bi bi-arrow-left" aria-hidden="true"></i> Kembali</a>
         </div>
     </div>
 
@@ -1258,7 +1258,7 @@
                    id="submitBtn"
                    aria-disabled="true"><i class="bi bi-clipboard-check" aria-hidden="true"></i> Cek Shipment</a>
             @else
-                <a href="{{ route('sales.shipments.index') }}" class="sr-btn sr-btn-primary"><i class="bi bi-arrow-left" aria-hidden="true"></i> Kembali ke Index</a>
+                <a href="{{ route('sales.shipments.index') }}" class="sr-btn sr-btn-primary"><i class="bi bi-arrow-left" aria-hidden="true"></i> Kembali</a>
             @endif
         </div>
     </div>
