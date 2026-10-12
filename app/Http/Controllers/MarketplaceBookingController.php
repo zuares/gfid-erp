@@ -131,8 +131,14 @@ class MarketplaceBookingController extends Controller
 
     protected function sellerProcessVisible(MarketplaceBooking $booking, ?string $trackingNumber): bool
     {
-        return filled($trackingNumber)
-            && in_array(strtoupper((string) $booking->booking_status), ['READY_TO_HANDOVER', 'SHIPPED'], true);
+        $status = strtoupper(trim((string) $booking->booking_status));
+
+        // READY_TO_SHIP/PROCESSED adalah pekerjaan penjual meskipun AWB belum
+        // terbit. Status setelahnya tetap ditampilkan bila sudah ada AWB agar
+        // modul Shipments dapat mengecek/memindai resi.
+        return in_array($status, ['READY_TO_SHIP', 'PROCESSED'], true)
+            || (filled($trackingNumber)
+                && in_array($status, ['READY_TO_HANDOVER', 'SHIPPED'], true));
     }
 
     /**

@@ -130,4 +130,32 @@ class MarketplaceBookingStoredTest extends TestCase
         $this->assertNotNull($booking);
         $this->assertSame('SPXID06902531824A', $booking['tracking_number']);
     }
+
+    public function test_ready_to_ship_and_processed_bookings_are_seller_process_visible(): void
+    {
+        $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $store = Store::create([
+            'code' => 'SHOPEE-READY-TEST',
+            'name' => 'Toko Ready Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        foreach (['READY_TO_SHIP', 'PROCESSED'] as $index => $status) {
+            MarketplaceBooking::create([
+                'store_id' => $store->id,
+                'booking_sn' => "BOOKING-{$status}-TEST",
+                'booking_status' => $status,
+            ]);
+        }
+
+        $response = app(MarketplaceBookingController::class)->stored(
+            Request::create('/api/marketplace/bookings/stored', 'GET')
+        );
+        $rows = collect($response->getData(true)['data']);
+
+        $this->assertTrue($rows->firstWhere('booking_sn', 'BOOKING-READY_TO_SHIP-TEST')['seller_process_visible']);
+        $this->assertTrue($rows->firstWhere('booking_sn', 'BOOKING-PROCESSED-TEST')['seller_process_visible']);
+    }
 }
