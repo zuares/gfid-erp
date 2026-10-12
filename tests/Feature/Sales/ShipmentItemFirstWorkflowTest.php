@@ -358,6 +358,67 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_edit_item_qty_on_order_first_scan_page(): void
+    {
+        [$owner, $store, $item] = $this->shipmentContext();
+        $admin = User::factory()->create([
+            'employee_code' => 'SIF-ADMIN-' . strtoupper(substr(uniqid(), -8)),
+            'role' => 'admin',
+        ]);
+        $shipment = Shipment::create([
+            'code' => 'SHP-ADMIN-QTY-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $line = ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('sales.shipments.scan_order', $shipment))
+            ->assertOk()
+            ->assertSee('Klik qty item untuk mengubah jumlah.');
+
+        $this->actingAs($admin)
+            ->patchJson(route('sales.shipments.update_line_qty', $line), ['qty' => 3])
+            ->assertOk()
+            ->assertJsonPath('qty', 3);
+
+        $this->assertDatabaseHas('shipment_lines', [
+            'id' => $line->id,
+            'qty_scanned' => 3,
+            'allocated_qty' => 3,
+        ]);
+    }
+
+    public function test_owner_uses_compact_index_columns_with_extended_actions(): void
+    {
+        [$owner, $store] = $this->shipmentContext();
+        Shipment::create([
+            'code' => 'SHP-OWNER-INDEX-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('sales.shipments.index'))
+            ->assertOk()
+            ->assertSee('Dibuat')
+            ->assertSee('Pengiriman')
+            ->assertSee('Detail shipment')
+            ->assertSee('Batalkan shipment')
+            ->assertDontSee('<th style="width: 170px;">Waktu</th>', false);
+    }
+
     public function test_unknown_item_is_rejected_before_creating_daily_wave(): void
     {
         [$user, $store] = $this->shipmentContext();

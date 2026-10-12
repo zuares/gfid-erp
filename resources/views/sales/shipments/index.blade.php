@@ -793,7 +793,16 @@
     }
     .action-button i{ margin:0!important; font-size:.8rem; }
     .action-button:hover{ transform:translateY(-1px); }
-    .action-button-text{ display:inline; margin:0; }
+    .action-button-text{
+        display:inline;
+        margin:0;
+        font-size:.7rem;
+        font-weight:650;
+        line-height:1;
+    }
+    .ship-row-action .action-button.action-icon{ min-width:32px; width:32px!important; padding:0!important; }
+    .ship-row-action .action-button.action-icon i{ font-size:.8rem!important; }
+    .ship-row-action .action-button.action-icon .action-button-text{ display:none; }
     .ship-row-action .btn-ship-outline.action-button{ color:#64748b!important; }
     .ship-row-action .btn-ship-outline.action-button .action-button-text{ color:#64748b; }
     .ship-row-action .btn-ship-outline.action-button:hover,
@@ -882,6 +891,7 @@
         .ship-row-action .d-flex{ width:100%; display:grid!important; grid-template-columns:repeat(auto-fit, minmax(0, 1fr)); }
         .ship-row-action form{ width:100%; }
         .ship-row-action .action-button{ width:100%!important; min-height:37px; }
+        .ship-row-action .action-button.action-icon .action-button-text{ display:inline; }
         .list-footer > .muted{ display:block; }
         .list-footer nav{ margin-top:.6rem; overflow-x:auto; padding-bottom:.1rem; }
         .list-footer .pagination{ flex-wrap:nowrap; }
@@ -916,8 +926,11 @@
 
         $statusFilter = $statusFilter ?? request('status', 'all');
         $canSeeNominal = $canSeeNominal ?? ((auth()->user()->role ?? null) !== 'admin');
-        $isAdmin = (auth()->user()->role ?? null) === 'admin';
-        $canSeeShipmentTime = !$isAdmin;
+        $userRole = auth()->user()->role ?? null;
+        $isAdmin = $userRole === 'admin';
+        $isOwner = $userRole === 'owner';
+        $useCompactIndexColumns = $isAdmin || $isOwner;
+        $canSeeShipmentTime = !$useCompactIndexColumns;
         $canFreshShipments = $canFreshShipments ?? false;
 
         $sortUrl = function (string $column) use ($sort, $direction) {
@@ -1047,7 +1060,7 @@
                     <table class="table table-hover align-middle table-list">
                         <thead>
                             <tr>
-                                @if($isAdmin)
+                                @if($useCompactIndexColumns)
                                     <th style="width: 135px;">Dibuat</th>
                                 @else
                                     <th style="width: 46px;">#</th>
@@ -1056,7 +1069,7 @@
                                 @if($canSeeShipmentTime)
                                     <th style="width: 170px;">Waktu</th>
                                 @endif
-                                @if($isAdmin)
+                                @if($useCompactIndexColumns)
                                     <th style="width: 110px;">Pengiriman</th>
                                 @endif
                                 <th class="text-end" style="width: 72px;">Order</th>
@@ -1115,7 +1128,7 @@
                                 <tr class="shipment-row-clickable {{ $uiStatus === 'draft' ? 'row-draft' : '' }}"
                                     data-row-href="{{ $actionRoute }}" tabindex="0" role="link"
                                     aria-label="{{ $actionLabel }} {{ $shipment->code }}">
-                                    @if($isAdmin)
+                                    @if($useCompactIndexColumns)
                                         <td class="shipment-created-cell" aria-label="Tanggal dibuat dan kanal">
                                             <div class="shipment-created-stack">
                                                 <span class="shipment-created-date">{{ $fmtDate($shipment->created_at, 'd M Y') }}</span>
@@ -1166,7 +1179,7 @@
                                         </td>
                                     @endif
 
-                                    @if($isAdmin)
+                                    @if($useCompactIndexColumns)
                                         <td class="shipment-dispatch-cell">
                                             <span class="dispatch-badge {{ $dispatchClass }}">{{ $dispatchLabel }}</span>
                                         </td>
@@ -1234,12 +1247,38 @@
                                                         </button>
                                                     </form>
                                                 @endif
+                                                @if($isOwner && $uiStatus !== 'draft')
+                                                    <a href="{{ route('sales.shipments.show', $shipment) }}" class="btn btn-sm btn-ship-outline btn-pill action-button action-icon" title="Detail shipment" aria-label="Detail shipment {{ $shipment->code }}">
+                                                        <i class="bi bi-eye" aria-hidden="true"></i>
+                                                        <span class="action-button-text">Detail</span>
+                                                    </a>
+                                                @endif
+                                                @if($isOwner && $uiStatus !== 'cancelled')
+                                                    <a href="{{ route('sales.shipments.cancel_form', $shipment) }}" class="btn btn-sm btn-outline-danger btn-pill action-button action-icon" title="Batalkan shipment" aria-label="Batalkan shipment {{ $shipment->code }}">
+                                                        <i class="bi bi-x-circle" aria-hidden="true"></i>
+                                                        <span class="action-button-text">Batalkan</span>
+                                                    </a>
+                                                @endif
                                             </div>
                                         @else
-                                            <a href="{{ $actionRoute }}" class="btn btn-sm {{ $uiStatus === 'draft' ? 'btn-ship-primary' : 'btn-ship-outline' }} btn-pill action-button" title="{{ $actionLabel }}" aria-label="{{ $actionLabel }} {{ $shipment->code }}">
-                                                <i class="bi {{ $uiStatus === 'draft' ? 'bi-upc-scan' : 'bi-eye' }}" aria-hidden="true"></i>
-                                                <span class="action-button-text">{{ $uiStatus === 'draft' ? 'Lanjut scan' : 'Lihat detail' }}</span>
-                                            </a>
+                                            <div class="d-flex justify-content-end gap-1 flex-wrap">
+                                                <a href="{{ $actionRoute }}" class="btn btn-sm {{ $uiStatus === 'draft' ? 'btn-ship-primary' : 'btn-ship-outline' }} btn-pill action-button" title="{{ $actionLabel }}" aria-label="{{ $actionLabel }} {{ $shipment->code }}">
+                                                    <i class="bi {{ $uiStatus === 'draft' ? 'bi-upc-scan' : 'bi-eye' }}" aria-hidden="true"></i>
+                                                    <span class="action-button-text">{{ $uiStatus === 'draft' ? 'Lanjut scan' : 'Lihat detail' }}</span>
+                                                </a>
+                                                @if($isOwner && $uiStatus === 'draft')
+                                                    <a href="{{ route('sales.shipments.show', $shipment) }}" class="btn btn-sm btn-ship-outline btn-pill action-button action-icon" title="Detail shipment" aria-label="Detail shipment {{ $shipment->code }}">
+                                                        <i class="bi bi-eye" aria-hidden="true"></i>
+                                                        <span class="action-button-text">Detail</span>
+                                                    </a>
+                                                @endif
+                                                @if($isOwner && $uiStatus !== 'cancelled')
+                                                    <a href="{{ route('sales.shipments.cancel_form', $shipment) }}" class="btn btn-sm btn-outline-danger btn-pill action-button action-icon" title="Batalkan shipment" aria-label="Batalkan shipment {{ $shipment->code }}">
+                                                        <i class="bi bi-x-circle" aria-hidden="true"></i>
+                                                        <span class="action-button-text">Batalkan</span>
+                                                    </a>
+                                                @endif
+                                            </div>
                                         @endif
                                     </td>
                                 </tr>

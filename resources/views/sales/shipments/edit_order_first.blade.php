@@ -748,6 +748,113 @@
     .sr-toast.ok { background: #0f172a; }
     .sr-toast.error { background: #991b1b; }
 
+    /* Skala halaman mengikuti modul sidebar: ringkas, konsisten, tetap mudah
+       disentuh pada kontrol scanner dan qty. */
+    .sr-scan-page {
+        font-size: .82rem;
+    }
+
+    .sr-title {
+        font-size: 1rem;
+    }
+
+    .sr-sub,
+    .sr-section-help,
+    .sr-order-info {
+        font-size: .7rem;
+    }
+
+    .sr-btn,
+    .gf-scan-sound-toggle {
+        min-height: 34px;
+        padding: .3rem .72rem;
+        font-size: .7rem;
+    }
+
+    .sr-btn .bi,
+    .gf-scan-sound-toggle .bi,
+    .sr-delete-btn,
+    .sr-order-chevron {
+        font-size: .84rem;
+        line-height: 1;
+    }
+
+    .sr-scan-input {
+        font-size: 1.15rem;
+    }
+
+    .sr-section-title,
+    .sr-order-code {
+        font-size: .82rem;
+    }
+
+    .sr-item-code {
+        font-size: .78rem;
+    }
+
+    .sr-item-name,
+    .sr-current,
+    .sr-item-qty,
+    .sr-qty-input {
+        font-size: .74rem;
+    }
+
+    .sr-item-qty-value {
+        font-size: .78rem;
+    }
+
+    .sr-item-index {
+        width: 1.4rem;
+        height: 1.4rem;
+        font-size: .68rem;
+    }
+
+    .sr-marketplace-tab,
+    .sr-flow-step,
+    .sr-order-tools-count,
+    .sr-mode {
+        font-size: .66rem;
+    }
+
+    /* Metadata dibuat sebagai satu strip ringan agar tidak bersaing dengan
+       area scanner dan daftar order. */
+    .sr-meta {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0;
+        padding: .12rem;
+        border: 1px solid #edf1f6;
+        border-radius: 8px;
+        background: #fafbfc;
+    }
+
+    .sr-meta-item {
+        min-width: 0;
+        padding: .32rem .55rem;
+        border-left: 1px solid #edf1f6;
+    }
+
+    .sr-meta-item:first-child {
+        border-left: 0;
+    }
+
+    .sr-meta-label {
+        font-size: .58rem;
+        letter-spacing: .07em;
+        line-height: 1.15;
+    }
+
+    .sr-meta-value {
+        margin-top: .12rem;
+        overflow: hidden;
+        color: #475569;
+        font-size: .74rem;
+        font-weight: 650;
+        line-height: 1.25;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
     @media (max-width: 640px) {
         .sr-scan-page {
             padding: 0 .45rem 6rem;
@@ -911,6 +1018,31 @@
         .sr-toast {
             bottom: calc(var(--sr-mobile-nav-offset) + 4.25rem);
         }
+
+        .sr-meta {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .3rem;
+            padding: 0;
+            border: 0;
+            background: transparent;
+        }
+
+        .sr-meta-item,
+        .sr-meta-item.sr-meta-store {
+            display: block;
+            padding: .38rem .5rem;
+            border: 1px solid #edf1f6;
+            border-radius: 7px;
+            background: #fafbfc;
+        }
+
+        .sr-meta-item:first-child {
+            border-left: 1px solid #edf1f6;
+        }
+
+        .sr-meta-value {
+            font-size: .7rem;
+        }
     }
 </style>
 @endpush
@@ -940,7 +1072,7 @@
         ->values();
 
     $canDeleteShipmentRows = auth()->user()?->role === 'owner';
-    $canEditShipmentQty = auth()->user()?->role === 'owner';
+    $canEditShipmentQty = in_array(auth()->user()?->role, ['owner', 'admin'], true);
 @endphp
 
     @php
@@ -960,10 +1092,10 @@
         <div class="sr-top-actions">
             <button type="button" id="gfidScanSoundToggle" class="gf-scan-sound-toggle" aria-pressed="true">🔊 Suara ON</button>
             @if ($shipment->status === 'draft')
-                <a href="{{ route('sales.shipments.cancel_form', $shipment) }}" class="sr-btn sr-btn-danger">Batalkan</a>
+                <a href="{{ route('sales.shipments.cancel_form', $shipment) }}" class="sr-btn sr-btn-danger"><i class="bi bi-x-circle" aria-hidden="true"></i> Batalkan</a>
             @endif
-            <a href="{{ route('sales.shipments.edit', $shipment) }}" class="sr-btn">Scan Item</a>
-            <a href="{{ route('sales.shipments.show', $shipment) }}" class="sr-btn">Detail</a>
+            <a href="{{ route('sales.shipments.edit', $shipment) }}" class="sr-btn"><i class="bi bi-upc-scan" aria-hidden="true"></i> Scan Item</a>
+            <a href="{{ route('sales.shipments.show', $shipment) }}" class="sr-btn"><i class="bi bi-info-circle" aria-hidden="true"></i> Detail</a>
         </div>
     </div>
 
@@ -1076,14 +1208,14 @@
 
         <div class="sr-actions">
             @if ($shipment->status === 'draft')
-                <button type="button" class="sr-btn" id="nextOrderBtn">Order Baru</button>
+                <button type="button" class="sr-btn" id="nextOrderBtn"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Order Baru</button>
                 <a href="{{ route('sales.shipments.confirm_orders', $shipment) }}"
                    class="sr-btn sr-btn-primary"
                    id="submitBtn"
-                   aria-disabled="true">Cek Shipment</a>
+                   aria-disabled="true"><i class="bi bi-clipboard-check" aria-hidden="true"></i> Cek Shipment</a>
             @else
-                <a href="{{ route('sales.shipments.show', $shipment) }}" class="sr-btn">Detail</a>
-                <a href="{{ route('sales.shipments.index') }}" class="sr-btn sr-btn-primary">Daftar Shipment</a>
+                <a href="{{ route('sales.shipments.show', $shipment) }}" class="sr-btn"><i class="bi bi-info-circle" aria-hidden="true"></i> Detail</a>
+                <a href="{{ route('sales.shipments.index') }}" class="sr-btn sr-btn-primary"><i class="bi bi-list-ul" aria-hidden="true"></i> Daftar Shipment</a>
             @endif
         </div>
     </div>

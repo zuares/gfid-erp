@@ -57,6 +57,12 @@
 
     /* Clearance konten dari mobile bottom navigation yang fixed. */
     --mobile-bottom-nav-clearance: calc(70px + env(safe-area-inset-bottom, 0px) + 1rem);
+
+    /* Skala UI bersama dengan sidebar desktop. */
+    --gf-ui-font-size: .82rem;
+    --gf-ui-small-size: .7rem;
+    --gf-ui-icon-size: .9rem;
+    --gf-ui-control-height: 36px;
   }
 
   /* ========= THEME RESOLVER ========= */
@@ -360,6 +366,97 @@
     font-size:.78rem;
     color:#94a3b8;
   }
+
+  /* ========= GLOBAL UI SCALE =========
+     Modul utama memakai skala yang sama dengan item sidebar: teks ringkas,
+     ikon proporsional, dan kontrol tetap nyaman dipakai. Halaman khusus masih
+     dapat melakukan override untuk kebutuhan scanner atau form besar. */
+  .app-main {
+    font-size: var(--gf-ui-font-size);
+  }
+
+  .app-main h1,
+  .app-main h2,
+  .app-main h3,
+  .app-main h4,
+  .app-main h5,
+  .app-main h6 {
+    line-height: 1.25;
+  }
+
+  .app-main h1 { font-size: 1.25rem; }
+  .app-main h2 { font-size: 1.1rem; }
+  .app-main h3 { font-size: 1rem; }
+  .app-main h4 { font-size: .94rem; }
+  .app-main h5 { font-size: .88rem; }
+  .app-main h6 { font-size: .82rem; }
+
+  .app-main .btn:not(.btn-sm):not(.btn-lg) {
+    min-height: var(--gf-ui-control-height);
+    padding: .42rem .72rem;
+    border-radius: 8px;
+    font-size: var(--gf-ui-font-size);
+    line-height: 1.2;
+  }
+
+  .app-main .btn.btn-sm {
+    min-height: 30px;
+    padding: .28rem .56rem;
+    border-radius: 7px;
+    font-size: var(--gf-ui-small-size);
+    line-height: 1.2;
+  }
+
+  .app-main .btn.btn-lg {
+    min-height: 40px;
+    font-size: .9rem;
+  }
+
+  .app-main .btn > .bi,
+  .app-main button > .bi,
+  .app-main a.btn .bi {
+    font-size: var(--gf-ui-icon-size);
+    line-height: 1;
+    vertical-align: -.08em;
+  }
+
+  .app-main .badge {
+    font-size: var(--gf-ui-small-size);
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .app-main .table {
+    font-size: var(--gf-ui-font-size);
+  }
+
+  .app-main .table thead th {
+    font-size: var(--gf-ui-small-size);
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+
+  .app-main .form-label,
+  .app-main .form-text,
+  .app-main .input-group-text {
+    font-size: var(--gf-ui-small-size);
+  }
+
+  @media (min-width: 768px) {
+    .app-main .form-control:not(.form-control-sm):not(.form-control-lg),
+    .app-main .form-select:not(.form-select-sm):not(.form-select-lg) {
+      min-height: var(--gf-ui-control-height);
+      padding: .42rem .65rem;
+      font-size: var(--gf-ui-font-size);
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .app-main h1 { font-size: 1.1rem; }
+    .app-main h2 { font-size: 1rem; }
+    .app-main h3 { font-size: .94rem; }
+  }
+
   @media (max-width: 767.98px){
     .item-suggest-dropdown{ max-height:220px; }
   }

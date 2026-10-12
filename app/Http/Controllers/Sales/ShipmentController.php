@@ -3061,6 +3061,10 @@ class ShipmentController extends Controller
 
     public function updateLineQty(Request $request, ShipmentLine $line)
     {
+        if (!in_array($request->user()?->role, ['owner', 'admin'], true)) {
+            abort(403);
+        }
+
         $shipment = $line->shipment;
 
         if (!$shipment || $shipment->status !== 'draft') {
