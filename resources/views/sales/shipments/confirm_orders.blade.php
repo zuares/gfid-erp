@@ -701,6 +701,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     $currentWave = $currentWave ?? null;
     $kilatMatches = $kilatMatches ?? [];
     $bookingSkusByScan = $bookingSkusByScan ?? [];
+    $bookingItemsByScan = $bookingItemsByScan ?? [];
     $bookingItemCountsByScan = $bookingItemCountsByScan ?? [];
     $bookingOrderQtyByScan = $bookingOrderQtyByScan ?? [];
     $bookingStatusesByScan = $bookingStatusesByScan ?? [];
@@ -1046,6 +1047,22 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 $orderCogs = (float) $orderLines->sum(fn ($line) => $lineCogs($line));
                                 $hasNoItems = $orderLines->isEmpty();
                                 $bookingSkus = $hasBookingOnly ? ($bookingSkusByScan[$scan->id] ?? []) : [];
+                                $bookingItems = collect($hasBookingOnly ? ($bookingItemsByScan[$scan->id] ?? []) : []);
+                                $scannedItemIds = $orderLines->pluck('item_id')->map(fn ($id) => (int) $id);
+                                $bookingItemIds = $bookingItems->pluck('item_id')->map(fn ($id) => (int) $id);
+                                $bookingCanVerify = $hasBookingOnly
+                                    && $bookingItems->isNotEmpty()
+                                    && $orderLines->isNotEmpty()
+                                    && $bookingItems->every(fn ($item) => (int) ($item['item_id'] ?? 0) > 0 && (int) ($item['qty'] ?? 0) > 0)
+                                    && $scannedItemIds->every(fn ($id) => $id > 0)
+                                    && $scannedItemIds->unique()->count() === $orderLines->count()
+                                    && $bookingItemIds->unique()->sort()->values()->all() === $scannedItemIds->unique()->sort()->values()->all();
+                                $bookingQtyByItem = $bookingCanVerify
+                                    ? $bookingItems->groupBy('item_id')->map(fn ($items) => (int) $items->sum('qty'))
+                                    : collect();
+                                $bookingSkuByItem = $bookingCanVerify
+                                    ? $bookingItems->groupBy('item_id')->map(fn ($items) => $items->pluck('sku')->filter()->unique()->implode(', '))
+                                    : collect();
                                 $hasSingleBookingItem = $hasBookingOnly
                                     && ($bookingItemCountsByScan[$scan->id] ?? 0) === 1
                                     && $orderLines->count() === 1;
@@ -1115,6 +1132,17 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                             <div class="sd-items-head {{ $orderItemGridClass }} {{ $hasBookingOnly ? 'sd-qty-breakdown' : '' }}"><span>No</span><span>Kode Item</span>@if($hasBookingOnly)<span>Order</span><span>Ship</span><span>Diff</span>@else<span>Qty</span>@endif<span>SKU Marketplace</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                                         @endif
                                         @forelse($orderLines as $line)
+                                            @php
+                                                $lineOrderQty = $bookingCanVerify
+                                                    ? $bookingQtyByItem->get($line->item_id)
+                                                    : $bookingOrderQty;
+                                                $lineDifference = $bookingCanVerify
+                                                    ? (int) $line->qty_scanned - (int) $lineOrderQty
+                                                    : null;
+                                                $lineBookingSku = $bookingCanVerify
+                                                    ? $bookingSkuByItem->get($line->item_id, '')
+                                                    : ($showSingleBookingSku ? $bookingSkus[0] : ($hasBookingOnly && $bookingSkus !== [] ? 'Lihat daftar' : '—'));
+                                            @endphp
                                             <div class="sd-order-item {{ $orderItemGridClass }} {{ $hasBookingOnly ? 'sd-qty-breakdown' : '' }}">
                                                 <span class="sd-order-item-num">{{ $loop->iteration }}</span>
                                                 <div>
@@ -1122,13 +1150,13 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                     <div class="sd-order-item-name">{{ $line->item?->name ?? 'Nama item belum tersedia' }}</div>
                                                 </div>
                                                 @if($hasBookingOnly)
-                                                    <div class="sd-order-item-qty">{{ $bookingOrderQty === null ? '—' : number_format($bookingOrderQty, 0, ',', '.') }}</div>
+                                                    <div class="sd-order-item-qty">{{ $lineOrderQty === null ? '—' : number_format($lineOrderQty, 0, ',', '.') }}</div>
                                                     <div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>
-                                                    <div class="sd-order-item-diff sd-marketplace-short" title="Item booking dan item scan belum diverifikasi">Periksa</div>
+                                                    <div class="sd-order-item-diff {{ $lineDifference === 0 ? 'sd-marketplace-ok' : 'sd-marketplace-short' }}" @if($lineDifference === null) title="Mapping SKU booking ke item scan belum terverifikasi" @endif>{{ $lineDifference === null ? 'Periksa' : (($lineDifference > 0 ? '+' : '') . number_format($lineDifference, 0, ',', '.')) }}</div>
                                                 @else
                                                     <div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>
                                                 @endif
-                                                <div class="sd-order-item-marketplace-sku" @if($showSingleBookingSku) title="SKU Shopee dari booking atau produk toko; item scan belum diverifikasi" @endif>{{ $showSingleBookingSku ? $bookingSkus[0] : ($hasBookingOnly && $bookingSkus !== [] ? 'Lihat daftar' : '—') }}</div>
+                                                <div class="sd-order-item-marketplace-sku" @if($showSingleBookingSku && !$bookingCanVerify) title="SKU Shopee dari booking atau produk toko; item scan belum diverifikasi" @endif>{{ $lineBookingSku }}</div>
                                                 @if($canSeeCogs)
                                                     <div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div>
                                                     <div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>
@@ -1147,7 +1175,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                             <div class="sd-muted" style="padding:.45rem 0">Belum ada item.</div>
                                         @endforelse
                                     </div>
-                                    @if($hasBookingOnly && !$showSingleBookingSku)
+                                    @if($hasBookingOnly && !$showSingleBookingSku && !$bookingCanVerify)
                                         <div class="sd-sku-unmatched">{{ $bookingSkus === [] ? 'SKU booking belum tersedia.' : 'SKU booking: ' . implode(', ', $bookingSkus) }}</div>
                                     @endif
                                 @endif

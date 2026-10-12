@@ -13,6 +13,7 @@ use App\Models\OrderFulfillment;
 use App\Models\Shipment;
 use App\Models\ShipmentLine;
 use App\Models\ShipmentOrderScan;
+use App\Models\SkuMapping;
 use App\Models\Store;
 use App\Models\User;
 use App\Services\MarketplaceSyncService;
@@ -833,6 +834,176 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('sd-badge linked', false)
             ->assertDontSee('Booking ditemukan')
             ->assertSee('sd-marketplace-detail', false);
+    }
+
+    public function test_spx_booking_verifies_a_mapped_item_and_shows_quantity_difference(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $item->update(['code' => 'K7BLK', 'name' => 'Jogger Pendek Basic K7 Hitam']);
+        SkuMapping::create([
+            'marketplace_sku' => 'K7BLK-1',
+            'channel_code' => 'shopee',
+            'item_id' => $item->id,
+        ]);
+        $shipment = Shipment::create([
+            'code' => 'SHP-BOOKING-VERIFY-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $awb = 'SPXID00000000041A';
+        MarketplaceBooking::create([
+            'store_id' => $store->id,
+            'booking_sn' => 'BOOKING-VERIFY-001',
+            'tracking_number' => $awb,
+            'booking_status' => 'SHIPPED',
+            'items' => [['model_sku' => 'K7BLK-1', 'quantity' => 1]],
+        ]);
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => $awb,
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => $scan->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('Booking ditemukan')
+            ->assertSee('sd-order-item-diff sd-marketplace-ok', false)
+            ->assertSee('>0</div>', false)
+            ->assertDontSee('>Periksa</div>', false);
+
+        ShipmentLine::where('shipment_order_scan_id', $scan->id)->update(['qty_scanned' => 2]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('sd-order-item-diff sd-marketplace-short', false)
+            ->assertSee('>+1</div>', false)
+            ->assertDontSee('>Periksa</div>', false);
+    }
+
+    public function test_spx_booking_keeps_item_review_when_sku_maps_to_a_different_item(): void
+    {
+        [$user, $store, $scannedItem] = $this->shipmentContext();
+        $otherItem = Item::create([
+            'code' => 'K7BLK',
+            'name' => 'Jogger Pendek Basic K7 Hitam',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+        SkuMapping::create([
+            'marketplace_sku' => 'K7BLK-1',
+            'channel_code' => 'shopee',
+            'item_id' => $otherItem->id,
+        ]);
+        $shipment = Shipment::create([
+            'code' => 'SHP-BOOKING-VERIFY-002',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $awb = 'SPXID00000000042A';
+        MarketplaceBooking::create([
+            'store_id' => $store->id,
+            'booking_sn' => 'BOOKING-VERIFY-002',
+            'tracking_number' => $awb,
+            'booking_status' => 'SHIPPED',
+            'items' => [['model_sku' => 'K7BLK-1', 'quantity' => 1]],
+        ]);
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => $awb,
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => $scan->id,
+            'item_id' => $scannedItem->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('>Periksa</div>', false)
+            ->assertDontSee('sd-order-item-diff sd-marketplace-ok', false);
+    }
+
+    public function test_spx_booking_verifies_multiple_mapped_items_individually(): void
+    {
+        [$user, $store, $firstItem] = $this->shipmentContext();
+        $firstItem->update(['code' => 'K7BLK']);
+        $secondItem = Item::create([
+            'code' => 'K5BLK',
+            'name' => 'Jogger Pendek Basic K5 Hitam',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+        SkuMapping::create(['marketplace_sku' => 'K7BLK-1', 'channel_code' => 'shopee', 'item_id' => $firstItem->id]);
+        SkuMapping::create(['marketplace_sku' => 'K5BLK-1', 'channel_code' => null, 'item_id' => $secondItem->id]);
+        $shipment = Shipment::create([
+            'code' => 'SHP-BOOKING-VERIFY-MULTI',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $awb = 'SPXID00000000043A';
+        MarketplaceBooking::create([
+            'store_id' => $store->id,
+            'booking_sn' => 'BOOKING-VERIFY-MULTI',
+            'tracking_number' => $awb,
+            'booking_status' => 'SHIPPED',
+            'items' => [
+                ['model_sku' => 'K7BLK-1', 'quantity' => 1],
+                ['model_sku' => 'K5BLK-1', 'quantity' => 2],
+            ],
+        ]);
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => $awb,
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+        foreach ([[$firstItem, 1], [$secondItem, 2]] as [$item, $qty]) {
+            ShipmentLine::create([
+                'shipment_id' => $shipment->id,
+                'shipment_order_scan_id' => $scan->id,
+                'item_id' => $item->id,
+                'qty_scanned' => $qty,
+                'allocated_qty' => $qty,
+            ]);
+        }
+
+        $response = $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('>K7BLK-1</div>', false)
+            ->assertSee('>K5BLK-1</div>', false)
+            ->assertDontSee('>Periksa</div>', false);
+
+        $this->assertSame(2, substr_count($response->getContent(), 'sd-order-item-diff sd-marketplace-ok'));
     }
 
     public function test_spx_booking_uses_same_store_product_model_sku_when_booking_sku_is_empty(): void

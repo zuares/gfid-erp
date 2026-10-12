@@ -11,6 +11,7 @@ use App\Models\Shipment;
 use App\Models\ShipmentLine;
 use App\Models\ShipmentOrderScan;
 use App\Models\ShipmentWave;
+use App\Models\SkuMapping;
 use App\Models\Store;
 use App\Models\SystemSetting;
 use App\Models\Warehouse;
@@ -4050,12 +4051,14 @@ class ShipmentController extends Controller
             ->get(['marketplace_product_id', 'model_id', 'model_sku'])
             ->keyBy(fn ($model) => $model->marketplace_product_id . '|' . $model->model_id);
         $bookingSkusByScan = [];
+        $bookingItemsByScan = [];
         $bookingItemCountsByScan = [];
         $bookingOrderQtyByScan = [];
         $bookingStatusesByScan = [];
         $bookingIdentifiersByScan = [];
         foreach ($bookingMatches as $scanId => $booking) {
             $skus = [];
+            $bookingItemsByScan[$scanId] = [];
             $bookingItems = is_array($booking->items) ? $booking->items : [];
             $bookingItemCountsByScan[$scanId] = count(array_filter($bookingItems, 'is_array'));
             $bookingStatusesByScan[$scanId] = strtoupper(trim((string) $booking->booking_status));
@@ -4087,8 +4090,40 @@ class ShipmentController extends Controller
                 if ($sku !== '') {
                     $skus[] = $sku;
                 }
+                $rawQty = $item['quantity'] ?? $item['model_quantity_purchased'] ?? $item['qty'] ?? null;
+                $bookingItemsByScan[$scanId][] = [
+                    'sku' => $sku,
+                    'qty' => is_numeric($rawQty) && (int) $rawQty > 0 ? (int) $rawQty : null,
+                    'item_id' => null,
+                ];
             }
             $bookingSkusByScan[$scanId] = array_values(array_unique($skus));
+        }
+
+        // Verifikasi booking memakai mapping SKU Shopee yang eksplisit.
+        // Jangan menganggap prefix SKU (mis. K7BLK-1) sama dengan kode item internal.
+        $bookingSkuValues = collect($bookingItemsByScan)
+            ->flatMap(fn ($items) => $items)
+            ->pluck('sku')
+            ->filter()
+            ->unique()
+            ->values();
+        if ($bookingSkuValues->isNotEmpty()) {
+            $skuMappings = $bookingSkuValues->chunk(400)->flatMap(fn ($skus) => SkuMapping::query()
+                ->whereIn('marketplace_sku', $skus)
+                ->where(fn ($query) => $query->where('channel_code', 'shopee')->orWhereNull('channel_code'))
+                ->get(['marketplace_sku', 'channel_code', 'item_id']));
+            $itemIdBySku = $skuMappings->whereNull('channel_code')->pluck('item_id', 'marketplace_sku');
+            foreach ($skuMappings->where('channel_code', 'shopee') as $mapping) {
+                $itemIdBySku->put($mapping->marketplace_sku, (int) $mapping->item_id);
+            }
+            foreach ($bookingItemsByScan as &$items) {
+                foreach ($items as &$item) {
+                    $item['item_id'] = $itemIdBySku->get($item['sku']);
+                }
+                unset($item);
+            }
+            unset($items);
         }
 
         $warehouse = $this->whRts();
@@ -4106,6 +4141,7 @@ class ShipmentController extends Controller
             'mappingErrors',
             'kilatMatches',
             'bookingSkusByScan',
+            'bookingItemsByScan',
             'bookingItemCountsByScan',
             'bookingOrderQtyByScan',
             'bookingStatusesByScan',
