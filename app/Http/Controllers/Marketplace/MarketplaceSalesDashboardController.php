@@ -1725,14 +1725,22 @@ SQL;
         $statusExpression = "UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), ''))";
         $nameExpression = "COALESCE(NULLIF(oi.item_name, ''), NULLIF(oi.item_name_snapshot, ''), NULLIF(oi.variant_name, ''), NULLIF(oi.variant_snapshot, ''), 'Produk tanpa nama')";
         $skuExpression = "COALESCE(NULLIF(oi.item_sku, ''), NULLIF(oi.marketplace_sku, ''), NULLIF(oi.model_sku, ''), NULLIF(oi.external_sku, ''), NULLIF(oi.item_code_snapshot, ''), '-')";
+        $orderLineValueExpression = 'CASE WHEN COALESCE(order_totals.line_net_amount, 0) > 0 THEN order_totals.line_net_amount WHEN COALESCE(order_totals.price, 0) > 0 THEN order_totals.price * COALESCE(order_totals.qty, 0) WHEN COALESCE(order_totals.line_gross_amount, 0) > 0 THEN order_totals.line_gross_amount ELSE 0 END';
+        $orderItemTotals = DB::table('marketplace_order_items as order_totals')
+            ->selectRaw('COALESCE(order_totals.marketplace_order_id, order_totals.order_id) as order_key')
+            ->selectRaw("COALESCE(SUM({$orderLineValueExpression}), 0) as order_item_value")
+            ->groupByRaw('COALESCE(order_totals.marketplace_order_id, order_totals.order_id)');
+        $orderPayoutExpression = 'COALESCE(NULLIF(o.net_payout_estimated, 0), NULLIF(s.final_income, 0), payout_ie.estimated_escrow_amount, 0)';
 
         $rows = DB::table('marketplace_order_items as oi')
             ->join('marketplace_orders as o', function ($join) {
                 $join->on(DB::raw('COALESCE(oi.marketplace_order_id, oi.order_id)'), '=', 'o.id');
             })
             ->leftJoin('marketplace_order_settlements as s', 's.order_id', '=', 'o.id')
+            ->leftJoin('marketplace_order_income_estimates as payout_ie', 'payout_ie.marketplace_order_id', '=', 'o.id')
             ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
             ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
+            ->leftJoinSub($orderItemTotals, 'product_order_totals', 'product_order_totals.order_key', '=', 'o.id')
             ->whereRaw("{$dateExpression} IS NOT NULL")
             ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
             ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
@@ -1765,6 +1773,8 @@ SQL;
             ->selectRaw("{$dateExpression} as order_at")
             ->selectRaw("{$nameExpression} as product_name")
             ->selectRaw("{$skuExpression} as product_sku")
+            ->selectRaw("{$orderPayoutExpression} as order_payout")
+            ->selectRaw('COALESCE(product_order_totals.order_item_value, 0) as order_item_value')
             ->orderByDesc('order_at')
             ->orderByDesc('o.id')
             ->limit(500)
@@ -1796,6 +1806,9 @@ SQL;
                     $first->total_amount,
                     $first->subtotal_items,
                 ])->map(fn ($value) => (float) $value)->first(fn (float $value) => $value > 0) ?? 0;
+                $orderItemValue = (float) ($first->order_item_value ?? 0);
+                $allocation = $orderItemValue > 0 ? min(1, max(0, $sales / $orderItemValue)) : 1;
+                $estimatedPayout = (float) ($first->order_payout ?? 0) * $allocation;
 
                 return [
                     'id' => (int) $first->id,
@@ -1804,15 +1817,25 @@ SQL;
                     'buyer' => $first->buyer_username ?: ($first->buyer_name ?: 'Pelanggan marketplace'),
                     'qty' => (int) $items->sum(fn ($item) => max(0, (int) ($item->qty ?? 0))),
                     'sales' => $sales,
-                    'buyer_payment' => $buyerPayment,
+                    'buyer_payment' => $buyerPayment * $allocation,
+                    'estimated_payout' => $estimatedPayout,
                     'payment_status' => $first->payment_status ?: 'Belum ditentukan',
                     'order_status' => $first->order_status ?: ($first->status ?: 'Belum ditentukan'),
                 ];
             })
             ->values();
 
+        $orderSummary = [
+            'orders' => $orders->count(),
+            'qty' => (int) $orders->sum('qty'),
+            'sales' => (float) $orders->sum('sales'),
+            'buyer_payment' => (float) $orders->sum('buyer_payment'),
+            'estimated_payout' => (float) $orders->sum('estimated_payout'),
+        ];
+
         return response()->json([
             'product' => ['name' => $name, 'sku' => $sku],
+            'summary' => $orderSummary,
             'orders' => $orders,
         ]);
     }

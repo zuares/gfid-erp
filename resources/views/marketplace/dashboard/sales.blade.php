@@ -5404,6 +5404,9 @@
                     const money = function (value) {
                         return 'Rp ' + new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Number(value || 0));
                     };
+                    const count = function (value) {
+                        return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Number(value || 0));
+                    };
                     const date = function (value) {
                         if (!value) return '—';
                         return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
@@ -5416,15 +5419,30 @@
                                 + '<td class="text-end">' + Number(order.qty || 0).toLocaleString('id-ID') + '</td>'
                                 + '<td class="text-end">' + money(order.sales) + '</td>'
                                 + '<td class="text-end">' + money(order.buyer_payment) + '</td>'
+                                + '<td class="text-end">' + money(order.estimated_payout) + '</td>'
                                 + '<td><span class="badge text-bg-light">' + escapeHtml(order.order_status) + '</span></td>'
                                 + '</tr>';
                         }).join('')
-                        : '<tr><td colspan="6" class="text-center text-muted py-4">Belum ada pesanan untuk produk ini pada periode aktif.</td></tr>';
+                        : '<tr><td colspan="7" class="text-center text-muted py-4">Belum ada pesanan untuk produk ini pada periode aktif.</td></tr>';
+                    const summary = payload.summary || {};
+                    const kpi = function (label, value, tone) {
+                        return '<div class="col-6 col-md"><div class="border rounded-3 bg-light-subtle px-3 py-2 h-100 text-start">'
+                            + '<div class="small text-muted text-uppercase fw-semibold" style="font-size:.62rem;letter-spacing:.04em">' + label + '</div>'
+                            + '<div class="fw-bold mt-1 ' + (tone || '') + '">' + value + '</div></div></div>';
+                    };
+                    const summaryHtml = '<div class="row g-2 mb-3">'
+                        + kpi('Pesanan', count(summary.orders))
+                        + kpi('Unit', count(summary.qty))
+                        + kpi('Penjualan Netto', money(summary.sales))
+                        + kpi('Pembayaran Pembeli', money(summary.buyer_payment))
+                        + kpi('Estimasi Payout', money(summary.estimated_payout), 'text-success')
+                        + '</div>';
 
                     Swal.fire({
                         title: 'Pesanan produk',
                         html: '<div class="text-start mb-3"><strong>' + escapeHtml(name) + '</strong>' + (sku && sku !== '-' ? '<div class="small text-muted">SKU: ' + escapeHtml(sku) + '</div>' : '') + '</div>'
-                            + '<div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 text-start"><thead><tr><th>Order</th><th>Pembeli</th><th class="text-end">Qty</th><th class="text-end">Penjualan</th><th class="text-end">Pembayaran Pembeli</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>',
+                            + summaryHtml
+                            + '<div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 text-start"><thead><tr><th>Order</th><th>Pembeli</th><th class="text-end">Qty</th><th class="text-end">Penjualan Netto</th><th class="text-end">Pembayaran Pembeli</th><th class="text-end">Estimasi Payout</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>',
                         width: Math.min(window.innerWidth - 32, 1100),
                         confirmButtonText: 'Tutup',
                     });
