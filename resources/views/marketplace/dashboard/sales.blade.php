@@ -267,6 +267,7 @@
     }
     .sales-dashboard .sales-filter-field { min-width: 0; }
     .sales-dashboard .sales-filter-platform { width: 145px; }
+    .sales-dashboard .sales-filter-purchase-channel { width: 165px; }
     .sales-dashboard .sales-filter-store { width: 235px; }
     .sales-dashboard .sales-filter-label {
         display: flex;
@@ -538,7 +539,7 @@
     .sales-dashboard .sales-daily-chart-analysis-item-label { display: block; color: var(--sales-muted); font-size: .57rem; font-weight: 750; line-height: 1.2; }
     .sales-dashboard .sales-daily-chart-analysis-item-value { display: block; margin-top: .24rem; color: var(--sales-ink); font-size: .68rem; font-weight: 850; line-height: 1.2; }
     .sales-dashboard .sales-daily-chart-analysis-item-date { display: block; margin-top: .12rem; color: var(--sales-muted); font-size: .56rem; font-weight: 700; line-height: 1.2; }
-    .sales-dashboard .sales-product-table { min-width: 1265px; table-layout: fixed; }
+    .sales-dashboard .sales-product-table { min-width: 1080px; table-layout: fixed; }
     .sales-dashboard .sales-product-table th,
     .sales-dashboard .sales-product-table td { white-space: nowrap; }
     .sales-dashboard .sales-product-table .sales-product-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1117,6 +1118,7 @@
         .sales-dashboard .sales-filter-comparison { order: 3; width: 100%; }
         .sales-dashboard .sales-filter-comparison .sales-nav-comparison { width: 100%; justify-content: flex-start; }
         .sales-dashboard .sales-filter-platform,
+        .sales-dashboard .sales-filter-purchase-channel,
         .sales-dashboard .sales-filter-store { width: auto; }
         .sales-dashboard .sales-nav-shell { align-items: stretch; flex-direction: column; }
         .sales-dashboard .sales-nav-comparison-label { padding-left: .35rem; }
@@ -1228,6 +1230,7 @@
     }
     $detailQuery = ['date_from' => $filters['date_from'], 'date_to' => $filters['date_to']];
     if ($filters['platform']) $detailQuery['platform'] = $filters['platform'];
+    if ($filters['purchase_channel']) $detailQuery['purchase_channel'] = $filters['purchase_channel'];
     if ($filters['store_id']) $detailQuery['store_id'] = $filters['store_id'];
     $platformCodes = $filters['platform_codes'] ?? ($filters['platform'] ? [$filters['platform']] : []);
     $visibleStores = $filters['platform']
@@ -1237,10 +1240,12 @@
     $importOrderQuery = $filters['store_id'] ? ['store_id' => $filters['store_id']] : [];
     $paymentDetailQuery = ['tab' => 'payments'];
     if ($filters['platform']) $paymentDetailQuery['platform'] = $filters['platform'];
+    if ($filters['purchase_channel']) $paymentDetailQuery['purchase_channel'] = $filters['purchase_channel'];
     if ($filters['store_id']) $paymentDetailQuery['store_id'] = $filters['store_id'];
     if (!empty($filters['dummy'])) $paymentDetailQuery['dummy'] = 1;
     $shippingDetailQuery = ['tab' => 'shipping'];
     if ($filters['platform']) $shippingDetailQuery['platform'] = $filters['platform'];
+    if ($filters['purchase_channel']) $shippingDetailQuery['purchase_channel'] = $filters['purchase_channel'];
     if ($filters['store_id']) $shippingDetailQuery['store_id'] = $filters['store_id'];
     if (!empty($filters['dummy'])) $shippingDetailQuery['dummy'] = 1;
     $shippingPct = fn ($value) => $shippingKpi['total'] > 0
@@ -2454,6 +2459,14 @@
                             </select>
                         </div>
                     @endif
+                    <div class="sales-filter-field sales-filter-purchase-channel">
+                        <label class="sales-filter-label" for="sales-purchase-channel"><i class="bi bi-shop-window" aria-hidden="true"></i>Kanal pesanan</label>
+                        <select id="sales-purchase-channel" class="form-select form-select-sm" name="purchase_channel">
+                            <option value="">Semua kanal</option>
+                            <option value="tiktok" @selected(($filters['purchase_channel'] ?? null) === 'tiktok')>TikTok Shop</option>
+                            <option value="tokopedia" @selected(($filters['purchase_channel'] ?? null) === 'tokopedia')>Tokopedia</option>
+                        </select>
+                    </div>
                     @if ($visibleStores->isNotEmpty())
                         <div class="sales-filter-field sales-filter-store">
                             <label class="sales-filter-label" for="sales-store"><i class="bi bi-shop" aria-hidden="true"></i>Toko</label>
@@ -3452,7 +3465,7 @@
                                     <td class="text-end pe-3" data-label="Laba Bersih">{{ $fmt($activeCategoryMetrics['net_profit']) }}</td>
                                 </tr>
                                 <tr id="{{ $categoryKey }}-detail" class="sales-category-comparison-detail" data-sales-category-comparison-items="{{ $categoryKey }}" hidden>
-                                    <td colspan="13">
+                                    <td colspan="10">
                                         <div class="sales-category-comparison-detail-card">
                                             <div class="sales-category-detail-header d-flex align-items-start justify-content-between gap-2 mb-2">
                                                 <div>
@@ -4052,38 +4065,33 @@
                     <table class="table table-sm table-hover align-middle sales-table sales-product-table sales-promotion-table">
                         <colgroup>
                             <col style="width: 4%">
-                            <col style="width: 24%">
-                            <col style="width: 7%">
-                            <col style="width: 4%">
-                            <col style="width: 4%">
+                            <col style="width: 27%">
                             <col style="width: 8%">
-                            <col style="width: 8%">
-                            <col style="width: 9%">
-                            <col style="width: 7%">
-                            <col style="width: 7%">
                             <col style="width: 5%">
                             <col style="width: 5%">
+                            <col style="width: 14%">
+                            <col style="width: 10%">
+                            <col style="width: 10%">
                             <col style="width: 7%">
+                            <col style="width: 10%">
                         </colgroup>
                         <thead>
                             <tr>
                                 <th scope="col" class="sales-index-column" rowspan="2">No.</th>
                                 <th rowspan="2">Produk / Variant</th>
-                                <th class="sales-product-table-group-head" colspan="6">Kinerja Penjualan</th>
-                                <th class="sales-product-table-group-head" colspan="5">Kinerja Iklan</th>
+                                <th class="sales-product-table-group-head" colspan="4">Kinerja Penjualan</th>
+                                <th class="sales-product-table-group-head" colspan="3">Kinerja Iklan</th>
+                                <th class="sales-product-table-group-head" colspan="1">Profitabilitas</th>
                             </tr>
                             <tr>
                                 <th class="text-end" title="Variant: HPP terakhir per unit · Marketplace/kategori: total HPP berdasarkan unit">HPP</th>
                                 <th class="text-end">Order</th>
                                 <th class="text-end">Unit</th>
-                                <th class="text-end">Penjualan</th>
                                 <th class="text-end">Penjualan Netto</th>
-                                <th class="text-end">Pembayaran</th>
                                 <th class="text-end">Biaya Iklan</th>
                                 <th class="text-end">Penjualan Iklan</th>
-                                <th class="text-end">ACOS</th>
                                 <th class="text-end">ROAS</th>
-                                <th class="text-end pe-3">CPA</th>
+                                <th class="text-end pe-3">Laba Bersih</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -4137,16 +4145,14 @@
                                     $categoryCode = $categoryName === 'Multi kategori' ? '' : trim((string) ($category->category_code ?? ''));
                                     $categoryOrders = $uniqueOrderKeys($categoryProducts)->count();
                                     $categoryQty = (int) $categoryProducts->sum('qty');
-                                    $categorySales = (float) $categoryProducts->sum('sales');
                                     $categoryNetSales = (float) $categoryProducts->sum('net_sales');
-                                    $categoryBuyerPayment = (float) $categoryProducts->sum('buyer_payment');
-                                    $categoryContributionProfit = (float) $categoryProducts->filter(fn ($product) => $product->contribution_profit !== null)->sum('contribution_profit');
-                                    $categoryContributionMargin = $categoryNetSales > 0 ? ($categoryContributionProfit / $categoryNetSales) * 100 : null;
                                     $categoryAdProducts = $categoryProducts->filter(fn ($product) => $product->ad_spend_matched ?? false);
                                     $categorySpend = (float) $categoryAdProducts->sum('ad_spend');
                                     $categoryAdSales = (float) $categoryAdProducts->sum('ad_sales');
-                                    $categoryAdConversions = (int) $categoryAdProducts->sum('ad_conversions');
                                     $categoryHppTotal = (float) $categoryProducts->sum(fn ($product) => (float) ($product->hpp ?? 0) * (int) ($product->qty ?? 0));
+                                    $categoryNetProfit = $categoryProducts->every(fn ($product) => $product->net_profit !== null)
+                                        ? (float) $categoryProducts->sum('net_profit')
+                                        : null;
                                 @endphp
                                 <tr class="sales-product-group-row">
                                     <td class="sales-index-cell" aria-label="Kategori {{ $categoryNumber }}">{{ $categoryNumber }}</td>
@@ -4165,14 +4171,11 @@
                                     <td class="text-end fw-semibold"><div>{{ $categoryHppTotal > 0 ? $fmtHpp($categoryHppTotal) : '—' }}</div><div class="small text-muted">Total HPP</div></td>
                                     <td class="text-end">{{ number_format($categoryOrders) }}</td>
                                     <td class="text-end">{{ number_format($categoryQty) }}</td>
-                                    <td class="text-end fw-semibold">{{ $fmt($categorySales) }}</td>
-                                    <td class="text-end fw-semibold"><div>{{ $fmt($categoryNetSales) }}</div><div class="small text-muted">M {{ $categoryContributionMargin !== null ? $percentDisplay($categoryContributionMargin) : '—' }}</div></td>
-                                    <td class="text-end fw-semibold">{{ $fmt($categoryBuyerPayment) }}</td>
+                                    <td class="text-end fw-semibold">{{ $fmt($categoryNetSales) }}</td>
                                     <td class="text-end text-danger fw-semibold">{{ $fmt($categorySpend) }}</td>
                                     <td class="text-end text-danger fw-semibold">{{ $fmt($categoryAdSales) }}</td>
-                                    <td class="text-end">{{ $categoryAdSales > 0 ? $percentDisplay(($categorySpend / $categoryAdSales) * 100) : '—' }}</td>
                                     <td class="text-end">{{ $categorySpend > 0 ? $multipleDisplay($categoryAdSales / $categorySpend) : '—' }}</td>
-                                    <td class="text-end pe-3">{{ $categoryAdConversions > 0 ? $fmt($categorySpend / $categoryAdConversions) : '—' }}</td>
+                                    <td class="text-end pe-3 {{ ($categoryNetProfit ?? 0) < 0 ? 'text-danger' : '' }}">{{ $categoryNetProfit === null ? '—' : $fmt($categoryNetProfit) }}</td>
                                 </tr>
                                 @foreach ($marketplaceGroups as $marketplaceProducts)
                                     @php
@@ -4186,16 +4189,14 @@
                                         $marketplaceTitle = trim((string) ($marketplace->marketplace_name ?: $marketplace->name)) ?: 'Produk tanpa nama';
                                         $marketplaceOrders = $uniqueOrderKeys($marketplaceProducts)->count();
                                         $marketplaceQty = (int) $marketplaceProducts->sum('qty');
-                                        $marketplaceSales = (float) $marketplaceProducts->sum('sales');
                                         $marketplaceNetSales = (float) $marketplaceProducts->sum('net_sales');
-                                        $marketplaceBuyerPayment = (float) $marketplaceProducts->sum('buyer_payment');
-                                        $marketplaceContributionProfit = (float) $marketplaceProducts->filter(fn ($product) => $product->contribution_profit !== null)->sum('contribution_profit');
-                                        $marketplaceContributionMargin = $marketplaceNetSales > 0 ? ($marketplaceContributionProfit / $marketplaceNetSales) * 100 : null;
                                         $marketplaceAdProducts = $marketplaceProducts->filter(fn ($product) => $product->ad_spend_matched ?? false);
                                         $marketplaceSpend = (float) $marketplaceAdProducts->sum('ad_spend');
                                         $marketplaceAdSales = (float) $marketplaceAdProducts->sum('ad_sales');
-                                        $marketplaceAdConversions = (int) $marketplaceAdProducts->sum('ad_conversions');
                                         $marketplaceHppTotal = (float) $marketplaceProducts->sum(fn ($product) => (float) ($product->hpp ?? 0) * (int) ($product->qty ?? 0));
+                                        $marketplaceNetProfit = $marketplaceProducts->every(fn ($product) => $product->net_profit !== null)
+                                            ? (float) $marketplaceProducts->sum('net_profit')
+                                            : null;
                                     @endphp
                                     <tr id="{{ $marketplaceKey }}" class="sales-product-marketplace-row" data-sales-product-category-items="{{ $categoryKey }}" hidden>
                                         <td class="sales-index-cell sales-product-item-index" aria-label="Marketplace {{ $categoryNumber }}.{{ $marketplaceNumber }}"><span class="sales-product-item-number">{{ $categoryNumber }}.{{ $marketplaceNumber }}</span></td>
@@ -4222,14 +4223,11 @@
                                         <td class="text-end fw-semibold"><div>{{ $marketplaceHppTotal > 0 ? $fmtHpp($marketplaceHppTotal) : '—' }}</div><div class="small text-muted">Total HPP</div></td>
                                         <td class="text-end">{{ number_format($marketplaceOrders) }}</td>
                                         <td class="text-end">{{ number_format($marketplaceQty) }}</td>
-                                        <td class="text-end fw-semibold">{{ $fmt($marketplaceSales) }}</td>
-                                        <td class="text-end fw-semibold"><div>{{ $fmt($marketplaceNetSales) }}</div><div class="small text-muted">M {{ $marketplaceContributionMargin !== null ? $percentDisplay($marketplaceContributionMargin) : '—' }}</div></td>
-                                        <td class="text-end fw-semibold">{{ $fmt($marketplaceBuyerPayment) }}</td>
+                                        <td class="text-end fw-semibold">{{ $fmt($marketplaceNetSales) }}</td>
                                         <td class="text-end text-danger fw-semibold">{{ $fmt($marketplaceSpend) }}</td>
                                         <td class="text-end text-danger fw-semibold">{{ $fmt($marketplaceAdSales) }}</td>
-                                        <td class="text-end">{{ $marketplaceAdSales > 0 ? $percentDisplay(($marketplaceSpend / $marketplaceAdSales) * 100) : '—' }}</td>
                                         <td class="text-end">{{ $marketplaceSpend > 0 ? $multipleDisplay($marketplaceAdSales / $marketplaceSpend) : '—' }}</td>
-                                        <td class="text-end pe-3">{{ $marketplaceAdConversions > 0 ? $fmt($marketplaceSpend / $marketplaceAdConversions) : '—' }}</td>
+                                        <td class="text-end pe-3 {{ ($marketplaceNetProfit ?? 0) < 0 ? 'text-danger' : '' }}">{{ $marketplaceNetProfit === null ? '—' : $fmt($marketplaceNetProfit) }}</td>
                                     </tr>
                                     @foreach ($marketplaceProducts as $product)
                                         <tr id="{{ $marketplaceKey }}-items-{{ $loop->index }}" class="sales-product-internal-row" data-sales-product-category-items="{{ $categoryKey }}" data-sales-product-marketplace-items="{{ $marketplaceKey }}" hidden>
@@ -4248,14 +4246,11 @@
                                             <td class="text-end fw-semibold"><div>{{ (float) ($product->hpp ?? 0) > 0 ? $fmtHpp($product->hpp) : '—' }}</div><div class="small text-muted">HPP/unit</div></td>
                                             <td class="text-end">{{ number_format((int) $product->orders) }}</td>
                                             <td class="text-end">{{ number_format((int) $product->qty) }}</td>
-                                            <td class="text-end fw-semibold">{{ $fmt($product->sales) }}</td>
-                                            <td class="text-end fw-semibold"><div>{{ $fmt($product->net_sales) }}</div><div class="small text-muted">M {{ $product->contribution_margin !== null ? $percentDisplay($product->contribution_margin) : '—' }}</div></td>
-                                            <td class="text-end fw-semibold">{{ $fmt($product->buyer_payment) }}</td>
+                                            <td class="text-end fw-semibold">{{ $fmt($product->net_sales) }}</td>
                                             <td class="text-end {{ ($product->ad_spend ?? 0) > 0 ? 'text-danger fw-semibold' : 'text-muted' }}">{{ ($product->ad_spend_matched ?? false) ? $fmt($product->ad_spend) : '—' }}</td>
                                             <td class="text-end text-danger {{ ($product->ad_sales ?? 0) > 0 ? 'fw-semibold' : 'text-muted' }}">{{ ($product->ad_spend_matched ?? false) ? $fmt($product->ad_sales) : '—' }}</td>
-                                            <td class="text-end">{{ ($product->ad_spend_matched ?? false) && ($product->ad_sales ?? 0) > 0 ? $percentDisplay(($product->ad_spend / $product->ad_sales) * 100) : '—' }}</td>
                                             <td class="text-end">{{ ($product->ad_spend_matched ?? false) && ($product->ad_spend ?? 0) > 0 ? $multipleDisplay($product->ad_sales / $product->ad_spend) : '—' }}</td>
-                                            <td class="text-end pe-3">{{ ($product->ad_spend_matched ?? false) && ($product->ad_conversions ?? 0) > 0 ? $fmt($product->ad_spend / $product->ad_conversions) : '—' }}</td>
+                                            <td class="text-end pe-3 {{ ($product->net_profit ?? 0) < 0 ? 'text-danger' : '' }}">{{ $product->net_profit === null ? '—' : $fmt($product->net_profit) }}</td>
                                         </tr>
                                     @endforeach
                                 @endforeach
@@ -5459,6 +5454,9 @@
                 @endif
                 @if ($filters['platform'])
                     query.set('platform', @json($filters['platform']));
+                @endif
+                @if (!empty($filters['purchase_channel']))
+                    query.set('purchase_channel', @json($filters['purchase_channel']));
                 @endif
                 @if (!empty($filters['dummy']))
                     query.set('dummy', '1');
