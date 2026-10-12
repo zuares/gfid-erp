@@ -4,12 +4,17 @@ namespace Tests\Feature;
 
 use App\Models\Channel;
 use App\Models\MarketplaceImportBatch;
+use App\Models\MarketplaceOrder;
 use App\Models\MpShipment;
+use App\Services\Marketplace\Import\MpImportService;
 use App\Models\Store;
 use App\Models\User;
 use App\Services\Marketplace\Source\TiktokApiSourceAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
 
 class MarketplaceTikTokImportTest extends TestCase
@@ -23,6 +28,7 @@ class MarketplaceTikTokImportTest extends TestCase
                 'orders' => [[
                     'order_id' => 'API-ORDER-001',
                     'status' => 'SHIPPED',
+                    'purchase_channel' => 'Tokopedia',
                     'create_time' => 1785750000,
                     'packages' => [[
                         'package_id' => 'API-PACKAGE-001',
@@ -41,6 +47,7 @@ class MarketplaceTikTokImportTest extends TestCase
         $this->assertSame('API-ORDER-001', $normalized[0]['platform_order_id']);
         $this->assertSame('API-PACKAGE-001', $normalized[0]['platform_shipment_id']);
         $this->assertSame('API-TRACK-001', $normalized[0]['tracking_no']);
+        $this->assertSame('tokopedia', $normalized[0]['purchase_channel']);
         $this->assertSame('TTB-BLK-M', $normalized[0]['items'][0]['sku_code']);
         $this->assertSame(2, $normalized[0]['items'][0]['qty']);
         $this->assertSame(0.0, $normalized[0]['promotion_breakdown']['voucher_store']);
@@ -410,6 +417,281 @@ class MarketplaceTikTokImportTest extends TestCase
             ->assertOk()
             ->assertSee('586443354048595556')
             ->assertSee('Tracktop Jacket');
+    }
+
+    public function test_tiktok_xlsx_export_can_be_previewed_committed_and_shown_on_sales_dashboard(): void
+    {
+        $channel = Channel::updateOrCreate(
+            ['code' => 'TTK'],
+            ['name' => 'Tiktok', 'status' => 'active', 'is_active' => true]
+        );
+        $store = Store::create([
+            'code' => 'TTK-XLSX-TEST',
+            'name' => 'TikTok XLSX Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'TTK-XLSX-' . uniqid(),
+        ]);
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('OrderSKUList');
+        $sheet->fromArray([
+            ['Order ID', 'Order Status', 'Seller SKU', 'Product Name', 'Quantity', 'SKU Subtotal After Discount', 'Order Amount', 'Created Time', 'Tracking ID', 'Package ID', 'Purchase Channel'],
+            ['Platform unique order ID.', 'Current order status.', 'Seller sku input by the seller in the product system.', 'Platform product name.', 'SKU sold quantity in the order.', 'Subtotal after discount.', 'Order total amount paid by the buyer.', 'Order created time.', 'The order tracking number.', 'The order package ID.', ''],
+            ['', 'Dikirim', 'TTC-BLK-XL', 'Tracktop Jacket', 1, 50000, 85000, '12/10/2026 10:30:00', 'JY-XLSX-001', '', 'TikTok'],
+            ['', 'Dikirim', 'K5BLK', 'Jogger Hitam', 1, 35000, 85000, '12/10/2026 10:30:00', 'JY-XLSX-001', '', 'TikTok'],
+            ['586455555555555555', 'Dikirim', 'K7BLK', 'Jogger Tokopedia', 2, 33000, 66000, '12/10/2026 10:40:00', 'JY-XLSX-002', 'PKG-TOKO-001', 'Tokopedia'],
+        ]);
+        $orderId = '586444444444444444';
+        $packageId = '1213665526886401636';
+        foreach ([3, 4] as $row) {
+            $sheet->setCellValueExplicit("A{$row}", $orderId . "\t", DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("J{$row}", $packageId . "\t", DataType::TYPE_STRING);
+        }
+
+        $path = tempnam(sys_get_temp_dir(), 'tiktok-xlsx-');
+        (new Xlsx($spreadsheet))->save($path);
+        $spreadsheet->disconnectWorksheets();
+
+        try {
+            $this->actingAs($owner)
+                ->post(route('imports.marketplace.preview'), [
+                    'channel_id' => $channel->id,
+                    'store_id' => $store->id,
+                    'file' => new UploadedFile($path, 'tiktok-full-export.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true),
+                ])
+                ->assertOk()
+                ->assertViewIs('imports.marketplace.preview')
+                ->assertSee('Asal pesanan')
+                ->assertSee('Tokopedia')
+                ->assertSee('<div class="shipment-kpi-label">Paket</div>', false)
+                ->assertSee('Paket pengiriman terdeteksi')
+                ->assertDontSee('Baris terbaca dari file')
+                ->assertSee('Ch: <span class="mono">tiktok</span>', false)
+                ->assertSee('Ch: <span class="mono">tokopedia</span>', false);
+        } finally {
+            unlink($path);
+        }
+
+        $this->assertSame(2, session('mp_import_preview.stats.shipments_parsed'));
+        $this->assertSame(3, session('mp_import_preview.stats.items_parsed'));
+        $this->assertSame(1, session('mp_import_preview.stats.purchase_channels.tiktok.orders'));
+        $this->assertSame(1, session('mp_import_preview.stats.purchase_channels.tokopedia.orders'));
+
+        $this->actingAs($owner)
+            ->post(route('imports.marketplace.commit'))
+            ->assertRedirect(route('imports.marketplace.index'));
+
+        $shipment = MpShipment::query()
+            ->where('store_id', $store->id)
+            ->where('platform_order_id', $orderId)
+            ->firstOrFail();
+        $this->assertSame($packageId, $shipment->platform_shipment_id);
+        $this->assertSame('JY-XLSX-001', $shipment->tracking_no);
+        $this->assertSame(2, $shipment->items()->count());
+        $this->assertSame('tiktok', $shipment->purchase_channel);
+        $this->assertDatabaseHas('mp_shipments', [
+            'store_id' => $store->id,
+            'platform_order_id' => '586455555555555555',
+            'purchase_channel' => 'tokopedia',
+        ]);
+        $this->assertDatabaseHas('marketplace_orders', [
+            'store_id' => $store->id,
+            'channel_order_id' => $orderId,
+            'purchase_channel' => 'tiktok',
+        ]);
+        $this->assertDatabaseHas('marketplace_orders', [
+            'store_id' => $store->id,
+            'channel_order_id' => '586455555555555555',
+            'purchase_channel' => 'tokopedia',
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('marketplace.dashboard.sales', [
+                'store_id' => $store->id,
+                'date_from' => '2026-10-12',
+                'date_to' => '2026-10-12',
+            ]))
+            ->assertOk()
+            ->assertSee($orderId)
+            ->assertSee('Tracktop Jacket');
+    }
+
+    public function test_unknown_purchase_channel_blocks_preview_commit(): void
+    {
+        $store = $this->makeTiktokStore('TTK-UNKNOWN');
+        $path = $this->makeTiktokCsv('UNKNOWN-001', 'PKG-UNKNOWN', 'JY-UNKNOWN', 'Lazada');
+
+        try {
+            $service = app(MpImportService::class);
+            $preview = $service->import('tiktok', $path, $store->id, 'unknown.csv', true);
+            $this->assertCount(1, $preview['import_errors']);
+            $this->assertSame(0, $preview['stats']['purchase_channels']['tiktok']['orders'] ?? 0);
+
+            $this->expectException(\InvalidArgumentException::class);
+            $service->import('tiktok', $path, $store->id, 'unknown.csv');
+        } finally {
+            unlink($path);
+            $this->assertDatabaseCount('mp_shipments', 0);
+        }
+    }
+
+    public function test_import_only_fills_gaps_in_api_owned_shipment_and_order(): void
+    {
+        $store = $this->makeTiktokStore('TTK-API-SAFE');
+        $path = $this->makeTiktokCsv('API-SAFE-001', 'PKG-API-SAFE', 'JY-API-SAFE', 'TikTok');
+        $service = app(MpImportService::class);
+
+        try {
+            $service->import('tiktok', $path, $store->id, 'initial.csv');
+            $shipment = MpShipment::where('platform_order_id', 'API-SAFE-001')->firstOrFail();
+            $order = MarketplaceOrder::where('channel_order_id', 'API-SAFE-001')->firstOrFail();
+            $shipment->forceFill([
+                'source_type' => 'api', 'purchase_channel' => null,
+                'marketplace_status' => 'COMPLETED', 'grand_total' => 999000,
+                'source_updated_at' => '2026-10-13 12:00:00',
+            ])->save();
+            $order->forceFill([
+                'purchase_channel' => null, 'order_status' => 'COMPLETED',
+                'raw_json' => ['source' => 'api'],
+            ])->save();
+            $shipment->items()->firstOrFail()->forceFill(['qty' => 9])->save();
+            $order->items()->firstOrFail()->forceFill(['qty' => 9])->save();
+
+            $service->import('tiktok', $path, $store->id, 'older.csv');
+            $shipment->refresh();
+            $order->refresh();
+            $this->assertSame('COMPLETED', $shipment->marketplace_status);
+            $this->assertSame(999000.0, (float) $shipment->grand_total);
+            $this->assertSame(9, $shipment->items()->firstOrFail()->qty);
+            $this->assertSame('tiktok', $shipment->purchase_channel);
+            $this->assertSame('COMPLETED', $order->order_status);
+            $this->assertSame(9, $order->items()->firstOrFail()->qty);
+            $this->assertSame('tiktok', $order->purchase_channel);
+            $this->assertSame(1, MpShipment::where('platform_order_id', 'API-SAFE-001')->count());
+        } finally {
+            unlink($path);
+        }
+    }
+
+    public function test_existing_order_cannot_change_purchase_channel_by_reimport(): void
+    {
+        $store = $this->makeTiktokStore('TTK-CHANNEL-SAFE');
+        $original = $this->makeTiktokCsv('CHANNEL-001', 'PKG-CHANNEL', 'JY-CHANNEL', 'Tokopedia');
+        $conflict = $this->makeTiktokCsv('CHANNEL-001', 'PKG-CHANNEL', 'JY-CHANNEL', 'TikTok');
+        $service = app(MpImportService::class);
+
+        try {
+            $service->import('tiktok', $original, $store->id, 'original.csv');
+            $preview = $service->import('tiktok', $conflict, $store->id, 'conflict.csv', true);
+            $this->assertNotEmpty($preview['import_errors']);
+            $this->expectException(\InvalidArgumentException::class);
+            $service->import('tiktok', $conflict, $store->id, 'conflict.csv');
+        } finally {
+            unlink($original);
+            unlink($conflict);
+            $this->assertDatabaseHas('mp_shipments', [
+                'platform_order_id' => 'CHANNEL-001', 'purchase_channel' => 'tokopedia',
+            ]);
+            $this->assertDatabaseHas('marketplace_orders', [
+                'channel_order_id' => 'CHANNEL-001', 'purchase_channel' => 'tokopedia',
+            ]);
+        }
+    }
+
+    public function test_older_import_cannot_rollback_newer_import_and_tracking_matches_missing_package(): void
+    {
+        $store = $this->makeTiktokStore('TTK-OLD-SAFE');
+        $path = $this->makeTiktokCsv('OLD-SAFE-001', 'PKG-OLD-SAFE', 'JY-OLD-SAFE', 'Tokopedia');
+        $service = app(MpImportService::class);
+
+        try {
+            $service->import('tiktok', $path, $store->id, 'initial.csv');
+            $shipment = MpShipment::where('platform_order_id', 'OLD-SAFE-001')->firstOrFail();
+            $shipment->forceFill([
+                'platform_shipment_id' => null,
+                'source_updated_at' => '2026-10-13 12:00:00',
+                'marketplace_status' => 'COMPLETED',
+                'grand_total' => 999000,
+            ])->save();
+            $shipment->items()->firstOrFail()->forceFill(['qty' => 9])->save();
+
+            $preview = $service->import('tiktok', $path, $store->id, 'older.csv', true);
+            $this->assertSame(1, $preview['stats']['existing_shipments']);
+            $this->assertSame([], $preview['import_errors']);
+            $service->import('tiktok', $path, $store->id, 'older.csv');
+
+            $shipment->refresh();
+            $this->assertSame('PKG-OLD-SAFE', $shipment->platform_shipment_id);
+            $this->assertSame('COMPLETED', $shipment->marketplace_status);
+            $this->assertSame(999000.0, (float) $shipment->grand_total);
+            $this->assertSame(9, $shipment->items()->firstOrFail()->qty);
+            $this->assertSame(1, MpShipment::where('platform_order_id', 'OLD-SAFE-001')->count());
+        } finally {
+            unlink($path);
+        }
+    }
+
+    public function test_newer_file_refreshes_import_owned_snapshot(): void
+    {
+        $store = $this->makeTiktokStore('TTK-NEWER');
+        $older = $this->makeTiktokCsv('NEWER-001', 'PKG-NEWER', 'JY-NEWER', 'TikTok');
+        $newer = $this->makeTiktokCsv('NEWER-001', 'PKG-NEWER', 'JY-NEWER', 'TikTok', 2, '13/10/2026 11:00:00');
+        $service = app(MpImportService::class);
+
+        try {
+            $service->import('tiktok', $older, $store->id, 'older.csv');
+            $service->import('tiktok', $newer, $store->id, 'newer.csv');
+            $shipment = MpShipment::where('platform_order_id', 'NEWER-001')->firstOrFail();
+            $order = MarketplaceOrder::where('channel_order_id', 'NEWER-001')->firstOrFail();
+            $this->assertSame(2, $shipment->items()->firstOrFail()->qty);
+            $this->assertSame(2, $order->items()->firstOrFail()->qty);
+            $this->assertSame(66000.0, (float) $shipment->grand_total);
+            $this->assertSame(1, MpShipment::where('platform_order_id', 'NEWER-001')->count());
+        } finally {
+            unlink($older);
+            unlink($newer);
+        }
+    }
+
+    private function makeTiktokStore(string $code): Store
+    {
+        $channel = Channel::updateOrCreate(['code' => 'TTK'], [
+            'name' => 'Tiktok', 'status' => 'active', 'is_active' => true,
+        ]);
+
+        return Store::create([
+            'code' => $code, 'name' => $code, 'channel_id' => $channel->id,
+            'status' => 'active', 'is_active' => true,
+        ]);
+    }
+
+    private function makeTiktokCsv(
+        string $orderId,
+        string $packageId,
+        string $tracking,
+        string $purchaseChannel,
+        int $qty = 1,
+        string $shippedAt = '12/10/2026 11:00:00',
+    ): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'ttk-stage-one-');
+        $rows = [
+            ['Order ID', 'Order Status', 'Seller SKU', 'Product Name', 'Quantity', 'SKU Unit Original Price', 'SKU Subtotal After Discount', 'Order Amount', 'Created Time', 'Shipped Time', 'Tracking ID', 'Package ID', 'Purchase Channel'],
+            [$orderId, 'Dikirim', 'K5BLK', 'Jogger Hitam', $qty, 33000, 33000 * $qty, 33000 * $qty, '12/10/2026 10:30:00', $shippedAt, $tracking, $packageId, $purchaseChannel],
+        ];
+        $file = fopen($path, 'w');
+        foreach ($rows as $row) {
+            fputcsv($file, $row);
+        }
+        fclose($file);
+
+        return $path;
     }
 
     public function test_empty_or_wrong_template_cannot_be_committed(): void

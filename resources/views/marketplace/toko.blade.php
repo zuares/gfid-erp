@@ -1237,7 +1237,7 @@
             : 'Upload file order/shipment untuk toko ini.';
         $('importModalFileNote').innerHTML = importModalMode === 'income'
             ? '<i class="bi bi-info-circle"></i><span>Gunakan report Income Shopee atau payout per order TikTok Shop.</span>'
-            : '<i class="bi bi-info-circle"></i><span>Pilih file order marketplace (.xlsx, .xls, atau .csv).</span>';
+            : '<i class="bi bi-info-circle"></i><span>File order .xlsx, .xls, atau .csv didukung, termasuk ekspor TikTok Seller Center.</span>';
     };
 
     window.openImportModal = function (storeId) {

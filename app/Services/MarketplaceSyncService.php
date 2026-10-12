@@ -18,6 +18,7 @@ use App\Models\SkuMapping;
 use App\Models\Store;
 use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
+use App\Services\Marketplace\PurchaseChannel;
 use App\Services\Channels\ChannelManager;
 use App\Services\Channels\Contracts\MarketplaceChannel;
 use Carbon\Carbon;
@@ -2883,6 +2884,8 @@ class MarketplaceSyncService
             foreach ($chunk as $detail) {
                 if (empty($detail['order_sn'])) continue;
 
+                $purchaseChannel = PurchaseChannel::normalize($detail['purchase_channel'] ?? null);
+
                 $orderedAt   = ! empty($detail['create_time']) ? now()->setTimestamp((int) $detail['create_time']) : null;
                 $orderDate   = $orderedAt ? $orderedAt->toDateTimeString() : now()->toDateTimeString();
                 $orderStatus = $detail['order_status'] ?? null;
@@ -3062,6 +3065,7 @@ class MarketplaceSyncService
                     [
                         // Identifiers
                         'external_order_id' => $detail['order_sn'],
+                        ...($purchaseChannel !== null ? ['purchase_channel' => $purchaseChannel] : []),
                         'booking_sn'        => $detail['booking_sn'] ?? null,
                         'order_date'        => $orderDate,
                         'ordered_at'        => $orderedAt,

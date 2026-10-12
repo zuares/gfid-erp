@@ -4,6 +4,7 @@ namespace App\Services\Marketplace\Source;
 
 use Carbon\Carbon;
 use App\Services\Marketplace\Promotion\MarketplacePromotionNormalizer;
+use App\Services\Marketplace\PurchaseChannel;
 
 class TiktokApiSourceAdapter implements MarketplaceSourceAdapterInterface
 {
@@ -99,6 +100,7 @@ class TiktokApiSourceAdapter implements MarketplaceSourceAdapterInterface
                 $out[] = [
                     'store_id' => $storeId,
                     'channel' => $this->channel(),
+                    'purchase_channel' => PurchaseChannel::normalize($order['purchase_channel'] ?? null),
                     'platform_order_id' => $orderId,
                     'platform_shipment_id' => $packageId ?: null,
                     'tracking_no' => $tracking ?: null,

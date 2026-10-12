@@ -15,6 +15,7 @@ class MpShipment extends Model
         'store_id',
         'marketplace_order_id',
         'channel',
+        'purchase_channel',
         'platform_order_id',
         'platform_shipment_id',
         'tracking_no',

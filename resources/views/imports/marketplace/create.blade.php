@@ -247,7 +247,7 @@
       <div class="shipment-field">
         <label class="form-label small" style="color:var(--muted)">File</label>
         <input type="file" name="file" class="form-control" required accept=".xlsx,.xls,.csv">
-        <div class="shipment-upload-note mt-2"><i class="bi bi-info-circle"></i> Pastikan header kolom sesuai template marketplace.</div>
+        <div class="shipment-upload-note mt-2"><i class="bi bi-info-circle"></i> File TikTok Seller Center .xlsx (sheet OrderSKUList) dan .csv didukung. Periksa hasil preview sebelum commit.</div>
       </div>
     </div>
 

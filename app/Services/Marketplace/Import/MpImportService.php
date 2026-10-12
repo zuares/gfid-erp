@@ -4,6 +4,7 @@ namespace App\Services\Marketplace\Import;
 
 use App\Models\MpShipment;
 use App\Models\MpShipmentItem;
+use App\Models\MarketplaceOrder;
 use App\Services\Marketplace\Import\Adapters\MpImportAdapterInterface;
 use App\Services\Marketplace\MpPacketItemSyncService;
 use Illuminate\Support\Facades\DB;
@@ -58,24 +59,78 @@ class MpImportService
             'inserted_items' => 0,
             'new_shipments' => 0,
             'existing_shipments' => 0,
+            'purchase_channels' => [],
             'warnings' => [],
             'dry_run' => $dryRun,
         ];
 
-        foreach ($normalized as $s) {
-            $existing = MpShipment::query()
-                ->where('store_id', $s['store_id'] ?? $storeId)
-                ->where('channel', $s['channel'])
-                ->where('platform_order_id', $s['platform_order_id'])
-                ->where(function ($q) use ($s) {
-                    if (! empty($s['platform_shipment_id'])) {
-                        $q->where('platform_shipment_id', $s['platform_shipment_id']);
-                    } else {
-                        $q->whereNull('platform_shipment_id');
-                    }
-                })
-                ->exists();
+        $importErrors = [];
+        $ordersByPurchaseChannel = [];
+        $orderChannels = [];
+        $trackingPackages = [];
+        $savedOrderChannels = collect();
+        if ($channel === 'tiktok') {
+            foreach (array_chunk(array_unique(array_column($normalized, 'platform_order_id')), 500) as $orderIds) {
+                $savedOrderChannels = $savedOrderChannels->merge(
+                    MarketplaceOrder::query()
+                        ->where('store_id', $storeId)
+                        ->whereIn('channel_order_id', $orderIds)
+                        ->pluck('purchase_channel', 'channel_order_id')
+                );
+            }
+        }
 
+        foreach ($normalized as $s) {
+            $purchaseChannel = $s['purchase_channel'] ?? null;
+            $orderId = (string) ($s['platform_order_id'] ?? '');
+            $tracking = trim((string) ($s['tracking_no'] ?? ''));
+            $packageId = trim((string) ($s['platform_shipment_id'] ?? ''));
+
+            if ($purchaseChannel !== null && isset($orderChannels[$orderId]) && $orderChannels[$orderId] !== $purchaseChannel) {
+                $importErrors[] = ['key' => $orderId, 'message' => 'Satu order memiliki Purchase Channel berbeda antar paket.'];
+            }
+            $orderChannels[$orderId] = $purchaseChannel;
+
+            if ($tracking !== '') {
+                $trackingKey = $orderId.'|'.$tracking;
+                if (isset($trackingPackages[$trackingKey]) && $trackingPackages[$trackingKey] !== $packageId) {
+                    $importErrors[] = ['key' => $orderId, 'message' => 'Resi yang sama tercatat pada Package ID berbeda dalam file.'];
+                }
+                $trackingPackages[$trackingKey] = $packageId;
+            }
+
+            if ($channel === 'tiktok' && ($purchaseChannel === null || ! empty($s['purchase_channel_conflict']))) {
+                $importErrors[] = [
+                    'key' => $orderId,
+                    'message' => ! empty($s['purchase_channel_conflict'])
+                        ? 'Satu paket memiliki Purchase Channel berbeda pada baris itemnya.'
+                        : 'Purchase Channel kosong atau tidak dikenali. Gunakan TikTok atau Tokopedia.',
+                ];
+            }
+
+            if ($purchaseChannel !== null) {
+                $stats['purchase_channels'][$purchaseChannel] ??= ['orders' => 0, 'shipments' => 0, 'items' => 0, 'qty' => 0];
+                $stats['purchase_channels'][$purchaseChannel]['shipments']++;
+                $stats['purchase_channels'][$purchaseChannel]['items'] += count($s['items'] ?? []);
+                $stats['purchase_channels'][$purchaseChannel]['qty'] += (int) ($s['total_qty'] ?? 0);
+                if (! isset($ordersByPurchaseChannel[$purchaseChannel][$orderId])) {
+                    $ordersByPurchaseChannel[$purchaseChannel][$orderId] = true;
+                    $stats['purchase_channels'][$purchaseChannel]['orders']++;
+                }
+            }
+
+            [$existing, $lookupError] = $this->findExistingShipment($s, $storeId);
+            if ($lookupError !== null) {
+                $importErrors[] = ['key' => $orderId, 'message' => $lookupError];
+            }
+            if ($existing && $purchaseChannel !== null && filled($existing->purchase_channel)
+                && $existing->purchase_channel !== $purchaseChannel) {
+                $importErrors[] = ['key' => $orderId, 'message' => 'Purchase Channel file berbeda dari shipment yang sudah tersimpan.'];
+            }
+            $savedOrderChannel = $savedOrderChannels->get($orderId);
+            if ($purchaseChannel !== null && filled($savedOrderChannel) && $savedOrderChannel !== $purchaseChannel) {
+                $importErrors[] = ['key' => $orderId, 'message' => 'Purchase Channel file berbeda dari order yang sudah tersimpan.'];
+            }
             $stats[$existing ? 'existing_shipments' : 'new_shipments']++;
         }
 
@@ -84,7 +139,11 @@ class MpImportService
         }
 
         if ($dryRun) {
-            return compact('stats', 'normalized');
+            return compact('stats', 'normalized') + ['import_errors' => $importErrors];
+        }
+
+        if ($importErrors !== []) {
+            throw new \InvalidArgumentException('Import dibatalkan karena ada Purchase Channel atau identitas shipment yang tidak valid. Upload ulang dan periksa preview.');
         }
 
         DB::transaction(function () use (
@@ -113,22 +172,15 @@ class MpImportService
                  * UPSERT mp_shipment
                  * ======================================
                  */
-                $mp = MpShipment::query()
-                    ->where('store_id', $s['store_id'] ?? $storeId)
-                    ->where('channel', $s['channel'])
-                    ->where('platform_order_id', $s['platform_order_id'])
-                    ->where(function ($q) use ($s) {
-                        if (!empty($s['platform_shipment_id'])) {
-                            $q->where('platform_shipment_id', $s['platform_shipment_id']);
-                        } else {
-                            $q->whereNull('platform_shipment_id');
-                        }
-                    })
-                    ->first();
+                [$mp, $lookupError] = $this->findExistingShipment($s, $storeId);
+                if ($lookupError !== null) {
+                    throw new \InvalidArgumentException($lookupError);
+                }
 
                 $payload = [
                     'store_id' => (int) ($s['store_id'] ?? $storeId),
                     'channel' => $s['channel'],
+                    'purchase_channel' => $s['purchase_channel'] ?? null,
                     'platform_order_id' => $s['platform_order_id'],
                     'platform_shipment_id' => $s['platform_shipment_id'] ?? null,
                     'tracking_no' => $s['tracking_no'] ?? null,
@@ -171,33 +223,56 @@ class MpImportService
                     $payload['marketplace_order_id'] = $linkedOrderId;
                 }
 
-                if (!$mp) {
+                $isNew = $mp === null;
+                $refreshItems = $isNew;
+                $refreshOrder = $isNew;
+
+                if ($isNew) {
                     $mp = MpShipment::create($payload);
                     $stats['inserted_shipments']++;
-                } else {
-                    $update = $payload;
-
-                    if (empty($update['tracking_no'])) {
-                        unset($update['tracking_no']);
-                    }
-
-                    if (empty($update['marketplace_status'])) {
-                        unset($update['marketplace_status']);
-                    }
-
-                    if (empty($update['status_norm'])) {
-                        unset($update['status_norm']);
-                    }
-
-                    if (empty($update['raw_payload'])) {
-                        unset($update['raw_payload']);
-                    }
-
-                    if (empty($update['marketplace_order_id'])) {
-                        unset($update['marketplace_order_id']);
-                    }
-
+                } elseif ($s['channel'] !== 'tiktok') {
+                    // Jalur impor Shopee tetap mengikuti perilaku sebelumnya;
+                    // proteksi snapshot Tahap 1 khusus untuk ekspor TikTok Shop.
+                    $update = array_filter($payload, fn ($value, $key) =>
+                        ! in_array($key, ['tracking_no', 'marketplace_status', 'status_norm', 'raw_payload', 'marketplace_order_id'], true)
+                        || filled($value), ARRAY_FILTER_USE_BOTH);
                     $mp->fill($update)->save();
+                    $refreshItems = true;
+                    $refreshOrder = true;
+                    $stats['updated_shipments']++;
+                } else {
+                    $source = strtolower(trim((string) $mp->source_type));
+                    $apiOwned = $source !== '' && $source !== 'import';
+                    $incomingUpdatedAt = $s['source_updated_at'] ?? null;
+                    $currentUpdatedAt = $mp->source_updated_at?->toDateTimeString();
+                    $newerImport = ! $apiOwned
+                        && $incomingUpdatedAt !== null
+                        && ($currentUpdatedAt === null || $incomingUpdatedAt > $currentUpdatedAt);
+
+                    if ($newerImport) {
+                        // Nilai payout/fee dari proses income tidak boleh direset oleh file order.
+                        $update = collect($payload)->only([
+                            'purchase_channel', 'tracking_no', 'marketplace_status', 'status_norm',
+                            'order_created_at', 'paid_at', 'shipped_at', 'delivered_at', 'completed_at',
+                            'total_qty', 'order_subtotal', 'discount_total', 'shipping_fee',
+                            'grand_total', 'currency', 'refund_total', 'source_updated_at',
+                            'raw_payload', 'source_file', 'import_batch_id', 'imported_at',
+                            'marketplace_order_id', 'platform_shipment_id',
+                        ])->all();
+                        foreach ($update as $key => $value) {
+                            if ($value === null || $value === '') {
+                                unset($update[$key]);
+                            }
+                        }
+                        $mp->fill($update)->save();
+                        $refreshItems = true;
+                        $refreshOrder = true;
+                    } else {
+                        // Snapshot API atau file yang lebih baru tetap menjadi sumber utama.
+                        $this->fillMissingShipmentFields($mp, $payload);
+                        $refreshItems = $mp->items()->doesntExist() && $items !== [];
+                        $refreshOrder = $refreshItems;
+                    }
                     $stats['updated_shipments']++;
                 }
 
@@ -206,21 +281,23 @@ class MpImportService
                  * REFRESH mp_shipment_items (raw)
                  * ======================================
                  */
-                MpShipmentItem::where('mp_shipment_id', $mp->id)->delete();
+                if ($refreshItems) {
+                    MpShipmentItem::where('mp_shipment_id', $mp->id)->delete();
 
-                foreach ($items as $it) {
-                    MpShipmentItem::create([
-                        'mp_shipment_id' => $mp->id,
-                        'sku_code' => $it['sku_code'] ?? null,
-                        'sku_parent' => $it['sku_parent'] ?? null,
-                        'product_name' => $it['product_name'] ?? null,
-                        'variant_name' => $it['variant_name'] ?? null,
-                        'qty' => (int) ($it['qty'] ?? 0),
-                        'unit_price' => (float) ($it['unit_price'] ?? 0),
-                        'subtotal' => (float) ($it['subtotal'] ?? 0),
-                        'raw_line' => $it['raw_line'] ?? null,
-                    ]);
-                    $stats['inserted_items']++;
+                    foreach ($items as $it) {
+                        MpShipmentItem::create([
+                            'mp_shipment_id' => $mp->id,
+                            'sku_code' => $it['sku_code'] ?? null,
+                            'sku_parent' => $it['sku_parent'] ?? null,
+                            'product_name' => $it['product_name'] ?? null,
+                            'variant_name' => $it['variant_name'] ?? null,
+                            'qty' => (int) ($it['qty'] ?? 0),
+                            'unit_price' => (float) ($it['unit_price'] ?? 0),
+                            'subtotal' => (float) ($it['subtotal'] ?? 0),
+                            'raw_line' => $it['raw_line'] ?? null,
+                        ]);
+                        $stats['inserted_items']++;
+                    }
                 }
 
                 // Sales dashboard membaca marketplace_orders, sedangkan
@@ -232,6 +309,7 @@ class MpImportService
                     $items,
                     $batchId,
                     $now->toDateTimeString(),
+                    $refreshOrder,
                 );
                 if (! empty($salesOrder['order_id']) && (int) $mp->marketplace_order_id !== (int) $salesOrder['order_id']) {
                     $mp->forceFill(['marketplace_order_id' => (int) $salesOrder['order_id']])->save();
@@ -261,7 +339,7 @@ class MpImportService
                     }
                 }
 
-                if ($skuQtyMap) {
+                if ($refreshItems && $skuQtyMap) {
                     $packetSync->syncAutoSkuMap(
                         (string) $mp->id,
                         $skuQtyMap,
@@ -275,5 +353,76 @@ class MpImportService
         });
 
         return compact('stats');
+    }
+
+    /** @return array{0: ?MpShipment, 1: ?string} */
+    private function findExistingShipment(array $shipment, int $storeId): array
+    {
+        $query = MpShipment::query()
+            ->where('store_id', (int) ($shipment['store_id'] ?? $storeId))
+            ->where('channel', $shipment['channel'])
+            ->where('platform_order_id', $shipment['platform_order_id']);
+        $packageId = trim((string) ($shipment['platform_shipment_id'] ?? ''));
+        $tracking = trim((string) ($shipment['tracking_no'] ?? ''));
+
+        $exact = (clone $query)
+            ->when($packageId !== '', fn ($q) => $q->where('platform_shipment_id', $packageId), fn ($q) => $q->whereNull('platform_shipment_id'))
+            ->first();
+        if ($shipment['channel'] !== 'tiktok') {
+            return [$exact, null];
+        }
+        if ($exact) {
+            $existingTracking = trim((string) $exact->tracking_no);
+            if ($tracking !== '' && $existingTracking !== '' && $tracking !== $existingTracking) {
+                return [null, 'Package ID yang sama memiliki resi berbeda; perlu diperiksa sebelum import.'];
+            }
+            return [$exact, null];
+        }
+
+        if ($tracking !== '') {
+            $trackingMatches = (clone $query)->where('tracking_no', $tracking)->limit(2)->get();
+            if ($trackingMatches->count() === 1) {
+                $match = $trackingMatches->first();
+                if ($packageId !== '' && filled($match->platform_shipment_id)
+                    && $match->platform_shipment_id !== $packageId) {
+                    return [null, 'Resi yang sama sudah terhubung ke Package ID berbeda.'];
+                }
+
+                return [$match, null];
+            }
+            if ($trackingMatches->count() > 1) {
+                return [null, 'Resi cocok dengan lebih dari satu shipment lama.'];
+            }
+        }
+
+        if ((clone $query)->whereNull('platform_shipment_id')->exists() && $packageId !== '') {
+            return [null, 'Order lama belum memiliki Package ID dan resinya tidak cocok; perlu diperiksa agar tidak duplikat.'];
+        }
+        if ($packageId === '' && $tracking === '' && (clone $query)->exists()) {
+            return [null, 'Order lama sudah ada, tetapi file tidak memiliki Package ID atau resi untuk mencocokkan paket.'];
+        }
+
+        return [null, null];
+    }
+
+    private function fillMissingShipmentFields(MpShipment $shipment, array $payload): void
+    {
+        $fillable = [
+            'purchase_channel', 'platform_shipment_id', 'tracking_no', 'marketplace_status',
+            'status_norm', 'order_created_at', 'paid_at', 'shipped_at', 'delivered_at',
+            'completed_at', 'raw_payload', 'marketplace_order_id',
+        ];
+        $changes = [];
+        foreach ($fillable as $key) {
+            $value = $payload[$key] ?? null;
+            if (($shipment->{$key} === null || $shipment->{$key} === '')
+                && $value !== null && $value !== '') {
+                $changes[$key] = $value;
+            }
+        }
+
+        if ($changes !== []) {
+            $shipment->fill($changes)->save();
+        }
     }
 }

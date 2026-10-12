@@ -19,6 +19,7 @@ class ImportedMarketplaceOrderSyncService
         array $items,
         string $batchId,
         string $timestamp,
+        bool $replaceSnapshot = true,
     ): array {
         $orderKey = trim((string) ($normalized['platform_order_id'] ?? ''));
         if ($orderKey === '') {
@@ -30,7 +31,11 @@ class ImportedMarketplaceOrderSyncService
             ->where('channel_order_id', $orderKey)
             ->first();
 
-        if ($order && ! $this->isImportOwned($order)) {
+        if ($order && (! $this->isImportOwned($order) || ! $replaceSnapshot)) {
+            if (blank($order->purchase_channel) && filled($normalized['purchase_channel'] ?? null)) {
+                $order->forceFill(['purchase_channel' => $normalized['purchase_channel']])->save();
+            }
+
             return [
                 'order_id' => (int) $order->id,
                 'created' => false,
@@ -145,6 +150,7 @@ class ImportedMarketplaceOrderSyncService
 
         $raw['source'] = 'marketplace_shipment_import';
         $raw['channel'] = $normalized['channel'] ?? $shipment->channel;
+        $raw['purchase_channel'] = $normalized['purchase_channel'] ?? null;
         $raw['source_file'] = $normalized['source_file'] ?? null;
         $raw['import_batch_id'] = $batchId;
         $raw['promotion_breakdown'] = $promotion;
@@ -158,6 +164,7 @@ class ImportedMarketplaceOrderSyncService
 
         return [
             'store_id' => (int) $shipment->store_id,
+            'purchase_channel' => $normalized['purchase_channel'] ?? null,
             'channel_order_id' => (string) $normalized['platform_order_id'],
             'external_order_id' => (string) $normalized['platform_order_id'],
             'order_date' => $orderDate,

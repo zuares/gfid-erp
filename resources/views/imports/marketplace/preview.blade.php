@@ -61,7 +61,7 @@
     SUMMARY (fallback compute from rows)
     - stats boleh kosong, tapi UI wajib terisi
   ========================================================= */
-  $rowsTotal   = (int)($stats['rows'] ?? $stats['rows_parsed'] ?? count($rows));
+  $packagesTotal = (int)($stats['shipments_parsed'] ?? $stats['rows'] ?? count($rows));
   $ordersTotal = $stats['orders'] ?? $stats['orders_parsed'] ?? null;
 
   $itemsTotal  = $stats['items'] ?? $stats['item_lines'] ?? $stats['items_parsed'] ?? null;
@@ -141,6 +141,10 @@
   $newTotal = (int) ($stats['new_shipments'] ?? 0);
   $existingTotal = (int) ($stats['existing_shipments'] ?? 0);
   $warnings = is_array($stats['warnings'] ?? null) ? $stats['warnings'] : [];
+  $purchaseChannels = is_array($stats['purchase_channels'] ?? null) ? $stats['purchase_channels'] : [];
+  $groupedRows = $channelKey === 'tiktok'
+    ? collect($rows)->groupBy(fn ($row) => $row['purchase_channel'] ?? 'unknown')->all()
+    : ['all' => $rows];
 
   // UI message
   $actionHint = $hasErrors ? 'Perbaiki error sebelum commit.' : 'Cek singkat lalu commit.';
@@ -443,7 +447,7 @@
     <div class="import-tabs" role="tablist" aria-label="Navigasi preview marketplace shipments">
       <div class="import-tab active" role="tab" aria-selected="true"><i class="bi bi-table"></i> Preview Data</div>
     </div>
-    <div class="shipment-tab-meta">Dry-run • cek rows, KPI, error, dan detail item sebelum commit</div>
+    <div class="shipment-tab-meta">Dry-run • cek paket, KPI, error, dan detail item sebelum commit</div>
   </div>
 
   @if(session('error'))
@@ -458,9 +462,9 @@
   ========================= --}}
   <div class="shipment-kpi-grid">
     <div class="shipment-kpi order">
-      <div class="shipment-kpi-label">Rows</div>
-      <div class="shipment-kpi-value">{{ $num($rowsTotal) }}</div>
-      <div class="shipment-kpi-sub">Baris terbaca dari file</div>
+      <div class="shipment-kpi-label">Paket</div>
+      <div class="shipment-kpi-value">{{ $num($packagesTotal) }}</div>
+      <div class="shipment-kpi-sub">Paket pengiriman terdeteksi</div>
     </div>
     <div class="shipment-kpi ship">
       <div class="shipment-kpi-label">Orders</div>
@@ -479,6 +483,27 @@
     </div>
   </div>
 
+  @if($channelKey === 'tiktok' && $purchaseChannels !== [])
+    <section class="shipment-card mb-3">
+      <div class="shipment-card-head">
+        <div>
+          <h2 class="shipment-card-title">Asal pesanan</h2>
+          <div class="shipment-card-note">Satu toko, dipisahkan menurut Purchase Channel pada file.</div>
+        </div>
+      </div>
+      <div class="shipment-meta-grid">
+        @foreach(['tiktok' => 'TikTok', 'tokopedia' => 'Tokopedia'] as $key => $label)
+          @php $group = $purchaseChannels[$key] ?? ['orders' => 0, 'shipments' => 0, 'items' => 0, 'qty' => 0]; @endphp
+          <div class="shipment-meta-item">
+            <div class="shipment-meta-label">{{ $label }}</div>
+            <div class="shipment-meta-value">{{ $num($group['orders']) }} order</div>
+            <div class="small text-muted">{{ $num($group['shipments']) }} paket · {{ $num($group['items']) }} item · {{ $num($group['qty']) }} qty</div>
+          </div>
+        @endforeach
+      </div>
+    </section>
+  @endif
+
   <section class="shipment-card mb-3">
     <div class="shipment-card-head">
       <div>
@@ -492,7 +517,7 @@
       <div class="shipment-meta-item"><div class="shipment-meta-label">Akan Di-update</div><div class="shipment-meta-value">{{ $num($existingTotal) }}</div></div>
       <div class="shipment-meta-item"><div class="shipment-meta-label">Duplikat Tracking</div><div class="shipment-meta-value">{{ $num($dupTracking) }}</div></div>
       <div class="shipment-meta-item"><div class="shipment-meta-label">Duplikat Order</div><div class="shipment-meta-value">{{ $num($dupOrder) }}</div></div>
-      <div class="shipment-meta-item"><div class="shipment-meta-label">Sample</div><div class="shipment-meta-value">{{ $num(count($rows)) }} rows</div></div>
+      <div class="shipment-meta-item"><div class="shipment-meta-label">Sample</div><div class="shipment-meta-value">{{ $num(count($rows)) }} paket</div></div>
     </div>
   </section>
 
@@ -552,7 +577,14 @@
       <div class="text-muted">Tidak ada data untuk ditampilkan.</div>
     @else
       <div class="preview-list">
-        @foreach($rows as $i => $r)
+        @foreach($groupedRows as $groupKey => $groupRows)
+          @if($channelKey === 'tiktok')
+            <div class="px-3 py-2 fw-semibold bg-light border rounded-2 mb-2 mt-2">
+              {{ $groupKey === 'tiktok' ? 'TikTok' : ($groupKey === 'tokopedia' ? 'Tokopedia' : 'Perlu diperiksa') }}
+              <span class="text-muted fw-normal">· {{ count($groupRows) }} paket</span>
+            </div>
+          @endif
+        @foreach($groupRows as $i => $r)
           @php
             if (!is_array($r)) $r = [];
 
@@ -563,6 +595,7 @@
             $date      = $get($r, 'order_created_at', $get($r, 'order_date', null));
             $qty       = $get($r, 'total_qty', $get($r, 'qty', null));
             $grand     = $get($r, 'grand_total', $get($r, 'total', null));
+            $rowChannel = $get($r, 'purchase_channel') ?: ($channelKey === 'tiktok' ? '-' : ($channelKey ?? '-'));
 
             $items     = $get($r, 'items', []);
             if (!is_array($items)) $items = [];
@@ -576,7 +609,7 @@
                 <div class="ship-title mono">{{ $orderId }}</div>
 
                 <div class="ship-meta">
-                  <span class="chip">Ch: <span class="mono">{{ $channelKey ?? '-' }}</span></span>
+                  <span class="chip">Ch: <span class="mono">{{ $rowChannel }}</span></span>
 
                   @if($shipId)
                     <span class="chip mono">Ship: {{ $shipId }}</span>
@@ -654,6 +687,7 @@
               </div>
             </div>
           </details>
+        @endforeach
         @endforeach
       </div>
     @endif

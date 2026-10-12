@@ -4,6 +4,7 @@ namespace App\Services\Marketplace\Import\Adapters;
 
 use Carbon\Carbon;
 use App\Services\Marketplace\Promotion\MarketplacePromotionNormalizer;
+use App\Services\Marketplace\PurchaseChannel;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class TiktokImportAdapter implements MpImportAdapterInterface
@@ -93,6 +94,10 @@ class TiktokImportAdapter implements MpImportAdapterInterface
             $substatus = $this->v($r, $map, ['order substatus', 'substatus']);
             $tracking = $this->v($r, $map, ['tracking id', 'tracking no', 'tracking number', 'awb', 'resi']);
             $packageId = $this->v($r, $map, ['package id', 'shipment id', 'platform shipment id']);
+            $purchaseChannelRaw = $this->v($r, $map, ['purchase channel']);
+            $purchaseChannel = array_key_exists('purchase channel', $map)
+                ? PurchaseChannel::normalize($purchaseChannelRaw)
+                : 'tiktok';
 
             $created = $this->dt($this->v($r, $map, ['created time', 'order created time']));
             $paidAt = $this->dt($this->v($r, $map, ['paid time', 'payment time']));
@@ -162,6 +167,8 @@ class TiktokImportAdapter implements MpImportAdapterInterface
                 $shipments[$key] = [
                     'store_id' => $storeId,
                     'channel' => 'tiktok',
+                    'purchase_channel' => $purchaseChannel,
+                    'purchase_channel_raw' => $purchaseChannelRaw,
                     'platform_order_id' => $orderId,
                     'platform_shipment_id' => $packageId ? trim((string) $packageId) : null,
                     'tracking_no' => $tracking ? trim((string) $tracking) : null,
@@ -192,6 +199,7 @@ class TiktokImportAdapter implements MpImportAdapterInterface
                     ),
                     'raw_payload' => [
                         'order_substatus' => $substatus,
+                        'purchase_channel' => $purchaseChannelRaw,
                         'package_id' => $packageId,
                         'shipping_provider_name' => $this->v($r, $map, ['shipping provider name']),
                         'delivery_option' => $this->v($r, $map, ['delivery option']),
@@ -224,6 +232,10 @@ class TiktokImportAdapter implements MpImportAdapterInterface
                 $shipments[$key]['discount_total'] = $promotion['order']['product_discount']
                     + $promotion['order']['bundle_deal_discount'];
                 $shipments[$key]['refund_total'] = $refundAmount;
+            }
+
+            if ($shipments[$key]['purchase_channel'] !== $purchaseChannel) {
+                $shipments[$key]['purchase_channel_conflict'] = true;
             }
 
             // Nilai order-level hanya boleh dihitung sekali, walaupun export
@@ -298,6 +310,7 @@ class TiktokImportAdapter implements MpImportAdapterInterface
             $out[] = [
                 'store_id' => $storeId,
                 'channel' => 'tiktok',
+                'purchase_channel' => 'tiktok',
                 'platform_order_id' => $orderId,
                 'platform_shipment_id' => null,
                 'tracking_no' => null,

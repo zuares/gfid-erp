@@ -8,6 +8,7 @@ use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceSyncLog;
 use App\Models\Store;
 use App\Services\Channels\ChannelManager;
+use App\Services\Marketplace\PurchaseChannel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -112,10 +113,13 @@ class OmnichannelSyncService
             foreach ($details as $detail) {
                 if (empty($detail['order_sn'])) continue;
 
+                $purchaseChannel = PurchaseChannel::normalize($detail['purchase_channel'] ?? null);
+
                 $order = MarketplaceOrder::updateOrCreate(
                     ['store_id' => $store->id, 'channel_order_id' => $detail['order_sn']],
                     [
                         'external_order_id' => $detail['order_sn'],
+                        ...($purchaseChannel !== null ? ['purchase_channel' => $purchaseChannel] : []),
                         'order_date'       => ! empty($detail['create_time']) ? now()->setTimestamp((int) $detail['create_time'])->toDateTimeString() : now()->toDateTimeString(),
                         'booking_sn'       => $detail['booking_sn'] ?? null,
                         'order_status'     => $detail['order_status'] ?? null,

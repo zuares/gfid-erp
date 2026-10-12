@@ -14,6 +14,7 @@ class MarketplaceOrder extends Model
         // Omnichannel (primary)
         'store_id',
         'channel_order_id',
+        'purchase_channel',
         'booking_sn',
         'order_status',
         'buyer_username',
