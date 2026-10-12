@@ -1133,7 +1133,9 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                         $marketplaceLine = $line->marketplace_line ?? $marketplaceLines->first(function ($candidate) use ($line) {
                                                             return (int) ($candidate->internal_item_id ?: $candidate->item_id) === (int) $line->item_id;
                                                         });
-                                                        $marketplaceSku = $marketplaceLine?->marketplace_sku ?: $marketplaceLine?->item_sku ?: $marketplaceLine?->model_sku ?: '—';
+                                                        // Tampilkan SKU asli dari payload marketplace saja.
+                                                        // Jangan gunakan marketplace_sku hasil mapping nama atau kode internal.
+                                                        $marketplaceSku = $marketplaceLine?->model_sku ?: $marketplaceLine?->item_sku ?: '—';
                                                         $qtyOrder = (int) ($marketplaceLine?->qty ?? $line->qty_scanned);
                                                         $qtyShipment = (int) ($pickedByItem[$line->item_id] ?? $line->qty_scanned);
                                                         $difference = $qtyShipment - $qtyOrder;
