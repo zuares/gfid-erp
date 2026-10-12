@@ -29,13 +29,16 @@ class ShipmentController extends Controller
 {
     /**
      * Marketplace statuses that are eligible for shipment reconciliation.
-     * Keep cancelled, waiting, completed, and other terminal states out of
-     * the reconciliation picker.
+     * Historical Shopee shipments can still be scanned while waiting for
+     * receipt confirmation or after completion, so keep those statuses
+     * available for AWB/order matching as well.
      */
     private const RECONCILIATION_MARKETPLACE_STATUSES = [
         'READY_TO_SHIP',
         'PROCESSED',
         'SHIPPED',
+        'TO_CONFIRM_RECEIVE',
+        'COMPLETED',
     ];
 
     protected function isReconciliationMarketplaceStatus(?string $status): bool

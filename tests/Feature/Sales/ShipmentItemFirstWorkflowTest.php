@@ -886,6 +886,55 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Tertaut');
     }
 
+    public function test_completed_shopee_statuses_are_eligible_for_awb_reconciliation(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-AUTO-LINK-STATUS-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 2,
+            'allocated_qty' => 2,
+        ]);
+
+        foreach (['TO_CONFIRM_RECEIVE', 'COMPLETED'] as $index => $status) {
+            $awb = "SPX-STATUS-{$index}";
+            $order = MarketplaceOrder::create([
+                'store_id' => $store->id,
+                'external_order_id' => "ORDER-STATUS-{$index}",
+                'channel_order_id' => "ORDER-STATUS-{$index}",
+                'shipping_awb_no' => $awb,
+                'order_status' => $status,
+                'order_date' => now(),
+                'ordered_at' => now(),
+            ]);
+            MarketplaceOrderItem::create([
+                'order_id' => $order->id,
+                'marketplace_order_id' => $order->id,
+                'item_id' => $item->id,
+                'internal_item_id' => $item->id,
+                'item_name' => $item->name,
+                'item_sku' => $item->code,
+                'model_sku' => $item->code,
+                'qty' => 1,
+            ]);
+
+            $this->actingAs($user)
+                ->postJson(route('sales.shipments.scan_order_store', $shipment), [
+                    'order_no' => $awb,
+                ])
+                ->assertOk()
+                ->assertJsonPath('order.label', 'Tertaut otomatis');
+        }
+    }
+
     public function test_affiliate_shipment_defaults_to_order_first(): void
     {
         [$user, $store] = $this->shipmentContext();
