@@ -596,6 +596,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $this->actingAs($user)
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
+            ->assertSee(route('sales.shipments.scan_order', $shipment), false)
+            ->assertSee('Scan Order')
             ->assertSee('ORDER-TO-REKON-001')
             ->assertSee('ORDER-TO-REKON-001', false);
     }
@@ -762,6 +764,12 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'qty_scanned' => 1,
         ]);
         $this->assertSame(OrderFulfillment::STATUS_PENDING_REVIEW, $fulfillment->status);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('sd-badge linked', false)
+            ->assertSee('Tertaut');
     }
 
     public function test_affiliate_shipment_defaults_to_order_first(): void

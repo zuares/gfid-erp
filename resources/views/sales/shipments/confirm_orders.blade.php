@@ -58,6 +58,8 @@ body[data-theme="dark"] .sd-marketplace-detail{background:rgba(30,64,175,.14);bo
 body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dark"] .sd-marketplace-table td{color:#cbd5e1}body[data-theme="dark"] .sd-marketplace-table .sd-marketplace-code{color:#f1f5f9}
 .sd-badge{display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid rgba(148,163,184,.25);padding:.16rem .48rem;font-size:.69rem;font-weight:900;color:#64748b;white-space:nowrap}
 .sd-badge.pending{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:#92400e}
+.sd-badge.linked{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
+.sd-badge.unlinked{background:#f8fafc;border-color:#cbd5e1;color:#64748b}
 .sd-duplicate-badge{display:inline-flex;align-items:center;justify-content:center;margin-left:.35rem;border:1px solid #fcd34d;border-radius:999px;padding:.12rem .4rem;background:#fffbeb;color:#a16207;font-size:.62rem;font-weight:850;line-height:1;vertical-align:middle}
 .sd-missing-item-badge{display:inline-flex;align-items:center;justify-content:center;margin-left:.35rem;border:1px solid #cbd5e1;border-radius:999px;padding:.12rem .4rem;background:#f8fafc;color:#64748b;font-size:.62rem;font-weight:750;line-height:1;vertical-align:middle}
 .sd-empty{padding:1.6rem 1rem;text-align:center;color:#64748b;font-size:.84rem}
@@ -151,9 +153,9 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-topbar,
 .sd-flash,
 .sd-wrap {
-  --sd-content-width: 960px;
+  --sd-content-width: 1100px;
   box-sizing: border-box;
-  width: min(calc(100% - 1.4rem), var(--sd-content-width));
+  width: min(calc(100% - 1.5rem), var(--sd-content-width));
   max-width: var(--sd-content-width);
   margin-inline: auto;
 }
@@ -171,7 +173,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-topbar{gap:.35rem;padding:.45rem .65rem;box-shadow:0 1px 8px rgba(15,23,42,.05)}
 .sd-topbar .sd-btn,.sd-topbar .sd-pill{min-height:30px;padding:.2rem .5rem;font-size:.7rem}
 .sd-topbar .sd-code{font-size:.86rem}
-.sd-wrap{max-width:960px;padding:.6rem .7rem 1.25rem}
+.sd-wrap{max-width:1100px;padding:.6rem .75rem 1.25rem}
 .sd-card{border-radius:9px;box-shadow:0 1px 5px rgba(15,23,42,.03)}
 .sd-head{padding:.6rem .75rem}
 .sd-body{padding:.6rem .75rem}
@@ -612,7 +614,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     $unmappedLines = $lines->filter(fn ($line) => empty($line->shipment_order_scan_id))->values();
     $mappedQty = (int) $mappedLines->sum('qty_scanned');
     $unmappedQty = (int) $unmappedLines->sum('qty_scanned');
-    $unlinkedOrderScans = $orderScans->filter(fn ($scan) => empty($scan->fulfillment_id) && $scan->source !== 'sales_invoice')->values();
+    $unlinkedOrderScans = $orderScans->filter(fn ($scan) => !$scan->fulfillment?->marketplaceOrder && $scan->source !== 'marketplace' && data_get($scan->raw_payload, 'linked_source') !== 'marketplace_order' && $scan->source !== 'sales_invoice')->values();
     $mappingErrors = $mappingErrors ?? [];
     $editShipmentUrl = route('sales.shipments.scan_order', $shipment);
     $canDeleteShipmentRows = auth()->user()?->role === 'owner';
@@ -661,8 +663,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 @endphp
 
 <div class="sd-topbar">
-    <a href="{{ route('sales.shipments.index') }}" class="sd-btn sd-topbar-nav" title="Kembali ke shipment">
-        <i class="bi bi-arrow-left" aria-hidden="true"></i> Shipment
+    <a href="{{ route('sales.shipments.scan_order', $shipment) }}" class="sd-btn sd-topbar-nav" title="Kembali ke scan order">
+        <i class="bi bi-arrow-left" aria-hidden="true"></i> Scan Order
     </a>
     <span class="sd-code">{{ $shipment->code }}</span>
     @if($isDaily && $currentWave)
@@ -856,7 +858,12 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                         @foreach($orderScans as $scan)
                             @php
                                 $scanStatus = $scan->status ?: 'pending';
-                                $scanIsUnlinked = empty($scan->fulfillment_id);
+                                $hasMarketplaceLink = (bool) (
+                                    $scan->fulfillment?->marketplaceOrder
+                                    || $scan->source === 'marketplace'
+                                    || data_get($scan->raw_payload, 'linked_source') === 'marketplace_order'
+                                );
+                                $scanIsUnlinked = !$hasMarketplaceLink;
                                 $matchMethod = $scan->match_method ?: data_get($scan->raw_payload, 'match_method');
                                 $matchReason = $scan->match_reason ?: data_get($scan->raw_payload, 'match_reason') ?: data_get($scan->raw_payload, 'lookup_status');
                                 $matchMethodLabel = match ($matchMethod) {
@@ -878,6 +885,9 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 $scanLabel = $scanStatus === 'skip'
                                     ? 'Diabaikan'
                                     : ($scanIsUnlinked ? 'Belum Tertaut' : 'Tertaut');
+                                $scanBadgeClass = $scanStatus === 'skip'
+                                    ? 'skip'
+                                    : ($hasMarketplaceLink ? 'linked' : 'unlinked');
                                 $orderCodeUpper = strtoupper(trim((string) $scan->order_no));
                                 $marketplaceGroupKey = $marketplaceGroup($scan->order_no);
                                 $duplicateCount = (int) data_get($scan->raw_payload, 'duplicate_count', 0);
@@ -914,7 +924,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                         @endif
                                     </div>
                                     <div class="sd-order-head-side">
-                                        <span class="sd-badge {{ $scanStatus }}">{{ $scanLabel }}</span>
+                                        <span class="sd-badge {{ $scanBadgeClass }}">{{ $scanLabel }}</span>
                                         <div class="sd-order-summary sd-order-summary-inline {{ $canSeeCogs ? 'sd-summary-has-cogs' : '' }}">
                                             <span class="sd-order-summary-item"><span>Item</span><strong>{{ number_format($orderItemCount, 0, ',', '.') }}</strong></span>
                                             <span class="sd-order-summary-item"><span>Jenis</span><strong>{{ number_format($orderItemTypes, 0, ',', '.') }}</strong></span>
