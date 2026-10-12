@@ -2180,11 +2180,20 @@ class ShipmentController extends Controller
         ?Shipment $shipment = null,
         bool $promoteBooking = false,
         bool $eligibleOnly = true,
+        ?bool $includeCompleted = null,
     ): ?\App\Models\MarketplaceOrder {
+        $reconciliationStatuses = self::RECONCILIATION_MARKETPLACE_STATUSES;
+        if ($includeCompleted === false) {
+            $reconciliationStatuses = array_values(array_diff(
+                $reconciliationStatuses,
+                ['COMPLETED'],
+            ));
+        }
+
         $findOrder = fn () => $this->marketplaceOrderQuery($scanCode, $shipment)
-            ->when($eligibleOnly, fn ($query) => $query->whereIn(
+            ->when($eligibleOnly || $includeCompleted === false, fn ($query) => $query->whereIn(
                 \Illuminate\Support\Facades\DB::raw("UPPER(COALESCE(NULLIF(order_status, ''), status, ''))"),
-                [...self::RECONCILIATION_MARKETPLACE_STATUSES, 'PROCESS']
+                [...$reconciliationStatuses, 'PROCESS']
             ))
             ->with(['items.internalItem', 'store'])
             ->first();
@@ -3807,6 +3816,7 @@ class ShipmentController extends Controller
                 $matchRequest = Request::create('/', 'POST', [
                     'order_no' => $scan->order_no,
                     'pool_used' => json_encode($poolUsed),
+                    'include_completed' => false,
                 ]);
                 $matchRequest->headers->set('Accept', 'application/json');
 
@@ -3867,7 +3877,9 @@ class ShipmentController extends Controller
                 continue;
             }
 
-            $marketplaceOrder = $this->findReconciliationMarketplaceOrder($orderNo, $shipment, true);
+            // Keep the confirm page responsive: historical completed orders
+            // are checked only when the operator explicitly matches/scans.
+            $marketplaceOrder = $this->findReconciliationMarketplaceOrder($orderNo, $shipment, true, true, false);
 
             if (!$marketplaceOrder) {
                 continue;
@@ -3982,7 +3994,16 @@ class ShipmentController extends Controller
         // Endpoint ini hanya dipanggil dari halaman rekonsiliasi, sehingga
         // lookup marketplace tetap dijalankan walaupun scan operasional utama
         // dikonfigurasi sebagai record-only.
-        $marketplaceOrder = $this->findReconciliationMarketplaceOrder($no, $shipment, true, false);
+        $includeCompleted = $request->has('include_completed')
+            ? $request->boolean('include_completed')
+            : true;
+        $marketplaceOrder = $this->findReconciliationMarketplaceOrder(
+            $no,
+            $shipment,
+            true,
+            false,
+            $includeCompleted,
+        );
 
         if (!$marketplaceOrder) {
             $salesInvoice = $this->salesInvoiceQuery($no, $shipment)

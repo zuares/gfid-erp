@@ -935,6 +935,71 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         }
     }
 
+    public function test_confirm_loading_skips_completed_orders_until_explicit_match(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-AUTO-LINK-STATUS-002',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-COMPLETED-CONFIRM',
+            'channel_order_id' => 'ORDER-COMPLETED-CONFIRM',
+            'shipping_awb_no' => 'SPX-COMPLETED-CONFIRM',
+            'order_status' => 'COMPLETED',
+            'order_date' => now(),
+            'ordered_at' => now(),
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'item_id' => $item->id,
+            'internal_item_id' => $item->id,
+            'item_name' => $item->name,
+            'item_sku' => $item->code,
+            'model_sku' => $item->code,
+            'qty' => 1,
+        ]);
+        ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => 'SPX-COMPLETED-CONFIRM',
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk();
+
+        $this->assertDatabaseMissing('order_fulfillments', [
+            'marketplace_order_id' => $order->id,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('sales.shipments.rekon_match', $shipment), [
+                'order_no' => 'SPX-COMPLETED-CONFIRM',
+                'pool_used' => '{}',
+            ])
+            ->assertOk()
+            ->assertJsonPath('order.order_no', 'ORDER-COMPLETED-CONFIRM');
+
+        $this->assertDatabaseHas('order_fulfillments', [
+            'marketplace_order_id' => $order->id,
+        ]);
+    }
+
     public function test_affiliate_shipment_defaults_to_order_first(): void
     {
         [$user, $store] = $this->shipmentContext();
