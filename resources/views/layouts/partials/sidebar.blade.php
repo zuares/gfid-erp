@@ -1486,7 +1486,7 @@
                             <div class="sidebar-subhead">Permintaan Pembelian</div>
                             <div class="simple-group">
                                 <x-sidebar.simple-link href="{{ route('purchasing.purchase_requests.index') }}" icon="bi bi-list-ul"
-                                    :active="request()->routeIs('purchasing.purchase_requests.*')">
+                                    :active="request()->routeIs('purchasing.purchase_requests.index')">
                                     Permintaan Beli
                                 </x-sidebar.simple-link>
                                 @if ($hasPrCreate)
@@ -1498,33 +1498,41 @@
                             </div>
                         @endif
 
-                        <div class="sidebar-subhead">PO & Penerimaan</div>
-                        <div class="simple-group">
-                    @if ($hasPoIndex)
-                        <x-sidebar.simple-link href="{{ route('purchasing.purchase_orders.index') }}" icon="bi bi-list-ul"
-                            :active="request()->routeIs('purchasing.purchase_orders.index')">
-                            Daftar PO
-                        </x-sidebar.simple-link>
-                    @endif
-                    @if ($hasPoCreate)
-                        <x-sidebar.simple-link href="{{ route('purchasing.purchase_orders.create') }}" icon="bi bi-plus-circle"
-                            :active="request()->routeIs('purchasing.purchase_orders.create')">
-                            Buat PO
-                        </x-sidebar.simple-link>
-                    @endif
-                    @if ($hasGrnIndex)
-                        <x-sidebar.simple-link href="{{ route('purchasing.purchase_receipts.index') }}" icon="bi bi-list-ul"
-                            :active="request()->routeIs('purchasing.purchase_receipts.index')">
-                            Daftar Penerimaan
-                        </x-sidebar.simple-link>
-                    @endif
-                    @if ($hasGrnCreate)
-                        <x-sidebar.simple-link href="{{ route('purchasing.purchase_receipts.create') }}" icon="bi bi-box-seam"
-                            :active="request()->routeIs('purchasing.purchase_receipts.create')">
-                            Buat Penerimaan
-                        </x-sidebar.simple-link>
-                    @endif
-                        </div>
+                        @if ($hasPoIndex || $hasPoCreate)
+                            <div class="sidebar-subhead">PO</div>
+                            <div class="simple-group">
+                                @if ($hasPoIndex)
+                                    <x-sidebar.simple-link href="{{ route('purchasing.purchase_orders.index') }}" icon="bi bi-list-ul"
+                                        :active="request()->routeIs('purchasing.purchase_orders.index')">
+                                        Daftar PO
+                                    </x-sidebar.simple-link>
+                                @endif
+                                @if ($hasPoCreate)
+                                    <x-sidebar.simple-link href="{{ route('purchasing.purchase_orders.create') }}" icon="bi bi-plus-circle"
+                                        :active="request()->routeIs('purchasing.purchase_orders.create')">
+                                        Buat PO
+                                    </x-sidebar.simple-link>
+                                @endif
+                            </div>
+                        @endif
+
+                        @if ($hasGrnIndex || $hasGrnCreate)
+                            <div class="sidebar-subhead">Penerimaan</div>
+                            <div class="simple-group">
+                                @if ($hasGrnIndex)
+                                    <x-sidebar.simple-link href="{{ route('purchasing.purchase_receipts.index') }}" icon="bi bi-list-ul"
+                                        :active="request()->routeIs('purchasing.purchase_receipts.index')">
+                                        Daftar Penerimaan
+                                    </x-sidebar.simple-link>
+                                @endif
+                                @if ($hasGrnCreate)
+                                    <x-sidebar.simple-link href="{{ route('purchasing.purchase_receipts.create') }}" icon="bi bi-box-seam"
+                                        :active="request()->routeIs('purchasing.purchase_receipts.create')">
+                                        Buat Penerimaan
+                                    </x-sidebar.simple-link>
+                                @endif
+                            </div>
+                        @endif
                     </div>
                 </li>
             @endif

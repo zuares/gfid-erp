@@ -19,6 +19,9 @@ it('shows purchase request navigation for admin users', function () {
         ->assertSee('href="' . route('purchasing.purchase_requests.index') . '"', false)
         ->assertSee('Buat Permintaan Beli')
         ->assertSee('href="' . route('purchasing.purchase_requests.create') . '"', false)
+        ->assertSee('PO')
+        ->assertSee('Penerimaan')
+        ->assertDontSee('PO &amp; Penerimaan', false)
         ->assertSee('data-bs-target="#navPurchasingAdmin"', false)
         ->assertSee('data-bs-target="#navPurchasingAdminMobile"', false);
 });
