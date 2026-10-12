@@ -46,6 +46,12 @@ class PurchaseRequestFlowTest extends TestCase
         ));
         $this->assertSame('draft', $purchaseRequest->status);
         $this->assertTrue($purchaseRequest->isConvertible());
+
+        $this->get(route('purchasing.purchase_requests.show', $purchaseRequest))
+            ->assertOk()
+            ->assertSee('Pilih Supplier')
+            ->assertSee('Barang')
+            ->assertDontSee('Menunggu persetujuan');
     }
 
     public function test_purchase_request_add_row_reinitializes_item_autosuggest(): void
