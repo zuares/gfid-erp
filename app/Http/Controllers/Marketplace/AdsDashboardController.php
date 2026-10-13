@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Marketplace;
 
 use App\Http\Controllers\Controller;
 use App\Models\Store;
+use App\Models\MarketplaceAdCampaign;
+use App\Models\MarketplaceProduct;
 use App\Models\AdsCampaignSchedule;
 use App\Services\Marketplace\Ads\AdsActionService;
 use App\Services\Marketplace\Ads\AdsDashboardService;
@@ -19,6 +21,37 @@ use App\Services\Marketplace\Ads\ShopeeAdsApiService;
 
 class AdsDashboardController extends Controller
 {
+    public function campaignDetailPage(Request $request, MarketplaceAdCampaign $campaign)
+    {
+        abort_unless(
+            $campaign->store?->is_active
+            && $campaign->store?->channel
+            && in_array(strtolower((string) $campaign->store->channel->code), ['shopee', 'shp'], true),
+            404
+        );
+
+        $campaign->loadMissing('store:id,name,channel_id', 'store.channel:id,code,name', 'internalItem:id,code,name');
+        $product = $campaign->channel_item_id
+            ? MarketplaceProduct::with('models:id,marketplace_product_id,model_id,model_name,price')
+                ->where('store_id', $campaign->store_id)
+                ->where('item_id', (string) $campaign->channel_item_id)
+                ->first()
+            : null;
+
+        return view('marketplace.ads_campaign_detail', [
+            'campaign' => $campaign,
+            'product' => $product,
+            'storeId' => (int) $campaign->store_id,
+            'dateFrom' => $request->input('date_from', now()->subDays(29)->toDateString()),
+            'dateTo' => $request->input('date_to', now()->toDateString()),
+            'backUrl' => url('/marketplace/ads-dashboard?' . http_build_query(array_filter([
+                'store_id' => $request->input('store_id', $campaign->store_id),
+                'date_from' => $request->input('date_from'),
+                'date_to' => $request->input('date_to'),
+            ]))),
+        ]);
+    }
+
     public function index(Request $request, AdsAnalyticsService $analytics, AdsDashboardService $dashboardService)
     {
         // Daftar ini sengaja tidak memuat credentials. Dipakai panel koneksi

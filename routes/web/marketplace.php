@@ -125,6 +125,8 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
         // =========================
         Route::get('ads-dashboard', [AdsDashboardController::class, 'index'])
             ->name('ads.dashboard');
+        Route::get('ads-dashboard/campaigns/{campaign}/detail', [AdsDashboardController::class, 'campaignDetailPage'])
+            ->name('ads.campaign.detail');
         Route::get('ads-dashboard/integration-status', [AdsDashboardController::class, 'integrationStatus'])
             ->name('ads.integration.status');
         Route::post('ads-dashboard/integrations/{store}/revoke', [AdsDashboardController::class, 'revokeIntegration'])

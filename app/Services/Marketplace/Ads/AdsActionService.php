@@ -122,6 +122,10 @@ class AdsActionService
         $oldTargetRoas = $localCampaign?->target_roas !== null
             ? (float) $localCampaign->target_roas
             : null;
+        $oldBudget = $localCampaign?->campaign_budget !== null
+            ? (float) $localCampaign->campaign_budget
+            : null;
+        $oldStatus = $localCampaign?->campaign_status ?: $localCampaign?->status;
 
         $experimentGuard = $this->activeExperimentGuard(
             $store,
@@ -245,6 +249,67 @@ class AdsActionService
             }
         }
 
+        // Budget-only edits need their own evaluation record. When ROAS is
+        // changed in the same request, the ROAS experiment already records the
+        // budget change as a confounder.
+        if (($dailyBudget !== null && $dailyBudget !== '') && ($roasTarget === null || $roasTarget === '')) {
+            try {
+                app(AdsExperimentService::class)->recordManualChange(
+                    store: $store,
+                    change: [
+                        'channel_campaign_id' => (string) $campaignId,
+                        'channel_item_id' => $localCampaign?->channel_item_id !== null
+                            ? (string) $localCampaign->channel_item_id
+                            : null,
+                        'change_type' => 'budget',
+                        'before_value' => $oldBudget === null ? '0' : (string) $oldBudget,
+                        'after_value' => (string) $dailyBudget,
+                        'changed_at' => now(),
+                        'objective' => 'Mengoptimalkan efisiensi budget campaign',
+                        'primary_kpi' => 'roas',
+                        'notes' => 'Perubahan dilakukan dari detail campaign.',
+                        'confounders' => $statusAction ? ['campaign_status_changed'] : [],
+                    ],
+                    createdBy: auth()->id(),
+                );
+            } catch (\Throwable $e) {
+                Log::warning('[AdsActionService] failed to record budget experiment', [
+                    'store_id' => $store->id,
+                    'campaign_id' => $campaignId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ($statusAction && ($roasTarget === null || $roasTarget === '') && ($dailyBudget === null || $dailyBudget === '')) {
+            try {
+                app(AdsExperimentService::class)->recordManualChange(
+                    store: $store,
+                    change: [
+                        'channel_campaign_id' => (string) $campaignId,
+                        'channel_item_id' => $localCampaign?->channel_item_id !== null
+                            ? (string) $localCampaign->channel_item_id
+                            : null,
+                        'change_type' => 'other',
+                        'before_value' => (string) ($oldStatus ?: 'unknown'),
+                        'after_value' => (string) $statusAction,
+                        'changed_at' => now(),
+                        'objective' => 'Mengatur delivery campaign',
+                        'primary_kpi' => 'roas',
+                        'notes' => 'Perubahan status dilakukan dari detail campaign.',
+                        'confounders' => [],
+                    ],
+                    createdBy: auth()->id(),
+                );
+            } catch (\Throwable $e) {
+                Log::warning('[AdsActionService] failed to record status experiment', [
+                    'store_id' => $store->id,
+                    'campaign_id' => $campaignId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return [
             'status' => 'success',
             'message' => 'Pengaturan Kampanye CPC berhasil disimpan: ' . implode(' dan ', $results),
@@ -271,9 +336,16 @@ class AdsActionService
             $localCampaignQuery->whereLike('channel_campaign_id', 'GMS-%');
         }
         $localCampaign = $localCampaignQuery->first();
+        $experimentCampaignId = $localCampaign?->channel_campaign_id !== null
+            ? (string) $localCampaign->channel_campaign_id
+            : ($campaignId !== null ? (string) $campaignId : null);
         $oldTargetRoas = $localCampaign?->target_roas !== null
             ? (float) $localCampaign->target_roas
             : null;
+        $oldBudget = $localCampaign?->campaign_budget !== null
+            ? (float) $localCampaign->campaign_budget
+            : null;
+        $oldStatus = $localCampaign?->campaign_status ?: $localCampaign?->status;
 
         $experimentGuard = $this->activeExperimentGuard(
             $store,
@@ -384,7 +456,7 @@ class AdsActionService
             try {
                 app(AdsExperimentService::class)->recordTargetRoasChange(
                     store: $store,
-                    channelCampaignId: $campaignId !== null ? (string) $campaignId : null,
+                    channelCampaignId: $experimentCampaignId,
                     channelItemId: $localCampaign?->channel_item_id !== null
                         ? (string) $localCampaign->channel_item_id
                         : null,
@@ -397,6 +469,64 @@ class AdsActionService
                 );
             } catch (\Throwable $e) {
                 Log::warning('[AdsActionService] failed to record GMS target ROAS experiment', [
+                    'store_id' => $store->id,
+                    'campaign_id' => $campaignId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if (($dailyBudget !== null && $dailyBudget !== '') && ($roasTarget === null || $roasTarget === '')) {
+            try {
+                app(AdsExperimentService::class)->recordManualChange(
+                    store: $store,
+                    change: [
+                        'channel_campaign_id' => $experimentCampaignId,
+                        'channel_item_id' => $localCampaign?->channel_item_id !== null
+                            ? (string) $localCampaign->channel_item_id
+                            : null,
+                        'change_type' => 'budget',
+                        'before_value' => $oldBudget === null ? '0' : (string) $oldBudget,
+                        'after_value' => (string) $dailyBudget,
+                        'changed_at' => now(),
+                        'objective' => 'Mengoptimalkan efisiensi budget campaign',
+                        'primary_kpi' => 'roas',
+                        'notes' => 'Perubahan dilakukan dari detail campaign.',
+                        'confounders' => $statusAction ? ['campaign_status_changed'] : [],
+                    ],
+                    createdBy: auth()->id(),
+                );
+            } catch (\Throwable $e) {
+                Log::warning('[AdsActionService] failed to record GMS budget experiment', [
+                    'store_id' => $store->id,
+                    'campaign_id' => $campaignId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ($statusAction && ($roasTarget === null || $roasTarget === '') && ($dailyBudget === null || $dailyBudget === '')) {
+            try {
+                app(AdsExperimentService::class)->recordManualChange(
+                    store: $store,
+                    change: [
+                        'channel_campaign_id' => $experimentCampaignId,
+                        'channel_item_id' => $localCampaign?->channel_item_id !== null
+                            ? (string) $localCampaign->channel_item_id
+                            : null,
+                        'change_type' => 'other',
+                        'before_value' => (string) ($oldStatus ?: 'unknown'),
+                        'after_value' => (string) $statusAction,
+                        'changed_at' => now(),
+                        'objective' => 'Mengatur delivery campaign',
+                        'primary_kpi' => 'roas',
+                        'notes' => 'Perubahan status dilakukan dari detail campaign.',
+                        'confounders' => [],
+                    ],
+                    createdBy: auth()->id(),
+                );
+            } catch (\Throwable $e) {
+                Log::warning('[AdsActionService] failed to record GMS status experiment', [
                     'store_id' => $store->id,
                     'campaign_id' => $campaignId,
                     'error' => $e->getMessage(),

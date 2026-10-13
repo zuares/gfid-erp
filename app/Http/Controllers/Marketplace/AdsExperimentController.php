@@ -74,6 +74,7 @@ class AdsExperimentController extends Controller
     {
         $data = $request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'channel_campaign_id' => ['nullable', 'string', 'max:80'],
             'change_type' => ['nullable', 'in:creative,target_roas,price,budget,title,other,price_and_target_roas'],
             'lifecycle_status' => ['nullable', 'string', 'max:32'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
@@ -82,6 +83,7 @@ class AdsExperimentController extends Controller
         $rows = MarketplaceAdExperiment::query()
             ->with(['store:id,name', 'internalItem:id,code,name'])
             ->when(isset($data['store_id']), fn ($q) => $q->where('store_id', $data['store_id']))
+            ->when(isset($data['channel_campaign_id']), fn ($q) => $q->where('channel_campaign_id', $data['channel_campaign_id']))
             ->when(isset($data['change_type']), fn ($q) => $q->where('change_type', $data['change_type']))
             ->orderByDesc('changed_at')
             ->orderByDesc('id')

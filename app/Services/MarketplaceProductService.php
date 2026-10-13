@@ -394,6 +394,44 @@ class MarketplaceProductService
     }
 
     /**
+     * Update metadata dasar produk di marketplace dan salinan lokal.
+     * Dipakai untuk perubahan judul dari workflow evaluasi iklan.
+     */
+    public function updateBaseInfo(MarketplaceProduct $product, array $data): array
+    {
+        $driver = $this->channelDriver($product->store);
+        $payload = array_filter([
+            'item_name' => $data['item_name'] ?? null,
+            'description' => $data['description'] ?? null,
+        ], static fn ($value) => $value !== null);
+
+        if ($payload === []) {
+            return ['error' => 'empty_update', 'message' => 'Tidak ada metadata produk yang diubah.'];
+        }
+
+        $res = $driver->updateItemBaseInfo($product->store, (int) $product->item_id, $payload);
+        if (! empty($res['error'])) {
+            return $res;
+        }
+
+        $raw = is_array($product->raw_json) ? $product->raw_json : [];
+        if (array_key_exists('item_name', $payload)) {
+            $raw['item_name'] = $payload['item_name'];
+        }
+        if (array_key_exists('description', $payload)) {
+            $raw['description'] = $payload['description'];
+        }
+
+        $product->forceFill([
+            'item_name' => $payload['item_name'] ?? $product->item_name,
+            'raw_json' => $raw,
+            'synced_at' => now(),
+        ])->save();
+
+        return ['success' => true];
+    }
+
+    /**
      * Unlist / tampilkan kembali item.
      */
     public function setUnlist(MarketplaceProduct $product, bool $unlist): array

@@ -474,6 +474,25 @@ class MarketplaceProductController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function updateBaseInfo(MarketplaceProduct $product, Request $request)
+    {
+        $data = $request->validate([
+            'item_name' => 'nullable|string|max:255',
+            'description' => 'nullable|string|max:3000',
+        ]);
+
+        if (! array_filter($data, static fn ($value) => filled($value))) {
+            return response()->json(['message' => 'Isi judul atau deskripsi yang ingin diubah.'], 422);
+        }
+
+        $res = $this->products->updateBaseInfo($product, $data);
+        if (! empty($res['error'])) {
+            return response()->json(['message' => $res['message'] ?? 'Gagal update informasi produk di Shopee.'], 422);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
     public function updateSku(MarketplaceProduct $product, Request $request)
     {
         $data = $request->validate([

@@ -210,6 +210,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/products/{product}/price',       [\App\Http\Controllers\MarketplaceProductController::class, 'updatePrice'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/products/{product}/base-info',  [\App\Http\Controllers\MarketplaceProductController::class, 'updateBaseInfo'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/products/{product}/unlist',      [\App\Http\Controllers\MarketplaceProductController::class, 'toggleUnlist'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/products/{product}/sku',         [\App\Http\Controllers\MarketplaceProductController::class, 'updateSku'])
