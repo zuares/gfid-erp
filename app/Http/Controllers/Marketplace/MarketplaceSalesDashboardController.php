@@ -8,6 +8,7 @@ use App\Services\Marketplace\Ads\AdsDashboardService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -130,6 +131,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->map(fn ($id) => (int) $id)
             ->values()
             ->all();
+        $this->queueRecentAdsSync($adStoreIds, $storeId, $from, $to);
         $adDailyMetrics = app(AdsDashboardService::class)->getDailyMetrics(
             $adStoreIds,
             $storeId,
@@ -1497,7 +1499,45 @@ SQL;
 
     private function storeDayKey(?string $day, mixed $storeId): string
     {
-        return (string) $day . '|' . ($storeId === null ? '0' : (string) $storeId);
+        return (string) $day.'|'.($storeId === null ? '0' : (string) $storeId);
+    }
+
+    private function queueRecentAdsSync(array $adStoreIds, ?int $storeId, Carbon $from, Carbon $to): void
+    {
+        if ($adStoreIds === [] || ($storeId !== null && ! in_array($storeId, $adStoreIds, true))) {
+            return;
+        }
+
+        $today = now()->startOfDay();
+        $recentFrom = $today->copy()->subDay();
+        if ($to->lt($recentFrom) || $from->gt($today)) {
+            return;
+        }
+
+        $syncFrom = $from->gt($recentFrom) ? $from : $recentFrom;
+        $syncTo = $to->lt($today) ? $to : $today;
+        if ($syncFrom->gt($syncTo)) {
+            return;
+        }
+
+        $storeScope = $storeId ?: 'all';
+        $dateFrom = $syncFrom->toDateString();
+        $dateTo = $syncTo->toDateString();
+        $autoSyncKey = 'ads_dashboard_autosync:'.$storeScope.':'.$dateFrom.':'.$dateTo;
+        if (! Cache::add($autoSyncKey, true, now()->addMinutes(15))) {
+            return;
+        }
+
+        $syncParams = [
+            '--from' => $dateFrom,
+            '--to' => $dateTo,
+            '--hourly' => true,
+        ];
+        if ($storeId) {
+            $syncParams['--store'] = $storeId;
+        }
+
+        Artisan::queue('marketplace:sync-ads', $syncParams)->onQueue('ads');
     }
 
     private function adSpendByStoreDay(array $storeIds, string $dateFrom, string $dateTo): Collection
@@ -1532,6 +1572,31 @@ SQL;
                 ->selectRaw('date, store_id, SUM(spend) as spend')
                 ->groupBy('date', 'store_id')
         );
+        if (Schema::hasTable('marketplace_ads_hourly_performances')) {
+            $today = Carbon::today()->toDateString();
+            $recentFrom = Carbon::today()->subDay()->toDateString();
+            $hourlyFrom = $dateFrom > $recentFrom ? $dateFrom : $recentFrom;
+            $hourlyTo = $dateTo < $today ? $dateTo : $today;
+
+            if ($hourlyFrom <= $hourlyTo) {
+                $hourlyShop = $aggregate(
+                    DB::table('marketplace_ads_hourly_performances')
+                        ->whereIn('store_id', $storeIds)
+                        ->whereBetween('performance_date', [$hourlyFrom, $hourlyTo])
+                        ->whereNull('campaign_id')
+                        ->where(function ($query) {
+                            $query->where('channel_campaign_id', '-')
+                                ->orWhereNull('channel_campaign_id');
+                        })
+                        ->selectRaw('performance_date as date, store_id, SUM(expense) as spend')
+                        ->groupBy('performance_date', 'store_id')
+                );
+
+                foreach ($hourlyShop as $key => $row) {
+                    $shop->put($key, $row);
+                }
+            }
+        }
         $campaign = $aggregate(
             DB::table('marketplace_ad_campaign_dailies')
                 ->whereIn('store_id', $storeIds)

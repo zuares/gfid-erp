@@ -15,6 +15,7 @@ use App\Models\SkuMapping;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class AdsDashboardService
 {
@@ -159,6 +160,42 @@ class AdsDashboardService
             ->groupBy('date')
             ->get()
             ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
+
+        // Data daily dari Shopee dapat tertinggal untuk hari aktif. Sync hourly
+        // sudah menyimpan snapshot toko yang lebih baru, jadi gunakan hourly
+        // sebagai sumber terbaru untuk hari ini dan kemarin.
+        if (Schema::hasTable('marketplace_ads_hourly_performances')) {
+            $today = Carbon::today()->toDateString();
+            $recentFrom = Carbon::today()->subDay()->toDateString();
+            $hourlyFrom = $dateFrom > $recentFrom ? $dateFrom : $recentFrom;
+            $hourlyTo = $dateTo < $today ? $dateTo : $today;
+
+            if ($hourlyFrom <= $hourlyTo) {
+                $hourlyShop = DB::table('marketplace_ads_hourly_performances')
+                    ->whereIn('store_id', $storeIds)
+                    ->whereBetween('performance_date', [$hourlyFrom, $hourlyTo])
+                    ->whereNull('campaign_id')
+                    ->where(function ($query) {
+                        $query->where('channel_campaign_id', '-')
+                            ->orWhereNull('channel_campaign_id');
+                    })
+                    ->selectRaw('performance_date as date, SUM(expense) as spend, SUM(impression) as impressions, SUM(clicks) as clicks, SUM(broad_order) as orders, SUM(broad_gmv) as gmv')
+                    ->groupBy('performance_date')
+                    ->get();
+
+                foreach ($hourlyShop as $row) {
+                    $date = substr((string) $row->date, 0, 10);
+                    $shop->put($date, (object) [
+                        'date' => $date,
+                        'spend' => $row->spend,
+                        'impressions' => $row->impressions,
+                        'clicks' => $row->clicks,
+                        'orders' => $row->orders,
+                        'gmv' => $row->gmv,
+                    ]);
+                }
+            }
+        }
 
         $campaign = DB::table('marketplace_ad_campaign_dailies')
             ->whereIn('store_id', $storeIds)
