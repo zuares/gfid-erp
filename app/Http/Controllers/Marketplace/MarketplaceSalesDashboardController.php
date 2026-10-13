@@ -1532,7 +1532,6 @@ SQL;
             $syncParams = [
                 '--from' => $dateFrom,
                 '--to' => $dateTo,
-                '--hourly' => true,
             ];
             if ($storeId) {
                 $syncParams['--store'] = $storeId;
