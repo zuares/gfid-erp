@@ -1640,11 +1640,13 @@ SQL;
             ->sort()
             ->mapWithKeys(function (string $key) use ($shop, $campaign, $gms) {
                 $shopRow = $shop->get($key);
-                if ($shopRow) {
+                $campaignSpend = (float) ($campaign->get($key)->spend ?? 0);
+                $gmsSpend = (float) ($gms->get($key)->spend ?? 0);
+                if ($shopRow && ((float) $shopRow->spend > 0 || ($campaignSpend <= 0 && $gmsSpend <= 0))) {
                     return [$key => (float) $shopRow->spend];
                 }
 
-                return [$key => (float) ($campaign->get($key)->spend ?? 0) + (float) ($gms->get($key)->spend ?? 0)];
+                return [$key => $campaignSpend + $gmsSpend];
             });
     }
 

@@ -154,6 +154,42 @@ class AdsModuleTest extends TestCase
         $this->assertSame(200, $metrics->get($date)['impressions']);
     }
 
+    public function test_active_ads_metrics_fall_back_to_campaign_facts_when_shop_daily_is_zero()
+    {
+        $store = $this->createStore('ACTIVECAMPAIGN');
+        $date = now()->toDateString();
+
+        \Illuminate\Support\Facades\DB::table('marketplace_ads_dailies')->insert([
+            'store_id' => $store->id,
+            'date' => $date,
+            'impressions' => 0,
+            'clicks' => 0,
+            'spend' => 0,
+            'orders' => 0,
+            'gmv' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        \Illuminate\Support\Facades\DB::table('marketplace_ad_campaign_dailies')->insert([
+            'store_id' => $store->id,
+            'channel_campaign_id' => 'CAMPAIGN-ACTIVE',
+            'date' => $date,
+            'impressions' => 100,
+            'clicks' => 10,
+            'expense' => 5000,
+            'broad_order' => 1,
+            'broad_gmv' => 50000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $metrics = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->getDailyMetrics([$store->id], null, $date, $date);
+
+        $this->assertSame(5000.0, $metrics->get($date)['spend']);
+        $this->assertSame(100, $metrics->get($date)['impressions']);
+    }
+
     public function test_ads_throttle_uses_database_rate_limiter_without_redis()
     {
         config(['cache.limiter' => 'database']);

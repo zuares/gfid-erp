@@ -239,7 +239,31 @@ class AdsDashboardService
             ->sort()
             ->mapWithKeys(function (string $date) use ($shop, $campaign, $gms) {
                 $shopRow = $shop->get($date);
-                if ($shopRow) {
+                $campaignRow = $campaign->get($date);
+                $gmsRow = $gms->get($date);
+                $shopHasData = $shopRow && (
+                    (float) ($shopRow->spend ?? 0) > 0
+                    || (int) ($shopRow->impressions ?? 0) > 0
+                    || (int) ($shopRow->clicks ?? 0) > 0
+                    || (int) ($shopRow->orders ?? 0) > 0
+                    || (float) ($shopRow->gmv ?? 0) > 0
+                );
+                $campaignHasData = $campaignRow && (
+                    (float) ($campaignRow->spend ?? 0) > 0
+                    || (int) ($campaignRow->impressions ?? 0) > 0
+                    || (int) ($campaignRow->clicks ?? 0) > 0
+                    || (int) ($campaignRow->orders ?? 0) > 0
+                    || (float) ($campaignRow->gmv ?? 0) > 0
+                );
+                $gmsHasData = $gmsRow && (
+                    (float) ($gmsRow->spend ?? 0) > 0
+                    || (int) ($gmsRow->impressions ?? 0) > 0
+                    || (int) ($gmsRow->clicks ?? 0) > 0
+                    || (int) ($gmsRow->orders ?? 0) > 0
+                    || (float) ($gmsRow->gmv ?? 0) > 0
+                );
+
+                if ($shopRow && ($shopHasData || (! $campaignHasData && ! $gmsHasData))) {
                     return [$date => [
                         'spend' => (float) ($shopRow->spend ?? 0),
                         'impressions' => (int) ($shopRow->impressions ?? 0),
@@ -248,9 +272,6 @@ class AdsDashboardService
                         'gmv' => (float) ($shopRow->gmv ?? 0),
                     ]];
                 }
-
-                $campaignRow = $campaign->get($date);
-                $gmsRow = $gms->get($date);
 
                 return [$date => [
                     'spend' => (float) ($campaignRow->spend ?? 0) + (float) ($gmsRow->spend ?? 0),
