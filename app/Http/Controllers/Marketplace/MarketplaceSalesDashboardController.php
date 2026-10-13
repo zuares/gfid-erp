@@ -1524,20 +1524,30 @@ SQL;
         $dateFrom = $syncFrom->toDateString();
         $dateTo = $syncTo->toDateString();
         $autoSyncKey = 'ads_dashboard_autosync:'.$storeScope.':'.$dateFrom.':'.$dateTo;
-        if (! Cache::add($autoSyncKey, true, now()->addMinutes(15))) {
-            return;
-        }
+        try {
+            if (! Cache::add($autoSyncKey, true, now()->addMinutes(15))) {
+                return;
+            }
 
-        $syncParams = [
-            '--from' => $dateFrom,
-            '--to' => $dateTo,
-            '--hourly' => true,
-        ];
-        if ($storeId) {
-            $syncParams['--store'] = $storeId;
-        }
+            $syncParams = [
+                '--from' => $dateFrom,
+                '--to' => $dateTo,
+                '--hourly' => true,
+            ];
+            if ($storeId) {
+                $syncParams['--store'] = $storeId;
+            }
 
-        Artisan::queue('marketplace:sync-ads', $syncParams)->onQueue('ads');
+            Artisan::queue('marketplace:sync-ads', $syncParams)->onQueue('ads');
+        } catch (\Throwable $exception) {
+            try {
+                Cache::forget($autoSyncKey);
+            } catch (\Throwable) {
+                // Queue/cache failures must not make the dashboard unavailable.
+            }
+
+            report($exception);
+        }
     }
 
     private function adSpendByStoreDay(array $storeIds, string $dateFrom, string $dateTo): Collection
