@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\MarketplaceProduct;
+use App\Models\MarketplaceProductChangeLog;
+use App\Models\MarketplaceProductImage;
 use App\Models\MarketplaceProductModel;
 use App\Models\Store;
 use App\Services\Marketplace\MarketplaceApiGateway;
@@ -249,6 +251,150 @@ class MarketplaceProductService
     }
 
     /**
+     * Ambil snapshot detail terbaru untuk editor produk.
+     * Tidak mengirim mutation ke Shopee; gallery lokal disegarkan dari snapshot.
+     */
+    public function getEditData(MarketplaceProduct $product): array
+    {
+        $store = $product->store;
+        $channel = strtolower((string) ($store?->channel?->code ?? ''));
+
+        if (! in_array($channel, ['shopee', 'shp'], true)) {
+            return [
+                'error' => 'unsupported_channel',
+                'message' => 'Editor tahap ini hanya tersedia untuk produk Shopee.',
+            ];
+        }
+
+        $base = $this->gateway->getItemBaseInfo($store, [(string) $product->item_id]);
+        if (! empty($base['error'])) {
+            return [
+                'error' => $base['error'],
+                'message' => $base['message'] ?? 'Shopee gagal mengembalikan detail produk.',
+            ];
+        }
+
+        $item = data_get($base, 'response.item_list.0');
+        if (! is_array($item)) {
+            return [
+                'error' => 'item_not_found',
+                'message' => 'Produk tidak ditemukan di Shopee. Coba lakukan sync terlebih dahulu.',
+            ];
+        }
+
+        $hasModel = (bool) ($item['has_model'] ?? $product->has_model);
+        $tiers = [];
+        $models = [];
+
+        if ($hasModel) {
+            $modelsResponse = $this->gateway->getProductModelList($store, (string) $product->item_id);
+            if (! empty($modelsResponse['error'])) {
+                return [
+                    'error' => $modelsResponse['error'],
+                    'message' => $modelsResponse['message'] ?? 'Daftar varian produk gagal diambil dari Shopee.',
+                ];
+            }
+
+            $tiers = data_get($modelsResponse, 'response.tier_variation', []);
+            $models = collect(data_get($modelsResponse, 'response.model', []))
+                ->map(function (array $model) use ($tiers): array {
+                    $name = $model['model_name'] ?? null;
+                    if (! $name && ! empty($model['tier_index']) && ! empty($tiers)) {
+                        $parts = [];
+                        foreach ($model['tier_index'] as $tierPos => $optionIndex) {
+                            $option = data_get($tiers, "{$tierPos}.option_list.{$optionIndex}.option");
+                            if ($option) {
+                                $parts[] = $option;
+                            }
+                        }
+                        $name = implode(' / ', $parts) ?: null;
+                    }
+
+                    $priceInfo = data_get($model, 'price_info.0', []);
+                    $stock = data_get($model, 'stock_info_v2.seller_stock.0.stock')
+                        ?? data_get($model, 'stock_info_v2.summary_info.total_available_stock')
+                        ?? data_get($model, 'stock_info.0.current_stock');
+
+                    return [
+                        'model_id' => (string) ($model['model_id'] ?? ''),
+                        'model_name' => $name,
+                        'model_sku' => $model['model_sku'] ?? null,
+                        'original_price' => $priceInfo['original_price'] ?? null,
+                        'current_price' => $priceInfo['current_price'] ?? $priceInfo['original_price'] ?? null,
+                        'stock' => $stock !== null ? (int) $stock : 0,
+                        'tier_index' => $model['tier_index'] ?? [],
+                    ];
+                })
+                ->filter(fn (array $model) => $model['model_id'] !== '')
+                ->values()
+                ->all();
+        } else {
+            $priceInfo = data_get($item, 'price_info.0', []);
+            $stock = data_get($item, 'stock_info_v2.seller_stock.0.stock')
+                ?? data_get($item, 'stock_info_v2.summary_info.total_available_stock')
+                ?? data_get($item, 'stock_info.0.current_stock');
+
+            $models[] = [
+                'model_id' => '0',
+                'model_name' => null,
+                'model_sku' => $item['item_sku'] ?? $product->item_sku,
+                'original_price' => $priceInfo['original_price'] ?? null,
+                'current_price' => $priceInfo['current_price'] ?? $priceInfo['original_price'] ?? null,
+                'stock' => $stock !== null ? (int) $stock : 0,
+                'tier_index' => [],
+            ];
+        }
+
+        $imageIds = array_values(array_filter(array_map(
+            static fn ($imageId) => trim((string) $imageId),
+            (array) data_get($item, 'image.image_id_list', [])
+        ), static fn (string $imageId) => $imageId !== ''));
+        $imageUrls = array_values(array_filter(array_map(
+            static fn ($url) => trim((string) $url),
+            (array) data_get($item, 'image.image_url_list', [])
+        ), static fn (string $url) => $url !== ''));
+
+        $images = [];
+        $imageCount = max(count($imageIds), count($imageUrls));
+        for ($index = 0; $index < $imageCount; $index++) {
+            $images[] = [
+                'image_id' => $imageIds[$index] ?? null,
+                'image_url' => $imageUrls[$index] ?? null,
+                'sort_order' => $index,
+                'is_cover' => $index === 0,
+            ];
+        }
+
+        $this->syncProductImages($product, $item);
+
+        return [
+            'product' => [
+                'local_id' => $product->id,
+                'store_id' => $store->id,
+                'store_name' => $store->name,
+                'item_id' => (string) ($item['item_id'] ?? $product->item_id),
+                'item_name' => $item['item_name'] ?? $product->item_name,
+                'description' => $item['description'] ?? data_get($product->raw_json, 'description'),
+                'item_sku' => $item['item_sku'] ?? $product->item_sku,
+                'item_status' => $item['item_status'] ?? $product->item_status,
+                'category_id' => isset($item['category_id']) ? (string) $item['category_id'] : $product->category_id,
+            'has_model' => $hasModel,
+                'weight' => $item['weight'] ?? null,
+                'dimension' => $item['dimension'] ?? null,
+            ],
+            'images' => $images,
+            'tiers' => $tiers,
+            'models' => $models,
+            'source' => [
+                'channel' => 'shopee',
+                'fetched_at' => now()->toIso8601String(),
+                'base_info_endpoint' => '/api/v2/product/get_item_base_info',
+                'model_list_endpoint' => '/api/v2/product/get_model_list',
+            ],
+        ];
+    }
+
+    /**
      * Update stok di Shopee + lokal.
      * $stockList: [['model_id' => '0', 'stock' => 10], ...]
      */
@@ -432,6 +578,292 @@ class MarketplaceProductService
     }
 
     /**
+     * Upload file baru ke media space tanpa mengubah listing produk.
+     */
+    public function uploadImages(MarketplaceProduct $product, array $files): array
+    {
+        $result = $this->uploadImageFiles($product->store, $files);
+        if (! empty($result['error'])) {
+            return $result;
+        }
+
+        $this->logProductChange(
+            product: $product,
+            action: 'image_upload',
+            status: 'success',
+            after: [
+                'image_ids' => collect($result['images'])->pluck('image_id')->values()->all(),
+                'image_urls' => collect($result['images'])->pluck('image_url')->values()->all(),
+            ],
+        );
+
+        return $result;
+    }
+
+    /**
+     * Upload gambar untuk wizard produk baru. Belum ada product lokal sebelum
+     * publish, sehingga audit listing dicatat setelah add_item berhasil.
+     */
+    public function uploadImagesForStore(Store $store, array $files): array
+    {
+        return $this->uploadImageFiles($store, $files);
+    }
+
+    public function getCreateCategories(Store $store): array
+    {
+        return $this->channelDriver($store)->getProductCategory($store, 'id');
+    }
+
+    public function getCreateAttributes(Store $store, int $categoryId): array
+    {
+        return $this->channelDriver($store)->getProductAttributeTree($store, $categoryId, 'id');
+    }
+
+    public function getCreateLogistics(Store $store): array
+    {
+        return $this->channelDriver($store)->getProductLogistics($store);
+    }
+
+    /**
+     * Publish item baru lalu simpan item_id dan snapshot lokal bila detail dapat
+     * langsung dibaca ulang dari Shopee.
+     */
+    public function createProduct(Store $store, array $payload): array
+    {
+        $driver = $this->channelDriver($store);
+        if (! is_callable([$driver, 'addProduct'])) {
+            return ['error' => 'not_supported', 'message' => 'Channel toko ini belum mendukung tambah produk.'];
+        }
+
+        $res = $driver->addProduct($store, $payload);
+        if (! empty($res['error'])) {
+            return $res;
+        }
+
+        $itemId = data_get($res, 'response.item_id')
+            ?? data_get($res, 'item_id')
+            ?? data_get($res, 'response.item.item_id');
+        if (! $itemId) {
+            return [
+                'error' => 'item_id_missing',
+                'message' => 'Shopee menerima request tetapi tidak mengembalikan item_id.',
+                'response' => $res,
+            ];
+        }
+
+        $detail = $driver->getItemBaseInfo($store, [(string) $itemId]);
+        $item = data_get($detail, 'response.item_list.0');
+        $warning = null;
+
+        if (! is_array($item)) {
+            $warning = 'Produk sudah dipublish, tetapi detail belum dapat disinkronkan. Jalankan sync produk untuk melengkapinya.';
+            $item = [
+                'item_id' => (string) $itemId,
+                'item_name' => $payload['item_name'] ?? null,
+                'item_sku' => $payload['item_sku'] ?? null,
+                'item_status' => $payload['item_status'] ?? 'UNLIST',
+                'category_id' => $payload['category_id'] ?? null,
+                'image' => [
+                    'image_id_list' => data_get($payload, 'image.image_id_list', []),
+                ],
+                'price_info' => [['original_price' => $payload['original_price'] ?? null]],
+                'stock_info_v2' => ['seller_stock' => [['stock' => data_get($payload, 'seller_stock.0.stock', 0)]]],
+            ];
+        }
+
+        $product = $this->upsertProduct($store, $item);
+        $this->syncProductImages($product, $item);
+        $this->logProductChange(
+            product: $product,
+            action: 'create',
+            status: $warning ? 'warning' : 'success',
+            after: ['item_id' => (string) $itemId, 'payload' => $payload],
+            response: ['publish' => $res, 'detail' => $detail],
+            error: $warning,
+        );
+
+        return array_filter([
+            'success' => true,
+            'item_id' => (string) $itemId,
+            'product_id' => $product->id,
+            'warning' => $warning,
+        ], static fn ($value) => $value !== null);
+    }
+
+    /**
+     * Simpan urutan gallery final ke Shopee.
+     *
+     * $imageOrder berisi token existing:{image_id} atau new:{index}. File baru
+     * dipetakan berdasarkan urutan index tersebut agar gambar dapat dihapus,
+     * ditambah, dan diurutkan dalam satu aksi.
+     */
+    public function updateImages(MarketplaceProduct $product, array $imageOrder, array $files = []): array
+    {
+        $driver = $this->channelDriver($product->store);
+        $current = $driver->getItemBaseInfo($product->store, [(string) $product->item_id]);
+
+        if (! empty($current['error'])) {
+            return [
+                'error' => $current['error'],
+                'message' => $current['message'] ?? 'Gambar produk gagal dibaca dari Shopee.',
+            ];
+        }
+
+        $item = data_get($current, 'response.item_list.0');
+        if (! is_array($item)) {
+            return ['error' => 'item_not_found', 'message' => 'Produk tidak ditemukan di Shopee.'];
+        }
+
+        $currentIds = array_values(array_filter(array_map(
+            static fn ($imageId) => trim((string) $imageId),
+            (array) data_get($item, 'image.image_id_list', [])
+        ), static fn (string $imageId) => $imageId !== ''));
+        $currentUrls = array_values(array_map(
+            static fn ($url) => $url !== null ? trim((string) $url) : null,
+            (array) data_get($item, 'image.image_url_list', [])
+        ));
+        $beforeImages = [
+            'image_ids' => $currentIds,
+            'image_urls' => $currentUrls,
+        ];
+
+        $imageOrder = array_values(array_filter(array_map(
+            static fn ($token) => trim((string) $token),
+            $imageOrder
+        ), static fn (string $token) => $token !== ''));
+
+        if ($imageOrder === [] && $files === []) {
+            return ['error' => 'empty_images', 'message' => 'Pilih minimal satu gambar untuk disimpan.'];
+        }
+
+        $uploadedIds = [];
+        if ($files !== []) {
+            $uploadResult = $this->uploadImages($product, $files);
+            if (! empty($uploadResult['error'])) {
+                return $uploadResult;
+            }
+            $uploadedIds = collect($uploadResult['images'] ?? [])->pluck('image_id')->map(fn ($id) => (string) $id)->all();
+        }
+
+        $finalIds = [];
+        $newIndex = 0;
+        foreach ($imageOrder as $token) {
+            if (str_starts_with($token, 'existing:')) {
+                $imageId = substr($token, strlen('existing:'));
+                if ($imageId !== '' && in_array($imageId, $currentIds, true)) {
+                    $finalIds[] = $imageId;
+                }
+                continue;
+            }
+
+            if (str_starts_with($token, 'new:')) {
+                $finalIds[] = $uploadedIds[$newIndex] ?? null;
+                $newIndex++;
+            }
+        }
+
+        if ($imageOrder === []) {
+            $finalIds = array_merge($currentIds, $uploadedIds);
+        }
+
+        // Fallback untuk caller non-UI yang hanya mengirim existing IDs.
+        if ($finalIds === [] && $imageOrder !== [] && $uploadedIds === []) {
+            $finalIds = array_values(array_filter($imageOrder, fn (string $id) => in_array($id, $currentIds, true)));
+        }
+
+        $finalIds = array_values(array_unique(array_filter($finalIds)));
+        if ($finalIds === []) {
+            return ['error' => 'empty_images', 'message' => 'Gallery harus memiliki minimal satu gambar.'];
+        }
+        if (count($finalIds) > 9) {
+            return ['error' => 'too_many_images', 'message' => 'Maksimal 9 gambar produk yang dapat disimpan.'];
+        }
+
+        $res = $driver->updateProductImages($product->store, (int) $product->item_id, $finalIds);
+        if (! empty($res['error'])) {
+            $this->logProductChange(
+                product: $product,
+                action: 'images',
+                status: 'failed',
+                before: $beforeImages,
+                after: ['image_ids' => $finalIds],
+                response: $res,
+                error: $res['message'] ?? $res['error'],
+            );
+
+            return [
+                'error' => $res['error'],
+                'message' => $res['message'] ?? 'Urutan gallery gagal disimpan ke Shopee.',
+            ];
+        }
+
+        // Refresh snapshot lokal agar thumbnail katalog tidak tertinggal.
+        $fresh = $driver->getItemBaseInfo($product->store, [(string) $product->item_id]);
+        $freshItem = data_get($fresh, 'response.item_list.0');
+        if (! is_array($freshItem)) {
+            // Remote update berhasil, tetapi jangan menimpa lokal dengan snapshot
+            // sebelum perubahan. Biarkan sync berikutnya memperbaiki snapshot.
+            $message = $fresh['message'] ?? 'Update gambar berhasil, tetapi verifikasi ulang ke Shopee gagal.';
+            $this->logProductChange(
+                product: $product,
+                action: 'images',
+                status: 'warning',
+                before: $beforeImages,
+                after: ['image_ids' => $finalIds],
+                response: ['update' => $res, 'refresh' => $fresh],
+                error: $message,
+            );
+
+            return [
+                'success' => true,
+                'image_ids' => $finalIds,
+                'warning' => $message,
+                'sync_required' => true,
+            ];
+        }
+
+        $actualIds = array_values(array_filter(array_map(
+            static fn ($imageId) => trim((string) $imageId),
+            (array) data_get($freshItem, 'image.image_id_list', [])
+        ), static fn (string $imageId) => $imageId !== ''));
+        $actualUrls = array_values(array_map(
+            static fn ($url) => $url !== null ? trim((string) $url) : null,
+            (array) data_get($freshItem, 'image.image_url_list', [])
+        ));
+        $verificationWarning = $actualIds !== $finalIds
+            ? 'Shopee menerima perubahan, tetapi urutan gambar aktual berbeda dari permintaan. Data lokal mengikuti hasil aktual Shopee.'
+            : null;
+
+        $product->forceFill([
+            'item_name' => $freshItem['item_name'] ?? $product->item_name,
+            'item_sku' => $freshItem['item_sku'] ?? $product->item_sku,
+            'item_status' => $freshItem['item_status'] ?? $product->item_status,
+            'category_id' => isset($freshItem['category_id']) ? (string) $freshItem['category_id'] : $product->category_id,
+            'image_url' => $actualUrls[0] ?? null,
+            'has_model' => (bool) ($freshItem['has_model'] ?? $product->has_model),
+            'raw_json' => $freshItem,
+            'synced_at' => now(),
+        ])->save();
+
+        $this->syncProductImages($product, $freshItem);
+        $this->logProductChange(
+            product: $product,
+            action: 'images',
+            status: $verificationWarning ? 'warning' : 'success',
+            before: $beforeImages,
+            after: ['image_ids' => $actualIds, 'image_urls' => $actualUrls],
+            response: ['update' => $res, 'refresh' => $fresh],
+            error: $verificationWarning,
+        );
+
+        return array_filter([
+            'success' => true,
+            'image_ids' => $actualIds,
+            'warning' => $verificationWarning,
+        ], static fn ($value) => $value !== null);
+    }
+
+    /**
      * Unlist / tampilkan kembali item.
      */
     public function setUnlist(MarketplaceProduct $product, bool $unlist): array
@@ -464,6 +896,141 @@ class MarketplaceProductService
     // ─────────────────────────────────────────────────────────────────────────
     // Private helpers
     // ─────────────────────────────────────────────────────────────────────────
+
+    private function uploadImageFiles(Store $store, array $files): array
+    {
+        if ($files === []) {
+            return ['error' => 'empty_images', 'message' => 'Pilih minimal satu file gambar.'];
+        }
+
+        if (count($files) > 9) {
+            return ['error' => 'too_many_images', 'message' => 'Maksimal 9 file dapat di-upload dalam satu batch.'];
+        }
+
+        $driver = $this->channelDriver($store);
+        if (! is_callable([$driver, 'uploadProductImage'])) {
+            return ['error' => 'not_supported', 'message' => 'Channel toko ini belum mendukung upload gambar.'];
+        }
+
+        $uploaded = [];
+        foreach ($files as $file) {
+            $contents = @file_get_contents($file->getRealPath());
+            if ($contents === false) {
+                return ['error' => 'image_read_failed', 'message' => 'File gambar tidak dapat dibaca server.'];
+            }
+
+            $upload = $driver->uploadProductImage(
+                $store,
+                $contents,
+                $file->getClientOriginalName(),
+                $file->getMimeType() ?: 'application/octet-stream',
+            );
+
+            if (! empty($upload['error'])) {
+                return [
+                    'error' => $upload['error'],
+                    'message' => $upload['message'] ?? 'Gambar gagal di-upload ke Shopee.',
+                ];
+            }
+
+            $imageId = data_get($upload, 'response.image_info.image_id')
+                ?? data_get($upload, 'response.image_list.0.image_id')
+                ?? data_get($upload, 'response.image_id')
+                ?? data_get($upload, 'image_id');
+            $imageUrl = data_get($upload, 'response.image_info.image_url')
+                ?? data_get($upload, 'response.image_list.0.image_url')
+                ?? data_get($upload, 'response.image_url')
+                ?? data_get($upload, 'image_url');
+
+            if (! $imageId) {
+                return ['error' => 'image_id_missing', 'message' => 'Shopee tidak mengembalikan image ID hasil upload.'];
+            }
+
+            $uploaded[] = [
+                'image_id' => (string) $imageId,
+                'image_url' => $imageUrl ? (string) $imageUrl : null,
+                'raw_json' => $upload,
+            ];
+        }
+
+        return ['success' => true, 'images' => $uploaded];
+    }
+
+    private function syncProductImages(MarketplaceProduct $product, array $item): void
+    {
+        $imageIds = array_values(array_filter(array_map(
+            static fn ($imageId) => trim((string) $imageId),
+            (array) data_get($item, 'image.image_id_list', [])
+        ), static fn (string $imageId) => $imageId !== ''));
+        $imageUrls = array_values(array_map(
+            static fn ($url) => $url !== null ? trim((string) $url) : null,
+            (array) data_get($item, 'image.image_url_list', [])
+        ));
+
+        if ($imageIds === []) {
+            $product->images()->update([
+                'status' => 'removed',
+                'is_cover' => false,
+            ]);
+            return;
+        }
+
+        foreach ($imageIds as $index => $imageId) {
+            MarketplaceProductImage::updateOrCreate(
+                [
+                    'marketplace_product_id' => $product->id,
+                    'shopee_image_id' => $imageId,
+                ],
+                [
+                    'image_url' => $imageUrls[$index] ?? null,
+                    'sort_order' => $index,
+                    'is_cover' => $index === 0,
+                    'status' => 'active',
+                    'raw_json' => [
+                        'image_id' => $imageId,
+                        'image_url' => $imageUrls[$index] ?? null,
+                    ],
+                ]
+            );
+        }
+
+        $product->images()
+            ->whereNotIn('shopee_image_id', $imageIds)
+            ->update([
+                'status' => 'removed',
+                'is_cover' => false,
+            ]);
+    }
+
+    private function logProductChange(
+        MarketplaceProduct $product,
+        string $action,
+        string $status,
+        ?array $before = null,
+        ?array $after = null,
+        ?array $response = null,
+        ?string $error = null,
+    ): void {
+        try {
+            MarketplaceProductChangeLog::create([
+                'marketplace_product_id' => $product->id,
+                'action' => $action,
+                'status' => $status,
+                'before_json' => $before,
+                'after_json' => $after,
+                'response_json' => $response,
+                'error_message' => $error,
+                'created_by' => auth()->id(),
+            ]);
+        } catch (\Throwable $e) {
+            // Audit tidak boleh menggagalkan update marketplace yang sudah sukses.
+            Log::warning('[MarketplaceProductService] failed to write product change log', [
+                'product_id' => $product->id,
+                'action' => $action,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
 
     private function upsertProduct(Store $store, array $item, array $extra = []): MarketplaceProduct
     {

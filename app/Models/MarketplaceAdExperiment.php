@@ -18,6 +18,7 @@ class MarketplaceAdExperiment extends Model
     public const STATUS_EARLY_SIGNAL = 'EARLY_SIGNAL';
     public const STATUS_READY_TO_EVALUATE = 'READY_TO_EVALUATE';
     public const STATUS_COMPLETED = 'COMPLETED';
+    public const STATUS_INVALIDATED = 'INVALIDATED';
 
     protected $table = 'marketplace_ad_experiments';
 
@@ -48,6 +49,9 @@ class MarketplaceAdExperiment extends Model
         'calculation_version',
         'evaluated_at',
         'completed_at',
+        'invalidated_at',
+        'invalidated_by',
+        'invalidation_reason',
         'created_by',
     ];
 
@@ -64,6 +68,7 @@ class MarketplaceAdExperiment extends Model
         'calculation_snapshot' => 'array',
         'evaluated_at' => 'datetime',
         'completed_at' => 'datetime',
+        'invalidated_at' => 'datetime',
     ];
 
     public function store(): BelongsTo
@@ -83,6 +88,6 @@ class MarketplaceAdExperiment extends Model
 
     public function scopeOpen(Builder $query): Builder
     {
-        return $query->whereNotIn('lifecycle_status', [self::STATUS_COMPLETED]);
+        return $query->whereNotIn('lifecycle_status', [self::STATUS_COMPLETED, self::STATUS_INVALIDATED]);
     }
 }

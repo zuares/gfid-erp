@@ -3439,6 +3439,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <option value="READY_TO_EVALUATE">Ready to Evaluate</option>
                                 <option value="INSUFFICIENT_DATA">Insufficient Data</option>
                                 <option value="CONFOUNDED">Confounded</option>
+                                <option value="INVALIDATED">Invalidated</option>
                                 <option value="COMPLETED">Completed</option>
                             </select>
                         </div>
@@ -3560,6 +3561,37 @@ document.addEventListener('DOMContentLoaded', function() {
                             <span class="spinner-border spinner-border-sm me-1" role="status"></span> Menghitung...
                         </div>
                         <div id="experimentSimulationResult" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL INVALIDASI EXPERIMENT -->
+        <div class="modal fade" id="modalInvalidateExperiment" tabindex="-1" aria-labelledby="modalInvalidateExperimentLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content" style="border-radius:16px; background:var(--card-bg); color:var(--text); border:1px solid var(--card-border); box-shadow:var(--card-shadow);">
+                    <div class="modal-header border-0 pb-1">
+                        <div>
+                            <h5 class="modal-title fw-bold mb-1" id="modalInvalidateExperimentLabel">
+                                <i class="bi bi-archive text-secondary me-1"></i> Invalidasi perubahan
+                            </h5>
+                            <div style="font-size:.72rem; color:var(--dsh-muted);">
+                                Record tidak dihapus. Record dikeluarkan dari evaluasi aktif dan tetap tersimpan untuk audit.
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                    </div>
+                    <div class="modal-body pt-2">
+                        <div id="invalidateExperimentLabel" style="font-size:.74rem; font-weight:800; margin-bottom:.7rem;"></div>
+                        <label for="invalidateExperimentReason" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Alasan invalidasi</label>
+                        <textarea id="invalidateExperimentReason" class="form-control form-control-sm" rows="3" maxlength="500" placeholder="Contoh: Foto #2 dan #3 tercatat bersamaan sehingga hasil tidak dapat dipisahkan." style="border-radius:9px;"></textarea>
+                        <div id="invalidateExperimentError" style="display:none; margin-top:.65rem; padding:.6rem .7rem; border-radius:9px; color:#b91c1c; background:rgba(220,38,38,.07); border:1px solid rgba(220,38,38,.2); font-size:.72rem; font-weight:700;"></div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal" style="border-radius:9px;">Batal</button>
+                        <button type="button" id="btnConfirmInvalidateExperiment" class="btn btn-secondary btn-sm" style="border-radius:9px; font-weight:800;">
+                            <i class="bi bi-archive"></i> Invalidasi record
+                        </button>
                     </div>
                 </div>
             </div>
@@ -4598,6 +4630,7 @@ window.AdsDashboardRoutes = {
     evaluationsStore: @json(route('marketplace.ads.evaluations.store')),
     experimentsIndex: @json(route('marketplace.ads.experiments.index')),
     experimentsShow: @json(route('marketplace.ads.experiments.show', ['experiment' => '__EXPERIMENT_ID__'])),
+    experimentsInvalidate: @json(route('marketplace.ads.experiments.invalidate', ['experiment' => '__EXPERIMENT_ID__'])),
     experimentsSimulate: @json(route('marketplace.ads.experiments.simulate')),
 };
 
@@ -7246,6 +7279,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const changeFilter = document.getElementById('experimentChangeFilter');
     const statusFilter = document.getElementById('experimentStatusFilter');
     const dataNote = document.getElementById('experimentDataNote');
+    const invalidateModal = document.getElementById('modalInvalidateExperiment');
+    const invalidateLabel = document.getElementById('invalidateExperimentLabel');
+    const invalidateReason = document.getElementById('invalidateExperimentReason');
+    const invalidateError = document.getElementById('invalidateExperimentError');
+    const invalidateButton = document.getElementById('btnConfirmInvalidateExperiment');
     const recordModal = document.getElementById('modalRecordAdChange');
     const recordForm = document.getElementById('recordAdChangeForm');
     const recordStore = document.getElementById('recordAdChangeStore');
@@ -7259,6 +7297,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const recordSubmit = document.getElementById('btnSubmitRecordAdChange');
     let lastRows = [];
     let activeExperiment = null;
+    let invalidateExperimentId = null;
 
     if (!loading || !routes.experimentsIndex) return;
 
@@ -7268,6 +7307,7 @@ document.addEventListener('DOMContentLoaded', function () {
         READY_TO_EVALUATE: ['Ready to Evaluate', '#15803d', 'rgba(21,128,61,.12)'],
         INSUFFICIENT_DATA: ['Insufficient Data', '#b45309', 'rgba(180,83,9,.12)'],
         CONFOUNDED: ['Confounded', '#b91c1c', 'rgba(185,28,28,.1)'],
+        INVALIDATED: ['Invalidated', '#64748b', 'rgba(100,116,139,.14)'],
         COMPLETED: ['Completed', '#475569', 'rgba(71,85,105,.12)'],
     };
 
@@ -7360,6 +7400,63 @@ document.addEventListener('DOMContentLoaded', function () {
         return parts.join(' · ');
     }
 
+    function openInvalidateModal(experiment) {
+        if (!invalidateModal || !experiment?.id) return;
+        invalidateExperimentId = experiment.id;
+        invalidateLabel.textContent = changeLabel(experiment) + ' · ' + scopeLabel(experiment);
+        invalidateReason.value = '';
+        invalidateError.style.display = 'none';
+        window.bootstrap?.Modal.getOrCreateInstance(invalidateModal).show();
+    }
+
+    function submitInvalidate() {
+        if (!invalidateExperimentId || !routes.experimentsInvalidate) return;
+        const reason = String(invalidateReason.value || '').trim();
+        if (!reason) {
+            invalidateError.textContent = 'Alasan invalidasi wajib diisi.';
+            invalidateError.style.display = 'block';
+            return;
+        }
+
+        invalidateButton.disabled = true;
+        const originalText = invalidateButton.innerHTML;
+        invalidateButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menyimpan...';
+        const url = routes.experimentsInvalidate.replace('__EXPERIMENT_ID__', encodeURIComponent(invalidateExperimentId));
+
+        fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            },
+            body: JSON.stringify({ reason }),
+        })
+            .then(function (response) {
+                return response.json().catch(function () { return {}; }).then(function (data) {
+                    if (!response.ok) throw new Error(data.message || 'Record gagal di-invalidasi.');
+                    return data;
+                });
+            })
+            .then(function (data) {
+                window.bootstrap?.Modal.getOrCreateInstance(invalidateModal).hide();
+                if (window.showToast) window.showToast(data.message || 'Record berhasil di-invalidasi.');
+                loadList();
+                if (activeExperiment && String(activeExperiment.id) === String(invalidateExperimentId)) {
+                    loadDetail(invalidateExperimentId);
+                }
+            })
+            .catch(function (err) {
+                invalidateError.textContent = err.message || 'Record gagal di-invalidasi.';
+                invalidateError.style.display = 'block';
+            })
+            .finally(function () {
+                invalidateButton.disabled = false;
+                invalidateButton.innerHTML = originalText;
+            });
+    }
+
     function periodSummary(period) {
         if (!period || Number(period.days_with_data || 0) === 0) {
             return '<div style="font-size:.7rem; line-height:1.65; color:var(--dsh-muted);">' +
@@ -7402,22 +7499,35 @@ document.addEventListener('DOMContentLoaded', function () {
             const experiment = row.experiment || {};
             const details = row.details || {};
             const changedAt = (details.change || {}).effective_date || experiment.effective_date || '-';
+            const status = details.lifecycle_status || experiment.lifecycle_status;
+            const canInvalidate = status !== 'INVALIDATED' && !experiment.invalidated_at;
             const tr = document.createElement('tr');
             tr.innerHTML =
                 '<td><div style="font-weight:800; font-size:.72rem; color:var(--text);">' + esc(changeLabel(experiment)) + '</div>' +
                     '<div style="font-size:.64rem; color:var(--dsh-muted); margin-top:.15rem;">' + esc(experiment.change_event_id || '') + '</div></td>' +
                 '<td><div style="font-size:.7rem; max-width:210px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(scopeLabel(experiment)) + '">' + esc(scopeLabel(experiment)) + '</div></td>' +
                 '<td><div style="font-size:.7rem; font-weight:700;">' + esc(changedAt) + '</div><div style="font-size:.64rem; color:var(--dsh-muted);">' + esc(experiment.profit_basis || 'incomplete') + '</div></td>' +
-                '<td>' + statusBadge(details.lifecycle_status || experiment.lifecycle_status) + '</td>' +
+                '<td>' + statusBadge(status) + (details.invalidation?.reason ? '<div style="font-size:.62rem; color:var(--dsh-muted); margin-top:.25rem; max-width:150px;">' + esc(details.invalidation.reason) + '</div>' : '') + '</td>' +
                 '<td>' + periodSummary(details.baseline) + '</td>' +
                 '<td>' + periodSummary(details.observation) + '</td>' +
-                '<td><button type="button" class="btn btn-sm js-view-experiment" data-id="' + esc(experiment.id) + '" style="border:1px solid rgba(37,99,235,.25); color:var(--dsh-accent); background:rgba(37,99,235,.06); border-radius:8px; font-size:.68rem; font-weight:800;">Detail</button></td>';
+                '<td><div class="d-flex flex-column gap-1 align-items-stretch">' +
+                    '<button type="button" class="btn btn-sm js-view-experiment" data-id="' + esc(experiment.id) + '" style="border:1px solid rgba(37,99,235,.25); color:var(--dsh-accent); background:rgba(37,99,235,.06); border-radius:8px; font-size:.68rem; font-weight:800;">Detail</button>' +
+                    (canInvalidate ? '<button type="button" class="btn btn-sm js-invalidate-experiment" data-id="' + esc(experiment.id) + '" style="border:1px solid rgba(100,116,139,.35); color:#64748b; background:rgba(100,116,139,.06); border-radius:8px; font-size:.66rem; font-weight:800;">Invalidasi</button>' : '') +
+                '</div></td>';
             tableBody.appendChild(tr);
         });
 
         tableBody.querySelectorAll('.js-view-experiment').forEach(function (button) {
             button.addEventListener('click', function () {
                 loadDetail(button.dataset.id);
+            });
+        });
+        tableBody.querySelectorAll('.js-invalidate-experiment').forEach(function (button) {
+            button.addEventListener('click', function () {
+                const row = lastRows.find(function (item) {
+                    return String(item?.experiment?.id || '') === String(button.dataset.id || '');
+                });
+                openInvalidateModal(row?.experiment || {});
             });
         });
     }
@@ -7869,6 +7979,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('btnCloseExperimentDetail')?.addEventListener('click', function () {
         detailPanel.style.display = 'none';
     });
+    invalidateButton?.addEventListener('click', submitInvalidate);
     simulationButton?.addEventListener('click', runSimulation);
     simulationPeriod?.addEventListener('change', function () {
         simulationResult.style.display = 'none';

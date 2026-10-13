@@ -13,9 +13,163 @@ class MarketplaceProductController extends Controller
 {
     public function __construct(protected MarketplaceProductService $products) {}
 
+    public function createOptions()
+    {
+        $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code']);
+
+        return response()->json([
+            'stores' => $stores,
+            'steps' => ['store_category', 'attributes', 'content', 'images_logistics', 'preview'],
+        ]);
+    }
+
+    public function createCategories(Request $request)
+    {
+        $store = $this->createStore($request);
+        $result = $this->products->getCreateCategories($store);
+
+        return $this->marketplaceResult($result, 'Kategori Shopee gagal diambil.');
+    }
+
+    public function createAttributes(Request $request)
+    {
+        $data = $request->validate(['category_id' => 'required|integer|min:1']);
+        $store = $this->createStore($request);
+        $result = $this->products->getCreateAttributes($store, (int) $data['category_id']);
+
+        return $this->marketplaceResult($result, 'Atribut kategori Shopee gagal diambil.');
+    }
+
+    public function createLogistics(Request $request)
+    {
+        $store = $this->createStore($request);
+        $result = $this->products->getCreateLogistics($store);
+
+        return $this->marketplaceResult($result, 'Channel logistik Shopee gagal diambil.');
+    }
+
+    public function uploadCreateImages(Request $request)
+    {
+        $data = $request->validate([
+            'store_id' => 'required|integer|exists:stores,id',
+            'images' => 'required|array|min:1|max:9',
+            'images.*' => 'required|file|image|mimes:jpg,jpeg,png|max:5120',
+        ]);
+        $store = $this->createStore($request);
+        $result = $this->products->uploadImagesForStore($store, array_values(array_filter($data['images'] ?? [])));
+
+        return $this->marketplaceResult($result, 'Gambar produk baru gagal di-upload.');
+    }
+
+    public function publishCreate(Request $request)
+    {
+        $data = $request->validate([
+            'store_id' => 'required|integer|exists:stores,id',
+            'item_name' => 'required|string|max:255',
+            'item_sku' => 'nullable|string|max:100',
+            'description' => 'required|string|max:3000',
+            'category_id' => 'required|integer|min:1',
+            'image_ids' => 'required|array|min:1|max:9',
+            'image_ids.*' => 'required|string|max:160',
+            'original_price' => 'required|numeric|min:100',
+            'stock' => 'required|integer|min:0',
+            'weight' => 'required|numeric|gt:0',
+            'dimension' => 'required|array',
+            'dimension.package_length' => 'required|integer|min:1',
+            'dimension.package_width' => 'required|integer|min:1',
+            'dimension.package_height' => 'required|integer|min:1',
+            'logistic_info' => 'required|array|min:1',
+            'logistic_info.*.logistic_id' => 'required|integer|min:1',
+            'logistic_info.*.enabled' => 'required|boolean',
+            'logistic_info.*.is_free' => 'nullable|boolean',
+            'logistic_info.*.shipping_fee' => 'nullable|numeric|min:0',
+            'attribute_list' => 'nullable|array',
+            'pre_order' => 'nullable|array',
+            'pre_order.is_pre_order' => 'nullable|boolean',
+            'pre_order.days_to_ship' => 'nullable|integer|min:1',
+            'item_status' => 'nullable|in:NORMAL,UNLIST',
+        ]);
+
+        $store = $this->createStore($request);
+        $payload = [
+            'item_name' => $data['item_name'],
+            'description' => $data['description'],
+            'category_id' => (int) $data['category_id'],
+            'original_price' => (float) $data['original_price'],
+            'weight' => (float) $data['weight'],
+            'image' => ['image_id_list' => array_values($data['image_ids'])],
+            'seller_stock' => [['stock' => (int) $data['stock']]],
+            'logistic_info' => array_values($data['logistic_info']),
+            'item_status' => $data['item_status'] ?? 'UNLIST',
+        ];
+
+        foreach (['item_sku', 'dimension', 'attribute_list', 'pre_order'] as $key) {
+            if (array_key_exists($key, $data) && $data[$key] !== null && $data[$key] !== '') {
+                $payload[$key] = $data[$key];
+            }
+        }
+
+        $result = $this->products->createProduct($store, $payload);
+
+        return $this->marketplaceResult($result, 'Produk baru gagal dipublish ke Shopee.');
+    }
+
     public function page()
     {
         return view('marketplace.products');
+    }
+
+    private function createStore(Request $request): Store
+    {
+        $storeId = $request->validate(['store_id' => 'required|integer|exists:stores,id'])['store_id'];
+        $store = Store::whereKey($storeId)
+            ->where('status', 'active')
+            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->first();
+
+        abort_unless($store, 422, 'Toko aktif Shopee tidak ditemukan.');
+
+        return $store;
+    }
+
+    private function marketplaceResult(array $result, string $fallbackMessage)
+    {
+        if (! empty($result['error'])) {
+            return response()->json([
+                'message' => $result['message'] ?? $fallbackMessage,
+                'error' => $result['error'],
+            ], 422);
+        }
+
+        return response()->json($result);
+    }
+
+    /**
+     * Detail edit produk yang diambil ulang dari Shopee.
+     * Tahap ini read-only: belum mengirim perubahan ke marketplace.
+     */
+    public function edit(MarketplaceProduct $product)
+    {
+        try {
+            $data = $this->products->getEditData($product);
+
+            if (! empty($data['error'])) {
+                return response()->json([
+                    'message' => $data['message'] ?? 'Detail produk tidak dapat diambil dari Shopee.',
+                ], 422);
+            }
+
+            return response()->json($data);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => $e->getMessage() ?: 'Gagal mengambil detail produk dari Shopee.',
+            ], 422);
+        }
     }
 
     /**
@@ -493,6 +647,49 @@ class MarketplaceProductController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Upload file gambar ke media space Shopee tanpa mengubah listing.
+     */
+    public function uploadImages(MarketplaceProduct $product, Request $request)
+    {
+        $data = $request->validate([
+            'images'   => 'required|array|min:1|max:9',
+            'images.*' => 'required|file|image|mimes:jpg,jpeg,png|max:5120',
+        ]);
+
+        $res = $this->products->uploadImages($product, array_values(array_filter($data['images'] ?? [])));
+        if (! empty($res['error'])) {
+            return response()->json(['message' => $res['message'] ?? 'Gagal upload gambar ke Shopee.'], 422);
+        }
+
+        return response()->json($res);
+    }
+
+    /**
+     * Update gallery produk. image_order berisi existing:{id} atau new:{index}.
+     */
+    public function updateImages(MarketplaceProduct $product, Request $request)
+    {
+        $data = $request->validate([
+            'image_order'   => 'nullable|array|max:9',
+            'image_order.*' => 'string|max:120',
+            'images'        => 'nullable|array|max:9',
+            'images.*'      => 'file|image|mimes:jpg,jpeg,png|max:5120',
+        ]);
+
+        $files = array_values(array_filter($request->file('images', [])));
+        if (empty($data['image_order']) && empty($files)) {
+            return response()->json(['message' => 'Pilih minimal satu gambar untuk disimpan.'], 422);
+        }
+
+        $res = $this->products->updateImages($product, $data['image_order'] ?? [], $files);
+        if (! empty($res['error'])) {
+            return response()->json(['message' => $res['message'] ?? 'Gagal update gambar produk di Shopee.'], 422);
+        }
+
+        return response()->json($res);
+    }
+
     public function updateSku(MarketplaceProduct $product, Request $request)
     {
         $data = $request->validate([
@@ -537,6 +734,31 @@ class MarketplaceProductController extends Controller
             'product' => ['id' => $product->id, 'name' => $product->item_name, 'sku' => $product->item_sku],
             'days'    => $rows,
         ]);
+    }
+
+    /**
+     * Audit perubahan listing produk, termasuk hasil verifikasi gambar Shopee.
+     */
+    public function changeLogs(MarketplaceProduct $product)
+    {
+        $logs = $product->changeLogs()
+            ->with('creator:id,name')
+            ->latest()
+            ->limit(100)
+            ->get()
+            ->map(static fn ($log) => [
+                'id' => $log->id,
+                'action' => $log->action,
+                'status' => $log->status,
+                'before' => $log->before_json,
+                'after' => $log->after_json,
+                'response' => $log->response_json,
+                'error_message' => $log->error_message,
+                'created_by' => $log->creator?->name,
+                'created_at' => $log->created_at?->toIso8601String(),
+            ]);
+
+        return response()->json(['product_id' => $product->id, 'logs' => $logs]);
     }
 
     /**

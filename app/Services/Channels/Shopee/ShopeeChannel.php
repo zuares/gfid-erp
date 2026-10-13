@@ -81,7 +81,7 @@ class ShopeeChannel implements MarketplaceChannel
     protected function isMutationEndpoint(string $path): bool
     {
         return (bool) preg_match(
-            '#/(?:returns/confirm|ads/edit_|logistics/(?:ship_|create_)|sellerchat/(?:send_|read_)|product/(?:update_|unlist_item|boost_item)|discount/(?:add_|update_|end_|delete_|set_))#',
+            '#/(?:returns/confirm|ads/edit_|media_space/upload_image|logistics/(?:ship_|create_)|sellerchat/(?:send_|read_)|product/(?:add_item|update_|unlist_item|boost_item)|discount/(?:add_|update_|end_|delete_|set_))#',
             $path
         );
     }
@@ -260,6 +260,38 @@ class ShopeeChannel implements MarketplaceChannel
         ];
 
         $response = Http::connectTimeout(10)->timeout(30)->post($this->baseUrl($store) . $path . '?' . http_build_query($query), $body);
+
+        return $this->withHttpMeta($response);
+    }
+
+    /**
+     * POST multipart untuk endpoint Shopee yang menerima file.
+     * Isi file dikirim sebagai string supaya request dapat dibuat ulang setelah
+     * refresh token tanpa bergantung pada pointer stream yang sudah terbaca.
+     */
+    protected function doMultipartPost(
+        Store $store,
+        string $path,
+        string $field,
+        string $contents,
+        string $filename,
+        string $mimeType,
+        array $body = []
+    ): array {
+        $timestamp = time();
+
+        $query = [
+            'partner_id'   => (int) $this->partnerId($store),
+            'timestamp'    => $timestamp,
+            'access_token' => $this->accessToken($store),
+            'shop_id'      => (int) $this->shopId($store),
+            'sign'         => $this->sign($store, $path, $timestamp),
+        ];
+
+        $response = Http::connectTimeout(10)
+            ->timeout(60)
+            ->attach($field, $contents, $filename, ['Content-Type' => $mimeType])
+            ->post($this->baseUrl($store) . $path . '?' . http_build_query($query), $body);
 
         return $this->withHttpMeta($response);
     }
@@ -1431,6 +1463,42 @@ class ShopeeChannel implements MarketplaceChannel
         ]);
     }
 
+    /**
+     * Upload satu gambar ke media space Shopee.
+     */
+    public function uploadProductImage(
+        Store $store,
+        string $contents,
+        string $filename,
+        string $mimeType
+    ): array {
+        return $this->resilientRequest(
+            $store,
+            fn () => $this->doMultipartPost(
+                $store,
+                '/api/v2/media_space/upload_image',
+                'image',
+                $contents,
+                $filename,
+                $mimeType,
+            ),
+            false
+        );
+    }
+
+    /**
+     * Update urutan gallery produk.
+     */
+    public function updateProductImages(Store $store, int $itemId, array $imageIds): array
+    {
+        return $this->post($store, '/api/v2/product/update_item', [
+            'item_id' => $itemId,
+            'image' => [
+                'image_id_list' => array_values($imageIds),
+            ],
+        ]);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Discount APIs (Shopee v2.discount)
     // ─────────────────────────────────────────────────────────────────────────
@@ -1568,6 +1636,33 @@ class ShopeeChannel implements MarketplaceChannel
         return $this->get($store, '/api/v2/product/get_category', [
             'language' => $language,
         ]);
+    }
+
+    /**
+     * Atribut wajib dan pilihan atribut berdasarkan kategori.
+     */
+    public function getProductAttributeTree(Store $store, int $categoryId, string $language = 'id'): array
+    {
+        return $this->get($store, '/api/v2/product/get_attribute_tree', [
+            'category_id' => $categoryId,
+            'language' => $language,
+        ]);
+    }
+
+    /**
+     * Channel logistik yang tersedia untuk toko.
+     */
+    public function getProductLogistics(Store $store): array
+    {
+        return $this->get($store, '/api/v2/logistics/get_channel_list');
+    }
+
+    /**
+     * Publish item baru ke Shopee.
+     */
+    public function addProduct(Store $store, array $payload): array
+    {
+        return $this->post($store, '/api/v2/product/add_item', $payload);
     }
 
     // ─── Boost / Naikkan Produk ───────────────────────────────────────────────

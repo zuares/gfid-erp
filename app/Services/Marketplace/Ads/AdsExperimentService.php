@@ -288,6 +288,36 @@ class AdsExperimentService
         ]);
     }
 
+    /**
+     * Keluarkan satu record dari evaluasi tanpa menghapus histori audit.
+     * Ini dipakai ketika user tidak sengaja mencatat perubahan creative ganda.
+     */
+    public function invalidate(
+        MarketplaceAdExperiment $experiment,
+        string $reason,
+        ?int $invalidatedBy = null,
+    ): MarketplaceAdExperiment {
+        if ($experiment->invalidated_at) {
+            return $experiment->refresh();
+        }
+
+        $flags = array_values(array_unique(array_merge(
+            $experiment->data_quality_flags ?? [],
+            ['invalidated']
+        )));
+
+        $experiment->forceFill([
+            'lifecycle_status' => MarketplaceAdExperiment::STATUS_INVALIDATED,
+            'verdict' => null,
+            'invalidated_at' => now(),
+            'invalidated_by' => $invalidatedBy,
+            'invalidation_reason' => trim($reason),
+            'data_quality_flags' => $flags,
+        ])->save();
+
+        return $experiment->refresh();
+    }
+
     public function activeExperimentForScope(
         Store $store,
         ?string $channelCampaignId,
@@ -301,7 +331,9 @@ class AdsExperimentService
             ->whereNotIn('lifecycle_status', [
                 MarketplaceAdExperiment::STATUS_COMPLETED,
                 MarketplaceAdExperiment::STATUS_CONFOUNDED,
+                MarketplaceAdExperiment::STATUS_INVALIDATED,
             ])
+            ->whereNull('invalidated_at')
             ->whereDate('effective_date', '<=', $date)
             ->orderByDesc('effective_date')
             ->orderByDesc('id')
@@ -323,6 +355,7 @@ class AdsExperimentService
 
         return $this->scopeExperimentQuery($store, $channelCampaignId, $channelItemId)
             ->where('change_type', MarketplaceAdExperiment::CHANGE_TARGET_ROAS)
+            ->whereNull('invalidated_at')
             ->whereDate('changed_at', $date)
             ->orderByDesc('changed_at')
             ->orderByDesc('id')
@@ -376,14 +409,18 @@ class AdsExperimentService
             $effectiveMappingStatus,
         );
         $impact = $this->impactAnalysis($baseline, $observation);
-        $status = $this->lifecycleStatus(
-            $experiment,
-            $baseline,
-            $observation,
-            $completedObservationDays,
-            $conflicts,
-        );
-        $verdict = $this->determineVerdict($impact, $dataSufficiency, $conflicts);
+        $status = $experiment->invalidated_at
+            ? MarketplaceAdExperiment::STATUS_INVALIDATED
+            : $this->lifecycleStatus(
+                $experiment,
+                $baseline,
+                $observation,
+                $completedObservationDays,
+                $conflicts,
+            );
+        $verdict = $experiment->invalidated_at
+            ? 'INCONCLUSIVE'
+            : $this->determineVerdict($impact, $dataSufficiency, $conflicts);
 
         return [
             'experiment' => $experiment,
@@ -432,6 +469,12 @@ class AdsExperimentService
                 'mapping_status' => $effectiveMappingStatus,
                 'actual_profit_ready' => (bool) ($observation['metrics']['actual_profit_ready'] ?? false),
                 'profit_estimated' => (bool) ($observation['metrics']['profit_estimated'] ?? true),
+            ],
+            'invalidation' => [
+                'is_invalidated' => (bool) $experiment->invalidated_at,
+                'invalidated_at' => $experiment->invalidated_at?->timezone($timezone)->toIso8601String(),
+                'invalidated_by' => $experiment->invalidated_by,
+                'reason' => $experiment->invalidation_reason,
             ],
             'calculation_snapshot' => $experiment->calculation_snapshot ?? [],
         ];
@@ -1042,6 +1085,7 @@ class AdsExperimentService
             ->where('store_id', $experiment->store_id)
             ->where('id', '!=', $experiment->id)
             ->where('change_event_id', '!=', $experiment->change_event_id)
+            ->whereNull('invalidated_at')
             ->whereBetween('changed_at', [
                 $effectiveDate->copy()->startOfDay(),
                 $observationWindowEnd->copy()->endOfDay(),

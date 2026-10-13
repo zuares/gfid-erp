@@ -202,6 +202,18 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
 
     // Produk Marketplace
     Route::get('/products',                        [\App\Http\Controllers\MarketplaceProductController::class, 'index']);
+    Route::get('/products/create/options',         [\App\Http\Controllers\MarketplaceProductController::class, 'createOptions']);
+    Route::post('/products/create/categories',     [\App\Http\Controllers\MarketplaceProductController::class, 'createCategories'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/products/create/attributes',     [\App\Http\Controllers\MarketplaceProductController::class, 'createAttributes'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/products/create/logistics',      [\App\Http\Controllers\MarketplaceProductController::class, 'createLogistics'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/products/create/images/upload',  [\App\Http\Controllers\MarketplaceProductController::class, 'uploadCreateImages'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/products/create/publish',        [\App\Http\Controllers\MarketplaceProductController::class, 'publishCreate'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/products/{product}/edit',         [\App\Http\Controllers\MarketplaceProductController::class, 'edit']);
     Route::post('/products/sync',                  [\App\Http\Controllers\MarketplaceProductController::class, 'sync'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/products/auto-map',              [\App\Http\Controllers\MarketplaceProductController::class, 'autoMap'])
@@ -212,6 +224,10 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/products/{product}/base-info',  [\App\Http\Controllers\MarketplaceProductController::class, 'updateBaseInfo'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/products/{product}/images',      [\App\Http\Controllers\MarketplaceProductController::class, 'updateImages'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/products/{product}/images/upload', [\App\Http\Controllers\MarketplaceProductController::class, 'uploadImages'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/products/{product}/unlist',      [\App\Http\Controllers\MarketplaceProductController::class, 'toggleUnlist'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/products/{product}/sku',         [\App\Http\Controllers\MarketplaceProductController::class, 'updateSku'])
@@ -220,6 +236,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/products/{product}/orders',         [\App\Http\Controllers\MarketplaceProductController::class, 'orders']);
     Route::get('/products/{product}/history',      [\App\Http\Controllers\MarketplaceProductController::class, 'history']);
+    Route::get('/products/{product}/change-logs', [\App\Http\Controllers\MarketplaceProductController::class, 'changeLogs']);
 
     // Promosi / Diskon
     Route::get('/promotions',                         [MarketplaceController::class, 'promotionsIndex']);

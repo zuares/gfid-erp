@@ -413,6 +413,46 @@ class AdsExperimentPhase2Test extends TestCase
         $this->assertSame(30.0, (float) $details['baseline']['metrics']['hpp']);
     }
 
+    public function test_experiment_can_be_invalidated_without_deleting_audit_record(): void
+    {
+        $store = $this->store('PHASE3-INVALIDATE');
+        $item = Item::create([
+            'code' => 'PHASE3-ITEM-INVALIDATE',
+            'name' => 'Phase 3 Invalidate Item',
+            'type' => 'finished',
+            'hpp' => 20,
+            'active' => true,
+        ]);
+        $experiment = $this->experiment($store, $item, [
+            'channel_campaign_id' => 'C-PHASE3-INVALIDATE',
+            'channel_item_id' => 'ITEM-PHASE3-INVALIDATE',
+            'changed_at' => now(),
+            'effective_date' => now()->toDateString(),
+        ]);
+
+        $this->actingAs($this->user())
+            ->postJson(route('marketplace.ads.experiments.invalidate', ['experiment' => $experiment]), [
+                'reason' => 'Foto #2 dan #3 tercatat bersamaan.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.experiment_id', $experiment->id)
+            ->assertJsonPath('data.lifecycle_status', MarketplaceAdExperiment::STATUS_INVALIDATED);
+
+        $experiment->refresh();
+        $this->assertNotNull($experiment->invalidated_at);
+        $this->assertSame(MarketplaceAdExperiment::STATUS_INVALIDATED, $experiment->lifecycle_status);
+        $this->assertSame('Foto #2 dan #3 tercatat bersamaan.', $experiment->invalidation_reason);
+        $this->assertNull(
+            app(\App\Services\Marketplace\Ads\AdsExperimentService::class)
+                ->activeExperimentForScope($store, 'C-PHASE3-INVALIDATE', 'ITEM-PHASE3-INVALIDATE')
+        );
+
+        $details = app(\App\Services\Marketplace\Ads\AdsExperimentService::class)->details($experiment);
+        $this->assertSame(MarketplaceAdExperiment::STATUS_INVALIDATED, $details['lifecycle_status']);
+        $this->assertTrue($details['invalidation']['is_invalidated']);
+        $this->assertSame('INCONCLUSIVE', $details['verdict']);
+    }
+
     private function store(string $code): Store
     {
         $channel = Channel::firstOrCreate(['code' => 'shopee'], ['name' => 'Shopee']);

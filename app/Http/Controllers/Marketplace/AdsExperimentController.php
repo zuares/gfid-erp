@@ -132,6 +132,29 @@ class AdsExperimentController extends Controller
         ]);
     }
 
+    public function invalidate(Request $request, MarketplaceAdExperiment $experiment, AdsExperimentService $experiments): JsonResponse
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        $experiment = $experiments->invalidate(
+            experiment: $experiment,
+            reason: $data['reason'],
+            invalidatedBy: $request->user()?->getAuthIdentifier(),
+        );
+
+        return response()->json([
+            'message' => 'Record experiment di-invalidasi dan tidak lagi dihitung sebagai experiment aktif.',
+            'data' => [
+                'experiment_id' => $experiment->id,
+                'lifecycle_status' => $experiment->lifecycle_status,
+                'invalidated_at' => $experiment->invalidated_at?->toIso8601String(),
+                'reason' => $experiment->invalidation_reason,
+            ],
+        ]);
+    }
+
     public function simulate(Request $request, AdsExperimentService $experiments): JsonResponse
     {
         $data = $request->validate([

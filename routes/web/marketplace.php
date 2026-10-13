@@ -173,6 +173,8 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             ->name('ads.experiments.simulate');
         Route::get('ads-dashboard/experiments/{experiment}', [AdsExperimentController::class, 'show'])
             ->name('ads.experiments.show');
+        Route::post('ads-dashboard/experiments/{experiment}/invalidate', [AdsExperimentController::class, 'invalidate'])
+            ->name('ads.experiments.invalidate');
 
         // Log API Shopee
         Route::get('shopee-api-logs', [\App\Http\Controllers\Marketplace\ShopeeApiLogController::class, 'index'])

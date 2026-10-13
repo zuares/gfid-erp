@@ -113,6 +113,16 @@
     .btn-mini{ font-size:.65rem; padding:2px 8px; border-radius:6px; }
     .prd-caret{ cursor:pointer; user-select:none; color:#64748b; font-size:.8rem; }
     .empty{ padding:2.2rem 1.25rem; text-align:center; color:#64748b; }
+    .prd-edit-gallery{ display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:.65rem; }
+    .prd-edit-image{ position:relative; aspect-ratio:1/1; overflow:hidden; border:1px solid var(--prd-border); border-radius:10px; background:#f8fafc; cursor:grab; }
+    .prd-edit-image:active{ cursor:grabbing; }
+    .prd-edit-image img{ width:100%; height:100%; object-fit:cover; }
+    .prd-edit-image .cover{ position:absolute; left:.35rem; top:.35rem; border-radius:999px; padding:.16rem .4rem; background:#334155; color:#fff; font-size:.62rem; font-weight:700; }
+    .prd-edit-image .image-order{ position:absolute; right:.35rem; bottom:.35rem; border-radius:999px; padding:.12rem .38rem; background:rgba(15,23,42,.75); color:#fff; font-size:.62rem; }
+    .prd-edit-section{ border:1px solid var(--prd-border); border-radius:12px; padding:.8rem; margin-bottom:.75rem; background:rgba(148,163,184,.035); }
+    .prd-edit-section-title{ font-size:.78rem; font-weight:800; margin-bottom:.6rem; color:var(--prd-accent); }
+    .prd-edit-meta{ font-size:.7rem; color:var(--prd-muted); }
+    .prd-edit-readonly{ background:var(--card,#fff)!important; }
 
     /* Autosuggest item untuk SKU varian di tab Bermasalah */
     .variant-sku-suggest{ position:relative; width:180px; }
@@ -244,6 +254,7 @@
         </div>
         <div class="controls">
             <button class="btn btn-pill btn-prd-outline" id="btnAutoMap" onclick="autoMap()">⚡ Auto-map</button>
+            <button class="btn btn-pill btn-prd-outline" onclick="openProductCreate()">＋ Tambah Produk</button>
             <button class="btn btn-pill btn-prd-primary" id="btnSync" onclick="syncProducts()">⟳ Sync Shopee</button>
         </div>
     </div>
@@ -454,6 +465,50 @@
     </div>
 </div>
 
+<div class="modal fade" id="modalProductCreate" tabindex="-1" aria-labelledby="modalProductCreateLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:16px">
+            <div class="modal-header border-0 pb-2">
+                <div>
+                    <h5 class="modal-title fw-bold" id="modalProductCreateLabel">Tambah Produk Baru</h5>
+                    <div class="prd-edit-meta">Wizard terpisah · produk dibuat sebagai UNLIST sampai diverifikasi.</div>
+                </div>
+                <button class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body pt-1" id="productCreateBody">
+                <div class="text-center text-muted py-5">Memuat wizard…</div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <span class="prd-edit-meta me-auto" id="productCreateStatus">Langkah 1 dari 4</span>
+                <button class="btn btn-light border" style="border-radius:999px" id="productCreatePrev" onclick="previousProductCreateStep()" disabled>Kembali</button>
+                <button class="btn btn-primary fw-bold" style="border-radius:999px" id="productCreateNext" onclick="nextProductCreateStep()">Lanjut</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalProductEditor" tabindex="-1" aria-labelledby="modalProductEditorLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:16px">
+            <div class="modal-header border-0 pb-2">
+                <div>
+                    <h5 class="modal-title fw-bold" id="modalProductEditorLabel">Detail Produk</h5>
+                    <div class="prd-edit-meta" id="productEditorSubtitle">Mengambil data terbaru dari Shopee…</div>
+                </div>
+                <button class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body pt-1" id="productEditorBody">
+                <div class="text-center text-muted py-5">Memuat detail produk…</div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <span class="prd-edit-meta me-auto" id="productEditorSaveStatus">Perubahan belum disimpan.</span>
+                <button class="btn btn-primary fw-bold" style="border-radius:999px" id="productEditorSaveBtn" onclick="saveProductEditor()" disabled>Simpan Perubahan</button>
+                <button class="btn btn-light border" style="border-radius:999px" data-bs-dismiss="modal">Tutup</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -472,10 +527,539 @@
     };
 
     async function api(url, opts = {}) {
-        const res = await fetch(url, { headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }, ...opts });
+        const headers = { 'Accept': 'application/json', ...(opts.headers || {}) };
+        if (!(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+        const res = await fetch(url, { ...opts, headers });
         if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message || ('HTTP ' + res.status));
         return res.json();
     }
+
+    let productEditorPid = null;
+    let productEditorData = null;
+    let productEditorImages = [];
+    let productEditorImagesDirty = false;
+    let productCreate = null;
+
+    function emptyProductCreate() {
+        return {
+            step: 1,
+            stores: [],
+            storeId: '',
+            categories: [],
+            categoryId: '',
+            attributes: [],
+            attributeList: [],
+            logistics: [],
+            selectedLogistics: [],
+            logisticsLoaded: false,
+            files: [],
+            images: [],
+            itemName: '', itemSku: '', description: '',
+            price: '', stock: '', weight: '',
+            length: '', width: '', height: '',
+            status: 'UNLIST',
+            publishing: false,
+        };
+    }
+
+    function flattenCreateCategories(nodes, level = 0, rows = []) {
+        (nodes || []).forEach(node => {
+            rows.push({ id: node.category_id ?? node.id, name: `${'— '.repeat(level)}${node.category_name ?? node.name ?? 'Kategori'}` });
+            flattenCreateCategories(node.children || node.sub_category_list || node.category_list || [], level + 1, rows);
+        });
+        return rows;
+    }
+
+    function createStepStatus() {
+        const labels = ['Toko & kategori', 'Atribut', 'Konten', 'Gambar & logistik'];
+        return `${labels[productCreate.step - 1] || 'Preview'} · Langkah ${productCreate.step} dari 4`;
+    }
+
+    function createAttributeValue(attr) {
+        const values = attr.attribute_value_list || attr.value_list || [];
+        if (values.length) {
+            return `<select class="form-select form-select-sm" data-create-attr="${esc(attr.attribute_id)}">
+                <option value="">Pilih nilai…</option>
+                ${values.map(value => `<option value="${esc(value.value_id ?? 0)}" data-original="${esc(value.original_value_name ?? value.value_name ?? '')}">${esc(value.original_value_name ?? value.value_name ?? 'Nilai')}</option>`).join('')}
+            </select>`;
+        }
+        return `<input class="form-control form-control-sm" data-create-attr="${esc(attr.attribute_id)}" placeholder="Isi ${esc(attr.attribute_name || 'nilai atribut')}">`;
+    }
+
+    function renderProductCreate() {
+        if (!productCreate) return;
+        const body = $('productCreateBody');
+        let html = '';
+
+        if (productCreate.step === 1) {
+            html = `<div class="prd-edit-section">
+                <div class="prd-edit-section-title">1. Pilih toko dan kategori</div>
+                <label class="form-label small fw-bold">Toko Shopee</label>
+                <select class="form-select mb-3" id="createStoreSelect" onchange="onProductCreateStoreChange(this.value)">
+                    <option value="">Pilih toko…</option>
+                    ${productCreate.stores.map(store => `<option value="${store.id}" ${String(store.id) === String(productCreate.storeId) ? 'selected' : ''}>${esc(store.name)} (${esc(store.code)})</option>`).join('')}
+                </select>
+                <label class="form-label small fw-bold">Kategori Shopee</label>
+                <select class="form-select" id="createCategorySelect" onchange="productCreate.categoryId=this.value" ${productCreate.categories.length ? '' : 'disabled'}>
+                    <option value="">${productCreate.storeId ? (productCreate.categories.length ? 'Pilih kategori…' : 'Memuat kategori…') : 'Pilih toko terlebih dahulu'}</option>
+                    ${productCreate.categories.map(category => `<option value="${esc(category.id)}" ${String(category.id) === String(productCreate.categoryId) ? 'selected' : ''}>${esc(category.name)}</option>`).join('')}
+                </select>
+            </div>`;
+        } else if (productCreate.step === 2) {
+            html = `<div class="prd-edit-section">
+                <div class="prd-edit-section-title">2. Atribut wajib kategori</div>
+                <div class="prd-edit-meta mb-3">Isi atribut yang ditandai wajib. Atribut lanjutan/varian khusus akan dilanjutkan pada tahap berikutnya.</div>
+                ${productCreate.attributes.length ? productCreate.attributes.map(attr => `<div class="mb-3">
+                    <label class="form-label small fw-bold">${esc(attr.attribute_name || 'Atribut')} ${attr.is_mandatory ? '<span class="text-danger">*</span>' : ''}</label>
+                    ${createAttributeValue(attr)}
+                </div>`).join('') : '<div class="text-muted small">Tidak ada atribut wajib yang dikembalikan untuk kategori ini.</div>'}
+            </div>`;
+        } else if (productCreate.step === 3) {
+            if (!productCreate.logisticsLoaded && !productCreate.loadingLogistics && productCreate.storeId) {
+                productCreate.loadingLogistics = true;
+                api(`${API}/create/logistics`, { method: 'POST', body: JSON.stringify({ store_id: productCreate.storeId }) })
+                    .then(result => {
+                        productCreate.logistics = result.response?.logistics_channel_list || result.logistics_channel_list || [];
+                        const enabled = productCreate.logistics.filter(item => item.enabled).map(item => String(item.logistics_channel_id ?? item.logistic_id));
+                        productCreate.selectedLogistics = enabled.length ? enabled : (productCreate.logistics[0] ? [String(productCreate.logistics[0].logistics_channel_id ?? productCreate.logistics[0].logistic_id)] : []);
+                        productCreate.logisticsLoaded = true;
+                        renderProductCreate();
+                    })
+                    .catch(error => { productCreate.loadingLogistics = false; alert(error.message); });
+            }
+            html = `<div class="prd-edit-section">
+                <div class="prd-edit-section-title">3. Konten, harga, stok, dan paket</div>
+                <div class="row g-2">
+                    <div class="col-md-8"><label class="form-label small fw-bold">Nama produk</label><input class="form-control form-control-sm" id="createItemName" value="${esc(productCreate.itemName)}" maxlength="255"></div>
+                    <div class="col-md-4"><label class="form-label small fw-bold">SKU</label><input class="form-control form-control-sm" id="createItemSku" value="${esc(productCreate.itemSku)}" maxlength="100"></div>
+                    <div class="col-12"><label class="form-label small fw-bold">Deskripsi</label><textarea class="form-control form-control-sm" id="createDescription" rows="4" maxlength="3000">${esc(productCreate.description)}</textarea></div>
+                    <div class="col-md-3"><label class="form-label small fw-bold">Harga</label><input type="number" min="100" class="form-control form-control-sm" id="createPrice" value="${esc(productCreate.price)}"></div>
+                    <div class="col-md-3"><label class="form-label small fw-bold">Stok</label><input type="number" min="0" class="form-control form-control-sm" id="createStock" value="${esc(productCreate.stock)}"></div>
+                    <div class="col-md-3"><label class="form-label small fw-bold">Berat (kg)</label><input type="number" step="0.001" min="0.001" class="form-control form-control-sm" id="createWeight" value="${esc(productCreate.weight)}"></div>
+                    <div class="col-md-3"><label class="form-label small fw-bold">Status awal</label><select class="form-select form-select-sm" id="createStatus"><option value="UNLIST" ${productCreate.status === 'UNLIST' ? 'selected' : ''}>UNLIST (aman)</option><option value="NORMAL" ${productCreate.status === 'NORMAL' ? 'selected' : ''}>NORMAL</option></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-bold">Panjang (cm)</label><input type="number" min="1" class="form-control form-control-sm" id="createLength" value="${esc(productCreate.length)}"></div>
+                    <div class="col-md-4"><label class="form-label small fw-bold">Lebar (cm)</label><input type="number" min="1" class="form-control form-control-sm" id="createWidth" value="${esc(productCreate.width)}"></div>
+                    <div class="col-md-4"><label class="form-label small fw-bold">Tinggi (cm)</label><input type="number" min="1" class="form-control form-control-sm" id="createHeight" value="${esc(productCreate.height)}"></div>
+                </div>
+            </div>
+            <div class="prd-edit-section">
+                <div class="prd-edit-section-title">4. Gambar dan logistik</div>
+                <input type="file" class="form-control form-control-sm mb-2" id="createImages" accept="image/jpeg,image/png" multiple onchange="productCreate.files=Array.from(this.files || [])">
+                <div class="prd-edit-meta mb-2">Maksimal 9 gambar, JPG/PNG, 5 MB per file.</div>
+                <div class="row g-2">${productCreate.logistics.length ? productCreate.logistics.map(item => {
+                    const id = String(item.logistics_channel_id ?? item.logistic_id ?? '');
+                    const name = item.logistics_channel_name ?? item.logistic_name ?? `Logistik ${id}`;
+                    return `<div class="col-md-6"><label class="border rounded p-2 d-flex gap-2 align-items-center small"><input type="checkbox" data-create-logistic="${esc(id)}" ${productCreate.selectedLogistics.includes(id) ? 'checked' : ''}> <span>${esc(name)} <span class="text-muted">(${esc(id)})</span></span></label></div>`;
+                }).join('') : `<div class="col-12 text-muted small">${productCreate.loadingLogistics ? 'Memuat channel logistik…' : 'Channel logistik belum tersedia.'}</div>`}</div>
+            </div>`;
+        } else {
+            const selectedLogistics = productCreate.selectedLogistics.length ? productCreate.selectedLogistics.join(', ') : 'Belum dipilih';
+            html = `<div class="prd-edit-section">
+                <div class="prd-edit-section-title">Preview sebelum publish</div>
+                <dl class="row small mb-0"><dt class="col-sm-3">Toko</dt><dd class="col-sm-9">${esc(productCreate.stores.find(s => String(s.id) === String(productCreate.storeId))?.name || '—')}</dd><dt class="col-sm-3">Kategori</dt><dd class="col-sm-9">${esc(productCreate.categories.find(c => String(c.id) === String(productCreate.categoryId))?.name || productCreate.categoryId)}</dd><dt class="col-sm-3">Nama / SKU</dt><dd class="col-sm-9">${esc(productCreate.itemName)} / ${esc(productCreate.itemSku || '—')}</dd><dt class="col-sm-3">Harga / stok</dt><dd class="col-sm-9">${rp(productCreate.price)} / ${esc(productCreate.stock)}</dd><dt class="col-sm-3">Gambar</dt><dd class="col-sm-9">${productCreate.images.length} gambar</dd><dt class="col-sm-3">Logistik</dt><dd class="col-sm-9">${esc(selectedLogistics)}</dd></dl>
+                <div class="alert alert-warning small mt-3 mb-0">Produk akan dibuat sebagai <strong>${esc(productCreate.status)}</strong>. Publish tidak mengubah campaign atau eksperimen iklan.</div>
+            </div>`;
+        }
+
+        body.innerHTML = html;
+        $('productCreateStatus').textContent = createStepStatus();
+        $('productCreatePrev').disabled = productCreate.step <= 1 || productCreate.publishing;
+        $('productCreateNext').disabled = productCreate.publishing;
+        $('productCreateNext').textContent = productCreate.step === 4 ? 'Publish ke Shopee' : 'Lanjut';
+    }
+
+    window.openProductCreate = async function () {
+        productCreate = emptyProductCreate();
+        $('productCreateBody').innerHTML = '<div class="text-center text-muted py-5">Memuat toko Shopee…</div>';
+        bootstrap.Modal.getOrCreateInstance($('modalProductCreate')).show();
+        try {
+            const result = await api(`${API}/create/options`);
+            productCreate.stores = result.stores || [];
+            renderProductCreate();
+        } catch (error) {
+            $('productCreateBody').innerHTML = `<div class="alert alert-danger">${esc(error.message)}</div>`;
+        }
+    };
+
+    window.onProductCreateStoreChange = async function (storeId) {
+        productCreate.storeId = storeId;
+        productCreate.categories = [];
+        productCreate.categoryId = '';
+        productCreate.logistics = [];
+        productCreate.logisticsLoaded = false;
+        renderProductCreate();
+        if (!storeId) return;
+        try {
+            const result = await api(`${API}/create/categories`, { method: 'POST', body: JSON.stringify({ store_id: storeId }) });
+            productCreate.categories = flattenCreateCategories(result.response?.category_list || result.category_list || []);
+            renderProductCreate();
+        } catch (error) { alert(error.message); }
+    };
+
+    function collectProductCreateAttributes() {
+        const list = [];
+        document.querySelectorAll('[data-create-attr]').forEach(input => {
+            const attr = productCreate.attributes.find(item => String(item.attribute_id) === String(input.dataset.createAttr));
+            if (!attr || !input.value) return;
+            const option = input.selectedOptions?.[0];
+            list.push({
+                attribute_id: Number(attr.attribute_id),
+                attribute_value_list: [{
+                    value_id: Number(input.value) || 0,
+                    original_value_name: option?.dataset.original || input.value,
+                }],
+            });
+        });
+        return list;
+    }
+
+    function collectProductCreateContent() {
+        productCreate.itemName = $('createItemName')?.value.trim() || productCreate.itemName;
+        productCreate.itemSku = $('createItemSku')?.value.trim() || '';
+        productCreate.description = $('createDescription')?.value || productCreate.description;
+        productCreate.price = $('createPrice')?.value || productCreate.price;
+        productCreate.stock = $('createStock')?.value || productCreate.stock;
+        productCreate.weight = $('createWeight')?.value || productCreate.weight;
+        productCreate.length = $('createLength')?.value || productCreate.length;
+        productCreate.width = $('createWidth')?.value || productCreate.width;
+        productCreate.height = $('createHeight')?.value || productCreate.height;
+        productCreate.status = $('createStatus')?.value || productCreate.status;
+        productCreate.selectedLogistics = Array.from(document.querySelectorAll('[data-create-logistic]:checked')).map(input => input.dataset.createLogistic);
+    }
+
+    async function loadProductCreateAttributes() {
+        const result = await api(`${API}/create/attributes`, { method: 'POST', body: JSON.stringify({ store_id: productCreate.storeId, category_id: productCreate.categoryId }) });
+        productCreate.attributes = result.response?.attribute_list || result.attribute_list || [];
+    }
+
+    async function uploadProductCreateImages() {
+        if (productCreate.images.length) return;
+        if (!productCreate.files.length) throw new Error('Pilih minimal satu gambar produk.');
+        const form = new FormData();
+        form.append('store_id', productCreate.storeId);
+        productCreate.files.forEach(file => form.append('images[]', file, file.name));
+        const result = await api(`${API}/create/images/upload`, { method: 'POST', body: form });
+        productCreate.images = result.images || [];
+        productCreate.files = [];
+    }
+
+    window.nextProductCreateStep = async function () {
+        if (!productCreate || productCreate.publishing) return;
+        try {
+            if (productCreate.step === 1) {
+                if (!productCreate.storeId || !productCreate.categoryId) throw new Error('Pilih toko dan kategori terlebih dahulu.');
+                await loadProductCreateAttributes();
+                productCreate.step = 2;
+            } else if (productCreate.step === 2) {
+                productCreate.attributeList = collectProductCreateAttributes();
+                productCreate.step = 3;
+            } else if (productCreate.step === 3) {
+                collectProductCreateContent();
+                if (!productCreate.itemName || !productCreate.description || Number(productCreate.price) < 100 || Number(productCreate.weight) <= 0) throw new Error('Lengkapi nama, deskripsi, harga, dan berat.');
+                if (!productCreate.length || !productCreate.width || !productCreate.height) throw new Error('Lengkapi dimensi paket.');
+                if (!productCreate.selectedLogistics.length) throw new Error('Pilih minimal satu channel logistik.');
+                await uploadProductCreateImages();
+                productCreate.step = 4;
+            } else {
+                productCreate.publishing = true;
+                renderProductCreate();
+                const result = await api(`${API}/create/publish`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        store_id: productCreate.storeId,
+                        item_name: productCreate.itemName,
+                        item_sku: productCreate.itemSku || null,
+                        description: productCreate.description,
+                        category_id: productCreate.categoryId,
+                        image_ids: productCreate.images.map(image => image.image_id),
+                        original_price: Number(productCreate.price),
+                        stock: Number(productCreate.stock),
+                        weight: Number(productCreate.weight),
+                        dimension: { package_length: Number(productCreate.length), package_width: Number(productCreate.width), package_height: Number(productCreate.height) },
+                        logistic_info: productCreate.selectedLogistics.map(id => ({ logistic_id: Number(id), enabled: true, is_free: false })),
+                        attribute_list: productCreate.attributeList,
+                        item_status: productCreate.status,
+                    }),
+                });
+                productCreate.publishing = false;
+                toast(result.warning || `Produk berhasil dibuat. Item ID ${result.item_id || '—'}`, result.warning ? 'warning' : 'success');
+                bootstrap.Modal.getOrCreateInstance($('modalProductCreate')).hide();
+                if (typeof loadProducts === 'function') loadProducts();
+                return;
+            }
+            renderProductCreate();
+        } catch (error) {
+            productCreate.publishing = false;
+            renderProductCreate();
+            alert(error.message || 'Wizard produk gagal dilanjutkan.');
+        }
+    };
+
+    window.previousProductCreateStep = function () {
+        if (!productCreate || productCreate.step <= 1 || productCreate.publishing) return;
+        if (productCreate.step === 3) collectProductCreateContent();
+        productCreate.step -= 1;
+        renderProductCreate();
+    };
+
+    function productEditorImageHtml(image, index) {
+        const url = image?.file ? URL.createObjectURL(image.file) : (image?.image_url || '');
+        const label = image?.file ? image.file.name : (image?.image_id || 'Shopee');
+        return `<div class="prd-edit-image" draggable="true" ondragstart="dragProductEditorImage(event, ${index})" ondragover="event.preventDefault()" ondrop="dropProductEditorImage(event, ${index})">
+            ${url ? `<img src="${esc(url)}" loading="lazy" alt="Gambar ${index + 1}">` : '<div class="d-flex h-100 align-items-center justify-content-center text-muted" style="font-size:.7rem">Preview tidak tersedia</div>'}
+            ${index === 0 ? '<span class="cover">★ Cover</span>' : ''}
+            <span class="image-order">#${index + 1}</span>
+            <div class="position-absolute bottom-0 start-0 end-0 d-flex gap-1 p-1" style="background:linear-gradient(transparent,rgba(15,23,42,.86))">
+                <button type="button" class="btn btn-light btn-sm py-0 px-1" title="Naik" onclick="moveProductEditorImage(${index}, -1)" ${index === 0 ? 'disabled' : ''}>↑</button>
+                <button type="button" class="btn btn-light btn-sm py-0 px-1" title="Turun" onclick="moveProductEditorImage(${index}, 1)" ${index === productEditorImages.length - 1 ? 'disabled' : ''}>↓</button>
+                ${index !== 0 ? `<button type="button" class="btn btn-warning btn-sm py-0 px-1" title="Jadikan gambar utama" onclick="makeProductEditorCover(${index})">★</button>` : ''}
+                <button type="button" class="btn btn-danger btn-sm py-0 px-1 ms-auto" title="Hapus" onclick="removeProductEditorImage(${index})">×</button>
+            </div>
+            <div class="position-absolute top-0 start-0 end-0 p-1 text-truncate" style="font-size:.58rem;color:#fff;background:rgba(15,23,42,.65)" title="${esc(label)}">${esc(label)}</div>
+        </div>`;
+    }
+
+    function renderProductEditorGallery() {
+        const gallery = $('productEditorGallery');
+        if (!gallery) return;
+        gallery.innerHTML = productEditorImages.length
+            ? productEditorImages.map(productEditorImageHtml).join('')
+            : '<div class="text-muted" style="font-size:.75rem">Belum ada gambar. Pilih minimal satu gambar sebelum menyimpan.</div>';
+        const count = $('productEditorImageCount');
+        if (count) count.textContent = `(${productEditorImages.length}/9 gambar)`;
+    }
+
+    function renderProductEditor(data) {
+        const product = data.product || {};
+        const models = data.models || [];
+        productEditorData = data;
+        productEditorPid = product.local_id;
+        productEditorImagesDirty = false;
+        productEditorImages = (data.images || []).map(image => ({ ...image, file: null }));
+        $('modalProductEditorLabel').textContent = product.item_name || 'Edit Produk';
+        $('productEditorSubtitle').textContent = `${product.store_name || 'Toko'} · Item ID ${product.item_id || '—'} · Fresh ${orderDate(data.source?.fetched_at)}`;
+
+        const modelRows = models.length
+            ? models.map(model => {
+                const price = model.original_price ?? model.current_price ?? '';
+                return `<tr data-model-id="${esc(model.model_id || '0')}" data-original-price="${esc(price)}" data-original-stock="${esc(model.stock ?? 0)}" data-original-sku="${esc(model.model_sku || '')}">
+                    <td>${esc(model.model_name || 'Produk')}</td>
+                    <td><input class="form-control form-control-sm editor-model-sku" value="${esc(model.model_sku || '')}" maxlength="100" placeholder="SKU"></td>
+                    <td class="text-muted">${esc(model.model_id || '0')}</td>
+                    <td><input type="number" min="100" step="1" class="form-control form-control-sm text-end editor-model-price" value="${esc(price)}"></td>
+                    <td><input type="number" min="0" step="1" class="form-control form-control-sm text-end editor-model-stock" value="${esc(model.stock ?? 0)}"></td>
+                </tr>`;
+            }).join('')
+            : '<tr><td colspan="5" class="text-center text-muted">Data varian tidak tersedia</td></tr>';
+
+        $('productEditorBody').innerHTML = `
+            <div class="prd-edit-section">
+                <div class="prd-edit-section-title">Informasi Produk</div>
+                <div class="row">
+                    <div class="col-md-8 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">NAMA PRODUK</label><input class="form-control form-control-sm" id="editorItemName" maxlength="255" value="${esc(product.item_name || '')}"></div>
+                    <div class="col-md-4 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">SKU INDUK</label><input class="form-control form-control-sm" id="editorItemSku" maxlength="100" value="${esc(product.item_sku || '')}"></div>
+                    <div class="col-md-6 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">STATUS</label><input class="form-control form-control-sm prd-edit-readonly" value="${esc(product.item_status || '—')}" readonly></div>
+                    <div class="col-md-6 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">KATEGORI ID</label><input class="form-control form-control-sm prd-edit-readonly" value="${esc(product.category_id || '—')}" readonly></div>
+                </div>
+                <label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">DESKRIPSI</label>
+                <textarea class="form-control form-control-sm" id="editorDescription" rows="5" maxlength="3000">${esc(product.description || '')}</textarea>
+            </div>
+
+            <div class="prd-edit-section">
+                <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                    <div class="prd-edit-section-title mb-0">Gallery Produk <span class="prd-edit-meta" id="productEditorImageCount">(0/9 gambar)</span></div>
+                    <label class="btn btn-sm btn-outline-primary mb-0" style="border-radius:999px;cursor:pointer">+ Tambah gambar<input type="file" id="productEditorImageInput" accept="image/jpeg,image/png" multiple hidden onchange="addProductEditorImages(event)"></label>
+                </div>
+                <div class="prd-edit-meta mb-2">Drag-and-drop atau gunakan ↑/↓ untuk mengatur urutan. Gambar pertama menjadi cover; tombol × menghapus dari listing saat disimpan.</div>
+                <div class="prd-edit-gallery" id="productEditorGallery"></div>
+            </div>
+
+            <div class="prd-edit-section">
+                <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                    <div class="prd-edit-section-title mb-0">Varian, Harga, Stok, dan SKU</div>
+                    <span class="prd-edit-meta">Harga minimum Rp100</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0" style="font-size:.72rem">
+                        <thead><tr><th>Varian</th><th>SKU</th><th>Model ID</th><th>Harga</th><th>Stok</th></tr></thead>
+                        <tbody id="productEditorModels">${modelRows}</tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="prd-edit-section mb-0">
+                <div class="prd-edit-section-title">Catatan</div>
+                <div class="prd-edit-meta">Simpan akan mengirim hanya perubahan yang terdeteksi. Perubahan gallery meng-upload file baru ke Shopee lalu menyimpan daftar image ID final.</div>
+            </div>`;
+
+        renderProductEditorGallery();
+        $('productEditorSaveBtn').disabled = false;
+        $('productEditorSaveStatus').textContent = 'Perubahan belum disimpan.';
+    }
+
+    window.addProductEditorImages = function (event) {
+        const selected = Array.from(event.target.files || []);
+        if (productEditorImages.length + selected.length > 9) {
+            alert('Maksimal 9 gambar produk.');
+            event.target.value = '';
+            return;
+        }
+        productEditorImages.push(...selected.map(file => ({ image_id: null, image_url: null, file })));
+        productEditorImagesDirty = true;
+        event.target.value = '';
+        renderProductEditorGallery();
+    };
+
+    window.removeProductEditorImage = function (index) {
+        productEditorImages.splice(index, 1);
+        productEditorImagesDirty = true;
+        renderProductEditorGallery();
+    };
+
+    window.moveProductEditorImage = function (index, direction) {
+        const target = index + direction;
+        if (target < 0 || target >= productEditorImages.length) return;
+        [productEditorImages[index], productEditorImages[target]] = [productEditorImages[target], productEditorImages[index]];
+        productEditorImagesDirty = true;
+        renderProductEditorGallery();
+    };
+
+    let productEditorDragIndex = null;
+    window.dragProductEditorImage = function (event, index) {
+        productEditorDragIndex = index;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', String(index));
+    };
+
+    window.dropProductEditorImage = function (event, targetIndex) {
+        event.preventDefault();
+        const sourceIndex = productEditorDragIndex ?? Number(event.dataTransfer.getData('text/plain'));
+        productEditorDragIndex = null;
+        if (!Number.isInteger(sourceIndex) || sourceIndex === targetIndex || sourceIndex < 0 || targetIndex < 0) return;
+        const [moved] = productEditorImages.splice(sourceIndex, 1);
+        productEditorImages.splice(targetIndex, 0, moved);
+        productEditorImagesDirty = true;
+        renderProductEditorGallery();
+    };
+
+    window.makeProductEditorCover = function (index) {
+        if (index <= 0 || index >= productEditorImages.length) return;
+        const [cover] = productEditorImages.splice(index, 1);
+        productEditorImages.unshift(cover);
+        productEditorImagesDirty = true;
+        renderProductEditorGallery();
+    };
+
+    async function saveProductEditorImages() {
+        if (!productEditorImagesDirty) return null;
+        if (!productEditorImages.length) throw new Error('Gallery harus memiliki minimal satu gambar.');
+
+        const pending = productEditorImages.filter(image => image.file);
+        if (pending.length) {
+            const uploadBody = new FormData();
+            pending.forEach(image => uploadBody.append('images[]', image.file, image.file.name));
+            const uploadResult = await api(`${API}/${productEditorPid}/images/upload`, { method: 'POST', body: uploadBody });
+            const uploaded = uploadResult.images || [];
+            if (uploaded.length !== pending.length) throw new Error('Sebagian file tidak mendapatkan image ID dari Shopee.');
+
+            let uploadedIndex = 0;
+            productEditorImages = productEditorImages.map(image => {
+                if (!image.file) return image;
+                const remote = uploaded[uploadedIndex++];
+                return { ...image, ...remote, file: null };
+            });
+            renderProductEditorGallery();
+        }
+
+        const imageOrder = productEditorImages.map(image => image.image_id ? `existing:${image.image_id}` : null).filter(Boolean);
+        if (imageOrder.length !== productEditorImages.length) throw new Error('Ada gambar tanpa image ID yang belum selesai di-upload.');
+        const result = await api(`${API}/${productEditorPid}/images`, {
+            method: 'POST',
+            body: JSON.stringify({ image_order: imageOrder }),
+        });
+        productEditorImagesDirty = false;
+        return result;
+    }
+
+    window.saveProductEditor = async function () {
+        if (!productEditorPid || !productEditorData) return;
+        const button = $('productEditorSaveBtn');
+        const status = $('productEditorSaveStatus');
+        button.disabled = true;
+        status.textContent = 'Menyimpan perubahan ke Shopee…';
+
+        try {
+            const original = productEditorData.product || {};
+            const itemName = $('editorItemName')?.value.trim() || '';
+            const description = $('editorDescription')?.value || '';
+            const itemSku = $('editorItemSku')?.value.trim() || '';
+            const results = [];
+
+            if (itemName !== (original.item_name || '') || description !== (original.description || '')) {
+                results.push(await api(`${API}/${productEditorPid}/base-info`, {
+                    method: 'POST', body: JSON.stringify({ item_name: itemName, description })
+                }));
+            }
+            if (itemSku !== (original.item_sku || '')) {
+                results.push(await api(`${API}/${productEditorPid}/sku`, {
+                    method: 'POST', body: JSON.stringify({ new_sku: itemSku })
+                }));
+            }
+
+            const rows = Array.from(document.querySelectorAll('#productEditorModels tr[data-model-id]'));
+            const priceList = [];
+            const stockList = [];
+            const modelSkuUpdates = [];
+            rows.forEach(row => {
+                const modelId = row.dataset.modelId || '0';
+                const price = Number(row.querySelector('.editor-model-price')?.value);
+                const stock = Number(row.querySelector('.editor-model-stock')?.value);
+                const sku = row.querySelector('.editor-model-sku')?.value.trim() || '';
+                if (Number.isFinite(price) && price !== Number(row.dataset.originalPrice)) priceList.push({ model_id: modelId, original_price: price });
+                if (Number.isInteger(stock) && stock >= 0 && stock !== Number(row.dataset.originalStock)) stockList.push({ model_id: modelId, stock });
+                if (modelId !== '0' && sku !== (row.dataset.originalSku || '')) modelSkuUpdates.push({ model_id: modelId, new_sku: sku });
+            });
+
+            if (priceList.length) results.push(await api(`${API}/${productEditorPid}/price`, { method: 'POST', body: JSON.stringify({ price_list: priceList }) }));
+            if (stockList.length) results.push(await api(`${API}/${productEditorPid}/stock`, { method: 'POST', body: JSON.stringify({ stock_list: stockList }) }));
+            for (const update of modelSkuUpdates) {
+                results.push(await api(`${API}/${productEditorPid}/model-sku`, { method: 'POST', body: JSON.stringify(update) }));
+            }
+            if (productEditorImagesDirty) results.push(await saveProductEditorImages());
+
+            status.textContent = results.length ? 'Perubahan berhasil disimpan. Memuat ulang data terbaru…' : 'Tidak ada perubahan yang terdeteksi.';
+            if (results.length) {
+                const fresh = await api(`${API}/${productEditorPid}/edit`);
+                renderProductEditor(fresh);
+                if (typeof loadProducts === 'function') loadProducts();
+                const warning = results.find(result => result && result.warning)?.warning;
+                toast(warning || 'Perubahan produk berhasil disimpan.', warning ? 'warning' : 'success');
+            }
+        } catch (error) {
+            status.textContent = error.message || 'Gagal menyimpan perubahan.';
+            alert('Gagal menyimpan produk: ' + (error.message || 'Unknown error'));
+        } finally {
+            button.disabled = false;
+        }
+    };
+
+    window.openProductEditor = async function (pid) {
+        const modal = bootstrap.Modal.getOrCreateInstance($('modalProductEditor'));
+        $('modalProductEditorLabel').textContent = 'Detail Produk';
+        $('productEditorSubtitle').textContent = 'Mengambil data terbaru dari Shopee…';
+        $('productEditorBody').innerHTML = '<div class="text-center text-muted py-5">⏳ Memuat detail produk…</div>';
+        $('productEditorSaveBtn').disabled = true;
+        $('productEditorSaveStatus').textContent = 'Memuat data terbaru…';
+        modal.show();
+
+        try {
+            const data = await api(`${API}/${pid}/edit`);
+            renderProductEditor(data);
+        } catch (e) {
+            $('productEditorBody').innerHTML = `<div class="alert alert-danger mb-0" style="font-size:.8rem">${esc(e.message || 'Gagal mengambil detail produk.')}</div>`;
+            $('productEditorSubtitle').textContent = 'Gagal mengambil data terbaru';
+        }
+    };
 
     // ── Data ────────────────────────────────────────────────────────────────
     window.loadProducts = async function () {
@@ -705,6 +1289,7 @@
             let aksiContent = '';
             if (isBermasalahTab) {
                 let issues = [];
+                issues.push(`<button class="btn btn-sm btn-outline-primary w-100 mb-1 py-1" onclick="openProductEditor(${p.id})" style="font-size:.7rem">✎ Detail Produk</button>`);
                 if (p.item_status === 'BANNED') {
                     issues.push(`<a class="btn btn-sm btn-outline-danger w-100 mb-1 py-1" href="https://seller.shopee.co.id/portal/product/${p.item_id}" target="_blank" style="font-size:.7rem">Cek Pelanggaran di Shopee ↗</a>`);
                 }
@@ -740,6 +1325,7 @@
                             ⋮ Aksi
                         </button>
                         <ul class="dropdown-menu shadow-sm" style="font-size: .78rem; min-width: 140px; padding: .3rem 0; border-radius: 8px;">
+                            <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openProductEditor(${p.id})">✎ Detail Produk</a></li>
                             <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="showHistory(${p.id})">📈 Riwayat</a></li>
                             ${st === 'NORMAL' ? `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="boostNow(${p.id}, this)">🚀 Naikkan (Boost)</a></li>` : ''}
                             ${st === 'NORMAL' ? `<li><hr class="dropdown-divider" style="margin: .2rem 0"></li><li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="setUnlist(${p.id}, true)">🙈 Arsipkan Produk</a></li>` : (st === 'UNLIST' ? `<li><hr class="dropdown-divider" style="margin: .2rem 0"></li><li><a class="dropdown-item py-2 text-success" href="javascript:void(0)" onclick="setUnlist(${p.id}, false)">👁 Aktifkan Produk</a></li>` : '')}

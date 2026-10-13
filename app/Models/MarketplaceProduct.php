@@ -31,4 +31,14 @@ class MarketplaceProduct extends Model
     {
         return $this->hasMany(MarketplaceProductModel::class);
     }
+
+    public function images(): HasMany
+    {
+        return $this->hasMany(MarketplaceProductImage::class);
+    }
+
+    public function changeLogs(): HasMany
+    {
+        return $this->hasMany(MarketplaceProductChangeLog::class);
+    }
 }
