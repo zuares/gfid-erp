@@ -3,18 +3,78 @@
 namespace App\Http\Controllers\Marketplace;
 
 use App\Http\Controllers\Controller;
+use App\Models\MarketplaceAdCampaign;
 use App\Models\MarketplaceAdExperiment;
+use App\Models\Store;
 use App\Services\Marketplace\Ads\AdsExperimentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AdsExperimentController extends Controller
 {
+    public function store(Request $request, AdsExperimentService $experiments): JsonResponse
+    {
+        $data = $request->validate([
+            'store_id' => ['required', 'integer', 'exists:stores,id'],
+            'channel_campaign_id' => ['nullable', 'string', 'max:80'],
+            'channel_item_id' => ['nullable', 'string', 'max:80'],
+            'change_type' => ['required', 'in:creative,target_roas,price,budget,title,other'],
+            'before_value' => ['required', 'string', 'max:1000'],
+            'after_value' => ['required', 'string', 'max:1000'],
+            'changed_at' => ['nullable', 'date'],
+            'objective' => ['required', 'string', 'max:255'],
+            'primary_kpi' => ['required', 'in:roas,acos,orders,cvr,profit,gmv,ctr'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'confounders' => ['nullable', 'array', 'max:6'],
+            'confounders.*' => ['string', 'max:40'],
+        ]);
+
+        $store = Store::query()
+            ->where('is_active', true)
+            ->whereHas('channel', fn ($query) => $query->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->findOrFail($data['store_id']);
+
+        $campaignId = $data['channel_campaign_id'] ?? null;
+        $campaign = $campaignId
+            ? MarketplaceAdCampaign::query()
+                ->where('store_id', $store->id)
+                ->where('channel_campaign_id', $campaignId)
+                ->first()
+            : null;
+
+        // Scope campaign harus berasal dari toko yang dipilih. GMS virtual
+        // campaign tidak selalu punya row lokal, sehingga tetap diizinkan.
+        if ($campaignId && ! $campaign && ! str_starts_with((string) $campaignId, 'GMS-')) {
+            return response()->json([
+                'message' => 'Campaign tidak ditemukan pada toko yang dipilih.',
+            ], 422);
+        }
+
+        if ($campaign) {
+            $data['channel_item_id'] = $campaign->channel_item_id;
+        }
+
+        $experiment = $experiments->recordManualChange(
+            store: $store,
+            change: $data,
+            createdBy: $request->user()?->getAuthIdentifier(),
+        );
+
+        return response()->json([
+            'message' => 'Perubahan berhasil dicatat dan masuk ke fase Learning.',
+            'data' => [
+                'experiment_id' => $experiment->id,
+                'change_type' => $experiment->change_type,
+                'lifecycle_status' => $experiment->lifecycle_status,
+            ],
+        ], 201);
+    }
+
     public function index(Request $request, AdsExperimentService $experiments): JsonResponse
     {
         $data = $request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
-            'change_type' => ['nullable', 'in:price,target_roas,price_and_target_roas'],
+            'change_type' => ['nullable', 'in:creative,target_roas,price,budget,title,other,price_and_target_roas'],
             'lifecycle_status' => ['nullable', 'string', 'max:32'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);

@@ -214,6 +214,80 @@ class AdsExperimentService
         ]);
     }
 
+    /**
+     * Catat perubahan manual dari workflow optimasi dashboard.
+     *
+     * Perubahan yang sudah punya integrasi otomatis (harga dan target ROAS)
+     * tetap dicatat oleh action service. Method ini dipakai untuk perubahan
+     * yang dilakukan di luar endpoint tersebut, misalnya foto, budget, judul,
+     * atau perubahan lain yang perlu diberi konteks dan KPI evaluasi.
+     */
+    public function recordManualChange(
+        Store $store,
+        array $change,
+        ?int $createdBy = null,
+    ): MarketplaceAdExperiment {
+        $changeType = (string) ($change['change_type'] ?? 'other');
+        $channelCampaignId = filled($change['channel_campaign_id'] ?? null)
+            ? (string) $change['channel_campaign_id']
+            : null;
+        $channelItemId = filled($change['channel_item_id'] ?? null)
+            ? (string) $change['channel_item_id']
+            : null;
+        $internalItemId = $this->mappedInternalItemId(
+            (int) $store->id,
+            $channelItemId,
+            $channelCampaignId,
+        );
+        $confounders = collect($change['confounders'] ?? [])
+            ->map(fn ($value) => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $beforeValue = trim((string) ($change['before_value'] ?? ''));
+        $afterValue = trim((string) ($change['after_value'] ?? ''));
+        $oldNumeric = is_numeric($beforeValue) ? (float) $beforeValue : null;
+        $newNumeric = is_numeric($afterValue) ? (float) $afterValue : null;
+
+        $snapshot = [
+            'workflow' => 'manual_optimization',
+            'change_label' => match ($changeType) {
+                'creative' => 'Ganti foto / creative',
+                'target_roas' => 'Update target ROAS',
+                'price' => 'Update harga',
+                'budget' => 'Update budget',
+                'title' => 'Update judul/deskripsi',
+                default => 'Perubahan lainnya',
+            },
+            'before' => $beforeValue,
+            'after' => $afterValue,
+            'objective' => trim((string) ($change['objective'] ?? '')),
+            'primary_kpi' => (string) ($change['primary_kpi'] ?? 'roas'),
+            'notes' => trim((string) ($change['notes'] ?? '')),
+            'confounders' => $confounders,
+        ];
+
+        return $this->createExperiment([
+            'store_id' => $store->id,
+            'channel_campaign_id' => $channelCampaignId,
+            'channel_item_id' => $channelItemId,
+            'internal_item_id' => $internalItemId,
+            'change_type' => $changeType,
+            'old_price' => $changeType === MarketplaceAdExperiment::CHANGE_PRICE ? $oldNumeric : null,
+            'new_price' => $changeType === MarketplaceAdExperiment::CHANGE_PRICE ? $newNumeric : null,
+            'old_target_roas' => $changeType === MarketplaceAdExperiment::CHANGE_TARGET_ROAS ? $oldNumeric : null,
+            'new_target_roas' => $changeType === MarketplaceAdExperiment::CHANGE_TARGET_ROAS ? $newNumeric : null,
+            'changed_at' => $change['changed_at'] ?? null,
+            'source_granularity' => $channelItemId ? 'item' : ($channelCampaignId ? 'campaign' : 'store'),
+            'mapping_status' => $internalItemId ? 'mapped' : 'missing_mapping',
+            'confounded' => $confounders !== [],
+            'conflict_reason' => $confounders !== [] ? $confounders : null,
+            'calculation_snapshot' => $snapshot,
+            'created_by' => $createdBy,
+        ]);
+    }
+
     public function activeExperimentForScope(
         Store $store,
         ?string $channelCampaignId,
@@ -521,12 +595,16 @@ class AdsExperimentService
         [$table, $query] = $this->factQuery($experiment, $from, $to);
         $isCampaignFact = $table === 'marketplace_ad_campaign_dailies';
         $isItemFact = $table === 'marketplace_ads_item_dailies';
+        $isStoreFact = $table === 'marketplace_ads_dailies';
+        $spendColumn = $isStoreFact ? 'spend' : 'expense';
+        $ordersColumn = $isStoreFact ? 'orders' : 'broad_order';
+        $revenueColumn = $isStoreFact ? 'gmv' : 'broad_gmv';
         $aggregate = (clone $query)
             ->selectRaw('COALESCE(SUM(impressions), 0) as impressions')
             ->selectRaw('COALESCE(SUM(clicks), 0) as clicks')
-            ->selectRaw('COALESCE(SUM(' . ($isCampaignFact ? 'expense' : 'expense') . '), 0) as spend')
-            ->selectRaw('COALESCE(SUM(' . ($isCampaignFact ? 'broad_order' : 'broad_order') . '), 0) as orders')
-            ->selectRaw('COALESCE(SUM(' . ($isCampaignFact ? 'broad_gmv' : 'broad_gmv') . '), 0) as revenue')
+            ->selectRaw('COALESCE(SUM(' . $spendColumn . '), 0) as spend')
+            ->selectRaw('COALESCE(SUM(' . $ordersColumn . '), 0) as orders')
+            ->selectRaw('COALESCE(SUM(' . $revenueColumn . '), 0) as revenue')
             ->when($isCampaignFact, fn ($q) => $q->selectRaw('COALESCE(SUM(broad_order_amount), 0) as qty_reported'))
             ->first();
         $daysWithData = (int) (clone $query)->distinct()->count('date');

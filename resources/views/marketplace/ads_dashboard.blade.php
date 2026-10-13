@@ -16,6 +16,10 @@
     $lastSuccessRun = $lastSuccessRun ?? null;
     $insightTraffic = $insightTraffic ?? collect();
     $campaigns = $campaigns ?? collect();
+    $evaluationCampaigns = collect($campaigns)
+        ->filter(fn ($campaign) => !empty($campaign->channel_campaign_id))
+        ->unique(fn ($campaign) => $campaign->store_id . '|' . $campaign->channel_campaign_id)
+        ->values();
     $campaignSchedules = collect($campaignSchedules ?? []);
     $integrationStores = collect($integrationStores ?? []);
     $adsSetting = $adsSetting ?? (object)[];
@@ -1798,7 +1802,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ['tab-ltv', 'Customer & LTV', 'bi-person-heart'],
         ]},
         { id: 'grp-experiment', panes: [
-            ['tab-experiments', 'Experiment', 'bi-bezier2'],
+            ['tab-experiments', 'Evaluasi', 'bi-clipboard2-pulse'],
         ]},
         { id: 'grp-control', panes: [
             ['tab-control', 'Control Panel', 'bi-toggles'],
@@ -2576,7 +2580,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button class="dash-tab-m" data-group="grp-profit"><i class="bi bi-cash-coin"></i> Profit</button>
                 <button class="dash-tab-m" data-group="grp-funnel"><i class="bi bi-funnel"></i> Funnel &amp; Creative</button>
                 <button class="dash-tab-m" data-group="grp-ltv"><i class="bi bi-person-heart"></i> Customer &amp; LTV</button>
-                <button class="dash-tab-m" data-group="grp-experiment"><i class="bi bi-bezier2"></i> Experiment</button>
+                <button class="dash-tab-m" data-group="grp-experiment"><i class="bi bi-clipboard2-pulse"></i> Evaluasi</button>
                 <button class="dash-tab-m" data-group="grp-control"><i class="bi bi-toggles"></i> Control Panel</button>
                 <button class="dash-tab-m" data-group="grp-settings"><i class="bi bi-sliders"></i> Pengaturan <span id="tabSyncBadge" style="display:none; margin-left:2px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:#3b82f6; color:#fff; font-size:.6rem; font-weight:800; line-height:16px; text-align:center;"></span></button>
             </div>
@@ -3394,17 +3398,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
         <!-- (Tab Sync has been merged into Tab Pengaturan) -->
 
-        <!-- TAB ADS EXPERIMENT -->
+        <!-- TAB EVALUASI ADS -->
         <div class="tab-pane" id="tab-experiments">
             <div class="ads-tab-panel mb-3">
                 <div class="ads-tab-panel-head">
                     <div>
-                        <div class="ads-tab-panel-title"><i class="bi bi-bezier2 text-primary"></i> Ads Experiment &amp; Impact</div>
-                        <div class="ads-tab-panel-note">Bandingkan 7 hari sebelum dan sesudah perubahan harga atau target ROAS.</div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-clipboard2-pulse text-primary"></i> Evaluasi Perubahan Iklan</div>
+                        <div class="ads-tab-panel-note">Bandingkan baseline dan observation untuk menilai dampak perubahan harga atau target ROAS.</div>
                     </div>
-                    <button type="button" id="btnReloadExperiments" class="btn btn-sm" style="border:1px solid var(--dsh-border); color:var(--text); background:var(--card-bg); border-radius:9px; font-size:.74rem; font-weight:700;">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" id="btnOpenRecordAdChange" class="btn btn-primary btn-sm" style="border-radius:9px; font-size:.74rem; font-weight:800;">
+                            <i class="bi bi-plus-circle"></i> Catat perubahan
+                        </button>
+                        <button type="button" id="btnReloadExperiments" class="btn btn-sm" style="border:1px solid var(--dsh-border); color:var(--text); background:var(--card-bg); border-radius:9px; font-size:.74rem; font-weight:700;">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
                 </div>
                 <div class="p-3">
                     <div class="row g-2 align-items-end mb-3">
@@ -3412,8 +3421,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             <label for="experimentChangeFilter" class="form-label mb-1" style="font-size:.7rem; font-weight:800; color:var(--dsh-muted);">Perubahan</label>
                             <select id="experimentChangeFilter" class="form-select form-select-sm" style="border-radius:9px; font-size:.76rem;">
                                 <option value="">Semua perubahan</option>
+                                <option value="creative">Foto / Creative</option>
                                 <option value="price">Harga</option>
                                 <option value="target_roas">Target ROAS</option>
+                                <option value="budget">Budget</option>
+                                <option value="title">Judul / Deskripsi</option>
+                                <option value="other">Lainnya</option>
                                 <option value="price_and_target_roas">Harga + Target ROAS</option>
                             </select>
                         </div>
@@ -3438,14 +3451,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     <div id="experimentsLoading" style="display:none; padding:2.4rem 1rem; text-align:center; color:var(--dsh-muted);">
                         <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
-                        <div style="font-size:.78rem;">Memuat experiment...</div>
+                        <div style="font-size:.78rem;">Memuat evaluasi...</div>
                     </div>
 
                     <div id="experimentsEmpty" style="display:none; padding:2.6rem 1rem; text-align:center; border:1px dashed var(--dsh-border); border-radius:14px; color:var(--dsh-muted);">
-                        <i class="bi bi-bezier2" style="font-size:2rem; color:#93c5fd;"></i>
-                        <div style="font-weight:800; color:var(--text); margin-top:.55rem;">Belum ada experiment</div>
+                        <i class="bi bi-clipboard2-pulse" style="font-size:2rem; color:#93c5fd;"></i>
+                        <div style="font-weight:800; color:var(--text); margin-top:.55rem;">Belum ada evaluasi</div>
                         <div style="font-size:.75rem; max-width:34rem; margin:.35rem auto 0; line-height:1.55;">
-                            Experiment akan tercatat setelah perubahan harga atau target ROAS dilakukan melalui Ads Dashboard.
+                            Evaluasi akan tercatat setelah perubahan harga atau target ROAS dilakukan melalui Ads Dashboard.
                             History lama belum di-backfill karena timestamp perubahan belum tersedia.
                         </div>
                     </div>
@@ -3548,6 +3561,126 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                         <div id="experimentSimulationResult" style="display:none;"></div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL CATAT PERUBAHAN OPTIMASI -->
+        <div class="modal fade" id="modalRecordAdChange" tabindex="-1" aria-labelledby="modalRecordAdChangeLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content" style="border-radius:16px; background:var(--card-bg); color:var(--text); border:1px solid var(--card-border); box-shadow:var(--card-shadow);">
+                    <div class="modal-header border-0 pb-1">
+                        <div>
+                            <h5 class="modal-title fw-bold mb-1" id="modalRecordAdChangeLabel">
+                                <i class="bi bi-plus-circle text-primary me-1"></i> Catat perubahan iklan
+                            </h5>
+                            <div style="font-size:.72rem; color:var(--dsh-muted);">
+                                Simpan baseline sebelum perubahan supaya hasilnya bisa dievaluasi dengan adil.
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                    </div>
+                    <form id="recordAdChangeForm">
+                        <div class="modal-body pt-2">
+                            <div class="p-2 mb-3" style="border-radius:10px; background:rgba(37,99,235,.07); border:1px solid rgba(37,99,235,.16); font-size:.72rem; line-height:1.5; color:var(--dsh-muted);">
+                                <i class="bi bi-info-circle text-primary me-1"></i>
+                                Hari perubahan tidak dihitung. Sistem akan membandingkan 7 hari baseline dengan 7 hari observation.
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-12 col-md-6">
+                                    <label for="recordAdChangeStore" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Toko</label>
+                                    <select id="recordAdChangeStore" name="store_id" class="form-select form-select-sm" required style="border-radius:9px;">
+                                        <option value="">Pilih toko</option>
+                                        @foreach($integrationStores as $evaluationStore)
+                                            <option value="{{ $evaluationStore->id }}" {{ (string) $storeId !== 'all' && (string) $storeId === (string) $evaluationStore->id ? 'selected' : '' }}>
+                                                {{ $evaluationStore->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="recordAdChangeCampaign" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Scope evaluasi</label>
+                                    <select id="recordAdChangeCampaign" name="channel_campaign_id" class="form-select form-select-sm" style="border-radius:9px;">
+                                        <option value="" data-store-id="">Level toko</option>
+                                        @foreach($evaluationCampaigns as $evaluationCampaign)
+                                            @php
+                                                $evaluationCampaignId = (string) ($evaluationCampaign->channel_campaign_id ?? '');
+                                                $evaluationCampaignName = $evaluationCampaign->campaign_name ?: 'Campaign ' . $evaluationCampaignId;
+                                                $evaluationItemName = $evaluationCampaign->marketplace_item_name ?: ($evaluationCampaign->channel_item_id ? 'Item ' . $evaluationCampaign->channel_item_id : 'Tanpa item');
+                                            @endphp
+                                            <option
+                                                value="{{ $evaluationCampaignId }}"
+                                                data-store-id="{{ $evaluationCampaign->store_id }}"
+                                                data-item-id="{{ $evaluationCampaign->channel_item_id }}"
+                                                data-target-roas="{{ $evaluationCampaign->target_roas }}"
+                                                data-budget="{{ $evaluationCampaign->campaign_budget }}"
+                                            >{{ $evaluationCampaign->store?->name ?? 'Toko #' . $evaluationCampaign->store_id }} · {{ $evaluationCampaignName }} · {{ $evaluationItemName }}</option>
+                                        @endforeach
+                                    </select>
+                                    <input type="hidden" id="recordAdChangeItem" name="channel_item_id">
+                                </div>
+                                <div class="col-12 col-md-5">
+                                    <label for="recordAdChangeType" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Jenis perubahan</label>
+                                    <select id="recordAdChangeType" name="change_type" class="form-select form-select-sm" required style="border-radius:9px;">
+                                        <option value="creative">Ganti foto / creative</option>
+                                        <option value="target_roas">Update target ROAS</option>
+                                        <option value="price">Update harga</option>
+                                        <option value="budget">Update budget</option>
+                                        <option value="title">Update judul / deskripsi</option>
+                                        <option value="other">Perubahan lainnya</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-7">
+                                    <label for="recordAdChangeAt" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Waktu perubahan</label>
+                                    <input type="datetime-local" id="recordAdChangeAt" name="changed_at" class="form-control form-control-sm" required style="border-radius:9px;">
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="recordAdChangeBefore" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Sebelum perubahan</label>
+                                    <input type="text" id="recordAdChangeBefore" name="before_value" class="form-control form-control-sm" required placeholder="Contoh: foto utama lama / 3.0 / Rp 150.000" style="border-radius:9px;">
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label for="recordAdChangeAfter" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Sesudah perubahan</label>
+                                    <input type="text" id="recordAdChangeAfter" name="after_value" class="form-control form-control-sm" required placeholder="Contoh: foto baru / 4.0 / Rp 175.000" style="border-radius:9px;">
+                                </div>
+                                <div class="col-12 col-md-7">
+                                    <label for="recordAdChangeObjective" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Tujuan perubahan</label>
+                                    <input type="text" id="recordAdChangeObjective" name="objective" class="form-control form-control-sm" required placeholder="Contoh: menaikkan CTR tanpa menurunkan ROAS" style="border-radius:9px;">
+                                </div>
+                                <div class="col-12 col-md-5">
+                                    <label for="recordAdChangeKpi" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">KPI utama</label>
+                                    <select id="recordAdChangeKpi" name="primary_kpi" class="form-select form-select-sm" required style="border-radius:9px;">
+                                        <option value="roas">ROAS</option>
+                                        <option value="acos">ACOS</option>
+                                        <option value="orders">Order</option>
+                                        <option value="cvr">CVR</option>
+                                        <option value="profit">Profit</option>
+                                        <option value="gmv">GMV</option>
+                                        <option value="ctr">CTR</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label for="recordAdChangeNotes" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Catatan <span style="font-weight:500; color:var(--dsh-muted);">(opsional)</span></label>
+                                    <textarea id="recordAdChangeNotes" name="notes" class="form-control form-control-sm" rows="2" maxlength="2000" placeholder="Misalnya: perubahan lain yang sengaja tidak dilakukan selama periode evaluasi." style="border-radius:9px;"></textarea>
+                                </div>
+                                <div class="col-12">
+                                    <div style="font-size:.7rem; font-weight:800; margin-bottom:.35rem;">Perubahan lain di waktu yang sama</div>
+                                    <div class="d-flex flex-wrap gap-2" style="font-size:.7rem;">
+                                        <label class="form-check form-check-inline mb-0"><input class="form-check-input" type="checkbox" name="confounders[]" value="creative"> Foto / creative</label>
+                                        <label class="form-check form-check-inline mb-0"><input class="form-check-input" type="checkbox" name="confounders[]" value="target_roas"> Target ROAS</label>
+                                        <label class="form-check form-check-inline mb-0"><input class="form-check-input" type="checkbox" name="confounders[]" value="price"> Harga</label>
+                                        <label class="form-check form-check-inline mb-0"><input class="form-check-input" type="checkbox" name="confounders[]" value="budget"> Budget</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="recordAdChangeError" style="display:none; margin-top:.75rem; padding:.65rem .75rem; border-radius:9px; color:#b91c1c; background:rgba(220,38,38,.07); border:1px solid rgba(220,38,38,.2); font-size:.72rem; font-weight:700;"></div>
+                        </div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal" style="border-radius:9px;">Batal</button>
+                            <button type="submit" id="btnSubmitRecordAdChange" class="btn btn-primary btn-sm" style="border-radius:9px; font-weight:800;">
+                                <i class="bi bi-check2-circle"></i> Simpan &amp; mulai evaluasi
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -3740,6 +3873,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                             </div>
                                         </div>
                                         <div class="ads-control-actions">
+                                            <button type="button" class="btn btn-sm btn-outline-primary ads-control-icon" data-record-ad-change
+                                                data-record-store-id="{{ $controlCampaign->store_id }}"
+                                                data-record-campaign-id="{{ $controlId }}"
+                                                data-record-item-id="{{ $controlCampaign->channel_item_id }}"
+                                                data-record-target-roas="{{ $controlCampaign->target_roas }}"
+                                                data-record-budget="{{ $controlCampaign->campaign_budget }}"
+                                                title="Catat perubahan untuk evaluasi"><i class="bi bi-clipboard2-plus"></i></button>
                                             @if($controlStatus === 'ongoing')
                                                 <button type="button" class="btn btn-sm btn-outline-warning ads-control-icon" data-control-action="pause" title="Jeda sekarang"><i class="bi bi-pause-fill"></i></button>
                                             @elseif($controlStatus === 'paused')
@@ -4455,6 +4595,7 @@ window.AdsDashboardRoutes = {
     integrationStatus: @json(route('marketplace.ads.integration.status')),
     integrationRevoke: @json(route('marketplace.ads.integration.revoke', ['store' => '__STORE_ID__'])),
     feeSetting: @json(route('marketplace.ads.fee.setting')),
+    evaluationsStore: @json(route('marketplace.ads.evaluations.store')),
     experimentsIndex: @json(route('marketplace.ads.experiments.index')),
     experimentsShow: @json(route('marketplace.ads.experiments.show', ['experiment' => '__EXPERIMENT_ID__'])),
     experimentsSimulate: @json(route('marketplace.ads.experiments.simulate')),
@@ -7105,6 +7246,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const changeFilter = document.getElementById('experimentChangeFilter');
     const statusFilter = document.getElementById('experimentStatusFilter');
     const dataNote = document.getElementById('experimentDataNote');
+    const recordModal = document.getElementById('modalRecordAdChange');
+    const recordForm = document.getElementById('recordAdChangeForm');
+    const recordStore = document.getElementById('recordAdChangeStore');
+    const recordCampaign = document.getElementById('recordAdChangeCampaign');
+    const recordItem = document.getElementById('recordAdChangeItem');
+    const recordType = document.getElementById('recordAdChangeType');
+    const recordChangedAt = document.getElementById('recordAdChangeAt');
+    const recordBefore = document.getElementById('recordAdChangeBefore');
+    const recordAfter = document.getElementById('recordAdChangeAfter');
+    const recordError = document.getElementById('recordAdChangeError');
+    const recordSubmit = document.getElementById('btnSubmitRecordAdChange');
     let lastRows = [];
     let activeExperiment = null;
 
@@ -7181,12 +7333,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function changeLabel(experiment) {
         const type = experiment.change_type;
+        const snapshot = experiment.calculation_snapshot || {};
+        if (snapshot.change_label) {
+            const before = snapshot.before || 'N/A';
+            const after = snapshot.after || 'N/A';
+            return snapshot.change_label + ' · ' + before + ' → ' + after;
+        }
         if (type === 'price') {
             return 'Harga · ' + (experiment.old_price === null ? 'N/A' : money(experiment.old_price)) + ' → ' + (experiment.new_price === null ? 'N/A' : money(experiment.new_price));
         }
         if (type === 'target_roas') {
             return 'Target ROAS · ' + (experiment.old_target_roas === null ? 'N/A' : number(experiment.old_target_roas, 2) + 'x') + ' → ' + (experiment.new_target_roas === null ? 'N/A' : number(experiment.new_target_roas, 2) + 'x');
         }
+        if (type === 'creative') return 'Ganti foto / creative';
+        if (type === 'budget') return 'Budget';
+        if (type === 'title') return 'Judul / deskripsi';
+        if (type === 'other') return 'Perubahan lainnya';
         return 'Harga + Target ROAS';
     }
 
@@ -7538,7 +7700,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 const profitNote = quality.actual_profit_ready
                     ? 'actual'
                     : 'belum aktual (mapping/HPP atau data observation belum lengkap)';
+                const plan = data.calculation_snapshot || {};
+                const planHtml = plan.workflow === 'manual_optimization'
+                    ? '<div style="padding:.7rem .8rem; margin-bottom:.6rem; border-radius:10px; background:rgba(37,99,235,.06); border:1px solid rgba(37,99,235,.18); color:var(--dsh-muted);">' +
+                        '<b style="color:var(--text);">Tujuan:</b> ' + esc(plan.objective || '-') + '<br>' +
+                        '<b style="color:var(--text);">KPI utama:</b> ' + esc((plan.primary_kpi || '-').toUpperCase()) +
+                        (plan.notes ? '<br><b style="color:var(--text);">Catatan:</b> ' + esc(plan.notes) : '') +
+                        '</div>'
+                    : '';
                 qualityNote.innerHTML =
+                    planHtml +
                     '<div style="padding:.7rem .8rem; border-radius:10px; background:rgba(148,163,184,.08); border:1px solid var(--dsh-border); color:var(--dsh-muted);">' +
                     '<b style="color:var(--text);">Kualitas data:</b> ' + esc(flagText) + '<br>' +
                     '<b style="color:var(--text);">Mapping:</b> ' + esc(quality.mapping_status || 'unknown') + ' · ' +
@@ -7551,6 +7722,148 @@ document.addEventListener('DOMContentLoaded', function () {
                 qualityNote.innerHTML = '<div style="color:#b91c1c; font-size:.75rem;">Gagal memuat detail: ' + esc(err.message) + '</div>';
             });
     }
+
+    function openRecordAdChange(prefill = {}) {
+        if (!recordModal) return;
+        recordError.style.display = 'none';
+        if (prefill.storeId && recordStore) recordStore.value = String(prefill.storeId);
+        syncRecordCampaignOptions();
+        if (prefill.campaignId && recordCampaign) {
+            recordCampaign.value = String(prefill.campaignId);
+            syncRecordScope();
+        }
+        if (prefill.type && recordType) recordType.value = prefill.type;
+        if (prefill.before && recordBefore) recordBefore.value = prefill.before;
+        syncRecordTypeHints();
+        if (!recordChangedAt.value) {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            recordChangedAt.value = now.toISOString().slice(0, 16);
+        }
+        window.bootstrap?.Modal.getOrCreateInstance(recordModal).show();
+    }
+
+    function syncRecordCampaignOptions() {
+        if (!recordStore || !recordCampaign) return;
+        const storeId = recordStore.value;
+        const currentValue = recordCampaign.value;
+        let currentStillValid = currentValue === '';
+        Array.from(recordCampaign.options).forEach(function (option) {
+            const optionStoreId = option.dataset.storeId || '';
+            const visible = !optionStoreId || !storeId || optionStoreId === String(storeId);
+            option.hidden = !visible;
+            if (option.value === currentValue && visible) currentStillValid = true;
+        });
+        if (!currentStillValid) recordCampaign.value = '';
+        syncRecordScope();
+    }
+
+    function syncRecordScope() {
+        const option = recordCampaign?.selectedOptions?.[0];
+        if (!option) return;
+        if (recordItem) recordItem.value = option.dataset.itemId || '';
+        if (recordType?.value === 'target_roas' && !recordBefore.value && option.dataset.targetRoas) {
+            recordBefore.value = option.dataset.targetRoas;
+        }
+        if (recordType?.value === 'budget' && !recordBefore.value && option.dataset.budget) {
+            recordBefore.value = option.dataset.budget;
+        }
+    }
+
+    function syncRecordTypeHints() {
+        const hints = {
+            creative: ['ID/link atau deskripsi foto lama', 'ID/link atau deskripsi foto baru', 'ctr'],
+            target_roas: ['Contoh: 3.0 atau Auto', 'Contoh: 4.0 atau Auto', 'roas'],
+            price: ['Harga sebelum', 'Harga sesudah', 'profit'],
+            budget: ['Budget sebelum', 'Budget sesudah', 'roas'],
+            title: ['Judul/deskripsi lama', 'Judul/deskripsi baru', 'ctr'],
+            other: ['Nilai/kondisi sebelum', 'Nilai/kondisi sesudah', 'roas'],
+        };
+        const hint = hints[recordType?.value] || hints.other;
+        if (recordBefore) recordBefore.placeholder = hint[0];
+        if (recordAfter) recordAfter.placeholder = hint[1];
+        const kpi = document.getElementById('recordAdChangeKpi');
+        if (kpi && !kpi.dataset.userChanged) kpi.value = hint[2];
+        syncRecordScope();
+    }
+
+    function recordFormPayload() {
+        const payload = {};
+        new FormData(recordForm).forEach(function (value, key) {
+            if (key === 'confounders[]') {
+                payload.confounders = payload.confounders || [];
+                payload.confounders.push(value);
+                return;
+            }
+            payload[key] = value;
+        });
+        return payload;
+    }
+
+    function submitRecordAdChange(event) {
+        event.preventDefault();
+        if (!routes.evaluationsStore || !recordForm) return;
+        recordError.style.display = 'none';
+        recordSubmit.disabled = true;
+        const originalText = recordSubmit.innerHTML;
+        recordSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menyimpan...';
+
+        fetch(routes.evaluationsStore, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            },
+            body: JSON.stringify(recordFormPayload()),
+        })
+            .then(function (response) {
+                return response.json().catch(function () { return {}; }).then(function (data) {
+                    if (!response.ok) {
+                        const firstError = data.errors ? Object.values(data.errors).flat()[0] : null;
+                        throw new Error(firstError || data.message || 'Perubahan gagal dicatat.');
+                    }
+                    return data;
+                });
+            })
+            .then(function (data) {
+                window.bootstrap?.Modal.getOrCreateInstance(recordModal).hide();
+                recordForm.reset();
+                recordItem.value = '';
+                syncRecordCampaignOptions();
+                if (window.showToast) window.showToast(data.message || 'Perubahan berhasil dicatat.');
+                loadList();
+            })
+            .catch(function (error) {
+                recordError.textContent = error.message || 'Perubahan gagal dicatat.';
+                recordError.style.display = 'block';
+            })
+            .finally(function () {
+                recordSubmit.disabled = false;
+                recordSubmit.innerHTML = originalText;
+            });
+    }
+
+    document.getElementById('btnOpenRecordAdChange')?.addEventListener('click', openRecordAdChange);
+    document.querySelectorAll('[data-record-ad-change]').forEach(function (button) {
+        button.addEventListener('click', function (event) {
+            event.stopPropagation();
+            openRecordAdChange({
+                storeId: button.dataset.recordStoreId,
+                campaignId: button.dataset.recordCampaignId,
+                before: '',
+            });
+        });
+    });
+    recordStore?.addEventListener('change', syncRecordCampaignOptions);
+    recordCampaign?.addEventListener('change', syncRecordScope);
+    recordType?.addEventListener('change', syncRecordTypeHints);
+    document.getElementById('recordAdChangeKpi')?.addEventListener('change', function () {
+        this.dataset.userChanged = '1';
+    });
+    recordForm?.addEventListener('submit', submitRecordAdChange);
+    syncRecordTypeHints();
 
     document.getElementById('btnReloadExperiments')?.addEventListener('click', loadList);
     document.getElementById('btnCloseExperimentDetail')?.addEventListener('click', function () {
