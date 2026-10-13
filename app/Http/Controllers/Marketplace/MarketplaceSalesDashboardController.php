@@ -1582,30 +1582,34 @@ SQL;
                 ->selectRaw('date, store_id, SUM(spend) as spend')
                 ->groupBy('date', 'store_id')
         );
-        if (Schema::hasTable('marketplace_ads_hourly_performances')) {
-            $today = Carbon::today()->toDateString();
-            $recentFrom = Carbon::today()->subDay()->toDateString();
-            $hourlyFrom = $dateFrom > $recentFrom ? $dateFrom : $recentFrom;
-            $hourlyTo = $dateTo < $today ? $dateTo : $today;
+        try {
+            if (Schema::hasTable('marketplace_ads_hourly_performances')) {
+                $today = Carbon::today()->toDateString();
+                $recentFrom = Carbon::today()->subDay()->toDateString();
+                $hourlyFrom = $dateFrom > $recentFrom ? $dateFrom : $recentFrom;
+                $hourlyTo = $dateTo < $today ? $dateTo : $today;
 
-            if ($hourlyFrom <= $hourlyTo) {
-                $hourlyShop = $aggregate(
-                    DB::table('marketplace_ads_hourly_performances')
-                        ->whereIn('store_id', $storeIds)
-                        ->whereBetween('performance_date', [$hourlyFrom, $hourlyTo])
-                        ->whereNull('campaign_id')
-                        ->where(function ($query) {
-                            $query->where('channel_campaign_id', '-')
-                                ->orWhereNull('channel_campaign_id');
-                        })
-                        ->selectRaw('performance_date as date, store_id, SUM(expense) as spend')
-                        ->groupBy('performance_date', 'store_id')
-                );
+                if ($hourlyFrom <= $hourlyTo) {
+                    $hourlyShop = $aggregate(
+                        DB::table('marketplace_ads_hourly_performances')
+                            ->whereIn('store_id', $storeIds)
+                            ->whereBetween('performance_date', [$hourlyFrom, $hourlyTo])
+                            ->whereNull('campaign_id')
+                            ->where(function ($query) {
+                                $query->where('channel_campaign_id', '-')
+                                    ->orWhereNull('channel_campaign_id');
+                            })
+                            ->selectRaw('performance_date as date, store_id, SUM(expense) as spend')
+                            ->groupBy('performance_date', 'store_id')
+                    );
 
-                foreach ($hourlyShop as $key => $row) {
-                    $shop->put($key, $row);
+                    foreach ($hourlyShop as $key => $row) {
+                        $shop->put($key, $row);
+                    }
                 }
             }
+        } catch (\Throwable $exception) {
+            report($exception);
         }
         $campaign = $aggregate(
             DB::table('marketplace_ad_campaign_dailies')
