@@ -187,7 +187,7 @@
             <aside>
                 <section class="cd-card cd-section mb-3" id="quick-edit">
                     <div class="cd-section-title"><i class="bi bi-sliders2 text-primary"></i> Edit cepat campaign</div>
-                    <div class="cd-section-note">Perubahan ROAS, budget, dan status dikirim ke API campaign. Setelah berhasil, perubahan dicatat otomatis ke Evaluasi.</div>
+                    <div class="cd-section-note">Perubahan dikirim ke API campaign dan otomatis dicatat ke Evaluasi. Untuk menjaga rate limit marketplace, simpan satu perubahan per klik.</div>
                     <div id="quickAlert" class="cd-alert"></div>
                     <form id="quickEditForm" class="cd-form">
                         <div class="mb-2">
@@ -295,7 +295,10 @@
         ];
         $('performanceMetrics').innerHTML = metrics.map(item => '<div class="cd-metric"><div class="cd-metric-label">' + item[0] + '</div><div class="cd-metric-value">' + item[1] + '</div></div>').join('');
         $('quickRoas').value = s.target_roas == null ? '' : s.target_roas;
+        $('quickRoas').dataset.current = s.target_roas == null ? '' : s.target_roas;
         $('quickBudget').value = s.campaign_budget == null ? '' : s.campaign_budget;
+        $('quickBudget').dataset.current = s.campaign_budget == null ? '' : s.campaign_budget;
+        $('quickStatus').dataset.current = String(s.campaign_status || s.status || '').toLowerCase();
         $('settingRoas').textContent = s.target_roas != null && Number(s.target_roas) > 0 ? roas(s.target_roas) : 'Auto / —';
         $('settingBudget').textContent = s.campaign_budget != null && Number(s.campaign_budget) > 0 ? money(s.campaign_budget) : 'Tidak terbatas / —';
         $('settingBidding').textContent = s.bidding_method || '—';
@@ -364,15 +367,34 @@
     $('quickEditForm').addEventListener('submit', function (event) {
         event.preventDefault();
         showAlert('quickAlert', '');
-        const form = new FormData(event.currentTarget);
+        const formElement = event.currentTarget;
+        const form = new FormData(formElement);
+        const roasInput = form.get('roas_target') || '';
+        const budgetInput = form.get('daily_budget') || '';
+        const changedFields = [];
+
+        if (String(roasInput).trim() !== '' && numericChangeValue(roasInput) !== numericChangeValue($('quickRoas').dataset.current || '')) {
+            changedFields.push('roas_target');
+        }
+        if (String(budgetInput).trim() !== '' && numericChangeValue(budgetInput) !== numericChangeValue($('quickBudget').dataset.current || '')) {
+            changedFields.push('daily_budget');
+        }
+        if (form.get('status_action')) {
+            changedFields.push('status_action');
+        }
+
+        if (changedFields.length > 1) {
+            return showAlert('quickAlert', 'Simpan satu perubahan per klik agar tidak memicu rate limit marketplace.');
+        }
+
         const payload = {
             store_id: storeId,
             campaign_id: campaignId,
-            roas_target: form.get('roas_target') || '',
-            daily_budget: form.get('daily_budget') || '',
+            roas_target: changedFields.includes('roas_target') ? roasInput : '',
+            daily_budget: changedFields.includes('daily_budget') ? budgetInput : '',
             status_action: form.get('status_action') || '',
         };
-        if (!payload.roas_target && !payload.daily_budget && !payload.status_action) return showAlert('quickAlert', 'Isi minimal satu perubahan campaign.');
+        if (!changedFields.length) return showAlert('quickAlert', 'Belum ada perubahan baru pada campaign.');
         const button = $('quickSubmit'); button.disabled = true; button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menyimpan...';
         requestJson(isGms ? gmsEditUrl : editUrl, { method:'POST', headers:{ Accept:'application/json', 'Content-Type':'application/json', 'X-CSRF-TOKEN':csrf }, body:JSON.stringify(payload) })
             .then(data => { showAlert('quickAlert', data.message || 'Campaign berhasil diperbarui.', 'success'); loadDetail(); loadEvaluations(); })
@@ -419,13 +441,14 @@
     $('recordChangeForm').addEventListener('submit', function (event) {
         event.preventDefault();
         showAlert('recordAlert', '');
+        const formElement = event.currentTarget;
         const payload = {};
-        new FormData(event.currentTarget).forEach((value, key) => {
+        new FormData(formElement).forEach((value, key) => {
             if (key === 'confounders[]') { payload.confounders = payload.confounders || []; payload.confounders.push(value); } else payload[key] = value;
         });
         const button = $('recordSubmit'); button.disabled = true; button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menyimpan...';
         applyRecordedChange(payload)
-            .then(data => { showAlert('recordAlert', data.message || 'Perubahan berhasil diterapkan dan masuk ke Evaluasi.', 'success'); event.currentTarget.reset(); setChangedAt(); syncRecordType(); loadDetail(); loadEvaluations(); })
+            .then(data => { showAlert('recordAlert', data.message || 'Perubahan berhasil diterapkan dan masuk ke Evaluasi.', 'success'); formElement.reset(); setChangedAt(); syncRecordType(); loadDetail(); loadEvaluations(); })
             .catch(error => showAlert('recordAlert', error.message))
             .finally(() => { button.disabled = false; syncRecordType(); });
     });
