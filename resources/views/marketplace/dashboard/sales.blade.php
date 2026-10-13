@@ -1229,8 +1229,9 @@
         $activeDateSummary = '30 hari terakhir';
     }
     $detailQuery = ['date_from' => $filters['date_from'], 'date_to' => $filters['date_to']];
+    $purchaseChannel = $filters['purchase_channel'] ?? null;
     if ($filters['platform']) $detailQuery['platform'] = $filters['platform'];
-    if ($filters['purchase_channel']) $detailQuery['purchase_channel'] = $filters['purchase_channel'];
+    if ($purchaseChannel) $detailQuery['purchase_channel'] = $purchaseChannel;
     if ($filters['store_id']) $detailQuery['store_id'] = $filters['store_id'];
     $platformCodes = $filters['platform_codes'] ?? ($filters['platform'] ? [$filters['platform']] : []);
     $visibleStores = $filters['platform']
@@ -1240,12 +1241,12 @@
     $importOrderQuery = $filters['store_id'] ? ['store_id' => $filters['store_id']] : [];
     $paymentDetailQuery = ['tab' => 'payments'];
     if ($filters['platform']) $paymentDetailQuery['platform'] = $filters['platform'];
-    if ($filters['purchase_channel']) $paymentDetailQuery['purchase_channel'] = $filters['purchase_channel'];
+    if ($purchaseChannel) $paymentDetailQuery['purchase_channel'] = $purchaseChannel;
     if ($filters['store_id']) $paymentDetailQuery['store_id'] = $filters['store_id'];
     if (!empty($filters['dummy'])) $paymentDetailQuery['dummy'] = 1;
     $shippingDetailQuery = ['tab' => 'shipping'];
     if ($filters['platform']) $shippingDetailQuery['platform'] = $filters['platform'];
-    if ($filters['purchase_channel']) $shippingDetailQuery['purchase_channel'] = $filters['purchase_channel'];
+    if ($purchaseChannel) $shippingDetailQuery['purchase_channel'] = $purchaseChannel;
     if ($filters['store_id']) $shippingDetailQuery['store_id'] = $filters['store_id'];
     if (!empty($filters['dummy'])) $shippingDetailQuery['dummy'] = 1;
     $shippingPct = fn ($value) => $shippingKpi['total'] > 0
