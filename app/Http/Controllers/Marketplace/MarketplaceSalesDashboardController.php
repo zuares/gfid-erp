@@ -1604,6 +1604,11 @@ SQL;
                     );
 
                     foreach ($hourlyShop as $key => $row) {
+                        $dailyRow = $shop->get($key);
+                        if ($dailyRow && (float) $row->spend <= 0 && (float) $dailyRow->spend > 0) {
+                            continue;
+                        }
+
                         $shop->put($key, $row);
                     }
                 }

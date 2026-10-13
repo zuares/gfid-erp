@@ -117,6 +117,43 @@ class AdsModuleTest extends TestCase
         $this->assertSame($renderedView, $result);
     }
 
+    public function test_active_ads_metrics_do_not_get_erased_by_zero_hourly_snapshot()
+    {
+        $store = $this->createStore('ACTIVEZERO');
+        $date = now()->toDateString();
+
+        \Illuminate\Support\Facades\DB::table('marketplace_ads_dailies')->insert([
+            'store_id' => $store->id,
+            'date' => $date,
+            'impressions' => 200,
+            'clicks' => 20,
+            'spend' => 12000,
+            'orders' => 2,
+            'gmv' => 70000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        MarketplaceAdsHourlyPerformance::create([
+            'store_id' => $store->id,
+            'campaign_id' => null,
+            'channel_campaign_id' => '-',
+            'performance_date' => $date,
+            'performance_hour' => 10,
+            'impression' => 0,
+            'clicks' => 0,
+            'expense' => 0,
+            'broad_order' => 0,
+            'broad_gmv' => 0,
+        ]);
+
+        $metrics = app(\App\Services\Marketplace\Ads\AdsDashboardService::class)
+            ->getDailyMetrics([$store->id], null, $date, $date);
+
+        $this->assertSame(12000.0, $metrics->get($date)['spend']);
+        $this->assertSame(200, $metrics->get($date)['impressions']);
+    }
+
     public function test_ads_throttle_uses_database_rate_limiter_without_redis()
     {
         config(['cache.limiter' => 'database']);

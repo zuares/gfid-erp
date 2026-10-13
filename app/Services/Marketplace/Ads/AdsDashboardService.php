@@ -186,6 +186,19 @@ class AdsDashboardService
 
                     foreach ($hourlyShop as $row) {
                         $date = substr((string) $row->date, 0, 10);
+                        $dailyRow = $shop->get($date);
+                        $hourlyHasData = (float) ($row->spend ?? 0) > 0
+                            || (int) ($row->impressions ?? 0) > 0
+                            || (int) ($row->clicks ?? 0) > 0
+                            || (int) ($row->orders ?? 0) > 0
+                            || (float) ($row->gmv ?? 0) > 0;
+
+                        // Jangan biarkan snapshot hourly sementara yang semuanya
+                        // nol menghapus fakta daily yang masih valid.
+                        if ($dailyRow && ! $hourlyHasData) {
+                            continue;
+                        }
+
                         $shop->put($date, (object) [
                             'date' => $date,
                             'spend' => $row->spend,
