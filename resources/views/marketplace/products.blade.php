@@ -149,6 +149,17 @@
     .prd-edit-section{ border:1px solid var(--prd-border); border-radius:12px; padding:.8rem; margin-bottom:.75rem; background:rgba(148,163,184,.035); }
     .prd-edit-section-title{ font-size:.78rem; font-weight:800; margin-bottom:.6rem; color:var(--prd-accent); }
     .prd-edit-meta{ font-size:.7rem; color:var(--prd-muted); }
+    .prd-promo-context{ display:flex; align-items:center; gap:.75rem; padding:.65rem .75rem; border:1px solid rgba(37,99,235,.2); border-radius:11px; background:rgba(37,99,235,.06); color:#1e3a8a; }
+    .prd-promo-context .title{ font-size:.82rem; font-weight:800; }
+    .prd-promo-context .meta{ font-size:.68rem; color:#64748b; margin-top:.12rem; }
+    .prd-promo-table{ width:100%; font-size:.74rem; }
+    .prd-promo-table th{ color:#64748b; font-size:.65rem; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; }
+    .prd-promo-table td,.prd-promo-table th{ padding:.5rem .45rem; vertical-align:middle; border-bottom:1px solid var(--prd-border); }
+    .prd-promo-table tr:last-child td{ border-bottom:0; }
+    .prd-promo-input{ width:132px; max-width:100%; text-align:right; }
+    .prd-promo-empty{ padding:1rem .75rem; border:1px dashed var(--prd-border); border-radius:11px; color:var(--prd-muted); font-size:.75rem; }
+    body[data-theme="dark"] .prd-promo-context{ background:rgba(37,99,235,.12); color:#bfdbfe; border-color:rgba(96,165,250,.25); }
+    body[data-theme="dark"] .prd-promo-context .meta,.prd-promo-table th{ color:#94a3b8; }
     .prd-edit-readonly{ background:var(--card,#fff)!important; }
     .prd-change-log{ display:flex; flex-direction:column; gap:.45rem; }
     .prd-change-log-row{ display:flex; align-items:flex-start; gap:.55rem; padding:.5rem .6rem; border:1px solid var(--prd-border); border-radius:9px; background:var(--card,#fff); }
@@ -232,6 +243,29 @@
     body[data-theme="dark"] .bo-sec{ background:rgba(15,23,42,.5); }
     .bo-sec-head{ font-size:.85rem; font-weight:750; margin-bottom:.6rem; }
     .bo-hint{ font-weight:500; font-size:.7rem; color:#94a3b8; margin-left:.3rem; }
+    .bo-picker{ border:1px solid var(--prd-border); border-radius:12px; padding:.65rem; background:rgba(248,250,252,.55); flex:1 1 100%; min-width:0; }
+    body[data-theme="dark"] .bo-picker{ background:rgba(15,23,42,.48); }
+    .bo-picker-head{ display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem; }
+    .bo-picker-label{ font-size:.72rem; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:.04em; }
+    body[data-theme="dark"] .bo-picker-label{ color:#cbd5e1; }
+    .bo-picker-selected{ margin-left:auto; font-size:.68rem; color:#ea580c; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bo-picker-search-wrap{ position:relative; margin-bottom:.5rem; }
+    .bo-picker-search-wrap i{ position:absolute; left:.65rem; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:.72rem; }
+    .bo-picker-search{ width:100%; border:1px solid var(--prd-border); border-radius:8px; background:var(--card,#fff); color:inherit; font-size:.75rem; padding:.4rem .6rem .4rem 1.85rem; outline:0; }
+    .bo-picker-search:focus{ border-color:#ea580c; box-shadow:0 0 0 3px rgba(234,88,12,.1); }
+    body[data-theme="dark"] .bo-picker-search{ background:#0f172a; }
+    .bo-picker-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(215px,1fr)); gap:.45rem; max-height:250px; overflow-y:auto; padding:.1rem; }
+    .bo-product-card{ display:flex; align-items:center; gap:.5rem; width:100%; min-width:0; padding:.45rem; border:1px solid var(--prd-border); border-radius:10px; background:var(--card,#fff); color:inherit; text-align:left; cursor:pointer; transition:border-color .15s, background .15s, box-shadow .15s; }
+    .bo-product-card:hover{ border-color:rgba(234,88,12,.55); background:rgba(234,88,12,.04); }
+    .bo-product-card.active{ border-color:#ea580c; background:rgba(234,88,12,.09); box-shadow:0 0 0 2px rgba(234,88,12,.1); }
+    body[data-theme="dark"] .bo-product-card{ background:rgba(30,41,59,.72); }
+    .bo-product-card img, .bo-product-thumb{ width:44px; height:44px; border-radius:9px; object-fit:cover; flex:none; background:#e2e8f0; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:1rem; }
+    .bo-product-card .copy{ min-width:0; flex:1; }
+    .bo-product-card .name{ font-size:.74rem; font-weight:750; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bo-product-card .meta{ margin-top:.15rem; font-size:.64rem; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bo-product-card .check{ color:#ea580c; font-size:.85rem; opacity:0; flex:none; }
+    .bo-product-card.active .check{ opacity:1; }
+    .bo-picker-empty{ color:#94a3b8; font-size:.72rem; padding:.45rem .2rem; }
     .bo-slotbar{ display:flex; gap:.4rem; margin-bottom:.6rem; }
     .bo-slot{ width:40px; height:40px; border-radius:10px; border:2px dashed rgba(148,163,184,.4); display:flex; align-items:center; justify-content:center; font-size:1rem; color:#cbd5e1; }
     .bo-slot.filled{ border-style:solid; border-color:#ea580c; background:rgba(234,88,12,.08); }
@@ -253,7 +287,7 @@
     .bo-timepill.off{ background:rgba(148,163,184,.18); color:#64748b; }
     .bo-timepill a{ text-decoration:none; }
     .bo-add{ display:flex; gap:.4rem; flex-wrap:wrap; align-items:center; margin-top:.7rem; padding-top:.7rem; border-top:1px dashed rgba(148,163,184,.3); }
-    .bo-add select.prod-picker{ min-width:220px; max-width:280px; }
+    .bo-add .bo-picker + input[type="hidden"]{ display:none; }
     .bo-times{ display:flex; gap:.3rem; flex-wrap:wrap; }
     .bo-t{ font-size:.76rem; padding:.25rem .4rem; border-radius:7px; border:1px solid var(--prd-border); background:var(--card,#fff); }
     body[data-theme="dark"] .bo-t{ background:#0f172a; color:#fff; }
@@ -479,7 +513,12 @@
             <div class="bo-sec-head">⏰ Jadwal jam-tetap <span class="bo-hint">naik otomatis tiap hari di jam ini</span></div>
             <div id="boSchedList" class="bo-list"></div>
             <div class="bo-add">
-                <select class="prod-picker form-select form-select-sm" id="boSchedPick"></select>
+                <div class="bo-picker" id="boSchedPicker">
+                    <div class="bo-picker-head"><span class="bo-picker-label">Pilih produk</span><span class="bo-picker-selected" id="boSchedSelectedLabel">Belum dipilih</span></div>
+                    <div class="bo-picker-search-wrap"><i class="bi bi-search"></i><input type="search" class="bo-picker-search" id="boSchedSearch" placeholder="Cari nama produk atau SKU…" autocomplete="off"></div>
+                    <div class="bo-picker-grid"></div>
+                </div>
+                <input type="hidden" id="boSchedPick">
                 <span class="bo-times" id="boSchedTimes"><input type="time" class="bo-t" value="08:00"></span>
                 <button class="btn btn-sm btn-prd-outline" onclick="boAddTime()">+ jam</button>
                 <button class="btn btn-sm btn-prd-primary" onclick="boSaveSched()">Simpan</button>
@@ -491,7 +530,12 @@
             <div class="bo-sec-head">🔁 Rotasi otomatis <span class="bo-hint">isi slot kosong bergiliran tiap 4 jam</span></div>
             <div id="boPoolList" class="bo-list"></div>
             <div class="bo-add">
-                <select class="prod-picker form-select form-select-sm" id="boPoolPick"></select>
+                <div class="bo-picker" id="boPoolPicker">
+                    <div class="bo-picker-head"><span class="bo-picker-label">Tambah ke antrian</span><span class="bo-picker-selected" id="boPoolSelectedLabel">Belum dipilih</span></div>
+                    <div class="bo-picker-search-wrap"><i class="bi bi-search"></i><input type="search" class="bo-picker-search" id="boPoolSearch" placeholder="Cari nama produk atau SKU…" autocomplete="off"></div>
+                    <div class="bo-picker-grid"></div>
+                </div>
+                <input type="hidden" id="boPoolPick">
                 <button class="btn btn-sm btn-prd-primary" onclick="boAddPool()">+ Tambah ke antrian</button>
             </div>
         </div>
@@ -596,6 +640,28 @@
     </div>
 </div>
 
+<div class="modal fade" id="modalProductPromotion" tabindex="-1" aria-labelledby="modalProductPromotionLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:16px">
+            <div class="modal-header border-0 pb-2">
+                <div>
+                    <h5 class="modal-title fw-bold" id="modalProductPromotionLabel">Atur Harga Promo</h5>
+                    <div class="prd-edit-meta" id="productPromotionSubtitle">Memuat campaign terkait…</div>
+                </div>
+                <button class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body pt-1" id="productPromotionBody">
+                <div class="text-center text-muted py-5">Memuat campaign terkait…</div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <span class="prd-edit-meta me-auto" id="productPromotionStatus">Harga promo tersimpan sebagai bagian dari campaign.</span>
+                <button class="btn btn-light border" style="border-radius:999px" data-bs-dismiss="modal">Batal</button>
+                <button class="btn btn-success fw-bold" style="border-radius:999px" id="productPromotionSaveBtn" onclick="saveProductPromotion()" disabled>Simpan Harga Promo</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -626,6 +692,14 @@
     let productEditorImages = [];
     let productEditorImagesDirty = false;
     let productCreate = null;
+    let productPromotionState = {
+        product: null,
+        modelId: null,
+        campaigns: [],
+        detail: null,
+        selectedDiscountId: null,
+        loading: false,
+    };
 
     function emptyProductCreate() {
         return {
@@ -1697,19 +1771,231 @@
         } catch (e) { alert('Gagal: ' + e.message); }
     };
 
-    window.openPromotionsForProduct = function (pid, modelId = null) {
+    function productPromotionVariants(product) {
+        const models = Array.isArray(product?.models) && product.models.length
+            ? product.models
+            : [{ model_id: '0', model_name: 'Default', model_sku: product?.item_sku || '', price: product?.price_min ?? 0, stock: product?.stock_total ?? 0 }];
+        return models.map(model => ({
+            model_id: String(model.model_id ?? '0'),
+            model_name: model.model_name || 'Default',
+            model_sku: model.model_sku || '',
+            original_price: Number(model.price ?? product?.price_min ?? 0),
+            stock: Number(model.stock ?? 0),
+        }));
+    }
+
+    function productPromotionDateLabel(value) {
+        if (!value) return '—';
+        const date = new Date(Number(value) * 1000);
+        return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+    }
+
+    function productPromotionCampaignHasProduct(campaign, product) {
+        return (campaign?.items_preview || []).some(item => String(item.item_id) === String(product?.item_id));
+    }
+
+    function promotionItemPayload(item) {
+        return {
+            item_id: Number(item.item_id),
+            model_list: (item.model_list || []).map(model => ({
+                model_id: Number(model.model_id || 0),
+                model_promotion_price: model.model_promotion_price === '' || model.model_promotion_price == null ? null : Number(model.model_promotion_price),
+                model_promotion_percentage: model.model_promotion_percentage === '' || model.model_promotion_percentage == null ? null : Number(model.model_promotion_percentage),
+            })).filter(model => model.model_promotion_price !== null || model.model_promotion_percentage !== null),
+        };
+    }
+
+    function renderProductPromotionCampaignPicker() {
+        const product = productPromotionState.product;
+        const body = $('productPromotionBody');
+        if (!product || !body) return;
+
+        const campaigns = productPromotionState.campaigns || [];
+        const withPreview = campaigns.filter(campaign => Array.isArray(campaign.items_preview) && campaign.items_preview.length);
+        const related = withPreview.filter(campaign => productPromotionCampaignHasProduct(campaign, product));
+        const candidates = related.length ? related : campaigns;
+        productPromotionState.candidates = candidates;
+
+        $('productPromotionSubtitle').textContent = `${product.item_name || 'Produk'} · Item ID ${product.item_id} · Harga promo diatur per campaign`;
+
+        if (!candidates.length) {
+            body.innerHTML = `<div class="prd-promo-context mb-3"><i class="bi bi-tag fs-5"></i><div><div class="title">Belum ada campaign aktif</div><div class="meta">Tidak ada promo ongoing atau upcoming yang bisa diedit untuk toko ini.</div></div></div>
+                <div class="prd-promo-empty">Buat campaign baru dari modul Promosi terlebih dahulu, lalu harga promo variant dapat diedit langsung dari halaman produk.</div>`;
+            $('productPromotionSaveBtn').disabled = true;
+            return;
+        }
+
+        body.innerHTML = `
+            <div class="prd-promo-context mb-3">
+                ${product.image_url ? `<img class="prd-img" src="${esc(product.image_url)}" loading="lazy" alt="">` : '<div class="prd-img"></div>'}
+                <div class="min-w-0"><div class="title text-truncate">${esc(product.item_name || 'Produk')}</div><div class="meta">${esc(product.item_sku || 'SKU kosong')} · ${productPromotionVariants(product).length} variant</div></div>
+            </div>
+            <div class="prd-edit-section mb-3">
+                <label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">CAMPAIGN PROMO</label>
+                <select class="form-select form-select-sm" id="productPromotionCampaign" onchange="selectProductPromotion(this.value)">
+                    ${candidates.map(campaign => `<option value="${esc(campaign.discount_id)}">${esc(campaign.discount_name || `Promo #${campaign.discount_id}`)} · ${esc(campaign.status_label || campaign.discount_status || '')}</option>`).join('')}
+                </select>
+                ${related.length ? '<div class="prd-edit-meta mt-2">Menampilkan campaign yang memuat produk ini.</div>' : '<div class="prd-edit-meta mt-2">Campaign aktif ditemukan. Pilih campaign untuk mengecek variant produk ini.</div>'}
+            </div>
+            <div id="productPromotionDetail"><div class="text-center text-muted py-4">Memuat variant promo…</div></div>`;
+
+        selectProductPromotion(candidates[0].discount_id);
+    }
+
+    function renderProductPromotionDetail() {
+        const detail = productPromotionState.detail;
+        const product = productPromotionState.product;
+        const target = $('productPromotionDetail');
+        const saveButton = $('productPromotionSaveBtn');
+        if (!target || !product || !detail) return;
+
+        const promoItem = (detail.items || []).find(item => String(item.item_id) === String(product.item_id));
+        if (!promoItem) {
+            target.innerHTML = `<div class="prd-promo-empty"><i class="bi bi-info-circle me-1"></i> Produk ini belum masuk ke campaign <b>${esc(detail.discount_name || `#${detail.discount_id}`)}</b>.</div>`;
+            saveButton.disabled = true;
+            return;
+        }
+
+        const promoModels = promoItem.model_list || [];
+        const rows = productPromotionVariants(product).map(model => {
+            const current = promoModels.find(item => String(item.model_id ?? 0) === model.model_id);
+            const promoPrice = current?.model_promotion_price ?? '';
+            const percentage = promoPrice && model.original_price > 0
+                ? Math.max(0, Math.round(((model.original_price - Number(promoPrice)) / model.original_price) * 100))
+                : '';
+            return `<tr>
+                <td><div class="fw-bold">${esc(model.model_name)}</div><div class="prd-edit-meta">${esc(model.model_sku || 'SKU kosong')} · Stok ${model.stock.toLocaleString('id-ID')}</div></td>
+                <td class="text-end">${rp(model.original_price)}</td>
+                <td><input type="number" min="100" step="1" class="form-control form-control-sm prd-promo-input" data-promo-model-id="${esc(model.model_id)}" value="${esc(promoPrice)}" placeholder="Nonaktif"></td>
+                <td class="text-end"><span id="prdPromoPct-${esc(model.model_id)}">${percentage ? `${percentage}%` : '—'}</span></td>
+            </tr>`;
+        }).join('');
+
+        target.innerHTML = `<div class="d-flex align-items-center justify-content-between gap-2 mb-2"><div><div class="prd-edit-section-title mb-0">Harga promo per variant</div><div class="prd-edit-meta">Kosongkan harga untuk menonaktifkan variant dari campaign.</div></div><span class="badge-status st-normal">${esc(detail.status_label || detail.discount_status || 'Aktif')}</span></div>
+            <div class="prd-edit-meta mb-2">Periode: ${esc(productPromotionDateLabel(detail.start_time))} — ${esc(productPromotionDateLabel(detail.end_time))}</div>
+            <div class="table-responsive"><table class="prd-promo-table"><thead><tr><th>Variant</th><th class="text-end">Harga normal</th><th class="text-end">Harga promo</th><th class="text-end">Diskon</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+        saveButton.disabled = false;
+
+        target.querySelectorAll('[data-promo-model-id]').forEach(input => {
+            input.addEventListener('input', () => {
+                const model = productPromotionVariants(product).find(item => item.model_id === String(input.dataset.promoModelId));
+                const percentageTarget = $(`prdPromoPct-${input.dataset.promoModelId}`);
+                const value = Number(input.value);
+                const percentage = model && value > 0 && model.original_price > 0
+                    ? Math.max(0, Math.round(((model.original_price - value) / model.original_price) * 100))
+                    : '';
+                if (percentageTarget) percentageTarget.textContent = percentage ? `${percentage}%` : '—';
+            });
+        });
+
+        if (productPromotionState.modelId !== null && productPromotionState.modelId !== undefined) {
+            const focusInput = target.querySelector(`[data-promo-model-id="${String(productPromotionState.modelId)}"]`);
+            if (focusInput) {
+                focusInput.focus();
+                focusInput.scrollIntoView({ block: 'center' });
+            }
+        }
+    }
+
+    window.selectProductPromotion = async function (discountId) {
+        const product = productPromotionState.product;
+        const storeId = product?.store?.id;
+        if (!product || !storeId || !discountId) return;
+
+        productPromotionState.selectedDiscountId = String(discountId);
+        const target = $('productPromotionDetail');
+        const saveButton = $('productPromotionSaveBtn');
+        if (target) target.innerHTML = '<div class="text-center text-muted py-4">Memuat variant promo…</div>';
+        if (saveButton) saveButton.disabled = true;
+
+        try {
+            const result = await api(`/api/marketplace/promotions/${storeId}/${discountId}?refresh=1`);
+            productPromotionState.detail = result.promotion || null;
+            if (!productPromotionState.detail) throw new Error('Detail campaign tidak ditemukan.');
+            renderProductPromotionDetail();
+        } catch (error) {
+            if (target) target.innerHTML = `<div class="prd-promo-empty text-danger">${esc(error.message || 'Detail campaign gagal dimuat.')}</div>`;
+        }
+    };
+
+    window.saveProductPromotion = async function () {
+        const product = productPromotionState.product;
+        const detail = productPromotionState.detail;
+        const button = $('productPromotionSaveBtn');
+        if (!product || !detail || !button) return;
+
+        const targetItemId = String(product.item_id);
+        const targetModels = productPromotionVariants(product).map(model => {
+            const input = document.querySelector(`[data-promo-model-id="${model.model_id}"]`);
+            const rawPrice = input?.value?.trim() || '';
+            if (!rawPrice) return null;
+            const promoPrice = Number(rawPrice);
+            if (!Number.isFinite(promoPrice) || promoPrice < 100) throw new Error(`${model.model_name}: harga promo minimal Rp100.`);
+            if (model.original_price > 0 && promoPrice >= model.original_price) throw new Error(`${model.model_name}: harga promo harus lebih rendah dari harga normal.`);
+            return {
+                model_id: Number(model.model_id),
+                model_promotion_price: promoPrice,
+                model_promotion_percentage: model.original_price > 0 ? Math.round(((model.original_price - promoPrice) / model.original_price) * 100) : null,
+            };
+        }).filter(Boolean);
+
+        if (!targetModels.length) return alert('Isi minimal satu harga promo variant.');
+
+        const itemList = (detail.items || [])
+            .filter(item => String(item.item_id) !== targetItemId)
+            .map(promotionItemPayload)
+            .filter(item => item.model_list.length);
+        itemList.push({ item_id: Number(product.item_id), model_list: targetModels });
+
+        button.disabled = true;
+        button.textContent = 'Menyimpan…';
+        try {
+            const result = await api(`/api/marketplace/promotions/${product.store.id}/${detail.discount_id}/update`, {
+                method: 'POST',
+                body: JSON.stringify({ item_list: itemList }),
+            });
+            toast(result.message || 'Harga promo berhasil diperbarui.');
+            $('productPromotionStatus').textContent = 'Harga promo berhasil disimpan ke campaign.';
+            await window.selectProductPromotion(detail.discount_id);
+        } catch (error) {
+            toast(error.message || 'Harga promo gagal disimpan.', 'error');
+        } finally {
+            button.disabled = false;
+            button.textContent = 'Simpan Harga Promo';
+        }
+    };
+
+    window.openPromotionsForProduct = async function (pid, modelId = null) {
         const product = products.find(item => String(item.id) === String(pid));
         if (!product?.store?.id || !product.item_id) {
             return alert('Data toko atau item produk belum tersedia. Silakan sync produk terlebih dahulu.');
         }
-        const params = new URLSearchParams({
-            store_id: String(product.store.id),
-            item_id: String(product.item_id),
-        });
-        if (modelId !== null && modelId !== undefined && String(modelId) !== '') {
-            params.set('model_id', String(modelId));
+
+        productPromotionState = { product, modelId: modelId === null || modelId === undefined ? null : String(modelId), campaigns: [], detail: null, selectedDiscountId: null, loading: true };
+        const modal = bootstrap.Modal.getOrCreateInstance($('modalProductPromotion'));
+        $('modalProductPromotionLabel').textContent = `Atur Harga Promo · ${product.item_name || 'Produk'}`;
+        $('productPromotionSubtitle').textContent = 'Mencari campaign terkait…';
+        $('productPromotionBody').innerHTML = '<div class="text-center text-muted py-5">Memuat campaign ongoing dan upcoming…</div>';
+        $('productPromotionSaveBtn').disabled = true;
+        modal.show();
+
+        try {
+            const [ongoing, upcoming] = await Promise.all([
+                api(`/api/marketplace/promotions?store_id=${product.store.id}&status=ongoing`),
+                api(`/api/marketplace/promotions?store_id=${product.store.id}&status=upcoming`),
+            ]);
+            const unique = new Map();
+            [...(ongoing.promotions || []), ...(upcoming.promotions || [])].forEach(campaign => {
+                if (campaign?.discount_id) unique.set(String(campaign.discount_id), campaign);
+            });
+            productPromotionState.campaigns = Array.from(unique.values());
+            productPromotionState.loading = false;
+            renderProductPromotionCampaignPicker();
+        } catch (error) {
+            productPromotionState.loading = false;
+            $('productPromotionBody').innerHTML = `<div class="prd-promo-empty text-danger">${esc(error.message || 'Campaign promo gagal dimuat.')}</div>`;
+            $('productPromotionSubtitle').textContent = 'Gagal memuat campaign';
         }
-        window.location.href = `/marketplace/promotions?${params.toString()}`;
     };
 
     window.setUnlist = async function (pid, unlist) {
@@ -2462,13 +2748,69 @@
         if (!sel.dataset.bound) { sel.addEventListener('change', boReload); sel.dataset.bound = '1'; }
     }
 
-    function boFillPickers() {
+    function boCandidateProducts() {
         const sid = String(boStoreId());
-        const opts = '<option value="">— pilih produk —</option>' +
-            products.filter(p => String(p.store?.id) === sid && p.item_status === 'NORMAL')
-                .map(p => `<option value="${p.id}">${esc((p.item_name || 'item ' + p.item_id).slice(0, 60))}${p.item_sku ? ' · ' + esc(p.item_sku) : ''}</option>`).join('');
-        document.querySelectorAll('#tabBoost .prod-picker').forEach(el => el.innerHTML = opts);
+        return products
+            .filter(p => String(p.store?.id) === sid && p.item_status === 'NORMAL')
+            .sort((a, b) => String(a.item_name || '').localeCompare(String(b.item_name || ''), 'id'));
     }
+
+    function boRenderPicker(type) {
+        const isSched = type === 'sched';
+        const picker = $(isSched ? 'boSchedPicker' : 'boPoolPicker');
+        const hidden = $(isSched ? 'boSchedPick' : 'boPoolPick');
+        const search = $(isSched ? 'boSchedSearch' : 'boPoolSearch');
+        const label = $(isSched ? 'boSchedSelectedLabel' : 'boPoolSelectedLabel');
+        if (!picker || !hidden) return;
+
+        const list = boCandidateProducts();
+        const selected = String(hidden.value || '');
+        if (selected && !list.some(p => String(p.id) === selected)) hidden.value = '';
+        const query = String(search?.value || '').trim().toLowerCase();
+        const filtered = list.filter(p => {
+            if (!query) return true;
+            return [p.item_name, p.item_sku, p.item_id].some(v => String(v || '').toLowerCase().includes(query));
+        });
+        const current = String(hidden.value || '');
+        const currentProduct = list.find(p => String(p.id) === current);
+        label.textContent = currentProduct ? (currentProduct.item_name || 'Produk dipilih') : 'Belum dipilih';
+
+        const grid = picker.querySelector('.bo-picker-grid');
+        if (!filtered.length) {
+            grid.innerHTML = `<div class="bo-picker-empty">${list.length ? 'Produk tidak ditemukan.' : 'Belum ada produk aktif di toko ini.'}</div>`;
+            return;
+        }
+        grid.innerHTML = filtered.map(p => {
+            const id = String(p.id), active = id === current;
+            const image = p.image_url
+                ? `<img src="${esc(p.image_url)}" alt="" loading="lazy">`
+                : '<span class="bo-product-thumb">▧</span>';
+            const meta = [p.item_sku || ('ID ' + (p.item_id || p.id)), p.stock_total != null ? 'Stok ' + p.stock_total : ''].filter(Boolean).join(' · ');
+            return `<button type="button" class="bo-product-card ${active ? 'active' : ''}" onclick="boPickProduct('${type}', ${p.id})" title="${esc(p.item_name || 'Produk')}">
+                ${image}<span class="copy"><span class="name">${esc(p.item_name || 'Produk tanpa nama')}</span><span class="meta">${esc(meta)}</span></span><span class="check">✓</span>
+            </button>`;
+        }).join('');
+    }
+
+    window.boPickProduct = function (type, id) {
+        const hidden = $(type === 'sched' ? 'boSchedPick' : 'boPoolPick');
+        if (!hidden) return;
+        hidden.value = String(id);
+        boRenderPicker(type);
+    };
+
+    function boFillPickers() {
+        boRenderPicker('sched');
+        boRenderPicker('pool');
+    }
+
+    ['boSchedSearch', 'boPoolSearch'].forEach(id => {
+        const input = $(id);
+        if (input && !input.dataset.bound) {
+            input.addEventListener('input', () => boRenderPicker(id === 'boSchedSearch' ? 'sched' : 'pool'));
+            input.dataset.bound = '1';
+        }
+    });
 
     window.boReload = function () {
         boFillPickers();
@@ -2526,6 +2868,7 @@
             const res = await api(`${BAPI}/schedules`, { method:'POST', body: JSON.stringify({ store_id: boStoreId(), marketplace_product_id: pid, times }) });
             toast(res.message);
             $('boSchedPick').value = '';
+            boRenderPicker('sched');
             $('boSchedTimes').innerHTML = '<input type="time" class="bo-t" value="08:00">';
             boScheds();
         } catch (e) { toast('Gagal: ' + e.message, 'error'); }
@@ -2553,7 +2896,7 @@
         if (!pid) return alert('Pilih produk dulu.');
         try {
             const res = await api(`${BAPI}/pool`, { method:'POST', body: JSON.stringify({ store_id: boStoreId(), product_ids: [pid] }) });
-            toast(res.message); $('boPoolPick').value = ''; boPool();
+            toast(res.message); $('boPoolPick').value = ''; boRenderPicker('pool'); boPool();
         } catch (e) { toast('Gagal: ' + e.message, 'error'); }
     };
 
