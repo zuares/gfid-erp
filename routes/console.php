@@ -196,6 +196,13 @@ Schedule::call(fn () => Artisan::call('marketplace:snapshot-products', ['--sync'
     ->name('snapshot-products')
     ->withoutOverlapping();
 
+// Shopee Brand Portal performance: tarik 7 hari terakhir agar metrik yang
+// terlambat final (refund/voucher/order) ikut diperbarui.
+Schedule::command('marketplace:sync-shopee-performance')
+    ->dailyAt('02:30')
+    ->name('sync-shopee-performance')
+    ->withoutOverlapping();
+
 // Naikkan Produk: mesin boost terjadwal (jam-tetap + rotasi otomatis, maks 5 / 4 jam)
 Schedule::call(fn () => Artisan::call('marketplace:run-boosts'))
     ->everyFiveMinutes()

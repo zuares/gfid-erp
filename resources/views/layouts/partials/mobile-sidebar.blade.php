@@ -355,6 +355,7 @@
     $hasMarketplaceAds = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics = $router->has('marketplace.analytics');
     $hasMarketplaceSalesDashboard = $router->has('marketplace.dashboard.sales');
+    $hasMarketplaceShopeePerformance = $router->has('marketplace.shopee-performance');
     $hasMarketplaceIssues = $router->has('marketplace.issues');
     $hasMarketplaceShopeeApiLogs = $router->has('marketplace.shopee-api-logs');
     $hasSocialMediaInstagram = $router->has('social-media.instagram');
@@ -595,6 +596,7 @@
         request()->routeIs('marketplace.ads.dashboard') ||
         request()->routeIs('marketplace.analytics') ||
         request()->routeIs('marketplace.dashboard.sales') ||
+        request()->routeIs('marketplace.shopee-performance') ||
         request()->routeIs('marketplace.issues') ||
         request()->routeIs('marketplace.shopee-api-logs') ||
         request()->routeIs('imports.marketplace.*') ||
@@ -628,7 +630,8 @@
         request()->routeIs('marketplace.reports.*') ||
         request()->routeIs('marketplace.finance.*') ||
         request()->routeIs('marketplace.ads.dashboard') ||
-        request()->routeIs('marketplace.analytics');
+        request()->routeIs('marketplace.analytics') ||
+        request()->routeIs('marketplace.shopee-performance');
 
     $marketplaceDataGroupOpen =
         request()->routeIs('marketplace.sync') ||
@@ -1004,7 +1007,7 @@
                                     </div>
                                 @endif
 
-                                @if ($hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
+                                @if ($hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceShopeePerformance || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
                                     <button class="mobile-sidebar-link mobile-sidebar-toggle mobile-sidebar-nested-toggle {{ $marketplaceFinanceGroupOpen ? 'is-open' : '' }}"
                                             type="button" data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminFinanceMobile"
                                             aria-expanded="{{ $marketplaceFinanceGroupOpen ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminFinanceMobile">
@@ -1859,7 +1862,7 @@
                     @endif
 
                     {{-- SALES & MARKETPLACE --}}
-                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceProfit || $hasMarketplaceSalesReport || $hasMarketplaceSalesDashboard || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialQuality || $hasMarketplaceFinance || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues || $hasMarketplaceShopeeApiLogs || $hasImportMarketplaceIndex || $hasImportMarketplaceDraft || $hasImportMarketplaceIncomeIndex || $hasImportMarketplaceIncomeDraft)
+                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceProfit || $hasMarketplaceSalesReport || $hasMarketplaceSalesDashboard || $hasMarketplaceShopeePerformance || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialQuality || $hasMarketplaceFinance || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues || $hasMarketplaceShopeeApiLogs || $hasImportMarketplaceIndex || $hasImportMarketplaceDraft || $hasImportMarketplaceIncomeIndex || $hasImportMarketplaceIncomeDraft)
                     <div class="mobile-sidebar-section-label">Toko Online</div>
                     <li class="mb-1">
                         <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}"
@@ -2077,6 +2080,12 @@
                                 <a href="{{ route('marketplace.dashboard.sales') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.dashboard.sales') ? 'active' : '' }}">
                                     <span class="icon">📈</span><span>Dashboard Penjualan</span>
+                                </a>
+                            @endif
+                            @if ($hasMarketplaceShopeePerformance)
+                                <a href="{{ route('marketplace.shopee-performance') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.shopee-performance') ? 'active' : '' }}">
+                                    <span class="icon">🛍️</span><span>Shopee Performance</span>
                                 </a>
                             @endif
                             @if ($hasMarketplaceSalesReport)

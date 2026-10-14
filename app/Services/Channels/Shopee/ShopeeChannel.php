@@ -30,6 +30,20 @@ class ShopeeChannel implements MarketplaceChannel
         return trim((string) $store->credential('shop_id', $store->external_shop_id));
     }
 
+    /**
+     * Principal ID used by Brand Portal / principal-level APIs.
+     * Prefer the encrypted per-store credential so a principal can own more
+     * than one shop; keep the config fallback for the existing single-principal
+     * deployment setup.
+     */
+    protected function principalId(Store $store): string
+    {
+        return trim((string) $store->credential(
+            'principal_id',
+            data_get($store->meta ?? [], 'principal_id', config('shopee.principal_id'))
+        ));
+    }
+
     protected function accessToken(Store $store): string
     {
         return trim((string) $store->credential('access_token'));
@@ -42,6 +56,17 @@ class ShopeeChannel implements MarketplaceChannel
         if ($shopApi) {
             $baseString .= $this->accessToken($store) . $this->shopId($store);
         }
+
+        return hash_hmac('sha256', $baseString, $this->partnerKey($store));
+    }
+
+    protected function principalSign(Store $store, string $path, int $timestamp): string
+    {
+        $baseString = $this->partnerId($store)
+            . $path
+            . $timestamp
+            . $this->accessToken($store)
+            . $this->principalId($store);
 
         return hash_hmac('sha256', $baseString, $this->partnerKey($store));
     }
@@ -72,6 +97,15 @@ class ShopeeChannel implements MarketplaceChannel
         // server (mis. kirim chat, atur pengiriman) dan retry akan menduplikasi aksi.
         // Hanya 429 yang aman di-retry (request pasti ditolak sebelum diproses).
         return $this->resilientRequest($store, fn () => $this->doPost($store, $path, $body), false);
+    }
+
+    /**
+     * POST for principal-level read APIs. Principal endpoints use principal_id
+     * in both the query string and signature instead of shop_id.
+     */
+    protected function postPrincipal(Store $store, string $path, array $body = []): array
+    {
+        return $this->resilientRequest($store, fn () => $this->doPrincipalPost($store, $path, $body), false);
     }
 
     /**
@@ -260,6 +294,25 @@ class ShopeeChannel implements MarketplaceChannel
         ];
 
         $response = Http::connectTimeout(10)->timeout(30)->post($this->baseUrl($store) . $path . '?' . http_build_query($query), $body);
+
+        return $this->withHttpMeta($response);
+    }
+
+    protected function doPrincipalPost(Store $store, string $path, array $body = []): array
+    {
+        $timestamp = time();
+
+        $query = [
+            'partner_id'   => (int) $this->partnerId($store),
+            'timestamp'    => $timestamp,
+            'access_token' => $this->accessToken($store),
+            'principal_id' => (int) $this->principalId($store),
+            'sign'         => $this->principalSign($store, $path, $timestamp),
+        ];
+
+        $response = Http::connectTimeout(10)
+            ->timeout(30)
+            ->post($this->baseUrl($store) . $path . '?' . http_build_query($query), $body);
 
         return $this->withHttpMeta($response);
     }
@@ -671,6 +724,29 @@ class ShopeeChannel implements MarketplaceChannel
     public function getAmsValidationReport(Store $store, array $params): array
     {
         return $this->post($store, '/api/v2/ams/get_validation_report', $params);
+    }
+
+    // ─── Brand Portal / Principal APIs ──────────────────────────────────────
+
+    /**
+     * Retrieve shop-level sales performance metrics for a principal.
+     *
+     * Endpoint permission: Brand Portal Service.
+     */
+    public function getShopSalesPerformanceDetail(Store $store, array $params): array
+    {
+        if ($this->principalId($store) === '') {
+            return [
+                'error' => 'principal_id_missing',
+                'message' => 'Principal ID Shopee belum dikonfigurasi untuk toko ini.',
+            ];
+        }
+
+        return $this->postPrincipal(
+            $store,
+            '/api/v2/principal/get_shop_sales_performance_detail',
+            $params
+        );
     }
 
     // ─── Ads API ──────────────────────────────────────────────────────────────

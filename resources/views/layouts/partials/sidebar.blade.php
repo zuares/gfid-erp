@@ -112,6 +112,7 @@
     $hasMarketplaceAds         = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics   = $router->has('marketplace.analytics');
     $hasMarketplaceSalesDashboard = $router->has('marketplace.dashboard.sales');
+    $hasMarketplaceShopeePerformance = $router->has('marketplace.shopee-performance');
     $hasMarketplaceIssues      = $router->has('marketplace.issues');
     $hasMarketplaceShopeeApiLogs = $router->has('marketplace.shopee-api-logs');
     $hasSocialMediaInstagram = $router->has('social-media.instagram');
@@ -357,6 +358,7 @@
         $open('marketplace.finance.*') ||
         $open('marketplace.analytics') ||
         $open('marketplace.dashboard.sales') ||
+        $open('marketplace.shopee-performance') ||
         $open('marketplace.ads.dashboard');
 
     $openMarketplaceDataGroup =
@@ -1225,7 +1227,7 @@
                             </div>
                         @endif
 
-                        @if ($hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
+                        @if ($hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceShopeePerformance || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
                             <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceFinanceGroup ? 'is-open' : '' }}" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminFinance"
                                 aria-expanded="{{ $openMarketplaceFinanceGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminFinance">
@@ -1238,6 +1240,12 @@
                                     <x-sidebar.sub-link href="{{ route('marketplace.dashboard.sales') }}" icon="bi bi-speedometer2"
                                         :active="request()->routeIs('marketplace.dashboard.sales')">
                                         Dashboard Penjualan
+                                    </x-sidebar.sub-link>
+                                @endif
+                                @if ($hasMarketplaceShopeePerformance)
+                                    <x-sidebar.sub-link href="{{ route('marketplace.shopee-performance') }}" icon="bi bi-shop-window"
+                                        :active="request()->routeIs('marketplace.shopee-performance')">
+                                        Shopee Performance
                                     </x-sidebar.sub-link>
                                 @endif
                                 @if ($hasMarketplaceSalesReport)
@@ -1992,7 +2000,7 @@
                             </div>
                         @endif
 
-                        @if ($hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialClosing || $hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceFinance)
+                        @if ($hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialClosing || $hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceShopeePerformance || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceFinance)
                             <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceFinanceGroup ? 'is-open' : '' }}" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerFinance"
                                 aria-expanded="{{ $openMarketplaceFinanceGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerFinance">
@@ -2006,6 +2014,12 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.dashboard.sales') }}" icon="bi bi-speedometer2"
                                 :active="request()->routeIs('marketplace.dashboard.sales')">
                                 Dashboard Penjualan
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceShopeePerformance)
+                            <x-sidebar.sub-link href="{{ route('marketplace.shopee-performance') }}" icon="bi bi-shop-window"
+                                :active="request()->routeIs('marketplace.shopee-performance')">
+                                Shopee Performance
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplacePencairanDana)

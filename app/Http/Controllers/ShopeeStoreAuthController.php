@@ -104,6 +104,12 @@ class ShopeeStoreAuthController extends Controller
             'partner_id' => $partnerId,
             'partner_key' => $partnerKey,
             'shop_id' => (string) $shopId,
+            // Principal-level APIs (Brand Portal) use a different signing
+            // subject. Persist it when the OAuth response provides one; keep
+            // the deployment-level config fallback for older connections.
+            'principal_id' => $token['principal_id']
+                ?? data_get($token, 'principal_id_list.0')
+                ?? config('shopee.principal_id'),
             'access_token' => $token['access_token'] ?? null,
             'refresh_token' => $token['refresh_token'] ?? null,
             'base_url' => $baseUrl,

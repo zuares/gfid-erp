@@ -79,6 +79,7 @@ use App\Http\Controllers\Marketplace\EscrowController;
 use App\Http\Controllers\Marketplace\PayoutController;
 use App\Http\Controllers\Marketplace\MarketplaceAnalyticsController;
 use App\Http\Controllers\Marketplace\MarketplaceSalesDashboardController;
+use App\Http\Controllers\Marketplace\ShopeeShopPerformanceController;
 
 // Marketplace — halaman
 Route::middleware(['auth', 'access:marketplace'])->group(function () {
@@ -119,6 +120,8 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::post('/marketplace/settings/delete-template', [MarketplaceSettingsController::class, 'deleteTemplate'])->name('marketplace.settings.delete_template');
     Route::get('/marketplace/analytics',  [MarketplaceAnalyticsController::class, 'index'])->name('marketplace.analytics');
     Route::get('/marketplace/dashboard/sales', [MarketplaceSalesDashboardController::class, 'index'])->name('marketplace.dashboard.sales');
+    Route::get('/marketplace/shopee-performance', [ShopeeShopPerformanceController::class, 'index'])->name('marketplace.shopee-performance');
+    Route::post('/marketplace/shopee-performance/sync', [ShopeeShopPerformanceController::class, 'sync'])->name('marketplace.shopee-performance.sync');
     Route::get('/marketplace/dashboard/products/orders', [MarketplaceSalesDashboardController::class, 'productOrders'])->name('marketplace.dashboard.products.orders');
     Route::get('/marketplace/dashboard/payments/{date}', [MarketplaceSalesDashboardController::class, 'paymentDetail'])->name('marketplace.dashboard.payments.detail');
     Route::get('/marketplace/dashboard/promotions/{date}', [MarketplaceSalesDashboardController::class, 'promotionDetail'])->name('marketplace.dashboard.promotions.detail');
@@ -195,6 +198,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/analytics-cash-orders',       [MarketplaceAnalyticsController::class, 'cashOrders']);
     Route::get('/analytics-return-orders',      [MarketplaceAnalyticsController::class, 'returnOrders']);
     Route::get('/analytics-ad-cost',           [MarketplaceController::class, 'analyticsAdCost']);
+    Route::get('/shopee-performance/data',     [ShopeeShopPerformanceController::class, 'data'])->name('marketplace.api.shopee-performance.data');
     Route::get('/local-orders/{order}/buyer-completed-orders', [MarketplaceController::class, 'buyerCompletedOrders']);
     Route::get('/local-orders-paginated',      [MarketplaceController::class, 'localOrdersPaginated']);
     Route::get('/local-order-counts',          [MarketplaceController::class, 'localOrderCounts']);
