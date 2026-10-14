@@ -149,6 +149,15 @@
     .prd-edit-section{ border:1px solid var(--prd-border); border-radius:12px; padding:.8rem; margin-bottom:.75rem; background:rgba(148,163,184,.035); }
     .prd-edit-section-title{ font-size:.78rem; font-weight:800; margin-bottom:.6rem; color:var(--prd-accent); }
     .prd-edit-meta{ font-size:.7rem; color:var(--prd-muted); }
+    .prd-category-card{ display:flex; align-items:center; gap:.7rem; min-height:58px; padding:.65rem .75rem; border:1px solid var(--prd-border); border-radius:11px; background:var(--card,#fff); }
+    .prd-category-icon{ width:34px; height:34px; display:grid; place-items:center; flex:none; border-radius:9px; background:rgba(37,99,235,.1); color:#2563eb; }
+    .prd-category-copy{ min-width:0; flex:1; }
+    .prd-category-label{ font-size:.61rem; font-weight:800; letter-spacing:.07em; color:#64748b; text-transform:uppercase; }
+    .prd-category-name{ margin-top:.12rem; color:inherit; font-size:.76rem; font-weight:750; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .prd-category-meta{ margin-top:.12rem; color:#94a3b8; font-size:.65rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .prd-category-badge{ flex:none; padding:.25rem .45rem; border-radius:6px; background:rgba(100,116,139,.11); color:#64748b; font-size:.61rem; font-weight:800; }
+    body[data-theme="dark"] .prd-category-card{ background:rgba(15,23,42,.55); }
+    body[data-theme="dark"] .prd-category-name{ color:#e2e8f0; }
     .prd-promo-context{ display:flex; align-items:center; gap:.75rem; padding:.65rem .75rem; border:1px solid rgba(37,99,235,.2); border-radius:11px; background:rgba(37,99,235,.06); color:#1e3a8a; }
     .prd-promo-modal .modal-content{ border:0; box-shadow:0 18px 60px rgba(15,23,42,.2); overflow:hidden; }
     .prd-promo-modal .modal-header{ padding:1.1rem 1.25rem .85rem; background:var(--card,#fff); }
@@ -791,6 +800,7 @@
     let productEditorData = null;
     let productEditorImages = [];
     let productEditorImagesDirty = false;
+    const productCategoryCache = new Map();
     let productCreate = null;
     let productPromotionState = {
         product: null,
@@ -829,6 +839,43 @@
             flattenCreateCategories(node.children || node.sub_category_list || node.category_list || [], level + 1, rows);
         });
         return rows;
+    }
+
+    function findCategoryPath(nodes, categoryId, parents = []) {
+        for (const node of (nodes || [])) {
+            const id = String(node.category_id ?? node.id ?? '');
+            const name = node.category_name ?? node.name ?? 'Kategori';
+            const path = [...parents, name];
+            if (id === String(categoryId)) return path;
+            const found = findCategoryPath(node.children || node.sub_category_list || node.category_list || [], categoryId, path);
+            if (found.length) return found;
+        }
+        return [];
+    }
+
+    async function loadProductCategoryLabel(storeId, categoryId) {
+        const nameTarget = $('productEditorCategoryName');
+        const metaTarget = $('productEditorCategoryMeta');
+        if (!nameTarget || !metaTarget) return;
+        if (!categoryId) {
+            nameTarget.textContent = 'Belum ditetapkan';
+            metaTarget.textContent = 'Produk belum memiliki kategori marketplace';
+            return;
+        }
+        const cacheKey = String(storeId || '');
+        try {
+            if (!productCategoryCache.has(cacheKey)) {
+                const result = await api(`${API}/create/categories`, { method: 'POST', body: JSON.stringify({ store_id: storeId }) });
+                productCategoryCache.set(cacheKey, result.response?.category_list || result.category_list || []);
+            }
+            const path = findCategoryPath(productCategoryCache.get(cacheKey), categoryId);
+            nameTarget.textContent = path.length ? path[path.length - 1] : 'Kategori Shopee tidak ditemukan';
+            nameTarget.title = path.join(' › ');
+            metaTarget.textContent = `ID kategori ${categoryId}${path.length > 1 ? ` · ${path.join(' › ')}` : ''}`;
+        } catch (error) {
+            nameTarget.textContent = 'Nama kategori belum tersedia';
+            metaTarget.textContent = `ID kategori ${categoryId} · Gagal memuat nama kategori`;
+        }
     }
 
     function createStepStatus() {
@@ -1165,8 +1212,8 @@
                 <div class="row">
                     <div class="col-md-8 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">NAMA PRODUK</label><input class="form-control form-control-sm" id="editorItemName" maxlength="255" value="${esc(product.item_name || '')}"></div>
                     <div class="col-md-4 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">SKU INDUK</label><input class="form-control form-control-sm" id="editorItemSku" maxlength="100" value="${esc(product.item_sku || '')}"></div>
-                    <div class="col-md-6 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">STATUS</label><input class="form-control form-control-sm prd-edit-readonly" value="${esc(product.item_status || '—')}" readonly></div>
-                    <div class="col-md-6 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">KATEGORI ID</label><input class="form-control form-control-sm prd-edit-readonly" value="${esc(product.category_id || '—')}" readonly></div>
+                    <div class="col-md-4 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">STATUS LISTING</label><input class="form-control form-control-sm prd-edit-readonly" value="${esc(product.item_status || '—')}" readonly></div>
+                    <div class="col-md-8 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">KATEGORI MARKETPLACE</label><div class="prd-category-card"><span class="prd-category-icon"><i class="bi bi-diagram-3"></i></span><span class="prd-category-copy"><span class="prd-category-label">Shopee</span><span class="prd-category-name" id="productEditorCategoryName">Memuat nama kategori…</span><span class="prd-category-meta" id="productEditorCategoryMeta">ID kategori ${esc(product.category_id || '—')}</span></span><span class="prd-category-badge">READ ONLY</span></div></div>
                 </div>
                 <label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">DESKRIPSI</label>
                 <textarea class="form-control form-control-sm" id="editorDescription" rows="5" maxlength="3000">${esc(product.description || '')}</textarea>
@@ -1208,6 +1255,7 @@
             </div>`;
 
         renderProductEditorGallery();
+        loadProductCategoryLabel(product.store_id, product.category_id);
         loadProductEditorLogs();
         $('productEditorSaveBtn').disabled = false;
         $('productEditorSaveStatus').textContent = 'Perubahan belum disimpan.';
