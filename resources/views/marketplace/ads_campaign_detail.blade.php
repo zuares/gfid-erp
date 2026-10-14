@@ -90,7 +90,7 @@
 
                 <section class="cd-card cd-section mb-3" id="record-change">
                     <div class="cd-section-title"><i class="bi bi-clipboard2-pulse text-primary"></i> Catat perubahan campaign</div>
-                    <div class="cd-section-note">Gunakan ini setelah mengganti foto, harga, judul, atau perubahan lain di Seller Center. Record ini menjadi baseline evaluasi campaign ini.</div>
+                    <div class="cd-section-note">Mode lokal saja: perubahan dicatat ke database dan menjadi baseline evaluasi, tanpa mengirim request ke Seller Center.</div>
                     <div id="recordAlert" class="cd-alert"></div>
                     <form id="recordChangeForm" class="cd-form">
                         <input type="hidden" name="store_id" value="{{ $storeId }}">
@@ -163,9 +163,9 @@
                                 </div>
                             </div>
                         </div>
-                        <div id="recordApplyNote" class="cd-help mt-2">Target ROAS dan budget akan diterapkan ke campaign. Perubahan lain akan diterapkan ke produk jika data produk tersedia, lalu otomatis dicatat ke Evaluasi.</div>
+                        <div id="recordApplyNote" class="cd-help mt-2">Tidak ada perubahan yang dikirim ke Shopee. Form ini hanya mencatat rencana/perubahan ke Evaluasi lokal.</div>
                         <div class="d-flex justify-content-end mt-3">
-                            <button id="recordSubmit" class="btn btn-primary" type="submit"><i class="bi bi-save"></i> Terapkan &amp; catat</button>
+                            <button id="recordSubmit" class="btn btn-primary" type="submit"><i class="bi bi-save"></i> Catat lokal</button>
                         </div>
                     </form>
                 </section>
@@ -187,7 +187,7 @@
             <aside>
                 <section class="cd-card cd-section mb-3" id="quick-edit">
                     <div class="cd-section-title"><i class="bi bi-sliders2 text-primary"></i> Edit cepat campaign</div>
-                    <div class="cd-section-note">Perubahan dikirim ke API campaign dan otomatis dicatat ke Evaluasi. Untuk menjaga rate limit marketplace, simpan satu perubahan per klik.</div>
+                    <div class="cd-section-note">Mode lokal saja. Perubahan tidak dikirim ke Shopee; hanya dicatat ke Evaluasi lokal. Simpan satu perubahan per klik.</div>
                     <div id="quickAlert" class="cd-alert"></div>
                     <form id="quickEditForm" class="cd-form">
                         <div class="mb-2">
@@ -236,16 +236,10 @@
 (function () {
     const campaignId = @json($campaignId);
     const storeId = @json($storeId);
-    const campaignRecordId = @json((int) $campaign->id);
-    const productId = @json($product?->id);
-    const productPriceUrl = @json($product ? url('/api/marketplace/products/' . $product->id . '/price') : null);
-    const productBaseInfoUrl = @json($product ? url('/api/marketplace/products/' . $product->id . '/base-info') : null);
-    const isGms = String(campaignId).toUpperCase().startsWith('GMS-');
+    const channelItemId = @json($campaign->channel_item_id);
     const detailUrl = @json(url('/api/marketplace/ad-campaigns/' . $campaign->id . '/detail'));
     const evaluationsUrl = @json(route('marketplace.ads.experiments.index'));
     const recordUrl = @json(route('marketplace.ads.evaluations.store'));
-    const editUrl = @json(route('marketplace.ads.cpc.campaign.edit'));
-    const gmsEditUrl = @json(route('marketplace.ads.gms.campaign.edit'));
     const backUrl = @json($backUrl);
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     const detailFrom = @json($dateFrom);
@@ -321,18 +315,15 @@
         if (type === 'target_roas' && !$('recordBefore').value) $('recordBefore').value = $('recordType').dataset.beforeTargetRoas || '';
         if (type === 'budget' && !$('recordBefore').value) $('recordBefore').value = $('recordType').dataset.beforeBudget || '';
         const notes = {
-            creative: productId ? 'Perubahan foto dicatat di workflow ini. Upload foto tetap mengikuti dukungan image API marketplace.' : 'Produk belum tersinkron; perubahan akan dicatat sebagai evaluasi manual.',
-            price: productPriceUrl ? 'Harga akan dikirim ke marketplace dari halaman ini dan otomatis masuk ke Evaluasi.' : 'Produk belum tersinkron; perubahan akan dicatat sebagai evaluasi manual.',
-            title: productBaseInfoUrl ? 'Judul akan dikirim ke marketplace dari halaman ini dan otomatis masuk ke Evaluasi.' : 'Produk belum tersinkron; perubahan akan dicatat sebagai evaluasi manual.',
-            target_roas: 'Target ROAS akan diterapkan ke campaign dan dicatat sebagai evaluasi.',
-            budget: 'Budget akan diterapkan ke campaign dan dicatat sebagai evaluasi.',
-            other: 'Perubahan ini hanya dicatat sebagai evaluasi manual.',
+            creative: 'Perubahan foto/creative hanya dicatat sebagai evaluasi lokal.',
+            price: 'Perubahan harga hanya dicatat sebagai evaluasi lokal.',
+            title: 'Perubahan judul/deskripsi hanya dicatat sebagai evaluasi lokal.',
+            target_roas: 'Perubahan Target ROAS hanya dicatat sebagai evaluasi lokal.',
+            budget: 'Perubahan budget hanya dicatat sebagai evaluasi lokal.',
+            other: 'Perubahan ini hanya dicatat sebagai evaluasi lokal.',
         };
         $('recordApplyNote').textContent = notes[type] || notes.other;
-        const canApply = (type === 'target_roas' || type === 'budget' || type === 'price' && !!productPriceUrl || type === 'title' && !!productBaseInfoUrl);
-        $('recordSubmit').innerHTML = canApply
-            ? '<i class="bi bi-cloud-check"></i> Terapkan &amp; catat'
-            : '<i class="bi bi-save"></i> Catat ke Evaluasi';
+        $('recordSubmit').innerHTML = '<i class="bi bi-save"></i> Catat lokal';
     }
 
     function loadDetail() {
@@ -390,16 +381,33 @@
         const payload = {
             store_id: storeId,
             campaign_id: campaignId,
-            roas_target: changedFields.includes('roas_target') ? roasInput : '',
-            daily_budget: changedFields.includes('daily_budget') ? budgetInput : '',
-            status_action: form.get('status_action') || '',
+            channel_campaign_id: campaignId,
+            channel_item_id: channelItemId == null ? '' : String(channelItemId),
+            change_type: changedFields[0] === 'roas_target' ? 'target_roas' : changedFields[0] === 'daily_budget' ? 'budget' : 'other',
+            before_value: changedFields[0] === 'roas_target'
+                ? ($('quickRoas').dataset.current || 'Auto')
+                : changedFields[0] === 'daily_budget'
+                    ? ($('quickBudget').dataset.current || '0')
+                    : ($('quickStatus').dataset.current || 'unknown'),
+            after_value: changedFields[0] === 'roas_target' ? roasInput : changedFields[0] === 'daily_budget' ? budgetInput : form.get('status_action'),
+            changed_at: new Date().toISOString(),
+            objective: changedFields[0] === 'status_action' ? 'Mencatat perubahan status campaign' : 'Mencatat perubahan setting campaign',
+            primary_kpi: changedFields[0] === 'daily_budget' ? 'roas' : 'roas',
+            notes: 'Mode lokal saja; belum diterapkan ke Shopee.',
+            confounders: [],
         };
         if (!changedFields.length) return showAlert('quickAlert', 'Belum ada perubahan baru pada campaign.');
         const button = $('quickSubmit'); button.disabled = true; button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menyimpan...';
-        requestJson(isGms ? gmsEditUrl : editUrl, { method:'POST', headers:{ Accept:'application/json', 'Content-Type':'application/json', 'X-CSRF-TOKEN':csrf }, body:JSON.stringify(payload) })
-            .then(data => { showAlert('quickAlert', data.message || 'Campaign berhasil diperbarui.', 'success'); loadDetail(); loadEvaluations(); })
+        recordManual(payload)
+            .then(data => {
+                showAlert('quickAlert', data.message || 'Perubahan berhasil dicatat secara lokal.', 'success');
+                $('quickRoas').value = $('quickRoas').dataset.current || '';
+                $('quickBudget').value = $('quickBudget').dataset.current || '';
+                $('quickStatus').value = '';
+                loadEvaluations();
+            })
             .catch(error => showAlert('quickAlert', error.message))
-            .finally(() => { button.disabled = false; button.innerHTML = '<i class="bi bi-cloud-check"></i> Simpan perubahan'; });
+            .finally(() => { button.disabled = false; button.innerHTML = '<i class="bi bi-save"></i> Catat lokal'; });
     });
 
     function recordManual(payload) {
@@ -413,28 +421,6 @@
     }
 
     function applyRecordedChange(payload) {
-        const type = payload.change_type;
-        if (type === 'target_roas' || type === 'budget') {
-            const quickPayload = {
-                store_id: storeId,
-                campaign_id: campaignId,
-                roas_target: type === 'target_roas' ? numericChangeValue(payload.after_value) : '',
-                daily_budget: type === 'budget' ? numericChangeValue(payload.after_value) : '',
-                status_action: '',
-            };
-            return requestJson(isGms ? gmsEditUrl : editUrl, { method:'POST', headers:{ Accept:'application/json', 'Content-Type':'application/json', 'X-CSRF-TOKEN':csrf }, body:JSON.stringify(quickPayload) });
-        }
-
-        if (type === 'price' && productPriceUrl && payload.after_value !== '') {
-            const modelId = $('recordModelId').value || '0';
-            return requestJson(productPriceUrl, { method:'POST', headers:{ Accept:'application/json', 'Content-Type':'application/json', 'X-CSRF-TOKEN':csrf }, body:JSON.stringify({ price_list:[{ model_id:modelId, original_price:Number(payload.after_value) }] }) });
-        }
-
-        if (type === 'title' && productBaseInfoUrl) {
-            return requestJson(productBaseInfoUrl, { method:'POST', headers:{ Accept:'application/json', 'Content-Type':'application/json', 'X-CSRF-TOKEN':csrf }, body:JSON.stringify({ item_name:payload.after_value }) })
-                .then(() => recordManual(payload));
-        }
-
         return recordManual(payload);
     }
 
