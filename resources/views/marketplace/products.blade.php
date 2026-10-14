@@ -1824,17 +1824,29 @@
         } catch (e) { alert('Gagal: ' + e.message); }
     };
 
-    function productPromotionVariants(product) {
+    function productPromotionVariants(product, promoItem = null) {
         const models = Array.isArray(product?.models) && product.models.length
             ? product.models
             : [{ model_id: '0', model_name: 'Default', model_sku: product?.item_sku || '', price: product?.price_min ?? 0, stock: product?.stock_total ?? 0 }];
-        return models.map(model => ({
-            model_id: String(model.model_id ?? '0'),
-            model_name: model.model_name || 'Default',
-            model_sku: model.model_sku || '',
-            original_price: Number(model.price ?? product?.price_min ?? 0),
-            stock: Number(model.stock ?? 0),
-        }));
+        const promoModels = new Map((promoItem?.model_list || []).map(model => [String(model.model_id ?? '0'), model]));
+        const itemOriginalPrice = Number(promoItem?.item_original_price ?? 0);
+        return models.map(model => {
+            const modelId = String(model.model_id ?? '0');
+            const promoModel = promoModels.get(modelId);
+            const campaignOriginalPrice = Number(promoModel?.model_original_price ?? 0);
+            const localOriginalPrice = Number(model.price ?? model.original_price ?? model.current_price ?? product?.price_min ?? 0);
+            const originalPrice = campaignOriginalPrice > 0
+                ? campaignOriginalPrice
+                : (modelId === '0' && itemOriginalPrice > 0 ? itemOriginalPrice : localOriginalPrice);
+
+            return {
+                model_id: modelId,
+                model_name: model.model_name || promoModel?.model_name || 'Default',
+                model_sku: model.model_sku || '',
+                original_price: originalPrice,
+                stock: Number(model.stock ?? 0),
+            };
+        });
     }
 
     function productPromotionDateLabel(value) {
@@ -1910,7 +1922,8 @@
         }
 
         const promoModels = promoItem.model_list || [];
-        const rows = productPromotionVariants(product).map(model => {
+        const variants = productPromotionVariants(product, promoItem);
+        const rows = variants.map(model => {
             const current = promoModels.find(item => String(item.model_id ?? 0) === model.model_id);
             const promoPrice = current?.model_promotion_price ?? '';
             const percentage = promoPrice && model.original_price > 0
@@ -1931,7 +1944,7 @@
 
         target.querySelectorAll('[data-promo-model-id]').forEach(input => {
             input.addEventListener('input', () => {
-                const model = productPromotionVariants(product).find(item => item.model_id === String(input.dataset.promoModelId));
+                const model = variants.find(item => item.model_id === String(input.dataset.promoModelId));
                 const percentageTarget = $(`prdPromoPct-${input.dataset.promoModelId}`);
                 const value = Number(input.value);
                 const percentage = model && value > 0 && model.original_price > 0
@@ -1978,7 +1991,8 @@
         if (!product || !detail || !button) return;
 
         const targetItemId = String(product.item_id);
-        const targetModels = productPromotionVariants(product).map(model => {
+        const promoItem = (detail.items || []).find(item => String(item.item_id) === targetItemId);
+        const targetModels = productPromotionVariants(product, promoItem).map(model => {
             const input = document.querySelector(`[data-promo-model-id="${model.model_id}"]`);
             const rawPrice = input?.value?.trim() || '';
             if (!rawPrice) return null;
