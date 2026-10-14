@@ -150,15 +150,61 @@
     .prd-edit-section-title{ font-size:.78rem; font-weight:800; margin-bottom:.6rem; color:var(--prd-accent); }
     .prd-edit-meta{ font-size:.7rem; color:var(--prd-muted); }
     .prd-promo-context{ display:flex; align-items:center; gap:.75rem; padding:.65rem .75rem; border:1px solid rgba(37,99,235,.2); border-radius:11px; background:rgba(37,99,235,.06); color:#1e3a8a; }
-    .prd-promo-context .title{ font-size:.82rem; font-weight:800; }
-    .prd-promo-context .meta{ font-size:.68rem; color:#64748b; margin-top:.12rem; }
+    .prd-promo-modal .modal-content{ border:0; box-shadow:0 18px 60px rgba(15,23,42,.2); overflow:hidden; }
+    .prd-promo-modal .modal-header{ padding:1.1rem 1.25rem .85rem; background:var(--card,#fff); }
+    .prd-promo-modal .modal-body{ padding:.75rem 1.25rem 1.1rem; background:rgba(248,250,252,.62); }
+    .prd-promo-modal .modal-footer{ padding:.8rem 1.25rem; border-top:1px solid var(--prd-border)!important; background:var(--card,#fff); }
+    .prd-promo-context{ display:flex; align-items:center; gap:.8rem; padding:.8rem .9rem; border:1px solid rgba(37,99,235,.2); border-radius:13px; background:linear-gradient(135deg,rgba(37,99,235,.09),rgba(59,130,246,.025)); color:#1e3a8a; }
+    .prd-promo-context-image{ width:52px; height:52px; flex:none; display:grid; place-items:center; border-radius:11px; overflow:hidden; background:rgba(37,99,235,.1); color:#60a5fa; font-size:1.1rem; }
+    .prd-promo-context-image img{ width:100%; height:100%; object-fit:cover; }
+    .prd-promo-context .eyebrow,.prd-promo-campaign-box .eyebrow{ font-size:.61rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#64748b; }
+    .prd-promo-context .title{ margin-top:.12rem; font-size:.84rem; font-weight:800; color:#1e3a8a; }
+    .prd-promo-context .meta{ font-size:.68rem; color:#64748b; margin-top:.14rem; }
+    .prd-promo-context-status{ margin-left:auto; display:inline-flex; align-items:center; gap:.3rem; padding:.27rem .5rem; border-radius:999px; background:rgba(22,163,74,.1); color:#15803d; font-size:.65rem; font-weight:800; white-space:nowrap; }
+    .prd-promo-campaign-box{ margin: .8rem 0; padding:.75rem .85rem; border:1px solid var(--prd-border); border-radius:13px; background:var(--card,#fff); }
+    .prd-promo-campaign-head{ display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem; }
+    .prd-promo-campaign-label{ margin-top:.1rem; font-size:.78rem; font-weight:800; color:inherit; }
+    .prd-promo-campaign-count{ margin-left:auto; color:#64748b; font-size:.67rem; font-weight:700; }
+    .prd-promo-campaign-select{ min-height:38px; border-radius:9px; font-size:.76rem; font-weight:650; }
+    .prd-promo-campaign-help{ display:flex; align-items:center; gap:.35rem; margin-top:.45rem; color:#64748b; font-size:.67rem; }
+    .prd-promo-detail-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:.75rem; margin:.95rem 0 .55rem; }
+    .prd-promo-detail-title{ font-size:.8rem; font-weight:800; }
+    .prd-promo-detail-copy{ margin-top:.15rem; color:#64748b; font-size:.68rem; }
+    .prd-promo-detail-meta{ display:flex; align-items:center; gap:.35rem; flex-wrap:wrap; justify-content:flex-end; }
+    .prd-promo-status,.prd-promo-variant-count{ display:inline-flex; align-items:center; min-height:25px; padding:.2rem .5rem; border-radius:999px; font-size:.64rem; font-weight:800; }
+    .prd-promo-status{ background:rgba(22,163,74,.1); color:#15803d; }
+    .prd-promo-variant-count{ background:rgba(100,116,139,.11); color:#64748b; }
+    .prd-promo-period{ display:flex; align-items:center; gap:.35rem; margin-bottom:.55rem; color:#64748b; font-size:.67rem; }
+    .prd-promo-table-wrap{ border:1px solid var(--prd-border); border-radius:12px; background:var(--card,#fff); overflow:hidden; }
     .prd-promo-table{ width:100%; font-size:.74rem; }
-    .prd-promo-table th{ color:#64748b; font-size:.65rem; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; }
-    .prd-promo-table td,.prd-promo-table th{ padding:.5rem .45rem; vertical-align:middle; border-bottom:1px solid var(--prd-border); }
+    .prd-promo-table th{ color:#64748b; background:rgba(148,163,184,.07); font-size:.62rem; text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
+    .prd-promo-table td,.prd-promo-table th{ padding:.65rem .7rem; vertical-align:middle; border-bottom:1px solid var(--prd-border); }
+    .prd-promo-table tbody tr:hover{ background:rgba(37,99,235,.025); }
     .prd-promo-table tr:last-child td{ border-bottom:0; }
-    .prd-promo-input{ width:132px; max-width:100%; text-align:right; }
+    .prd-promo-variant-name{ font-size:.75rem; font-weight:800; }
+    .prd-promo-variant-meta{ display:flex; gap:.25rem; flex-wrap:wrap; margin-top:.18rem; color:#94a3b8; font-size:.65rem; }
+    .prd-promo-normal-price{ color:#475569; font-size:.76rem; font-weight:750; white-space:nowrap; }
+    .prd-promo-input-wrap{ display:flex; align-items:center; width:150px; max-width:100%; border:1px solid var(--prd-border); border-radius:8px; background:var(--card,#fff); overflow:hidden; }
+    .prd-promo-input-wrap:focus-within{ border-color:#16a34a; box-shadow:0 0 0 3px rgba(22,163,74,.1); }
+    .prd-promo-input-prefix{ padding-left:.55rem; color:#94a3b8; font-size:.68rem; font-weight:750; }
+    .prd-promo-input{ width:100%; border:0!important; box-shadow:none!important; text-align:right; background:transparent!important; }
+    .prd-promo-discount{ display:inline-flex; align-items:center; justify-content:center; min-width:47px; padding:.28rem .45rem; border-radius:7px; background:rgba(22,163,74,.1); color:#15803d; font-size:.7rem; font-weight:800; }
+    .prd-promo-discount.empty{ background:rgba(148,163,184,.11); color:#94a3b8; font-weight:650; }
     .prd-promo-empty{ padding:1rem .75rem; border:1px dashed var(--prd-border); border-radius:11px; color:var(--prd-muted); font-size:.75rem; }
+    body[data-theme="dark"] .prd-promo-modal .modal-body{ background:rgba(15,23,42,.42); }
     body[data-theme="dark"] .prd-promo-context{ background:rgba(37,99,235,.12); color:#bfdbfe; border-color:rgba(96,165,250,.25); }
+    body[data-theme="dark"] .prd-promo-context .title{ color:#bfdbfe; }
+    body[data-theme="dark"] .prd-promo-table th{ background:rgba(30,41,59,.65); }
+    body[data-theme="dark"] .prd-promo-normal-price{ color:#cbd5e1; }
+    body[data-theme="dark"] .prd-promo-input-wrap{ background:#0f172a; }
+    @media (max-width:768px){
+        .prd-promo-modal .modal-body,.prd-promo-modal .modal-header,.prd-promo-modal .modal-footer{ padding-inline:.75rem; }
+        .prd-promo-context-status{ display:none; }
+        .prd-promo-detail-head{ display:block; }
+        .prd-promo-detail-meta{ justify-content:flex-start; margin-top:.5rem; }
+        .prd-promo-table td,.prd-promo-table th{ padding:.55rem .45rem; }
+        .prd-promo-input-wrap{ width:126px; }
+    }
     body[data-theme="dark"] .prd-promo-context .meta,.prd-promo-table th{ color:#94a3b8; }
     .prd-edit-readonly{ background:var(--card,#fff)!important; }
     .prd-change-log{ display:flex; flex-direction:column; gap:.45rem; }
@@ -675,10 +721,11 @@
 </div>
 
 <div class="modal fade" id="modalProductPromotion" tabindex="-1" aria-labelledby="modalProductPromotionLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content" style="border-radius:16px">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable prd-promo-modal">
+        <div class="modal-content">
             <div class="modal-header border-0 pb-2">
                 <div>
+                    <div class="prd-edit-meta mb-1"><i class="bi bi-tag me-1"></i>PRICING WORKSPACE</div>
                     <h5 class="modal-title fw-bold" id="modalProductPromotionLabel">Atur Harga Promo</h5>
                     <div class="prd-edit-meta" id="productPromotionSubtitle">Memuat campaign terkait…</div>
                 </div>
@@ -1891,16 +1938,17 @@
         }
 
         body.innerHTML = `
-            <div class="prd-promo-context mb-3">
-                ${product.image_url ? `<img class="prd-img" src="${esc(product.image_url)}" loading="lazy" alt="">` : '<div class="prd-img"></div>'}
-                <div class="min-w-0"><div class="title text-truncate">${esc(product.item_name || 'Produk')}</div><div class="meta">${esc(product.item_sku || 'SKU kosong')} · ${productPromotionVariants(product).length} variant</div></div>
+            <div class="prd-promo-context">
+                <div class="prd-promo-context-image">${product.image_url ? `<img src="${esc(product.image_url)}" loading="lazy" alt="">` : '<i class="bi bi-image"></i>'}</div>
+                <div class="min-w-0"><div class="eyebrow">Produk terkait promo</div><div class="title text-truncate">${esc(product.item_name || 'Produk')}</div><div class="meta">${esc(product.item_sku || 'SKU kosong')} · Item ID ${esc(product.item_id)} · ${productPromotionVariants(product).length} variant</div></div>
+                <span class="prd-promo-context-status"><i class="bi bi-check-circle-fill"></i> Siap diedit</span>
             </div>
-            <div class="prd-edit-section mb-3">
-                <label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">CAMPAIGN PROMO</label>
-                <select class="form-select form-select-sm" id="productPromotionCampaign" onchange="selectProductPromotion(this.value)">
+            <div class="prd-promo-campaign-box">
+                <div class="prd-promo-campaign-head"><div><div class="eyebrow">Campaign promo</div><div class="prd-promo-campaign-label">Pilih campaign yang ingin diperbarui</div></div><span class="prd-promo-campaign-count">${candidates.length} campaign</span></div>
+                <select class="form-select prd-promo-campaign-select" id="productPromotionCampaign" onchange="selectProductPromotion(this.value)">
                     ${candidates.map(campaign => `<option value="${esc(campaign.discount_id)}">${esc(campaign.discount_name || `Promo #${campaign.discount_id}`)} · ${esc(campaign.status_label || campaign.discount_status || '')}</option>`).join('')}
                 </select>
-                ${related.length ? '<div class="prd-edit-meta mt-2">Menampilkan campaign yang memuat produk ini.</div>' : '<div class="prd-edit-meta mt-2">Campaign aktif ditemukan. Pilih campaign untuk mengecek variant produk ini.</div>'}
+                <div class="prd-promo-campaign-help"><i class="bi bi-info-circle"></i>${related.length ? 'Campaign yang memuat produk ini ditampilkan lebih dulu.' : 'Campaign toko ditemukan. Pilih campaign untuk mengecek variant produk ini.'}</div>
             </div>
             <div id="productPromotionDetail"><div class="text-center text-muted py-4">Memuat variant promo…</div></div>`;
 
@@ -1930,16 +1978,16 @@
                 ? Math.max(0, Math.round(((model.original_price - Number(promoPrice)) / model.original_price) * 100))
                 : '';
             return `<tr>
-                <td><div class="fw-bold">${esc(model.model_name)}</div><div class="prd-edit-meta">${esc(model.model_sku || 'SKU kosong')} · Stok ${model.stock.toLocaleString('id-ID')}</div></td>
-                <td class="text-end">${rp(model.original_price)}</td>
-                <td><input type="number" min="100" step="1" class="form-control form-control-sm prd-promo-input" data-promo-model-id="${esc(model.model_id)}" value="${esc(promoPrice)}" placeholder="Nonaktif"></td>
-                <td class="text-end"><span id="prdPromoPct-${esc(model.model_id)}">${percentage ? `${percentage}%` : '—'}</span></td>
+                <td><div class="prd-promo-variant-name">${esc(model.model_name)}</div><div class="prd-promo-variant-meta"><span>${esc(model.model_sku || 'SKU kosong')}</span><span>·</span><span>Stok ${model.stock.toLocaleString('id-ID')}</span></div></td>
+                <td class="text-end"><span class="prd-promo-normal-price">${rp(model.original_price)}</span></td>
+                <td><div class="prd-promo-input-wrap"><span class="prd-promo-input-prefix">Rp</span><input type="number" min="100" step="1" inputmode="numeric" class="form-control form-control-sm prd-promo-input" data-promo-model-id="${esc(model.model_id)}" value="${esc(promoPrice)}" placeholder="Nonaktif" aria-label="Harga promo ${esc(model.model_name)}"></div></td>
+                <td class="text-end"><span class="prd-promo-discount ${percentage ? '' : 'empty'}" id="prdPromoPct-${esc(model.model_id)}">${percentage ? `${percentage}%` : '—'}</span></td>
             </tr>`;
         }).join('');
 
-        target.innerHTML = `<div class="d-flex align-items-center justify-content-between gap-2 mb-2"><div><div class="prd-edit-section-title mb-0">Harga promo per variant</div><div class="prd-edit-meta">Kosongkan harga untuk menonaktifkan variant dari campaign.</div></div><span class="badge-status st-normal">${esc(detail.status_label || detail.discount_status || 'Aktif')}</span></div>
-            <div class="prd-edit-meta mb-2">Periode: ${esc(productPromotionDateLabel(detail.start_time))} — ${esc(productPromotionDateLabel(detail.end_time))}</div>
-            <div class="table-responsive"><table class="prd-promo-table"><thead><tr><th>Variant</th><th class="text-end">Harga normal</th><th class="text-end">Harga promo</th><th class="text-end">Diskon</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+        target.innerHTML = `<div class="prd-promo-detail-head"><div><div class="prd-promo-detail-title">Harga promo per variant</div><div class="prd-promo-detail-copy">Kosongkan harga jika variant tidak ingin diikutkan dalam campaign.</div></div><div class="prd-promo-detail-meta"><span class="prd-promo-status"><i class="bi bi-broadcast-pin me-1"></i>${esc(detail.status_label || detail.discount_status || 'Aktif')}</span><span class="prd-promo-variant-count">${variants.length} variant</span></div></div>
+            <div class="prd-promo-period"><i class="bi bi-calendar3"></i><span>Periode ${esc(productPromotionDateLabel(detail.start_time))} — ${esc(productPromotionDateLabel(detail.end_time))}</span></div>
+            <div class="prd-promo-table-wrap"><div class="table-responsive"><table class="prd-promo-table"><thead><tr><th>Variant</th><th class="text-end">Harga normal</th><th>Harga promo</th><th class="text-end">Diskon</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
         saveButton.disabled = false;
 
         target.querySelectorAll('[data-promo-model-id]').forEach(input => {
@@ -1950,7 +1998,10 @@
                 const percentage = model && value > 0 && model.original_price > 0
                     ? Math.max(0, Math.round(((model.original_price - value) / model.original_price) * 100))
                     : '';
-                if (percentageTarget) percentageTarget.textContent = percentage ? `${percentage}%` : '—';
+                if (percentageTarget) {
+                    percentageTarget.textContent = percentage ? `${percentage}%` : '—';
+                    percentageTarget.classList.toggle('empty', !percentage);
+                }
             });
         });
 
