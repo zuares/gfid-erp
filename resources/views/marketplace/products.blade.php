@@ -307,8 +307,14 @@
     .table-list tbody td{ padding:.72rem .65rem; }
     .table-list tbody tr[data-pid]:hover td{ background:rgba(37,99,235,.055); }
     .prd-img{ width:50px; height:50px; border-radius:11px; }
+    .prd-product-cell{ display:flex; align-items:center; gap:.55rem; min-width:240px; }
+    .prd-product-copy{ min-width:0; }
+    .prd-product-copy .prd-sku{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px; }
     .prd-name{ font-size:.8rem; }
     .badge-status{ border-radius:999px; padding:.22rem .55rem; }
+    .prd-demo-badge{ display:none; align-items:center; gap:.3rem; margin-left:.4rem; padding:.18rem .5rem; border:1px solid rgba(245,158,11,.3); border-radius:999px; background:rgba(245,158,11,.1); color:#a16207; font-size:.65rem; font-weight:750; vertical-align:middle; }
+    .prd-demo-badge.show{ display:inline-flex; }
+    body[data-theme="dark"] .prd-demo-badge{ color:#fbbf24; background:rgba(245,158,11,.12); }
     .btn-mini{ border-radius:8px; }
     .prd-edit-section{ border-radius:14px; padding:.95rem; background:rgba(148,163,184,.025); }
     .modal-content{ border:1px solid var(--prd-border)!important; box-shadow:0 24px 70px rgba(15,23,42,.18); }
@@ -329,7 +335,7 @@
         <div>
             <div class="prd-eyebrow"><i class="bi bi-shop"></i> Marketplace / Shopee</div>
             <h1 class="title"><i class="bi bi-box-seam me-1 text-primary"></i>Produk Marketplace</h1>
-            <div class="sub">Kelola listing, harga normal, stok, mapping SKU, dan gambar dalam satu workspace <span id="rtLabel" class="muted"></span></div>
+            <div class="sub">Kelola listing, harga normal, stok, mapping SKU, dan gambar dalam satu workspace <span id="rtLabel" class="muted"></span><span id="prdDemoBadge" class="prd-demo-badge"><i class="bi bi-flask"></i> Data demo lokal</span></div>
             <div class="kpis" id="kpiRow"></div>
         </div>
         <div class="controls">
@@ -348,7 +354,7 @@
 
     {{-- ══ TAB: Daftar Produk ══ --}}
     <div id="tabProduk" class="pt-pane active">
-    <div class="workspace-intro"><span class="dot"></span><span>Pilih toko atau gunakan filter untuk menemukan produk yang ingin dikelola.</span></div>
+    <div class="workspace-intro"><span class="dot"></span><span>Pilih toko atau gunakan filter untuk menemukan produk yang ingin dikelola. Harga promo diatur dari modul Promosi.</span></div>
     <div id="storeTabs" class="store-tabs-shell" role="tablist" aria-label="Filter toko"></div>
     <div class="filter-panel">
         <div class="filter-panel-heading"><i class="bi bi-funnel"></i><span>Filter & urutan</span><span class="filter-count" id="prdCountLabel"></span></div>
@@ -397,10 +403,9 @@
     <div class="card-main table-wrap" style="max-height: calc(100vh - 210px); overflow-y: auto;">
         <table class="table-list table-hover">
             <thead><tr>
-                <th style="width:38px;text-align:center">#</th><th style="width:26px"></th><th style="width:50px"></th><th>Produk</th>
-                <th>Status</th><th title="Harga setelah diskon">Harga</th><th>Stok</th><th>Terjual</th><th title="Views dan rating">Performa</th><th title="Total nilai promosi">Promosi</th><th title="Total pembayaran pembeli">Keuangan</th><th>Mapping</th><th style="width:230px">Aksi</th>
+                <th style="width:38px;text-align:center">#</th><th>Produk</th><th>Status</th><th title="Harga normal produk">Harga</th><th>Stok</th><th>Mapping</th><th style="width:230px">Aksi</th>
             </tr></thead>
-            <tbody id="prdBody"><tr><td colspan="13" class="empty"><span class="prd-skeleton" style="max-width:260px"></span></td></tr></tbody>
+            <tbody id="prdBody"><tr><td colspan="7" class="empty"><span class="prd-skeleton" style="max-width:260px"></span></td></tr></tbody>
         </table>
     </div>
     </div>{{-- /tabProduk --}}
@@ -1200,14 +1205,16 @@
 
     // ── Data ────────────────────────────────────────────────────────────────
     window.loadProducts = async function () {
-        $('prdBody').innerHTML = `<tr><td colspan="13" class="empty"><div class="empty-state"><div class="empty-state-icon"><i class="bi bi-arrow-repeat"></i></div><div class="empty-state-title">Mengambil produk terbaru…</div><div class="empty-state-copy">Data listing sedang disiapkan dari penyimpanan lokal.</div></div></td></tr>`;
+        $('prdBody').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-state"><div class="empty-state-icon"><i class="bi bi-arrow-repeat"></i></div><div class="empty-state-title">Mengambil produk terbaru…</div><div class="empty-state-copy">Data listing sedang disiapkan dari penyimpanan lokal.</div></div></td></tr>`;
         try {
             products = await api(API);
+            const demoBadge = $('prdDemoBadge');
+            if (demoBadge) demoBadge.classList.toggle('show', products.some(product => product.raw_json?.dummy_source === 'marketplace_products_ui_v1'));
             buildStoreOptions();
             render();
             if ($('tabStok') && $('tabStok').classList.contains('active')) stRender();
         } catch (e) {
-            $('prdBody').innerHTML = `<tr><td colspan="13" class="empty text-danger">${esc(e.message)}</td></tr>`;
+            $('prdBody').innerHTML = `<tr><td colspan="7" class="empty text-danger">${esc(e.message)}</td></tr>`;
         }
     };
 
@@ -1407,7 +1414,7 @@
 
         if (!rows.length) {
             const hasProducts = products.length > 0;
-            $('prdBody').innerHTML = `<tr><td colspan="13" class="empty"><div class="empty-state">
+            $('prdBody').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-state">
                 <div class="empty-state-icon"><i class="bi bi-${hasProducts ? 'search' : 'box-seam'}"></i></div>
                 <div class="empty-state-title">${hasProducts ? 'Produk tidak ditemukan' : 'Belum ada produk'}</div>
                 <div class="empty-state-copy">${hasProducts ? 'Coba ubah kata kunci atau filter yang dipilih.' : 'Klik Sync Shopee untuk mengambil listing, atau tambah produk baru untuk mulai menjual.'}</div>
@@ -1423,10 +1430,6 @@
             const price = p.price_min != null
                 ? (p.price_min === p.price_max ? rp(p.price_min) : `${rp(p.price_min)} – ${rp(p.price_max)}`)
                 : '—';
-            const stats = `<div style="font-size:.7rem; line-height:1.4; white-space:nowrap;"><i class="bi bi-eye"></i> ${p.views || 0} &nbsp; <i class="bi bi-star"></i> ${p.rating_star || 0}</div>`;
-            const totalPromotion = Number(p.total_promotion || 0);
-            const buyerPayment = Number(p.buyer_payment || 0);
-
             const isBermasalahTab = $('fStore').value === 'bermasalah';
 
             let aksiContent = '';
@@ -1483,25 +1486,19 @@
             const isModelOpened = openedModels.has(p.id);
             const mainRow = `<tr data-pid="${p.id}">
                 <td class="prd-no">${rowIndex + 1}</td>
-                <td>${multiModel ? `<span class="prd-caret" onclick="toggleModels(${p.id}, this)"><i class="bi bi-chevron-${isModelOpened ? 'down' : 'right'}"></i></span>` : ''}</td>
-                <td>${p.image_url ? `<img class="prd-img" src="${esc(p.image_url)}" loading="lazy">` : '<div class="prd-img"></div>'}</td>
-                <td><a class="prd-product-link" href="javascript:void(0)" onclick="showProductOrders(${p.id}); return false;" title="Lihat pesanan produk"><div class="prd-name" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" title="${esc(p.item_name || '')}">${esc(p.item_name || '—')}</div></a>
-                    <div class="prd-sku d-flex align-items-center gap-1 flex-wrap mt-1">
+                <td><div class="prd-product-cell">
+                    ${multiModel ? `<span class="prd-caret" onclick="toggleModels(${p.id}, this)" title="Tampilkan varian"><i class="bi bi-chevron-${isModelOpened ? 'down' : 'right'}"></i></span>` : '<span style="width:.8rem"></span>'}
+                    ${p.image_url ? `<img class="prd-img" src="${esc(p.image_url)}" loading="lazy" alt="">` : '<div class="prd-img"></div>'}
+                    <div class="prd-product-copy"><a class="prd-product-link" href="javascript:void(0)" onclick="showProductOrders(${p.id}); return false;" title="Lihat pesanan produk"><div class="prd-name" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" title="${esc(p.item_name || '')}">${esc(p.item_name || '—')}</div></a>
+                    <div class="prd-sku mt-1" title="${esc(p.item_sku || p.item_id || '')}">
                         <span class="text-muted">SKU:</span>
-                        <div class="input-group input-group-sm" style="max-width:180px;">
-                            <input type="text" class="form-control px-2 py-0" style="font-size:.72rem;height:24px" value="${esc(p.item_sku || '')}" id="isku-${p.id}" placeholder="Induk SKU">
-                            <button class="btn btn-outline-secondary btn-mini fw-bold" onclick="saveIndukSkuInline(${p.id})" style="padding:1px 8px;height:24px" title="Simpan SKU">💾</button>
-                        </div>
-                        <span class="text-muted">· ${esc(p.item_id)}${multiModel ? ` · ${models.length} varian` : ''}</span>
-                    </div>
+                        ${esc(p.item_sku || 'SKU kosong')} <span class="text-muted">· ${esc(p.item_id)}${multiModel ? ` · ${models.length} varian` : ''}</span>
+                    </div></div>
+                </div>
                 </td>
                 <td>${statusBadge(st)}</td>
                 <td>${price}</td>
                 <td>${stockCell(p.stock_total)}</td>
-                <td class="muted">${p.sales ?? '—'}</td>
-                <td>${stats}</td>
-                <td class="prd-money promo">${rp(totalPromotion)}</td>
-                <td class="prd-money buyer">${rp(buyerPayment)}</td>
                 <td data-product-mapping="${p.id}">${multiModel ? mappingSummary(models) : (models.length ? mappingBadge(models[0]) : mappingBadge(p, p.item_sku, p.mapping))}</td>
                 <td>
                     ${aksiContent}
@@ -1510,7 +1507,7 @@
 
             const modelRows = multiModel ? models.map(m => `
                 <tr class="model-row mr-${p.id}" data-model-id="${esc(m.model_id)}" style="${isModelOpened ? '' : 'display:none'}">
-                    <td></td><td></td><td></td>
+                    <td></td>
                     <td style="padding-left:22px">↳ ${esc(m.model_name || 'Varian')} 
                         <div class="variant-sku-suggest mt-1">
                             <div class="input-group input-group-sm">
@@ -1523,10 +1520,6 @@
                     <td></td>
                     <td>${rp(m.price)}</td>
                     <td>${stockCell(m.stock)}</td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
                     <td class="variant-mapping-cell">${mappingBadge(m)}</td>
                     <td><div class="d-flex align-items-center gap-1">${inlineEditors(p.id, m)}<button class="btn btn-outline-secondary btn-mini" onclick="showHistory(${p.id})" style="padding:1px 5px" title="Riwayat">📈</button></div></td>
                 </tr>`).join('') : '';

@@ -326,7 +326,7 @@ class MarketplaceProductController extends Controller
             return;
         }
 
-        $matchedItems = $itemsQuery
+        $matchedQuery = $itemsQuery
             ->whereRaw("UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), '')) NOT IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
                 'UNPAID', 'INVOICE_PENDING', 'CANCELLED', 'CANCELED',
                 'CANCELLED_BEFORE_SHIPPING', 'BATAL', 'IN_CANCEL', 'TO_RETURN',
@@ -349,23 +349,60 @@ class MarketplaceProductController extends Controller
                 'oi.line_gross_amount',
                 'oi.line_net_amount',
                 'o.store_id',
-            ])
-            ->get();
+            ]);
 
-        if ($matchedItems->isEmpty()) {
-            foreach ($products as $product) {
-                $product->setAttribute('total_promotion', 0.0);
-                $product->setAttribute('buyer_payment', 0.0);
+        // Jangan mengambil seluruh transaksi ke memory sekaligus. Toko yang
+        // sudah lama berjalan bisa memiliki puluhan ribu line item yang
+        // cocok dengan SKU produk di katalog. Chunk berdasarkan order, bukan
+        // line item, supaya voucher/order payment tidak dihitung dua kali
+        // ketika satu order punya beberapa item yang cocok.
+        $matchedOrderQuery = (clone $matchedQuery)
+            ->selectRaw('COALESCE(oi.marketplace_order_id, oi.order_id) as matched_order_id')
+            ->distinct()
+            ->orderBy('matched_order_id');
+
+        $matchedOrderQuery->chunk(500, function (Collection $orderRows) use ($matchedQuery, &$metrics, $productsByItem, $productsBySku): void {
+            $orderIds = $orderRows
+                ->pluck('matched_order_id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            if ($orderIds === []) {
+                return;
             }
-            return;
-        }
 
+            $matchedItems = (clone $matchedQuery)
+                ->whereIn(DB::raw('COALESCE(oi.marketplace_order_id, oi.order_id)'), $orderIds)
+                ->get();
+
+            $this->attachFinancialMetricChunk($matchedItems, $metrics, $productsByItem, $productsBySku);
+        });
+
+        foreach ($products as $product) {
+            $metric = $metrics[$product->id] ?? ['total_promotion' => 0, 'buyer_payment' => 0];
+            $product->setAttribute('total_promotion', round((float) $metric['total_promotion'], 2));
+            $product->setAttribute('buyer_payment', round((float) $metric['buyer_payment'], 2));
+        }
+    }
+
+    /**
+     * Proses sebagian line item supaya endpoint katalog tidak kehabisan memory.
+     */
+    private function attachFinancialMetricChunk(Collection $matchedItems, array &$metrics, array $productsByItem, array $productsBySku): void
+    {
         $orderIds = $matchedItems
             ->map(fn ($item) => (int) ($item->marketplace_order_id ?: $item->order_id))
             ->filter()
             ->unique()
             ->values()
             ->all();
+
+        if ($orderIds === []) {
+            return;
+        }
 
         $allItems = DB::table('marketplace_order_items')
             ->whereIn(DB::raw('COALESCE(marketplace_order_id, order_id)'), $orderIds)
@@ -388,9 +425,9 @@ class MarketplaceProductController extends Controller
             ->keyBy('id');
 
         $matchedItems->groupBy(fn ($item) => (int) ($item->marketplace_order_id ?: $item->order_id))
-            ->each(function (Collection $orderItems, $orderId) use (&$metrics, $allItems, $orders, $productsByItem, $productsBySku) {
+            ->each(function (Collection $orderItems, $orderId) use (&$metrics, $allItems, $orders, $productsByItem, $productsBySku): void {
                 $order = $orders->get($orderId);
-                if (!$order) {
+                if (! $order) {
                     return;
                 }
 
@@ -405,10 +442,10 @@ class MarketplaceProductController extends Controller
                 $promotionRemainder = max(0, $promotionTotal - $linePromotionTotal);
                 $buyerPayment = $this->buyerPaymentTotal($order);
 
-                $orderItems->each(function ($item) use (&$metrics, $orderLineValue, $orderQty, $promotionRemainder, $buyerPayment, $productsByItem, $productsBySku) {
+                $orderItems->each(function ($item) use (&$metrics, $orderLineValue, $orderQty, $promotionRemainder, $buyerPayment, $productsByItem, $productsBySku): void {
                     $storeKey = (string) $item->store_id;
                     $productId = $productsByItem[$storeKey . '|' . trim((string) $item->external_item_id)] ?? null;
-                    if (!$productId) {
+                    if (! $productId) {
                         foreach ([$item->model_sku, $item->item_sku, $item->marketplace_sku, $item->external_sku] as $sku) {
                             $productId = $productsBySku[$storeKey . '|' . mb_strtolower(trim((string) $sku))] ?? null;
                             if ($productId) {
@@ -416,7 +453,7 @@ class MarketplaceProductController extends Controller
                             }
                         }
                     }
-                    if (!$productId || !isset($metrics[$productId])) {
+                    if (! $productId || ! isset($metrics[$productId])) {
                         return;
                     }
 
@@ -428,12 +465,6 @@ class MarketplaceProductController extends Controller
                     $metrics[$productId]['buyer_payment'] += $buyerPayment * $share;
                 });
             });
-
-        foreach ($products as $product) {
-            $metric = $metrics[$product->id] ?? ['total_promotion' => 0, 'buyer_payment' => 0];
-            $product->setAttribute('total_promotion', round((float) $metric['total_promotion'], 2));
-            $product->setAttribute('buyer_payment', round((float) $metric['buyer_payment'], 2));
-        }
     }
 
     private function productLineValue(object $item): float
