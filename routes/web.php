@@ -213,6 +213,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/products/create/publish',        [\App\Http\Controllers\MarketplaceProductController::class, 'publishCreate'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/products/{product}/category-info', [\App\Http\Controllers\MarketplaceProductController::class, 'categoryInfo']);
     Route::get('/products/{product}/edit',         [\App\Http\Controllers\MarketplaceProductController::class, 'edit']);
     Route::post('/products/sync',                  [\App\Http\Controllers\MarketplaceProductController::class, 'sync'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);

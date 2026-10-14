@@ -573,9 +573,128 @@ class MarketplaceProductService
         return $this->channelDriver($store)->getProductCategory($store, 'id');
     }
 
+    /**
+     * Ambil metadata kategori produk existing dari Shopee.
+     * get_item_base_info hanya mengembalikan category_id, sehingga nama dan
+     * breadcrumb perlu dicocokkan dengan tree get_category.
+     */
+    public function getCategoryInfo(MarketplaceProduct $product): array
+    {
+        $categoryId = (int) ($product->category_id ?? 0);
+        if ($categoryId <= 0) {
+            return [
+                'category_id' => null,
+                'category_name' => null,
+                'category_path' => [],
+                'attributes' => [],
+                'attribute_count' => 0,
+                'required_attribute_count' => 0,
+            ];
+        }
+
+        $store = $product->store;
+        $driver = $this->channelDriver($store);
+        $categoryResult = $driver->getProductCategory($store, 'id');
+        if (! empty($categoryResult['error'])) {
+            return $categoryResult;
+        }
+
+        $categories = data_get($categoryResult, 'response.category_list')
+            ?? data_get($categoryResult, 'category_list')
+            ?? [];
+        $path = $this->findCategoryPath(is_array($categories) ? $categories : [], $categoryId);
+
+        $attributeResult = $driver->getProductAttributeTree($store, $categoryId, 'id');
+        $attributes = data_get($attributeResult, 'response.attribute_list')
+            ?? data_get($attributeResult, 'attribute_list')
+            ?? [];
+        $attributes = is_array($attributes) ? collect($attributes)->map(function ($attribute): array {
+            return [
+                'id' => (int) data_get($attribute, 'attribute_id', 0),
+                'name' => (string) (data_get($attribute, 'name') ?? data_get($attribute, 'attribute_name') ?? 'Atribut'),
+                'mandatory' => (bool) (data_get($attribute, 'mandatory') ?? data_get($attribute, 'is_mandatory') ?? false),
+            ];
+        })->values()->all() : [];
+
+        return [
+            'category_id' => $categoryId,
+            'category_name' => $path !== [] ? $path[array_key_last($path)] : null,
+            'category_path' => $path,
+            'attributes' => $attributes,
+            'attribute_count' => count($attributes),
+            'required_attribute_count' => count(array_filter($attributes, fn (array $attribute): bool => $attribute['mandatory'])),
+        ];
+    }
+
     public function getCreateAttributes(Store $store, int $categoryId): array
     {
         return $this->channelDriver($store)->getProductAttributeTree($store, $categoryId, 'id');
+    }
+
+    private function findCategoryPath(array $nodes, int $categoryId, array $parents = []): array
+    {
+        $flat = [];
+        $this->flattenCategoryNodes($nodes, $flat);
+        if (isset($flat[$categoryId])) {
+            $path = [];
+            $currentId = $categoryId;
+            $visited = [];
+            while ($currentId > 0 && isset($flat[$currentId]) && ! isset($visited[$currentId])) {
+                $visited[$currentId] = true;
+                $current = $flat[$currentId];
+                array_unshift($path, $current['name']);
+                $currentId = $current['parent_id'];
+            }
+            if ($path !== []) {
+                return $path;
+            }
+        }
+
+        foreach ($nodes as $node) {
+            $nodeId = (int) (data_get($node, 'category_id') ?? data_get($node, 'id') ?? 0);
+            $nodeName = (string) (data_get($node, 'display_category_name')
+                ?? data_get($node, 'category_name')
+                ?? data_get($node, 'name')
+                ?? 'Kategori');
+            $path = [...$parents, $nodeName];
+            if ($nodeId === $categoryId) {
+                return $path;
+            }
+
+            $children = data_get($node, 'children')
+                ?? data_get($node, 'sub_category_list')
+                ?? data_get($node, 'category_list')
+                ?? [];
+            $found = $this->findCategoryPath(is_array($children) ? $children : [], $categoryId, $path);
+            if ($found !== []) {
+                return $found;
+            }
+        }
+
+        return [];
+    }
+
+    private function flattenCategoryNodes(array $nodes, array &$flat): void
+    {
+        foreach ($nodes as $node) {
+            $id = (int) (data_get($node, 'category_id') ?? data_get($node, 'id') ?? 0);
+            if ($id > 0) {
+                $flat[$id] = [
+                    'name' => (string) (data_get($node, 'display_category_name')
+                        ?? data_get($node, 'category_name')
+                        ?? data_get($node, 'name')
+                        ?? 'Kategori'),
+                    'parent_id' => (int) (data_get($node, 'parent_category_id') ?? 0),
+                ];
+            }
+            $children = data_get($node, 'children')
+                ?? data_get($node, 'sub_category_list')
+                ?? data_get($node, 'category_list')
+                ?? [];
+            if (is_array($children) && $children !== []) {
+                $this->flattenCategoryNodes($children, $flat);
+            }
+        }
     }
 
     public function getCreateLogistics(Store $store): array

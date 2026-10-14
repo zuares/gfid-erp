@@ -154,7 +154,10 @@
     .prd-category-copy{ min-width:0; flex:1; }
     .prd-category-label{ font-size:.61rem; font-weight:800; letter-spacing:.07em; color:#64748b; text-transform:uppercase; }
     .prd-category-name{ margin-top:.12rem; color:inherit; font-size:.76rem; font-weight:750; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .prd-category-meta{ margin-top:.12rem; color:#94a3b8; font-size:.65rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .prd-category-path{ display:flex; align-items:center; gap:.2rem; margin-top:.22rem; min-width:0; overflow:hidden; color:#64748b; font-size:.63rem; white-space:nowrap; }
+    .prd-category-path span{ overflow:hidden; text-overflow:ellipsis; }
+    .prd-category-path .separator{ flex:none; color:#94a3b8; }
+    .prd-category-meta{ margin-top:.16rem; color:#94a3b8; font-size:.63rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .prd-category-badge{ flex:none; padding:.25rem .45rem; border-radius:6px; background:rgba(100,116,139,.11); color:#64748b; font-size:.61rem; font-weight:800; }
     body[data-theme="dark"] .prd-category-card{ background:rgba(15,23,42,.55); }
     body[data-theme="dark"] .prd-category-name{ color:#e2e8f0; }
@@ -800,7 +803,6 @@
     let productEditorData = null;
     let productEditorImages = [];
     let productEditorImagesDirty = false;
-    const productCategoryCache = new Map();
     let productCreate = null;
     let productPromotionState = {
         product: null,
@@ -841,39 +843,31 @@
         return rows;
     }
 
-    function findCategoryPath(nodes, categoryId, parents = []) {
-        for (const node of (nodes || [])) {
-            const id = String(node.category_id ?? node.id ?? '');
-            const name = node.category_name ?? node.name ?? 'Kategori';
-            const path = [...parents, name];
-            if (id === String(categoryId)) return path;
-            const found = findCategoryPath(node.children || node.sub_category_list || node.category_list || [], categoryId, path);
-            if (found.length) return found;
-        }
-        return [];
-    }
-
-    async function loadProductCategoryLabel(storeId, categoryId) {
+    async function loadProductCategoryLabel(productId, categoryId) {
         const nameTarget = $('productEditorCategoryName');
+        const pathTarget = $('productEditorCategoryPath');
         const metaTarget = $('productEditorCategoryMeta');
-        if (!nameTarget || !metaTarget) return;
+        if (!nameTarget || !pathTarget || !metaTarget) return;
         if (!categoryId) {
             nameTarget.textContent = 'Belum ditetapkan';
+            pathTarget.innerHTML = '<span>Belum ada breadcrumb kategori</span>';
             metaTarget.textContent = 'Produk belum memiliki kategori marketplace';
             return;
         }
-        const cacheKey = String(storeId || '');
         try {
-            if (!productCategoryCache.has(cacheKey)) {
-                const result = await api(`${API}/create/categories`, { method: 'POST', body: JSON.stringify({ store_id: storeId }) });
-                productCategoryCache.set(cacheKey, result.response?.category_list || result.category_list || []);
-            }
-            const path = findCategoryPath(productCategoryCache.get(cacheKey), categoryId);
-            nameTarget.textContent = path.length ? path[path.length - 1] : 'Kategori Shopee tidak ditemukan';
+            const result = await api(`${API}/${productId}/category-info`);
+            const path = result.category_path || [];
+            const attributeCount = Number(result.attribute_count || 0);
+            const requiredCount = Number(result.required_attribute_count || 0);
+            nameTarget.textContent = result.category_name || 'Kategori Shopee tidak ditemukan';
             nameTarget.title = path.join(' › ');
-            metaTarget.textContent = `ID kategori ${categoryId}${path.length > 1 ? ` · ${path.join(' › ')}` : ''}`;
+            pathTarget.innerHTML = path.length
+                ? path.map((part, index) => `<span title="${esc(part)}">${esc(part)}</span>${index < path.length - 1 ? '<span class="separator">›</span>' : ''}`).join('')
+                : '<span>Breadcrumb kategori tidak ditemukan</span>';
+            metaTarget.textContent = `ID kategori ${categoryId}${path.length > 1 ? ` · ${path.join(' › ')}` : ''} · ${attributeCount} atribut${requiredCount ? ` (${requiredCount} wajib)` : ''}`;
         } catch (error) {
             nameTarget.textContent = 'Nama kategori belum tersedia';
+            pathTarget.innerHTML = '<span>Breadcrumb kategori gagal dimuat</span>';
             metaTarget.textContent = `ID kategori ${categoryId} · Gagal memuat nama kategori`;
         }
     }
@@ -1213,7 +1207,7 @@
                     <div class="col-md-8 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">NAMA PRODUK</label><input class="form-control form-control-sm" id="editorItemName" maxlength="255" value="${esc(product.item_name || '')}"></div>
                     <div class="col-md-4 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">SKU INDUK</label><input class="form-control form-control-sm" id="editorItemSku" maxlength="100" value="${esc(product.item_sku || '')}"></div>
                     <div class="col-md-4 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">STATUS LISTING</label><input class="form-control form-control-sm prd-edit-readonly" value="${esc(product.item_status || '—')}" readonly></div>
-                    <div class="col-md-8 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">KATEGORI MARKETPLACE</label><div class="prd-category-card"><span class="prd-category-icon"><i class="bi bi-diagram-3"></i></span><span class="prd-category-copy"><span class="prd-category-label">Shopee</span><span class="prd-category-name" id="productEditorCategoryName">Memuat nama kategori…</span><span class="prd-category-meta" id="productEditorCategoryMeta">ID kategori ${esc(product.category_id || '—')}</span></span><span class="prd-category-badge">READ ONLY</span></div></div>
+                    <div class="col-md-8 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">KATEGORI MARKETPLACE</label><div class="prd-category-card"><span class="prd-category-icon"><i class="bi bi-diagram-3"></i></span><span class="prd-category-copy"><span class="prd-category-label">Shopee</span><span class="prd-category-name" id="productEditorCategoryName">Memuat nama kategori…</span><span class="prd-category-path" id="productEditorCategoryPath"><span>Menyiapkan breadcrumb kategori…</span></span><span class="prd-category-meta" id="productEditorCategoryMeta">ID kategori ${esc(product.category_id || '—')}</span></span><span class="prd-category-badge">READ ONLY</span></div></div>
                 </div>
                 <label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">DESKRIPSI</label>
                 <textarea class="form-control form-control-sm" id="editorDescription" rows="5" maxlength="3000">${esc(product.description || '')}</textarea>
@@ -1255,7 +1249,7 @@
             </div>`;
 
         renderProductEditorGallery();
-        loadProductCategoryLabel(product.store_id, product.category_id);
+        loadProductCategoryLabel(product.local_id, product.category_id);
         loadProductEditorLogs();
         $('productEditorSaveBtn').disabled = false;
         $('productEditorSaveStatus').textContent = 'Perubahan belum disimpan.';

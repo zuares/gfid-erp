@@ -172,6 +172,27 @@ class MarketplaceProductController extends Controller
         }
     }
 
+    public function categoryInfo(MarketplaceProduct $product)
+    {
+        try {
+            $data = $this->products->getCategoryInfo($product);
+
+            if (! empty($data['error'])) {
+                return response()->json([
+                    'message' => $data['message'] ?? 'Metadata kategori tidak dapat diambil dari Shopee.',
+                ], 422);
+            }
+
+            return response()->json($data);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => $e->getMessage() ?: 'Gagal mengambil metadata kategori.',
+            ], 422);
+        }
+    }
+
     /**
      * Daftar produk lokal + filter.
      */
