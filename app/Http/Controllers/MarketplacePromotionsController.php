@@ -88,4 +88,53 @@ class MarketplacePromotionsController extends Controller
             ],
         ]);
     }
+
+    private function resolvePromotionStore(?int $storeId = null): ?Store
+    {
+        if ($storeId) {
+            $store = Store::with('channel')->find($storeId);
+
+            return $this->isPromotionFilterableStore($store) ? $store : null;
+        }
+
+        return Store::with('channel')
+            ->where('is_active', true)
+            ->whereHas('channel', fn ($query) => $query->whereIn('code', ['shopee', 'shp']))
+            ->orderBy('id')
+            ->first();
+    }
+
+    private function resolvePromotionStoreBinding(mixed $store): Store
+    {
+        $storeId = $store instanceof Store ? $store->id : $store;
+        $resolved = is_numeric($storeId) ? Store::with('channel')->findOrFail((int) $storeId) : null;
+
+        abort_unless($this->isPromotionFilterableStore($resolved), 404, 'Toko promosi tidak ditemukan.');
+
+        return $resolved;
+    }
+
+    private function isPromotionFilterableStore(?Store $store): bool
+    {
+        if (! $store || $store->is_active === false) {
+            return false;
+        }
+
+        return in_array(strtolower((string) ($store->channel?->code ?? '')), ['shopee', 'shp'], true);
+    }
+
+    private function normalizeStorePayload(Store $store): array
+    {
+        return [
+            'id' => $store->id,
+            'name' => $store->name,
+            'code' => $store->code,
+            'is_active' => $store->is_active,
+            'channel' => $store->channel ? [
+                'id' => $store->channel->id,
+                'name' => $store->channel->name,
+                'code' => $store->channel->code,
+            ] : null,
+        ];
+    }
 }

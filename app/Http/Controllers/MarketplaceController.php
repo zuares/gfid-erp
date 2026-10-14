@@ -489,6 +489,9 @@ class MarketplaceController extends Controller
 
         $store = Store::with('channel')->findOrFail((int) $data['store_id']);
         $itemList = $this->normalizePromotionItemList($data['item_list'] ?? []);
+        if ($priceError = $this->validatePromotionItemPrices($store, $itemList)) {
+            return response()->json(['success' => false, 'message' => $priceError], 422);
+        }
 
         try {
             $createResponse = $this->gateway->addDiscount(
@@ -582,6 +585,9 @@ class MarketplaceController extends Controller
         ]);
 
         $itemList = $this->normalizePromotionItemList($data['item_list'] ?? []);
+        if ($priceError = $this->validatePromotionItemPrices($store, $itemList)) {
+            return response()->json(['success' => false, 'message' => $priceError], 422);
+        }
         $currentRecord = MarketplacePromotion::query()
             ->where('store_id', $store->id)
             ->where('discount_id', $discountId)
@@ -1591,6 +1597,63 @@ class MarketplaceController extends Controller
 
             return $item;
         })->values()->all();
+    }
+
+    /**
+     * Harga promo dikelola sebagai harga campaign dan harus lebih rendah
+     * daripada harga normal produk yang tersimpan lokal.
+     */
+    private function validatePromotionItemPrices(Store $store, array $items): ?string
+    {
+        $itemIds = collect($items)
+            ->pluck('item_id')
+            ->filter()
+            ->map(fn ($id) => (string) $id)
+            ->unique()
+            ->values();
+
+        if ($itemIds->isEmpty()) {
+            return null;
+        }
+
+        $products = MarketplaceProduct::with('models')
+            ->where('store_id', $store->id)
+            ->whereIn('item_id', $itemIds->all())
+            ->get()
+            ->keyBy(fn ($product) => (string) $product->item_id);
+
+        foreach ($items as $item) {
+            $product = $products->get((string) ($item['item_id'] ?? ''));
+            if (! $product) {
+                continue;
+            }
+
+            foreach (($item['model_list'] ?? []) as $model) {
+                $promoPrice = $model['model_promotion_price'] ?? null;
+                $promoPercentage = $model['model_promotion_percentage'] ?? null;
+                $modelId = (string) ($model['model_id'] ?? '0');
+
+                if ($promoPrice !== null && (float) $promoPrice < 100) {
+                    return 'Harga promo item ' . $product->item_id . ' harus minimal Rp100.';
+                }
+                if ($promoPercentage !== null && ((float) $promoPercentage <= 0 || (float) $promoPercentage >= 100)) {
+                    return 'Persentase promo item ' . $product->item_id . ' harus di antara 0% dan 100%.';
+                }
+                if ($promoPrice === null) {
+                    continue;
+                }
+
+                $localModel = $product->models->firstWhere('model_id', $modelId);
+                $normalPrice = (float) ($localModel?->price ?? $product->price_min ?? 0);
+                if ($normalPrice > 0 && (float) $promoPrice >= $normalPrice) {
+                    return 'Harga promo item ' . $product->item_id
+                        . ' harus lebih rendah dari harga normal Rp'
+                        . number_format($normalPrice, 0, ',', '.') . '.';
+                }
+            }
+        }
+
+        return null;
     }
 
     private function normalizePromotionItemList(mixed $items): array

@@ -1335,24 +1335,22 @@
 
     function inlineEditors(pid, m) {
         let origPrc = m.price ?? '';
-        let discPrc = origPrc;
         
         try {
             const raw = typeof m.raw_json === 'string' ? JSON.parse(m.raw_json) : (m.raw_json || {});
             const pInfo = raw.price_info?.[0];
             if (pInfo) {
                 origPrc = pInfo.original_price ?? origPrc;
-                discPrc = pInfo.current_price ?? origPrc;
             }
         } catch(e) {}
 
         return `<div class="d-flex gap-1 flex-nowrap align-items-center">
-            <input type="hidden" id="prc-${pid}-${m.model_id}" value="${origPrc}">
-            <div class="input-group input-group-sm" style="width:115px;" title="Harga Setelah Diskon">
-                <span class="input-group-text text-success" style="padding:0 6px; font-size:.7rem">Rp</span>
-                <input class="form-control px-2" style="font-size:.75rem; padding: 2px 6px;" type="number" min="100" value="${discPrc}" id="disc-${pid}-${m.model_id}">
+            <div class="input-group input-group-sm" style="width:132px;" title="Harga normal produk">
+                <span class="input-group-text" style="padding:0 6px; font-size:.7rem">Rp</span>
+                <input class="form-control px-2" style="font-size:.75rem; padding: 2px 6px;" type="number" min="100" value="${origPrc}" id="base-${pid}-${m.model_id}" aria-label="Harga normal">
             </div>
-            <button class="btn btn-outline-primary btn-mini" onclick="savePrice(${pid}, '${m.model_id}')" style="padding:1px 6px;" title="Simpan Harga">💾</button>
+            <button class="btn btn-outline-primary btn-mini" onclick="savePrice(${pid}, '${m.model_id}')" style="padding:1px 6px;" title="Simpan harga normal">💾</button>
+            <button class="btn btn-outline-success btn-mini" onclick="openPromotionsForProduct(${pid}, '${m.model_id}')" style="padding:1px 6px;" title="Atur harga promo">🏷</button>
         </div>`;
     }
 
@@ -1391,6 +1389,7 @@
             if (isBermasalahTab) {
                 let issues = [];
                 issues.push(`<button class="btn btn-sm btn-outline-primary w-100 mb-1 py-1" onclick="openProductEditor(${p.id})" style="font-size:.7rem">✎ Detail Produk</button>`);
+                issues.push(`<button class="btn btn-sm btn-outline-success w-100 mb-1 py-1" onclick="openPromotionsForProduct(${p.id})" style="font-size:.7rem">🏷 Atur Harga Promo</button>`);
                 if (p.item_status === 'BANNED') {
                     issues.push(`<a class="btn btn-sm btn-outline-danger w-100 mb-1 py-1" href="https://seller.shopee.co.id/portal/product/${p.item_id}" target="_blank" style="font-size:.7rem">Cek Pelanggaran di Shopee ↗</a>`);
                 }
@@ -1427,6 +1426,7 @@
                         </button>
                         <ul class="dropdown-menu shadow-sm" style="font-size: .78rem; min-width: 140px; padding: .3rem 0; border-radius: 8px;">
                             <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openProductEditor(${p.id})">✎ Detail Produk</a></li>
+                            <li><a class="dropdown-item py-2 text-success" href="javascript:void(0)" onclick="openPromotionsForProduct(${p.id})">🏷 Atur Harga Promo</a></li>
                             <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="showHistory(${p.id})">📈 Riwayat</a></li>
                             ${st === 'NORMAL' ? `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="boostNow(${p.id}, this)">🚀 Naikkan (Boost)</a></li>` : ''}
                             ${st === 'NORMAL' ? `<li><hr class="dropdown-divider" style="margin: .2rem 0"></li><li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="setUnlist(${p.id}, true)">🙈 Arsipkan Produk</a></li>` : (st === 'UNLIST' ? `<li><hr class="dropdown-divider" style="margin: .2rem 0"></li><li><a class="dropdown-item py-2 text-success" href="javascript:void(0)" onclick="setUnlist(${p.id}, false)">👁 Aktifkan Produk</a></li>` : '')}
@@ -1635,21 +1635,18 @@
     };
 
     window.savePrice = async function (pid, modelId) {
-        const origPrice = parseFloat($(`prc-${pid}-${modelId}`).value);
-        const discPrice = parseFloat($(`disc-${pid}-${modelId}`).value);
+        const origPrice = parseFloat($(`base-${pid}-${modelId}`).value);
         
         if (isNaN(origPrice) || origPrice < 100) return alert('Harga asli tidak valid (min 100)');
-        if (isNaN(discPrice) || discPrice < 100) return alert('Harga jual tidak valid (min 100)');
-        if (discPrice > origPrice) return alert('Harga jual tidak boleh lebih tinggi dari Harga Asli');
 
         try {
             await api(`${API}/${pid}/price`, { 
                 method: 'POST', 
                 body: JSON.stringify({ 
-                    price_list: [{ model_id: modelId, original_price: origPrice, discount_price: discPrice }] 
+                    price_list: [{ model_id: modelId, original_price: origPrice }]
                 }) 
             });
-            toast('Harga berhasil diupdate ke Shopee ✔');
+            toast('Harga normal berhasil diupdate ke Shopee ✔');
             
             // Update local state instead of reloading table
             const p = products.find(x => x.id === pid);
@@ -1657,16 +1654,25 @@
                 const m = p.models.find(x => String(x.model_id) === String(modelId));
                 if (m) {
                     m.price = origPrice;
-                    // Try parsing promotion if exists
-                    const promo = m.promotion || p.promotion || null;
-                    if (promo && typeof promo === 'object') {
-                        if (promo.promotion_price_info && promo.promotion_price_info[0]) {
-                            promo.promotion_price_info[0].promotion_price = discPrice;
-                        }
-                    }
                 }
             }
+            render();
         } catch (e) { alert('Gagal: ' + e.message); }
+    };
+
+    window.openPromotionsForProduct = function (pid, modelId = null) {
+        const product = products.find(item => String(item.id) === String(pid));
+        if (!product?.store?.id || !product.item_id) {
+            return alert('Data toko atau item produk belum tersedia. Silakan sync produk terlebih dahulu.');
+        }
+        const params = new URLSearchParams({
+            store_id: String(product.store.id),
+            item_id: String(product.item_id),
+        });
+        if (modelId !== null && modelId !== undefined && String(modelId) !== '') {
+            params.set('model_id', String(modelId));
+        }
+        window.location.href = `/marketplace/promotions?${params.toString()}`;
     };
 
     window.setUnlist = async function (pid, unlist) {

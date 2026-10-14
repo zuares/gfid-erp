@@ -617,6 +617,7 @@ class MarketplaceProductController extends Controller
             'price_list'                  => 'required|array|min:1',
             'price_list.*.model_id'       => 'required',
             'price_list.*.original_price' => 'required|numeric|min:100',
+            'price_list.*.discount_price' => 'prohibited',
         ]);
 
         $res = $this->products->updatePrice($product, $data['price_list']);

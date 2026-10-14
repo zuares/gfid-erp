@@ -421,8 +421,9 @@ class MarketplaceProductService
     }
 
     /**
-     * Update harga di Shopee + lokal.
-     * $priceList: [['model_id' => '0', 'original_price' => 125000, 'discount_price' => 110000], ...]
+     * Update harga normal/base price di Shopee + lokal.
+     * Harga promo dikelola oleh MarketplacePromotionService melalui campaign.
+     * $priceList: [['model_id' => '0', 'original_price' => 125000], ...]
      */
     public function updatePrice(MarketplaceProduct $product, array $priceList): array
     {
@@ -445,39 +446,6 @@ class MarketplaceProductService
             return $res;
         }
 
-        // 2. Handle Discount Price
-        $hasDiscount = false;
-        foreach ($priceList as $p) {
-            if (isset($p['discount_price']) && $p['discount_price'] < $p['original_price']) {
-                $hasDiscount = true;
-                break;
-            }
-        }
-
-        if ($hasDiscount) {
-            $discountId = $this->findDiscountCampaignId($product->store, 'GFID-Harga-Jual');
-
-            if (! $discountId) {
-                $newD = $driver->addDiscount($product->store, 'GFID-Harga-Jual-' . date('Ym'), time(), time() + (86400 * 180));
-                if (! empty($newD['error'])) {
-                    Log::error("Failed to create discount: " . ($newD['message'] ?? $newD['error']));
-                } else {
-                    $discountId = data_get($newD, 'response.discount_id');
-                }
-            }
-
-            if ($discountId) {
-                $itemList = $this->buildDiscountItemList($product, $priceList);
-
-                $addRes = $driver->addDiscountItem($product->store, $discountId, $itemList);
-
-                // Jika gagal karena item sudah ada di dalam diskon ini, maka update item tersebut
-                if (! empty($addRes['error']) && str_contains(strtolower($addRes['message'] ?? ''), 'exists')) {
-                    $driver->updateDiscountItem($product->store, $discountId, $itemList);
-                }
-            }
-        }
-
         foreach ($priceList as $p) {
             $model = MarketplaceProductModel::where('marketplace_product_id', $product->id)
                 ->where('model_id', (string) ($p['model_id'] ?? '0'))
@@ -487,10 +455,6 @@ class MarketplaceProductService
                 $raw = is_string($model->raw_json) ? json_decode($model->raw_json, true) : ($model->raw_json ?? []);
                 if (!isset($raw['price_info'])) $raw['price_info'] = [[]];
                 $raw['price_info'][0]['original_price'] = (float) $p['original_price'];
-                if (isset($p['discount_price'])) {
-                    $raw['price_info'][0]['current_price'] = (float) $p['discount_price'];
-                }
-                
                 $model->update([
                     'price' => (float) $p['original_price'],
                     'raw_json' => $raw
@@ -511,15 +475,10 @@ class MarketplaceProductService
                 $oldRaw = is_string($oldModel?->raw_json)
                     ? json_decode($oldModel->raw_json, true)
                     : ($oldModel?->raw_json ?? []);
-                $oldEffectivePrice = data_get($oldRaw, 'price_info.0.current_price');
-                if ($oldEffectivePrice === null) {
-                    $oldEffectivePrice = $oldModel?->price;
-                }
-
                 return [
                     'model_id' => (string) ($price['model_id'] ?? '0'),
-                    'old_price' => $oldEffectivePrice,
-                    'new_price' => $price['discount_price'] ?? $price['original_price'] ?? null,
+                    'old_price' => data_get($oldRaw, 'price_info.0.original_price') ?? $oldModel?->price,
+                    'new_price' => $price['original_price'] ?? null,
                 ];
             })->all();
 
@@ -1212,38 +1171,4 @@ class MarketplaceProductService
         return $driver->deleteDiscountItem($store, $discountId, $itemId, $modelId);
     }
 
-    private function findDiscountCampaignId(Store $store, string $namePrefix): ?int
-    {
-        $driver = $this->gateway;
-
-        foreach (['ongoing', 'upcoming'] as $status) {
-            $discounts = $driver->getDiscountList($store, $status);
-            if (! empty($discounts['error'])) {
-                continue;
-            }
-
-            foreach (data_get($discounts, 'response.discount_list', []) as $discount) {
-                if (str_contains((string) ($discount['discount_name'] ?? ''), $namePrefix)) {
-                    return (int) ($discount['discount_id'] ?? 0) ?: null;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private function buildDiscountItemList(MarketplaceProduct $product, array $priceList): array
-    {
-        return [
-            [
-                'item_id' => (int) $product->item_id,
-                'model_list' => array_map(function ($p) {
-                    return [
-                        'model_id' => (int) ($p['model_id'] ?? 0),
-                        'model_promotion_price' => (float) ($p['discount_price'] ?? 0),
-                    ];
-                }, $priceList),
-            ],
-        ];
-    }
 }

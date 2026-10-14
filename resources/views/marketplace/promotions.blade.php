@@ -170,6 +170,22 @@
         white-space:nowrap;
         font-weight:700;
     }
+    .promo-context{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:.75rem;
+        flex-wrap:wrap;
+        padding:.7rem .85rem;
+        border:1px solid rgba(37,99,235,.2);
+        border-radius:12px;
+        background:rgba(37,99,235,.06);
+        color:#1e3a8a;
+        font-size:.78rem;
+    }
+    body[data-theme="dark"] .promo-context{ background:rgba(37,99,235,.12); color:#bfdbfe; border-color:rgba(96,165,250,.25); }
+    .promo-context-title{ font-weight:800; }
+    .promo-context-meta{ font-size:.7rem; opacity:.82; margin-top:.12rem; }
 
     .promo-badge{
         display:inline-flex; align-items:center; gap:.3rem; border-radius:999px; padding:.15rem .55rem;
@@ -580,6 +596,13 @@
     </div>
 
     <div id="promoAlert" class="alert d-none mb-3" style="border-radius:12px;font-size:.85rem"></div>
+    <div id="promoProductContext" class="promo-context mb-3 d-none">
+        <div>
+            <div class="promo-context-title">Atur harga promo dari modul Promosi</div>
+            <div class="promo-context-meta" id="promoProductContextMeta">Produk dipilih dari halaman katalog.</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-primary" id="promoProductContextCreate">Buat campaign untuk produk ini</button>
+    </div>
 
     <div class="card promo-card">
         <div class="table-responsive">
@@ -759,6 +782,9 @@
 (() => {
     const initialStoreId = @json($selectedStoreId);
     const initialStatus = @json((string) $selectedStatus);
+    const contextParams = new URLSearchParams(window.location.search);
+    const contextItemId = contextParams.get('item_id') || '';
+    const contextModelId = contextParams.get('model_id') || '';
     const { api, esc } = window.mpHelpers;
 
     const state = {
@@ -770,6 +796,7 @@
         formMode: 'create',
         builderItems: [],
         pendingFormConfig: null,
+        productContext: null,
     };
 
     const refs = {
@@ -815,6 +842,9 @@
         detailCacheBadge: document.getElementById('detailCacheBadge'),
         detailCacheTime: document.getElementById('detailCacheTime'),
         promoStoreId: document.getElementById('promoStoreId'),
+        promoProductContext: document.getElementById('promoProductContext'),
+        promoProductContextMeta: document.getElementById('promoProductContextMeta'),
+        promoProductContextCreate: document.getElementById('promoProductContextCreate'),
     };
 
     const formModal = new bootstrap.Modal(refs.promoFormModal);
@@ -1212,6 +1242,22 @@
             .filter(Boolean);
     }
 
+    function validateBuilderPrices() {
+        for (const item of state.builderItems || []) {
+            for (const model of item.model_list || []) {
+                if (!isBuilderModelActive(model)) continue;
+                const promo = toNumberOrNull(model.model_promotion_price);
+                const original = toNumberOrNull(model.model_original_price ?? item.item_original_price);
+                if (promo === null) continue;
+                if (promo < 100) return 'Harga promo minimal Rp100.';
+                if (original !== null && promo >= original) {
+                    return `Harga promo ${model.model_name || item.item_name || item.item_id} harus lebih rendah dari harga normal Rp${formatPriceLabel(original)}.`;
+                }
+            }
+        }
+        return null;
+    }
+
     function renderBuilderStats() {
         if (!refs.promoBuilderStats) {
             return;
@@ -1478,6 +1524,76 @@
     function formatStoreLabel(store) {
         if (!store) return '—';
         return store.channel ? `${store.name} • ${store.channel.name}` : store.name;
+    }
+
+    function productToBuilderItem(product) {
+        const models = Array.isArray(product?.models) && product.models.length
+            ? product.models.map((model) => ({
+                model_id: String(model.model_id ?? '0'),
+                model_name: model.model_name || 'Varian',
+                model_sku: model.model_sku || '',
+                model_original_price: model.price ?? product.price_min ?? '',
+            }))
+            : [{
+                model_id: '0',
+                model_name: 'Default',
+                model_sku: product.item_sku || '',
+                model_original_price: product.price_min ?? '',
+            }];
+
+        return {
+            item_id: String(product.item_id || ''),
+            item_name: product.item_name || '',
+            item_original_price: product.price_min ?? '',
+            model_list: models,
+        };
+    }
+
+    function renderProductContext() {
+        const product = state.productContext;
+        if (!refs.promoProductContext || !refs.promoProductContextMeta) return;
+        if (!product) {
+            refs.promoProductContext.classList.add('d-none');
+            return;
+        }
+
+        refs.promoProductContext.classList.remove('d-none');
+        refs.promoProductContextMeta.textContent = `${product.item_name || 'Produk'} · Item ID ${product.item_id}${contextModelId ? ` · Model ${contextModelId}` : ''} · Harga promo diatur per campaign.`;
+    }
+
+    async function loadProductContext() {
+        if (!contextItemId) return;
+        const storeId = refs.storeSelect.value || contextParams.get('store_id') || '';
+        if (!storeId) return;
+
+        try {
+            const params = new URLSearchParams({ store_id: storeId, search: contextItemId });
+            const products = await api(`/api/marketplace/products?${params.toString()}`);
+            state.productContext = (Array.isArray(products) ? products : []).find((product) => String(product.item_id) === String(contextItemId)) || null;
+            renderProductContext();
+            if (!state.productContext && refs.promoProductContextMeta) {
+                refs.promoProductContext.classList.remove('d-none');
+                refs.promoProductContextMeta.textContent = 'Produk tidak ditemukan di katalog lokal. Jalankan sync produk terlebih dahulu.';
+                refs.promoProductContextCreate.disabled = true;
+            }
+        } catch (error) {
+            refs.promoProductContext?.classList.remove('d-none');
+            if (refs.promoProductContextMeta) refs.promoProductContextMeta.textContent = `Produk belum dapat dimuat: ${error.message || 'Error'}`;
+            if (refs.promoProductContextCreate) refs.promoProductContextCreate.disabled = true;
+        }
+    }
+
+    function createPromotionForContextProduct() {
+        if (!state.productContext) {
+            toast('Produk belum berhasil dimuat.', 'warning');
+            return;
+        }
+
+        openFormModal(null, {
+            mode: 'create',
+            discountName: `Promo ${state.productContext.item_name || state.productContext.item_id}`,
+            items: [productToBuilderItem(state.productContext)],
+        });
     }
 
     function renderStoreOptions() {
@@ -1926,6 +2042,12 @@
             return;
         }
 
+        const priceError = validateBuilderPrices();
+        if (priceError) {
+            toast(priceError, 'warning');
+            return;
+        }
+
         if (!payload.discount_name) {
             toast('Nama promo wajib diisi.', 'warning');
             return;
@@ -2058,6 +2180,7 @@
     }
 
     refs.storeSelect.addEventListener('change', loadPromotions);
+    refs.promoProductContextCreate?.addEventListener('click', createPromotionForContextProduct);
     refs.statusSelect.value = initialStatus || 'ongoing';
     refs.statusSelect.addEventListener('change', loadPromotions);
     refs.searchInput.addEventListener('input', renderPromotions);
@@ -2091,6 +2214,7 @@
         try {
             initPromoPickers();
             await loadStores();
+            await loadProductContext();
             if (initialStatus) refs.statusSelect.value = initialStatus;
             await loadPromotions();
         } catch (err) {
