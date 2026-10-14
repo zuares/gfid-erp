@@ -275,6 +275,49 @@
         .workspace-intro{ align-items:flex-start; }
         .filter-panel-heading{ display:none; }
     }
+
+    /* ── Minimal modern layer ── */
+    .prd-topbar{
+        top:.65rem;
+        margin-inline:0;
+        padding:1rem 1.1rem;
+        border:1px solid var(--prd-border);
+        border-radius:18px;
+        box-shadow:0 14px 34px rgba(15,23,42,.07);
+    }
+    .prd-eyebrow{ display:flex; align-items:center; gap:.38rem; margin-bottom:.18rem; color:#94a3b8; font-size:.62rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; }
+    .prd-eyebrow i{ color:#2563eb; font-size:.72rem; }
+    .title{ font-size:1.2rem; letter-spacing:-.025em; }
+    .sub{ margin-top:.18rem; max-width:680px; line-height:1.45; }
+    .controls{ gap:.4rem; }
+    .controls .btn-pill{ min-height:34px; border-radius:10px; }
+    .kpis{ gap:.4rem; margin-top:.65rem; }
+    .kpi{ background:rgba(248,250,252,.8); border-color:rgba(148,163,184,.2); }
+    body[data-theme="dark"] .kpi{ background:rgba(15,23,42,.75); }
+    .pt-tabs{ gap:.2rem; padding:.25rem; border:1px solid var(--prd-border); border-radius:13px; background:rgba(148,163,184,.05); width:max-content; }
+    .pt-tab{ border-color:transparent; border-radius:9px; padding:.48rem .85rem; }
+    .pt-tab.active{ box-shadow:0 4px 12px rgba(15,23,42,.12); }
+    .store-tabs-shell{ border-radius:15px 15px 0 0; padding:.3rem .55rem 0; }
+    .store-tab{ border-radius:8px 8px 0 0; padding:.55rem .8rem; }
+    .filter-panel{ border-radius:0 0 15px 15px; padding:.75rem .85rem .65rem; }
+    .filter-bar{ gap:.6rem; }
+    .filter-search,.filter-select{ border-radius:9px; min-height:34px; }
+    .card-main{ border-radius:16px; box-shadow:0 14px 34px rgba(15,23,42,.06); }
+    .table-list thead th{ padding:.7rem .65rem; font-size:.65rem; letter-spacing:.02em; text-transform:uppercase; }
+    .table-list tbody td{ padding:.72rem .65rem; }
+    .table-list tbody tr[data-pid]:hover td{ background:rgba(37,99,235,.055); }
+    .prd-img{ width:50px; height:50px; border-radius:11px; }
+    .prd-name{ font-size:.8rem; }
+    .badge-status{ border-radius:999px; padding:.22rem .55rem; }
+    .btn-mini{ border-radius:8px; }
+    .prd-edit-section{ border-radius:14px; padding:.95rem; background:rgba(148,163,184,.025); }
+    .modal-content{ border:1px solid var(--prd-border)!important; box-shadow:0 24px 70px rgba(15,23,42,.18); }
+    body[data-theme="dark"] .modal-content{ box-shadow:0 24px 70px rgba(0,0,0,.35); }
+    @media (max-width:768px){
+        .prd-topbar{ margin-inline:0; top:.35rem; padding:.85rem; }
+        .pt-tabs{ width:100%; overflow-x:auto; }
+        .pt-tab{ flex:1 0 auto; }
+    }
 </style>
 @endpush
 
@@ -284,22 +327,23 @@
     {{-- Topbar --}}
     <div class="prd-topbar">
         <div>
-            <h1 class="title">🏷 Produk Marketplace</h1>
-            <div class="sub">Kelola stok, harga, tampil/sembunyi & mapping SKU — tersinkron langsung ke Shopee <span id="rtLabel" class="muted"></span></div>
+            <div class="prd-eyebrow"><i class="bi bi-shop"></i> Marketplace / Shopee</div>
+            <h1 class="title"><i class="bi bi-box-seam me-1 text-primary"></i>Produk Marketplace</h1>
+            <div class="sub">Kelola listing, harga normal, stok, mapping SKU, dan gambar dalam satu workspace <span id="rtLabel" class="muted"></span></div>
             <div class="kpis" id="kpiRow"></div>
         </div>
         <div class="controls">
-            <button class="btn btn-pill btn-prd-outline" id="btnAutoMap" onclick="autoMap()" title="Cocokkan SKU marketplace dengan item internal">⚡ Auto-map</button>
-            <button class="btn btn-pill btn-prd-primary" onclick="openProductCreate()" title="Buat listing produk baru">＋ Tambah Produk</button>
-            <button class="btn btn-pill btn-prd-outline" id="btnSync" onclick="syncProducts()" title="Ambil data terbaru dari Shopee">⟳ Sync Shopee</button>
+            <button class="btn btn-pill btn-prd-outline" id="btnAutoMap" onclick="autoMap()" title="Cocokkan SKU marketplace dengan item internal"><i class="bi bi-link-45deg me-1"></i>Auto-map</button>
+            <button class="btn btn-pill btn-prd-primary" onclick="openProductCreate()" title="Buat listing produk baru"><i class="bi bi-plus-lg me-1"></i>Tambah Produk</button>
+            <button class="btn btn-pill btn-prd-outline" id="btnSync" onclick="syncProducts()" title="Ambil data terbaru dari Shopee"><i class="bi bi-arrow-repeat me-1"></i>Sync Shopee</button>
         </div>
     </div>
 
     {{-- Tabs --}}
     <div class="pt-tabs" role="tablist" aria-label="Area produk marketplace">
-        <button class="pt-tab active" data-tab="produk" role="tab" aria-selected="true" onclick="switchTab('produk')">🏷 Daftar Produk</button>
-        <button class="pt-tab" data-tab="stok" role="tab" aria-selected="false" onclick="switchTab('stok')">📦 Stok</button>
-        <button class="pt-tab" data-tab="boost" role="tab" aria-selected="false" onclick="switchTab('boost')">🚀 Naikkan Produk</button>
+        <button class="pt-tab active" data-tab="produk" role="tab" aria-selected="true" onclick="switchTab('produk')"><i class="bi bi-grid me-1"></i>Daftar Produk</button>
+        <button class="pt-tab" data-tab="stok" role="tab" aria-selected="false" onclick="switchTab('stok')"><i class="bi bi-boxes me-1"></i>Stok</button>
+        <button class="pt-tab" data-tab="boost" role="tab" aria-selected="false" onclick="switchTab('boost')"><i class="bi bi-rocket me-1"></i>Naikkan Produk</button>
     </div>
 
     {{-- ══ TAB: Daftar Produk ══ --}}

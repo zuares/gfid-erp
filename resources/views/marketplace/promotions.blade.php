@@ -514,6 +514,46 @@
     @media (max-width: 576px){
         .promo-dashboard-grid{ grid-template-columns:1fr; }
     }
+
+    /* ── Minimal modern layer ── */
+    .promo-wrap{ max-width:1440px; padding:.85rem 1rem 4rem; }
+    .promo-topbar{ top:.65rem; margin-inline:0; padding:1rem 1.1rem; border-radius:18px; box-shadow:0 14px 34px rgba(15,23,42,.07); }
+    .promo-eyebrow{ display:flex; align-items:center; gap:.38rem; margin-bottom:.18rem; color:#94a3b8; font-size:.62rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; }
+    .promo-eyebrow i{ color:#2563eb; font-size:.72rem; }
+    .promo-title{ font-size:1.2rem; letter-spacing:-.025em; }
+    .promo-sub{ max-width:680px; line-height:1.45; }
+    .promo-chipbar{ gap:.4rem; margin-top:.65rem; }
+    .promo-chip{ border-radius:9px; padding:.28rem .55rem; background:rgba(248,250,252,.8); }
+    body[data-theme="dark"] .promo-chip{ background:rgba(15,23,42,.75); }
+    .promo-dashboard-grid{ grid-template-columns:repeat(6, minmax(0,1fr)); gap:.65rem; }
+    .promo-stat-card{ min-height:94px; border-radius:15px; padding:.75rem .85rem; transition:transform .15s,box-shadow .15s; }
+    .promo-stat-card:hover{ transform:translateY(-2px); box-shadow:0 10px 24px rgba(15,23,42,.06); }
+    .promo-stat-label{ font-size:.62rem; letter-spacing:.08em; }
+    .promo-stat-value{ font-size:1.1rem; }
+    .promo-card{ border-radius:16px; box-shadow:0 14px 34px rgba(15,23,42,.055); }
+    .promo-filter{ min-height:35px; border-radius:9px; }
+    .promo-table thead th{ padding:.7rem .65rem; font-size:.64rem; text-transform:uppercase; letter-spacing:.02em; }
+    .promo-table tbody td{ padding:.7rem .65rem; }
+    .promo-table tbody tr{ transition:background .15s; }
+    .promo-table tbody tr:hover td{ background:rgba(37,99,235,.045); }
+    .promo-name{ font-size:.8rem; }
+    .promo-badge{ padding:.22rem .58rem; }
+    .promo-context{ border-radius:14px; padding:.8rem .9rem; box-shadow:0 8px 20px rgba(37,99,235,.06); }
+    .promo-controls .btn{ min-height:35px; border-radius:10px; }
+    @media (max-width:1100px){
+        .promo-dashboard-grid{ grid-template-columns:repeat(3, minmax(0,1fr)); }
+    }
+    @media (max-width:768px){
+        .promo-wrap{ padding:.5rem .5rem 4rem; }
+        .promo-topbar{ margin-inline:0; top:.35rem; padding:.85rem; }
+        .promo-dashboard-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+        .promo-controls{ width:100%; }
+        .promo-controls .btn, .promo-controls a{ flex:1; text-align:center; }
+    }
+    @media (max-width:576px){
+        .promo-dashboard-grid{ grid-template-columns:1fr; }
+        .promo-controls .btn, .promo-controls a{ flex:auto; }
+    }
 </style>
 @endpush
 
@@ -521,8 +561,9 @@
 <div class="promo-wrap">
     <div class="promo-topbar">
         <div>
+            <div class="promo-eyebrow"><i class="bi bi-tag"></i> Marketplace / Pricing</div>
             <h1 class="promo-title">Promosi Diskon</h1>
-            <div class="promo-sub">Kelola campaign diskon per toko, mulai dari list, detail, sampai tutup promo.</div>
+            <div class="promo-sub">Atur harga promo per campaign tanpa mengubah harga normal produk.</div>
             <div class="promo-chipbar">
                 <span class="promo-chip"><span class="lbl">Total</span><span class="val" id="kpiTotal">—</span></span>
                 <span class="promo-chip"><span class="lbl">Ongoing</span><span class="val" id="kpiOngoing">—</span></span>
