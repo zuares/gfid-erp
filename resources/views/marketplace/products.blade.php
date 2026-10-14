@@ -8,28 +8,35 @@
         --prd-accent-2:#1f2937;
         --prd-border:rgba(148,163,184,.18);
         --prd-muted:#64748b;
+        --prd-surface:#ffffff;
+        --prd-shadow:0 10px 30px rgba(15,23,42,.06);
+        --prd-radius:12px;
+        --prd-focus:rgba(37,99,235,.22);
     }
-    .page-wrap{ max-width:1180px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
+    .page-wrap{ max-width:1440px; margin-inline:auto; padding:.85rem 1rem 4rem; background:transparent!important; }
 
     /* ── Topbar (selaras shipment) ── */
     .prd-topbar{
         position:sticky; top:0; z-index:300;
         display:flex; justify-content:space-between; align-items:center; gap:.6rem; flex-wrap:wrap;
-        padding:.45rem .75rem; margin-inline:-.75rem; margin-bottom:.65rem;
-        background:var(--card,#fff); border-bottom:1px solid var(--prd-border);
+        padding:.7rem .85rem; margin-inline:-1rem; margin-bottom:.85rem;
+        background:var(--card,#fff); background:color-mix(in srgb, var(--card,#fff) 94%, transparent); border-bottom:1px solid var(--prd-border);
+        box-shadow:0 4px 14px rgba(15,23,42,.04); backdrop-filter:blur(12px);
     }
     body[data-theme="dark"] .prd-topbar{ background:var(--card,#0f172a); }
-    .title{ font-weight:750; font-size:1rem; margin:0; }
+    body[data-theme="dark"] .store-tabs-shell, body[data-theme="dark"] .prd-change-log-row{ --prd-surface:#0f172a; background:var(--card,#0f172a); }
+    .title{ font-weight:800; font-size:1.08rem; margin:0; letter-spacing:-.01em; }
     .sub{ color:var(--prd-muted); font-size:.78rem; }
     body[data-theme="dark"] .sub{ color:#9ca3af; }
 
     .kpis{ display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.35rem; }
     .kpi{
         display:inline-flex; align-items:baseline; gap:.45rem; cursor:pointer;
-        border-radius:7px; padding:.2rem .48rem; border:1px solid rgba(148,163,184,.28);
+        border-radius:9px; padding:.28rem .55rem; border:1px solid rgba(148,163,184,.28);
         background:transparent; font-size:.72rem; user-select:none;
+        transition:background .15s,border-color .15s,transform .15s;
     }
-    .kpi:hover{ background:rgba(148,163,184,.08); }
+    .kpi:hover{ background:rgba(148,163,184,.08); border-color:rgba(51,65,85,.38); transform:translateY(-1px); }
     .kpi.active{ border-color:var(--prd-accent); background:rgba(51,65,85,.06); }
     body[data-theme="dark"] .kpi{ background:rgba(15,23,42,.96); border-color:rgba(51,65,85,.85); }
     .kpi .lbl{ font-size:.66rem; color:#94a3b8; }
@@ -37,11 +44,21 @@
     body[data-theme="dark"] .kpi .val{ color:#cbd5e1; }
 
     .controls{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
-    .btn-pill{ border-radius:7px; padding-inline:.78rem; box-shadow:none!important; font-weight:600; font-size:.8rem; }
+    .btn-pill{ border-radius:9px; padding:.48rem .82rem; min-height:36px; box-shadow:none!important; font-weight:650; font-size:.8rem; }
     .btn-prd-primary{ background:var(--prd-accent)!important; border-color:var(--prd-accent)!important; color:#fff!important; }
     .btn-prd-primary:hover{ background:var(--prd-accent-2)!important; border-color:var(--prd-accent-2)!important; }
     .btn-prd-outline{ color:#475569!important; background:transparent!important; border:1px solid rgba(148,163,184,.35)!important; }
     .btn-prd-outline:hover{ background:rgba(148,163,184,.08)!important; }
+    .btn:focus-visible, .form-control:focus, .form-select:focus, .store-tab:focus-visible, .pt-tab:focus-visible{ box-shadow:0 0 0 3px var(--prd-focus)!important; outline:0; }
+
+    .workspace-intro{ display:flex; align-items:center; gap:.45rem; margin-bottom:.55rem; color:var(--prd-muted); font-size:.75rem; }
+    .workspace-intro .dot{ width:7px; height:7px; border-radius:999px; background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.12); flex:none; }
+    .store-tabs-shell{ display:flex; align-items:center; gap:.45rem; overflow-x:auto; border:1px solid var(--prd-border); border-radius:var(--prd-radius) var(--prd-radius) 0 0; background:var(--prd-surface); padding:.15rem .45rem 0; scrollbar-width:none; }
+    .store-tabs-shell::-webkit-scrollbar{ display:none; }
+    .filter-panel{ background:rgba(148,163,184,.035); padding:.7rem .8rem .55rem; border-radius:0 0 var(--prd-radius) var(--prd-radius); border:1px solid var(--prd-border); border-top:0; margin-bottom:.8rem; }
+    .filter-panel-heading{ display:flex; align-items:center; gap:.45rem; margin-bottom:.35rem; color:var(--prd-muted); font-size:.7rem; font-weight:750; }
+    .filter-panel-heading .filter-count{ margin-left:auto; }
+    .filter-bar{ margin-bottom:0; }
 
     /* ── Filter bar ── */
     .filter-bar{
@@ -54,7 +71,7 @@
 
     /* ── Card + table (selaras shipment) ── */
     .card-main{
-        background:var(--card,#fff); border-radius:8px; border:1px solid var(--prd-border); overflow:hidden;
+        background:var(--card,#fff); border-radius:var(--prd-radius); border:1px solid var(--prd-border); overflow:hidden; box-shadow:var(--prd-shadow);
     }
     body[data-theme="dark"] .card-main{ border-color:rgba(51,65,85,.85); }
     .table-list{ width:100%; margin-bottom:0; border-collapse:collapse; }
@@ -70,8 +87,11 @@
         padding:.52rem .62rem; font-size:.78rem;
     }
     body[data-theme="dark"] .table-list tbody td{ border-top-color:rgba(51,65,85,.85); }
+    .table-list tbody tr[data-pid]:hover td{ background:rgba(59,130,246,.035); }
+    .table-list tbody tr[data-pid]{ transition:background .15s; }
+    .table-list th:last-child, .table-list td:last-child{ min-width:180px; }
 
-    .prd-img{ width:42px; height:42px; border-radius:7px; object-fit:cover; background:#f1f5f9; }
+    .prd-img{ width:46px; height:46px; border-radius:9px; object-fit:cover; background:#f1f5f9; border:1px solid rgba(148,163,184,.2); }
     .prd-name{ 
         font-weight:700; color:inherit; max-width:280px; line-height:1.3;
         display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis;
@@ -113,6 +133,13 @@
     .btn-mini{ font-size:.65rem; padding:2px 8px; border-radius:6px; }
     .prd-caret{ cursor:pointer; user-select:none; color:#64748b; font-size:.8rem; }
     .empty{ padding:2.2rem 1.25rem; text-align:center; color:#64748b; }
+    .empty-state{ max-width:380px; margin:0 auto; padding:1.25rem .5rem; }
+    .empty-state-icon{ display:grid; place-items:center; width:42px; height:42px; margin:0 auto .6rem; border-radius:12px; background:rgba(59,130,246,.1); color:#2563eb; font-size:1.1rem; }
+    .empty-state-title{ color:inherit; font-weight:750; font-size:.85rem; margin-bottom:.25rem; }
+    .empty-state-copy{ font-size:.74rem; line-height:1.5; }
+    .prd-loading-row{ height:74px; }
+    .prd-skeleton{ display:inline-block; width:100%; height:10px; border-radius:999px; background:linear-gradient(90deg,rgba(148,163,184,.12),rgba(148,163,184,.3),rgba(148,163,184,.12)); background-size:200% 100%; animation:prdshine 1.2s infinite; }
+    @keyframes prdshine{ to{ background-position:-200% 0; } }
     .prd-edit-gallery{ display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:.65rem; }
     .prd-edit-image{ position:relative; aspect-ratio:1/1; overflow:hidden; border:1px solid var(--prd-border); border-radius:10px; background:#f8fafc; cursor:grab; }
     .prd-edit-image:active{ cursor:grabbing; }
@@ -123,6 +150,13 @@
     .prd-edit-section-title{ font-size:.78rem; font-weight:800; margin-bottom:.6rem; color:var(--prd-accent); }
     .prd-edit-meta{ font-size:.7rem; color:var(--prd-muted); }
     .prd-edit-readonly{ background:var(--card,#fff)!important; }
+    .prd-change-log{ display:flex; flex-direction:column; gap:.45rem; }
+    .prd-change-log-row{ display:flex; align-items:flex-start; gap:.55rem; padding:.5rem .6rem; border:1px solid var(--prd-border); border-radius:9px; background:var(--card,#fff); }
+    .prd-change-log-dot{ width:7px; height:7px; border-radius:999px; margin-top:.35rem; flex:none; background:#94a3b8; }
+    .prd-change-log-dot.ok{ background:#22c55e; }
+    .prd-change-log-dot.fail{ background:#ef4444; }
+    .prd-change-log-action{ font-size:.72rem; font-weight:750; }
+    .prd-change-log-meta{ margin-top:.1rem; font-size:.66rem; color:var(--prd-muted); }
 
     /* Autosuggest item untuk SKU varian di tab Bermasalah */
     .variant-sku-suggest{ position:relative; width:180px; }
@@ -231,13 +265,15 @@
 
     @media (max-width:768px){
         .page-wrap{ padding:.5rem .5rem 4rem; }
-        .prd-topbar{ margin-inline:-.5rem; padding:.5rem .65rem; }
+        .prd-topbar{ margin-inline:-.5rem; padding:.6rem .65rem; }
         .sub{ display:none; }
         .controls{ width:100%; }
-        .controls .btn-pill{ flex:1; }
+        .controls .btn-pill{ flex:1 1 30%; padding-inline:.45rem; }
         .filter-select, .filter-search{ max-width:none; flex:1 1 46%; }
         .table-wrap{ overflow-x:auto; }
         .prd-name{ max-width:200px; }
+        .workspace-intro{ align-items:flex-start; }
+        .filter-panel-heading{ display:none; }
     }
 </style>
 @endpush
@@ -253,23 +289,25 @@
             <div class="kpis" id="kpiRow"></div>
         </div>
         <div class="controls">
-            <button class="btn btn-pill btn-prd-outline" id="btnAutoMap" onclick="autoMap()">⚡ Auto-map</button>
-            <button class="btn btn-pill btn-prd-outline" onclick="openProductCreate()">＋ Tambah Produk</button>
-            <button class="btn btn-pill btn-prd-primary" id="btnSync" onclick="syncProducts()">⟳ Sync Shopee</button>
+            <button class="btn btn-pill btn-prd-outline" id="btnAutoMap" onclick="autoMap()" title="Cocokkan SKU marketplace dengan item internal">⚡ Auto-map</button>
+            <button class="btn btn-pill btn-prd-primary" onclick="openProductCreate()" title="Buat listing produk baru">＋ Tambah Produk</button>
+            <button class="btn btn-pill btn-prd-outline" id="btnSync" onclick="syncProducts()" title="Ambil data terbaru dari Shopee">⟳ Sync Shopee</button>
         </div>
     </div>
 
     {{-- Tabs --}}
-    <div class="pt-tabs">
-        <button class="pt-tab active" data-tab="produk" onclick="switchTab('produk')">🏷 Daftar Produk</button>
-        <button class="pt-tab" data-tab="stok" onclick="switchTab('stok')">📦 Stok</button>
-        <button class="pt-tab" data-tab="boost" onclick="switchTab('boost')">🚀 Naikkan Produk</button>
+    <div class="pt-tabs" role="tablist" aria-label="Area produk marketplace">
+        <button class="pt-tab active" data-tab="produk" role="tab" aria-selected="true" onclick="switchTab('produk')">🏷 Daftar Produk</button>
+        <button class="pt-tab" data-tab="stok" role="tab" aria-selected="false" onclick="switchTab('stok')">📦 Stok</button>
+        <button class="pt-tab" data-tab="boost" role="tab" aria-selected="false" onclick="switchTab('boost')">🚀 Naikkan Produk</button>
     </div>
 
     {{-- ══ TAB: Daftar Produk ══ --}}
     <div id="tabProduk" class="pt-pane active">
-    <div id="storeTabs" class="d-flex gap-2 mb-2" style="overflow-x:auto; border-bottom:1px solid var(--prd-border); padding-bottom:0px; scrollbar-width:none;"></div>
-    <div style="background:rgba(148,163,184,.03); padding:.55rem .75rem; border-radius:8px; border:1px solid var(--prd-border); margin-bottom:.65rem;">
+    <div class="workspace-intro"><span class="dot"></span><span>Pilih toko atau gunakan filter untuk menemukan produk yang ingin dikelola.</span></div>
+    <div id="storeTabs" class="store-tabs-shell" role="tablist" aria-label="Filter toko"></div>
+    <div class="filter-panel">
+        <div class="filter-panel-heading"><i class="bi bi-funnel"></i><span>Filter & urutan</span><span class="filter-count" id="prdCountLabel"></span></div>
         <div class="filter-bar" style="flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; margin-bottom: 0;">
             <div style="position:relative; flex-shrink:0;">
                 <input type="text" class="form-control form-control-sm filter-search w-100" style="padding-left:26px;" placeholder="Cari nama / SKU / item id…" id="fSearch">
@@ -316,9 +354,9 @@
         <table class="table-list table-hover">
             <thead><tr>
                 <th style="width:38px;text-align:center">#</th><th style="width:26px"></th><th style="width:50px"></th><th>Produk</th>
-                <th>Status</th><th>Harga Setelah Diskon</th><th>Stok</th><th>Terjual</th><th>Statistik</th><th>Total Promosi</th><th>Pembayaran Pembeli</th><th>Mapping</th><th style="width:230px">Aksi</th>
+                <th>Status</th><th title="Harga setelah diskon">Harga</th><th>Stok</th><th>Terjual</th><th title="Views dan rating">Performa</th><th title="Total nilai promosi">Promosi</th><th title="Total pembayaran pembeli">Keuangan</th><th>Mapping</th><th style="width:230px">Aksi</th>
             </tr></thead>
-            <tbody id="prdBody"><tr><td colspan="13" class="empty">Memuat…</td></tr></tbody>
+            <tbody id="prdBody"><tr><td colspan="13" class="empty"><span class="prd-skeleton" style="max-width:260px"></span></td></tr></tbody>
         </table>
     </div>
     </div>{{-- /tabProduk --}}
@@ -829,6 +867,52 @@
         if (count) count.textContent = `(${productEditorImages.length}/9 gambar)`;
     }
 
+    function changeLogActionLabel(action) {
+        return {
+            base_info: 'Info produk diperbarui',
+            sku: 'SKU induk diperbarui',
+            model_sku: 'SKU varian diperbarui',
+            price: 'Harga diperbarui',
+            stock: 'Stok diperbarui',
+            images: 'Urutan gambar diperbarui',
+            image_upload: 'Gambar baru di-upload',
+            unlist: 'Status listing diperbarui',
+            create: 'Produk dibuat',
+        }[action] || action || 'Perubahan produk';
+    }
+
+    function renderProductEditorChangeLogs(logs) {
+        const target = $('productEditorChangeLogs');
+        if (!target) return;
+        if (!logs.length) {
+            target.innerHTML = '<div class="prd-edit-meta">Belum ada riwayat perubahan untuk produk ini.</div>';
+            return;
+        }
+        target.innerHTML = `<div class="prd-change-log">${logs.slice(0, 8).map(log => {
+            const failed = ['failed', 'error'].includes(String(log.status || '').toLowerCase());
+            const status = failed ? 'Gagal' : (log.status || 'Selesai');
+            return `<div class="prd-change-log-row">
+                <span class="prd-change-log-dot ${failed ? 'fail' : 'ok'}"></span>
+                <div class="flex-grow-1 min-w-0"><div class="prd-change-log-action">${esc(changeLogActionLabel(log.action))}</div>
+                    <div class="prd-change-log-meta">${esc(status)} · ${esc(log.created_by || 'Sistem')} · ${orderDate(log.created_at)}</div>
+                    ${failed && log.error_message ? `<div class="text-danger mt-1" style="font-size:.66rem">${esc(log.error_message)}</div>` : ''}
+                </div>
+            </div>`;
+        }).join('')}</div>`;
+    }
+
+    window.loadProductEditorLogs = async function () {
+        const target = $('productEditorChangeLogs');
+        if (!target || !productEditorPid) return;
+        target.innerHTML = '<div class="prd-edit-meta">Memuat riwayat…</div>';
+        try {
+            const result = await api(`${API}/${productEditorPid}/change-logs`);
+            renderProductEditorChangeLogs(result.logs || []);
+        } catch (error) {
+            target.innerHTML = `<div class="prd-edit-meta text-danger">Riwayat belum dapat dimuat: ${esc(error.message || 'Error')}</div>`;
+        }
+    }
+
     function renderProductEditor(data) {
         const product = data.product || {};
         const models = data.models || [];
@@ -890,9 +974,18 @@
             <div class="prd-edit-section mb-0">
                 <div class="prd-edit-section-title">Catatan</div>
                 <div class="prd-edit-meta">Simpan akan mengirim hanya perubahan yang terdeteksi. Perubahan gallery meng-upload file baru ke Shopee lalu menyimpan daftar image ID final.</div>
+            </div>
+
+            <div class="prd-edit-section mb-0">
+                <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                    <div class="prd-edit-section-title mb-0">Riwayat perubahan</div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" style="border-radius:999px" onclick="loadProductEditorLogs()">↻ Muat ulang</button>
+                </div>
+                <div id="productEditorChangeLogs"></div>
             </div>`;
 
         renderProductEditorGallery();
+        loadProductEditorLogs();
         $('productEditorSaveBtn').disabled = false;
         $('productEditorSaveStatus').textContent = 'Perubahan belum disimpan.';
     }
@@ -1063,6 +1156,7 @@
 
     // ── Data ────────────────────────────────────────────────────────────────
     window.loadProducts = async function () {
+        $('prdBody').innerHTML = `<tr><td colspan="13" class="empty"><div class="empty-state"><div class="empty-state-icon"><i class="bi bi-arrow-repeat"></i></div><div class="empty-state-title">Mengambil produk terbaru…</div><div class="empty-state-copy">Data listing sedang disiapkan dari penyimpanan lokal.</div></div></td></tr>`;
         try {
             products = await api(API);
             buildStoreOptions();
@@ -1088,10 +1182,10 @@
         const sel = $('fStore'), cur = sel.value;
         const stores = [...new Map(products.filter(p => p.store).map(p => [p.store.id, p.store.name])).entries()];
         
-        let html = `<button class="store-tab ${cur === '' ? 'active' : ''}" onclick="setStoreTab('')">Semua Produk</button>`;
-        html += `<button class="store-tab ${cur === 'bermasalah' ? 'active' : ''}" style="color:var(--bs-danger);" onclick="setStoreTab('bermasalah')">⚠ Bermasalah</button>`;
+        let html = `<button type="button" class="store-tab ${cur === '' ? 'active' : ''}" role="tab" aria-selected="${cur === ''}" onclick="setStoreTab('')">Semua Produk</button>`;
+        html += `<button type="button" class="store-tab ${cur === 'bermasalah' ? 'active' : ''}" role="tab" aria-selected="${cur === 'bermasalah'}" style="color:var(--bs-danger);" onclick="setStoreTab('bermasalah')">⚠ Bermasalah</button>`;
         stores.forEach(([id, name]) => {
-            html += `<button class="store-tab ${cur === String(id) ? 'active' : ''}" onclick="setStoreTab('${id}')">${esc(name)}</button>`;
+            html += `<button type="button" class="store-tab ${cur === String(id) ? 'active' : ''}" role="tab" aria-selected="${cur === String(id)}" onclick="setStoreTab('${id}')">${esc(name)}</button>`;
         });
         if ($('storeTabs')) $('storeTabs').innerHTML = html;
     }
@@ -1266,10 +1360,17 @@
         renderKpis();
         const rows = filtered();
         $('prdCount').textContent = `${rows.length} dari ${products.length} produk`;
+        if ($('prdCountLabel')) $('prdCountLabel').textContent = `${rows.length} produk terlihat`;
         $('fReset').style.display = anyFilterActive() ? '' : 'none';
 
         if (!rows.length) {
-            $('prdBody').innerHTML = `<tr><td colspan="13" class="empty">${products.length ? 'Tidak ada produk yang cocok dengan filter. <a href="javascript:resetFilters()">Reset filter</a>' : 'Belum ada produk. Klik "⟳ Sync Shopee".'}</td></tr>`;
+            const hasProducts = products.length > 0;
+            $('prdBody').innerHTML = `<tr><td colspan="13" class="empty"><div class="empty-state">
+                <div class="empty-state-icon"><i class="bi bi-${hasProducts ? 'search' : 'box-seam'}"></i></div>
+                <div class="empty-state-title">${hasProducts ? 'Produk tidak ditemukan' : 'Belum ada produk'}</div>
+                <div class="empty-state-copy">${hasProducts ? 'Coba ubah kata kunci atau filter yang dipilih.' : 'Klik Sync Shopee untuk mengambil listing, atau tambah produk baru untuk mulai menjual.'}</div>
+                ${hasProducts ? '<button type="button" class="btn btn-sm btn-prd-outline mt-2" onclick="resetFilters()">Reset filter</button>' : '<button type="button" class="btn btn-sm btn-prd-primary mt-2" onclick="syncProducts()">⟳ Sync Shopee</button>'}
+            </div></td></tr>`;
             return;
         }
 
@@ -2286,7 +2387,11 @@
     let boLoaded = false;
 
     window.switchTab = function (tab) {
-        document.querySelectorAll('.pt-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+        document.querySelectorAll('.pt-tab').forEach(t => {
+            const active = t.dataset.tab === tab;
+            t.classList.toggle('active', active);
+            t.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
         $('tabProduk').classList.toggle('active', tab === 'produk');
         $('tabStok').classList.toggle('active', tab === 'stok');
         $('tabBoost').classList.toggle('active', tab === 'boost');
