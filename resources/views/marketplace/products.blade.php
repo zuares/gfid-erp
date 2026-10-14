@@ -243,29 +243,33 @@
     body[data-theme="dark"] .bo-sec{ background:rgba(15,23,42,.5); }
     .bo-sec-head{ font-size:.85rem; font-weight:750; margin-bottom:.6rem; }
     .bo-hint{ font-weight:500; font-size:.7rem; color:#94a3b8; margin-left:.3rem; }
-    .bo-picker{ border:1px solid var(--prd-border); border-radius:12px; padding:.65rem; background:rgba(248,250,252,.55); flex:1 1 100%; min-width:0; }
-    body[data-theme="dark"] .bo-picker{ background:rgba(15,23,42,.48); }
-    .bo-picker-head{ display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem; }
-    .bo-picker-label{ font-size:.72rem; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:.04em; }
-    body[data-theme="dark"] .bo-picker-label{ color:#cbd5e1; }
-    .bo-picker-selected{ margin-left:auto; font-size:.68rem; color:#ea580c; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .bo-picker-search-wrap{ position:relative; margin-bottom:.5rem; }
-    .bo-picker-search-wrap i{ position:absolute; left:.65rem; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:.72rem; }
-    .bo-picker-search{ width:100%; border:1px solid var(--prd-border); border-radius:8px; background:var(--card,#fff); color:inherit; font-size:.75rem; padding:.4rem .6rem .4rem 1.85rem; outline:0; }
-    .bo-picker-search:focus{ border-color:#ea580c; box-shadow:0 0 0 3px rgba(234,88,12,.1); }
-    body[data-theme="dark"] .bo-picker-search{ background:#0f172a; }
-    .bo-picker-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(215px,1fr)); gap:.45rem; max-height:250px; overflow-y:auto; padding:.1rem; }
-    .bo-product-card{ display:flex; align-items:center; gap:.5rem; width:100%; min-width:0; padding:.45rem; border:1px solid var(--prd-border); border-radius:10px; background:var(--card,#fff); color:inherit; text-align:left; cursor:pointer; transition:border-color .15s, background .15s, box-shadow .15s; }
+    .bo-product-choice{ flex:1 1 280px; min-width:0; }
+    .bo-select-product-btn{ display:flex; align-items:center; gap:.6rem; width:100%; min-height:58px; padding:.45rem .6rem; border:1px solid var(--prd-border); border-radius:11px; background:var(--card,#fff); color:inherit; text-align:left; cursor:pointer; transition:border-color .15s, background .15s, box-shadow .15s; }
+    .bo-select-product-btn:hover{ border-color:#ea580c; background:rgba(234,88,12,.04); box-shadow:0 2px 8px rgba(15,23,42,.06); }
+    body[data-theme="dark"] .bo-select-product-btn{ background:rgba(30,41,59,.72); }
+    .bo-choice-thumb, .bo-product-thumb{ width:42px; height:42px; border-radius:9px; object-fit:cover; flex:none; background:#e2e8f0; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:1rem; }
+    .bo-choice-copy{ min-width:0; flex:1; }
+    .bo-choice-copy strong{ display:block; font-size:.76rem; font-weight:750; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bo-choice-copy small{ display:block; margin-top:.12rem; color:#94a3b8; font-size:.66rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bo-choice-chevron{ color:#94a3b8; font-size:.9rem; flex:none; }
+    .bo-modal-search-wrap{ position:relative; margin-bottom:.75rem; }
+    .bo-modal-search-wrap i{ position:absolute; left:.75rem; top:50%; transform:translateY(-50%); color:#94a3b8; }
+    .bo-modal-search{ width:100%; border:1px solid var(--prd-border); border-radius:10px; background:var(--card,#fff); color:inherit; font-size:.8rem; padding:.55rem .7rem .55rem 2.15rem; outline:0; }
+    .bo-modal-search:focus{ border-color:#ea580c; box-shadow:0 0 0 3px rgba(234,88,12,.1); }
+    body[data-theme="dark"] .bo-modal-search{ background:#0f172a; }
+    .bo-modal-count{ color:#94a3b8; font-size:.7rem; margin-bottom:.45rem; }
+    .bo-modal-product-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:.55rem; max-height:48vh; overflow-y:auto; padding:.15rem; }
+    .bo-product-card{ display:flex; align-items:center; gap:.55rem; width:100%; min-width:0; padding:.55rem; border:1px solid var(--prd-border); border-radius:11px; background:var(--card,#fff); color:inherit; text-align:left; cursor:pointer; transition:border-color .15s, background .15s, box-shadow .15s; }
     .bo-product-card:hover{ border-color:rgba(234,88,12,.55); background:rgba(234,88,12,.04); }
     .bo-product-card.active{ border-color:#ea580c; background:rgba(234,88,12,.09); box-shadow:0 0 0 2px rgba(234,88,12,.1); }
     body[data-theme="dark"] .bo-product-card{ background:rgba(30,41,59,.72); }
-    .bo-product-card img, .bo-product-thumb{ width:44px; height:44px; border-radius:9px; object-fit:cover; flex:none; background:#e2e8f0; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:1rem; }
+    .bo-product-card img, .bo-product-card .bo-product-thumb{ width:52px; height:52px; }
     .bo-product-card .copy{ min-width:0; flex:1; }
-    .bo-product-card .name{ font-size:.74rem; font-weight:750; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .bo-product-card .meta{ margin-top:.15rem; font-size:.64rem; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .bo-product-card .check{ color:#ea580c; font-size:.85rem; opacity:0; flex:none; }
+    .bo-product-card .name{ display:block; font-size:.76rem; font-weight:750; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bo-product-card .meta{ display:block; margin-top:.18rem; font-size:.66rem; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bo-product-card .check{ color:#ea580c; font-size:.9rem; opacity:0; flex:none; }
     .bo-product-card.active .check{ opacity:1; }
-    .bo-picker-empty{ color:#94a3b8; font-size:.72rem; padding:.45rem .2rem; }
+    .bo-picker-empty{ color:#94a3b8; font-size:.75rem; padding:1rem .25rem; grid-column:1/-1; text-align:center; }
     .bo-slotbar{ display:flex; gap:.4rem; margin-bottom:.6rem; }
     .bo-slot{ width:40px; height:40px; border-radius:10px; border:2px dashed rgba(148,163,184,.4); display:flex; align-items:center; justify-content:center; font-size:1rem; color:#cbd5e1; }
     .bo-slot.filled{ border-style:solid; border-color:#ea580c; background:rgba(234,88,12,.08); }
@@ -287,10 +291,27 @@
     .bo-timepill.off{ background:rgba(148,163,184,.18); color:#64748b; }
     .bo-timepill a{ text-decoration:none; }
     .bo-add{ display:flex; gap:.4rem; flex-wrap:wrap; align-items:center; margin-top:.7rem; padding-top:.7rem; border-top:1px dashed rgba(148,163,184,.3); }
-    .bo-add .bo-picker + input[type="hidden"]{ display:none; }
+    .bo-add input[type="hidden"]{ display:none; }
     .bo-times{ display:flex; gap:.3rem; flex-wrap:wrap; }
-    .bo-t{ font-size:.76rem; padding:.25rem .4rem; border-radius:7px; border:1px solid var(--prd-border); background:var(--card,#fff); }
-    body[data-theme="dark"] .bo-t{ background:#0f172a; color:#fff; }
+    .bo-time-picker{ flex:1 1 100%; min-width:0; padding:.65rem .7rem; border:1px solid var(--prd-border); border-radius:12px; background:rgba(248,250,252,.55); }
+    body[data-theme="dark"] .bo-time-picker{ background:rgba(15,23,42,.48); }
+    .bo-time-head{ display:flex; align-items:center; gap:.5rem; margin-bottom:.55rem; }
+    .bo-time-label{ font-size:.72rem; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:.04em; }
+    body[data-theme="dark"] .bo-time-label{ color:#cbd5e1; }
+    .bo-time-count{ margin-left:auto; color:#ea580c; font-size:.68rem; font-weight:700; }
+    .bo-time-presets{ display:flex; gap:.35rem; flex-wrap:wrap; margin-bottom:.55rem; }
+    .bo-time-preset{ border:1px solid var(--prd-border); border-radius:999px; padding:.25rem .55rem; background:var(--card,#fff); color:inherit; font-size:.69rem; font-weight:700; cursor:pointer; }
+    .bo-time-preset:hover, .bo-time-preset.active{ border-color:#ea580c; color:#c2410c; background:rgba(234,88,12,.09); }
+    body[data-theme="dark"] .bo-time-preset{ background:#0f172a; }
+    .bo-time-fields{ display:flex; gap:.45rem; flex-wrap:wrap; align-items:center; }
+    .bo-time-field{ display:flex; align-items:center; gap:.25rem; padding:.2rem .25rem .2rem .5rem; border:1px solid var(--prd-border); border-radius:9px; background:var(--card,#fff); }
+    body[data-theme="dark"] .bo-time-field{ background:#0f172a; }
+    .bo-t{ min-width:92px; border:0; outline:0; font-size:.76rem; font-weight:700; padding:.18rem .2rem; background:transparent; color:inherit; }
+    .bo-time-remove{ width:22px; height:22px; border:0; border-radius:6px; background:transparent; color:#94a3b8; cursor:pointer; line-height:1; }
+    .bo-time-remove:hover:not(:disabled){ background:rgba(239,68,68,.1); color:#dc2626; }
+    .bo-time-remove:disabled{ opacity:.28; cursor:not-allowed; }
+    .bo-time-add{ margin-top:.55rem; border:1px dashed rgba(234,88,12,.5); border-radius:8px; padding:.3rem .55rem; background:transparent; color:#c2410c; font-size:.69rem; font-weight:750; cursor:pointer; }
+    .bo-time-add:hover{ background:rgba(234,88,12,.07); }
     .bo-tag{ font-size:.62rem; font-weight:800; padding:.1rem .4rem; border-radius:5px; text-transform:uppercase; }
     .tag-schedule{ background:rgba(37,99,235,.12); color:#1d4ed8; }
     .tag-pool{ background:rgba(22,163,74,.12); color:#15803d; }
@@ -513,14 +534,25 @@
             <div class="bo-sec-head">⏰ Jadwal jam-tetap <span class="bo-hint">naik otomatis tiap hari di jam ini</span></div>
             <div id="boSchedList" class="bo-list"></div>
             <div class="bo-add">
-                <div class="bo-picker" id="boSchedPicker">
-                    <div class="bo-picker-head"><span class="bo-picker-label">Pilih produk</span><span class="bo-picker-selected" id="boSchedSelectedLabel">Belum dipilih</span></div>
-                    <div class="bo-picker-search-wrap"><i class="bi bi-search"></i><input type="search" class="bo-picker-search" id="boSchedSearch" placeholder="Cari nama produk atau SKU…" autocomplete="off"></div>
-                    <div class="bo-picker-grid"></div>
+                <div class="bo-product-choice" id="boSchedPicker">
+                    <button type="button" class="bo-select-product-btn" onclick="boOpenProductPicker('sched')">
+                        <span class="bo-choice-thumb" id="boSchedSelectedThumb">▧</span>
+                        <span class="bo-choice-copy"><strong id="boSchedSelectedLabel">Pilih produk</strong><small id="boSchedSelectedMeta">Buka daftar produk aktif</small></span>
+                        <span class="bo-choice-chevron">⌄</span>
+                    </button>
                 </div>
                 <input type="hidden" id="boSchedPick">
-                <span class="bo-times" id="boSchedTimes"><input type="time" class="bo-t" value="08:00"></span>
-                <button class="btn btn-sm btn-prd-outline" onclick="boAddTime()">+ jam</button>
+                <div class="bo-time-picker">
+                    <div class="bo-time-head"><span class="bo-time-label">Jam naik otomatis</span><span class="bo-time-count" id="boTimeCount">1 jam dipilih</span></div>
+                    <div class="bo-time-presets" id="boTimePresets">
+                        <button type="button" class="bo-time-preset" data-time="08:00" onclick="boAddPresetTime('08:00')">08:00</button>
+                        <button type="button" class="bo-time-preset" data-time="12:00" onclick="boAddPresetTime('12:00')">12:00</button>
+                        <button type="button" class="bo-time-preset" data-time="16:00" onclick="boAddPresetTime('16:00')">16:00</button>
+                        <button type="button" class="bo-time-preset" data-time="20:00" onclick="boAddPresetTime('20:00')">20:00</button>
+                    </div>
+                    <div class="bo-time-fields" id="boSchedTimes"></div>
+                    <button type="button" class="bo-time-add" onclick="boAddTime()">＋ Tambah jam lain</button>
+                </div>
                 <button class="btn btn-sm btn-prd-primary" onclick="boSaveSched()">Simpan</button>
             </div>
         </div>
@@ -530,10 +562,12 @@
             <div class="bo-sec-head">🔁 Rotasi otomatis <span class="bo-hint">isi slot kosong bergiliran tiap 4 jam</span></div>
             <div id="boPoolList" class="bo-list"></div>
             <div class="bo-add">
-                <div class="bo-picker" id="boPoolPicker">
-                    <div class="bo-picker-head"><span class="bo-picker-label">Tambah ke antrian</span><span class="bo-picker-selected" id="boPoolSelectedLabel">Belum dipilih</span></div>
-                    <div class="bo-picker-search-wrap"><i class="bi bi-search"></i><input type="search" class="bo-picker-search" id="boPoolSearch" placeholder="Cari nama produk atau SKU…" autocomplete="off"></div>
-                    <div class="bo-picker-grid"></div>
+                <div class="bo-product-choice" id="boPoolPicker">
+                    <button type="button" class="bo-select-product-btn" onclick="boOpenProductPicker('pool')">
+                        <span class="bo-choice-thumb" id="boPoolSelectedThumb">▧</span>
+                        <span class="bo-choice-copy"><strong id="boPoolSelectedLabel">Pilih produk</strong><small id="boPoolSelectedMeta">Buka daftar produk aktif</small></span>
+                        <span class="bo-choice-chevron">⌄</span>
+                    </button>
                 </div>
                 <input type="hidden" id="boPoolPick">
                 <button class="btn btn-sm btn-prd-primary" onclick="boAddPool()">+ Tambah ke antrian</button>
@@ -657,6 +691,25 @@
                 <span class="prd-edit-meta me-auto" id="productPromotionStatus">Harga promo tersimpan sebagai bagian dari campaign.</span>
                 <button class="btn btn-light border" style="border-radius:999px" data-bs-dismiss="modal">Batal</button>
                 <button class="btn btn-success fw-bold" style="border-radius:999px" id="productPromotionSaveBtn" onclick="saveProductPromotion()" disabled>Simpan Harga Promo</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalBoostProductPicker" tabindex="-1" aria-labelledby="modalBoostProductPickerLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:16px">
+            <div class="modal-header border-0 pb-2">
+                <div>
+                    <h5 class="modal-title fw-bold" id="modalBoostProductPickerLabel">Pilih Produk</h5>
+                    <div class="prd-edit-meta">Pilih produk aktif untuk dijadwalkan atau dimasukkan ke rotasi.</div>
+                </div>
+                <button class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body pt-1">
+                <div class="bo-modal-search-wrap"><i class="bi bi-search"></i><input type="search" class="bo-modal-search" id="boModalProductSearch" placeholder="Cari nama produk, SKU, atau ID…" autocomplete="off"></div>
+                <div class="bo-modal-count" id="boModalProductCount"></div>
+                <div class="bo-modal-product-grid" id="boModalProductGrid"></div>
             </div>
         </div>
     </div>
@@ -2757,46 +2810,76 @@
 
     function boRenderPicker(type) {
         const isSched = type === 'sched';
-        const picker = $(isSched ? 'boSchedPicker' : 'boPoolPicker');
         const hidden = $(isSched ? 'boSchedPick' : 'boPoolPick');
-        const search = $(isSched ? 'boSchedSearch' : 'boPoolSearch');
         const label = $(isSched ? 'boSchedSelectedLabel' : 'boPoolSelectedLabel');
-        if (!picker || !hidden) return;
+        const meta = $(isSched ? 'boSchedSelectedMeta' : 'boPoolSelectedMeta');
+        const thumb = $(isSched ? 'boSchedSelectedThumb' : 'boPoolSelectedThumb');
+        if (!hidden || !label || !meta || !thumb) return;
 
         const list = boCandidateProducts();
         const selected = String(hidden.value || '');
         if (selected && !list.some(p => String(p.id) === selected)) hidden.value = '';
-        const query = String(search?.value || '').trim().toLowerCase();
-        const filtered = list.filter(p => {
-            if (!query) return true;
-            return [p.item_name, p.item_sku, p.item_id].some(v => String(v || '').toLowerCase().includes(query));
-        });
         const current = String(hidden.value || '');
         const currentProduct = list.find(p => String(p.id) === current);
-        label.textContent = currentProduct ? (currentProduct.item_name || 'Produk dipilih') : 'Belum dipilih';
+        if (!currentProduct) {
+            label.textContent = 'Pilih produk';
+            meta.textContent = list.length ? 'Buka daftar produk aktif' : 'Belum ada produk aktif di toko ini';
+            thumb.textContent = '▧';
+            thumb.innerHTML = '▧';
+            return;
+        }
+        label.textContent = currentProduct.item_name || 'Produk dipilih';
+        meta.textContent = [currentProduct.item_sku || ('ID ' + (currentProduct.item_id || currentProduct.id)), currentProduct.stock_total != null ? 'Stok ' + currentProduct.stock_total : ''].filter(Boolean).join(' · ');
+        thumb.innerHTML = currentProduct.image_url
+            ? `<img class="bo-choice-thumb" src="${esc(currentProduct.image_url)}" alt="" loading="lazy">`
+            : '▧';
+    }
 
-        const grid = picker.querySelector('.bo-picker-grid');
+    let boPickerType = 'sched';
+
+    function boRenderModalProducts() {
+        const grid = $('boModalProductGrid');
+        const count = $('boModalProductCount');
+        const search = $('boModalProductSearch');
+        const hidden = $(boPickerType === 'sched' ? 'boSchedPick' : 'boPoolPick');
+        if (!grid || !hidden) return;
+        const list = boCandidateProducts();
+        const query = String(search?.value || '').trim().toLowerCase();
+        const filtered = list.filter(p => !query || [p.item_name, p.item_sku, p.item_id].some(v => String(v || '').toLowerCase().includes(query)));
+        count.textContent = `${filtered.length} dari ${list.length} produk aktif`;
         if (!filtered.length) {
             grid.innerHTML = `<div class="bo-picker-empty">${list.length ? 'Produk tidak ditemukan.' : 'Belum ada produk aktif di toko ini.'}</div>`;
             return;
         }
+        const current = String(hidden.value || '');
         grid.innerHTML = filtered.map(p => {
             const id = String(p.id), active = id === current;
             const image = p.image_url
                 ? `<img src="${esc(p.image_url)}" alt="" loading="lazy">`
                 : '<span class="bo-product-thumb">▧</span>';
-            const meta = [p.item_sku || ('ID ' + (p.item_id || p.id)), p.stock_total != null ? 'Stok ' + p.stock_total : ''].filter(Boolean).join(' · ');
-            return `<button type="button" class="bo-product-card ${active ? 'active' : ''}" onclick="boPickProduct('${type}', ${p.id})" title="${esc(p.item_name || 'Produk')}">
-                ${image}<span class="copy"><span class="name">${esc(p.item_name || 'Produk tanpa nama')}</span><span class="meta">${esc(meta)}</span></span><span class="check">✓</span>
+            const productMeta = [p.item_sku || ('ID ' + (p.item_id || p.id)), p.stock_total != null ? 'Stok ' + p.stock_total : ''].filter(Boolean).join(' · ');
+            return `<button type="button" class="bo-product-card ${active ? 'active' : ''}" onclick="boPickProduct('${boPickerType}', ${p.id})" title="${esc(p.item_name || 'Produk')}">
+                ${image}<span class="copy"><span class="name">${esc(p.item_name || 'Produk tanpa nama')}</span><span class="meta">${esc(productMeta)}</span></span><span class="check">✓</span>
             </button>`;
         }).join('');
     }
+
+    window.boOpenProductPicker = function (type) {
+        boPickerType = type === 'pool' ? 'pool' : 'sched';
+        const search = $('boModalProductSearch');
+        if (search) search.value = '';
+        boRenderModalProducts();
+        bootstrap.Modal.getOrCreateInstance($('modalBoostProductPicker')).show();
+        setTimeout(() => search?.focus(), 150);
+    };
 
     window.boPickProduct = function (type, id) {
         const hidden = $(type === 'sched' ? 'boSchedPick' : 'boPoolPick');
         if (!hidden) return;
         hidden.value = String(id);
         boRenderPicker(type);
+        const modal = $('modalBoostProductPicker');
+        if (modal) bootstrap.Modal.getOrCreateInstance(modal).hide();
     };
 
     function boFillPickers() {
@@ -2804,13 +2887,8 @@
         boRenderPicker('pool');
     }
 
-    ['boSchedSearch', 'boPoolSearch'].forEach(id => {
-        const input = $(id);
-        if (input && !input.dataset.bound) {
-            input.addEventListener('input', () => boRenderPicker(id === 'boSchedSearch' ? 'sched' : 'pool'));
-            input.dataset.bound = '1';
-        }
-    });
+    const boModalSearch = $('boModalProductSearch');
+    if (boModalSearch) boModalSearch.addEventListener('input', boRenderModalProducts);
 
     window.boReload = function () {
         boFillPickers();
@@ -2853,23 +2931,57 @@
         }).join('') : '<div class="bo-empty">Belum ada jadwal.</div>';
     }
 
-    window.boAddTime = function () {
-        const el = document.createElement('input');
-        el.type = 'time'; el.className = 'bo-t'; el.value = '20:00';
-        $('boSchedTimes').appendChild(el);
+    function boTimeFieldHtml(value) {
+        return `<label class="bo-time-field"><input type="time" class="bo-t" value="${esc(value || '')}" aria-label="Jam naik"><button type="button" class="bo-time-remove" onclick="boRemoveTime(this)" aria-label="Hapus jam">×</button></label>`;
+    }
+
+    function boUpdateTimeSummary() {
+        const fields = [...document.querySelectorAll('#boSchedTimes .bo-t')];
+        const values = fields.map(input => input.value).filter(Boolean);
+        const count = $('boTimeCount');
+        if (count) count.textContent = `${values.length} jam dipilih`;
+        document.querySelectorAll('#boTimePresets .bo-time-preset').forEach(button => button.classList.toggle('active', values.includes(button.dataset.time)));
+        document.querySelectorAll('#boSchedTimes .bo-time-remove').forEach(button => { button.disabled = fields.length <= 1; });
+    }
+
+    function boResetTimes(value = '08:00') {
+        const target = $('boSchedTimes');
+        if (!target) return;
+        target.innerHTML = boTimeFieldHtml(value);
+        boUpdateTimeSummary();
+    }
+
+    window.boAddTime = function (value = '20:00') {
+        const target = $('boSchedTimes');
+        if (!target) return;
+        const current = [...target.querySelectorAll('.bo-t')].map(input => input.value).filter(Boolean);
+        const next = value && !current.includes(value) ? value : ['08:00', '12:00', '16:00', '20:00'].find(time => !current.includes(time)) || '';
+        target.insertAdjacentHTML('beforeend', boTimeFieldHtml(next));
+        boUpdateTimeSummary();
     };
+
+    window.boAddPresetTime = function (value) { boAddTime(value); };
+    window.boRemoveTime = function (button) {
+        const fields = document.querySelectorAll('#boSchedTimes .bo-time-field');
+        if (fields.length <= 1) return;
+        button.closest('.bo-time-field')?.remove();
+        boUpdateTimeSummary();
+    };
+
+    $('boSchedTimes')?.addEventListener('input', boUpdateTimeSummary);
+    boResetTimes();
 
     window.boSaveSched = async function () {
         const pid = parseInt($('boSchedPick').value);
         if (!pid) return alert('Pilih produk dulu.');
-        const times = [...document.querySelectorAll('#boSchedTimes .bo-t')].map(i => i.value).filter(Boolean);
+        const times = [...new Set([...document.querySelectorAll('#boSchedTimes .bo-t')].map(i => i.value).filter(Boolean))].sort();
         if (!times.length) return alert('Isi minimal satu jam.');
         try {
             const res = await api(`${BAPI}/schedules`, { method:'POST', body: JSON.stringify({ store_id: boStoreId(), marketplace_product_id: pid, times }) });
             toast(res.message);
             $('boSchedPick').value = '';
             boRenderPicker('sched');
-            $('boSchedTimes').innerHTML = '<input type="time" class="bo-t" value="08:00">';
+            boResetTimes();
             boScheds();
         } catch (e) { toast('Gagal: ' + e.message, 'error'); }
     };
