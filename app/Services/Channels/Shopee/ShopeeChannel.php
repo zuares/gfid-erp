@@ -184,10 +184,28 @@ class ShopeeChannel implements MarketplaceChannel
             // 1) Hormati cooldown 429 yang di-set proses lain
             $remaining = $this->cooldownRemaining($store);
             if ($remaining > 0) {
-                sleep(min($remaining, $isConsole ? 60 : 2));
+                // Untuk request web, cooldown pendek harus ditunggu sampai
+                // benar-benar selesai. Sebelumnya hanya menunggu maksimal 2
+                // detik lalu mengembalikan error walaupun tinggal ±1 detik;
+                // import payout akhirnya gagal padahal request aman untuk
+                // dicoba ulang. Cooldown panjang tetap dikembalikan ke UI.
+                $maxWebWait = max(0, (int) config('shopee.web_rate_limit_max_wait', 10));
+                if (! $isConsole && $remaining > $maxWebWait) {
+                    return [
+                        'error'   => 'rate_limit_cooldown',
+                        'message' => "Shopee sedang membatasi permintaan (rate limit). Coba lagi ±{$remaining} detik lagi.",
+                        '_meta'   => ['http_status' => 429, 'retry_after' => $remaining],
+                    ];
+                }
+
+                $wait = min($remaining, $isConsole ? 60 : $maxWebWait);
+                // Grace period mencegah pembulatan time() membuat cooldown
+                // terlihat masih aktif tepat di batas kedaluwarsa.
+                usleep((int) round(($wait + 0.25) * 1_000_000));
                 $remaining = $this->cooldownRemaining($store);
                 if ($remaining > 0 && ! $isConsole) {
-                    // Request web jangan digantung — beri jawaban jelas ke UI.
+                    // Cache eksternal dapat terlambat menghapus entry. Jangan
+                    // mengirim request sebelum cooldown benar-benar habis.
                     return [
                         'error'   => 'rate_limit_cooldown',
                         'message' => "Shopee sedang membatasi permintaan (rate limit). Coba lagi ±{$remaining} detik lagi.",

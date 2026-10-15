@@ -6,6 +6,7 @@ use App\Models\Channel;
 use App\Models\Store;
 use App\Services\Channels\Shopee\ShopeeChannel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -133,6 +134,23 @@ class ShopeeChannelMetaTest extends TestCase
         $result = app(ShopeeChannel::class)->getEscrowDetail($store, 'ORDER-X');
 
         $this->assertSame(500, $result['_meta']['http_status']);
+    }
+
+    public function test_request_web_menunggu_cooldown_pendek_lalu_mencoba_lagi(): void
+    {
+        $store = $this->createStore();
+
+        Cache::put('shopee:cooldown:12345', time() + 3, 10);
+        Http::fake([
+            '*/api/v2/payment/get_escrow_detail*' => Http::response([
+                'response' => ['order_income' => ['final_income' => 1000]],
+            ], 200),
+        ]);
+
+        $result = app(ShopeeChannel::class)->getEscrowDetail($store, 'ORDER-X');
+
+        $this->assertSame(1000, $result['response']['order_income']['final_income']);
+        Http::assertSentCount(1);
     }
 
     public function test_gms_campaign_performance_uses_valid_payload()

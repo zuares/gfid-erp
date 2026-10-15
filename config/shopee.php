@@ -22,11 +22,15 @@ return [
     |                       Request web selalu dibatasi 3 detik.
     | rate_limit_cooldown : fallback detik cooldown saat Shopee menjawab 429
     |                       tanpa header Retry-After.
+    | web_rate_limit_max_wait: batas tunggu request web untuk cooldown yang
+    |                       sudah aktif. Cooldown yang lebih lama dikembalikan
+    |                       ke UI agar request web tidak menggantung.
     */
     'min_gap_ms'          => (int) env('SHOPEE_MIN_GAP_MS', 150),
     'retry_max_attempts'  => env('SHOPEE_RETRY_MAX_ATTEMPTS'),
     'retry_max_sleep'     => (int) env('SHOPEE_RETRY_MAX_SLEEP', 15),
     'rate_limit_cooldown' => (int) env('SHOPEE_RATE_LIMIT_COOLDOWN', 30),
+    'web_rate_limit_max_wait' => (int) env('SHOPEE_WEB_RATE_LIMIT_MAX_WAIT', 10),
 
     // Rentang default enrichment escrow_release_time. Dibuat terbatas agar
     // scheduler tidak mengulang seluruh histori pada setiap siklus.

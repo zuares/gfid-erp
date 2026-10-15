@@ -386,7 +386,7 @@
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ route('accounting.marketplace-payouts.import-shopee') }}">
+            <form method="POST" action="{{ route('accounting.marketplace-payouts.import-shopee') }}" id="importShopeeForm">
                 @csrf
                 <div class="modal-body">
                     <div class="mp-import-info mb-3">
@@ -462,7 +462,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="mp-btn" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="mp-btn mp-btn-primary"><i class="bi bi-play-circle"></i> Jalankan import</button>
+                    <button type="submit" class="mp-btn mp-btn-primary" id="importShopeeSubmit"><i class="bi bi-play-circle"></i> Jalankan import</button>
                 </div>
             </form>
         </div>
@@ -511,6 +511,13 @@
             });
 
             syncSelection();
+
+            document.getElementById('importShopeeForm')?.addEventListener('submit', function () {
+                const submit = document.getElementById('importShopeeSubmit');
+                if (!submit) return;
+                submit.disabled = true;
+                submit.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Mengimport…';
+            });
         });
     </script>
 @endpush
