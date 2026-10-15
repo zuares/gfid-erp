@@ -7590,7 +7590,9 @@ document.addEventListener('DOMContentLoaded', function () {
             '<div style="font-size:.65rem; color:' + (hasData ? 'var(--dsh-muted)' : '#b45309') + '; margin-top:.55rem;">' +
                 (hasData
                     ? 'Data: ' + esc((period || {}).source_table || 'belum tersedia') + ' · ' + number((period || {}).days_with_data || 0) + ' hari memiliki data'
-                    : 'Belum ada hari selesai dengan data · periode ' + esc((period || {}).from || '-') + ' → ' + esc((period || {}).to || '-')) +
+                    : ((period || {}).to
+                        ? 'Belum ada hari selesai dengan data · periode ' + esc((period || {}).from || '-') + ' → ' + esc((period || {}).to || '-')
+                        : 'Belum ada hari selesai setelah perubahan · mulai ' + esc((period || {}).from || '-'))) +
             '</div>';
     }
 

@@ -91,12 +91,15 @@ class AdsExperimentService
                 'old_price' => $this->singleValue($normalizedChanges, 'old_price'),
                 'new_price' => $this->singleValue($normalizedChanges, 'new_price'),
                 'changed_at' => $changedAt,
-                'source_granularity' => 'item',
+                'source_granularity' => $this->sourceGranularityForScope(
+                    null,
+                    (string) $product->item_id,
+                ),
                 'mapping_status' => $fallbackInternalItemId ? 'mapped' : 'missing_mapping',
                 'calculation_snapshot' => $this->priceSnapshot(
                     $normalizedChanges->all(),
                     $fallbackInternalItemId,
-                    'item',
+                    $this->sourceGranularityForScope(null, (string) $product->item_id),
                 ),
                 'created_by' => $createdBy,
             ]));
@@ -122,12 +125,18 @@ class AdsExperimentService
                 'old_price' => $this->singleValue($normalizedChanges, 'old_price'),
                 'new_price' => $this->singleValue($normalizedChanges, 'new_price'),
                 'changed_at' => $changedAt,
-                'source_granularity' => 'item',
+                'source_granularity' => $this->sourceGranularityForScope(
+                    (string) $campaign->channel_campaign_id,
+                    (string) $product->item_id,
+                ),
                 'mapping_status' => $internalItemId ? 'mapped' : 'missing_mapping',
                 'calculation_snapshot' => $this->priceSnapshot(
                     $normalizedChanges->all(),
                     $internalItemId,
-                    'item',
+                    $this->sourceGranularityForScope(
+                        (string) $campaign->channel_campaign_id,
+                        (string) $product->item_id,
+                    ),
                 ),
                 'created_by' => $createdBy,
             ]));
@@ -173,7 +182,7 @@ class AdsExperimentService
                     $sameDay->old_target_roas !== null ? (float) $sameDay->old_target_roas : $oldTargetRoas,
                     $newTargetRoas,
                     $sameDay->internal_item_id ? (int) $sameDay->internal_item_id : null,
-                    $sameDay->source_granularity ?: ($channelCampaignId ? 'campaign' : ($channelItemId ? 'item' : 'store')),
+                    $this->sourceGranularityForScope($channelCampaignId, $channelItemId),
                 ),
                 'confounded' => $sameDay->confounded || $conflictReasons !== [],
                 'conflict_reason' => $conflictReasons ?: null,
@@ -188,7 +197,7 @@ class AdsExperimentService
             $channelItemId,
             $channelCampaignId,
         );
-        $sourceGranularity = $channelCampaignId ? 'campaign' : ($channelItemId ? 'item' : 'store');
+        $sourceGranularity = $this->sourceGranularityForScope($channelCampaignId, $channelItemId);
 
         return $this->createExperiment([
             'store_id' => $store->id,
@@ -279,7 +288,7 @@ class AdsExperimentService
             'old_target_roas' => $changeType === MarketplaceAdExperiment::CHANGE_TARGET_ROAS ? $oldNumeric : null,
             'new_target_roas' => $changeType === MarketplaceAdExperiment::CHANGE_TARGET_ROAS ? $newNumeric : null,
             'changed_at' => $change['changed_at'] ?? null,
-            'source_granularity' => $channelItemId ? 'item' : ($channelCampaignId ? 'campaign' : 'store'),
+            'source_granularity' => $this->sourceGranularityForScope($channelCampaignId, $channelItemId),
             'mapping_status' => $internalItemId ? 'mapped' : 'missing_mapping',
             'confounded' => $confounders !== [],
             'conflict_reason' => $confounders !== [] ? $confounders : null,
@@ -377,9 +386,11 @@ class AdsExperimentService
             min((int) $experiment->observation_days, self::MAX_OBSERVATION_DAYS)
         );
         $lastCompletedDate = Carbon::today($timezone)->subDay();
-        $observationTo = $observationWindowEnd->lt($lastCompletedDate)
-            ? $observationWindowEnd
-            : $lastCompletedDate;
+        $observationTo = $observationFrom->lte($lastCompletedDate)
+            ? ($observationWindowEnd->lt($lastCompletedDate)
+                ? $observationWindowEnd
+                : $lastCompletedDate)
+            : null;
 
         $baseline = $this->periodMetrics(
             $experiment,
@@ -387,16 +398,16 @@ class AdsExperimentService
             $baselineTo,
             $experiment->old_price !== null ? (float) $experiment->old_price : ($experiment->new_price !== null ? (float) $experiment->new_price : null),
         );
-        $observation = $observationFrom->lte($observationTo)
+        $observation = $observationTo !== null
             ? $this->periodMetrics(
                 $experiment,
                 $observationFrom,
                 $observationTo,
                 $experiment->new_price !== null ? (float) $experiment->new_price : ($experiment->old_price !== null ? (float) $experiment->old_price : null),
             )
-            : $this->emptyPeriod($observationFrom, $observationTo);
+            : $this->emptyPeriod($observationFrom, null);
 
-        $completedObservationDays = $observationFrom->lte($observationTo)
+        $completedObservationDays = $observationTo !== null
             ? $observationFrom->diffInDays($observationTo) + 1
             : 0;
         $effectiveMappingStatus = $this->effectiveMappingStatus($experiment);
@@ -447,7 +458,7 @@ class AdsExperimentService
                 ],
                 'observation' => [
                     'from' => $observationFrom->toDateString(),
-                    'to' => $observationTo->toDateString(),
+                    'to' => $observationTo?->toDateString(),
                     'completed_days' => $completedObservationDays,
                     'window_days' => (int) $experiment->observation_days,
                 ],
@@ -547,6 +558,28 @@ class AdsExperimentService
             ],
             'result' => $result,
         ];
+    }
+
+    private function sourceGranularityForScope(?string $channelCampaignId, ?string $channelItemId): string
+    {
+        if (filled($channelCampaignId)) {
+            return filled($channelItemId) && str_starts_with(strtoupper($channelCampaignId), 'GMS-')
+                ? 'item'
+                : 'campaign';
+        }
+
+        return filled($channelItemId) ? 'item' : 'store';
+    }
+
+    private function effectiveSourceGranularity(MarketplaceAdExperiment $experiment): string
+    {
+        // Before the source resolver existed, regular campaigns with an item
+        // scope were persisted as "item". Derive the effective source from
+        // the scope so those historical records keep reading the right facts.
+        return $this->sourceGranularityForScope(
+            $experiment->channel_campaign_id,
+            $experiment->channel_item_id,
+        );
     }
 
     private function createExperiment(array $attributes): MarketplaceAdExperiment
@@ -753,7 +786,9 @@ class AdsExperimentService
 
     private function factQuery(MarketplaceAdExperiment $experiment, CarbonInterface $from, CarbonInterface $to): array
     {
-        if ($experiment->source_granularity === 'item' && $experiment->channel_item_id) {
+        $sourceGranularity = $this->effectiveSourceGranularity($experiment);
+
+        if ($sourceGranularity === 'item' && $experiment->channel_item_id) {
             $query = DB::table('marketplace_ads_item_dailies')
                 ->where('store_id', $experiment->store_id)
                 ->where('channel_item_id', $experiment->channel_item_id)
@@ -782,11 +817,11 @@ class AdsExperimentService
         return ['marketplace_ads_dailies', $query];
     }
 
-    private function emptyPeriod(CarbonInterface $from, CarbonInterface $to): array
+    private function emptyPeriod(CarbonInterface $from, ?CarbonInterface $to): array
     {
         return [
             'from' => $from->toDateString(),
-            'to' => $to->toDateString(),
+            'to' => $to?->toDateString(),
             'days_with_data' => 0,
             'availability' => 'pending',
             'source_table' => null,
@@ -1091,9 +1126,11 @@ class AdsExperimentService
                 $observationWindowEnd->copy()->endOfDay(),
             ]);
 
-        if ($experiment->source_granularity === 'item' && $experiment->channel_item_id) {
+        $sourceGranularity = $this->effectiveSourceGranularity($experiment);
+
+        if ($sourceGranularity === 'item' && $experiment->channel_item_id) {
             $query->where('channel_item_id', $experiment->channel_item_id);
-        } elseif ($experiment->source_granularity === 'campaign' && $experiment->channel_campaign_id) {
+        } elseif ($sourceGranularity === 'campaign' && $experiment->channel_campaign_id) {
             $query->where('channel_campaign_id', $experiment->channel_campaign_id);
         }
 

@@ -81,6 +81,88 @@ class AdsExperimentPhase2Test extends TestCase
         $this->assertFalse($metrics['profit_estimated']);
     }
 
+    public function test_legacy_item_granularity_on_regular_campaign_reads_campaign_facts(): void
+    {
+        $store = $this->store('PHASE2-LEGACY-SOURCE');
+        $item = Item::create([
+            'code' => 'PHASE2-ITEM-LEGACY',
+            'name' => 'Phase 2 Legacy Source Item',
+            'type' => 'finished',
+            'hpp' => 30,
+            'active' => true,
+        ]);
+        $experiment = $this->experiment($store, $item, [
+            'channel_campaign_id' => 'C-PHASE2-LEGACY',
+            'channel_item_id' => 'ITEM-PHASE2-LEGACY',
+            'source_granularity' => 'item',
+            'old_price' => 100,
+            'new_price' => 120,
+        ]);
+
+        $effective = Carbon::parse($experiment->effective_date);
+        foreach (range(1, 7) as $days) {
+            $this->campaignFact($store, 'C-PHASE2-LEGACY', $effective->copy()->subDays($days), [
+                'clicks' => 50,
+                'impressions' => 500,
+                'expense' => 100,
+                'broad_order' => 2,
+                'broad_order_amount' => 2,
+                'broad_gmv' => 200,
+            ]);
+        }
+
+        $details = app(\App\Services\Marketplace\Ads\AdsExperimentService::class)->details($experiment);
+
+        $this->assertSame('marketplace_ad_campaign_dailies', $details['baseline']['source_table']);
+        $this->assertSame(7, $details['baseline']['days_with_data']);
+        $this->assertSame(350, $details['baseline']['metrics']['clicks']);
+    }
+
+    public function test_new_manual_regular_campaign_change_uses_campaign_granularity(): void
+    {
+        $store = $this->store('PHASE2-SOURCE-RESOLVER');
+
+        $experiment = app(\App\Services\Marketplace\Ads\AdsExperimentService::class)
+            ->recordManualChange($store, [
+                'channel_campaign_id' => 'C-PHASE2-REGULAR',
+                'channel_item_id' => 'ITEM-PHASE2-REGULAR',
+                'change_type' => 'creative',
+                'before_value' => 'Foto lama',
+                'after_value' => 'Foto baru',
+                'changed_at' => now()->subDays(10),
+                'objective' => 'Naikkan ATC',
+                'primary_kpi' => 'profit',
+            ]);
+
+        $this->assertSame('campaign', $experiment->source_granularity);
+    }
+
+    public function test_observation_window_is_null_until_a_completed_day_exists(): void
+    {
+        $store = $this->store('PHASE2-OPEN-WINDOW');
+        $item = Item::create([
+            'code' => 'PHASE2-ITEM-OPEN',
+            'name' => 'Phase 2 Open Window Item',
+            'type' => 'finished',
+            'hpp' => 30,
+            'active' => true,
+        ]);
+        $today = Carbon::today();
+        $experiment = $this->experiment($store, $item, [
+            'channel_campaign_id' => 'C-PHASE2-OPEN',
+            'channel_item_id' => 'ITEM-PHASE2-OPEN',
+            'changed_at' => $today->copy()->startOfDay(),
+            'effective_date' => $today->toDateString(),
+        ]);
+
+        $details = app(\App\Services\Marketplace\Ads\AdsExperimentService::class)->details($experiment);
+
+        $this->assertSame($today->copy()->addDay()->toDateString(), $details['windows']['observation']['from']);
+        $this->assertNull($details['windows']['observation']['to']);
+        $this->assertSame(0, $details['windows']['observation']['completed_days']);
+        $this->assertSame(0, $details['observation']['days_with_data']);
+    }
+
     public function test_multi_item_observation_is_scoped_to_changed_item_and_reads_reported_qty(): void
     {
         $store = $this->store('PHASE2-MULTI');
