@@ -663,11 +663,11 @@
     </div>
 
     <div class="promo-tabs" role="tablist" aria-label="Jenis promosi">
-        <button type="button" class="promo-tab is-active" data-promo-tab="discount" role="tab" aria-selected="true">
+        <button type="button" class="promo-tab is-active" data-promo-tab="discount" role="tab" aria-selected="true" onclick="window.__promoTabSwitch?.('discount')">
             <i class="bi bi-tags"></i>
             <span><span>Promo Diskon</span><small>Atur harga promo per produk</small></span>
         </button>
-        <button type="button" class="promo-tab" data-promo-tab="voucher" role="tab" aria-selected="false">
+        <button type="button" class="promo-tab" data-promo-tab="voucher" role="tab" aria-selected="false" onclick="window.__promoTabSwitch?.('voucher')">
             <i class="bi bi-ticket-perforated"></i>
             <span><span>Voucher Toko</span><small>Kelola kode voucher untuk pembeli</small></span>
         </button>
@@ -800,6 +800,40 @@
         </div>
     </div>
 </div>
+
+<script>
+(() => {
+    const switchTab = (tab, updateUrl = true) => {
+        const selected = tab === 'voucher' ? 'voucher' : 'discount';
+        document.querySelectorAll('[data-promo-tab]').forEach((button) => {
+            const active = button.dataset.promoTab === selected;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        document.querySelectorAll('[data-promo-panel]').forEach((panel) => {
+            panel.classList.toggle('d-none', panel.dataset.promoPanel !== selected);
+        });
+        document.getElementById('discountActions')?.classList.toggle('d-none', selected === 'voucher');
+        document.getElementById('discountKpis')?.classList.toggle('d-none', selected === 'voucher');
+        document.getElementById('voucherKpis')?.classList.toggle('d-none', selected !== 'voucher');
+        const title = document.getElementById('promotionPageTitle');
+        const subtitle = document.getElementById('promotionPageSub');
+        if (title) title.textContent = selected === 'voucher' ? 'Voucher Toko' : 'Promosi Diskon';
+        if (subtitle) subtitle.textContent = selected === 'voucher' ? 'Buat dan kelola voucher seller langsung dari Shopee Open API.' : 'Atur harga promo per campaign tanpa mengubah harga normal produk.';
+        if (updateUrl) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', selected);
+            window.history.replaceState({}, '', url);
+        }
+        if (typeof window.activatePromotionTab === 'function' && window.activatePromotionTab !== switchTab) {
+            window.activatePromotionTab(selected, false);
+        }
+    };
+    window.__promoTabSwitch = switchTab;
+    const root = document.querySelector('.promo-wrap');
+    switchTab(root?.dataset.activeTab || 'discount', false);
+})();
+</script>
 
 <div class="modal fade" id="voucherAutomationModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
