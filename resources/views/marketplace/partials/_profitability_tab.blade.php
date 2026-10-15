@@ -321,7 +321,7 @@ window.__profitChartData = {
         </select>
     </div>
     <div class="p-3 p-md-3">
-        <div class="ads-kpi-grid mb-3">
+        <div class="ads-kpi-grid profit-kpi-grid mb-3">
             <div class="dpanel ads-kpi kpi-revenue">
                 <div class="ads-kpi-label" title="Total nilai penjualan sebelum biaya"><i class="bi bi-graph-up-arrow"></i> Omzet Kotor</div>
                 <div class="ads-kpi-value" style="font-variant-numeric:tabular-nums;">{{ $fmt($totalGmv) }}</div>
@@ -775,6 +775,21 @@ window.__profitChartData = {
         text-overflow:ellipsis;
         white-space:nowrap;
         text-align:left;
+    }
+    .profit-kpi-grid {
+        grid-template-columns:repeat(5, minmax(0, 1fr));
+        gap:.6rem;
+    }
+    .profit-kpi-grid .ads-kpi {
+        min-width:0;
+        min-height:118px;
+    }
+    @media (max-width:1199.98px) {
+        .profit-kpi-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+    }
+    @media (max-width:767.98px) {
+        .profit-kpi-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:.45rem; }
+        .profit-kpi-grid .ads-kpi { min-height:112px; padding:.7rem .72rem; }
     }
     .ads-kpi-grid .ads-kpi {
         display:grid;
