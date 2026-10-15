@@ -123,22 +123,35 @@ class AdsDashboardController extends Controller
 
         if ($autoSyncRange) {
             $autoSyncKey = 'ads_dashboard_autosync:' . $storeId . ':' . $autoSyncRange['from'] . ':' . $autoSyncRange['to'];
-            if (! \Illuminate\Support\Facades\Cache::has($autoSyncKey)) {
-                $syncParams = [
-                    '--from' => $autoSyncRange['from'],
-                    '--to'   => $autoSyncRange['to'],
-                ];
-                if ($storeId !== 'all') {
-                    $syncParams['--store'] = $storeId;
+            try {
+                if (! \Illuminate\Support\Facades\Cache::has($autoSyncKey)) {
+                    $syncParams = [
+                        '--from' => $autoSyncRange['from'],
+                        '--to'   => $autoSyncRange['to'],
+                    ];
+                    if ($storeId !== 'all') {
+                        $syncParams['--store'] = $storeId;
+                    }
+
+                    // Kirim command wrapper ke queue ads; job sync-nya juga memakai queue ads.
+                    // Kegagalan backend queue tidak boleh membuat dashboard ikut 500.
+                    \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-ads', $syncParams)
+                        ->onQueue('ads');
+
+                    // Satu kali per jam per toko + rentang agar membuka dashboard
+                    // berulang tidak memicu panggilan API berlebihan.
+                    \Illuminate\Support\Facades\Cache::put($autoSyncKey, true, now()->addHour());
+                }
+            } catch (\Throwable $exception) {
+                // Auto-sync bersifat best effort. Jika queue/cache bermasalah
+                // (misalnya database queue rusak), tetap tampilkan dashboard.
+                try {
+                    \Illuminate\Support\Facades\Cache::forget($autoSyncKey);
+                } catch (\Throwable) {
+                    // Jangan menutupi error asli dengan kegagalan cleanup cache.
                 }
 
-                // Kirim command wrapper ke queue ads; job sync-nya juga memakai queue ads.
-                $queued = \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-ads', $syncParams);
-                $queued->onQueue('ads');
-
-                // Satu kali per jam per toko + rentang agar membuka dashboard
-                // berulang tidak memicu panggilan API berlebihan.
-                \Illuminate\Support\Facades\Cache::put($autoSyncKey, true, now()->addHour());
+                report($exception);
             }
         }
 

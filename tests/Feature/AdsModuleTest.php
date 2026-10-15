@@ -117,6 +117,40 @@ class AdsModuleTest extends TestCase
         $this->assertSame($renderedView, $result);
     }
 
+    public function test_dashboard_stays_available_when_auto_sync_queue_fails()
+    {
+        $store = $this->createStore('AUTOFAIL');
+        $store->update(['token_expires_at' => now()->addHour()]);
+        $selectedDate = now()->subDay()->toDateString();
+
+        \Illuminate\Support\Facades\Artisan::shouldReceive('queue')
+            ->once()
+            ->andThrow(new \RuntimeException('queue backend unavailable'));
+
+        $dashboardService = \Mockery::mock(\App\Services\Marketplace\Ads\AdsDashboardService::class);
+        $dashboardService->shouldReceive('buildDashboardData')->once()->andReturn([
+            'dateFrom' => $selectedDate,
+            'dateTo' => $selectedDate,
+            'compareMode' => 'prev_period',
+        ]);
+
+        $renderedView = \Mockery::mock(\Illuminate\Contracts\View\View::class);
+        $view = \Mockery::mock(\Illuminate\Contracts\View\Factory::class);
+        $view->shouldReceive('make')->once()->andReturn($renderedView);
+        $this->app->instance(\Illuminate\Contracts\View\Factory::class, $view);
+
+        $request = \Illuminate\Http\Request::create('/marketplace/ads-dashboard', 'GET', [
+            'store_id' => $store->id,
+            'date_from' => $selectedDate,
+            'date_to' => $selectedDate,
+        ]);
+
+        $result = app(\App\Http\Controllers\Marketplace\AdsDashboardController::class)
+            ->index($request, app(\App\Services\Marketplace\Ads\AdsAnalyticsService::class), $dashboardService);
+
+        $this->assertSame($renderedView, $result);
+    }
+
     public function test_active_ads_metrics_do_not_get_erased_by_zero_hourly_snapshot()
     {
         $store = $this->createStore('ACTIVEZERO');
