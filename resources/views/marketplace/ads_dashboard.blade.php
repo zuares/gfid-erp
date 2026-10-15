@@ -3336,7 +3336,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     <tbody>
                                                         @foreach($trafficCategoryCampaignRows->get($categoryRow['category'], collect()) as $campaignRow)
                                                             <tr>
-                                                                <td><a href="{{ route('marketplace.ads.campaign.detail', ['campaign' => $campaignRow['row']->id, 'store_id' => $campaignRow['row']->store_id, 'date_from' => $dateFrom ?? null, 'date_to' => $dateTo ?? null]) }}" onclick="event.stopPropagation();" class="fw-bold text-truncate d-block" style="max-width:260px; color:inherit; text-decoration:none;" title="Buka detail campaign {{ $campaignRow['name'] }}">{{ $campaignRow['name'] }} <i class="bi bi-box-arrow-up-right" style="font-size:.58rem;color:#2563eb;"></i></a><div class="text-muted" style="font-size:.62rem;">ID: {{ $campaignRow['id'] }}</div></td>
+                                                                <td>
+                                                                    @if(data_get($campaignRow, 'row.id'))
+                                                                        <a href="{{ route('marketplace.ads.campaign.detail', ['campaign' => $campaignRow['row']->id, 'store_id' => $campaignRow['row']->store_id, 'date_from' => $dateFrom ?? null, 'date_to' => $dateTo ?? null]) }}" onclick="event.stopPropagation();" class="fw-bold text-truncate d-block" style="max-width:260px; color:inherit; text-decoration:none;" title="Buka detail campaign {{ $campaignRow['name'] }}">{{ $campaignRow['name'] }} <i class="bi bi-box-arrow-up-right" style="font-size:.58rem;color:#2563eb;"></i></a>
+                                                                    @else
+                                                                        <span class="fw-bold text-truncate d-block" style="max-width:260px;">{{ $campaignRow['name'] }}</span>
+                                                                    @endif
+                                                                    <div class="text-muted" style="font-size:.62rem;">ID: {{ $campaignRow['id'] }}</div>
+                                                                </td>
                                                                 <td><span class="badge bg-{{ $campaignRow['signal']['class'] }}" style="font-size:.58rem;">{{ $campaignRow['signal']['label'] }}</span></td>
                                                                 <td class="text-end">{{ number_format($campaignRow['impressions'], 0, ',', '.') }}</td>
                                                                 <td class="text-end">{{ number_format($campaignRow['clicks'], 0, ',', '.') }}</td>
@@ -3364,7 +3371,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                         data-cvr="{{ $trafficRow['cvr'] }}"
                                         data-cpc="{{ $trafficRow['cpc'] }}"
                                         data-cpm="{{ $trafficRow['cpm'] }}">
-                                        <td><a href="{{ route('marketplace.ads.campaign.detail', ['campaign' => $trafficRow['row']->id, 'store_id' => $trafficRow['row']->store_id, 'date_from' => $dateFrom ?? null, 'date_to' => $dateTo ?? null]) }}" onclick="event.stopPropagation();" class="fw-bold d-block" style="font-size:.78rem; color:inherit; text-decoration:none;" title="Buka detail campaign {{ $trafficRow['name'] }}">{{ $trafficRow['name'] }} <i class="bi bi-box-arrow-up-right" style="font-size:.58rem;color:#2563eb;"></i></a><div class="text-muted" style="font-size: 0.65rem;">ID: {{ $trafficRow['id'] }}</div></td>
+                                        <td>
+                                            @if(data_get($trafficRow, 'row.id'))
+                                                <a href="{{ route('marketplace.ads.campaign.detail', ['campaign' => $trafficRow['row']->id, 'store_id' => $trafficRow['row']->store_id, 'date_from' => $dateFrom ?? null, 'date_to' => $dateTo ?? null]) }}" onclick="event.stopPropagation();" class="fw-bold d-block" style="font-size:.78rem; color:inherit; text-decoration:none;" title="Buka detail campaign {{ $trafficRow['name'] }}">{{ $trafficRow['name'] }} <i class="bi bi-box-arrow-up-right" style="font-size:.58rem;color:#2563eb;"></i></a>
+                                            @else
+                                                <span class="fw-bold d-block" style="font-size:.78rem;">{{ $trafficRow['name'] }}</span>
+                                            @endif
+                                            <div class="text-muted" style="font-size: 0.65rem;">ID: {{ $trafficRow['id'] }}</div>
+                                        </td>
                                         <td><span class="badge bg-{{ $trafficRow['signal']['class'] }}" style="font-size:.6rem;"><i class="bi {{ $trafficRow['signal']['icon'] }} me-1"></i>{{ $trafficRow['signal']['label'] }}</span></td>
                                         <td class="text-end">{{ number_format($trafficRow['impressions'], 0, ',', '.') }}</td>
                                         <td class="text-end">{{ number_format($trafficRow['clicks'], 0, ',', '.') }}</td>
