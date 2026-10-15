@@ -77,6 +77,11 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-orders'))
     ->name('sync-orders')
     ->withoutOverlapping();
 
+Schedule::command('marketplace:run-voucher-automations')
+    ->everyMinute()
+    ->name('run-voucher-automations')
+    ->withoutOverlapping();
+
 // Verifikasi status order yang masih aktif ke API setelah sync order. Sweep ini
 // juga mencakup SHIPPED/TO_CONFIRM_RECEIVE supaya COMPLETED tidak menunggu
 // histori sync besar, serta memakai guard agar response API yang stale tidak

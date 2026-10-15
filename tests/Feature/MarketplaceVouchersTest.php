@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Channel;
 use App\Models\MarketplaceVoucher;
+use App\Models\MarketplaceVoucherAutomation;
 use App\Models\Store;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -22,7 +23,48 @@ class MarketplaceVouchersTest extends TestCase
             ->assertSee('Promo Diskon')
             ->assertSee('Voucher Toko Shopee')
             ->assertSee('Voucher Toko')
+            ->assertSee('data-promo-tab="voucher"', false)
             ->assertSee('Buat Voucher');
+
+        $this->get(route('marketplace.promotions', ['tab' => 'voucher']))
+            ->assertOk()
+            ->assertSee('data-active-tab="voucher"', false);
+    }
+
+    public function test_voucher_automation_can_be_configured_and_run_once(): void
+    {
+        $this->withoutMiddleware();
+        $store = $this->store();
+
+        $create = $this->postJson('/api/marketplace/vouchers/automations', [
+            'store_id' => $store->id,
+            'name_prefix' => 'GFID Flash Sale',
+            'code_prefix' => 'GFID',
+            'interval_hours' => 4,
+            'duration_hours' => 2,
+            'usage_quantity' => 25,
+            'voucher_type' => 1,
+            'reward_type' => 1,
+            'discount_amount' => 10000,
+            'next_run_at' => now()->subMinute()->timestamp,
+            'display_channel_list' => [1],
+        ]);
+
+        $create->assertOk()->assertJsonPath('success', true);
+        $automation = MarketplaceVoucherAutomation::query()->firstOrFail();
+        $this->assertSame($store->id, $automation->store_id);
+
+        Http::fake(['*/api/v2/voucher/add_voucher*' => Http::response(['response' => ['voucher_id' => 901]])]);
+        $run = $this->postJson('/api/marketplace/vouchers/automations/' . $automation->id . '/run');
+
+        $run->assertOk()->assertJsonPath('success', true)->assertJsonPath('status', 'created');
+        $voucher = MarketplaceVoucher::query()->where('store_id', $store->id)->where('voucher_id', 901)->firstOrFail();
+        $this->assertMatchesRegularExpression('/^GFID001\d{10}$/', $voucher->voucher_code);
+        $this->assertDatabaseHas('marketplace_voucher_automations', [
+            'id' => $automation->id,
+            'last_voucher_id' => 901,
+            'run_count' => 1,
+        ]);
     }
 
     private function store(): Store

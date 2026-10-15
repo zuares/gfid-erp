@@ -265,6 +265,15 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
 
     // Voucher Toko Shopee
     Route::get('/vouchers', [MarketplaceVouchersController::class, 'index']);
+    Route::get('/vouchers/automations', [MarketplaceVouchersController::class, 'automations']);
+    Route::post('/vouchers/automations', [MarketplaceVouchersController::class, 'storeAutomation'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/vouchers/automations/{automation}', [MarketplaceVouchersController::class, 'updateAutomation'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/vouchers/automations/{automation}/run', [MarketplaceVouchersController::class, 'runAutomation'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::delete('/vouchers/automations/{automation}', [MarketplaceVouchersController::class, 'destroyAutomation'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/vouchers/{store}/{voucherId}', [MarketplaceVouchersController::class, 'show']);
     Route::post('/vouchers', [MarketplaceVouchersController::class, 'store'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);

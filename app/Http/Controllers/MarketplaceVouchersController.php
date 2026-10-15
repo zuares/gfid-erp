@@ -3,14 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\MarketplaceVoucher;
+use App\Models\MarketplaceVoucherAutomation;
 use App\Models\Store;
 use App\Services\Marketplace\MarketplaceApiGateway;
+use App\Services\Marketplace\MarketplaceVoucherAutomationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class MarketplaceVouchersController extends Controller
 {
-    public function __construct(protected MarketplaceApiGateway $gateway) {}
+    public function __construct(
+        protected MarketplaceApiGateway $gateway,
+        protected MarketplaceVoucherAutomationService $automationService,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -127,6 +132,62 @@ class MarketplaceVouchersController extends Controller
         return $this->mutate($store, $voucherId, 'deleteVoucher', 'Voucher berhasil dihapus.', 'deleted');
     }
 
+    public function automations(Request $request): JsonResponse
+    {
+        $data = $request->validate(['store_id' => ['required', 'integer', 'exists:stores,id']]);
+        $store = $this->resolveStore((int) $data['store_id']);
+
+        return response()->json([
+            'success' => true,
+            'automations' => MarketplaceVoucherAutomation::query()
+                ->where('store_id', $store->id)
+                ->orderByDesc('is_active')
+                ->orderBy('next_run_at')
+                ->get(),
+        ]);
+    }
+
+    public function storeAutomation(Request $request): JsonResponse
+    {
+        $data = $this->validateAutomation($request, true);
+        $store = $this->resolveStore((int) $data['store_id']);
+        $automation = MarketplaceVoucherAutomation::create($data + [
+            'store_id' => $store->id,
+            'display_channel_list' => $data['display_channel_list'] ?? [1],
+            'is_active' => $data['is_active'] ?? true,
+        ]);
+
+        return response()->json(['success' => true, 'automation' => $automation]);
+    }
+
+    public function updateAutomation(Request $request, int $automationId): JsonResponse
+    {
+        $automation = MarketplaceVoucherAutomation::query()->findOrFail($automationId);
+        $this->resolveStore($automation->store_id);
+        $data = $this->validateAutomation($request, false, $automation);
+        $automation->update($data);
+
+        return response()->json(['success' => true, 'automation' => $automation->refresh()]);
+    }
+
+    public function destroyAutomation(Request $request, int $automationId): JsonResponse
+    {
+        $automation = MarketplaceVoucherAutomation::query()->findOrFail($automationId);
+        $this->resolveStore($automation->store_id);
+        $automation->delete();
+
+        return response()->json(['success' => true, 'message' => 'Automation voucher dihapus.']);
+    }
+
+    public function runAutomation(Request $request, int $automationId): JsonResponse
+    {
+        $automation = MarketplaceVoucherAutomation::query()->findOrFail($automationId);
+        $this->resolveStore($automation->store_id);
+        $result = $this->automationService->runOne($automation);
+
+        return response()->json($result, ($result['success'] ?? false) ? 200 : 422);
+    }
+
     private function mutate(Store $store, int $voucherId, string $method, string $message, string $status): JsonResponse
     {
         $store = $this->resolveStore($store->id);
@@ -178,6 +239,43 @@ class MarketplaceVouchersController extends Controller
         $data = $request->validate($rules);
         if (($data['start_time'] ?? 0) && ($data['end_time'] ?? 0) && $data['end_time'] < $data['start_time']) {
             abort(response()->json(['message' => 'Waktu selesai harus setelah waktu mulai.'], 422));
+        }
+
+        return $data;
+    }
+
+    private function validateAutomation(Request $request, bool $creating, ?MarketplaceVoucherAutomation $existing = null): array
+    {
+        $rules = [
+            'store_id' => [$creating ? 'required' : 'nullable', 'integer', 'exists:stores,id'],
+            'name_prefix' => [$creating ? 'required' : 'sometimes', 'string', 'max:100'],
+            'code_prefix' => [$creating ? 'required' : 'sometimes', 'string', 'max:20', 'regex:/^[A-Za-z0-9]+$/'],
+            'interval_hours' => [$creating ? 'required' : 'sometimes', 'integer', 'min:1', 'max:168'],
+            'duration_hours' => [$creating ? 'required' : 'sometimes', 'integer', 'min:1', 'max:168'],
+            'usage_quantity' => [$creating ? 'required' : 'sometimes', 'integer', 'min:1', 'max:100000'],
+            'voucher_type' => ['sometimes', 'integer', 'in:1,2'],
+            'reward_type' => ['sometimes', 'integer', 'in:1,2,3'],
+            'min_basket_price' => ['sometimes', 'numeric', 'min:0'],
+            'discount_amount' => ['nullable', 'numeric', 'min:0'],
+            'percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'max_price' => ['nullable', 'numeric', 'min:0'],
+            'display_channel_list' => ['nullable', 'array'],
+            'display_channel_list.*' => ['integer', 'in:1,2,3,4'],
+            'item_id_list' => ['nullable', 'array'],
+            'item_id_list.*' => ['integer', 'min:1'],
+            'next_run_at' => [$creating ? 'required' : 'sometimes', 'integer', 'min:1'],
+            'is_active' => ['sometimes', 'boolean'],
+        ];
+
+        $data = $request->validate($rules);
+        $interval = (int) ($data['interval_hours'] ?? $existing?->interval_hours ?? 0);
+        $duration = (int) ($data['duration_hours'] ?? $existing?->duration_hours ?? 0);
+        if ($interval < $duration) {
+            abort(response()->json(['message' => 'Interval harus sama atau lebih besar dari durasi voucher agar jadwal tidak overlap.'], 422));
+        }
+
+        if (! $creating && array_key_exists('store_id', $data)) {
+            unset($data['store_id']);
         }
 
         return $data;

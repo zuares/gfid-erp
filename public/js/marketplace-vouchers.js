@@ -1,4 +1,32 @@
 (() => {
+    const tabRoot = document.querySelector('.promo-wrap');
+    const tabButtons = Array.from(document.querySelectorAll('[data-promo-tab]'));
+    const tabPanels = Array.from(document.querySelectorAll('[data-promo-panel]'));
+    const applyTabFallback = (tab, updateUrl = true) => {
+        const selected = tab === 'voucher' ? 'voucher' : 'discount';
+        tabButtons.forEach((button) => {
+            const active = button.dataset.promoTab === selected;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        tabPanels.forEach((panel) => panel.classList.toggle('d-none', panel.dataset.promoPanel !== selected));
+        document.getElementById('discountActions')?.classList.toggle('d-none', selected === 'voucher');
+        document.getElementById('discountKpis')?.classList.toggle('d-none', selected === 'voucher');
+        document.getElementById('voucherKpis')?.classList.toggle('d-none', selected !== 'voucher');
+        const title = document.getElementById('promotionPageTitle');
+        const subtitle = document.getElementById('promotionPageSub');
+        if (title) title.textContent = selected === 'voucher' ? 'Voucher Toko' : 'Promosi Diskon';
+        if (subtitle) subtitle.textContent = selected === 'voucher' ? 'Buat dan kelola voucher seller langsung dari Shopee Open API.' : 'Atur harga promo per campaign tanpa mengubah harga normal produk.';
+        if (updateUrl) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', selected);
+            window.history.replaceState({}, '', url);
+        }
+    };
+    tabButtons.forEach((button) => button.addEventListener('click', () => applyTabFallback(button.dataset.promoTab)));
+    applyTabFallback(tabRoot?.dataset.activeTab || 'discount', false);
+    window.activatePromotionTab = applyTabFallback;
+
     const { api, esc } = window.mpHelpers || {};
     if (!api) return;
 
@@ -11,6 +39,15 @@
         discountKpis: $('discountKpis'), voucherKpis: $('voucherKpis'), voucherKpiTotal: $('voucherKpiTotal'),
         voucherKpiOngoing: $('voucherKpiOngoing'), voucherKpiUsage: $('voucherKpiUsage'),
         tabs: Array.from(document.querySelectorAll('[data-promo-tab]')), panels: Array.from(document.querySelectorAll('[data-promo-panel]')),
+        automationCreate: $('voucherAutomationCreateBtn'), automationList: $('voucherAutomationList'),
+        automationAlert: $('voucherAutomationAlert'), automationModal: $('voucherAutomationModal'),
+        automationTitle: $('voucherAutomationTitle'), automationId: $('voucherAutomationId'),
+        automationNamePrefix: $('voucherAutomationNamePrefix'), automationCodePrefix: $('voucherAutomationCodePrefix'),
+        automationInterval: $('voucherAutomationInterval'), automationDuration: $('voucherAutomationDuration'),
+        automationUsage: $('voucherAutomationUsage'), automationReward: $('voucherAutomationReward'),
+        automationValue: $('voucherAutomationValue'), automationValueLabel: $('voucherAutomationValueLabel'),
+        automationMin: $('voucherAutomationMin'), automationMax: $('voucherAutomationMax'),
+        automationStart: $('voucherAutomationStart'), automationSave: $('voucherAutomationSaveBtn'),
         modal: $('voucherFormModal'), title: $('voucherFormTitle'), id: $('voucherId'), name: $('voucherName'), code: $('voucherCode'),
         type: $('voucherType'), reward: $('voucherRewardType'), usage: $('voucherUsageQuantity'), value: $('voucherValue'),
         min: $('voucherMinBasketPrice'), max: $('voucherMaxPrice'), start: $('voucherStart'), end: $('voucherEnd'),
@@ -20,7 +57,9 @@
     if (!refs.store || !refs.body || !refs.modal) return;
 
     const modal = new bootstrap.Modal(refs.modal);
+    const automationModal = refs.automationModal ? new bootstrap.Modal(refs.automationModal) : null;
     const state = { rows: [], editing: false };
+    state.automations = [];
     const initialTab = root?.dataset.activeTab === 'voucher' ? 'voucher' : 'discount';
 
     const text = (value) => value === null || typeof value === 'undefined' ? '' : String(value);
@@ -82,7 +121,10 @@
             url.searchParams.set('tab', selected);
             window.history.replaceState({}, '', url);
         }
-        if (isVoucher && refs.store.value) loadVouchers();
+        if (isVoucher && refs.store.value) {
+            loadVouchers();
+            loadAutomations();
+        }
     }
 
     function render() {
@@ -114,6 +156,162 @@
             state.rows = [];
             refs.body.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Gagal memuat voucher.</td></tr>';
             setAlert(error.message || 'Gagal memuat voucher dari Shopee.');
+        }
+    }
+
+    function automationDate(value) {
+        return value ? new Date(Number(value) * 1000).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+    }
+
+    function setAutomationAlert(message, type = 'danger') {
+        if (!refs.automationAlert) return;
+        refs.automationAlert.className = 'alert alert-' + type + ' mt-2 mb-0';
+        refs.automationAlert.textContent = message;
+        refs.automationAlert.classList.remove('d-none');
+    }
+
+    function clearAutomationAlert() {
+        refs.automationAlert?.classList.add('d-none');
+    }
+
+    function renderAutomations() {
+        if (!refs.automationList) return;
+        if (!state.automations.length) {
+            refs.automationList.innerHTML = '<div class="promo-muted">Belum ada automation untuk toko ini.</div>';
+            return;
+        }
+        refs.automationList.innerHTML = state.automations.map((automation) => {
+            const active = Boolean(automation.is_active);
+            const status = active ? 'Aktif' : 'Pause';
+            const action = active ? 'Pause' : 'Aktifkan';
+            return '<div class="promo-automation-row">' +
+                '<div><div class="promo-name">' + esc(automation.name_prefix) + ' · ' + esc(automation.code_prefix) + '</div>' +
+                '<div class="promo-automation-meta">' + automation.interval_hours + ' jam sekali · aktif ' + automation.duration_hours + ' jam · kuota ' + Number(automation.usage_quantity || 0).toLocaleString('id-ID') + ' · berikutnya ' + automationDate(automation.next_run_at) + '</div>' +
+                (automation.last_error ? '<div class="text-danger" style="font-size:.68rem">' + esc(automation.last_error) + '</div>' : '') + '</div>' +
+                '<div class="d-flex align-items-center gap-1 flex-wrap">' +
+                '<span class="promo-badge ' + (active ? 'promo-ongoing' : 'promo-ended') + '">' + status + '</span>' +
+                '<button type="button" class="btn btn-sm btn-ship-outline" data-automation-edit="' + automation.id + '"><i class="bi bi-pencil"></i></button>' +
+                '<button type="button" class="btn btn-sm btn-ship-outline" data-automation-run="' + automation.id + '"><i class="bi bi-play-fill"></i></button>' +
+                '<button type="button" class="btn btn-sm btn-ship-outline" data-automation-toggle="' + automation.id + '" data-automation-active="' + (active ? '1' : '0') + '">' + action + '</button>' +
+                '<button type="button" class="btn btn-sm btn-outline-danger" data-automation-delete="' + automation.id + '"><i class="bi bi-trash"></i></button>' +
+                '</div></div>';
+        }).join('');
+    }
+
+    async function loadAutomations() {
+        const storeId = selectedStoreId();
+        if (!storeId) {
+            state.automations = [];
+            renderAutomations();
+            return;
+        }
+        try {
+            const result = await api('/api/marketplace/vouchers/automations?store_id=' + encodeURIComponent(storeId));
+            state.automations = Array.isArray(result.automations) ? result.automations : [];
+            clearAutomationAlert();
+            renderAutomations();
+        } catch (error) {
+            state.automations = [];
+            renderAutomations();
+            setAutomationAlert(error.message || 'Gagal memuat automation voucher.');
+        }
+    }
+
+    function setAutomationForm(automation = null) {
+        const editing = Boolean(automation);
+        refs.automationTitle.textContent = editing ? 'Edit Automation Voucher' : 'Setup Automation Voucher';
+        refs.automationId.value = automation?.id || '';
+        refs.automationNamePrefix.value = automation?.name_prefix || 'GFID Flash Sale';
+        refs.automationCodePrefix.value = automation?.code_prefix || 'GFID';
+        refs.automationInterval.value = automation?.interval_hours || 4;
+        refs.automationDuration.value = automation?.duration_hours || 2;
+        refs.automationUsage.value = automation?.usage_quantity || 25;
+        refs.automationReward.value = automation?.reward_type || 1;
+        refs.automationValue.value = automation?.reward_type === 1 ? (automation?.discount_amount || 10000) : (automation?.percentage || 10);
+        refs.automationMin.value = automation?.min_basket_price || 0;
+        refs.automationMax.value = automation?.max_price || 0;
+        refs.automationStart.value = automation?.next_run_at ? localInput(automation.next_run_at) : localInput(Math.floor(Date.now() / 1000) + 300);
+        updateAutomationRewardUi();
+    }
+
+    function updateAutomationRewardUi() {
+        const percentage = refs.automationReward.value !== '1';
+        refs.automationValueLabel.textContent = percentage ? 'Persentase benefit (%)' : 'Nominal potongan (Rp)';
+        refs.automationValue.max = percentage ? '100' : '';
+    }
+
+    function automationPayload() {
+        const reward = Number(refs.automationReward.value);
+        const start = timestamp(refs.automationStart.value);
+        const payload = {
+            store_id: Number(selectedStoreId()),
+            name_prefix: refs.automationNamePrefix.value.trim(),
+            code_prefix: refs.automationCodePrefix.value.trim().toUpperCase(),
+            interval_hours: Number(refs.automationInterval.value || 0),
+            duration_hours: Number(refs.automationDuration.value || 0),
+            usage_quantity: Number(refs.automationUsage.value || 0),
+            voucher_type: 1,
+            reward_type: reward,
+            min_basket_price: Number(refs.automationMin.value || 0),
+            max_price: Number(refs.automationMax.value || 0),
+            display_channel_list: [1],
+            next_run_at: start,
+            is_active: true,
+        };
+        if (reward === 1) payload.discount_amount = Number(refs.automationValue.value || 0);
+        else payload.percentage = Number(refs.automationValue.value || 0);
+        return payload;
+    }
+
+    async function saveAutomation() {
+        const body = automationPayload();
+        if (!body.store_id || !body.name_prefix || !body.code_prefix || !body.next_run_at) {
+            setAutomationAlert('Toko, prefix nama, prefix kode, dan waktu mulai wajib diisi.');
+            return;
+        }
+        if (body.interval_hours < body.duration_hours) {
+            setAutomationAlert('Interval harus sama atau lebih besar dari durasi voucher.');
+            return;
+        }
+        refs.automationSave.disabled = true;
+        try {
+            const id = refs.automationId.value;
+            const url = id ? '/api/marketplace/vouchers/automations/' + id : '/api/marketplace/vouchers/automations';
+            await api(url, { method: 'POST', body: JSON.stringify(body) });
+            automationModal.hide();
+            await loadAutomations();
+        } catch (error) {
+            setAutomationAlert(error.message || 'Gagal menyimpan automation voucher.');
+        } finally {
+            refs.automationSave.disabled = false;
+        }
+    }
+
+    async function runAutomation(id) {
+        try {
+            await api('/api/marketplace/vouchers/automations/' + id + '/run', { method: 'POST', body: JSON.stringify({}) });
+            await Promise.all([loadAutomations(), loadVouchers()]);
+        } catch (error) {
+            setAutomationAlert(error.message || 'Gagal menjalankan automation voucher.');
+        }
+    }
+
+    async function toggleAutomation(id, active) {
+        try {
+            await api('/api/marketplace/vouchers/automations/' + id, { method: 'POST', body: JSON.stringify({ is_active: !active }) });
+            await loadAutomations();
+        } catch (error) {
+            setAutomationAlert(error.message || 'Gagal mengubah status automation.');
+        }
+    }
+
+    async function deleteAutomation(id) {
+        if (!window.confirm('Hapus automation voucher ini?')) return;
+        try {
+            await api('/api/marketplace/vouchers/automations/' + id, { method: 'DELETE' });
+            await loadAutomations();
+        } catch (error) {
+            setAutomationAlert(error.message || 'Gagal menghapus automation voucher.');
         }
     }
 
@@ -204,12 +402,28 @@
     });
     refs.search.addEventListener('input', render);
     refs.status.addEventListener('change', loadVouchers);
-    refs.store.addEventListener('change', loadVouchers);
+    refs.store.addEventListener('change', () => { loadVouchers(); loadAutomations(); });
     refs.refresh.addEventListener('click', loadVouchers);
     refs.create.addEventListener('click', () => { setForm(); modal.show(); });
     refs.save.addEventListener('click', save);
     refs.reward.addEventListener('change', updateRewardUi);
     refs.type.addEventListener('change', updateTypeUi);
+    refs.automationCreate?.addEventListener('click', () => { setAutomationForm(); automationModal?.show(); });
+    refs.automationSave?.addEventListener('click', saveAutomation);
+    refs.automationReward?.addEventListener('change', updateAutomationRewardUi);
+    refs.automationList?.addEventListener('click', (event) => {
+        const edit = event.target.closest('[data-automation-edit]');
+        const run = event.target.closest('[data-automation-run]');
+        const toggle = event.target.closest('[data-automation-toggle]');
+        const del = event.target.closest('[data-automation-delete]');
+        if (edit) {
+            const automation = state.automations.find((item) => String(item.id) === String(edit.dataset.automationEdit));
+            if (automation) { setAutomationForm(automation); automationModal?.show(); }
+        }
+        if (run) runAutomation(run.dataset.automationRun);
+        if (toggle) toggleAutomation(toggle.dataset.automationToggle, toggle.dataset.automationActive === '1');
+        if (del) deleteAutomation(del.dataset.automationDelete);
+    });
     refs.tabs.forEach((button) => button.addEventListener('click', () => activateTab(button.dataset.promoTab)));
 
     window.loadVouchers = loadVouchers;
@@ -218,7 +432,10 @@
         activateTab(initialTab, false);
         const boot = (tries = 0) => {
             if (refs.store.options.length > 0 || tries >= 20) {
-                if (initialTab === 'voucher') loadVouchers();
+                if (initialTab === 'voucher') {
+                    loadVouchers();
+                    loadAutomations();
+                }
                 return;
             }
             window.setTimeout(() => boot(tries + 1), 150);

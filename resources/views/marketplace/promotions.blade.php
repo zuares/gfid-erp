@@ -582,12 +582,32 @@
     .promo-tab:hover{ border-color:rgba(100,116,139,.28); background:rgba(148,163,184,.06); }
     .promo-tab.is-active{ border-color:rgba(51,65,85,.2); background:rgba(248,250,252,.96); box-shadow:0 7px 16px rgba(15,23,42,.07); }
     .promo-tab.is-active i{ background:#334155; color:#fff; }
+    .promo-automation{
+        margin-bottom:.85rem;
+        padding:.8rem;
+        border:1px solid rgba(148,163,184,.2);
+        border-radius:13px;
+        background:rgba(248,250,252,.68);
+    }
+    body[data-theme="dark"] .promo-automation{ background:rgba(15,23,42,.72); border-color:rgba(51,65,85,.88); }
+    .promo-automation-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:.7rem; flex-wrap:wrap; }
+    .promo-automation-title{ font-size:.78rem; font-weight:800; color:#334155; }
+    body[data-theme="dark"] .promo-automation-title{ color:#e2e8f0; }
+    .promo-automation-sub{ margin-top:.15rem; color:#64748b; font-size:.7rem; line-height:1.4; }
+    body[data-theme="dark"] .promo-automation-sub{ color:#9ca3af; }
+    .promo-automation-list{ display:grid; gap:.45rem; margin-top:.7rem; }
+    .promo-automation-row{ display:flex; align-items:center; justify-content:space-between; gap:.6rem; flex-wrap:wrap; padding:.55rem .65rem; border:1px solid rgba(148,163,184,.17); border-radius:10px; background:var(--card,#fff); }
+    body[data-theme="dark"] .promo-automation-row{ background:rgba(2,6,23,.32); border-color:rgba(51,65,85,.8); }
+    .promo-automation-meta{ color:#64748b; font-size:.68rem; }
+    body[data-theme="dark"] .promo-automation-meta{ color:#9ca3af; }
+    .promo-automation-row .btn{ min-height:29px; border-radius:8px; }
     body[data-theme="dark"] .promo-tabs{ background:var(--card,#0f172a); border-color:rgba(51,65,85,.88); box-shadow:none; }
     body[data-theme="dark"] .promo-tab span{ color:#e2e8f0; }
     body[data-theme="dark"] .promo-tab{ color:#94a3b8; }
     body[data-theme="dark"] .promo-tab i{ background:rgba(148,163,184,.12); color:#cbd5e1; }
     body[data-theme="dark"] .promo-tab:hover{ background:rgba(51,65,85,.28); border-color:rgba(148,163,184,.22); }
     body[data-theme="dark"] .promo-tab.is-active{ background:rgba(30,41,59,.88); border-color:rgba(148,163,184,.24); box-shadow:none; }
+    #voucherAutomationModal .modal-content{ border:1px solid var(--shp-border); border-radius:14px; overflow:hidden; }
     @media (max-width:576px){
         .promo-tabs{ grid-template-columns:1fr; }
         .promo-tab{ padding:.62rem .7rem; }
@@ -744,6 +764,7 @@
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
                     <button type="button" class="btn btn-sm btn-ship-outline" id="voucherRefreshBtn"><i class="bi bi-arrow-repeat me-1"></i>Refresh</button>
+                    <button type="button" class="btn btn-sm btn-ship-outline" id="voucherAutomationCreateBtn"><i class="bi bi-clock-history me-1"></i>Automation</button>
                     <button type="button" class="btn btn-sm btn-ship-primary" id="voucherCreateBtn"><i class="bi bi-plus-lg me-1"></i>Buat Voucher</button>
                 </div>
             </div>
@@ -757,12 +778,53 @@
                 </select>
                 <input id="voucherSearchInput" type="search" class="form-control form-control-sm promo-filter" placeholder="Cari nama / kode voucher" style="min-width:240px;flex:1">
             </div>
+            <div class="promo-automation">
+                <div class="promo-automation-head">
+                    <div>
+                        <div class="promo-automation-title"><i class="bi bi-magic me-1"></i>Automation Voucher</div>
+                        <div class="promo-automation-sub">Setup sekali; nama, kode, dan voucher berikutnya dibuat otomatis sesuai interval.</div>
+                    </div>
+                    <span class="promo-badge promo-ended">Scheduler aktif per menit</span>
+                </div>
+                <div id="voucherAutomationAlert" class="alert d-none mt-2 mb-0" style="border-radius:10px;font-size:.75rem"></div>
+                <div id="voucherAutomationList" class="promo-automation-list">
+                    <div class="promo-muted">Belum ada automation untuk toko ini.</div>
+                </div>
+            </div>
             <div class="table-responsive">
                 <table class="promo-table">
                     <thead><tr><th>Voucher</th><th>Benefit</th><th>Periode</th><th>Penggunaan</th><th>Status</th><th class="text-end">Aksi</th></tr></thead>
                     <tbody id="voucherBody"><tr><td colspan="6" class="text-center text-muted py-4">Belum dimuat.</td></tr></tbody>
                 </table>
             </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="voucherAutomationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div><h5 class="modal-title mb-0" id="voucherAutomationTitle">Setup Automation Voucher</h5><div class="promo-muted">Sistem akan membuat nama dan kode voucher otomatis setiap periode.</div></div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="voucherAutomationId">
+                <div class="row g-3">
+                    <div class="col-md-7"><label class="form-label">Prefix nama voucher</label><input id="voucherAutomationNamePrefix" class="form-control" value="GFID Flash Sale" maxlength="100"></div>
+                    <div class="col-md-5"><label class="form-label">Prefix kode voucher</label><input id="voucherAutomationCodePrefix" class="form-control" value="GFID" maxlength="20"></div>
+                    <div class="col-md-4"><label class="form-label">Interval pembuatan (jam)</label><input id="voucherAutomationInterval" type="number" min="1" max="168" class="form-control" value="4"></div>
+                    <div class="col-md-4"><label class="form-label">Durasi aktif (jam)</label><input id="voucherAutomationDuration" type="number" min="1" max="168" class="form-control" value="2"></div>
+                    <div class="col-md-4"><label class="form-label">Kuota per voucher</label><input id="voucherAutomationUsage" type="number" min="1" class="form-control" value="25"></div>
+                    <div class="col-md-4"><label class="form-label">Jenis benefit</label><select id="voucherAutomationReward" class="form-select"><option value="1">Potongan tetap (Rp)</option><option value="2">Potongan persentase (%)</option><option value="3">Cashback koin (%)</option></select></div>
+                    <div class="col-md-4"><label class="form-label" id="voucherAutomationValueLabel">Nominal potongan (Rp)</label><input id="voucherAutomationValue" type="number" min="0" class="form-control" value="10000"></div>
+                    <div class="col-md-4"><label class="form-label">Minimum belanja (Rp)</label><input id="voucherAutomationMin" type="number" min="0" class="form-control" value="0"></div>
+                    <div class="col-md-6"><label class="form-label">Mulai automation</label><input id="voucherAutomationStart" type="datetime-local" class="form-control"></div>
+                    <div class="col-md-6"><label class="form-label">Maksimum benefit (Rp)</label><input id="voucherAutomationMax" type="number" min="0" class="form-control" value="0"><div class="form-text">Untuk persentase/cashback; 0 = tanpa batas.</div></div>
+                    <div class="col-12"><div class="alert alert-secondary mb-0" style="font-size:.75rem;border-radius:10px">Rekomendasi awal: interval 4 jam, aktif 2 jam, kuota 25. Kode akan menjadi seperti <code>GFID00115100800</code>.</div></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button><button type="button" class="btn btn-primary" id="voucherAutomationSaveBtn">Simpan Automation</button></div>
         </div>
     </div>
 </div>
