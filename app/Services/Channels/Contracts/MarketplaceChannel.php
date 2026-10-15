@@ -139,6 +139,14 @@ interface MarketplaceChannel
 
     public function deleteSipDiscount(Store $store, string $region): array;
 
+    // Voucher APIs (Shopee v2.voucher)
+    public function getVoucherList(Store $store, string $status = 'all', int $pageNo = 1, int $pageSize = 100): array;
+    public function addVoucher(Store $store, array $payload): array;
+    public function updateVoucher(Store $store, int $voucherId, array $payload = []): array;
+    public function getVoucher(Store $store, int $voucherId): array;
+    public function endVoucher(Store $store, int $voucherId): array;
+    public function deleteVoucher(Store $store, int $voucherId): array;
+
     public function refreshToken(Store $store, bool $force = false): array;
 
     /**

@@ -315,6 +315,36 @@ class TikTokShopChannel implements MarketplaceChannel
         return ['error' => 'not_implemented', 'message' => 'Fitur SIP discount belum tersedia untuk TikTok Shop'];
     }
 
+    public function getVoucherList(Store $store, string $status = 'all', int $pageNo = 1, int $pageSize = 100): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur voucher belum tersedia untuk TikTok Shop'];
+    }
+
+    public function addVoucher(Store $store, array $payload): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur voucher belum tersedia untuk TikTok Shop'];
+    }
+
+    public function updateVoucher(Store $store, int $voucherId, array $payload = []): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur voucher belum tersedia untuk TikTok Shop'];
+    }
+
+    public function getVoucher(Store $store, int $voucherId): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur voucher belum tersedia untuk TikTok Shop'];
+    }
+
+    public function endVoucher(Store $store, int $voucherId): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur voucher belum tersedia untuk TikTok Shop'];
+    }
+
+    public function deleteVoucher(Store $store, int $voucherId): array
+    {
+        return ['error' => 'not_implemented', 'message' => 'Fitur voucher belum tersedia untuk TikTok Shop'];
+    }
+
     // ─── Refresh token ────────────────────────────────────────────────────────
 
     public function refreshToken(Store $store, bool $force = false): array

@@ -69,6 +69,7 @@ use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\MarketplaceFinanceController;
 use App\Http\Controllers\Marketplace\MarketplaceProfitOverviewController;
 use App\Http\Controllers\MarketplacePromotionsController;
+use App\Http\Controllers\MarketplaceVouchersController;
 use App\Http\Controllers\MarketplaceSettingsController;
 use App\Http\Controllers\MarketplaceSystemController;
 use App\Http\Controllers\Owner\FulfillmentController;
@@ -260,6 +261,18 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::post('/promotions/{store}/{discountId}/delete', [MarketplaceController::class, 'promotionDelete'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/promotions/{store}/{discountId}/delete-item', [MarketplaceController::class, 'promotionDeleteItem'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
+    // Voucher Toko Shopee
+    Route::get('/vouchers', [MarketplaceVouchersController::class, 'index']);
+    Route::get('/vouchers/{store}/{voucherId}', [MarketplaceVouchersController::class, 'show']);
+    Route::post('/vouchers', [MarketplaceVouchersController::class, 'store'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/vouchers/{store}/{voucherId}/update', [MarketplaceVouchersController::class, 'update'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/vouchers/{store}/{voucherId}/end', [MarketplaceVouchersController::class, 'end'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/vouchers/{store}/{voucherId}/delete', [MarketplaceVouchersController::class, 'destroy'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
     // Naikkan Produk (boost)

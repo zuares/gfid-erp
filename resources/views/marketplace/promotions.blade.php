@@ -582,6 +582,9 @@
             <a href="{{ route('marketplace.promotions.create') }}" class="btn btn-pill btn-ship-primary">
                 <i class="bi bi-plus-lg me-1"></i>Buat Promosi
             </a>
+            <a href="#voucherModule" class="btn btn-pill btn-ship-outline">
+                <i class="bi bi-ticket-perforated me-1"></i>Voucher Toko
+            </a>
         </div>
     </div>
 
@@ -661,6 +664,38 @@
                     <tr><td colspan="5" class="text-center text-muted py-4">Belum dimuat.</td></tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <div id="voucherModule" class="card promo-card mt-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
+                <div>
+                    <div class="promo-eyebrow"><i class="bi bi-ticket-perforated"></i> Marketplace / Voucher</div>
+                    <h2 class="h5 mb-1">Voucher Toko Shopee</h2>
+                    <div class="promo-muted">Kelola voucher seller langsung lewat Shopee Open API. Voucher platform/Shopee tidak ikut ditampilkan.</div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-sm btn-ship-outline" id="voucherRefreshBtn"><i class="bi bi-arrow-repeat me-1"></i>Refresh</button>
+                    <button type="button" class="btn btn-sm btn-ship-primary" id="voucherCreateBtn"><i class="bi bi-plus-lg me-1"></i>Buat Voucher</button>
+                </div>
+            </div>
+            <div id="voucherAlert" class="alert d-none mb-3" style="border-radius:12px;font-size:.85rem"></div>
+            <div class="d-flex gap-2 flex-wrap align-items-center mb-3">
+                <select id="voucherStatusSelect" class="form-select form-select-sm promo-filter" style="min-width:160px">
+                    <option value="all">Semua voucher</option>
+                    <option value="ongoing">Ongoing</option>
+                    <option value="upcoming">Upcoming</option>
+                    <option value="expired">Expired</option>
+                </select>
+                <input id="voucherSearchInput" type="search" class="form-control form-control-sm promo-filter" placeholder="Cari nama / kode voucher" style="min-width:240px;flex:1">
+            </div>
+            <div class="table-responsive">
+                <table class="promo-table">
+                    <thead><tr><th>Voucher</th><th>Benefit</th><th>Periode</th><th>Penggunaan</th><th>Status</th><th class="text-end">Aksi</th></tr></thead>
+                    <tbody id="voucherBody"><tr><td colspan="6" class="text-center text-muted py-4">Belum dimuat.</td></tr></tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
@@ -815,6 +850,32 @@
             </div>
         </div>
     </div>
+</div>
+
+<div class="modal fade" id="voucherFormModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title" id="voucherFormTitle">Buat Voucher Toko</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <input type="hidden" id="voucherId">
+            <div class="alert alert-info py-2 small">Shopee membatasi voucher aktif maksimal 3 bulan. Voucher yang sedang berjalan hanya dapat mengubah field tertentu seperti nama, kuota, periode selesai, channel tampil, dan item.</div>
+            <div class="row g-3">
+                <div class="col-md-7"><label class="form-label">Nama voucher</label><input id="voucherName" class="form-control" maxlength="255"></div>
+                <div class="col-md-5"><label class="form-label">Kode voucher</label><input id="voucherCode" class="form-control" maxlength="50" placeholder="GFIDHEMAT"><div class="form-text">Tidak bisa diubah setelah dibuat.</div></div>
+                <div class="col-md-4"><label class="form-label">Jenis voucher</label><select id="voucherType" class="form-select"><option value="1">Voucher toko</option><option value="2">Voucher produk</option></select></div>
+                <div class="col-md-4"><label class="form-label">Jenis benefit</label><select id="voucherRewardType" class="form-select"><option value="1">Potongan tetap (Rp)</option><option value="2">Potongan persentase (%)</option><option value="3">Cashback koin (%)</option></select></div>
+                <div class="col-md-4"><label class="form-label">Kuota penggunaan</label><input id="voucherUsageQuantity" type="number" min="1" class="form-control"></div>
+                <div class="col-md-4"><label class="form-label" id="voucherValueLabel">Nominal potongan (Rp)</label><input id="voucherValue" type="number" min="0" class="form-control"></div>
+                <div class="col-md-4"><label class="form-label">Minimum belanja (Rp)</label><input id="voucherMinBasketPrice" type="number" min="0" class="form-control"></div>
+                <div class="col-md-4"><label class="form-label">Maksimum benefit (Rp)</label><input id="voucherMaxPrice" type="number" min="0" class="form-control"><div class="form-text">Dipakai untuk persentase/cashback; 0 = tanpa batas.</div></div>
+                <div class="col-md-6"><label class="form-label">Mulai berlaku</label><input id="voucherStart" type="datetime-local" class="form-control"></div>
+                <div class="col-md-6"><label class="form-label">Selesai berlaku</label><input id="voucherEnd" type="datetime-local" class="form-control"></div>
+                <div class="col-md-6"><label class="form-label">Mulai tampil di halaman toko <span class="text-muted">(opsional)</span></label><input id="voucherDisplayStart" type="datetime-local" class="form-control"></div>
+                <div class="col-md-6"><label class="form-label">Channel tampil</label><select id="voucherDisplayChannels" class="form-select" multiple><option value="1" selected>Semua channel</option><option value="2">Halaman pesanan</option><option value="3">Feed</option><option value="4">Live streaming</option></select></div>
+                <div class="col-12" id="voucherItemsWrap"><label class="form-label">Item ID produk <span class="text-muted">(wajib untuk voucher produk)</span></label><input id="voucherItemIds" class="form-control" placeholder="123456789, 987654321"><div class="form-text">Pisahkan beberapa Item ID dengan koma.</div></div>
+            </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button><button type="button" class="btn btn-primary" id="voucherSaveBtn">Simpan Voucher</button></div>
+    </div></div>
 </div>
 @endsection
 
@@ -2284,4 +2345,5 @@
     window.deleteCurrentPromotion = deleteCurrentPromotion;
 })();
 </script>
+<script src="{{ asset('js/marketplace-vouchers.js') }}"></script>
 @endpush

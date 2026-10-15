@@ -115,7 +115,7 @@ class ShopeeChannel implements MarketplaceChannel
     protected function isMutationEndpoint(string $path): bool
     {
         return (bool) preg_match(
-            '#/(?:returns/confirm|ads/edit_|media_space/upload_image|logistics/(?:ship_|create_)|sellerchat/(?:send_|read_)|product/(?:add_item|update_|unlist_item|boost_item)|discount/(?:add_|update_|end_|delete_|set_))#',
+            '#/(?:returns/confirm|ads/edit_|media_space/upload_image|logistics/(?:ship_|create_)|sellerchat/(?:send_|read_)|product/(?:add_item|update_|unlist_item|boost_item)|discount/(?:add_|update_|end_|delete_|set_)|voucher/(?:add_|update_|end_|delete_))#',
             $path
         );
     }
@@ -1702,6 +1702,41 @@ class ShopeeChannel implements MarketplaceChannel
         return $this->post($store, '/api/v2/discount/delete_sip_discount', [
             'region' => $region,
         ]);
+    }
+
+    // Voucher APIs (Shopee v2.voucher)
+    public function getVoucherList(Store $store, string $status = 'all', int $pageNo = 1, int $pageSize = 100): array
+    {
+        return $this->get($store, '/api/v2/voucher/get_voucher_list', [
+            'status' => $status,
+            'page_no' => $pageNo,
+            'page_size' => $pageSize,
+        ]);
+    }
+
+    public function addVoucher(Store $store, array $payload): array
+    {
+        return $this->post($store, '/api/v2/voucher/add_voucher', $payload);
+    }
+
+    public function updateVoucher(Store $store, int $voucherId, array $payload = []): array
+    {
+        return $this->post($store, '/api/v2/voucher/update_voucher', array_merge(['voucher_id' => $voucherId], $payload));
+    }
+
+    public function getVoucher(Store $store, int $voucherId): array
+    {
+        return $this->get($store, '/api/v2/voucher/get_voucher', ['voucher_id' => $voucherId]);
+    }
+
+    public function endVoucher(Store $store, int $voucherId): array
+    {
+        return $this->post($store, '/api/v2/voucher/end_voucher', ['voucher_id' => $voucherId]);
+    }
+
+    public function deleteVoucher(Store $store, int $voucherId): array
+    {
+        return $this->post($store, '/api/v2/voucher/delete_voucher', ['voucher_id' => $voucherId]);
     }
 
     /**
