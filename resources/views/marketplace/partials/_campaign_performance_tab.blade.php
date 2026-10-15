@@ -918,9 +918,13 @@
                                     <span class="perf-campaign-image-empty"><i class="bi bi-image"></i></span>
                                 @endif
                                 <div style="min-width:0;">
-                                    <a href="{{ route('marketplace.ads.campaign.detail', ['campaign' => $row['record_id'], 'store_id' => $row['store_id'], 'date_from' => $dateFrom ?? null, 'date_to' => $dateTo ?? null]) }}"
-                                       class="fw-bold text-truncate d-block" style="max-width: 220px; color:inherit; text-decoration:none;" title="Buka detail campaign {{ $row['name'] }}"
-                                       onclick="event.stopPropagation();">{{ $row['name'] }} <i class="bi bi-box-arrow-up-right" style="font-size:.58rem; color:#2563eb;"></i></a>
+                                    @if($row['record_id'] ?? null)
+                                        <a href="{{ route('marketplace.ads.campaign.detail', ['campaign' => $row['record_id'], 'store_id' => $row['store_id'], 'date_from' => $dateFrom ?? null, 'date_to' => $dateTo ?? null]) }}"
+                                           class="fw-bold text-truncate d-block" style="max-width: 220px; color:inherit; text-decoration:none;" title="Buka detail campaign {{ $row['name'] }}"
+                                           onclick="event.stopPropagation();">{{ $row['name'] }} <i class="bi bi-box-arrow-up-right" style="font-size:.58rem; color:#2563eb;"></i></a>
+                                    @else
+                                        <span class="fw-bold text-truncate d-block" style="max-width: 220px;">{{ $row['name'] }}</span>
+                                    @endif
                                     <div class="text-muted text-truncate" style="max-width: 220px; font-size:.68rem;">
                                         <i class="bi bi-box"></i> {{ $row['item_name'] }}
                                         @if($row['type'])<span class="badge bg-light text-dark border ms-1" style="font-size:.52rem;">{{ strtoupper($row['type']) }}</span>@endif
