@@ -617,6 +617,8 @@ body[data-theme="dark"] .dash-tab-sm.active { background: var(--card-bg); }
 
 .ads-kpi-compact{
     display:grid;
+    grid-column:1 / -1;
+    width:100%;
     grid-template-columns:repeat(4,minmax(0,1fr));
     gap:.45rem;
     margin-top:.55rem;
