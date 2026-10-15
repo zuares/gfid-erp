@@ -615,6 +615,36 @@ body[data-theme="dark"] .dash-tab-sm.active { background: var(--card-bg); }
     margin-bottom:.95rem;
 }
 
+.ads-kpi-compact{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:.45rem;
+    margin-top:.55rem;
+}
+
+.ads-kpi-compact-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:.5rem;
+    min-width:0;
+    padding:.48rem .6rem;
+    border:1px solid var(--ads-line,#e2e8f0);
+    border-radius:.55rem;
+    background:var(--ads-soft,#f8fafc);
+    color:var(--ads-muted,#64748b);
+    font-size:.63rem;
+}
+
+.ads-kpi-compact-item strong{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    color:var(--ads-ink,#0f172a);
+    font-size:.7rem;
+}
+
 .ads-kpi{
     position:relative;
     display:flex;
@@ -1769,6 +1799,7 @@ body[data-theme="dark"] .dash-sec{
     .ads-dashboard #filterForm { grid-template-columns: 1fr; }
     .ads-dashboard .ads-kpi { min-height: 118px; }
     .ads-dashboard .ads-kpi-value { font-size: 1.15rem; }
+    .ads-kpi-compact { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 </style>
 
@@ -4164,14 +4195,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     $metrics = [
                         ['title' => 'GMV', 'key' => 'gmv', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'revenue', 'icon' => 'bi-wallet2'],
                         ['title' => 'Biaya Iklan', 'key' => 'spend', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'spend', 'icon' => 'bi-cash-stack'],
-                        ['title' => 'Profit Bersih', 'key' => 'net_profit', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'profit', 'icon' => 'bi-piggy-bank'],
-                        ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => '', 'cls' => 'profit', 'icon' => 'bi-box-seam'],
                         ['title' => 'ROAS', 'key' => 'roas', 'prefix' => '', 'suffix' => 'x', 'cls' => 'roas', 'icon' => 'bi-lightning-charge'],
-                        ['title' => 'Impresi', 'key' => 'impressions', 'prefix' => '', 'suffix' => '', 'cls' => 'revenue', 'icon' => 'bi-eye'],
-                        ['title' => 'Klik', 'key' => 'clicks', 'prefix' => '', 'suffix' => '', 'cls' => 'spend', 'icon' => 'bi-cursor'],
-                        ['title' => 'CTR', 'key' => 'ctr', 'prefix' => '', 'suffix' => '%', 'cls' => 'roas', 'icon' => 'bi-hand-index-thumb'],
-                        ['title' => 'CVR', 'key' => 'cvr', 'prefix' => '', 'suffix' => '%', 'cls' => 'profit', 'icon' => 'bi-funnel'],
-                        ['title' => 'CPC', 'key' => 'cpc', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'spend', 'icon' => 'bi-cash'],
+                        ['title' => 'Pesanan', 'key' => 'orders', 'prefix' => '', 'suffix' => '', 'cls' => 'profit', 'icon' => 'bi-box-seam'],
+                        ['title' => 'CPA', 'key' => 'cpa', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'spend', 'icon' => 'bi-person-check'],
+                        ['title' => 'Profit Bersih', 'key' => 'net_profit', 'prefix' => 'Rp ', 'suffix' => '', 'cls' => 'profit', 'icon' => 'bi-piggy-bank'],
                     ];
                 @endphp
                 @foreach($metrics as $m)
@@ -4205,6 +4232,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         } elseif ($m['key'] === 'cpc') {
                             $val = $currClicks > 0 ? round($currSpendAfterTax / $currClicks, 0) : 0;
                             $prevVal = $prevClicks > 0 ? round($prevSpendAfterTax / $prevClicks, 0) : 0;
+                        } elseif ($m['key'] === 'cpa') {
+                            $val = $currOrders > 0 ? round($currSpendAfterTax / $currOrders, 0) : 0;
+                            $prevVal = $prevOrders > 0 ? round($prevSpendAfterTax / $prevOrders, 0) : 0;
                         } elseif ($m['key'] === 'ctr') {
                             $val = $currImpressions > 0 ? round(($currClicks / $currImpressions) * 100, 2) : 0;
                             $prevVal = $prevImpressions > 0 ? round(($prevClicks / $prevImpressions) * 100, 2) : 0;
@@ -4214,7 +4244,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
 
                         $change = $kpi['changes'][$m['key']] ?? 0;
-                        if (in_array($m['key'], ['aov', 'aov_net', 'cpc', 'ctr', 'cvr', 'net_revenue', 'net_profit', 'spend_topup'])) {
+                        if (in_array($m['key'], ['aov', 'aov_net', 'cpa', 'cpc', 'ctr', 'cvr', 'net_revenue', 'net_profit', 'roas', 'spend_topup'])) {
                             if ($prevVal == 0) {
                                 $change = $val > 0 ? null : 0;
                             } else {
@@ -4229,13 +4259,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         // For cost metrics, going down is good (green). For others, going up is good.
                         if (!$hasComparison) {
                             $colorClass = 'color: #64748b;';
-                        } elseif (in_array($m['key'], ['spend', 'cpc', 'spend_topup'])) {
+                        } elseif (in_array($m['key'], ['spend', 'cpa', 'cpc', 'spend_topup'])) {
                             $colorClass = $isUp && $change > 0 ? 'color: #dc2626;' : 'color: #16a34a;';
                         } else {
                             $colorClass = $isUp ? 'color: #16a34a;' : 'color: #dc2626;';
                         }
 
-                        $valueDecimals = in_array($m['key'], ['gmv', 'spend', 'net_profit', 'cpc', 'orders', 'impressions', 'clicks']) ? 0 : 2;
+                        $valueDecimals = in_array($m['key'], ['gmv', 'spend', 'net_profit', 'cpa', 'cpc', 'orders', 'impressions', 'clicks']) ? 0 : 2;
                     @endphp
                     <div class="dpanel ads-kpi kpi-{{ $m['cls'] }}">
                         <div class="ads-kpi-label" @if($m['key'] === 'spend') title="Biaya iklan setelah PPN 11%, termasuk GMV Max Auto" @endif>
@@ -4263,6 +4293,22 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
                 @endforeach
+                @php
+                    $compactKpis = [
+                        ['label' => 'Net Revenue', 'value' => 'Rp ' . number_format((float) ($kpi['current']->net_revenue ?? 0), 0, ',', '.')],
+                        ['label' => 'AOV Net', 'value' => 'Rp ' . number_format((float) ($kpi['current']->aov_net ?? 0), 0, ',', '.')],
+                        ['label' => 'CTR', 'value' => number_format($currImpressions > 0 ? ($currClicks / $currImpressions) * 100 : 0, 2, ',', '.') . '%'],
+                        ['label' => 'CVR', 'value' => number_format($currClicks > 0 ? ($currOrders / $currClicks) * 100 : 0, 2, ',', '.') . '%'],
+                    ];
+                @endphp
+                <div class="ads-kpi-compact" aria-label="Metrik pendamping">
+                    @foreach($compactKpis as $compactKpi)
+                        <div class="ads-kpi-compact-item">
+                            <span>{{ $compactKpi['label'] }}</span>
+                            <strong>{{ $compactKpi['value'] }}</strong>
+                        </div>
+                    @endforeach
+                </div>
             </div>
             </div>
         </div>
