@@ -1771,6 +1771,101 @@ body[data-theme="dark"] .dash-sec{
 .ads-dashboard .ads-tab-panel-title { color: var(--ads-ink); font-size: 1rem; }
 .ads-dashboard .ads-tab-panel-note { color: var(--ads-muted); background: var(--ads-soft); border-color: var(--ads-line); }
 
+.ads-tab-context{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:.75rem;
+    margin:.45rem 0 .85rem;
+    padding:.55rem .75rem;
+    border:1px solid var(--ads-line);
+    border-radius:.7rem;
+    background:var(--ads-soft);
+    color:var(--ads-muted);
+    font-size:.68rem;
+}
+
+.ads-tab-context-main{
+    display:flex;
+    align-items:center;
+    gap:.5rem;
+    min-width:0;
+}
+
+.ads-tab-context-icon{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:1.65rem;
+    height:1.65rem;
+    flex:0 0 auto;
+    border-radius:.5rem;
+    background:rgba(37,99,235,.12);
+    color:var(--dsh-accent);
+}
+
+.ads-tab-context-title{
+    color:var(--ads-ink);
+    font-size:.74rem;
+    font-weight:800;
+}
+
+.ads-tab-context-description{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.ads-tab-context-meta{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:.4rem;
+    flex:0 0 auto;
+}
+
+.ads-tab-context-chip,
+.ads-tab-count{
+    display:inline-flex;
+    align-items:center;
+    gap:.25rem;
+    min-height:1.15rem;
+    padding:.12rem .42rem;
+    border:1px solid var(--ads-line);
+    border-radius:999px;
+    background:var(--ads-card);
+    color:var(--ads-muted);
+    font-size:.6rem;
+    font-weight:750;
+}
+
+.ads-tab-count{
+    margin-left:.25rem;
+    padding-inline:.35rem;
+    border-color:transparent;
+    background:rgba(148,163,184,.16);
+    line-height:1;
+}
+
+.ads-dashboard .dash-tab-m:focus-visible,
+.ads-dashboard .dash-tab-sm:focus-visible{
+    outline:2px solid var(--dsh-accent);
+    outline-offset:2px;
+}
+
+@media (max-width: 767.98px) {
+    .ads-tab-context{
+        align-items:flex-start;
+        flex-direction:column;
+        gap:.45rem;
+    }
+
+    .ads-tab-context-meta{
+        justify-content:flex-start;
+        flex-wrap:wrap;
+    }
+}
+
 .ads-dashboard .ads-kpi {
     min-height: 132px;
     border-color: var(--ads-line);
@@ -1843,6 +1938,22 @@ document.addEventListener('DOMContentLoaded', function () {
         ]},
     ];
 
+    const ADS_TAB_CONTEXTS = {
+        'tab-campaigns': { title: 'Ringkasan', description: 'Ringkasan kesehatan iklan dan prioritas tindakan.', icon: 'bi-grid-1x2' },
+        'tab-analysis': { title: 'Analisa', description: 'Bandingkan periode dan temukan pola waktu terbaik.', icon: 'bi-graph-up' },
+        'tab-alerts': { title: 'Alerts & Actions', description: 'Prioritaskan anomali, kebocoran budget, dan peluang scale-up.', icon: 'bi-bell' },
+        'tab-campaign-performance': { title: 'Campaign Performance', description: 'Bandingkan efisiensi dan profitabilitas setiap kampanye.', icon: 'bi-bar-chart-steps' },
+        'tab-traffic': { title: 'Traffic', description: 'Pantau alur impresi, klik, pesanan, dan biaya iklan.', icon: 'bi-stoplights' },
+        'tab-items': { title: 'Produk', description: 'Temukan produk hero, loss maker, dan risiko stok.', icon: 'bi-box-seam' },
+        'tab-profit': { title: 'Profit', description: 'Rekonsiliasi omzet, HPP, biaya iklan, dan profit bersih.', icon: 'bi-cash-coin' },
+        'tab-funnel': { title: 'Funnel', description: 'Cari titik drop-off dari impresi hingga pembelian.', icon: 'bi-funnel' },
+        'tab-creative': { title: 'Creative & Audience', description: 'Evaluasi hook visual dan kualitas intent audiens.', icon: 'bi-person-video2' },
+        'tab-ltv': { title: 'Customer & LTV', description: 'Lihat CAC blended, repeat rate, dan frekuensi order.', icon: 'bi-person-heart' },
+        'tab-experiments': { title: 'Evaluasi', description: 'Ukur dampak perubahan iklan dengan baseline yang konsisten.', icon: 'bi-clipboard2-pulse' },
+        'tab-control': { title: 'Control Panel', description: 'Kelola target, budget, status, dan jadwal kampanye.', icon: 'bi-toggles' },
+        'tab-settings': { title: 'Pengaturan', description: 'Kelola integrasi, fee, target, dan sinkronisasi data.', icon: 'bi-sliders' },
+    };
+
     const paneToGroup = {};
     ADS_GROUPS.forEach(g => g.panes.forEach(p => { paneToGroup[p[0]] = g.id; }));
 
@@ -1851,10 +1962,36 @@ document.addEventListener('DOMContentLoaded', function () {
     const subTabsBar = document.getElementById('adsSubTabs');
     const tabPanes = document.querySelectorAll('.tab-pane');
 
+    function updateTabContext(paneId) {
+        const context = ADS_TAB_CONTEXTS[paneId] || ADS_TAB_CONTEXTS['tab-campaigns'];
+        const icon = document.getElementById('adsTabContextIcon');
+        const title = document.getElementById('adsTabContextTitle');
+        const description = document.getElementById('adsTabContextDescription');
+        const store = document.getElementById('adsTabContextStore');
+        const period = document.getElementById('adsTabContextPeriod');
+        const sync = document.getElementById('adsTabContextSync');
+        const storeSelect = document.getElementById('ads-store-filter');
+        const syncStatus = document.getElementById('globalSyncStatus');
+
+        if (icon) icon.innerHTML = '<i class="bi ' + context.icon + '"></i>';
+        if (title) title.textContent = context.title;
+        if (description) description.textContent = context.description;
+        if (store) store.textContent = storeSelect?.selectedOptions?.[0]?.textContent?.trim() || 'Semua toko';
+        if (period) period.textContent = `${document.getElementById('fromHidden')?.value || ''} — ${document.getElementById('toHidden')?.value || ''}`;
+        if (sync) sync.textContent = syncStatus?.dataset?.lastSync || 'Belum sync';
+    }
+
     function showPane(paneId) {
         tabPanes.forEach(p => p.classList.remove('active'));
         const pane = document.getElementById(paneId);
-        if (pane) pane.classList.add('active');
+        if (pane) {
+            pane.classList.add('active');
+            pane.setAttribute('aria-hidden', 'false');
+        }
+        tabPanes.forEach(p => {
+            if (p.id !== paneId) p.setAttribute('aria-hidden', 'true');
+        });
+        updateTabContext(paneId);
         localStorage.setItem('adsDashboardActivePane', paneId);
         // charts sering perlu re-layout saat panel baru tampil
         try { window.dispatchEvent(new Event('resize')); } catch (e) {}
@@ -1872,10 +2009,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 const b = document.createElement('button');
                 b.className = 'dash-tab-sm' + (paneId === activePaneId ? ' active' : '');
                 b.setAttribute('data-target', paneId);
+                b.setAttribute('role', 'tab');
+                b.setAttribute('aria-controls', paneId);
+                b.setAttribute('aria-selected', paneId === activePaneId ? 'true' : 'false');
                 b.innerHTML = '<i class="bi ' + icon + '"></i> ' + label;
                 b.addEventListener('click', () => {
-                    subTabsBar.querySelectorAll('.dash-tab-sm').forEach(x => x.classList.remove('active'));
+                    subTabsBar.querySelectorAll('.dash-tab-sm').forEach(x => {
+                        x.classList.remove('active');
+                        x.setAttribute('aria-selected', 'false');
+                    });
                     b.classList.add('active');
+                    b.setAttribute('aria-selected', 'true');
                     showPane(paneId);
                 });
                 subTabsBar.appendChild(b);
@@ -1886,7 +2030,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function activateGroup(groupId, preferredPaneId) {
         const group = ADS_GROUPS.find(g => g.id === groupId) || ADS_GROUPS[0];
-        primaryBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-group') === group.id));
+        primaryBtns.forEach(b => {
+            const active = b.getAttribute('data-group') === group.id;
+            b.classList.toggle('active', active);
+            b.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
         const paneIds = group.panes.map(p => p[0]);
         const activePaneId = paneIds.includes(preferredPaneId) ? preferredPaneId : paneIds[0];
         localStorage.setItem('adsDashboardActiveGroup', group.id);
@@ -1895,6 +2043,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     primaryBtns.forEach(btn => {
         btn.addEventListener('click', () => activateGroup(btn.getAttribute('data-group')));
+        btn.addEventListener('keydown', event => {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+            event.preventDefault();
+            const buttons = Array.from(primaryBtns);
+            const currentIndex = buttons.indexOf(btn);
+            const nextIndex = event.key === 'Home'
+                ? 0
+                : event.key === 'End'
+                    ? buttons.length - 1
+                    : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+            buttons[nextIndex].focus();
+            activateGroup(buttons[nextIndex].getAttribute('data-group'));
+        });
     });
 
     // Restore: prioritaskan panel terakhir; fallback ke grup lama; default grup pertama.
@@ -2602,22 +2763,43 @@ document.addEventListener('DOMContentLoaded', function() {
         {{-- ==============================================
              TABS (SEGMENTED CONTROL)
         ============================================== --}}
+        @php
+            $adsCampaignCount = is_countable($campaigns ?? null) ? count($campaigns) : 0;
+            $adsProductCount = is_countable($itemPerformance ?? null) ? count($itemPerformance) : 0;
+            $adsSyncRunCount = is_countable($syncRuns ?? null) ? count($syncRuns) : 0;
+            $adsUnknownProfitCount = (int) data_get($kpi ?? [], 'current.profit_unknown_campaign_count', 0);
+            $adsCustomerCount = (int) data_get($ltvData ?? [], 'total_customers', 0);
+        @endphp
         {{-- Navigasi 2 tingkat: 6 grup induk + sub-tab (dibangun oleh JS dari ADS_GROUPS).
              Semua panel .tab-pane lama dipertahankan; grup hanya mengelompokkan navigasi. --}}
         <div class="ads-tabs-wrap" style="overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none;">
-            <div class="dash-tabs-modern" id="adsPrimaryTabs">
-                <button class="dash-tab-m active" data-group="grp-ringkasan"><i class="bi bi-grid-1x2"></i> Ringkasan</button>
-                <button class="dash-tab-m" data-group="grp-performa"><i class="bi bi-bar-chart-steps"></i> Performa</button>
-                <button class="dash-tab-m" data-group="grp-profit"><i class="bi bi-cash-coin"></i> Profit</button>
-                <button class="dash-tab-m" data-group="grp-funnel"><i class="bi bi-funnel"></i> Funnel &amp; Creative</button>
-                <button class="dash-tab-m" data-group="grp-ltv"><i class="bi bi-person-heart"></i> Customer &amp; LTV</button>
-                <button class="dash-tab-m" data-group="grp-experiment"><i class="bi bi-clipboard2-pulse"></i> Evaluasi</button>
-                <button class="dash-tab-m" data-group="grp-control"><i class="bi bi-toggles"></i> Control Panel</button>
-                <button class="dash-tab-m" data-group="grp-settings"><i class="bi bi-sliders"></i> Pengaturan <span id="tabSyncBadge" style="display:none; margin-left:2px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:#3b82f6; color:#fff; font-size:.6rem; font-weight:800; line-height:16px; text-align:center;"></span></button>
+            <div class="dash-tabs-modern" id="adsPrimaryTabs" role="tablist" aria-label="Kelompok dashboard iklan">
+                <button class="dash-tab-m active" data-group="grp-ringkasan" role="tab" aria-selected="true"><i class="bi bi-grid-1x2"></i> Ringkasan <span class="ads-tab-count">{{ $adsCampaignCount }}</span></button>
+                <button class="dash-tab-m" data-group="grp-performa" role="tab" aria-selected="false"><i class="bi bi-bar-chart-steps"></i> Performa <span class="ads-tab-count">{{ $adsCampaignCount + $adsProductCount }}</span></button>
+                <button class="dash-tab-m" data-group="grp-profit" role="tab" aria-selected="false"><i class="bi bi-cash-coin"></i> Profit @if($adsUnknownProfitCount > 0)<span class="ads-tab-count">{{ $adsUnknownProfitCount }} perlu HPP</span>@endif</button>
+                <button class="dash-tab-m" data-group="grp-funnel" role="tab" aria-selected="false"><i class="bi bi-funnel"></i> Funnel &amp; Creative</button>
+                <button class="dash-tab-m" data-group="grp-ltv" role="tab" aria-selected="false"><i class="bi bi-person-heart"></i> Customer &amp; LTV <span class="ads-tab-count">{{ $adsCustomerCount }}</span></button>
+                <button class="dash-tab-m" data-group="grp-experiment" role="tab" aria-selected="false"><i class="bi bi-clipboard2-pulse"></i> Evaluasi</button>
+                <button class="dash-tab-m" data-group="grp-control" role="tab" aria-selected="false"><i class="bi bi-toggles"></i> Control Panel</button>
+                <button class="dash-tab-m" data-group="grp-settings" role="tab" aria-selected="false"><i class="bi bi-sliders"></i> Pengaturan <span id="tabSyncBadge" style="display:none; margin-left:2px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:#3b82f6; color:#fff; font-size:.6rem; font-weight:800; line-height:16px; text-align:center;"></span><span class="ads-tab-count">{{ $adsSyncRunCount }}</span></button>
             </div>
         </div>
         <div class="ads-tabs-wrap" id="adsSubTabsWrap" style="overflow-x: auto; padding-top: 0.35rem; padding-bottom: 0.25rem; scrollbar-width: none;">
-            <div class="dash-tabs-modern" id="adsSubTabs" style="padding:.2rem;"></div>
+            <div class="dash-tabs-modern" id="adsSubTabs" role="tablist" aria-label="Tab dashboard iklan"></div>
+        </div>
+        <div id="adsTabContext" class="ads-tab-context" role="status" aria-live="polite">
+            <div class="ads-tab-context-main">
+                <span id="adsTabContextIcon" class="ads-tab-context-icon"><i class="bi bi-grid-1x2"></i></span>
+                <div style="min-width:0;">
+                    <div id="adsTabContextTitle" class="ads-tab-context-title">Ringkasan</div>
+                    <div id="adsTabContextDescription" class="ads-tab-context-description">Ringkasan kesehatan iklan dan prioritas tindakan.</div>
+                </div>
+            </div>
+            <div class="ads-tab-context-meta">
+                <span class="ads-tab-context-chip"><i class="bi bi-shop"></i> <span id="adsTabContextStore">Semua toko</span></span>
+                <span class="ads-tab-context-chip"><i class="bi bi-calendar2-week"></i> <span id="adsTabContextPeriod">{{ $dateFrom }} — {{ $dateTo }}</span></span>
+                <span class="ads-tab-context-chip"><i class="bi bi-arrow-repeat"></i> <span id="adsTabContextSync">{{ ($lastSyncTime ?? '') ?: 'Belum sync' }}</span></span>
+            </div>
         </div>
     @endif
 
