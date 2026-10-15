@@ -540,6 +540,58 @@
     .promo-badge{ padding:.22rem .58rem; }
     .promo-context{ border-radius:14px; padding:.8rem .9rem; box-shadow:0 8px 20px rgba(37,99,235,.06); }
     .promo-controls .btn{ min-height:35px; border-radius:10px; }
+    .promo-tabs{
+        display:grid;
+        grid-template-columns:repeat(2, minmax(0,1fr));
+        gap:.65rem;
+        margin-bottom:.8rem;
+        padding:.4rem;
+        background:var(--card,#fff);
+        border:1px solid var(--shp-border);
+        border-radius:16px;
+        box-shadow:0 10px 24px rgba(15,23,42,.04);
+    }
+    .promo-tab{
+        display:flex;
+        align-items:center;
+        gap:.65rem;
+        min-width:0;
+        padding:.7rem .8rem;
+        border:1px solid transparent;
+        border-radius:12px;
+        background:transparent;
+        color:#64748b;
+        text-align:left;
+        cursor:pointer;
+        transition:background .15s ease,border-color .15s ease,color .15s ease,box-shadow .15s ease;
+    }
+    .promo-tab i{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        width:2rem;
+        height:2rem;
+        flex:0 0 auto;
+        border-radius:10px;
+        background:rgba(51,65,85,.08);
+        color:#334155;
+        font-size:.9rem;
+    }
+    .promo-tab span{ display:block; color:#334155; font-size:.8rem; font-weight:800; }
+    .promo-tab small{ display:block; margin-top:.12rem; color:#94a3b8; font-size:.68rem; line-height:1.3; }
+    .promo-tab:hover{ border-color:rgba(100,116,139,.28); background:rgba(148,163,184,.06); }
+    .promo-tab.is-active{ border-color:rgba(51,65,85,.2); background:rgba(248,250,252,.96); box-shadow:0 7px 16px rgba(15,23,42,.07); }
+    .promo-tab.is-active i{ background:#334155; color:#fff; }
+    body[data-theme="dark"] .promo-tabs{ background:var(--card,#0f172a); border-color:rgba(51,65,85,.88); box-shadow:none; }
+    body[data-theme="dark"] .promo-tab span{ color:#e2e8f0; }
+    body[data-theme="dark"] .promo-tab{ color:#94a3b8; }
+    body[data-theme="dark"] .promo-tab i{ background:rgba(148,163,184,.12); color:#cbd5e1; }
+    body[data-theme="dark"] .promo-tab:hover{ background:rgba(51,65,85,.28); border-color:rgba(148,163,184,.22); }
+    body[data-theme="dark"] .promo-tab.is-active{ background:rgba(30,41,59,.88); border-color:rgba(148,163,184,.24); box-shadow:none; }
+    @media (max-width:576px){
+        .promo-tabs{ grid-template-columns:1fr; }
+        .promo-tab{ padding:.62rem .7rem; }
+    }
     @media (max-width:1100px){
         .promo-dashboard-grid{ grid-template-columns:repeat(3, minmax(0,1fr)); }
     }
@@ -558,21 +610,26 @@
 @endpush
 
 @section('content')
-<div class="promo-wrap">
+<div class="promo-wrap" data-active-tab="{{ $selectedTab }}">
     <div class="promo-topbar">
         <div>
             <div class="promo-eyebrow"><i class="bi bi-tag"></i> Marketplace / Pricing</div>
-            <h1 class="promo-title">Promosi Diskon</h1>
-            <div class="promo-sub">Atur harga promo per campaign tanpa mengubah harga normal produk.</div>
-            <div class="promo-chipbar">
+            <h1 class="promo-title" id="promotionPageTitle">Promosi Diskon</h1>
+            <div class="promo-sub" id="promotionPageSub">Atur harga promo per campaign tanpa mengubah harga normal produk.</div>
+            <div class="promo-chipbar" id="discountKpis">
                 <span class="promo-chip"><span class="lbl">Total</span><span class="val" id="kpiTotal">—</span></span>
                 <span class="promo-chip"><span class="lbl">Ongoing</span><span class="val" id="kpiOngoing">—</span></span>
                 <span class="promo-chip"><span class="lbl">Upcoming</span><span class="val" id="kpiUpcoming">—</span></span>
                 <span class="promo-chip"><span class="lbl">Ended</span><span class="val" id="kpiEnded">—</span></span>
                 <span class="promo-chip"><span class="lbl">Items</span><span class="val" id="kpiItems">—</span></span>
             </div>
+            <div class="promo-chipbar d-none" id="voucherKpis">
+                <span class="promo-chip"><span class="lbl">Total voucher</span><span class="val" id="voucherKpiTotal">—</span></span>
+                <span class="promo-chip"><span class="lbl">Ongoing</span><span class="val" id="voucherKpiOngoing">—</span></span>
+                <span class="promo-chip"><span class="lbl">Terpakai</span><span class="val" id="voucherKpiUsage">—</span></span>
+            </div>
         </div>
-        <div class="promo-controls">
+        <div class="promo-controls" id="discountActions">
             <a href="{{ route('marketplace.promotions.summary') }}" class="btn btn-pill btn-ship-outline">
                 <i class="bi bi-grid-3x3-gap me-1"></i>Summary
             </a>
@@ -582,12 +639,21 @@
             <a href="{{ route('marketplace.promotions.create') }}" class="btn btn-pill btn-ship-primary">
                 <i class="bi bi-plus-lg me-1"></i>Buat Promosi
             </a>
-            <a href="#voucherModule" class="btn btn-pill btn-ship-outline">
-                <i class="bi bi-ticket-perforated me-1"></i>Voucher Toko
-            </a>
         </div>
     </div>
 
+    <div class="promo-tabs" role="tablist" aria-label="Jenis promosi">
+        <button type="button" class="promo-tab is-active" data-promo-tab="discount" role="tab" aria-selected="true">
+            <i class="bi bi-tags"></i>
+            <span><span>Promo Diskon</span><small>Atur harga promo per produk</small></span>
+        </button>
+        <button type="button" class="promo-tab" data-promo-tab="voucher" role="tab" aria-selected="false">
+            <i class="bi bi-ticket-perforated"></i>
+            <span><span>Voucher Toko</span><small>Kelola kode voucher untuk pembeli</small></span>
+        </button>
+    </div>
+
+    <div id="discountPanel" data-promo-panel="discount">
     <div class="promo-dashboard mb-3">
         <div class="promo-dashboard-grid">
             <div class="promo-stat-card is-accent">
@@ -666,8 +732,9 @@
             </table>
         </div>
     </div>
+    </div>
 
-    <div id="voucherModule" class="card promo-card mt-4">
+    <div id="voucherModule" data-promo-panel="voucher" class="card promo-card mt-4 d-none">
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
                 <div>

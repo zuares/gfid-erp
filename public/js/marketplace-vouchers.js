@@ -3,9 +3,14 @@
     if (!api) return;
 
     const $ = (id) => document.getElementById(id);
+    const root = document.querySelector('.promo-wrap');
     const refs = {
         store: $('storeSelect'), status: $('voucherStatusSelect'), search: $('voucherSearchInput'), body: $('voucherBody'),
         alert: $('voucherAlert'), refresh: $('voucherRefreshBtn'), create: $('voucherCreateBtn'),
+        titlePage: $('promotionPageTitle'), subPage: $('promotionPageSub'), discountActions: $('discountActions'),
+        discountKpis: $('discountKpis'), voucherKpis: $('voucherKpis'), voucherKpiTotal: $('voucherKpiTotal'),
+        voucherKpiOngoing: $('voucherKpiOngoing'), voucherKpiUsage: $('voucherKpiUsage'),
+        tabs: Array.from(document.querySelectorAll('[data-promo-tab]')), panels: Array.from(document.querySelectorAll('[data-promo-panel]')),
         modal: $('voucherFormModal'), title: $('voucherFormTitle'), id: $('voucherId'), name: $('voucherName'), code: $('voucherCode'),
         type: $('voucherType'), reward: $('voucherRewardType'), usage: $('voucherUsageQuantity'), value: $('voucherValue'),
         min: $('voucherMinBasketPrice'), max: $('voucherMaxPrice'), start: $('voucherStart'), end: $('voucherEnd'),
@@ -16,6 +21,7 @@
 
     const modal = new bootstrap.Modal(refs.modal);
     const state = { rows: [], editing: false };
+    const initialTab = root?.dataset.activeTab === 'voucher' ? 'voucher' : 'discount';
 
     const text = (value) => value === null || typeof value === 'undefined' ? '' : String(value);
     const fmtTs = (value) => value ? new Date(Number(value) * 1000).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
@@ -48,7 +54,39 @@
         return '—';
     }
 
+    function updateVoucherKpis() {
+        const total = state.rows.length;
+        const ongoing = state.rows.filter((voucher) => String(voucher.voucher_status || '').toLowerCase() === 'ongoing').length;
+        const usage = state.rows.reduce((sum, voucher) => sum + Number(voucher.current_usage || 0), 0);
+        if (refs.voucherKpiTotal) refs.voucherKpiTotal.textContent = total.toLocaleString('id-ID');
+        if (refs.voucherKpiOngoing) refs.voucherKpiOngoing.textContent = ongoing.toLocaleString('id-ID');
+        if (refs.voucherKpiUsage) refs.voucherKpiUsage.textContent = usage.toLocaleString('id-ID');
+    }
+
+    function activateTab(tab, updateUrl = true) {
+        const selected = tab === 'voucher' ? 'voucher' : 'discount';
+        const isVoucher = selected === 'voucher';
+        refs.tabs.forEach((button) => {
+            const active = button.dataset.promoTab === selected;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        refs.panels.forEach((panel) => panel.classList.toggle('d-none', panel.dataset.promoPanel !== selected));
+        refs.discountActions?.classList.toggle('d-none', isVoucher);
+        refs.discountKpis?.classList.toggle('d-none', isVoucher);
+        refs.voucherKpis?.classList.toggle('d-none', !isVoucher);
+        if (refs.titlePage) refs.titlePage.textContent = isVoucher ? 'Voucher Toko' : 'Promosi Diskon';
+        if (refs.subPage) refs.subPage.textContent = isVoucher ? 'Buat dan kelola voucher seller langsung dari Shopee Open API.' : 'Atur harga promo per campaign tanpa mengubah harga normal produk.';
+        if (updateUrl) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', selected);
+            window.history.replaceState({}, '', url);
+        }
+        if (isVoucher && refs.store.value) loadVouchers();
+    }
+
     function render() {
+        updateVoucherKpis();
         const query = text(refs.search.value).trim().toLowerCase();
         const rows = state.rows.filter((v) => !query || [v.voucher_name, v.voucher_code, v.voucher_id].some((x) => text(x).toLowerCase().includes(query)));
         if (!rows.length) {
@@ -172,11 +210,17 @@
     refs.save.addEventListener('click', save);
     refs.reward.addEventListener('change', updateRewardUi);
     refs.type.addEventListener('change', updateTypeUi);
+    refs.tabs.forEach((button) => button.addEventListener('click', () => activateTab(button.dataset.promoTab)));
 
     window.loadVouchers = loadVouchers;
+    window.activatePromotionTab = activateTab;
     window.addEventListener('DOMContentLoaded', () => {
+        activateTab(initialTab, false);
         const boot = (tries = 0) => {
-            if (refs.store.options.length > 0 || tries >= 20) { loadVouchers(); return; }
+            if (refs.store.options.length > 0 || tries >= 20) {
+                if (initialTab === 'voucher') loadVouchers();
+                return;
+            }
             window.setTimeout(() => boot(tries + 1), 150);
         };
         boot();

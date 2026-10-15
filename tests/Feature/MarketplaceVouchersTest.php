@@ -19,7 +19,9 @@ class MarketplaceVouchersTest extends TestCase
 
         $this->get(route('marketplace.promotions'))
             ->assertOk()
+            ->assertSee('Promo Diskon')
             ->assertSee('Voucher Toko Shopee')
+            ->assertSee('Voucher Toko')
             ->assertSee('Buat Voucher');
     }
 

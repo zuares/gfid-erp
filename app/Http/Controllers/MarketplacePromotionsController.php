@@ -41,9 +41,16 @@ class MarketplacePromotionsController extends Controller
 {
     public function promotions(Request $request): \Illuminate\View\View
     {
+        $selectedTab = $request->query('tab', 'discount');
+
+        if (! in_array($selectedTab, ['discount', 'voucher'], true)) {
+            $selectedTab = 'discount';
+        }
+
         return view('marketplace.promotions', [
             'selectedStoreId' => $request->integer('store_id') ?: null,
             'selectedStatus'   => $request->query('status', 'ongoing'),
+            'selectedTab'     => $selectedTab,
         ]);
     }
 
