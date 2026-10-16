@@ -1919,6 +1919,9 @@ document.addEventListener('DOMContentLoaded', function () {
             ['tab-traffic', 'Iklan', 'bi-stoplights'],
             ['tab-items', 'Produk', 'bi-box-seam'],
         ]},
+        { id: 'grp-keyword', panes: [
+            ['tab-keywords', 'Keyword', 'bi-search-heart'],
+        ]},
         { id: 'grp-profit', panes: [
             ['tab-profit', 'Keuntungan', 'bi-cash-coin'],
         ]},
@@ -1947,6 +1950,7 @@ document.addEventListener('DOMContentLoaded', function () {
         'tab-campaign-performance': { title: 'Performa Kampanye', description: 'Bandingkan efisiensi dan profitabilitas setiap kampanye.', icon: 'bi-bar-chart-steps' },
         'tab-traffic': { title: 'Performa Iklan', description: 'Pantau iklan dari dilihat sampai menghasilkan pesanan.', icon: 'bi-stoplights' },
         'tab-items': { title: 'Produk', description: 'Temukan produk hero, loss maker, dan risiko stok.', icon: 'bi-box-seam' },
+        'tab-keywords': { title: 'Rekomendasi Keyword', description: 'Temukan keyword prioritas dari rekomendasi Shopee.', icon: 'bi-search-heart' },
         'tab-profit': { title: 'Keuntungan', description: 'Rekonsiliasi omzet, HPP, biaya iklan, dan profit bersih.', icon: 'bi-cash-coin' },
         'tab-funnel': { title: 'Alur Penjualan', description: 'Cari titik drop-off dari impresi hingga pembelian.', icon: 'bi-funnel' },
         'tab-creative': { title: 'Konten & Pemirsa', description: 'Evaluasi hook visual dan kualitas intent audiens.', icon: 'bi-person-video2' },
@@ -2778,6 +2782,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="dash-tabs-modern" id="adsPrimaryTabs" role="tablist" aria-label="Kelompok dashboard iklan">
                 <button class="dash-tab-m active" data-group="grp-ringkasan" role="tab" aria-selected="true"><i class="bi bi-grid-1x2"></i> Ringkasan <span class="ads-tab-count">{{ $adsCampaignCount }}</span></button>
                 <button class="dash-tab-m" data-group="grp-performa" role="tab" aria-selected="false"><i class="bi bi-bar-chart-steps"></i> Performa <span class="ads-tab-count">{{ $adsCampaignCount + $adsProductCount }}</span></button>
+                <button class="dash-tab-m" data-group="grp-keyword" role="tab" aria-selected="false"><i class="bi bi-search-heart"></i> Keyword</button>
                 <button class="dash-tab-m" data-group="grp-profit" role="tab" aria-selected="false"><i class="bi bi-cash-coin"></i> Profit @if($adsUnknownProfitCount > 0)<span class="ads-tab-count">{{ $adsUnknownProfitCount }} perlu HPP</span>@endif</button>
                 <button class="dash-tab-m" data-group="grp-funnel" role="tab" aria-selected="false"><i class="bi bi-funnel"></i> Funnel &amp; Creative</button>
                 <button class="dash-tab-m" data-group="grp-ltv" role="tab" aria-selected="false"><i class="bi bi-person-heart"></i> Customer &amp; LTV <span class="ads-tab-count">{{ $adsCustomerCount }}</span></button>
@@ -4614,6 +4619,11 @@ document.addEventListener('DOMContentLoaded', function() {
             @include('marketplace.partials._products_tab')
         </div>
 
+        <!-- TAB REKOMENDASI KEYWORD -->
+        <div class="tab-pane" id="tab-keywords">
+            @include('marketplace.partials._recommended_keywords_tab')
+        </div>
+
         <!-- TAB FUNNEL -->
         <div class="tab-pane" id="tab-funnel">
             @include('marketplace.partials._funnel_tab')
@@ -4903,6 +4913,8 @@ window.AdsDashboardRoutes = {
     experimentsShow: @json(route('marketplace.ads.experiments.show', ['experiment' => '__EXPERIMENT_ID__'])),
     experimentsInvalidate: @json(route('marketplace.ads.experiments.invalidate', ['experiment' => '__EXPERIMENT_ID__'])),
     experimentsSimulate: @json(route('marketplace.ads.experiments.simulate')),
+    keywordProducts: @json(route('marketplace.ads.keyword.products')),
+    keywordRecommendations: @json(route('marketplace.ads.keyword.recommendations')),
 };
 
 window.revokeAdsIntegration = async function (storeId, storeName) {

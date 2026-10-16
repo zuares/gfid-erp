@@ -125,6 +125,10 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
         // =========================
         Route::get('ads-dashboard', [AdsDashboardController::class, 'index'])
             ->name('ads.dashboard');
+        Route::get('ads-dashboard/keyword-products', [AdsDashboardController::class, 'keywordProducts'])
+            ->name('ads.keyword.products');
+        Route::get('ads-dashboard/recommended-keywords', [AdsDashboardController::class, 'recommendedKeywords'])
+            ->name('ads.keyword.recommendations');
         Route::get('ads-dashboard/campaigns/{campaign}/detail', [AdsDashboardController::class, 'campaignDetailPage'])
             ->name('ads.campaign.detail');
         Route::get('ads-dashboard/integration-status', [AdsDashboardController::class, 'integrationStatus'])
