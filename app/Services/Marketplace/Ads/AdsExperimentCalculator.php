@@ -27,6 +27,7 @@ class AdsExperimentCalculator
         bool $qtyEstimated = false,
         bool $priceEstimated = false,
         bool $mappingReady = true,
+        ?float $netRevenueOverride = null,
     ): array {
         $impressions = max(0, (int) ($metrics['impressions'] ?? 0));
         $clicks = max(0, (int) ($metrics['clicks'] ?? 0));
@@ -38,14 +39,22 @@ class AdsExperimentCalculator
         $price = $price !== null && $price > 0 ? $price : null;
 
         $adCost = $spend * self::ADS_VAT_FACTOR;
-        $netRevenue = $revenue * $netRevenueRatio;
+        $netRevenue = $netRevenueOverride !== null
+            ? (float) $netRevenueOverride
+            : $revenue * $netRevenueRatio;
         $totalCogs = $hpp > 0 && $qty > 0 ? $hpp * $qty : null;
         $profit = $totalCogs !== null
             ? $netRevenue - $totalCogs - $adCost
             : null;
-        $contributionPerUnit = $price !== null
-            ? ($price * $netRevenueRatio) - $hpp
+        $netRevenuePerUnit = $netRevenueOverride !== null && $qty > 0
+            ? $netRevenue / $qty
+            : ($price !== null ? $price * $netRevenueRatio : null);
+        $contributionPerUnit = $netRevenuePerUnit !== null
+            ? $netRevenuePerUnit - $hpp
             : null;
+        $effectiveNetRevenueRatio = $netRevenueOverride !== null && $revenue > 0
+            ? $netRevenue / $revenue
+            : $netRevenueRatio;
         $breakEvenQty = $contributionPerUnit !== null && $contributionPerUnit > 0
             ? $adCost / $contributionPerUnit
             : null;
@@ -78,7 +87,7 @@ class AdsExperimentCalculator
             'actual_profit_ready' => $actualProfitReady,
             'price' => $price !== null ? round($price, 2) : null,
             'hpp' => $hpp > 0 ? round($hpp, 2) : null,
-            'net_revenue_ratio' => round($netRevenueRatio, 6),
+            'net_revenue_ratio' => round($effectiveNetRevenueRatio, 6),
             'contribution_per_unit' => $contributionPerUnit !== null ? round($contributionPerUnit, 2) : null,
             'break_even_qty' => $breakEvenQty !== null ? round($breakEvenQty, 4) : null,
             'cvr_bep' => $cvrBep !== null ? round($cvrBep, 6) : null,

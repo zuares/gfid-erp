@@ -292,6 +292,26 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     }
 
     function escrowHtml(o) {
+        const incomeSummary = o.income_summary;
+        const incomeAmount = incomeSummary?.amount !== null && incomeSummary?.amount !== undefined
+            ? Number(incomeSummary.amount)
+            : null;
+        if (incomeSummary?.available && Number.isFinite(incomeAmount)) {
+            const estimated = incomeSummary.is_estimated === true || incomeSummary.source === 'income_estimate';
+            const status = estimated ? 'EST' : 'ACT';
+            const label = estimated ? 'Penghasilan est.' : 'Payout';
+            const title = estimated
+                ? 'Perkiraan penghasilan dari data estimasi marketplace'
+                : incomeSummary.source === 'payout'
+                    ? 'Penghasilan aktual dari data payout'
+                    : 'Penghasilan aktual dari settlement';
+
+            return `<span class="ord-income-value ${estimated ? 'estimated' : 'actual'}" title="${title}">
+                <span class="ord-income-status">${label}</span>
+                <strong>${esc(fmtRp(incomeAmount))}</strong>
+            </span>`;
+        }
+
         const amount = escrowAmount(o);
         if (amount === null) return '<span class="ord-payment-empty">—</span>';
 
@@ -367,6 +387,23 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         return `<div class="ord-item-price" title="Harga jual setelah diskon">
             ${originalHtml}<span>${esc(fmtRp(sale))}</span>
             ${qty > 1 ? `<strong>${esc(fmtRp(lineTotal))}</strong>` : ''}
+        </div>`;
+    }
+
+    function itemIncomeHtml(i) {
+        const amount = i?.income_amount === null || i?.income_amount === undefined
+            ? null
+            : Number(i.income_amount);
+        if (!Number.isFinite(amount)) return '';
+
+        const estimated = i.income_is_estimated === true || i.income_source === 'income_estimate';
+        const label = estimated ? 'Penghasilan est.' : 'Payout';
+        const title = estimated
+            ? 'Perkiraan penghasilan produk dari estimasi marketplace'
+            : 'Bagian payout produk ini dari order';
+
+        return `<div class="ord-item-income ${estimated ? 'estimated' : 'actual'}" title="${title}">
+            <span>${label}</span><strong>${esc(fmtRp(amount))}</strong>
         </div>`;
     }
 
@@ -2065,7 +2102,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         const titleRowClass = internalCode
             ? 'ord-item-title-row ord-item-title-row-mapped'
             : 'ord-item-title-row';
-        const bodyHtml = `<div class="${titleRowClass}">${titleHtml}${itemSalePriceHtml(i)}</div>${detailsHtml}${stockHtml}`;
+        const bodyHtml = `<div class="${titleRowClass}">${titleHtml}${itemSalePriceHtml(i)}</div>${detailsHtml}${stockHtml}${itemIncomeHtml(i)}`;
 
         const qtyClass = urgent ? 'ord-item-qty urgent' : 'ord-item-qty';
         return `<div class="ord-item-card">

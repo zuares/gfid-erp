@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Console\Commands\Marketplace\SyncAdsCommand;
 use App\Jobs\ShopeeAdsSyncJob;
 use App\Models\MarketplaceAdCampaign;
+use App\Models\MarketplaceAdExperiment;
 use App\Models\MarketplaceAdsHourlyPerformance;
 use App\Models\MarketplaceAdsSyncRun;
 use App\Models\Store;
@@ -502,6 +503,54 @@ class AdsModuleTest extends TestCase
         $service->syncCampaignsAndSettings($store, $run);
 
         $this->assertTrue(true); // Should receive twice
+    }
+
+    public function test_sync_records_target_roas_changed_in_seller_center(): void
+    {
+        $store = $this->createStore('SELLER-ROAS-HISTORY');
+        $campaign = MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => '987654',
+            'campaign_name' => 'Seller Center ROAS History',
+            'target_roas' => 3,
+            'setting_synced_at' => now()->subDay(),
+        ]);
+
+        $api = \Mockery::mock(\App\Services\Marketplace\Ads\ShopeeAdsApiService::class)->makePartial();
+        $api->shouldReceive('getCampaignIdList')
+            ->once()
+            ->andReturn(['response' => [
+                'campaign_list' => [['campaign_id' => '987654']],
+                'page_info' => ['has_more' => false],
+            ]]);
+        $api->shouldReceive('getCampaignSettingInfo')
+            ->once()
+            ->andReturn(['response' => [
+                'campaign_list' => [[
+                    'campaign_id' => '987654',
+                    'common_info' => [
+                        'campaign_name' => 'Seller Center ROAS History',
+                        'campaign_status' => 'normal',
+                        'item_id_list' => ['445566'],
+                    ],
+                    'auto_bidding_info' => ['roas_target' => 4],
+                ]],
+            ]]);
+
+        $service = new \App\Services\Marketplace\Ads\ShopeeAdsSyncService($api);
+        $run = MarketplaceAdsSyncRun::create(['store_id' => $store->id, 'sync_type' => 'test']);
+        $service->syncCampaignsAndSettings($store, $run);
+
+        $experiment = MarketplaceAdExperiment::query()
+            ->where('store_id', $store->id)
+            ->where('channel_campaign_id', '987654')
+            ->firstOrFail();
+
+        $this->assertSame(3.0, (float) $experiment->old_target_roas);
+        $this->assertSame(4.0, (float) $experiment->new_target_roas);
+        $this->assertSame('seller_center', data_get($experiment->calculation_snapshot, 'change_source'));
+        $this->assertSame('445566', (string) $experiment->channel_item_id);
+        $this->assertSame(4.0, (float) $campaign->refresh()->target_roas);
     }
 
     // 11. Daily date range dipecah maksimal 30 hari & 20. Backfill uses chain

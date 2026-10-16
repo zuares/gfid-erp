@@ -154,6 +154,7 @@ class AdsExperimentService
         array $confounders = [],
         ?int $createdBy = null,
         CarbonInterface|string|null $changedAt = null,
+        string $changeSource = 'app',
     ): ?MarketplaceAdExperiment {
         if ($newTargetRoas === null || ($oldTargetRoas !== null && abs($oldTargetRoas - $newTargetRoas) <= 0.0001)) {
             return null;
@@ -183,6 +184,7 @@ class AdsExperimentService
                     $newTargetRoas,
                     $sameDay->internal_item_id ? (int) $sameDay->internal_item_id : null,
                     $this->sourceGranularityForScope($channelCampaignId, $channelItemId),
+                    $changeSource,
                 ),
                 'confounded' => $sameDay->confounded || $conflictReasons !== [],
                 'conflict_reason' => $conflictReasons ?: null,
@@ -218,6 +220,7 @@ class AdsExperimentService
                 $newTargetRoas,
                 $internalItemId,
                 $sourceGranularity,
+                $changeSource,
             ),
             'created_by' => $createdBy,
         ]);
@@ -641,6 +644,7 @@ class AdsExperimentService
         float $newTargetRoas,
         ?int $internalItemId,
         string $sourceGranularity,
+        string $changeSource = 'app',
     ): array {
         $hpp = $this->hppResolver->summary($internalItemId);
 
@@ -656,6 +660,7 @@ class AdsExperimentService
             'profit_basis' => AdsExperimentCalculator::PROFIT_BASIS,
             'source_granularity' => $sourceGranularity,
             'mapping_status' => $internalItemId ? 'mapped' : 'missing_mapping',
+            'change_source' => $changeSource,
             'calculation_version' => 'phase2-v1',
         ];
     }
@@ -728,6 +733,8 @@ class AdsExperimentService
             $experiment->channel_item_id,
             (int) $experiment->store_id,
         );
+        $payout = $this->periodPayout($experiment, $from, $to);
+        $netRevenueOverride = $payout['available'] ? $payout['amount'] : null;
 
         $quality = ['partial_day_excluded'];
         if ($usesQtyFallback) {
@@ -747,6 +754,9 @@ class AdsExperimentService
         }
         if ($daysWithData === 0) {
             $quality[] = 'missing_metric';
+        }
+        if (! $payout['available']) {
+            $quality[] = 'estimated_payout';
         }
 
         $baseMetrics = [
@@ -770,6 +780,7 @@ class AdsExperimentService
             $usesQtyFallback,
             $priceEstimated,
             $mappingReady && $hpp > 0,
+            $netRevenueOverride,
         );
         if ($calculatedMetrics['profit_estimated']) {
             $quality[] = 'estimated_profit';
@@ -781,8 +792,104 @@ class AdsExperimentService
             'days_with_data' => $daysWithData,
             'availability' => $daysWithData > 0 ? 'available' : 'pending',
             'source_table' => $table,
-            'metrics' => array_merge($baseMetrics, $calculatedMetrics),
+            'metrics' => array_merge($baseMetrics, $calculatedMetrics, [
+                'net_revenue_source' => $payout['available'] ? 'payout' : 'ratio_estimate',
+                'payout_amount' => $payout['available'] ? round($payout['amount'], 2) : null,
+                'payout_rows' => $payout['rows'],
+                'payout_available' => $payout['available'],
+                'payout_source' => $payout['source'],
+            ]),
             'data_quality' => array_values(array_unique($quality)),
+        ];
+    }
+
+    /**
+     * Resolve dana cair aktual dari settlement untuk item dan periode order
+     * yang sama dengan fakta iklan. Satu settlement berada di level order,
+     * jadi nilainya dibagi proporsional berdasarkan nilai item agar order
+     * multi-produk tidak dihitung penuh pada setiap produk.
+     *
+     * Payout dicocokkan memakai tanggal order, bukan tanggal pencairan,
+     * supaya baseline/observation tetap sejalan dengan tanggal fakta iklan.
+     * Payout import per order (mp_incomes.net_payout_actual) menjadi sumber
+     * utama. Settlement API final_income hanya dipakai bila payout import
+     * belum tersedia untuk order tersebut.
+     *
+     * @return array{amount: float, rows: int, available: bool, source: string}
+     */
+    private function periodPayout(
+        MarketplaceAdExperiment $experiment,
+        CarbonInterface $from,
+        CarbonInterface $to,
+    ): array {
+        if (! $experiment->channel_item_id || $from->gt($to)) {
+            return ['amount' => 0.0, 'rows' => 0, 'available' => false, 'source' => 'unavailable'];
+        }
+
+        $itemValueExpression = "COALESCE(NULLIF(moi.line_net_amount, 0), NULLIF(moi.line_gross_amount, 0), NULLIF(moi.price_after_discount * moi.qty, 0), NULLIF(moi.price * moi.qty, 0), 0)";
+        $orderLink = function ($join): void {
+            $join->on('mo.id', '=', 'moi.order_id')
+                ->orOn('mo.id', '=', 'moi.marketplace_order_id');
+        };
+
+        $matchedItems = DB::table('marketplace_order_items as moi')
+            ->join('marketplace_orders as mo', $orderLink)
+            ->where('mo.store_id', $experiment->store_id)
+            ->where('moi.external_item_id', $experiment->channel_item_id)
+            ->whereRaw('DATE(COALESCE(mo.ordered_at, mo.order_date)) BETWEEN ? AND ?', [
+                $from->toDateString(),
+                $to->toDateString(),
+            ])
+            ->selectRaw("COALESCE(moi.order_id, moi.marketplace_order_id) as order_id, mo.channel_order_id, mo.external_order_id, SUM({$itemValueExpression}) as item_value")
+            ->groupByRaw('COALESCE(moi.order_id, moi.marketplace_order_id), mo.channel_order_id, mo.external_order_id');
+
+        $orderItemTotals = DB::table('marketplace_order_items as moi')
+            ->selectRaw("COALESCE(moi.order_id, moi.marketplace_order_id) as order_id, SUM({$itemValueExpression}) as order_item_value")
+            ->where(function ($query): void {
+                $query->whereNotNull('moi.order_id')
+                    ->orWhereNotNull('moi.marketplace_order_id');
+            })
+            ->groupByRaw('COALESCE(moi.order_id, moi.marketplace_order_id)');
+
+        $payoutImport = DB::table('mp_incomes as mpi')
+            ->joinSub($matchedItems, 'mi', function ($join): void {
+                $join->on('mpi.platform_order_id', '=', 'mi.channel_order_id')
+                    ->orOn('mpi.platform_order_id', '=', 'mi.external_order_id');
+            })
+            ->joinSub($orderItemTotals, 'ot', fn ($join) => $join->on('ot.order_id', '=', 'mi.order_id'))
+            ->where('mpi.store_id', $experiment->store_id)
+            ->whereNotNull('mpi.net_payout_actual')
+            ->whereRaw('ot.order_item_value > 0')
+            ->selectRaw('COALESCE(SUM((mpi.net_payout_actual * mi.item_value) / NULLIF(ot.order_item_value, 0)), 0) as payout_amount')
+            ->selectRaw('COUNT(DISTINCT mpi.id) as payout_rows')
+            ->first();
+
+        $payoutImportRows = (int) ($payoutImport->payout_rows ?? 0);
+        if ($payoutImportRows > 0) {
+            return [
+                'amount' => (float) ($payoutImport->payout_amount ?? 0),
+                'rows' => $payoutImportRows,
+                'available' => true,
+                'source' => 'mp_incomes',
+            ];
+        }
+
+        $payout = DB::table('marketplace_order_settlements as mos')
+            ->joinSub($matchedItems, 'mi', fn ($join) => $join->on('mi.order_id', '=', 'mos.order_id'))
+            ->joinSub($orderItemTotals, 'ot', fn ($join) => $join->on('ot.order_id', '=', 'mos.order_id'))
+            ->whereNotNull('mos.final_income')
+            ->whereRaw('ot.order_item_value > 0')
+            ->selectRaw('COALESCE(SUM((mos.final_income * mi.item_value) / NULLIF(ot.order_item_value, 0)), 0) as payout_amount')
+            ->selectRaw('COUNT(DISTINCT mos.id) as payout_rows')
+            ->first();
+
+        $rows = (int) ($payout->payout_rows ?? 0);
+
+        return [
+            'amount' => (float) ($payout->payout_amount ?? 0),
+            'rows' => $rows,
+            'available' => $rows > 0,
+            'source' => $rows > 0 ? 'marketplace_order_settlements' : 'unavailable',
         ];
     }
 
@@ -919,6 +1026,11 @@ class AdsExperimentService
                 'qty_source' => 'none',
                 'qty_estimated' => true,
                 'net_revenue' => 0.0,
+                'net_revenue_source' => 'unavailable',
+                'payout_amount' => null,
+                'payout_rows' => 0,
+                'payout_available' => false,
+                'payout_source' => 'unavailable',
                 'ad_cost_incl_vat' => 0.0,
                 'total_cogs' => null,
                 'profit' => null,

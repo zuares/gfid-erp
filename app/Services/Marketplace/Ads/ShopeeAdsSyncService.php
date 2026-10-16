@@ -116,36 +116,61 @@ class ShopeeAdsSyncService
                 $common = $setting['common_info'] ?? [];
                 $manual = $setting['manual_bidding_info'] ?? [];
                 $auto = $setting['auto_bidding_info'] ?? [];
+                $hasTargetRoas = array_key_exists('roas_target', $auto) || array_key_exists('target_roas', $auto);
+                $rawTargetRoas = array_key_exists('roas_target', $auto)
+                    ? $auto['roas_target']
+                    : ($auto['target_roas'] ?? null);
+                // Shopee can represent Auto as 0 or null. Store an explicit
+                // Auto value as 0 so a later Seller Center edit can be
+                // detected against it without treating the first sync as a
+                // change event.
+                $targetRoas = $hasTargetRoas
+                    ? (($rawTargetRoas === null || $rawTargetRoas === '') ? 0.0 : (float) $rawTargetRoas)
+                    : null;
+                $previousCampaign = MarketplaceAdCampaign::query()
+                    ->where('store_id', $store->id)
+                    ->where('channel_campaign_id', $channelCampaignId)
+                    ->first();
+                $previousTargetRoas = $previousCampaign?->target_roas !== null
+                    ? (float) $previousCampaign->target_roas
+                    : null;
+                $canDetectTargetRoasChange = $hasTargetRoas
+                    && $previousCampaign?->setting_synced_at !== null
+                    && $previousTargetRoas !== null;
                 
+                $campaignPayload = [
+                    'campaign_name' => $common['ad_name'] ?? $common['campaign_name'] ?? null,
+                    'campaign_type' => $common['campaign_type'] ?? null,
+                    'status' => $common['status'] ?? null,
+                    'ad_type' => $common['ad_type'] ?? null,
+                    'bidding_method' => $common['bidding_method'] ?? null,
+                    'campaign_status' => match($common['campaign_status'] ?? null) {
+                        1 => 'normal',
+                        2 => 'ended',
+                        3 => 'paused',
+                        4 => 'abnormal',
+                        5 => 'deleted',
+                        // API juga bisa return string langsung
+                        'normal', 'ongoing', 'closed', 'paused', 'ended', 'abnormal', 'deleted' => $common['campaign_status'],
+                        default => $common['campaign_status'] ?? null,
+                    },
+                    'campaign_placement' => $common['campaign_placement'] ?? null,
+                    'campaign_budget' => $common['campaign_budget'] ?? $common['budget'] ?? null,
+                    'started_at' => isset($common['campaign_duration']['start_time']) && $common['campaign_duration']['start_time'] > 0 ? Carbon::createFromTimestamp($common['campaign_duration']['start_time']) : (isset($common['start_time']) && $common['start_time'] > 0 ? Carbon::createFromTimestamp($common['start_time']) : null),
+                    'ended_at' => isset($common['campaign_duration']['end_time']) && $common['campaign_duration']['end_time'] > 0 ? Carbon::createFromTimestamp($common['campaign_duration']['end_time']) : (isset($common['end_time']) && $common['end_time'] > 0 ? Carbon::createFromTimestamp($common['end_time']) : null),
+                    'raw_setting_payload' => $setting,
+                    'setting_synced_at' => now(),
+                ];
+                if ($hasTargetRoas) {
+                    $campaignPayload['target_roas'] = $targetRoas;
+                }
+
                 $campaign = MarketplaceAdCampaign::updateOrCreate(
                     [
                         'store_id' => $store->id,
                         'channel_campaign_id' => $channelCampaignId,
                     ],
-                    [
-                        'campaign_name' => $common['ad_name'] ?? $common['campaign_name'] ?? null,
-                        'campaign_type' => $common['campaign_type'] ?? null,
-                        'status' => $common['status'] ?? null,
-                        'ad_type' => $common['ad_type'] ?? null,
-                        'bidding_method' => $common['bidding_method'] ?? null,
-                        'campaign_status' => match($common['campaign_status'] ?? null) {
-                            1 => 'normal',
-                            2 => 'ended',
-                            3 => 'paused',
-                            4 => 'abnormal',
-                            5 => 'deleted',
-                            // API juga bisa return string langsung
-                            'normal', 'ongoing', 'closed', 'paused', 'ended', 'abnormal', 'deleted' => $common['campaign_status'],
-                            default => $common['campaign_status'] ?? null,
-                        },
-                        'campaign_placement' => $common['campaign_placement'] ?? null,
-                        'campaign_budget' => $common['campaign_budget'] ?? $common['budget'] ?? null,
-                        'target_roas' => $auto['roas_target'] ?? $auto['target_roas'] ?? null,
-                        'started_at' => isset($common['campaign_duration']['start_time']) && $common['campaign_duration']['start_time'] > 0 ? Carbon::createFromTimestamp($common['campaign_duration']['start_time']) : (isset($common['start_time']) && $common['start_time'] > 0 ? Carbon::createFromTimestamp($common['start_time']) : null),
-                        'ended_at' => isset($common['campaign_duration']['end_time']) && $common['campaign_duration']['end_time'] > 0 ? Carbon::createFromTimestamp($common['campaign_duration']['end_time']) : (isset($common['end_time']) && $common['end_time'] > 0 ? Carbon::createFromTimestamp($common['end_time']) : null),
-                        'raw_setting_payload' => $setting,
-                        'setting_synced_at' => now(),
-                    ]
+                    $campaignPayload,
                 );
                 
                 $run->total_updated++;
@@ -170,6 +195,28 @@ class ShopeeAdsSyncService
                             ['campaign_id' => $campaign->id, 'channel_item_id' => $item['item_id']],
                             ['status' => $item['status'] ?? null]
                         );
+                    }
+                }
+
+                if ($canDetectTargetRoasChange && abs($previousTargetRoas - $targetRoas) > 0.0001) {
+                    try {
+                        app(AdsExperimentService::class)->recordTargetRoasChange(
+                            store: $store,
+                            channelCampaignId: (string) $channelCampaignId,
+                            channelItemId: $campaign->channel_item_id !== null
+                                ? (string) $campaign->channel_item_id
+                                : null,
+                            oldTargetRoas: $previousTargetRoas,
+                            newTargetRoas: $targetRoas,
+                            changedAt: now(),
+                            changeSource: 'seller_center',
+                        );
+                    } catch (\Throwable $e) {
+                        Log::warning('[ShopeeAdsSync] failed to record Seller Center target ROAS change', [
+                            'store_id' => $store->id,
+                            'campaign_id' => $channelCampaignId,
+                            'error' => $e->getMessage(),
+                        ]);
                     }
                 }
             }

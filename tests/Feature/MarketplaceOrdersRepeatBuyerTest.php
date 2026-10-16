@@ -6,8 +6,10 @@ use App\Http\Middleware\EnsureModuleAccess;
 use App\Models\Channel;
 use App\Models\InventoryStock;
 use App\Models\Item;
+use App\Models\MarketplaceOrderIncomeEstimate;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
+use App\Models\MpIncome;
 use App\Models\Store;
 use App\Models\Warehouse;
 use App\Services\Marketplace\MarketplaceTrackingStatusService;
@@ -115,6 +117,72 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
         $response->assertOk();
         $this->assertSame(0, $row['buyer_previous_order_count']);
         $this->assertFalse($row['is_repeat_buyer']);
+    }
+
+    public function test_payout_order_dialokasikan_ke_item_produk_terkait(): void
+    {
+        $order = $this->createOrder('PAYOUT-ORDER-001', 'COMPLETED', 'buyer-payout');
+        $firstItem = MarketplaceOrderItem::create([
+            'marketplace_order_id' => $order->id,
+            'order_id' => $order->id,
+            'external_item_id' => 'PRODUCT-001',
+            'item_name' => 'Produk A',
+            'qty' => 1,
+            'line_net_amount' => 60000,
+        ]);
+        $secondItem = MarketplaceOrderItem::create([
+            'marketplace_order_id' => $order->id,
+            'order_id' => $order->id,
+            'external_item_id' => 'PRODUCT-002',
+            'item_name' => 'Produk B',
+            'qty' => 1,
+            'line_net_amount' => 40000,
+        ]);
+        MpIncome::create([
+            'store_id' => $this->store->id,
+            'channel' => 'shopee',
+            'platform_order_id' => $order->channel_order_id,
+            'net_payout_actual' => 78000,
+        ]);
+
+        $response = $this->getJson('/api/marketplace/local-orders-paginated?tab=completed&limit=50');
+        $row = collect($response->json('data'))->firstWhere('id', $order->id);
+
+        $response->assertOk();
+        $this->assertSame('payout', $row['income_summary']['source']);
+        $this->assertFalse($row['income_summary']['is_estimated']);
+        $this->assertSame(78000.0, (float) $row['income_summary']['amount']);
+        $this->assertSame(46800.0, (float) collect($row['items'])->firstWhere('id', $firstItem->id)['income_amount']);
+        $this->assertSame(31200.0, (float) collect($row['items'])->firstWhere('id', $secondItem->id)['income_amount']);
+    }
+
+    public function test_income_estimate_dipakai_bila_payout_belum_tersedia(): void
+    {
+        $order = $this->createOrder('ESTIMATE-ORDER-001', 'COMPLETED', 'buyer-estimate');
+        $item = MarketplaceOrderItem::create([
+            'marketplace_order_id' => $order->id,
+            'order_id' => $order->id,
+            'external_item_id' => 'PRODUCT-003',
+            'item_name' => 'Produk C',
+            'qty' => 2,
+            'price_after_discount' => 25000,
+        ]);
+        MarketplaceOrderIncomeEstimate::create([
+            'store_id' => $this->store->id,
+            'marketplace_order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'estimated_escrow_amount' => 42000,
+            'synced_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/marketplace/local-orders-paginated?tab=completed&limit=50');
+        $row = collect($response->json('data'))->firstWhere('id', $order->id);
+
+        $response->assertOk();
+        $this->assertSame('income_estimate', $row['income_summary']['source']);
+        $this->assertTrue($row['income_summary']['is_estimated']);
+        $this->assertSame(42000.0, (float) $row['items'][0]['income_amount']);
+        $this->assertSame($item->id, $row['items'][0]['id']);
     }
 
     public function test_order_eligible_tanpa_escrow_lama_ditandai_tertunda(): void

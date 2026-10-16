@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Item;
+use App\Models\MpIncome;
 use App\Models\MarketplaceOrder;
 use App\Models\Store;
 use Illuminate\Http\JsonResponse;
@@ -232,9 +233,10 @@ trait MarketplaceOrdersPaginatedTrait
         $paginator = $query->latest('ordered_at')->paginate($limit);
         $buyerPurchaseCounts = $this->buyerPurchaseCounts($paginator->getCollection());
         $baseStockReferences = $this->baseStockReferences($paginator->getCollection());
+        $incomeLookup = $this->mpIncomeLookup($paginator->getCollection());
 
         // Map items exactly like in localOrders
-        $paginator->getCollection()->transform(function ($o) use ($hasScanLog, $buyerPurchaseCounts, $baseStockReferences) {
+        $paginator->getCollection()->transform(function ($o) use ($hasScanLog, $buyerPurchaseCounts, $baseStockReferences, $incomeLookup) {
             $arr = $o->toArray();
 
             $buyerKey = $this->buyerIdentityKey($o);
@@ -248,6 +250,10 @@ trait MarketplaceOrdersPaginatedTrait
             $arr['tracking_description'] = $o->tracking_description;
             $arr['tracking_checked_at'] = $o->tracking_checked_at?->toIso8601String();
             $arr['payment_breakdown'] = $this->paymentBreakdownForIndex($o);
+            $incomeSummary = $this->orderIncomeSummary($o, $incomeLookup);
+            $totalItemValue = $incomeSummary['total_item_value'];
+            unset($incomeSummary['total_item_value']);
+            $arr['income_summary'] = $incomeSummary;
 
             if (isset($arr['items']) && is_array($arr['items'])) {
                 foreach ($arr['items'] as &$orderItem) {
@@ -270,6 +276,14 @@ trait MarketplaceOrdersPaginatedTrait
 
                         unset($orderItem['internal_item']['stock_on_hand'], $orderItem['internal_item']['stock_allocated']);
                     }
+
+                    $itemModel = $o->items->firstWhere('id', $orderItem['id'] ?? null);
+                    $itemValue = $itemModel ? $this->orderItemIncomeValue($itemModel) : 0.0;
+                    $orderItem['income_amount'] = $incomeSummary['available'] && $totalItemValue > 0
+                        ? round($incomeSummary['amount'] * $itemValue / $totalItemValue, 2)
+                        : null;
+                    $orderItem['income_source'] = $incomeSummary['source'];
+                    $orderItem['income_is_estimated'] = $incomeSummary['is_estimated'];
                 }
                 unset($orderItem);
             }
@@ -352,6 +366,118 @@ trait MarketplaceOrdersPaginatedTrait
         });
 
         return response()->json($paginator);
+    }
+
+    /**
+     * Ambil payout aktual satu kali untuk seluruh order di halaman ini.
+     * Pencocokan memakai nomor order platform dan store agar tidak N+1 serta
+     * tidak tertukar bila nomor order dari channel berbeda kebetulan sama.
+     *
+     * @param \Illuminate\Support\Collection<int,MarketplaceOrder> $orders
+     * @return array<string,float>
+     */
+    private function mpIncomeLookup($orders): array
+    {
+        $keys = $orders
+            ->flatMap(function (MarketplaceOrder $order): array {
+                return collect([$order->channel_order_id, $order->external_order_id])
+                    ->filter(fn ($value) => trim((string) $value) !== '')
+                    ->map(fn ($value) => [
+                        'store_id' => (int) $order->store_id,
+                        'value' => trim((string) $value),
+                    ])
+                    ->all();
+            })
+            ->unique(fn (array $row): string => $row['store_id'].'|'.$row['value'])
+            ->values();
+
+        if ($keys->isEmpty()) {
+            return [];
+        }
+
+        $byStore = $keys->groupBy('store_id');
+        $lookup = [];
+
+        foreach ($byStore as $storeId => $rows) {
+            $values = $rows->pluck('value')->unique()->values()->all();
+            MpIncome::query()
+                ->where('store_id', (int) $storeId)
+                ->whereIn('platform_order_id', $values)
+                ->whereNotNull('net_payout_actual')
+                ->get(['store_id', 'platform_order_id', 'net_payout_actual'])
+                ->each(function (MpIncome $income) use (&$lookup): void {
+                    $lookup[(int) $income->store_id.'|'.trim((string) $income->platform_order_id)] = (float) $income->net_payout_actual;
+                });
+        }
+
+        return $lookup;
+    }
+
+    /**
+     * Prioritas penghasilan order: payout aktual, settlement final income,
+     * lalu income estimate. Nilai total ini kemudian dialokasikan ke item
+     * berdasarkan nilai item agar /marketplace/orders bisa menampilkan
+     * penghasilan untuk produk yang terkait.
+     *
+     * @param array<string,float> $incomeLookup
+     * @return array{amount:?float,is_estimated:bool,source:string,available:bool,total_item_value:float}
+     */
+    private function orderIncomeSummary(MarketplaceOrder $order, array $incomeLookup): array
+    {
+        $amount = null;
+        $source = 'unavailable';
+        $isEstimated = false;
+        $orderIds = collect([$order->channel_order_id, $order->external_order_id])
+            ->filter(fn ($value) => trim((string) $value) !== '')
+            ->map(fn ($value) => trim((string) $value));
+
+        foreach ($orderIds as $orderId) {
+            $key = (int) $order->store_id.'|'.$orderId;
+            if (array_key_exists($key, $incomeLookup)) {
+                $amount = (float) $incomeLookup[$key];
+                $source = 'payout';
+                break;
+            }
+        }
+
+        if ($amount === null && $order->settlement?->final_income !== null) {
+            $amount = (float) $order->settlement->final_income;
+            $source = 'settlement';
+        }
+
+        if ($amount === null && $order->incomeEstimate?->estimated_escrow_amount !== null) {
+            $amount = (float) $order->incomeEstimate->estimated_escrow_amount;
+            $source = 'income_estimate';
+            $isEstimated = true;
+        }
+
+        return [
+            'amount' => $amount,
+            'is_estimated' => $isEstimated,
+            'source' => $source,
+            'available' => $amount !== null,
+            'total_item_value' => $order->items->sum(fn ($item): float => $this->orderItemIncomeValue($item)),
+        ];
+    }
+
+    private function orderItemIncomeValue($item): float
+    {
+        $qty = max(1, (float) ($item->qty ?: 1));
+        foreach (['line_net_amount', 'line_gross_amount'] as $field) {
+            $value = (float) ($item->{$field} ?? 0);
+            if ($value > 0) {
+                return $value;
+            }
+        }
+
+        foreach (['price_after_discount', 'price', 'price_original'] as $field) {
+            $unitPrice = (float) ($item->{$field} ?? 0);
+            if ($unitPrice > 0) {
+                return $unitPrice * $qty;
+            }
+        }
+
+        return $qty;
     }
 
     /**

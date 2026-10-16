@@ -7619,6 +7619,7 @@ document.addEventListener('DOMContentLoaded', function () {
         estimated_qty: 'jumlah terjual masih perkiraan',
         estimated_price: 'harga masih perkiraan',
         estimated_profit: 'keuntungan masih perkiraan',
+        estimated_payout: 'payout belum tersedia, jadi penghasilan masih estimasi',
         missing_mapping: 'produk belum terhubung ke HPP',
         missing_hpp: 'HPP belum tersedia',
         missing_price: 'harga belum tersedia',
@@ -7678,6 +7679,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (['revenue', 'spend', 'net_revenue', 'ad_cost_incl_vat', 'total_cogs', 'profit'].indexOf(key) >= 0) return money(value);
         if (key === 'break_even_qty') return number(value, 2);
         return number(value, key === 'qty' ? 1 : 0);
+    }
+
+    function netRevenueLabel(metrics) {
+        return (metrics || {}).net_revenue_source === 'payout'
+            ? 'Penghasilan dari payout'
+            : 'Penghasilan estimasi';
     }
 
     function profitBasisLabel(value) {
@@ -7823,7 +7830,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return '<div style="font-size:.7rem; line-height:1.65; color:var(--dsh-muted);">' +
             '<b style="color:var(--text);">Efisiensi ' + esc(metricValue('roas', metrics.roas)) + '</b> · ' +
             'Pesanan ' + esc(metricValue('orders', metrics.orders)) + ' · ' +
-            'Penghasilan ' + esc(metricValue('net_revenue', metrics.net_revenue)) + ' · ' +
+            netRevenueLabel(metrics) + ' ' + esc(metricValue('net_revenue', metrics.net_revenue)) + ' · ' +
             'HPP ' + esc(metricValue('total_cogs', metrics.total_cogs)) + ' · ' +
             'Biaya ' + esc(metricValue('spend', metrics.spend)) +
             '</div>';
@@ -7959,24 +7966,32 @@ document.addEventListener('DOMContentLoaded', function () {
             ['Jumlah terjual', 'qty'],
             ['Rasio pesanan', 'cvr'],
             ['Penjualan', 'revenue'],
-            ['Penghasilan bersih (est.)', 'net_revenue'],
-            ['HPP / pcs', 'hpp'],
-            ['Total HPP (COGS)', 'total_cogs'],
+            [netRevenueLabel(metrics), 'net_revenue'],
+            ['HPP total', 'total_cogs'],
             ['Biaya iklan', 'spend'],
             ['Efisiensi iklan', 'roas'],
             ['Keuntungan', 'profit'],
+        ];
+        const extraRows = [
+            ['HPP / pcs', 'hpp'],
             ['Titik impas jumlah', 'break_even_qty'],
             ['Rasio pesanan impas', 'cvr_bep'],
             ['Efisiensi impas', 'break_even_roas'],
         ];
-        target.innerHTML = '<div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:.45rem;">' +
-            rows.map(function (item) {
+        const renderRows = function (items) {
+            return items.map(function (item) {
                 const value = hasData ? metricValue(item[1], metrics[item[1]]) : '—';
                 return '<div style="padding:.55rem .6rem; border:1px solid var(--dsh-border); border-radius:9px;">' +
                     '<div style="font-size:.62rem; color:var(--dsh-muted);">' + item[0] + '</div>' +
                     '<div style="font-size:.78rem; font-weight:850; color:' + (hasData ? 'var(--text)' : '#b45309') + '; margin-top:.1rem;">' + esc(value) + '</div>' +
                 '</div>';
-            }).join('') + '</div>' +
+            }).join('');
+        };
+        target.innerHTML = '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:.45rem;">' + renderRows(rows) + '</div>' +
+            '<details style="margin-top:.55rem;">' +
+                '<summary style="cursor:pointer; color:var(--dsh-muted); font-size:.66rem; font-weight:800;">Lihat HPP per pcs dan titik impas</summary>' +
+                '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:.45rem; margin-top:.45rem;">' + renderRows(extraRows) + '</div>' +
+            '</details>' +
             '<div style="font-size:.65rem; color:' + (hasData ? 'var(--dsh-muted)' : '#b45309') + '; margin-top:.55rem;">' +
                 (hasData
                     ? 'Data tersedia selama ' + number((period || {}).days_with_data || 0) + ' hari'
@@ -8011,10 +8026,9 @@ document.addEventListener('DOMContentLoaded', function () {
             ['Klik', 'clicks'],
             ['Rasio klik', 'ctr'],
             ['Pesanan', 'orders'],
-            ['Jumlah terjual', 'qty'],
-            ['Penjualan', 'revenue'],
-            ['Penghasilan bersih (est.)', 'net_revenue'],
-            ['Total HPP', 'total_cogs'],
+            ['Rasio pesanan', 'cvr'],
+            [netRevenueLabel(currentMetrics), 'net_revenue'],
+            ['HPP total', 'total_cogs'],
             ['Biaya iklan', 'spend'],
             ['Efisiensi iklan', 'roas'],
             ['Keuntungan', 'profit'],
@@ -8099,13 +8113,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (impactSummary) {
             impactSummary.innerHTML = '<b>Kesimpulan sementara:</b> ' +
                 (sufficiency.metric_ready ? 'data sudah cukup untuk dibaca.' : 'data belum cukup untuk memastikan hasil.') +
-                (sufficiency.profit_ready ? ' Keuntungan sudah aktual.' : ' Keuntungan masih berupa perkiraan.') +
-                (reasons.length ? '<div style="margin-top:.25rem;color:var(--dsh-muted);">' + esc(reasonText) + '</div>' : '');
+                (sufficiency.profit_ready ? ' Keuntungan sudah aktual.' : ' Keuntungan masih berupa perkiraan.');
         }
-        sufficiencyNote.innerHTML = '<b style="color:var(--text);">Kesiapan hasil:</b> ' +
-            (sufficiency.metric_ready ? 'data cukup untuk dinilai' : 'data belum cukup untuk menentukan hasil') +
-            ' · ' + (sufficiency.profit_ready ? 'keuntungan sudah aktual' : 'keuntungan masih perkiraan') +
-            (reasonText ? '<br><span style="color:var(--dsh-muted);">Catatan: ' + esc(reasonText) + '</span>' : '');
+        sufficiencyNote.innerHTML = reasonText
+            ? '<b style="color:var(--text);">Perlu diperhatikan:</b> ' + esc(reasonText)
+            : '';
+        sufficiencyNote.style.display = reasonText ? 'block' : 'none';
 
         const conflicts = data.conflicts || [];
         if (conflicts.length) {
@@ -8280,8 +8293,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 detailMeta.innerHTML =
                     '<div class="col-12"><div style="display:flex;align-items:center;gap:.7rem;padding:.7rem .8rem;border:1px solid var(--dsh-border);border-radius:12px;background:rgba(148,163,184,.05);">' + productMedia + '<div style="min-width:0;"><div style="font-weight:850;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(productName) + '</div><div style="font-size:.68rem;color:var(--dsh-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(campaignLabel(experiment, product)) + '</div></div></div></div>' +
                     '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Hasil</div><div style="margin-top:.25rem;">' + statusBadge(data.lifecycle_status || experiment.lifecycle_status) + '</div></div>' +
-                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Dasar keuntungan</div><div style="font-size:.72rem; font-weight:800; margin-top:.25rem;">' + esc(profitBasisLabel(data.profit_basis)) + '</div></div>' +
-                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Yang diubah</div><div style="font-size:.72rem; font-weight:800; margin-top:.25rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(scopeLabel(experiment, product)) + '">' + esc(scopeLabel(experiment, product)) + '</div></div>' +
+                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Perubahan</div><div style="font-size:.72rem; font-weight:800; margin-top:.25rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(changeLabel(experiment)) + '">' + esc(changeLabel(experiment)) + '</div></div>' +
                     '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Kesimpulan</div><div style="font-size:.78rem; font-weight:800; margin-top:.25rem;">' + esc((verdictMap[data.verdict] || [data.verdict || 'Belum bisa dinilai'])[0]) + '</div></div>' +
                     '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Setting ROAS</div><div style="font-size:.78rem; font-weight:800; margin-top:.25rem;">' + esc(targetRoasLabel(experiment, product).replace('Target ROAS: ', '')) + '</div></div>';
                 renderMetricGrid(baselineMetrics, data.baseline);
@@ -8314,18 +8326,17 @@ document.addEventListener('DOMContentLoaded', function () {
                     : 'masih perkiraan';
                 const plan = data.calculation_snapshot || {};
                 const planHtml = plan.workflow === 'manual_optimization'
-                    ? '<div style="padding:.7rem .8rem; margin-bottom:.6rem; border-radius:10px; background:rgba(37,99,235,.06); border:1px solid rgba(37,99,235,.18); color:var(--dsh-muted);">' +
-                        '<b style="color:var(--text);">Tujuan:</b> ' + esc(plan.objective || '-') + '<br>' +
-                        '<b style="color:var(--text);">Yang diukur:</b> ' + esc((plan.primary_kpi || '-').toUpperCase()) +
-                        (plan.notes ? '<br><b style="color:var(--text);">Catatan:</b> ' + esc(plan.notes) : '') +
+                    ? '<div style="padding:.6rem .75rem; margin-bottom:.5rem; border-radius:10px; background:rgba(37,99,235,.06); border:1px solid rgba(37,99,235,.18); color:var(--dsh-muted); font-size:.7rem;">' +
+                        '<b style="color:var(--text);">Tujuan:</b> ' + esc(plan.objective || '-') + ' · ' +
+                        '<b style="color:var(--text);">KPI:</b> ' + esc((plan.primary_kpi || '-').toUpperCase()) +
                         '</div>'
                     : '';
                 qualityNote.innerHTML =
                     planHtml +
-                    '<div style="padding:.7rem .8rem; border-radius:10px; background:rgba(148,163,184,.08); border:1px solid var(--dsh-border); color:var(--dsh-muted);">' +
-                    '<b style="color:var(--text);">Catatan data:</b> ' + esc(flagText) + '<br>' +
-                    '<b style="color:var(--text);">Produk:</b> ' + esc(mappingLabel(quality.mapping_status)) + ' · ' +
-                    '<b style="color:var(--text);">Keuntungan:</b> ' + esc(profitNote) +
+                    '<div style="padding:.6rem .75rem; border-radius:10px; background:rgba(148,163,184,.08); border:1px solid var(--dsh-border); color:var(--dsh-muted); font-size:.7rem;">' +
+                    '<b style="color:var(--text);">Data:</b> ' + esc(flagText) + ' · ' +
+                    esc(mappingLabel(quality.mapping_status)) + ' · ' +
+                    'Profit ' + esc(profitNote) +
                     observationNote +
                     '</div>';
             })

@@ -73,12 +73,58 @@ class AdsExperimentPhase2Test extends TestCase
         $this->assertSame('reported', $metrics['qty_source']);
         $this->assertSame(1400.0, (float) $metrics['spend']);
         $this->assertSame(4200.0, (float) $metrics['revenue']);
+        $this->assertSame('ratio_estimate', $metrics['net_revenue_source']);
         $this->assertSame(676.2, (float) $metrics['profit']);
         $this->assertEqualsWithDelta(24.3879, (float) $metrics['break_even_qty'], 0.001);
         $this->assertEqualsWithDelta(0.03484, (float) $metrics['cvr_bep'], 0.0001);
         $this->assertEqualsWithDelta(2.0904, (float) $metrics['break_even_roas'], 0.001);
         $this->assertTrue($metrics['actual_profit_ready']);
         $this->assertFalse($metrics['profit_estimated']);
+    }
+
+    public function test_period_net_revenue_uses_item_payout_when_settlement_exists(): void
+    {
+        $store = $this->store('PHASE2-PAYOUT');
+        $item = Item::create([
+            'code' => 'PHASE2-ITEM-PAYOUT',
+            'name' => 'Phase 2 Payout Item',
+            'type' => 'finished',
+            'hpp' => 30,
+            'active' => true,
+        ]);
+        $experiment = $this->experiment($store, $item, [
+            'channel_campaign_id' => 'C-PHASE2-PAYOUT',
+            'channel_item_id' => 'ITEM-PHASE2-PAYOUT',
+            'old_price' => 100,
+            'new_price' => 120,
+        ]);
+        $effective = Carbon::parse($experiment->effective_date);
+
+        $baselineDate = $effective->copy()->subDay();
+        $observationDate = $effective->copy()->addDay();
+        foreach ([$baselineDate, $observationDate] as $date) {
+            $this->campaignFact($store, 'C-PHASE2-PAYOUT', $date, [
+                'clicks' => 40,
+                'impressions' => 400,
+                'expense' => 100,
+                'broad_order' => 1,
+                'broad_order_amount' => 1,
+                'broad_gmv' => 100000,
+            ]);
+        }
+
+        $this->payoutOrder($store, 'ITEM-PHASE2-PAYOUT', $baselineDate, 65000, 'PAYOUT-BASELINE');
+        $this->payoutOrder($store, 'ITEM-PHASE2-PAYOUT', $observationDate, 70000, 'PAYOUT-OBSERVATION');
+
+        $details = app(\App\Services\Marketplace\Ads\AdsExperimentService::class)->details($experiment);
+
+        $this->assertSame(65000.0, (float) $details['baseline']['metrics']['net_revenue']);
+        $this->assertSame('payout', $details['baseline']['metrics']['net_revenue_source']);
+        $this->assertSame('mp_incomes', $details['baseline']['metrics']['payout_source']);
+        $this->assertSame(70000.0, (float) $details['observation']['metrics']['net_revenue']);
+        $this->assertSame('payout', $details['observation']['metrics']['net_revenue_source']);
+        $this->assertSame('mp_incomes', $details['observation']['metrics']['payout_source']);
+        $this->assertSame(1, $details['observation']['metrics']['payout_rows']);
     }
 
     public function test_details_include_same_date_last_month_comparison_and_historical_target_roas(): void
@@ -671,6 +717,50 @@ class AdsExperimentPhase2Test extends TestCase
             'direct_order' => 2,
             'direct_gmv' => $gmv,
             'raw_json' => ['broad_order_amount' => $qty],
+        ]);
+    }
+
+    private function payoutOrder(Store $store, string $itemId, Carbon $date, float $finalIncome, string $orderId): void
+    {
+        $order = \App\Models\MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => $orderId,
+            'channel_order_id' => $orderId,
+            'order_date' => $date->copy()->setTime(10, 0),
+            'ordered_at' => $date->copy()->setTime(10, 0),
+            'order_status' => 'COMPLETED',
+            'total_amount' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+
+        \App\Models\MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'line_no' => 1,
+            'external_item_id' => $itemId,
+            'qty' => 1,
+            'price' => 100000,
+            'price_after_discount' => 100000,
+            'line_gross_amount' => 100000,
+            'line_net_amount' => 100000,
+        ]);
+
+        \App\Models\MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $orderId,
+            'buyer_payment_amount' => 100000,
+            'final_income' => $finalIncome,
+            'settlement_time' => $date->copy()->addDays(3)->setTime(12, 0),
+        ]);
+
+        \App\Models\MpIncome::create([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'platform_order_id' => $orderId,
+            'released_at' => $date->copy()->addDays(3)->setTime(12, 0),
+            'released_date' => $date->copy()->addDays(3)->toDateString(),
+            'net_payout_actual' => $finalIncome,
         ]);
     }
 }
