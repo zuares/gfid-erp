@@ -18,6 +18,7 @@
 .wa-broadcast-card-subtitle{color:#64748b;font-size:.76rem;margin:.2rem 0 0}
 .wa-step{width:28px;height:28px;display:grid;place-items:center;border-radius:9px;background:#dcfce7;color:#166534;font-size:.78rem;font-weight:950;flex:0 0 auto}
 .wa-broadcast-card-body{padding:1rem 1.1rem}
+.wa-manual-test{border:1px solid #bbf7d0;border-radius:13px;background:#f0fdf4;padding:.8rem;margin-bottom:1rem}.wa-manual-test-head{display:flex;align-items:flex-start;gap:.55rem;margin-bottom:.65rem}.wa-manual-test-icon{width:28px;height:28px;display:grid;place-items:center;border-radius:9px;background:#25d366;color:#fff;font-size:.78rem;flex:0 0 auto}.wa-manual-test-title{font-size:.78rem;font-weight:950;color:#166534}.wa-manual-test-subtitle{font-size:.69rem;color:#4d7c5a;margin-top:.1rem}.wa-manual-test .form-control{border-color:#bbf7d0;background:#fff}.wa-manual-test .form-control:focus{border-color:#22c55e;box-shadow:0 0 0 .2rem rgba(34,197,94,.12)}
 .wa-audience-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:.85rem}
 .wa-audience-tab{position:relative;display:block;padding:.65rem .7rem;border:1px solid #e2e8f0;border-radius:12px;color:#475569;text-decoration:none;background:#fff;transition:.15s ease}
 .wa-audience-tab:hover{border-color:#86efac;background:#f0fdf4;color:#166534}
@@ -70,6 +71,10 @@
             <section class="wa-broadcast-card">
                 <div class="wa-broadcast-card-head"><div><h2 class="wa-broadcast-card-title">Pilih penerima</h2><p class="wa-broadcast-card-subtitle">Hanya customer dengan nomor WhatsApp yang ditampilkan.</p></div><div class="wa-step">1</div></div>
                 <div class="wa-broadcast-card-body">
+                    <div class="wa-manual-test">
+                        <div class="wa-manual-test-head"><span class="wa-manual-test-icon"><i class="bi bi-phone"></i></span><div><div class="wa-manual-test-title">Testing cepat dengan nomor manual</div><div class="wa-manual-test-subtitle">Isi nomor di bawah untuk uji coba. Jika diisi, daftar customer akan diabaikan.</div></div></div>
+                        <div class="row g-2"><div class="col-md-7"><label class="wa-label" for="manual_phone">Nomor WhatsApp</label><input class="form-control" type="text" id="manual_phone" name="manual_phone" value="{{ old('manual_phone') }}" placeholder="08xxxxxxxxxx / 628xxxxxxxxxx"></div><div class="col-md-5"><label class="wa-label" for="manual_name">Nama penerima <span class="fw-normal text-secondary">(opsional)</span></label><input class="form-control" type="text" id="manual_name" name="manual_name" value="{{ old('manual_name') }}" placeholder="Test Recipient"></div></div>
+                    </div>
                     <div class="wa-audience-tabs">
                         <a class="wa-audience-tab {{ $audience === 'all' ? 'active' : '' }}" href="{{ route('whatsapp.broadcast', ['audience' => 'all', 'q' => $search]) }}"><strong>Semua customer</strong><span>Database customer</span></a>
                         <a class="wa-audience-tab {{ $audience === 'recent_90' ? 'active' : '' }}" href="{{ route('whatsapp.broadcast', ['audience' => 'recent_90', 'q' => $search]) }}"><strong>Aktif 90 hari</strong><span>Order terbaru</span></a>
@@ -137,6 +142,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const selectedCount = document.getElementById('selectedCount');
     const list = document.getElementById('recipientList');
     const selectVisible = document.getElementById('selectVisible');
+    const manualPhone = document.getElementById('manual_phone');
     const recipientSearch = document.getElementById('recipientSearch');
     const searchRecipients = document.getElementById('searchRecipients');
     const maxRecipients = 100;
@@ -149,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     function updateSelected() {
         const checked = list ? list.querySelectorAll('input[name="customer_ids[]"]:checked') : [];
-        if (selectedCount) selectedCount.textContent = checked.length;
+        if (selectedCount) selectedCount.textContent = manualPhone?.value.trim() ? '1 manual' : checked.length;
         if (selectVisible) selectVisible.textContent = checked.length === (list?.querySelectorAll('input[name="customer_ids[]"]').length || 0) ? 'Batalkan pilihan halaman' : 'Pilih semua di halaman';
     }
     document.querySelectorAll('input[name="customer_ids[]"]').forEach(function (input) {
@@ -175,12 +181,14 @@ document.addEventListener('DOMContentLoaded', function () {
     searchRecipients?.addEventListener('click', applySearch);
     recipientSearch?.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); applySearch(); } });
     message?.addEventListener('input', updateMessage);
+    manualPhone?.addEventListener('input', updateSelected);
     updateMessage(); updateSelected();
 });
 function confirmBroadcast() {
     const count = document.querySelectorAll('input[name="customer_ids[]"]:checked').length;
-    if (!count) { alert('Pilih minimal satu penerima terlebih dahulu.'); return false; }
-    return confirm('Kirim broadcast WhatsApp ke ' + count + ' penerima?');
+    const manualPhone = document.getElementById('manual_phone')?.value.trim();
+    if (!count && !manualPhone) { alert('Pilih minimal satu penerima atau isi nomor manual untuk testing.'); return false; }
+    return confirm(manualPhone ? 'Kirim test WhatsApp ke nomor manual ini?' : 'Kirim broadcast WhatsApp ke ' + count + ' penerima?');
 }
 </script>
 @endsection

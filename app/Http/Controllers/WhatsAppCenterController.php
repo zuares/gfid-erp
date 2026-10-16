@@ -73,8 +73,10 @@ class WhatsAppCenterController extends Controller
     public function sendBroadcast(Request $request, WhatsAppMessageService $whatsapp): RedirectResponse
     {
         $data = $request->validate([
-            'customer_ids' => ['required', 'array', 'min:1', 'max:100'],
+            'customer_ids' => ['nullable', 'array', 'max:100', 'required_without:manual_phone'],
             'customer_ids.*' => ['integer', 'distinct', 'exists:customers,id'],
+            'manual_phone' => ['nullable', 'string', 'max:30', 'required_without:customer_ids'],
+            'manual_name' => ['nullable', 'string', 'max:160'],
             'message' => ['required', 'string', 'max:4000'],
             'template_key' => ['nullable', 'string', 'exists:whatsapp_templates,key'],
         ]);
@@ -92,6 +94,33 @@ class WhatsAppCenterController extends Controller
 
         if ($data['template_key'] && ! $template) {
             return back()->withInput()->with('error', 'Template WhatsApp tidak aktif atau tidak ditemukan.');
+        }
+
+        if (filled($data['manual_phone'] ?? null)) {
+            $recipientName = trim((string) ($data['manual_name'] ?? '')) ?: 'Test Recipient';
+            $message = str_replace('{customer_name}', $recipientName, $data['message']);
+            $message = mb_substr($message, 0, 4000);
+
+            $log = $whatsapp->sendText(
+                $data['manual_phone'],
+                $message,
+                [
+                    'module' => 'whatsapp_broadcast',
+                    'reference_type' => self::class,
+                    'reference_label' => 'Test broadcast manual',
+                ],
+                $recipientName,
+                $template?->key,
+            );
+
+            return redirect()
+                ->route('whatsapp.broadcast')
+                ->with(
+                    $log->isSent() ? 'success' : 'error',
+                    $log->isSent()
+                        ? 'Test broadcast berhasil dikirim ke nomor manual.'
+                        : 'Test broadcast gagal dikirim ke nomor manual. Periksa koneksi WhatsApp.',
+                );
         }
 
         $customers = Customer::query()
