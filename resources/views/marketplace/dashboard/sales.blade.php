@@ -266,8 +266,7 @@
         box-shadow: inset 0 1px 0 rgba(255,255,255,.42);
     }
     .sales-dashboard .sales-filter-field { min-width: 0; }
-    .sales-dashboard .sales-filter-platform { width: 145px; }
-    .sales-dashboard .sales-filter-purchase-channel { width: 165px; }
+    .sales-dashboard .sales-filter-platform { width: 180px; }
     .sales-dashboard .sales-filter-store { width: 235px; }
     .sales-dashboard .sales-filter-label {
         display: flex;
@@ -1051,6 +1050,8 @@
     .sales-dashboard .sales-clickable-row { cursor: pointer; }
     .sales-dashboard .sales-empty { color: var(--sales-muted); padding: 2.5rem 1rem; }
     .sales-dashboard .sales-badge { background: var(--sales-accent-soft); border: 1px solid color-mix(in srgb, var(--sales-accent) 12%, var(--sales-line) 88%); color: var(--sales-accent); font-size: .7rem; font-weight: 700; }
+    .sales-dashboard .sales-profit-incomplete { display: inline-flex; align-items: center; gap: .25rem; margin-top: .3rem; color: #a16207; font-size: .66rem; font-weight: 700; }
+    body[data-theme="dark"] .sales-dashboard .sales-profit-incomplete { color: #fbbf24; }
 
     body[data-theme="dark"] .sales-dashboard .sales-filter-card,
     body[data-theme="dark"] .sales-dashboard .sales-table th { background: var(--card-soft, #132a45); }
@@ -1114,11 +1115,10 @@
         .sales-dashboard .sales-kpi-value { font-size: 1.2rem; }
         .sales-dashboard .sales-event-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-right: .8rem; padding-left: .8rem; }
         .sales-dashboard .sales-period-filter { order: 1; width: 100%; margin-left: 0; }
-        .sales-dashboard .sales-filter-scope { order: 2; width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; }
+        .sales-dashboard .sales-filter-scope { order: 2; width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; }
         .sales-dashboard .sales-filter-comparison { order: 3; width: 100%; }
         .sales-dashboard .sales-filter-comparison .sales-nav-comparison { width: 100%; justify-content: flex-start; }
         .sales-dashboard .sales-filter-platform,
-        .sales-dashboard .sales-filter-purchase-channel,
         .sales-dashboard .sales-filter-store { width: auto; }
         .sales-dashboard .sales-nav-shell { align-items: stretch; flex-direction: column; }
         .sales-dashboard .sales-nav-comparison-label { padding-left: .35rem; }
@@ -1237,8 +1237,22 @@
     $visibleStores = $filters['platform']
         ? $stores->filter(fn ($store) => in_array(strtoupper((string) ($store->channel->code ?? '')), $platformCodes, true))
         : $stores;
+    $selectedPlatformFilter = match ($purchaseChannel) {
+        'tiktok' => 'purchase:tiktok',
+        'tokopedia' => 'purchase:tokopedia',
+        default => !empty($filters['platform']) ? 'platform:'.$filters['platform'] : '',
+    };
+    $hasTikTokPlatform = $platforms->contains(fn ($platform) => ($platform['code'] ?? null) === 'TIKTOK');
     $canImportMarketplace = auth()->check() && auth()->user()->canAccessModule('imports');
     $importOrderQuery = $filters['store_id'] ? ['store_id' => $filters['store_id']] : [];
+    $exportQuery = array_filter([
+        'date_from' => $filters['date_from'] ?? null,
+        'date_to' => $filters['date_to'] ?? null,
+        'store_id' => $filters['store_id'] ?? null,
+        'platform' => $filters['platform'] ?? null,
+        'purchase_channel' => $purchaseChannel,
+    ], fn ($value) => $value !== null && $value !== '');
+    $exportUrl = route('marketplace.dashboard.sales.export', $exportQuery);
     $paymentDetailQuery = ['tab' => 'payments'];
     if ($filters['platform']) $paymentDetailQuery['platform'] = $filters['platform'];
     if ($purchaseChannel) $paymentDetailQuery['purchase_channel'] = $purchaseChannel;
@@ -2431,6 +2445,9 @@
             <h1 class="h3 sales-title mb-1">Dashboard Penjualan</h1>
         </div>
         <div class="d-flex flex-wrap align-items-center gap-2">
+            <a class="btn btn-outline-primary btn-sm" href="{{ $exportUrl }}" title="Unduh semua tab dalam format CSV dan JSONL">
+                <i class="bi bi-download me-1"></i>Export data
+            </a>
             @if ($canImportMarketplace)
                 <a class="btn btn-primary btn-sm" href="{{ route('imports.marketplace.create', $importOrderQuery) }}">
                     <i class="bi bi-upload me-1"></i>Import Pesanan
@@ -2448,26 +2465,25 @@
                 @endif
                 <input type="hidden" name="tab" id="sales-active-tab" value="{{ $activeTab }}">
                 <input type="hidden" name="comparison_mode" id="sales-comparison-mode" value="{{ $comparisonMode }}">
+                <input type="hidden" name="platform" id="sales-platform" value="{{ $filters['platform'] }}">
+                <input type="hidden" name="purchase_channel" id="sales-purchase-channel" value="{{ $purchaseChannel }}">
                 <div class="col-12 col-md-auto sales-filter-scope" role="group" aria-label="Filter analitik">
                     @if ($platforms->isNotEmpty())
                         <div class="sales-filter-field sales-filter-platform">
-                            <label class="sales-filter-label" for="sales-platform"><i class="bi bi-layers" aria-hidden="true"></i>Platform</label>
-                            <select id="sales-platform" class="form-select form-select-sm" name="platform">
+                            <label class="sales-filter-label" for="sales-platform-filter"><i class="bi bi-layers" aria-hidden="true"></i>Platform</label>
+                            <select id="sales-platform-filter" class="form-select form-select-sm" aria-label="Pilih platform">
                                 <option value="">Semua platform</option>
                                 @foreach ($platforms as $platform)
-                                    <option value="{{ $platform['code'] }}" @selected($filters['platform'] === $platform['code'])>{{ $platform['label'] }}</option>
+                                    @continue(in_array($platform['code'], ['TIKTOK', 'OFFL', 'OFFLINE'], true))
+                                    <option value="platform:{{ $platform['code'] }}" @selected($selectedPlatformFilter === 'platform:'.$platform['code'])>{{ $platform['label'] }}</option>
                                 @endforeach
+                                @if ($hasTikTokPlatform)
+                                    <option value="purchase:tiktok" @selected($selectedPlatformFilter === 'purchase:tiktok')>TikTok Shop</option>
+                                    <option value="purchase:tokopedia" @selected($selectedPlatformFilter === 'purchase:tokopedia')>Tokopedia</option>
+                                @endif
                             </select>
                         </div>
                     @endif
-                    <div class="sales-filter-field sales-filter-purchase-channel">
-                        <label class="sales-filter-label" for="sales-purchase-channel"><i class="bi bi-shop-window" aria-hidden="true"></i>Kanal pesanan</label>
-                        <select id="sales-purchase-channel" class="form-select form-select-sm" name="purchase_channel">
-                            <option value="">Semua kanal</option>
-                            <option value="tiktok" @selected(($filters['purchase_channel'] ?? null) === 'tiktok')>TikTok Shop</option>
-                            <option value="tokopedia" @selected(($filters['purchase_channel'] ?? null) === 'tokopedia')>Tokopedia</option>
-                        </select>
-                    </div>
                     @if ($visibleStores->isNotEmpty())
                         <div class="sales-filter-field sales-filter-store">
                             <label class="sales-filter-label" for="sales-store"><i class="bi bi-shop" aria-hidden="true"></i>Toko</label>
@@ -3234,7 +3250,14 @@
                                     <td class="sales-order-location">{{ $order->shipping_city ?: '-' }}</td>
                                     <td class="sales-order-location">{{ $order->shipping_province ?: '-' }}</td>
                                     <td class="text-muted">{{ ucwords(str_replace('_', ' ', strtolower($order->payment))) }}</td>
-                                    <td><span class="badge sales-badge">{{ ucwords(str_replace('_', ' ', strtolower($order->status ?: 'Belum ditentukan'))) }}</span></td>
+                                    <td>
+                                        <span class="badge sales-badge">{{ ucwords(str_replace('_', ' ', strtolower($order->status ?: 'Belum ditentukan'))) }}</span>
+                                        @if ($order->financial_data_status === 'incomplete')
+                                            <span class="sales-profit-incomplete" title="{{ str_replace('_', ' ', (string) $order->financial_issue_reason) }}">
+                                                <i class="bi bi-exclamation-circle" aria-hidden="true"></i>Profit belum lengkap
+                                            </span>
+                                        @endif
+                                    </td>
                                     <td class="text-end sales-order-promotion">
                                         <div class="fw-semibold">{{ $fmt($order->promotion_total) }}</div>
                                         <div class="small text-muted">Voucher toko: {{ $fmt($order->voucher_store) }}</div>
@@ -4813,7 +4836,9 @@
         const filterForm = document.querySelector('.sales-filter-card');
         const activeTabInput = document.querySelector('#sales-active-tab');
         const storeInput = document.querySelector('#sales-store');
+        const platformFilterInput = document.querySelector('#sales-platform-filter');
         const platformInput = document.querySelector('#sales-platform');
+        const purchaseChannelInput = document.querySelector('#sales-purchase-channel');
         const orderRows = document.querySelectorAll('[data-sales-order-row]');
         const comparisonModeInput = document.querySelector('#sales-comparison-mode');
         const orderDate = document.querySelector('#sales-order-detail-date');
@@ -5244,8 +5269,21 @@
             });
         }
 
-        if (platformInput && filterForm) {
-            platformInput.addEventListener('change', function () {
+        if (platformFilterInput && platformInput && purchaseChannelInput && filterForm) {
+            platformFilterInput.addEventListener('change', function () {
+                const [filterType = '', filterValue = ''] = platformFilterInput.value.split(':', 2);
+
+                if (filterType === 'purchase') {
+                    platformInput.value = 'TIKTOK';
+                    purchaseChannelInput.value = filterValue;
+                } else if (filterType === 'platform') {
+                    platformInput.value = filterValue;
+                    purchaseChannelInput.value = '';
+                } else {
+                    platformInput.value = '';
+                    purchaseChannelInput.value = '';
+                }
+
                 filterForm.requestSubmit();
             });
         }

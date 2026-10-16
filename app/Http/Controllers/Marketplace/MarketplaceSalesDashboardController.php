@@ -67,6 +67,7 @@ class MarketplaceSalesDashboardController extends Controller
     {
         $isPromotionDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
         $isSalesComparison = $request->boolean('_sales_comparison');
+        $isSalesExport = $request->boolean('_sales_export');
         $today = now()->startOfDay();
         $defaultFrom = (clone $today)->startOfMonth();
 
@@ -84,6 +85,7 @@ class MarketplaceSalesDashboardController extends Controller
 
         $storeId = $request->integer('store_id') ?: null;
         $platformCode = $this->normalizePlatformCode($request->query('platform'));
+        $purchaseChannel = $this->normalizePurchaseChannel($request->query('purchase_channel'));
         $platformCodes = $this->platformCodes($platformCode);
         $comparisonMode = in_array($request->query('comparison_mode'), ['period', 'month'], true)
             ? $request->query('comparison_mode')
@@ -131,7 +133,9 @@ class MarketplaceSalesDashboardController extends Controller
             ->map(fn ($id) => (int) $id)
             ->values()
             ->all();
-        $this->queueRecentAdsSync($adStoreIds, $storeId, $from, $to);
+        if (! $isSalesExport) {
+            $this->queueRecentAdsSync($adStoreIds, $storeId, $from, $to);
+        }
         $adDailyMetrics = app(AdsDashboardService::class)->getDailyMetrics(
             $adStoreIds,
             $storeId,
@@ -162,11 +166,11 @@ class MarketplaceSalesDashboardController extends Controller
         $statusExpression = "UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), ''))";
         $subtotalExpression = 'CASE WHEN COALESCE(o.subtotal_items, 0) > 0 THEN o.subtotal_items ELSE COALESCE(o.total_amount, 0) END';
         $gmvLineValueExpression = 'CASE'
-            . ' WHEN COALESCE(gmv_oi.line_net_amount, 0) > 0 THEN gmv_oi.line_net_amount'
-            . ' WHEN COALESCE(gmv_oi.price_after_discount, 0) > 0 THEN gmv_oi.price_after_discount * COALESCE(gmv_oi.qty, 0)'
-            . ' WHEN COALESCE(gmv_oi.line_gross_amount, 0) > 0 THEN gmv_oi.line_gross_amount'
-            . ' WHEN COALESCE(gmv_oi.price, 0) > 0 THEN gmv_oi.price * COALESCE(gmv_oi.qty, 0)'
-            . ' ELSE 0 END';
+            .' WHEN COALESCE(gmv_oi.line_net_amount, 0) > 0 THEN gmv_oi.line_net_amount'
+            .' WHEN COALESCE(gmv_oi.price_after_discount, 0) > 0 THEN gmv_oi.price_after_discount * COALESCE(gmv_oi.qty, 0)'
+            .' WHEN COALESCE(gmv_oi.line_gross_amount, 0) > 0 THEN gmv_oi.line_gross_amount'
+            .' WHEN COALESCE(gmv_oi.price, 0) > 0 THEN gmv_oi.price * COALESCE(gmv_oi.qty, 0)'
+            .' ELSE 0 END';
         $gmvItemTotals = DB::table('marketplace_order_items as gmv_oi')
             ->selectRaw('COALESCE(gmv_oi.marketplace_order_id, gmv_oi.order_id) as order_key')
             ->selectRaw("COALESCE(SUM({$gmvLineValueExpression}), 0) as gmv")
@@ -191,10 +195,11 @@ class MarketplaceSalesDashboardController extends Controller
                             ->whereBetween('o.order_date', [$fromDateTime, $toDateTime]);
                     });
             })
-            ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
+            ->whereRaw("{$statusExpression} NOT IN (".implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')).')', self::NON_REVENUE_STATUSES)
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
-            ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes));
+            ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
+            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel));
 
         $orderBase = (clone $base)->leftJoinSub($itemTotals, 'itot', 'itot.order_key', '=', 'o.id');
 
@@ -211,6 +216,8 @@ class MarketplaceSalesDashboardController extends Controller
                 'o.shipping_province',
                 'o.payment_method',
                 'o.payment_status',
+                'o.financial_data_status',
+                'o.financial_issue_reason',
                 'o.shipping_fee_customer',
                 'o.total_paid_customer',
                 'o.total_amount',
@@ -229,7 +236,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->selectRaw('COALESCE(itot.total_qty, 0) as item_qty')
             ->orderByDesc('order_at')
             ->orderByDesc('o.id')
-            ->limit(500)
+            ->when(! $isSalesExport, fn ($query) => $query->limit(500))
             ->get()
             ->map(function ($row) {
                 $quantity = (int) $row->item_qty;
@@ -346,12 +353,12 @@ class MarketplaceSalesDashboardController extends Controller
             ->values();
 
         $cogsExpression = 'COALESCE('
-            . 'NULLIF(cogs_oi.hpp_total_snapshot, 0), '
-            . 'NULLIF(cogs_oi.hpp_snapshot, 0) * COALESCE(cogs_oi.qty, 0), '
-            . 'NULLIF(cogs_oi.hpp_unit_snapshot, 0) * COALESCE(cogs_oi.qty, 0), '
-            . 'NULLIF(cogs_item.base_unit_cost, 0) * COALESCE(cogs_oi.qty, 0), '
-            . 'NULLIF(cogs_item.hpp, 0) * COALESCE(cogs_oi.qty, 0), '
-            . '0)';
+            .'NULLIF(cogs_oi.hpp_total_snapshot, 0), '
+            .'NULLIF(cogs_oi.hpp_snapshot, 0) * COALESCE(cogs_oi.qty, 0), '
+            .'NULLIF(cogs_oi.hpp_unit_snapshot, 0) * COALESCE(cogs_oi.qty, 0), '
+            .'NULLIF(cogs_item.base_unit_cost, 0) * COALESCE(cogs_oi.qty, 0), '
+            .'NULLIF(cogs_item.hpp, 0) * COALESCE(cogs_oi.qty, 0), '
+            .'0)';
         $cogsByStoreDay = (clone $base)
             ->leftJoin('marketplace_order_items as cogs_oi', function ($join) {
                 // Keep the nullable marketplace id fallback equivalent to
@@ -477,9 +484,10 @@ class MarketplaceSalesDashboardController extends Controller
             ->whereRaw("{$dateExpression} IS NOT NULL")
             ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
             ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
-            ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
+            ->whereRaw("{$statusExpression} NOT IN (".implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')).')', self::NON_REVENUE_STATUSES)
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
+            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
             ->selectRaw("COALESCE(MAX(NULLIF(internal_item.name, '')), MAX({$marketplaceProductNameExpression}), 'Produk tanpa nama') as name")
             ->selectRaw("MAX({$marketplaceProductNameExpression}) as marketplace_name")
             ->selectRaw("MAX(NULLIF(oi.image_url, '')) as image_url")
@@ -529,11 +537,12 @@ class MarketplaceSalesDashboardController extends Controller
                 ->leftJoin('channels as promo_ch', 'promo_ch.id', '=', 'promo_st.channel_id')
                 ->leftJoinSub($productOrderTotals, 'promo_order_totals', 'promo_order_totals.order_key', '=', 'promo_o.id')
                 ->whereRaw('COALESCE(promo_o.ordered_at, promo_o.order_date) IS NOT NULL')
-                ->whereDate(DB::raw("COALESCE(promo_o.ordered_at, promo_o.order_date)"), '>=', $from->toDateString())
-                ->whereDate(DB::raw("COALESCE(promo_o.ordered_at, promo_o.order_date)"), '<=', $to->toDateString())
-                ->whereRaw("UPPER(COALESCE(NULLIF(promo_o.order_status, ''), NULLIF(promo_o.status, ''), '')) NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
+                ->whereDate(DB::raw('COALESCE(promo_o.ordered_at, promo_o.order_date)'), '>=', $from->toDateString())
+                ->whereDate(DB::raw('COALESCE(promo_o.ordered_at, promo_o.order_date)'), '<=', $to->toDateString())
+                ->whereRaw("UPPER(COALESCE(NULLIF(promo_o.order_status, ''), NULLIF(promo_o.status, ''), '')) NOT IN (".implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')).')', self::NON_REVENUE_STATUSES)
                 ->when($storeId, fn ($query) => $query->where('promo_o.store_id', $storeId))
                 ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(promo_ch.code)'), $platformCodes))
+                ->when($purchaseChannel, fn ($query) => $query->where('promo_o.purchase_channel', $purchaseChannel))
                 ->where(function ($query) use ($internalProductIds, $unmappedProducts, $promotionProductNameExpression, $promotionProductSkuExpression) {
                     if ($internalProductIds->isNotEmpty()) {
                         $query->whereIn('promo_oi.internal_item_id', $internalProductIds->all());
@@ -960,8 +969,8 @@ class MarketplaceSalesDashboardController extends Controller
         $incomeDaily = (clone $incomeBase)
             ->selectRaw("DATE({$dateExpression}) as day")
             ->selectRaw('COUNT(DISTINCT o.id) as orders')
-            ->selectRaw("COUNT(DISTINCT CASE WHEN income_ms.settlement_time IS NOT NULL THEN o.id END) as settled_orders")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN income_ms.settlement_time IS NULL THEN o.id END) as pending_orders")
+            ->selectRaw('COUNT(DISTINCT CASE WHEN income_ms.settlement_time IS NOT NULL THEN o.id END) as settled_orders')
+            ->selectRaw('COUNT(DISTINCT CASE WHEN income_ms.settlement_time IS NULL THEN o.id END) as pending_orders')
             ->selectRaw("COALESCE(SUM({$incomePaymentExpression}), 0) as buyer_paid")
             ->selectRaw("COALESCE(SUM(CASE WHEN income_ms.settlement_time IS NOT NULL THEN ({$incomePaymentExpression}) ELSE 0 END), 0) as settled_buyer_paid")
             ->selectRaw("COALESCE(SUM(CASE WHEN income_ms.settlement_time IS NULL THEN ({$incomePaymentExpression}) ELSE 0 END), 0) as pending_buyer_paid")
@@ -1012,11 +1021,11 @@ SQL;
             ->groupByRaw('COALESCE(oi.marketplace_order_id, oi.order_id)');
 
         $legacyPromotionAmountExpression = 'COALESCE(ipromo.product_discount, 0)'
-            . ' + COALESCE(o.voucher_discount, 0)'
-            . ' + COALESCE(o.other_discount, 0)'
-            . ' + COALESCE(o.shipping_discount_platform, 0)';
+            .' + COALESCE(o.voucher_discount, 0)'
+            .' + COALESCE(o.other_discount, 0)'
+            .' + COALESCE(o.shipping_discount_platform, 0)';
         $visiblePromotionAmountExpression = 'COALESCE(ipromo.product_discount, 0)'
-            . ' + COALESCE(o.voucher_discount, 0)';
+            .' + COALESCE(o.voucher_discount, 0)';
 
         // Legacy/imported orders do not have a settlement breakdown. Keep them
         // separate from settlement-backed orders so voucher and bundle values
@@ -1059,9 +1068,10 @@ SQL;
             ->whereRaw("{$dateExpression} IS NOT NULL")
             ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
             ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
-            ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
+            ->whereRaw("{$statusExpression} NOT IN (".implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')).')', self::NON_REVENUE_STATUSES)
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
+            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
             ->select([
                 'ms.order_id',
                 'ms.seller_voucher',
@@ -1253,8 +1263,7 @@ SQL;
             ->map(function ($rows) {
                 return (object) [
                     'buyer_paid' => (float) $rows->sum('buyer_paid'),
-                    'seller_discounts' => (float) $rows->sum(fn ($row) =>
-                        (float) ($row->voucher_store ?? 0)
+                    'seller_discounts' => (float) $rows->sum(fn ($row) => (float) ($row->voucher_store ?? 0)
                         + (float) ($row->bundle_discount ?? 0)
                         + (float) ($row->combo_hemat ?? 0)
                     ),
@@ -1296,7 +1305,7 @@ SQL;
             ->map(fn ($rows) => $rows->sortBy('store_name')->values());
         $summary['aov'] = $summary['orders'] > 0 ? $summary['net_total'] / $summary['orders'] : 0;
 
-        $shippingFailedStatusesSql = "'" . implode("', '", self::SHIPPING_FAILED_STATUSES) . "'";
+        $shippingFailedStatusesSql = "'".implode("', '", self::SHIPPING_FAILED_STATUSES)."'";
         $shippingStatusExpression = "CASE WHEN COALESCE(o.delivery_failed, 0) = 1 OR UPPER(COALESCE(NULLIF(o.tracking_status, ''), '')) IN ({$shippingFailedStatusesSql}) THEN 'FAILED_DELIVERY' ELSE UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), 'BELUM DITENTUKAN')) END";
         $shippingExcludedPlaceholders = implode(',', array_fill(0, count(self::SHIPPING_EXCLUDED_STATUSES), '?'));
         $shippingBase = DB::table('marketplace_orders as o')
@@ -1308,8 +1317,9 @@ SQL;
             ->whereRaw("{$shippingStatusExpression} NOT IN ({$shippingExcludedPlaceholders})", self::SHIPPING_EXCLUDED_STATUSES)
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
-            ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes));
-        $shippingReturnStatusesSql = "'" . implode("', '", self::SHIPPING_RETURN_STATUSES) . "'";
+            ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
+            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel));
+        $shippingReturnStatusesSql = "'".implode("', '", self::SHIPPING_RETURN_STATUSES)."'";
 
         $shipping = (clone $shippingBase)
             ->selectRaw("{$shippingStatusExpression} as status")
@@ -1320,6 +1330,7 @@ SQL;
             ->get()
             ->map(function ($row) {
                 $row->label = ucwords(strtolower(str_replace('_', ' ', (string) $row->status)));
+
                 return $row;
             });
 
@@ -1365,7 +1376,7 @@ SQL;
         // Katalog aktif berasal dari sinkronisasi marketplace, bukan dari
         // order pada periode. Dengan begitu produk tanpa transaksi tetap
         // masuk sebagai produk aktif marketplace.
-        $activeMarketplaceCatalog = $this->activeMarketplaceCatalog($storeId, $platformCode, $to->toDateString());
+        $activeMarketplaceCatalog = $this->activeMarketplaceCatalog($storeId, $platformCode, $purchaseChannel, $to->toDateString());
 
         $comparisonMonth = null;
         $comparisonMonthPrevious = null;
@@ -1373,7 +1384,7 @@ SQL;
         $comparisonPeriod = null;
         $comparisonPeriodPrevious = null;
         $comparisonPeriodPreviousTwo = null;
-        if (! $isSalesComparison) {
+        if (! $isSalesComparison && ! $isSalesExport) {
             $loadComparison = function ($comparisonFrom, $comparisonTo) use ($request) {
                 $comparisonFromDate = $comparisonFrom->toDateString();
                 $comparisonToDate = $comparisonTo->toDateString();
@@ -1381,6 +1392,7 @@ SQL;
                     (string) ($request->user()?->getAuthIdentifier() ?? 'guest'),
                     (string) ($request->query('store_id') ?: 'all'),
                     (string) ($request->query('platform') ?: 'all'),
+                    (string) ($request->query('purchase_channel') ?: 'all'),
                     $comparisonFromDate,
                     $comparisonToDate,
                     $request->boolean('dummy') ? 'dummy' : 'live',
@@ -1465,6 +1477,7 @@ SQL;
             'promotionOrders' => $promotionOrders,
             'adSpendDaily' => $adSpendDaily,
             'adOrdersDaily' => $adOrdersDaily,
+            'adDailyMetrics' => $adDailyMetrics,
             'adSpendTotal' => $adSpendTotal,
             'adImpressionsTotal' => $adImpressionsTotal,
             'adClicksTotal' => $adClicksTotal,
@@ -1490,11 +1503,295 @@ SQL;
                 'date_to' => $to->toDateString(),
                 'store_id' => $storeId,
                 'platform' => $platformCode,
+                'purchase_channel' => $purchaseChannel,
                 'platform_codes' => $platformCodes,
                 'comparison_mode' => $comparisonMode,
                 'dummy' => $isPromotionDummy,
             ],
         ]);
+    }
+
+    /**
+     * Export the active sales-dashboard scope as an AI-friendly ZIP.
+     *
+     * The export reuses the dashboard query scope so date, store, platform,
+     * purchase-channel, and status rules stay aligned with the page.
+     */
+    public function export(Request $request)
+    {
+        $request->merge(['_sales_export' => true]);
+        $dashboardView = $this->index($request);
+        $data = $dashboardView->getData();
+        $filters = (array) ($data['filters'] ?? []);
+
+        $tabRows = [
+            'sales' => $data['daily'] ?? [],
+            'event_day' => $data['daily'] ?? [],
+            'products' => $data['products'] ?? [],
+            'payments' => $data['payments'] ?? [],
+            'promotions' => $data['promotionDaily'] ?? [],
+            'shipping' => $data['shippingDaily'] ?? [],
+            'income' => $data['incomeDaily'] ?? [],
+            'orders' => $data['orderDetails'] ?? [],
+            'advertising' => $data['adDailyMetrics'] ?? [],
+        ];
+
+        $normalizedTabs = [];
+        foreach ($tabRows as $tab => $rows) {
+            $normalizedTabs[$tab] = $this->normalizeExportRows($rows);
+        }
+
+        $generatedAt = now()->toIso8601String();
+        $metadata = [
+            'export_version' => '1.0',
+            'generated_at' => $generatedAt,
+            'timezone' => config('app.timezone', date_default_timezone_get()),
+            'dashboard' => 'marketplace/dashboard/sales',
+            'period' => [
+                'from' => $filters['date_from'] ?? null,
+                'to' => $filters['date_to'] ?? null,
+                'date_basis' => 'COALESCE(marketplace_orders.ordered_at, marketplace_orders.order_date)',
+            ],
+            'filters' => [
+                'store_id' => $filters['store_id'] ?? null,
+                'platform' => $filters['platform'] ?? null,
+                'purchase_channel' => $filters['purchase_channel'] ?? null,
+                'comparison_mode' => $filters['comparison_mode'] ?? null,
+            ],
+            'source' => [
+                'route' => 'marketplace.dashboard.sales.export',
+                'status_excluded' => self::NON_REVENUE_STATUSES,
+                'financial_values' => 'Dashboard-aligned estimates and imported settlement values; see data-quality.json.',
+            ],
+            'tabs' => array_keys($normalizedTabs),
+            'formats' => [
+                'csv' => 'Flat tabular data with raw numeric values and ISO dates.',
+                'jsonl' => 'One normalized JSON object per row for AI and data pipelines.',
+            ],
+        ];
+
+        $summary = [
+            'sales' => $this->normalizeExportValue($data['summary'] ?? []),
+            'payments' => $this->normalizeExportValue($data['paymentSummary'] ?? []),
+            'income' => $this->normalizeExportValue($data['incomeSummary'] ?? []),
+            'shipping' => $this->normalizeExportValue($data['shippingKpi'] ?? []),
+            'advertising' => [
+                'spend' => (float) ($data['adSpendTotal'] ?? 0),
+                'sales' => (float) ($data['adSalesTotal'] ?? 0),
+                'orders' => (int) ($data['adOrdersTotal'] ?? 0),
+                'impressions' => (int) ($data['adImpressionsTotal'] ?? 0),
+                'clicks' => (int) ($data['adClicksTotal'] ?? 0),
+                'ctr_percent' => $data['adCtr'] ?? null,
+                'cvr_percent' => $data['adCvr'] ?? null,
+            ],
+            'rows_by_tab' => array_map('count', $normalizedTabs),
+        ];
+
+        $schema = [];
+        $nullCounts = [];
+        foreach ($normalizedTabs as $tab => $rows) {
+            $columns = collect($rows)
+                ->flatMap(fn (array $row) => array_keys($row))
+                ->unique()
+                ->values()
+                ->all();
+            $schema[$tab] = collect($columns)->mapWithKeys(function (string $column) use ($rows) {
+                $sample = collect($rows)
+                    ->pluck($column)
+                    ->first(fn ($value) => $value !== null && $value !== '');
+
+                return [$column => $this->exportValueType($sample)];
+            })->all();
+            $nullCounts[$tab] = collect($columns)->mapWithKeys(function (string $column) use ($rows) {
+                return [$column => collect($rows)->filter(fn (array $row) => ! array_key_exists($column, $row) || $row[$column] === null)->count()];
+            })->all();
+        }
+
+        $orderRows = $normalizedTabs['orders'];
+        $financialStatusDistribution = collect($orderRows)
+            ->groupBy(fn (array $row) => (string) ($row['financial_data_status'] ?? 'missing'))
+            ->map(fn ($rows) => $rows->count())
+            ->all();
+        $dataQuality = [
+            'generated_at' => $generatedAt,
+            'rows_by_tab' => array_map('count', $normalizedTabs),
+            'null_counts_by_column' => $nullCounts,
+            'orders' => [
+                'exported_rows' => count($orderRows),
+                'financial_data_status_distribution' => $financialStatusDistribution,
+                'missing_order_reference' => collect($orderRows)->filter(fn (array $row) => blank($row['order_number'] ?? null))->count(),
+            ],
+            'notes' => [
+                'Null values are preserved as null in JSONL and empty cells in CSV.',
+                'Currency and percentage fields are exported as raw numeric values; formatting belongs to the UI layer.',
+                'The orders tab is not capped at the dashboard preview limit during export.',
+                'Some income and advertising values can be estimates when source settlement or attribution data is incomplete.',
+            ],
+        ];
+
+        $zipPath = tempnam(sys_get_temp_dir(), 'marketplace-sales-export-');
+        $zip = new \ZipArchive();
+        if ($zipPath === false || $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            if ($zipPath !== false && is_file($zipPath)) {
+                @unlink($zipPath);
+            }
+
+            abort(500, 'Export dashboard sales tidak dapat dibuat.');
+        }
+
+        $zip->addFromString('metadata.json', $this->exportJson($metadata));
+        $zip->addFromString('summary.json', $this->exportJson($summary));
+        $zip->addFromString('schema.json', $this->exportJson([
+            'schema_version' => '1.0',
+            'datasets' => $schema,
+        ]));
+        $zip->addFromString('data-quality.json', $this->exportJson($dataQuality));
+        $zip->addFromString('README.md', $this->salesExportReadme());
+
+        foreach ($normalizedTabs as $tab => $rows) {
+            $zip->addFromString('data/'.$tab.'.csv', $this->exportCsv($rows));
+            $zip->addFromString('data/'.$tab.'.jsonl', $this->exportJsonl($rows));
+        }
+
+        $zip->close();
+
+        $filename = 'marketplace-sales-export-'.now()->format('Ymd-His').'.zip';
+
+        return response()->download($zipPath, $filename, [
+            'Content-Type' => 'application/zip',
+        ])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeExportRows(mixed $rows): array
+    {
+        if ($rows instanceof Collection) {
+            $rows = $rows->all();
+        }
+
+        if (! is_array($rows)) {
+            return [];
+        }
+
+        return array_values(array_map(function ($row): array {
+            $normalized = $this->normalizeExportValue($row);
+
+            return is_array($normalized) ? $normalized : ['value' => $normalized];
+        }, $rows));
+    }
+
+    private function normalizeExportValue(mixed $value): mixed
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('c');
+        }
+
+        if ($value instanceof Collection) {
+            return $value->map(fn ($item) => $this->normalizeExportValue($item))->all();
+        }
+
+        if (is_object($value)) {
+            $value = get_object_vars($value);
+        }
+
+        if (is_array($value)) {
+            $normalized = [];
+            foreach ($value as $key => $item) {
+                $normalized[(string) $key] = $this->normalizeExportValue($item);
+            }
+
+            return $normalized;
+        }
+
+        return is_resource($value) ? null : $value;
+    }
+
+    private function exportValueType(mixed $value): string
+    {
+        return match (true) {
+            $value === null => 'null',
+            is_bool($value) => 'boolean',
+            is_int($value) => 'integer',
+            is_float($value) => 'number',
+            is_array($value) => 'object',
+            default => 'string',
+        };
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     */
+    private function exportCsv(array $rows): string
+    {
+        $columns = collect($rows)
+            ->flatMap(fn (array $row) => array_keys($row))
+            ->unique()
+            ->values()
+            ->all();
+        $handle = fopen('php://temp', 'r+');
+        fputcsv($handle, $columns, ',', '"', '\\');
+
+        foreach ($rows as $row) {
+            $line = [];
+            foreach ($columns as $column) {
+                $value = $row[$column] ?? null;
+                $line[] = is_array($value) || is_object($value)
+                    ? json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE)
+                    : (is_bool($value) ? ($value ? 'true' : 'false') : $value);
+            }
+            fputcsv($handle, $line, ',', '"', '\\');
+        }
+
+        rewind($handle);
+        $csv = stream_get_contents($handle) ?: '';
+        fclose($handle);
+
+        return $csv;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     */
+    private function exportJsonl(array $rows): string
+    {
+        return collect($rows)
+            ->map(fn (array $row) => json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | JSON_INVALID_UTF8_SUBSTITUTE))
+            ->implode("\n").(count($rows) > 0 ? "\n" : '');
+    }
+
+    private function exportJson(array $value): string
+    {
+        return json_encode(
+            $value,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | JSON_INVALID_UTF8_SUBSTITUTE,
+        )."\n";
+    }
+
+    private function salesExportReadme(): string
+    {
+        return <<<'README'
+# Marketplace Sales Dashboard Export
+
+Export ini mengikuti filter aktif pada `marketplace/dashboard/sales` dan berisi dataset pada seluruh tab dashboard untuk periode yang dipilih.
+
+## Struktur data
+
+- `data/*.csv`: tabular untuk spreadsheet atau SQL staging.
+- `data/*.jsonl`: satu objek JSON per baris untuk analisis AI dan pipeline data.
+- `metadata.json`: periode, filter, sumber, dan definisi tanggal.
+- `summary.json`: ringkasan KPI dashboard dalam nilai numerik mentah.
+- `schema.json`: kolom dan tipe data setiap dataset.
+- `data-quality.json`: jumlah baris, null, status finansial, dan catatan kualitas.
+
+## Konvensi
+
+- Tanggal menggunakan format ISO.
+- Nilai uang dan persentase tidak memakai format `Rp` atau `%`.
+- Nilai yang tidak tersedia dipertahankan sebagai `null` pada JSONL.
+- Jangan menjumlahkan nilai estimasi dan nilai settlement final tanpa memeriksa sumbernya.
+README;
     }
 
     private function storeDayKey(?string $day, mixed $storeId): string
@@ -1654,7 +1951,7 @@ SQL;
      * dan channel. Variant tanpa model tetap dihitung sebagai satu variant.
      * Mapping kategori memakai mapping item marketplace yang paling baru.
      */
-    private function activeMarketplaceCatalog(?int $storeId, ?string $platformCode, string $asOfDate): array
+    private function activeMarketplaceCatalog(?int $storeId, ?string $platformCode, ?string $purchaseChannel, string $asOfDate): array
     {
         $platformCodes = $this->platformCodes($platformCode);
         $catalogProducts = DB::table('marketplace_products as mp')
@@ -1755,6 +2052,7 @@ SQL;
                 ->where('st.is_active', true)
                 ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
                 ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
+                ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
                 ->select('o.store_id', 'oi.external_item_id', 'internal_category.name as category_name', 'oi.id')
                 ->orderByDesc('oi.id')
                 ->get();
@@ -1815,6 +2113,7 @@ SQL;
 
         $storeId = $request->integer('store_id') ?: null;
         $platformCode = $this->normalizePlatformCode($request->query('platform'));
+        $purchaseChannel = $this->normalizePurchaseChannel($request->query('purchase_channel'));
         $platformCodes = $this->platformCodes($platformCode);
         $isPromotionDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
         $dateExpression = 'COALESCE(o.ordered_at, o.order_date)';
@@ -1840,10 +2139,11 @@ SQL;
             ->whereRaw("{$dateExpression} IS NOT NULL")
             ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
             ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
-            ->whereRaw("{$statusExpression} NOT IN (" . implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')) . ')', self::NON_REVENUE_STATUSES)
+            ->whereRaw("{$statusExpression} NOT IN (".implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')).')', self::NON_REVENUE_STATUSES)
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
+            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
             ->when($internalItemId, fn ($query) => $query->where('oi.internal_item_id', $internalItemId))
             ->when(! $internalItemId, fn ($query) => $query->whereRaw("{$nameExpression} = ?", [$name]))
             ->when(! $internalItemId && $sku !== '' && $sku !== '-', fn ($query) => $query->whereRaw("{$skuExpression} = ?", [$sku]))
@@ -2041,6 +2341,7 @@ SQL;
         $isDashboardDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
         $storeId = $request->integer('store_id') ?: null;
         $platformCode = $this->normalizePlatformCode($request->query('platform'));
+        $purchaseChannel = $this->normalizePurchaseChannel($request->query('purchase_channel'));
         $platformCodes = $this->platformCodes($platformCode);
         $stores = Store::query()
             ->where('is_active', true)
@@ -2069,6 +2370,7 @@ SQL;
             ->when($isDashboardDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
+            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
             ->select([
                 'o.id',
                 'o.channel_order_id',
@@ -2200,6 +2502,7 @@ SQL;
             'filters' => [
                 'store_id' => $storeId,
                 'platform' => $platformCode,
+                'purchase_channel' => $purchaseChannel,
                 'dummy' => $isDashboardDummy,
             ],
         ]);
@@ -2219,6 +2522,7 @@ SQL;
         $isDashboardDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
         $storeId = $request->integer('store_id') ?: null;
         $platformCode = $this->normalizePlatformCode($request->query('platform'));
+        $purchaseChannel = $this->normalizePurchaseChannel($request->query('purchase_channel'));
         $platformCodes = $this->platformCodes($platformCode);
         $stores = Store::query()
             ->where('is_active', true)
@@ -2231,7 +2535,7 @@ SQL;
         }
 
         $dateExpression = 'COALESCE(o.ordered_at, o.order_date)';
-        $shippingFailedStatusesSql = "'" . implode("', '", self::SHIPPING_FAILED_STATUSES) . "'";
+        $shippingFailedStatusesSql = "'".implode("', '", self::SHIPPING_FAILED_STATUSES)."'";
         $statusExpression = "CASE WHEN COALESCE(o.delivery_failed, 0) = 1 OR UPPER(COALESCE(NULLIF(o.tracking_status, ''), '')) IN ({$shippingFailedStatusesSql}) THEN 'FAILED_DELIVERY' ELSE UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), 'BELUM DITENTUKAN')) END";
         $shippingExcludedPlaceholders = implode(',', array_fill(0, count(self::SHIPPING_EXCLUDED_STATUSES), '?'));
 
@@ -2244,6 +2548,7 @@ SQL;
             ->when($isDashboardDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
+            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
             ->select([
                 'o.id',
                 'o.channel_order_id',
@@ -2329,6 +2634,7 @@ SQL;
             'filters' => [
                 'store_id' => $storeId,
                 'platform' => $platformCode,
+                'purchase_channel' => $purchaseChannel,
                 'dummy' => $isDashboardDummy,
             ],
         ]);
@@ -2348,6 +2654,7 @@ SQL;
         $isPromotionDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
         $storeId = $request->integer('store_id') ?: null;
         $platformCode = $this->normalizePlatformCode($request->query('platform'));
+        $purchaseChannel = $this->normalizePurchaseChannel($request->query('purchase_channel'));
         $platformCodes = $this->platformCodes($platformCode);
         $stores = Store::query()
             ->where('is_active', true)
@@ -2393,6 +2700,7 @@ SQL;
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
+            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
             ->select([
                 'o.id',
                 'o.channel_order_id',
@@ -2478,6 +2786,7 @@ SQL;
             'filters' => [
                 'store_id' => $storeId,
                 'platform' => $platformCode,
+                'purchase_channel' => $purchaseChannel,
                 'dummy' => $isPromotionDummy,
             ],
         ]);
@@ -2506,6 +2815,13 @@ SQL;
         }
 
         return $code;
+    }
+
+    private function normalizePurchaseChannel(?string $channel): ?string
+    {
+        $channel = strtolower(trim((string) $channel));
+
+        return in_array($channel, ['tiktok', 'tokopedia'], true) ? $channel : null;
     }
 
     /**
@@ -2908,6 +3224,7 @@ SQL;
             }
             if ($isSettlementItem && $lineTotal > 0) {
                 $subtotal += $lineTotal;
+
                 continue;
             }
 

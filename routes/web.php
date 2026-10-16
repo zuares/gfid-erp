@@ -121,6 +121,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::post('/marketplace/settings/delete-template', [MarketplaceSettingsController::class, 'deleteTemplate'])->name('marketplace.settings.delete_template');
     Route::get('/marketplace/analytics',  [MarketplaceAnalyticsController::class, 'index'])->name('marketplace.analytics');
     Route::get('/marketplace/dashboard/sales', [MarketplaceSalesDashboardController::class, 'index'])->name('marketplace.dashboard.sales');
+    Route::get('/marketplace/dashboard/sales/export', [MarketplaceSalesDashboardController::class, 'export'])->name('marketplace.dashboard.sales.export');
     Route::get('/marketplace/shopee-performance', [ShopeeShopPerformanceController::class, 'index'])->name('marketplace.shopee-performance');
     Route::post('/marketplace/shopee-performance/sync', [ShopeeShopPerformanceController::class, 'sync'])->name('marketplace.shopee-performance.sync');
     Route::get('/marketplace/dashboard/products/orders', [MarketplaceSalesDashboardController::class, 'productOrders'])->name('marketplace.dashboard.products.orders');
