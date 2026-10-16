@@ -518,6 +518,33 @@ class AdsExperimentPhase2Test extends TestCase
             ->assertJsonCount(1, 'data');
     }
 
+    public function test_experiment_index_can_return_lazy_rows_without_calculating_all_details(): void
+    {
+        $store = $this->store('PHASE3-LAZY-LIST');
+        $item = Item::create([
+            'code' => 'PHASE3-LAZY-ITEM',
+            'name' => 'Phase 3 Lazy List Item',
+            'type' => 'finished',
+            'hpp' => 30,
+            'active' => true,
+        ]);
+        $this->experiment($store, $item, [
+            'channel_campaign_id' => 'C-PHASE3-LAZY',
+            'channel_item_id' => 'ITEM-PHASE3-LAZY',
+            'lifecycle_status' => MarketplaceAdExperiment::STATUS_LEARNING,
+        ]);
+
+        $this->actingAs($this->user())
+            ->getJson(route('marketplace.ads.experiments.index', [
+                'store_id' => $store->id,
+                'include_details' => 0,
+            ]))
+            ->assertOk()
+            ->assertJsonPath('data.0.details.baseline.lazy', true)
+            ->assertJsonPath('data.0.details.observation.lazy', true)
+            ->assertJsonMissingPath('data.0.details.metric_delta');
+    }
+
     public function test_active_experiment_scope_excludes_confounded_experiment(): void
     {
         $store = $this->store('PHASE3-LOCK');

@@ -80,7 +80,15 @@ class AdsExperimentController extends Controller
             'change_type' => ['nullable', 'in:creative,target_roas,price,budget,title,other,price_and_target_roas'],
             'lifecycle_status' => ['nullable', 'string', 'max:32'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'include_details' => ['nullable', 'boolean'],
         ]);
+
+        // Detail experiment menghitung beberapa agregasi fact table dan payout.
+        // Daftar Evaluasi memuatnya secara lazy saat user membuka satu baris,
+        // tetapi tetap pertahankan perilaku lama untuk client API lain.
+        $includeDetails = array_key_exists('include_details', $data)
+            ? (bool) $data['include_details']
+            : true;
 
         $rows = MarketplaceAdExperiment::query()
             ->with(['store:id,name', 'internalItem:id,code,name'])
@@ -112,20 +120,69 @@ class AdsExperimentController extends Controller
             ->map(fn ($group) => $group->sortByDesc('changed_at')->sortByDesc('id')->first())
             ->values();
 
+        if (! $includeDetails && isset($data['lifecycle_status'])) {
+            $rows = $rows
+                ->filter(fn (MarketplaceAdExperiment $experiment): bool => $experiment->lifecycle_status === $data['lifecycle_status'])
+                ->values();
+        }
+
         $productContexts = $this->productContexts($rows);
 
-        $payload = $rows->map(fn (MarketplaceAdExperiment $experiment) => [
+        $payload = $rows->map(function (MarketplaceAdExperiment $experiment) use ($productContexts, $experiments, $includeDetails): array {
+            $details = $includeDetails
+                ? $experiments->details($experiment)
+                : $this->lightweightDetails($experiment);
+
+            return [
                 'experiment' => $experiment,
                 'product' => $productContexts->get($experiment->id),
-                'details' => $experiments->details($experiment),
-            ]);
-        if (isset($data['lifecycle_status'])) {
+                'details' => $details,
+            ];
+        });
+        if ($includeDetails && isset($data['lifecycle_status'])) {
             $payload = $payload->filter(
                 fn (array $row): bool => ($row['details']['lifecycle_status'] ?? null) === $data['lifecycle_status']
             );
         }
 
         return response()->json(['data' => $payload->values()]);
+    }
+
+    /**
+     * Return enough context for the evaluation table without running the
+     * expensive fact/payout calculations for every row in the list.
+     */
+    private function lightweightDetails(MarketplaceAdExperiment $experiment): array
+    {
+        $timezone = config('app.timezone', 'Asia/Jakarta');
+        $effectiveDate = $experiment->effective_date
+            ->copy()
+            ->timezone($timezone)
+            ->startOfDay();
+        $baselineFrom = $effectiveDate->copy()->subDays((int) $experiment->baseline_days);
+        $baselineTo = $effectiveDate->copy()->subDay();
+        $observationFrom = $effectiveDate->copy()->addDay();
+        $observationTo = $observationFrom->copy()->addDays(
+            max(0, (int) $experiment->observation_days - 1)
+        );
+
+        return [
+            'lifecycle_status' => $experiment->invalidated_at
+                ? MarketplaceAdExperiment::STATUS_INVALIDATED
+                : ($experiment->lifecycle_status ?: MarketplaceAdExperiment::STATUS_LEARNING),
+            'baseline' => [
+                'from' => $baselineFrom->toDateString(),
+                'to' => $baselineTo->toDateString(),
+                'days_with_data' => null,
+                'lazy' => true,
+            ],
+            'observation' => [
+                'from' => $observationFrom->toDateString(),
+                'to' => $observationTo->toDateString(),
+                'days_with_data' => null,
+                'lazy' => true,
+            ],
+        ];
     }
 
     public function show(MarketplaceAdExperiment $experiment, AdsExperimentService $experiments): JsonResponse

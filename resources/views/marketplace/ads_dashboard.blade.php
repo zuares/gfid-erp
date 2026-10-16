@@ -7820,6 +7820,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function periodSummary(period) {
+        if (period && period.lazy) {
+            return '<div style="font-size:.7rem; line-height:1.65; color:var(--dsh-muted);">' +
+                '<b style="color:var(--dsh-accent);">Buka hasil untuk melihat data</b><br>' +
+                esc(period.from || '-') + ' → ' + esc(period.to || '-') +
+                '</div>';
+        }
         if (!period || Number(period.days_with_data || 0) === 0) {
             return '<div style="font-size:.7rem; line-height:1.65; color:var(--dsh-muted);">' +
                 '<b style="color:#b45309;">Menunggu data</b><br>' +
@@ -7933,6 +7939,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (changeFilter.value) params.set('change_type', changeFilter.value);
         if (statusFilter.value) params.set('lifecycle_status', statusFilter.value);
         params.set('limit', '100');
+        params.set('include_details', '0');
 
         fetch(routes.experimentsIndex + '?' + params.toString(), {
             headers: { Accept: 'application/json' },
