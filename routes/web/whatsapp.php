@@ -8,6 +8,8 @@ Route::middleware(['auth', 'role:owner,admin'])
     ->name('whatsapp.')
     ->group(function () {
         Route::get('/', [WhatsAppCenterController::class, 'index'])->name('index');
+        Route::get('/broadcast', [WhatsAppCenterController::class, 'broadcast'])->name('broadcast');
+        Route::post('/broadcast/send', [WhatsAppCenterController::class, 'sendBroadcast'])->name('broadcast.send');
         Route::get('/messages/purchase-order/{purchase_order}', [WhatsAppCenterController::class, 'composePurchaseOrder'])
             ->name('messages.compose.purchase_order');
         Route::post('/messages', [WhatsAppCenterController::class, 'send'])->name('messages.send');

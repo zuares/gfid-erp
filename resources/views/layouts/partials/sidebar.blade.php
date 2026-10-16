@@ -478,6 +478,7 @@
     $openMarketplaceCrm = $open('admin.crm.marketplace.*');
     $openAi = $open('ai.*');
     $openCommunication = $open('whatsapp.*') || $open('settings.whatsapp.*');
+    $hasWhatsAppBroadcast = $router->has('whatsapp.broadcast');
 
     // =========================================================
     // BADGE COUNTERS (dot-only, cached)
@@ -832,7 +833,7 @@
                     </x-sidebar.simple-link>
                 </li>
             @endif
-            @if ($isAdmin && $router->has('whatsapp.index'))
+            @if ($isAdmin && ($router->has('whatsapp.index') || $hasWhatsAppBroadcast))
                 <x-sidebar.label text="Komunikasi" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openCommunication ? 'is-open' : '' }}" type="button"
@@ -844,9 +845,15 @@
                     </button>
                     <div class="collapse {{ $openCommunication ? 'show' : '' }}" id="navCommunicationAdmin">
                         <x-sidebar.sub-link href="{{ route('whatsapp.index') }}" icon="bi bi-chat-left-text"
-                            :active="request()->routeIs('whatsapp.*')">
+                            :active="request()->routeIs('whatsapp.index')">
                             WhatsApp Center
                         </x-sidebar.sub-link>
+                        @if ($hasWhatsAppBroadcast)
+                            <x-sidebar.sub-link href="{{ route('whatsapp.broadcast') }}" icon="bi bi-megaphone"
+                                :active="request()->routeIs('whatsapp.broadcast')">
+                                Broadcast
+                            </x-sidebar.sub-link>
+                        @endif
                     </div>
                 </li>
             @endif
@@ -2938,7 +2945,7 @@
                 </div>
             </li>
 
-            @if ($router->has('whatsapp.index') || $router->has('settings.whatsapp.index'))
+            @if ($router->has('whatsapp.index') || $router->has('settings.whatsapp.index') || $hasWhatsAppBroadcast)
                 <x-sidebar.label text="Komunikasi" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openCommunication ? 'is-open' : '' }}" type="button"
@@ -2951,8 +2958,14 @@
                     <div class="collapse {{ $openCommunication ? 'show' : '' }}" id="navCommunication">
                         @if ($router->has('whatsapp.index'))
                             <x-sidebar.sub-link href="{{ route('whatsapp.index') }}" icon="bi bi-chat-left-text"
-                                :active="request()->routeIs('whatsapp.*')">
+                                :active="request()->routeIs('whatsapp.index')">
                                 WhatsApp Center
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasWhatsAppBroadcast)
+                            <x-sidebar.sub-link href="{{ route('whatsapp.broadcast') }}" icon="bi bi-megaphone"
+                                :active="request()->routeIs('whatsapp.broadcast')">
+                                Broadcast
                             </x-sidebar.sub-link>
                         @endif
                         @if ($router->has('settings.whatsapp.index'))

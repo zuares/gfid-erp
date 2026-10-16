@@ -6,6 +6,7 @@
 <style>
 .wa-center{max-width:1280px;margin:0 auto;padding:1rem .75rem 3rem}
 .wa-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1rem}
+.wa-hero-actions{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;justify-content:flex-end}
 .wa-title{font-size:1.35rem;font-weight:950;color:#0f172a;margin:0}
 .wa-subtitle{color:#64748b;font-size:.84rem;margin:.25rem 0 0}
 .wa-link{color:#166534;text-decoration:none;font-weight:800;font-size:.82rem}
@@ -53,7 +54,10 @@
             <h1 class="wa-title"><i class="bi bi-whatsapp" style="color:#25d366"></i> WhatsApp Center</h1>
             <p class="wa-subtitle">Kirim pesan operasional dan pantau riwayat komunikasi dari semua modul.</p>
         </div>
-        <a class="wa-link" href="{{ route('settings.whatsapp.index') }}"><i class="bi bi-gear"></i> Pengaturan koneksi</a>
+        <div class="wa-hero-actions">
+            <a class="wa-btn" href="{{ route('whatsapp.broadcast') }}"><i class="bi bi-megaphone"></i> Buat broadcast</a>
+            <a class="wa-link" href="{{ route('settings.whatsapp.index') }}"><i class="bi bi-gear"></i> Pengaturan koneksi</a>
+        </div>
     </div>
 
     @if(session('success'))

@@ -300,6 +300,7 @@
     $canManageRts = $isOwner || $isAdmin;
 
     $router = app('router');
+    $hasWhatsAppBroadcast = $router->has('whatsapp.broadcast');
 
     // ROUTE GUARDS
     $hasDashboardRoute = $router->has('dashboard');
@@ -833,7 +834,7 @@
                         </li>
                     @endif
 
-                    @if ($isAdmin && $router->has('whatsapp.index'))
+                    @if ($isAdmin && ($router->has('whatsapp.index') || $hasWhatsAppBroadcast))
                         <div class="mobile-sidebar-section-label">Komunikasi</div>
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $whatsappOpen ? 'is-open' : '' }}"
@@ -846,9 +847,15 @@
                             </button>
                             <div class="collapse {{ $whatsappOpen ? 'show' : '' }}" id="navCommunicationAdminMobile">
                                 <a href="{{ route('whatsapp.index') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('whatsapp.*') ? 'active' : '' }}">
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('whatsapp.index') ? 'active' : '' }}">
                                     <span class="icon">📨</span><span>WhatsApp Center</span>
                                 </a>
+                                @if ($hasWhatsAppBroadcast)
+                                    <a href="{{ route('whatsapp.broadcast') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('whatsapp.broadcast') ? 'active' : '' }}">
+                                        <span class="icon">📣</span><span>Broadcast</span>
+                                    </a>
+                                @endif
                             </div>
                         </li>
                     @endif
@@ -1722,7 +1729,7 @@
                         </div>
                     </li>
 
-                    @if ($router->has('whatsapp.index') || $router->has('settings.whatsapp.index'))
+                    @if ($router->has('whatsapp.index') || $router->has('settings.whatsapp.index') || $hasWhatsAppBroadcast)
                         <div class="mobile-sidebar-section-label">Komunikasi</div>
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $whatsappOpen ? 'is-open' : '' }}"
@@ -1736,8 +1743,14 @@
                             <div class="collapse {{ $whatsappOpen ? 'show' : '' }}" id="navCommunicationOwnerMobile">
                                 @if ($router->has('whatsapp.index'))
                                     <a href="{{ route('whatsapp.index') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('whatsapp.*') ? 'active' : '' }}">
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('whatsapp.index') ? 'active' : '' }}">
                                         <span class="icon">📨</span><span>WhatsApp Center</span>
+                                    </a>
+                                @endif
+                                @if ($hasWhatsAppBroadcast)
+                                    <a href="{{ route('whatsapp.broadcast') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('whatsapp.broadcast') ? 'active' : '' }}">
+                                        <span class="icon">📣</span><span>Broadcast</span>
                                     </a>
                                 @endif
                                 @if ($router->has('settings.whatsapp.index'))

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\PurchaseOrder;
+use App\Models\Customer;
+use App\Models\MarketplaceOrder;
 use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
 use App\Services\WhatsApp\PurchaseOrderWhatsAppMessageBuilder;
@@ -31,6 +33,149 @@ class WhatsAppCenterController extends Controller
             ->pluck('module');
 
         return view('whatsapp.index', compact('messages', 'templates', 'activeTemplates', 'modules'));
+    }
+
+    public function broadcast(Request $request): View
+    {
+        $audience = $request->string('audience')->toString();
+        $audience = in_array($audience, ['all', 'recent_90', 'repeat'], true) ? $audience : 'all';
+        $search = trim($request->string('q')->toString());
+
+        $recipientQuery = $this->broadcastRecipientsQuery($audience, $search);
+        $recipients = (clone $recipientQuery)
+            ->orderByRaw("CASE WHEN name IS NULL OR name = '' THEN 1 ELSE 0 END")
+            ->orderBy('name')
+            ->paginate(25)
+            ->withQueryString();
+
+        $templates = WhatsAppTemplate::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        $broadcastMessages = WhatsAppMessage::query()
+            ->where('module', 'whatsapp_broadcast')
+            ->latest()
+            ->limit(8)
+            ->get();
+
+        return view('whatsapp.broadcast', [
+            'recipients' => $recipients,
+            'recipientCount' => (clone $recipientQuery)->count(),
+            'templates' => $templates,
+            'audience' => $audience,
+            'search' => $search,
+            'broadcastMessages' => $broadcastMessages,
+            'isConfigured' => filled(config('services.fonnte.token')),
+        ]);
+    }
+
+    public function sendBroadcast(Request $request, WhatsAppMessageService $whatsapp): RedirectResponse
+    {
+        $data = $request->validate([
+            'customer_ids' => ['required', 'array', 'min:1', 'max:100'],
+            'customer_ids.*' => ['integer', 'distinct', 'exists:customers,id'],
+            'message' => ['required', 'string', 'max:4000'],
+            'template_key' => ['nullable', 'string', 'exists:whatsapp_templates,key'],
+        ]);
+
+        if (! filled(config('services.fonnte.token'))) {
+            return back()->withInput()->with('error', 'Token Fonnte belum dikonfigurasi. Atur koneksi WhatsApp sebelum mengirim broadcast.');
+        }
+
+        $template = ! empty($data['template_key'])
+            ? WhatsAppTemplate::query()
+                ->where('key', $data['template_key'])
+                ->where('is_active', true)
+                ->first()
+            : null;
+
+        if ($data['template_key'] && ! $template) {
+            return back()->withInput()->with('error', 'Template WhatsApp tidak aktif atau tidak ditemukan.');
+        }
+
+        $customers = Customer::query()
+            ->whereIn('id', $data['customer_ids'])
+            ->whereNotNull('phone')
+            ->where('phone', '!=', '')
+            ->get(['id', 'name', 'phone']);
+
+        if ($customers->isEmpty()) {
+            return back()->withInput()->with('error', 'Tidak ada penerima valid dengan nomor WhatsApp.');
+        }
+
+        $sent = 0;
+        $failed = 0;
+        foreach ($customers as $customer) {
+            $message = str_replace(
+                '{customer_name}',
+                $customer->name ?: 'Customer',
+                $data['message'],
+            );
+            $message = mb_substr($message, 0, 4000);
+
+            $log = $whatsapp->sendText(
+                $customer->phone,
+                $message,
+                [
+                    'module' => 'whatsapp_broadcast',
+                    'reference_type' => self::class,
+                    'reference_id' => $customer->id,
+                    'reference_label' => 'Broadcast WhatsApp',
+                ],
+                $customer->name,
+                $template?->key,
+            );
+
+            $log->isSent() ? $sent++ : $failed++;
+        }
+
+        $skipped = count($data['customer_ids']) - $customers->count();
+        $flashMessage = "Broadcast selesai: {$sent} terkirim";
+        if ($failed > 0) {
+            $flashMessage .= ", {$failed} gagal";
+        }
+        if ($skipped > 0) {
+            $flashMessage .= ", {$skipped} dilewati karena nomor tidak tersedia";
+        }
+        $flashMessage .= '.';
+
+        return redirect()
+            ->route('whatsapp.broadcast')
+            ->with($failed > 0 ? 'error' : 'success', $flashMessage);
+    }
+
+    private function broadcastRecipientsQuery(string $audience, string $search)
+    {
+        return Customer::query()
+            ->select('customers.*')
+            ->whereNotNull('customers.phone')
+            ->where('customers.phone', '!=', '')
+            ->withCount(['marketplaceOrders as marketplace_order_count' => fn ($query) => $query->where('status', '!=', 'cancelled')])
+            ->withMax(['marketplaceOrders as last_marketplace_order_at' => fn ($query) => $query->where('status', '!=', 'cancelled')], 'order_date')
+            ->when($audience === 'recent_90', fn ($query) => $query->whereIn(
+                'customers.id',
+                MarketplaceOrder::query()
+                    ->whereNotNull('customer_id')
+                    ->where('status', '!=', 'cancelled')
+                    ->where('order_date', '>=', now()->subDays(90)->startOfDay())
+                    ->select('customer_id')
+                    ->distinct(),
+            ))
+            ->when($audience === 'repeat', fn ($query) => $query->whereIn(
+                'customers.id',
+                MarketplaceOrder::query()
+                    ->whereNotNull('customer_id')
+                    ->where('status', '!=', 'cancelled')
+                    ->select('customer_id')
+                    ->groupBy('customer_id')
+                    ->havingRaw('COUNT(*) >= 2'),
+            ))
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search) {
+                $query->where('customers.name', 'like', "%{$search}%")
+                    ->orWhere('customers.phone', 'like', "%{$search}%")
+                    ->orWhere('customers.email', 'like', "%{$search}%");
+            }));
     }
 
     public function composePurchaseOrder(
