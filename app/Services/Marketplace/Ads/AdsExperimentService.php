@@ -827,6 +827,23 @@ class AdsExperimentService
         }
 
         $itemValueExpression = "COALESCE(NULLIF(moi.line_net_amount, 0), NULLIF(moi.line_gross_amount, 0), NULLIF(moi.price_after_discount * moi.qty, 0), NULLIF(moi.price * moi.qty, 0), 0)";
+        $fromDateTime = $from->copy()->startOfDay()->toDateTimeString();
+        $toDateTime = $to->copy()->endOfDay()->toDateTimeString();
+        $applyOrderScope = function ($query, string $alias) use ($experiment, $fromDateTime, $toDateTime): void {
+            $query
+                ->where("{$alias}.store_id", $experiment->store_id)
+                ->where(function ($dateQuery) use ($alias, $fromDateTime, $toDateTime): void {
+                    // ordered_at is the preferred timestamp. Fall back to
+                    // order_date only for legacy rows without ordered_at.
+                    $dateQuery
+                        ->whereBetween("{$alias}.ordered_at", [$fromDateTime, $toDateTime])
+                        ->orWhere(function ($fallbackQuery) use ($alias, $fromDateTime, $toDateTime): void {
+                            $fallbackQuery
+                                ->whereNull("{$alias}.ordered_at")
+                                ->whereBetween("{$alias}.order_date", [$fromDateTime, $toDateTime]);
+                        });
+                });
+        };
         $orderLink = function ($join): void {
             $join->on('mo.id', '=', 'moi.order_id')
                 ->orOn('mo.id', '=', 'moi.marketplace_order_id');
@@ -834,16 +851,23 @@ class AdsExperimentService
 
         $matchedItems = DB::table('marketplace_order_items as moi')
             ->join('marketplace_orders as mo', $orderLink)
-            ->where('mo.store_id', $experiment->store_id)
             ->where('moi.external_item_id', $experiment->channel_item_id)
-            ->whereRaw('DATE(COALESCE(mo.ordered_at, mo.order_date)) BETWEEN ? AND ?', [
-                $from->toDateString(),
-                $to->toDateString(),
-            ])
             ->selectRaw("COALESCE(moi.order_id, moi.marketplace_order_id) as order_id, mo.channel_order_id, mo.external_order_id, SUM({$itemValueExpression}) as item_value")
             ->groupByRaw('COALESCE(moi.order_id, moi.marketplace_order_id), mo.channel_order_id, mo.external_order_id');
+        $applyOrderScope($matchedItems, 'mo');
 
         $orderItemTotals = DB::table('marketplace_order_items as moi')
+            ->whereExists(function ($query) use ($applyOrderScope): void {
+                $query
+                    ->selectRaw('1')
+                    ->from('marketplace_orders as mo_total')
+                    ->where(function ($linkQuery): void {
+                        $linkQuery
+                            ->whereColumn('mo_total.id', 'moi.order_id')
+                            ->orWhereColumn('mo_total.id', 'moi.marketplace_order_id');
+                    });
+                $applyOrderScope($query, 'mo_total');
+            })
             ->selectRaw("COALESCE(moi.order_id, moi.marketplace_order_id) as order_id, SUM({$itemValueExpression}) as order_item_value")
             ->where(function ($query): void {
                 $query->whereNotNull('moi.order_id')

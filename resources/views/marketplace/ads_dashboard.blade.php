@@ -3720,16 +3720,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div id="experimentsError" style="display:none; padding:.8rem 1rem; border-radius:10px; border:1px solid rgba(220,38,38,.25); background:rgba(220,38,38,.06); color:#b91c1c; font-size:.76rem; font-weight:700;"></div>
 
                     <div id="experimentsTableWrap" class="table-responsive" style="display:none;">
-                        <table class="dpanel-table align-middle mb-0" style="min-width:860px;">
+                        <table class="dpanel-table align-middle mb-0" style="min-width:820px;">
                             <thead>
                                 <tr>
-                                    <th>Produk / Perubahan</th>
-                                    <th>Yang diubah</th>
+                                    <th>Produk</th>
+                                    <th>Perubahan</th>
                                     <th>Waktu</th>
-                                    <th>Hasil</th>
+                                    <th>Status</th>
                                     <th>Sebelum</th>
                                     <th>Sesudah</th>
-                                    <th></th>
+                                    <th>Aksi</th>
                                 </tr>
                             </thead>
                             <tbody id="experimentsTableBody"></tbody>
@@ -7892,9 +7892,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     '<div style="font-weight:800;font-size:.72rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px;" title="' + esc(productName) + '">' + esc(productName) + '</div>' +
                     '<div style="font-size:.64rem;color:var(--dsh-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px;">' + esc(campaignLabel(experiment, product)) + '</div>' +
                     '<div style="font-size:.62rem;color:var(--dsh-muted);margin-top:.1rem;"><i class="bi bi-bullseye me-1"></i>' + esc(targetRoasLabel(experiment, product)) + '</div>' +
-                    '<div style="font-size:.62rem;color:var(--dsh-muted);margin-top:.12rem;">' + esc(changeLabel(experiment)) + '</div>' +
                 '</div></div></td>' +
-                '<td><div style="font-size:.7rem; max-width:210px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(scopeLabel(experiment, product)) + '">' + esc(scopeLabel(experiment, product)) + '</div></td>' +
+                '<td><div style="font-size:.7rem; font-weight:750; max-width:210px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(changeLabel(experiment)) + '">' + esc(changeLabel(experiment)) + '</div></td>' +
                 '<td><div style="font-size:.7rem; font-weight:700;">' + esc(changedAt) + '</div></td>' +
                 '<td>' + statusBadge(status) + (details.invalidation?.reason ? '<div style="font-size:.62rem; color:var(--dsh-muted); margin-top:.25rem; max-width:150px;">' + esc(details.invalidation.reason) + '</div>' : '') + '</td>' +
                 '<td>' + periodSummary(details.baseline) + '</td>' +
