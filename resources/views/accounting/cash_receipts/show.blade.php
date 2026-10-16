@@ -16,6 +16,7 @@
 @push('head')
     @include('production.dashboard.partials._gf-styles')
     <style>
+        .cr-detail-shell { width: 100%; max-width: 1180px; margin-inline: auto; }
         .cr-detail-page { display: grid; gap: 1rem; }
         .cr-actions { display: flex; justify-content: flex-end; gap: .5rem; flex-wrap: wrap; }
         .cr-btn {
@@ -127,7 +128,7 @@
 @endpush
 
 @section('content')
-    <x-gf.page
+    <x-gf.page class="cr-detail-shell"
         eyebrow="Accounting"
         title="Detail Penerimaan"
         description="{{ $cashReceipt->description ?: 'Penerimaan kas harian' }}">
