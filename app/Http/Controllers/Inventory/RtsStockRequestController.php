@@ -150,10 +150,11 @@ class RtsStockRequestController extends Controller
         $prdWarehouse = Warehouse::where('code', 'WH-PRD')->firstOrFail();
         $rtsWarehouse = Warehouse::where('code', 'WH-RTS')->firstOrFail();
 
+        // RTS memindahkan stok barang jadi dari PRD ke RTS, jadi item beli-jadi
+        // tetap valid meskipun tidak memiliki kemampuan produksi in-house.
         $finishedGoodsItems = Item::query()
             ->select('id', 'code', 'name')
             ->where('type', 'finished_good')
-            ->canBeMade()
             ->orderBy('code')
             ->get();
 
