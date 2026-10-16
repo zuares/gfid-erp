@@ -53,7 +53,10 @@
             <h1 class="wa-title"><i class="bi bi-whatsapp" style="color:#25d366"></i> WhatsApp Center</h1>
             <p class="wa-subtitle">Kirim pesan operasional dan pantau riwayat komunikasi dari semua modul.</p>
         </div>
-        <a class="wa-link" href="{{ route('settings.whatsapp.index') }}"><i class="bi bi-gear"></i> Pengaturan koneksi</a>
+        <div class="d-flex flex-wrap gap-3">
+            <a class="wa-link" href="{{ route('whatsapp.broadcast') }}"><i class="bi bi-megaphone"></i> Broadcast beberapa nomor</a>
+            <a class="wa-link" href="{{ route('settings.whatsapp.index') }}"><i class="bi bi-gear"></i> Pengaturan koneksi</a>
+        </div>
     </div>
 
     @if(session('success'))

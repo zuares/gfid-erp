@@ -3,8 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
+use App\Services\WhatsApp\WhatsAppMessageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 use Tests\TestCase;
 
 class WhatsAppCenterTest extends TestCase
@@ -15,7 +18,7 @@ class WhatsAppCenterTest extends TestCase
     {
         $admin = User::factory()->create([
             'role' => 'admin',
-            'employee_code' => 'ADMIN-WA-CENTER-' . uniqid(),
+            'employee_code' => 'ADMIN-WA-CENTER-'.uniqid(),
         ]);
 
         $this->actingAs($admin)
@@ -30,7 +33,7 @@ class WhatsAppCenterTest extends TestCase
     {
         $admin = User::factory()->create([
             'role' => 'admin',
-            'employee_code' => 'ADMIN-WA-TEMPLATE-' . uniqid(),
+            'employee_code' => 'ADMIN-WA-TEMPLATE-'.uniqid(),
         ]);
 
         $this->actingAs($admin)
@@ -58,5 +61,51 @@ class WhatsAppCenterTest extends TestCase
 
         $this->assertFalse($template->fresh()->is_active);
         $this->assertSame('Update Pengiriman Customer', $template->fresh()->name);
+    }
+
+    public function test_admin_can_open_broadcast_page(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'employee_code' => 'ADMIN-WA-BROADCAST-'.uniqid(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('whatsapp.broadcast'))
+            ->assertOk()
+            ->assertSee('Broadcast WhatsApp')
+            ->assertSee('Nomor tujuan');
+    }
+
+    public function test_admin_can_send_broadcast_to_unique_normalized_numbers(): void
+    {
+        config(['services.fonnte.token' => 'test-token']);
+
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'employee_code' => 'ADMIN-WA-BROADCAST-SEND-'.uniqid(),
+        ]);
+        $service = Mockery::mock(WhatsAppMessageService::class);
+        $service->shouldReceive('sendBroadcast')
+            ->once()
+            ->with(
+                ['628123456789', '628987654321'],
+                'Pesan broadcast',
+                Mockery::type('array'),
+                null,
+            )
+            ->andReturn([
+                new WhatsAppMessage(['status' => 'sent']),
+                new WhatsAppMessage(['status' => 'sent']),
+            ]);
+        $this->app->instance(WhatsAppMessageService::class, $service);
+
+        $this->actingAs($admin)
+            ->post(route('whatsapp.broadcast.send'), [
+                'recipients' => "08123456789\n628123456789, 08987654321",
+                'message' => 'Pesan broadcast',
+            ])
+            ->assertRedirect(route('whatsapp.index'))
+            ->assertSessionHas('success', 'Broadcast selesai: 2 terkirim, 0 gagal dari 2 nomor.');
     }
 }

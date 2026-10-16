@@ -56,4 +56,24 @@ class WhatsAppMessageServiceTest extends TestCase
             'status' => 'failed',
         ]);
     }
+
+    public function test_send_broadcast_uses_one_transport_request_and_logs_each_recipient(): void
+    {
+        $transport = Mockery::mock(WaNotificationService::class);
+        $transport->shouldReceive('sendMessages')
+            ->once()
+            ->with(['08123456789', '628987654321'], 'Pesan broadcast')
+            ->andReturn(true);
+
+        $logs = (new WhatsAppMessageService($transport))->sendBroadcast(
+            ['08123456789', '628987654321'],
+            'Pesan broadcast',
+            ['module' => 'broadcast', 'reference_label' => 'Broadcast test'],
+        );
+
+        $this->assertCount(2, $logs);
+        $this->assertSame(['628123456789', '628987654321'], collect($logs)->pluck('recipient_phone')->all());
+        $this->assertTrue(collect($logs)->every(fn (WhatsAppMessage $log): bool => $log->isSent()));
+        $this->assertDatabaseCount('whatsapp_messages', 2);
+    }
 }
