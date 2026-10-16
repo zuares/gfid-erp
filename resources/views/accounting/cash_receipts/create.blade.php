@@ -5,6 +5,7 @@
 @push('head')
     @include('production.dashboard.partials._gf-styles')
     <style>
+        .cr-edit-shell { width: 100%; max-width: 1180px; margin-inline: auto; }
         .cr-edit-page { display: grid; gap: 1rem; }
         .cr-actions { display: flex; justify-content: flex-end; gap: .5rem; flex-wrap: wrap; }
         .cr-btn {
@@ -37,7 +38,7 @@
 @endpush
 
 @section('content')
-    <x-gf.page
+    <x-gf.page class="cr-edit-shell"
         eyebrow="Accounting"
         title="Tambah Penerimaan"
         description="Simpan dulu sebagai Draft, lalu posting dari halaman detail.">
