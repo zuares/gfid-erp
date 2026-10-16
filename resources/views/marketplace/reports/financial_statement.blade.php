@@ -63,7 +63,7 @@
             <div class="mp-eyebrow">Marketplace · Owner finance</div>
             <h4 class="mb-1">Laporan Keuangan Marketplace</h4>
             <p class="text-muted mb-0" style="max-width: 820px">
-                Laporan subledger marketplace berdasarkan settlement terverifikasi. Mode berjalan dapat menampilkan order shipped
+                Laporan subledger marketplace berdasarkan settlement terverifikasi. Mode berjalan dapat menampilkan order shipped/to_confirm_receive
                 sebagai piutang provisional; hanya mode final yang dapat diposting ke jurnal umum.
             </p>
         </div>
@@ -131,8 +131,8 @@
         <div class="alert alert-info d-flex gap-2 align-items-start">
             <i class="bi bi-info-circle fs-5"></i>
             <div>
-                <div class="fw-semibold">Mode berjalan: shipped ikut dihitung sebagai provisional.</div>
-                <div class="small">{{ $fmt($summary['provisional_order_count'] ?? 0) }} order shipped dengan settlement lengkap ditampilkan sebagai piutang marketplace. Angka ini belum boleh diposting ke pendapatan final sampai order menjadi COMPLETED.</div>
+                <div class="fw-semibold">Mode berjalan: shipped dan to_confirm_receive ikut dihitung sebagai provisional.</div>
+                <div class="small">{{ $fmt($summary['provisional_order_count'] ?? 0) }} order shipped/to_confirm_receive dengan settlement lengkap ditampilkan sebagai piutang marketplace. Angka ini belum boleh diposting ke pendapatan final sampai order menjadi COMPLETED.</div>
             </div>
         </div>
     @endif
@@ -217,7 +217,7 @@
                     <div class="col-6 col-md-3"><div class="text-muted small">Payout final</div><div class="fs-5 fw-bold">Rp {{ $fmt($summary['final']['payout'] ?? 0) }}</div></div>
                     <div class="col-6 col-md-3"><div class="text-muted small">Piutang provisional</div><div class="fs-5 fw-bold text-info">Rp {{ $fmt($summary['provisional_receivable'] ?? 0) }}</div></div>
                 </div>
-                <div class="small text-muted mt-3">Piutang provisional hanya memakai order SHIPPED dengan settlement lengkap. Reklasifikasi ke penjualan final dilakukan setelah status COMPLETED.</div>
+                <div class="small text-muted mt-3">Piutang provisional memakai order SHIPPED dan TO_CONFIRM_RECEIVE dengan settlement lengkap. Reklasifikasi ke penjualan final dilakukan setelah status COMPLETED.</div>
             </div>
         </div>
     @endif

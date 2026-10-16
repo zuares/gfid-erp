@@ -4,6 +4,7 @@ namespace Tests\Unit\Services;
 
 use App\Models\Channel;
 use App\Models\MarketplaceOrder;
+use App\Models\MarketplaceOrderIncomeEstimate;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\MarketplacePayout;
@@ -239,6 +240,61 @@ class MarketplaceProfitReportServiceTest extends TestCase
         $this->assertSame(270.0, $report['summary']['provisional_receivable']);
         $this->assertSame('provisional', $report['orders'][0]['recognition_status']);
         $this->assertSame(1, $report['quality']['provisional_ready']);
+    }
+
+    public function test_include_shipped_scope_includes_to_confirm_receive_and_uses_estimated_income(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'PROFIT-TCR-001',
+            'channel_order_id' => 'PROFIT-TCR-001',
+            'order_date' => '2026-08-04 10:00:00',
+            'ordered_at' => '2026-08-04 10:00:00',
+            'order_status' => 'TO_CONFIRM_RECEIVE',
+            'financial_data_status' => 'not_applicable',
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'line_no' => 1,
+            'item_name' => 'Produk TCR',
+            'model_sku' => 'SKU-TCR',
+            'qty' => 1,
+            'price' => 300,
+            'hpp_snapshot' => 100,
+            'data_status' => 'valid',
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => 'PROFIT-TCR-001',
+            'buyer_payment_amount' => 300,
+            'final_income' => 999,
+            'data_status' => 'complete',
+            'raw_json' => [],
+        ]);
+        MarketplaceOrderIncomeEstimate::create([
+            'store_id' => $store->id,
+            'marketplace_order_id' => $order->id,
+            'channel_order_id' => 'PROFIT-TCR-001',
+            'estimated_escrow_amount' => 270,
+            'income_status' => 2,
+            'synced_at' => '2026-08-04 10:00:00',
+        ]);
+
+        $report = app(MarketplaceProfitReportService::class)->report([
+            'store_id' => $store->id,
+            'report_scope' => 'include_shipped',
+            'date_basis' => 'ordered_at',
+            'date_from' => '2026-08-01',
+            'date_to' => '2026-08-31',
+        ]);
+
+        $this->assertSame(1, $report['summary']['order_count']);
+        $this->assertSame(1, $report['summary']['provisional_order_count']);
+        $this->assertSame(270.0, $report['summary']['provisional_receivable']);
+        $this->assertSame(270.0, $report['orders'][0]['payout']);
     }
 
     private function store(): Store

@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class MarketplaceProfitReportService
 {
+    private const PROVISIONAL_ORDER_STATUSES = ['SHIPPED', 'TO_CONFIRM_RECEIVE'];
+
     private const FEE_FIELDS = [
         'commission_fee',
         'service_fee',
@@ -26,7 +28,7 @@ class MarketplaceProfitReportService
     /**
      * Profit report menggunakan payout aktual, bukan estimasi omzet x rasio.
      * Scope final hanya menerima COMPLETED; scope include_shipped juga menerima
-     * SHIPPED dengan settlement lengkap dan menandainya sebagai provisional.
+     * SHIPPED/TO_CONFIRM_RECEIVE dengan settlement lengkap dan menandainya sebagai provisional.
      *
      * @return array<string, mixed>
      */
@@ -69,9 +71,9 @@ class MarketplaceProfitReportService
                 });
 
                 if ($filters['report_scope'] === 'include_shipped') {
-                    $query->orWhere(function (Builder $shipped) {
-                        $shipped
-                            ->where('order_status', 'SHIPPED')
+                    $query->orWhere(function (Builder $provisional) {
+                        $provisional
+                            ->whereIn('order_status', self::PROVISIONAL_ORDER_STATUSES)
                             ->whereHas('settlement', function (Builder $settlement) {
                                 $settlement->where('data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE);
                             });
@@ -84,7 +86,8 @@ class MarketplaceProfitReportService
             ->with([
                 'store:id,name,channel_id',
                 'store.channel:id,code,name',
-                'settlement:id,store_id,order_id,channel_order_id,buyer_payment_amount,commission_fee,service_fee,transaction_fee,affiliate_fee,activity_fee,shipping_insurance_fee,escrow_tax,seller_voucher,seller_coin_cash_back,drc_adjustable_refund,final_income,settlement_time,ad_cost,data_status',
+                'incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,synced_at',
+                'settlement:id,store_id,order_id,channel_order_id,buyer_payment_amount,commission_fee,service_fee,transaction_fee,affiliate_fee,activity_fee,shipping_insurance_fee,escrow_tax,seller_voucher,seller_coin_cash_back,drc_adjustable_refund,final_income,settlement_time,ad_cost,data_status,raw_json',
                 'items:id,marketplace_order_id,order_id,item_name,item_name_snapshot,model_sku,item_sku,external_sku,qty,price,hpp_snapshot,data_status',
             ]);
 
@@ -174,11 +177,11 @@ class MarketplaceProfitReportService
                 'unknown' => (int) ($qualityCounts['unknown'] ?? 0),
                 'issues' => $issueBreakdown,
                 'provisional_total' => $filters['report_scope'] === 'include_shipped'
-                    ? $this->filteredOrders($filters, $settlementSource)->where('order_status', 'SHIPPED')->count()
+                    ? $this->filteredOrders($filters, $settlementSource)->whereIn('order_status', self::PROVISIONAL_ORDER_STATUSES)->count()
                     : 0,
                 'provisional_ready' => $filters['report_scope'] === 'include_shipped'
                     ? $this->filteredOrders($filters, $settlementSource)
-                        ->where('order_status', 'SHIPPED')
+                        ->whereIn('order_status', self::PROVISIONAL_ORDER_STATUSES)
                         ->whereHas('settlement', fn (Builder $query) => $query->where('data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE))
                         ->whereHas('items', fn (Builder $query) => $query->where('data_status', 'valid')->where('hpp_snapshot', '>', 0))
                         ->count()
@@ -209,7 +212,16 @@ class MarketplaceProfitReportService
     private function filteredOrders(array $filters, array $settlementSource = ['active' => false, 'orders' => []]): Builder
     {
         $query = MarketplaceOrder::query()
-            ->when($filters['store_id'], fn (Builder $builder, $storeId) => $builder->where('store_id', $storeId));
+            ->when($filters['store_id'], fn (Builder $builder, $storeId) => $builder->where('store_id', $storeId))
+            // Keep the same regular-order boundary as /marketplace/orders;
+            // kilat/booking-only orders are reported in their own module.
+            ->where(function (Builder $builder) {
+                $builder->whereNull('booking_sn')
+                    ->orWhere('booking_sn', '')
+                    ->orWhere('shipping_carrier', 'like', '%instant%')
+                    ->orWhere('shipping_carrier', 'like', '%same day%')
+                    ->orWhere('shipping_carrier', 'like', '%sameday%');
+            });
 
         if ($filters['date_basis'] === 'settlement_time') {
             if ($settlementSource['active']) {
@@ -261,9 +273,7 @@ class MarketplaceProfitReportService
         $grossSales = $settlement->buyer_payment_amount !== null
             ? (float) $settlement->buyer_payment_amount
             : (float) ($order->total_amount ?? $order->total_paid_customer ?? $order->subtotal_items ?? 0);
-        $payoutAmount = $payout !== null && array_key_exists('amount', $payout)
-            ? (float) $payout['amount']
-            : (float) ($settlement->final_income ?? 0);
+        $payoutAmount = $this->payoutAmount($order, $settlement, $payout);
         $hpp = (float) $items->sum(fn (MarketplaceOrderItem $item) => (float) $item->hpp_snapshot * max((int) $item->qty, 0));
         $fees = (float) collect(self::FEE_FIELDS)->sum(fn (string $field) => (float) ($settlement->{$field} ?? 0));
         $sellerDiscount = (float) ($settlement->seller_voucher ?? 0) + (float) ($settlement->seller_coin_cash_back ?? 0);
@@ -295,6 +305,39 @@ class MarketplaceProfitReportService
             'margin_pct' => $grossSales > 0 ? round(($operatingProfit / $grossSales) * 100, 2) : 0.0,
             'qty' => (int) $items->sum(fn (MarketplaceOrderItem $item) => max((int) $item->qty, 0)),
         ];
+    }
+
+    private function payoutAmount(MarketplaceOrder $order, MarketplaceOrderSettlement $settlement, ?array $payout): float
+    {
+        if ($payout !== null && array_key_exists('amount', $payout)) {
+            return (float) $payout['amount'];
+        }
+
+        if ($settlement->settlement_time !== null && $settlement->final_income !== null) {
+            return (float) $settlement->final_income;
+        }
+
+        // Order yang belum cair memakai estimasi escrow Shopee. Nilai 0 tetap
+        // valid, jadi pengecekan harus berbasis null, bukan truthy/falsy.
+        if ($order->incomeEstimate?->estimated_escrow_amount !== null) {
+            return max(0.0, (float) $order->incomeEstimate->estimated_escrow_amount);
+        }
+
+        $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+        $nested = (array) data_get($raw, '_income_detail', []);
+        $value = array_key_exists('estimated_escrow_amount', $nested)
+            ? data_get($nested, 'estimated_escrow_amount')
+            : (array_key_exists('estimated_escrow_amount', $raw)
+                ? data_get($raw, 'estimated_escrow_amount')
+                : null);
+
+        if ($value !== null && $value !== '' && is_numeric($value)) {
+            return max(0.0, (float) $value);
+        }
+
+        // Kompatibilitas untuk import lama yang sudah memiliki final_income
+        // tetapi tidak menyimpan settlement_time.
+        return max(0.0, (float) ($settlement->final_income ?? 0));
     }
 
     private function emptyAggregate(array $extra = []): array
