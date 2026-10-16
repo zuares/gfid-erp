@@ -889,26 +889,18 @@ class GoodsReceiptService
     }
 
     /**
-     * FG dari GRN langsung ditempatkan di WH-RTS.
-     * Item selain FG tetap mengikuti gudang tujuan pada GRN.
+     * Gunakan gudang yang dipilih pada header GRN untuk semua item.
+     * Backend tidak boleh mengganti pilihan gudang dari UI berdasarkan tipe item.
      */
     public function resolveStockWarehouseId(PurchaseReceiptLine $line, int $defaultWarehouseId): int
     {
-        if (! $line->item?->isFinishedGood()) {
-            return $defaultWarehouseId;
-        }
-
-        $rtsWarehouseId = (int) Warehouse::query()
-            ->where('code', 'WH-RTS')
-            ->value('id');
-
-        if ($rtsWarehouseId <= 0) {
+        if ($defaultWarehouseId <= 0) {
             throw ValidationException::withMessages([
-                'grn' => 'Gudang WH-RTS belum tersedia. Buat/aktifkan gudang WH-RTS sebelum posting GRN FG.',
+                'grn' => 'Gudang tujuan GRN belum dipilih.',
             ]);
         }
 
-        return $rtsWarehouseId;
+        return $defaultWarehouseId;
     }
 
     /**

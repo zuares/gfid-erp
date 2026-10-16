@@ -35,6 +35,7 @@ class GrnFromDraftPoTest extends TestCase
     protected User $owner;
     protected User $admin;
     protected Warehouse $warehouse;
+    protected Warehouse $prdWarehouse;
     protected Warehouse $rtsWarehouse;
     protected Supplier $supplier;
     protected Supplier $supplierOther;
@@ -52,6 +53,7 @@ class GrnFromDraftPoTest extends TestCase
         // firstOrCreate: kode master (warehouse/supplier/COA) mungkin sudah
         // di-seed oleh migration — jangan bikin duplikat (UNIQUE constraint).
         $this->warehouse = Warehouse::firstOrCreate(['code' => 'GRNTWH'], ['name' => 'GRN Test WH']);
+        $this->prdWarehouse = Warehouse::firstOrCreate(['code' => 'WH-PRD'], ['name' => 'Gudang Produksi']);
         $this->rtsWarehouse = Warehouse::firstOrCreate(['code' => 'WH-RTS'], ['name' => 'Gudang RTS']);
         $this->supplier = Supplier::firstOrCreate(['code' => 'GRNSA'], ['name' => 'GRN Supplier A']);
         $this->supplierOther = Supplier::firstOrCreate(['code' => 'GRNSB'], ['name' => 'GRN Supplier B']);
@@ -634,7 +636,7 @@ class GrnFromDraftPoTest extends TestCase
         $grn = $this->grnService->create([
             'date' => now()->toDateString(),
             'supplier_id' => $this->supplier->id,
-            'warehouse_id' => $this->warehouse->id,
+            'warehouse_id' => $this->prdWarehouse->id,
             'purchase_order_id' => $po->id,
             'created_by' => $this->admin->id,
             'lines' => $poLines->map(fn ($line) => [
@@ -655,31 +657,31 @@ class GrnFromDraftPoTest extends TestCase
 
         $this->assertEqualsWithDelta(
             10,
-            (float) InventoryStock::where('warehouse_id', $this->warehouse->id)
+            (float) InventoryStock::where('warehouse_id', $this->prdWarehouse->id)
                 ->where('item_id', $this->item->id)->value('qty'),
             0.001
         );
         $this->assertEqualsWithDelta(
             0,
-            (float) InventoryStock::where('warehouse_id', $this->warehouse->id)
+            (float) InventoryStock::where('warehouse_id', $this->prdWarehouse->id)
                 ->where('item_id', $atk->id)->value('qty'),
             0.001
         );
         $this->assertEqualsWithDelta(
             3,
-            (float) InventoryStock::where('warehouse_id', $this->warehouse->id)
+            (float) InventoryStock::where('warehouse_id', $this->prdWarehouse->id)
                 ->where('item_id', $packaging->id)->value('qty'),
             0.001
         );
         $this->assertEqualsWithDelta(
             1,
-            (float) InventoryStock::where('warehouse_id', $this->rtsWarehouse->id)
+            (float) InventoryStock::where('warehouse_id', $this->prdWarehouse->id)
                 ->where('item_id', $finishedGood->id)->value('qty'),
             0.001
         );
         $this->assertEqualsWithDelta(
             0,
-            (float) InventoryStock::where('warehouse_id', $this->warehouse->id)
+            (float) InventoryStock::where('warehouse_id', $this->rtsWarehouse->id)
                 ->where('item_id', $finishedGood->id)->value('qty'),
             0.001
         );
