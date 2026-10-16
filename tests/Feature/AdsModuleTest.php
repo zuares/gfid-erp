@@ -75,6 +75,52 @@ class AdsModuleTest extends TestCase
         $response->assertStatus(200);
     }
 
+    public function test_dashboard_integration_panel_detects_connected_oauth_store()
+    {
+        $store = $this->createStore('OAUTH-STATUS');
+        $store->update([
+            'credentials' => ['access_token' => 'oauth-token'],
+            'meta' => [
+                'api_access_mode' => 'read_only',
+                'api_revoked_at' => null,
+            ],
+            'token_expires_at' => now()->addHour(),
+        ]);
+
+        $pending = \Mockery::mock();
+        $pending->shouldReceive('onQueue')->once()->with('ads');
+        \Illuminate\Support\Facades\Artisan::shouldReceive('queue')
+            ->once()
+            ->andReturn($pending);
+
+        $dashboardService = \Mockery::mock(\App\Services\Marketplace\Ads\AdsDashboardService::class);
+        $dashboardService->shouldReceive('buildDashboardData')->once()->andReturn([]);
+
+        $renderedView = \Mockery::mock(\Illuminate\Contracts\View\View::class);
+        $view = \Mockery::mock(\Illuminate\Contracts\View\Factory::class);
+        $view->shouldReceive('make')
+            ->once()
+            ->withArgs(function (string $viewName, array $data) use ($store) {
+                $integrationStore = $data['integrationStores']->firstWhere('id', $store->id);
+
+                return $viewName === 'marketplace.ads_dashboard'
+                    && $integrationStore?->readOnlyAdsIntegrationStatus() === 'connected';
+            })
+            ->andReturn($renderedView);
+        $this->app->instance(\Illuminate\Contracts\View\Factory::class, $view);
+
+        $request = \Illuminate\Http\Request::create('/marketplace/ads-dashboard', 'GET', [
+            'store_id' => $store->id,
+            'date_from' => now()->subDay()->toDateString(),
+            'date_to' => now()->subDay()->toDateString(),
+        ]);
+
+        $result = app(\App\Http\Controllers\Marketplace\AdsDashboardController::class)
+            ->index($request, app(\App\Services\Marketplace\Ads\AdsAnalyticsService::class), $dashboardService);
+
+        $this->assertSame($renderedView, $result);
+    }
+
     public function test_recommended_keyword_endpoint_returns_normalized_shopee_data()
     {
         $user = $this->createUser('admin');

@@ -54,11 +54,12 @@ class AdsDashboardController extends Controller
 
     public function index(Request $request, AdsAnalyticsService $analytics, AdsDashboardService $dashboardService)
     {
-        // Daftar ini sengaja tidak memuat credentials. Dipakai panel koneksi
-        // agar toko yang tokennya kedaluwarsa/dicabut tetap bisa dihubungkan
+        // Credentials tetap diambil untuk menghitung status OAuth melalui
+        // accessor Store. Nilainya terenkripsi dan tidak pernah dikirim ke
+        // view; toko yang tokennya kedaluwarsa/dicabut tetap bisa dihubungkan
         // ulang melalui OAuth resmi.
         $integrationStores = Store::query()
-            ->select('id', 'name', 'channel_id', 'status', 'is_active', 'token_expires_at', 'meta')
+            ->select('id', 'name', 'channel_id', 'status', 'is_active', 'credentials', 'token_expires_at', 'meta')
             ->with('channel:id,code,name')
             ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
             ->where('is_active', true)
