@@ -294,23 +294,12 @@ class PurchaseReceiptController extends Controller
             $line->partially_received = !$line->fully_received && $qtyAccounted > 0;
         });
 
-        // Default hanya sebagai usulan; user tetap dapat mengganti gudang di form GRN.
-        $defaultWhCode = 'WH-RTS';
-        $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode)
-            ?: $warehouses->firstWhere('code', 'RM')
-            ?: $warehouses->first();
-
-        $selectedWarehouseId = (int) old('warehouse_id', $defaultWarehouse?->id);
-
         return view('purchasing.purchase_receipts.create', [
             'suppliers' => $suppliers,
             'warehouses' => $warehouses,
             'order' => $order,
             'lines' => $lines,
             'selectedSupplierId' => $selectedSupplierId,
-            'defaultWhCode' => $defaultWarehouse?->code,
-            'defaultWarehouse' => $defaultWarehouse,
-            'selectedWarehouseId' => $selectedWarehouseId,
         ]);
     }
 
@@ -369,24 +358,12 @@ class PurchaseReceiptController extends Controller
         });
 
         $selectedSupplierId = $purchase_order->supplier_id;
-        // Semua GRN memakai WH-RTS sebagai default; user tetap dapat
-        // menggantinya di form bila diperlukan.
-        $defaultWhCode = 'WH-RTS';
-        $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode)
-            ?: $warehouses->firstWhere('code', 'RM')
-            ?: $warehouses->first();
-
-        $selectedWarehouseId = (int) old('warehouse_id', $defaultWarehouse?->id);
-
         return view('purchasing.purchase_receipts.create', [
             'suppliers' => $suppliers,
             'warehouses' => $warehouses,
             'order' => $purchase_order,
             'lines' => $lines,
             'selectedSupplierId' => $selectedSupplierId,
-            'defaultWhCode' => $defaultWarehouse?->code,
-            'defaultWarehouse' => $defaultWarehouse,
-            'selectedWarehouseId' => $selectedWarehouseId,
         ]);
     }
 
