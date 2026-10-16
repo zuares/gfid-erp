@@ -12,9 +12,14 @@ use Illuminate\Validation\ValidationException;
 class MarketplacePayoutService
 {
     private const MARKETPLACE_CLEARING_ACCOUNT_CODE = '1302';
+    private const MARKETPLACE_PAYOUT_PENDING_ACCOUNT_CODE = '2301';
 
     /**
-     * POST pencairan wallet: Dr Bank / Cr 1302 Saldo Marketplace / Clearing.
+     * POST pencairan wallet.
+     *
+     * Match the payout against an existing positive marketplace receivable
+     * first. Any amount that arrives before its final settlement is kept in a
+     * temporary liability so the clearing asset cannot become negative.
      */
     public function post(MarketplacePayout $payout): MarketplacePayout
     {
@@ -44,6 +49,26 @@ class MarketplacePayoutService
                 ]);
             }
 
+            $marketplacePayoutPendingAccount = Account::where(
+                'code',
+                (string) config(
+                    'marketplace.accounting_accounts.marketplace_payout_pending',
+                    self::MARKETPLACE_PAYOUT_PENDING_ACCOUNT_CODE,
+                ),
+            )
+                ->where('is_active', true)
+                ->first();
+            if (! $marketplacePayoutPendingAccount) {
+                throw ValidationException::withMessages([
+                    'account' => 'Akun 2301 Payout Marketplace Belum Direkonsiliasi tidak ditemukan.',
+                ]);
+            }
+
+            $amount = round((float) $locked->amount, 2);
+            $availableClearing = $this->positiveBalance($marketplaceClearingAccount->id);
+            $matchedAmount = min($amount, $availableClearing);
+            $pendingAmount = round($amount - $matchedAmount, 2);
+
             $desc = trim(
                 ($locked->description ?: "Penerimaan {$locked->marketplace_name}")
                 . ($locked->reference ? " (#{$locked->reference})" : '')
@@ -65,13 +90,25 @@ class MarketplacePayoutService
                 'credit'     => 0,
             ]);
 
-            // Cr 1302 Saldo Marketplace / Clearing
-            JournalLine::create([
-                'journal_id' => $journal->id,
-                'account_id' => $marketplaceClearingAccount->id,
-                'debit'      => 0,
-                'credit'     => $locked->amount,
-            ]);
+            if ($matchedAmount > 0) {
+                // Cr 1302 Saldo Marketplace / Clearing
+                JournalLine::create([
+                    'journal_id' => $journal->id,
+                    'account_id' => $marketplaceClearingAccount->id,
+                    'debit'      => 0,
+                    'credit'     => $matchedAmount,
+                ]);
+            }
+
+            if ($pendingAmount > 0) {
+                // Cr 2301 Payout Marketplace Belum Direkonsiliasi
+                JournalLine::create([
+                    'journal_id' => $journal->id,
+                    'account_id' => $marketplacePayoutPendingAccount->id,
+                    'debit'      => 0,
+                    'credit'     => $pendingAmount,
+                ]);
+            }
 
             $locked->update([
                 'status'     => 'posted',
@@ -80,6 +117,17 @@ class MarketplacePayoutService
 
             return $locked->fresh();
         });
+    }
+
+    private function positiveBalance(int $accountId): float
+    {
+        $balance = (float) JournalLine::query()
+            ->where('account_id', $accountId)
+            ->whereHas('journal', fn ($query) => $query->whereNull('voided_at'))
+            ->selectRaw('COALESCE(SUM(debit - credit), 0) as balance')
+            ->value('balance');
+
+        return max(round($balance, 2), 0);
     }
 
     /**

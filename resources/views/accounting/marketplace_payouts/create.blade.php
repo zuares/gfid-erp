@@ -35,7 +35,7 @@
             ← Kembali
         </a>
         <h5 class="mb-0 fw-black">Tambah Penerimaan Marketplace</h5>
-        <div class="text-muted" style="font-size:.8rem">Jurnal: Dr Bank / Cr 1302 Saldo Marketplace / Clearing</div>
+        <div class="text-muted" style="font-size:.8rem">Jurnal: Dr Bank / Cr 1302 jika settlement tersedia; selain itu Cr 2301 payout pending</div>
     </div>
 
     @if($errors->any())

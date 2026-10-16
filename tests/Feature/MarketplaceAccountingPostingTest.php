@@ -12,6 +12,7 @@ use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\Store;
 use App\Models\User;
+use App\Models\JournalLine;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -178,6 +179,41 @@ class MarketplaceAccountingPostingTest extends TestCase
         $this->assertSame($preview['total_debit'], $preview['total_credit']);
     }
 
+    public function test_final_settlement_releases_pending_payout_against_clearing(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-POSTING-PENDING-' . uniqid(),
+        ]);
+        $store = $this->seedFinancialData();
+        $pending = Account::where('code', '2301')->firstOrFail();
+
+        $pendingJournal = Journal::create([
+            'date' => '2026-08-10',
+            'description' => 'Payout before settlement test',
+            'source_type' => 'marketplace_payout',
+            'source_id' => 991,
+            'posted_at' => now(),
+        ]);
+        JournalLine::create([
+            'journal_id' => $pendingJournal->id,
+            'account_id' => $pending->id,
+            'debit' => 0,
+            'credit' => 235,
+        ]);
+
+        $preview = app(\App\Services\Marketplace\MarketplaceAccountingPostingService::class)->preview([
+            'store_id' => $store->id,
+            'date_basis' => 'ordered_at',
+            'date_from' => '2026-08-01',
+            'date_to' => '2026-08-31',
+        ]);
+        $lines = collect($preview['lines']);
+
+        $this->assertSame(235.0, (float) $lines->where('account_code', '2301')->sum('debit'));
+        $this->assertSame(235.0, (float) $lines->where('account_code', '1302')->sum('credit'));
+    }
+
     public function test_non_owner_cannot_post_marketplace_accounting(): void
     {
         $admin = User::factory()->create([
@@ -241,6 +277,7 @@ class MarketplaceAccountingPostingTest extends TestCase
             ['4101', 'Penjualan', 'revenue'],
             ['4201', 'Retur Penjualan', 'revenue'],
             ['1302', 'Saldo Marketplace / Clearing', 'asset'],
+            ['2301', 'Payout Marketplace Belum Direkonsiliasi', 'liability'],
             ['1304', 'Saldo Iklan Marketplace / Prepaid', 'asset'],
             ['6201', 'Biaya Marketplace', 'expense'],
             ['6206', 'Biaya Iklan Marketplace', 'expense'],

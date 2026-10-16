@@ -100,7 +100,7 @@
             <a href="{{ route('accounting.marketplace-payouts.edit', $p) }}" class="mp-btn">Edit</a>
             <form method="POST" action="{{ route('accounting.marketplace-payouts.post', $p) }}">
                 @csrf
-                <button class="mp-btn mp-btn-primary" onclick="return confirm('POST jurnal Dr Bank / Cr Saldo Marketplace / Clearing?')">
+                <button class="mp-btn mp-btn-primary" onclick="return confirm('POST jurnal Dr Bank / Cr clearing yang tersedia atau payout pending?')">
                     POST Jurnal
                 </button>
             </form>

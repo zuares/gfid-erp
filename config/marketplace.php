@@ -18,6 +18,10 @@ return [
     // pemakaian iklan tidak mengurangi 1302 untuk kedua kalinya.
     'accounting_accounts' => [
         'marketplace_receivable' => env('MARKETPLACE_ACCOUNT_RECEIVABLE', '1302'),
+        // Cash can arrive before the corresponding settlement is final and
+        // reconciled. Keep that amount in a temporary liability instead of
+        // allowing the marketplace clearing asset to become negative.
+        'marketplace_payout_pending' => env('MARKETPLACE_ACCOUNT_PAYOUT_PENDING', '2301'),
         'ad_wallet' => env('MARKETPLACE_ACCOUNT_AD_WALLET', '1304'),
         'sales' => env('MARKETPLACE_ACCOUNT_SALES', '4101'),
         'sales_return' => env('MARKETPLACE_ACCOUNT_SALES_RETURN', '4201'),

@@ -7,6 +7,7 @@ use App\Models\Journal;
 use App\Models\MarketplaceAccountingPosting;
 use App\Models\MarketplaceFinancialAuditLog;
 use App\Models\MarketplaceFinancialClosing;
+use App\Models\JournalLine;
 use App\Services\Accounting\JournalService;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Validation\ValidationException;
@@ -53,8 +54,17 @@ class MarketplaceAccountingPostingService
         $otherAdjustment = (float) $summary['other_settlement_adjustment'];
         $adCostForGl = round((float) ($summary['ad_cost_for_gl'] ?? $summary['wallet_ad_cost'] ?? 0), 2);
         $adWalletTopup = round((float) ($summary['wallet_ad_topup'] ?? 0), 2);
+        $pendingPayout = min(
+            max(round((float) ($summary['payout'] ?? 0), 2), 0),
+            $this->pendingPayoutCreditBalance($accounts[$this->accountCode('marketplace_payout_pending')]),
+        );
         $lines = [
             $this->line($accounts[$this->accountCode('marketplace_receivable')], (float) $summary['payout'], 0),
+            // Release cash that was received before the settlement became
+            // final. This offsets the temporary payout liability against the
+            // receivable created by the final settlement.
+            $this->line($accounts[$this->accountCode('marketplace_payout_pending')], $pendingPayout, 0),
+            $this->line($accounts[$this->accountCode('marketplace_receivable')], 0, $pendingPayout),
             $this->line($accounts[$this->accountCode('sales_return')], (float) $summary['seller_discount'] + (float) $summary['refund'], 0),
             $this->line($accounts[$this->accountCode('other_fee')], (float) $summary['marketplace_fees'] + max(-$otherAdjustment, 0), 0),
             $this->line($accounts[$this->accountCode('other_fee')], 0, max($otherAdjustment, 0)),
@@ -306,6 +316,7 @@ class MarketplaceAccountingPostingService
             $this->accountCode('sales'),
             $this->accountCode('sales_return'),
             $this->accountCode('marketplace_receivable'),
+            $this->accountCode('marketplace_payout_pending'),
             $this->accountCode('other_fee'),
             $this->accountCode('ad_wallet'),
             $this->accountCode('advertising'),
@@ -315,6 +326,17 @@ class MarketplaceAccountingPostingService
     private function accountCode(string $key): string
     {
         return (string) config('marketplace.accounting_accounts.' . $key, '6201');
+    }
+
+    private function pendingPayoutCreditBalance(Account $account): float
+    {
+        $balance = (float) JournalLine::query()
+            ->where('account_id', $account->id)
+            ->whereHas('journal', fn ($query) => $query->whereNull('voided_at'))
+            ->selectRaw('COALESCE(SUM(debit - credit), 0) as balance')
+            ->value('balance');
+
+        return max(round(-$balance, 2), 0);
     }
 
     private function scopeKey(array $filters): string

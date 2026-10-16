@@ -105,6 +105,13 @@ class AccountSeeder extends Seeder
                 'is_cash' => 0,
                 'is_active' => 1,
             ]);
+            DB::table('accounts')->updateOrInsert(['code' => '2301'], [
+                'code' => '2301',
+                'name' => 'Payout Marketplace Belum Direkonsiliasi',
+                'type' => 'liability',
+                'is_cash' => 0,
+                'is_active' => 1,
+            ]);
             DB::table('accounts')->updateOrInsert(['code' => '1401'], [
                 'code' => '1401',
                 'name' => 'PPN Masukan',

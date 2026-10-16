@@ -280,7 +280,7 @@ class MarketplacePayoutController extends Controller
         return redirect()
             ->route('accounting.marketplace-payouts.show', $marketplacePayout)
             ->with('status', 'ok')
-            ->with('message', 'Penerimaan berhasil di-POST (Dr Bank / Cr Saldo Marketplace / Clearing).');
+            ->with('message', 'Penerimaan berhasil di-POST (Dr Bank / Cr payout marketplace pending atau clearing yang tersedia).');
     }
 
     public function bulkPost(Request $request, MarketplacePayoutService $service)
