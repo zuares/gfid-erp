@@ -18,6 +18,7 @@
 @push('head')
     @include('production.dashboard.partials._gf-styles')
     <style>
+        .ce-detail-shell { width: 100%; max-width: 1180px; margin-inline: auto; }
         .ce-detail-page { display: grid; gap: .75rem; }
         .ce-actions { display: flex; justify-content: flex-end; gap: .35rem; flex-wrap: wrap; }
         .ce-btn {
@@ -254,7 +255,7 @@
 @endpush
 
 @section('content')
-    <x-gf.page
+    <x-gf.page class="ce-detail-shell"
         eyebrow="Accounting"
         title="Pengeluaran #{{ $cashExpense->id }}"
         description="Detail transaksi pengeluaran kas">

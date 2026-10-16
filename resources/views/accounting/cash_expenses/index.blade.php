@@ -109,6 +109,7 @@
             background: rgba(239, 68, 68, .08); color: #991b1b; font-size: .86rem;
         }
         .ce-form-error ul { margin: .35rem 0 0; padding-left: 1.1rem; }
+        .ce-modal .modal-dialog { max-width: 760px; }
         .ce-modal .modal-content { border: 0; border-radius: 16px; overflow: hidden; }
         .ce-modal .modal-header { border-bottom: 1px solid #eef2f7; }
         .ce-modal .modal-footer { border-top: 1px solid #eef2f7; }
