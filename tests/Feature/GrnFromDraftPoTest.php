@@ -721,7 +721,8 @@ class GrnFromDraftPoTest extends TestCase
         $response = $this->get(route('purchasing.purchase_receipts.create_from_order', $po));
 
         $response->assertOk()
-            ->assertSee('Sebagian diterima', false);
+            ->assertSee('Sebagian diterima', false)
+            ->assertSee('value="'.$this->rtsWarehouse->id.'" selected', false);
 
         $second = $this->grnService->create($this->makeGrnPayload($po, 3));
         $this->assertCount(1, $second->lines);

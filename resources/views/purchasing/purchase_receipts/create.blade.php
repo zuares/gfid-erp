@@ -360,11 +360,11 @@
 
     $selectedSupplier = isset($suppliers) ? $suppliers->firstWhere('id', $selectedSupplierId) : null;
 
-    $defaultWhCode = $defaultWhCode ?? 'RM';
+    $defaultWhCode = $defaultWhCode ?? 'WH-RTS';
     $defaultWarehouse = $defaultWarehouse
         ?? $warehouses->firstWhere('code', $defaultWhCode)
         ?? $warehouses->firstWhere('code', 'RM');
-    if (!$defaultWarehouse) { $defaultWhCode = 'RM'; $defaultWarehouse = $warehouses->first(); }
+    if (!$defaultWarehouse) { $defaultWhCode = 'WH-RTS'; $defaultWarehouse = $warehouses->first(); }
 
     $selectedWarehouseId = old('warehouse_id', $selectedWarehouseId ?? $defaultWarehouse?->id ?? '');
 

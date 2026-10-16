@@ -294,9 +294,11 @@ class PurchaseReceiptController extends Controller
             $line->partially_received = !$line->fully_received && $qtyAccounted > 0;
         });
 
-        // Default hanya sebagai usulan; user memilih warehouse di form GRN.
-        $defaultWhCode = 'RM';
-        $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode) ?: $warehouses->firstWhere('code', 'RM') ?: $warehouses->first();
+        // Default hanya sebagai usulan; user tetap dapat mengganti gudang di form GRN.
+        $defaultWhCode = 'WH-RTS';
+        $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode)
+            ?: $warehouses->firstWhere('code', 'RM')
+            ?: $warehouses->first();
 
         $selectedWarehouseId = (int) old('warehouse_id', $defaultWarehouse?->id);
 
@@ -367,12 +369,12 @@ class PurchaseReceiptController extends Controller
         });
 
         $selectedSupplierId = $purchase_order->supplier_id;
-        // Legacy order_type hanya dipakai untuk memberi usulan awal gudang
-        // pada PO lama; user tetap dapat menggantinya di form GRN.
-        $legacyOrderType = $this->normalizeOrderType($purchase_order->order_type) ?: 'material';
-
-        $defaultWhCode = ($legacyOrderType === 'finished_good') ? 'WH-RTS' : 'RM';
-        $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode) ?: $warehouses->firstWhere('code', 'RM') ?: $warehouses->first();
+        // Semua GRN memakai WH-RTS sebagai default; user tetap dapat
+        // menggantinya di form bila diperlukan.
+        $defaultWhCode = 'WH-RTS';
+        $defaultWarehouse = $warehouses->firstWhere('code', $defaultWhCode)
+            ?: $warehouses->firstWhere('code', 'RM')
+            ?: $warehouses->first();
 
         $selectedWarehouseId = (int) old('warehouse_id', $defaultWarehouse?->id);
 
