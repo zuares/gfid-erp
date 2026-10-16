@@ -792,25 +792,6 @@ class ShopeeChannel implements MarketplaceChannel
     }
 
     /**
-     * Ambil rekomendasi keyword untuk satu produk.
-     * Endpoint: GET /api/v2/ads/get_recommended_keyword_list
-     *
-     * `item_id` wajib, sedangkan `input_keyword` dipakai untuk memfilter
-     * rekomendasi ketika user mengetik keyword tertentu.
-     */
-    public function getRecommendedKeywordList(Store $store, int $itemId, ?string $inputKeyword = null): array
-    {
-        $params = ['item_id' => $itemId];
-        $inputKeyword = trim((string) $inputKeyword);
-
-        if ($inputKeyword !== '') {
-            $params['input_keyword'] = $inputKeyword;
-        }
-
-        return $this->get($store, '/api/v2/ads/get_recommended_keyword_list', $params);
-    }
-
-    /**
      * Ambil info pengaturan campaign (nama, tipe, status, budget, target ROAS).
      * Endpoint: GET /api/v2/ads/get_product_level_campaign_setting_info
      *

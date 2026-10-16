@@ -25,17 +25,6 @@ class ShopeeAdsApiService
     protected function execute(Store $store, string $endpoint, callable $callable)
     {
         try {
-            $cooldownUntil = (int) \Illuminate\Support\Facades\Cache::get(
-                'shopee-ads-cooldown:' . $store->id,
-                0
-            );
-            if ($cooldownUntil > now()->timestamp) {
-                throw new \App\Exceptions\ShopeeAdsRateLimitException(
-                    $cooldownUntil - now()->timestamp,
-                    "Shopee Ads API cooldown aktif untuk endpoint {$endpoint}."
-                );
-            }
-
             // Rate limit berbasis cache Laravel (database di Web Hosting), bukan Redis.
             // Maksimal 100 request / 60 detik per toko.
             $response = RateLimiter::attempt(
@@ -105,15 +94,6 @@ class ShopeeAdsApiService
     public function getCampaignIdList(Store $store, int $pageNo = 1, int $pageSize = 100): array
     {
         return $this->execute($store, 'get_campaign_id_list', fn() => $this->driver($store)->getCampaignIdList($store, $pageNo, $pageSize));
-    }
-
-    public function getRecommendedKeywordList(Store $store, int $itemId, ?string $inputKeyword = null): array
-    {
-        return $this->execute(
-            $store,
-            'get_recommended_keyword_list',
-            fn() => $this->driver($store)->getRecommendedKeywordList($store, $itemId, $inputKeyword)
-        );
     }
 
     public function getCampaignSettingInfo(Store $store, array $campaignIds): array
