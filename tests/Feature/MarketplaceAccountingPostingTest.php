@@ -196,6 +196,29 @@ class MarketplaceAccountingPostingTest extends TestCase
         ]);
     }
 
+    public function test_wallet_can_be_excluded_from_settlement_posting(): void
+    {
+        $store = $this->seedFinancialData();
+        $this->createWalletAdTransaction($store, 'SPM-TOPUP-EXCLUDED', 'SPM_DEDUCT', -50, '2026-08-10 10:00:00');
+        $this->createWalletAdTransaction($store, 'SPM-CHARGE-EXCLUDED', 'paid_ads_charge', -30, '2026-08-11 10:00:00');
+
+        $preview = app(\App\Services\Marketplace\MarketplaceAccountingPostingService::class)->preview([
+            'store_id' => $store->id,
+            'date_basis' => 'ordered_at',
+            'date_from' => '2026-08-01',
+            'date_to' => '2026-08-31',
+            'include_ads' => false,
+        ]);
+
+        $lines = collect($preview['lines']);
+        $this->assertSame(0.0, (float) $lines->where('account_code', '1304')->sum('debit'));
+        $this->assertSame(0.0, (float) $lines->where('account_code', '6206')->sum('debit'));
+        $this->assertFalse($preview['included_in_gl']['include_ads']);
+        $this->assertSame(50.0, (float) $preview['excluded_from_gl']['wallet_ad_topup']);
+        $this->assertSame('store:' . $store->id . '|basis:ordered_at|from:2026-08-01|to:2026-08-31|ads:excluded', $preview['scope_key']);
+        $this->assertSame($preview['total_debit'], $preview['total_credit']);
+    }
+
     public function test_final_settlement_releases_pending_payout_against_clearing(): void
     {
         $owner = User::factory()->create([

@@ -106,6 +106,7 @@ class MarketplaceFinancialStatementService
                 : 'ordered_at',
             'date_from' => $filters['date_from'] ?? null,
             'date_to' => $filters['date_to'] ?? null,
+            'include_ads' => filter_var($filters['include_ads'] ?? true, FILTER_VALIDATE_BOOLEAN),
         ];
     }
 

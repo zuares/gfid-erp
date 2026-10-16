@@ -9,6 +9,7 @@
     $quality = $statement['quality'];
     $filters = $statement['filters'];
     $includeShipped = ($filters['report_scope'] ?? 'final') === 'include_shipped';
+    $includeAds = (bool) ($filters['include_ads'] ?? true);
     $dataLastDate = !empty($summary['data_last_order_at'])
         ? \Carbon\Carbon::parse($summary['data_last_order_at'])->translatedFormat('d M Y')
         : 'Belum ada';
@@ -219,6 +220,15 @@
                 </div>
                 <div class="col-md-2"><label class="form-label small fw-semibold">Dari</label><input type="date" name="date_from" class="form-control" value="{{ $filters['date_from'] }}"></div>
                 <div class="col-md-2"><label class="form-label small fw-semibold">Sampai</label><input type="date" name="date_to" class="form-control" value="{{ $filters['date_to'] }}"></div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold d-block">Accounting</label>
+                    <input type="hidden" name="include_ads" value="0">
+                    <div class="form-check form-switch border rounded px-5 py-2 bg-light-subtle">
+                        <input class="form-check-input" type="checkbox" role="switch" name="include_ads" id="include-ads" value="1" @checked($includeAds)>
+                        <label class="form-check-label small fw-semibold" for="include-ads">Sertakan saldo iklan</label>
+                    </div>
+                    <div class="form-text">Top up dan pemakaian wallet ikut batch jurnal.</div>
+                </div>
                 <div class="col-md-auto d-flex gap-2 mp-filter-actions">
                     <button class="btn mp-btn mp-btn-primary mp-btn-apply" type="submit"><i class="bi bi-funnel"></i> Terapkan filter</button>
                     <a class="btn mp-btn mp-btn-secondary mp-btn-reset" href="{{ route('marketplace.reports.financial-statement') }}" title="Kembalikan filter default"><i class="bi bi-arrow-counterclockwise"></i><span>Reset</span></a>

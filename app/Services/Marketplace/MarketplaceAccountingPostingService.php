@@ -51,9 +51,12 @@ class MarketplaceAccountingPostingService
         }
 
         $summary = $statement['summary'];
+        $includeAds = (bool) ($statement['filters']['include_ads'] ?? true);
         $otherAdjustment = (float) $summary['other_settlement_adjustment'];
-        $adCostForGl = round((float) ($summary['ad_cost_for_gl'] ?? $summary['wallet_ad_cost'] ?? 0), 2);
-        $adWalletTopup = round((float) ($summary['wallet_ad_topup'] ?? 0), 2);
+        $rawAdCostForGl = round((float) ($summary['ad_cost_for_gl'] ?? $summary['wallet_ad_cost'] ?? 0), 2);
+        $rawAdWalletTopup = round((float) ($summary['wallet_ad_topup'] ?? 0), 2);
+        $adCostForGl = $includeAds ? $rawAdCostForGl : 0.0;
+        $adWalletTopup = $includeAds ? $rawAdWalletTopup : 0.0;
         $clearing = $accounts[$this->accountCode('marketplace_receivable')];
         $availableClearing = $this->positiveBalance($clearing->id);
         if ($adWalletTopup > $availableClearing) {
@@ -116,13 +119,18 @@ class MarketplaceAccountingPostingService
             'excluded_from_gl' => [
                 'hpp' => (float) $summary['hpp'],
                 'settlement_ad_cost' => (float) ($summary['ad_cost'] ?? 0),
-                'reason' => 'HPP dapat sudah diposting dari shipment COGS. Biaya iklan order/settlement tidak diposting. Penarikan bank tetap diproses di modul payout; biaya iklan subledger menggunakan saldo iklan prepaid agar 1302 tidak berkurang dua kali.',
+                'wallet_ad_topup' => $includeAds ? 0.0 : $rawAdWalletTopup,
+                'wallet_ad_cost' => $includeAds ? 0.0 : $rawAdCostForGl,
+                'reason' => $includeAds
+                    ? 'HPP dapat sudah diposting dari shipment COGS. Biaya iklan order/settlement tidak diposting. Penarikan bank tetap diproses di modul payout; biaya iklan subledger menggunakan saldo iklan prepaid agar 1302 tidak berkurang dua kali.'
+                    : 'Saldo iklan sengaja dikecualikan dari batch ini. Top up dan pemakaian wallet tetap terlihat di laporan subledger, tetapi tidak dibuatkan jurnal sampai sumber pendanaannya direkonsiliasi.',
             ],
             'included_in_gl' => [
-                'wallet_ad_cost' => (float) ($summary['wallet_ad_cost'] ?? 0),
+                'include_ads' => $includeAds,
+                'wallet_ad_cost' => $includeAds ? (float) ($summary['wallet_ad_cost'] ?? 0) : 0.0,
                 'wallet_ad_topup' => $adWalletTopup,
                 'amount' => $adCostForGl,
-                'source' => $summary['ad_cost_for_gl_source'] ?? 'none',
+                'source' => $includeAds ? ($summary['ad_cost_for_gl_source'] ?? 'none') : 'excluded_by_filter',
                 'ads_daily_fallback_spend' => (float) ($summary['ads_daily_fallback_spend'] ?? 0),
                 'account_code' => $this->accountCode('advertising'),
                 'account_name' => $accounts[$this->accountCode('advertising')]->name,
@@ -287,6 +295,7 @@ class MarketplaceAccountingPostingService
             'date_basis' => $posting->date_basis,
             'date_from' => $posting->date_from?->toDateString(),
             'date_to' => $posting->date_to?->toDateString(),
+            'include_ads' => ! str_ends_with((string) $posting->scope_key, '|ads:excluded'),
         ];
     }
 
@@ -377,9 +386,13 @@ class MarketplaceAccountingPostingService
             $filters['date_to'],
         );
 
-        return ($filters['report_scope'] ?? 'final') === 'final'
+        $key = ($filters['report_scope'] ?? 'final') === 'final'
             ? $key
             : $key . '|scope:' . $filters['report_scope'];
+
+        return ($filters['include_ads'] ?? true) === false
+            ? $key . '|ads:excluded'
+            : $key;
     }
 
     private function description(array $filters): string

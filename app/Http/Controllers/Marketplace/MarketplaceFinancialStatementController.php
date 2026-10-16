@@ -176,11 +176,13 @@ class MarketplaceFinancialStatementController extends Controller
             'date_basis' => ['nullable', 'in:ordered_at,settlement_time'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'include_ads' => ['nullable', 'boolean'],
         ]) + [
             'report_scope' => $request->input('report_scope', 'final'),
             'date_basis' => $request->input('date_basis', 'ordered_at'),
             'date_from' => $request->input('date_from', $defaultFrom),
             'date_to' => $request->input('date_to', $defaultTo),
+            'include_ads' => $request->input('include_ads', true),
         ];
     }
 }
