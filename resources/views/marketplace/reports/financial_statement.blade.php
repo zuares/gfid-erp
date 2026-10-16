@@ -103,6 +103,32 @@
     .mp-finance-page .table tbody tr:hover { background:#f8fbff; }
     .mp-finance-page .mp-status-strip a { color:#2563eb; font-weight:700; text-decoration:none; }
     .mp-finance-page .mp-status-strip a:hover { text-decoration:underline; }
+
+    /* Shared control language: every action uses the same height, rhythm,
+       icon alignment, focus ring, and semantic color treatment. */
+    .mp-finance-page .mp-btn { display:inline-flex; align-items:center; justify-content:center; gap:.42rem; min-height:37px; padding:.45rem .78rem; border-radius:8px!important; font-size:.73rem; font-weight:750; line-height:1.1; white-space:nowrap; transition:background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease; }
+    .mp-finance-page .mp-btn i { margin:0!important; font-size:.9rem; line-height:1; }
+    .mp-finance-page .mp-btn:hover { transform:translateY(-1px); }
+    .mp-finance-page .mp-btn:focus-visible, .mp-finance-page .mp-mode-switch .btn:focus-visible, .mp-finance-page .mp-tab-nav .nav-link:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(59,130,246,.2)!important; }
+    .mp-finance-page .mp-btn-primary { color:#fff; background:#2563eb; border-color:#2563eb; box-shadow:0 2px 5px rgba(37,99,235,.18); }
+    .mp-finance-page .mp-btn-primary:hover { color:#fff; background:#1d4ed8; border-color:#1d4ed8; }
+    .mp-finance-page .mp-btn-secondary { color:#334155; background:#fff; border-color:#cbd5e1; }
+    .mp-finance-page .mp-btn-secondary:hover { color:#1e293b; background:#f8fafc; border-color:#94a3b8; }
+    .mp-finance-page .mp-btn-info { color:#075985; background:#eff6ff; border-color:#bfdbfe; }
+    .mp-finance-page .mp-btn-info:hover { color:#0c4a6e; background:#dbeafe; border-color:#93c5fd; }
+    .mp-finance-page .mp-btn-warning { color:#92400e; background:#fffbeb; border-color:#fcd34d; }
+    .mp-finance-page .mp-btn-warning:hover { color:#78350f; background:#fef3c7; border-color:#f59e0b; }
+    .mp-finance-page .mp-btn-danger { color:#b91c1c; background:#fff; border-color:#fca5a5; }
+    .mp-finance-page .mp-btn-danger:hover { color:#991b1b; background:#fef2f2; border-color:#f87171; }
+    .mp-finance-page .page-actions .mp-btn { min-height:35px; }
+    .mp-finance-page .mp-filter-actions { align-items:stretch; }
+    .mp-finance-page .mp-filter-actions .mp-btn-apply { min-width:128px; }
+    .mp-finance-page .mp-filter-actions .mp-btn-reset { min-width:78px; }
+    .mp-finance-page .mp-mode-switch .btn { min-height:31px; }
+    .mp-finance-page .mp-mode-switch .btn-check:checked + .btn { color:#1d4ed8; }
+    .mp-finance-page .mp-mode-switch .btn-check:checked + .btn[data-scope="provisional"] { color:#075985; background:#eff6ff; }
+    .mp-finance-page .mp-tab-nav .nav-link { display:inline-flex; align-items:center; gap:.38rem; }
+    .mp-finance-page .mp-tab-nav .nav-link i { font-size:.82rem; }
     @media (max-width:767.98px) {
         .mp-finance-page { padding-left:.65rem; padding-right:.65rem; }
         .mp-finance-page .mp-finance-hero { padding:1.1rem; border-radius:14px; }
@@ -110,6 +136,8 @@
         .mp-finance-page .page-actions { width:100%; }
         .mp-finance-page .page-actions .btn, .mp-finance-page .page-actions form { flex:1 1 auto; }
         .mp-finance-page .page-actions form .btn { width:100%; }
+        .mp-finance-page .mp-filter-actions { width:100%; }
+        .mp-finance-page .mp-filter-actions .mp-btn { flex:1 1 0; }
         .mp-finance-page .summary-card .card-body { min-height:88px; padding:.7rem; }
         .mp-finance-page .summary-card .fs-5 { font-size:1rem!important; }
         .mp-finance-page .mp-tab-nav { overflow-x:auto; flex-wrap:nowrap; }
@@ -134,16 +162,16 @@
             <small>{{ $filters['date_from'] }} — {{ $filters['date_to'] }}</small>
         </div>
         <div class="d-flex flex-wrap gap-2 page-actions">
-            <a class="btn btn-outline-secondary" href="{{ route('marketplace.reports.profit', $filters) }}"><i class="bi bi-graph-up-arrow me-1"></i> Detail Profit</a>
-            <a class="btn btn-outline-warning" href="{{ route('marketplace.reports.financial-closing', $filters) }}"><i class="bi bi-lock-fill me-1"></i> Closing & Audit</a>
+            <a class="btn mp-btn mp-btn-secondary" href="{{ route('marketplace.reports.profit', $filters) }}"><i class="bi bi-graph-up-arrow"></i> Lihat profit</a>
+            <a class="btn mp-btn mp-btn-warning" href="{{ route('marketplace.reports.financial-closing', $filters) }}"><i class="bi bi-lock-fill"></i> Closing & audit</a>
             <form method="POST" action="{{ route('marketplace.reports.financial-statement.sync-ad-wallet') }}">
                 @csrf
                 @foreach ($filters as $key => $value)
                     <input type="hidden" name="{{ $key }}" value="{{ $value }}">
                 @endforeach
-                <button class="btn btn-outline-primary" type="submit" title="Tarik biaya iklan wallet Shopee untuk periode ini"><i class="bi bi-arrow-repeat me-1"></i> Sync biaya iklan</button>
+                <button class="btn mp-btn mp-btn-info" type="submit" title="Tarik biaya iklan wallet Shopee untuk periode ini"><i class="bi bi-arrow-repeat"></i> Sinkronkan iklan</button>
             </form>
-            <a class="btn btn-primary" href="{{ route('marketplace.reports.financial-statement.export', $filters) }}"><i class="bi bi-download me-1"></i> Export Statement</a>
+            <a class="btn mp-btn mp-btn-primary" href="{{ route('marketplace.reports.financial-statement.export', $filters) }}"><i class="bi bi-download"></i> Export laporan</a>
         </div>
     </div>
 
@@ -170,9 +198,9 @@
                     <label class="form-label small fw-semibold">Mode laporan</label>
                     <div class="btn-group w-100 mp-mode-switch" role="group" aria-label="Mode laporan">
                         <input type="radio" class="btn-check" name="report_scope" id="scope-final" value="final" @checked(!$includeShipped)>
-                        <label class="btn btn-outline-secondary" for="scope-final">Final ledger</label>
+                        <label class="btn btn-outline-secondary" for="scope-final"><i class="bi bi-check2-circle"></i> Final ledger</label>
                         <input type="radio" class="btn-check" name="report_scope" id="scope-shipped" value="include_shipped" @checked($includeShipped)>
-                        <label class="btn btn-outline-info" for="scope-shipped">+ Provisional</label>
+                        <label class="btn btn-outline-info" data-scope="provisional" for="scope-shipped"><i class="bi bi-hourglass-split"></i> Provisional</label>
                     </div>
                 </div>
                 <div class="col-md-2">
@@ -185,8 +213,8 @@
                 <div class="col-md-2"><label class="form-label small fw-semibold">Dari</label><input type="date" name="date_from" class="form-control" value="{{ $filters['date_from'] }}"></div>
                 <div class="col-md-2"><label class="form-label small fw-semibold">Sampai</label><input type="date" name="date_to" class="form-control" value="{{ $filters['date_to'] }}"></div>
                 <div class="col-md-auto d-flex gap-2 mp-filter-actions">
-                    <button class="btn btn-outline-primary"><i class="bi bi-funnel me-1"></i> Terapkan</button>
-                    <a class="btn btn-outline-secondary" href="{{ route('marketplace.reports.financial-statement') }}" title="Kembalikan filter default"><i class="bi bi-arrow-counterclockwise"></i></a>
+                    <button class="btn mp-btn mp-btn-primary mp-btn-apply" type="submit"><i class="bi bi-funnel"></i> Terapkan filter</button>
+                    <a class="btn mp-btn mp-btn-secondary mp-btn-reset" href="{{ route('marketplace.reports.financial-statement') }}" title="Kembalikan filter default"><i class="bi bi-arrow-counterclockwise"></i><span>Reset</span></a>
                 </div>
             </form>
         </div>
@@ -245,12 +273,12 @@
             </div>
             <div class="d-flex flex-wrap gap-2">
                 @if (!$includeShipped && !$posting && $quality['incomplete'] === 0 && $quality['unknown'] === 0 && $summary['order_count'] > 0)
-                    <a class="btn btn-primary" href="{{ route('marketplace.reports.financial-statement.posting-preview', $filters) }}"><i class="bi bi-journal-check me-1"></i> Review posting</a>
+                    <a class="btn mp-btn mp-btn-primary" href="{{ route('marketplace.reports.financial-statement.posting-preview', $filters) }}"><i class="bi bi-journal-check"></i> Review jurnal</a>
                 @elseif ($posting?->status === 'posted')
                     <form method="POST" action="{{ route('marketplace.reports.financial-statement.postings.void', $posting) }}" onsubmit="return confirm('Void posting ini? Jurnal asal akan di-void dan reversal audit dibuat.');">
                         @csrf
                         <input type="hidden" name="reason" value="Koreksi posting marketplace oleh owner">
-                        <button class="btn btn-outline-danger"><i class="bi bi-arrow-counterclockwise me-1"></i> Void & reversal</button>
+                        <button class="btn mp-btn mp-btn-danger" type="submit"><i class="bi bi-arrow-counterclockwise"></i> Void & buat reversal</button>
                     </form>
                 @endif
             </div>
@@ -258,11 +286,11 @@
     </div>
 
     <ul class="nav nav-pills mp-tab-nav mb-3" id="financialStatementTabs" role="tablist">
-        <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-summary" type="button" role="tab">Ringkasan</button></li>
-        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-stores" type="button" role="tab">Per toko</button></li>
-        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-products" type="button" role="tab">Per produk</button></li>
-        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-orders" type="button" role="tab">Detail order</button></li>
-        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-trend" type="button" role="tab">Trend</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-summary" type="button" role="tab" aria-controls="tab-summary" aria-selected="true"><i class="bi bi-grid-1x2"></i> Ringkasan</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-stores" type="button" role="tab" aria-controls="tab-stores" aria-selected="false"><i class="bi bi-shop"></i> Per toko</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-products" type="button" role="tab" aria-controls="tab-products" aria-selected="false"><i class="bi bi-box-seam"></i> Per produk</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-orders" type="button" role="tab" aria-controls="tab-orders" aria-selected="false"><i class="bi bi-receipt"></i> Detail order</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-trend" type="button" role="tab" aria-controls="tab-trend" aria-selected="false"><i class="bi bi-graph-up"></i> Trend</button></li>
     </ul>
 
     <div class="tab-content" id="financialStatementTabContent">
