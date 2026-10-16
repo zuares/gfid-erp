@@ -6,6 +6,7 @@ use App\Models\MarketplaceAdCampaign;
 use App\Models\MarketplaceAdCampaignDaily;
 use App\Models\MarketplaceAdExperiment;
 use App\Models\MarketplaceAdsDaily;
+use App\Models\Item;
 use App\Models\Store;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -63,6 +64,21 @@ class SeedAdsEvaluationUiDummy extends Command
 
                 $campaigns = [];
                 foreach (self::CAMPAIGN_IDS as $index => $campaignId) {
+                    $itemNumber = $index + 1;
+                    $unitCogs = [24000, 52000, 46000, 18000][$index] ?? 25000;
+                    $item = Item::query()->updateOrCreate(
+                        ['code' => sprintf('DUMMY-ADS-UI-%03d', $itemNumber)],
+                        [
+                            'name' => 'DUMMY Produk Ads · Evaluasi ' . $itemNumber,
+                            'unit' => 'pcs',
+                            'type' => 'finished',
+                            'hpp' => $unitCogs,
+                            'base_unit_cost' => $unitCogs,
+                            'active' => true,
+                            'hpp_behavior' => 'hpp',
+                        ],
+                    );
+
                     $campaigns[$campaignId] = MarketplaceAdCampaign::query()->updateOrCreate(
                         [
                             'store_id' => $store->id,
@@ -71,12 +87,15 @@ class SeedAdsEvaluationUiDummy extends Command
                         [
                             'campaign_name' => 'DUMMY UI · Evaluasi ' . ($index + 1),
                             'campaign_type' => 'manual',
+                            'channel_item_id' => 990000 + $itemNumber,
+                            'internal_item_id' => $item->id,
                             'status' => 'ongoing',
                             'campaign_status' => 'ongoing',
                             'ad_type' => 'manual',
                             'target_roas' => 3.5,
                             'campaign_budget' => 125000,
-                            'mapping_status' => 'unmapped',
+                            'mapping_status' => 'manual',
+                            'mapping_source' => 'dummy',
                             'synced_at' => now(),
                         ],
                     );

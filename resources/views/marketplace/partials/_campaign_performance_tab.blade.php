@@ -507,6 +507,52 @@
     .perf-sticky-scrollbar::-webkit-scrollbar { height: 12px; }
     .perf-sticky-scrollbar::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 999px; }
     .perf-sticky-scrollbar::-webkit-scrollbar-thumb { background: #64748b; border: 2px solid #e2e8f0; border-radius: 999px; }
+    .perf-category-table-scroll-shell { margin-top: .35rem; }
+    .perf-category-table-scroll-shell > .perf-category-table-scroll {
+        max-height: min(58vh, 520px);
+        overflow: auto;
+        scrollbar-color: #94a3b8 transparent;
+        scrollbar-width: thin;
+    }
+    .perf-category-table-scroll-shell > .perf-category-table-scroll::-webkit-scrollbar { width: 9px; height: 0; }
+    .perf-category-table-scroll-shell > .perf-category-table-scroll::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 999px; }
+    .perf-category-table-scroll-shell .perf-category-campaign-table {
+        min-width: 1830px;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .perf-category-table-scroll-shell .perf-category-campaign-table thead th {
+        position: sticky;
+        white-space: nowrap;
+        vertical-align: middle;
+        background: var(--card-bg, #fff);
+        border-bottom: 1px solid var(--dsh-border, #e2e8f0);
+        z-index: 5;
+    }
+    .perf-category-table-scroll-shell .perf-category-campaign-table thead tr:first-child th {
+        top: 0;
+        z-index: 6;
+        padding-top: .55rem;
+        padding-bottom: .4rem;
+    }
+    .perf-category-table-scroll-shell .perf-category-campaign-table thead tr:nth-child(2) th {
+        top: 34px;
+        z-index: 5;
+        color: var(--text, #0f172a);
+        background: var(--card-bg, #fff);
+    }
+    .perf-category-table-scroll-shell .perf-category-campaign-table thead tr:first-child th:first-child,
+    .perf-category-table-scroll-shell .perf-category-campaign-table tbody td:first-child {
+        position: sticky;
+        left: 0;
+        background: var(--card-bg, #fff);
+        box-shadow: 1px 0 0 var(--dsh-border, #e2e8f0);
+    }
+    .perf-category-table-scroll-shell .perf-category-campaign-table thead tr:first-child th:first-child { z-index: 9; }
+    .perf-category-table-scroll-shell .perf-category-campaign-table tbody td:first-child { z-index: 2; }
+    body[data-theme="dark"] .perf-category-table-scroll-shell .perf-category-campaign-table tbody td { border-bottom-color: rgba(71, 85, 105, .55); }
+    body[data-theme="dark"] .perf-category-table-scroll-shell .perf-category-campaign-table thead th,
+    body[data-theme="dark"] .perf-category-table-scroll-shell .perf-category-campaign-table tbody td:first-child { background: var(--card-bg, #111827); }
     body[data-theme="dark"] .perf-sticky-scrollbar { background: #0f172a !important; border-color: #475569; box-shadow: 0 -2px 10px rgba(0, 0, 0, .4); scrollbar-color: #94a3b8 #1e293b; }
     body[data-theme="dark"] .perf-sticky-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
     body[data-theme="dark"] .perf-sticky-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; border-color: #1e293b; }
@@ -1021,7 +1067,8 @@
                     <tr class="perf-category-detail" data-perf-views="category" style="display:none;">
                         <td colspan="15" class="bg-light">
                             <div class="text-muted fw-bold mb-1" style="font-size:.66rem;">Daftar campaign dalam kategori {{ $categoryRow['category'] }}</div>
-                            <div class="table-responsive">
+                            <div class="perf-table-scroll-shell perf-category-table-scroll-shell" data-perf-sticky-shell>
+                            <div class="table-responsive perf-category-table-scroll" data-perf-table-scroll>
                                 <table class="table table-sm table-hover align-middle mb-0 perf-category-campaign-table">
                                     <thead>
                                         <tr>
@@ -1134,6 +1181,8 @@
                                     </tbody>
                                 </table>
                             </div>
+                            <div class="perf-sticky-scrollbar" data-perf-sticky-scrollbar aria-label="Geser tabel campaign kategori secara horizontal"><div></div></div>
+                            </div>
                         </td>
                     </tr>
                 @endforeach
@@ -1164,13 +1213,11 @@
                                         <i class="bi bi-box"></i> {{ $row['item_name'] }}
                                         @if($row['type'])<span class="badge bg-light text-dark border ms-1" style="font-size:.52rem;">{{ strtoupper($row['type']) }}</span>@endif
                                     </div>
-                                    @if($row['item_name'] !== 'N/A')
-                                        <div class="perf-product-economics">
-                                            <span>COGS/unit <b>{{ $row['unit_cogs'] > 0 ? 'Rp ' . number_format($row['unit_cogs'], 0, ',', '.') : '—' }}</b></span>
-                                            <span>BEP <b>{{ $row['bep_roas'] === null ? '—' : number_format($row['bep_roas'], 2) . 'x' }}</b></span>
-                                            <span>CPA BEP <b>{{ $row['bep_cpa'] === null ? '—' : 'Rp ' . number_format($row['bep_cpa'], 0, ',', '.') }}</b></span>
-                                        </div>
-                                    @endif
+                                    <div class="perf-product-economics" title="{{ $row['item_name'] === 'N/A' ? 'Produk belum dipetakan ke HPP' : 'Ekonomi produk' }}">
+                                        <span>COGS/unit <b>{{ $row['unit_cogs'] > 0 ? 'Rp ' . number_format($row['unit_cogs'], 0, ',', '.') : '—' }}</b></span>
+                                        <span>BEP <b>{{ $row['bep_roas'] === null ? '—' : number_format($row['bep_roas'], 2) . 'x' }}</b></span>
+                                        <span>CPA BEP <b>{{ $row['bep_cpa'] === null ? '—' : 'Rp ' . number_format($row['bep_cpa'], 0, ',', '.') }}</b></span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="perf-campaign-controls" onclick="event.stopPropagation()">
@@ -1310,8 +1357,8 @@
                 </tr>
             </tbody>
         </table>
-        <div class="perf-sticky-scrollbar" data-perf-sticky-scrollbar aria-label="Geser tabel performa secara horizontal"><div></div></div>
     </div>
+    <div class="perf-sticky-scrollbar" data-perf-sticky-scrollbar aria-label="Geser tabel performa secara horizontal"><div></div></div>
     </div>
 </div>
 
@@ -1819,7 +1866,7 @@ function perfInitStickyScrollbar() {
         const tableScroll = shell.querySelector('[data-perf-table-scroll]');
         const stickyScroll = shell.querySelector('[data-perf-sticky-scrollbar]');
         const spacer = stickyScroll?.firstElementChild;
-        const table = tableScroll?.querySelector('.perf-table');
+        const table = tableScroll?.querySelector('.perf-table, .perf-category-campaign-table');
         if (!tableScroll || !stickyScroll || !spacer) return;
         shell.dataset.perfScrollbarReady = '1';
         let syncing = false;
@@ -1829,6 +1876,7 @@ function perfInitStickyScrollbar() {
             stickyScroll.style.display = contentWidth > tableScroll.clientWidth + 2 ? 'block' : 'none';
             if (!syncing) stickyScroll.scrollLeft = tableScroll.scrollLeft;
         };
+        shell.__perfSyncStickyScrollbar = syncWidth;
         tableScroll.addEventListener('scroll', () => {
             if (syncing) return;
             syncing = true;
@@ -1848,6 +1896,12 @@ function perfInitStickyScrollbar() {
             window.addEventListener('resize', syncWidth);
         }
         syncWidth();
+    });
+}
+
+function perfRefreshStickyScrollbars() {
+    document.querySelectorAll('[data-perf-sticky-shell]').forEach(shell => {
+        if (typeof shell.__perfSyncStickyScrollbar === 'function') shell.__perfSyncStickyScrollbar();
     });
 }
 
@@ -2000,7 +2054,9 @@ function perfToggleCategory(row) {
     row.classList.toggle('open');
     const detail = row.nextElementSibling;
     if (detail && detail.classList.contains('perf-category-detail')) {
-        detail.style.display = (detail.style.display === 'none' || !detail.style.display) ? 'table-row' : 'none';
+        const isOpen = detail.style.display === 'none' || !detail.style.display;
+        detail.style.display = isOpen ? 'table-row' : 'none';
+        if (isOpen) requestAnimationFrame(perfRefreshStickyScrollbars);
     }
 }
 
