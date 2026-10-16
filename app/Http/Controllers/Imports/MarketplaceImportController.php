@@ -79,12 +79,24 @@ class MarketplaceImportController extends Controller
      * ============================================================ */
     public function create(Request $request): View
     {
+        $channels = Channel::select('id', 'code', 'name')
+            ->where('is_active', 1)
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (Channel $channel): bool => $this->resolveChannelKey($channel->name, $channel->code) !== null)
+            ->values();
+        $supportedChannelIds = $channels->pluck('id');
+
         $selectedStore = null;
 
         if ($request->filled('store_id')) {
             $selectedStore = Store::query()
                 ->select('id', 'name', 'channel_id')
                 ->where('is_active', 1)
+                ->where(function ($query) use ($supportedChannelIds) {
+                    $query->whereIn('channel_id', $supportedChannelIds)
+                        ->orWhereNull('channel_id');
+                })
                 ->find((int) $request->input('store_id'));
         }
 
@@ -93,12 +105,13 @@ class MarketplaceImportController extends Controller
             ?: ($request->filled('channel_id') ? (int) $request->input('channel_id') : null);
 
         return view('imports.marketplace.create', [
-            'channels' => Channel::select('id', 'code', 'name')
-                ->where('is_active', 1)
-                ->orderBy('name')
-                ->get(),
+            'channels' => $channels,
             'stores' => Store::select('id', 'name', 'channel_id')
                 ->where('is_active', 1)
+                ->where(function ($query) use ($supportedChannelIds) {
+                    $query->whereIn('channel_id', $supportedChannelIds)
+                        ->orWhereNull('channel_id');
+                })
                 ->orderBy('name')
                 ->get(),
             'draft' => session('mp_import_preview'),

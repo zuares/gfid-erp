@@ -15,7 +15,8 @@ class MpIncomeImportService
     protected array $adapters = [];
 
     public function __construct(
-        protected ApplyIncomeService $applyIncome
+        protected ApplyIncomeService $applyIncome,
+        protected ImportedMarketplaceIncomeSyncService $orderIncomeSync,
     ) {
         $this->register(app(\App\Services\Marketplace\Income\Adapters\ShopeeIncomeAdapter::class));
         $this->register(app(\App\Services\Marketplace\Income\Adapters\TiktokIncomeAdapter::class));
@@ -75,6 +76,14 @@ class MpIncomeImportService
             'shipments_updated' => 0,
             'orders_with_multi_shipments' => 0,
 
+            'orders_matched_marketplace' => 0,
+            'orders_unmatched_marketplace' => 0,
+            'settlements_created' => 0,
+            'settlements_updated' => 0,
+            'api_settlements_preserved' => 0,
+            'income_mismatches' => 0,
+            'profit_incomplete' => 0,
+
             'rows_skipped_no_order_id' => $skippedNoOrderId,
             'rows_skipped_dedupe' => $skippedDedupe,
             'rows_skipped_unlinked_adjustment' => (int) ($adapterStats['rows_skipped_unlinked_adjustment'] ?? 0),
@@ -105,6 +114,14 @@ class MpIncomeImportService
                 $stats['orders_parsed'] - $stats['orders_matched_shipments']
             );
             $stats['shipments_updated'] = $stats['orders_matched_shipments'];
+            $stats['orders_matched_marketplace'] = \App\Models\MarketplaceOrder::query()
+                ->where('store_id', $storeId)
+                ->whereIn('channel_order_id', $uniqueOrderIds)
+                ->count();
+            $stats['orders_unmatched_marketplace'] = max(
+                0,
+                $stats['orders_parsed'] - $stats['orders_matched_marketplace']
+            );
 
             $sample = [];
             foreach (array_slice($uniqueOrderIds, 0, 5) as $oid) {
@@ -223,6 +240,22 @@ class MpIncomeImportService
                 $stats['orders_matched_shipments'] += (int) ($applyRes['matched_orders'] ?? 0);
                 $stats['shipments_updated'] += (int) ($applyRes['updated_shipments'] ?? 0);
                 $stats['orders_with_multi_shipments'] += (int) ($applyRes['multi_ship_orders'] ?? 0);
+
+                $orderSync = $this->orderIncomeSync->syncFromParsedRows(
+                    $storeId,
+                    $orderChunk,
+                    $rowByOrder,
+                    $batchId,
+                    $sourceFile,
+                    $tz,
+                );
+                $stats['orders_matched_marketplace'] += (int) ($orderSync['matched_orders'] ?? 0);
+                $stats['orders_unmatched_marketplace'] += (int) ($orderSync['unmatched_orders'] ?? 0);
+                $stats['settlements_created'] += (int) ($orderSync['settlements_created'] ?? 0);
+                $stats['settlements_updated'] += (int) ($orderSync['settlements_updated'] ?? 0);
+                $stats['api_settlements_preserved'] += (int) ($orderSync['api_settlements_preserved'] ?? 0);
+                $stats['income_mismatches'] += (int) ($orderSync['income_mismatches'] ?? 0);
+                $stats['profit_incomplete'] += (int) ($orderSync['profit_incomplete'] ?? 0);
             }
         });
 

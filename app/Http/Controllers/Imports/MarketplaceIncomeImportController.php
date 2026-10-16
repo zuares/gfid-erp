@@ -381,11 +381,11 @@ class MarketplaceIncomeImportController extends Controller
             return redirect()
                 ->route('imports.marketplace_income.index')
                 ->with('success',
-                    "Import income selesai. Orders=" . (int) ($stats['orders_parsed'] ?? 0)
-                    . " incomes=" . (int) ($stats['incomes_upserted'] ?? 0)
-                    . " matched=" . (int) ($stats['orders_matched_shipments'] ?? 0)
-                    . " updatedShip=" . (int) ($stats['shipments_updated'] ?? 0)
-                    . " batch=" . ($stats['batch'] ?? '-')
+                    'Import Income selesai: '
+                    . (int) ($stats['incomes_upserted'] ?? 0) . ' order tersimpan, '
+                    . (int) ($stats['orders_matched_marketplace'] ?? 0) . ' cocok ke data penjualan, dan '
+                    . (int) ($stats['profit_incomplete'] ?? 0) . ' profit perlu dilengkapi. '
+                    . 'Batch ' . ($stats['batch'] ?? '-')
                 );
         } catch (\Throwable $e) {
             report($e);

@@ -3,12 +3,18 @@
 namespace Tests\Feature;
 
 use App\Models\Channel;
+use App\Models\Item;
 use App\Models\MarketplaceImportBatch;
 use App\Models\MarketplaceOrder;
+use App\Models\MarketplaceOrderItem;
+use App\Models\MarketplaceOrderSettlement;
 use App\Models\MpShipment;
-use App\Services\Marketplace\Import\MpImportService;
+use App\Models\SkuMapping;
 use App\Models\Store;
 use App\Models\User;
+use App\Services\Marketplace\Import\MpImportService;
+use App\Services\Marketplace\Income\ImportedMarketplaceIncomeSyncService;
+use App\Services\Marketplace\Income\MpIncomeImportService;
 use App\Services\Marketplace\Source\TiktokApiSourceAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -93,7 +99,7 @@ class MarketplaceTikTokImportTest extends TestCase
     {
         $owner = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'TTK-SIDEBAR-' . uniqid(),
+            'employee_code' => 'TTK-SIDEBAR-'.uniqid(),
         ]);
 
         $this->actingAs($owner)
@@ -124,10 +130,18 @@ class MarketplaceTikTokImportTest extends TestCase
             'status' => 'active',
             'is_active' => true,
         ]);
+        $offlineChannel = Channel::updateOrCreate(
+            ['code' => 'OFFL'],
+            [
+                'name' => 'Offline',
+                'status' => 'active',
+                'is_active' => true,
+            ]
+        );
 
         $admin = User::factory()->create([
             'role' => 'admin',
-            'employee_code' => 'ADMIN-IMPORT-' . uniqid(),
+            'employee_code' => 'ADMIN-IMPORT-'.uniqid(),
         ]);
 
         $this->actingAs($admin)
@@ -135,12 +149,20 @@ class MarketplaceTikTokImportTest extends TestCase
             ->assertOk()
             ->assertSee('Import Order');
 
-        $this->actingAs($admin)
-            ->get(route('imports.marketplace.create', ['store_id' => $store->id]))
+        $importPage = $this->actingAs($admin)
+            ->get(route('imports.marketplace.create', ['store_id' => $store->id]));
+
+        $importPage
             ->assertOk()
             ->assertSee('Upload File')
-            ->assertSee('data-selected-store-id="' . $store->id . '"', false)
-            ->assertSee('value="' . $channel->id . '" selected', false);
+            ->assertSee('Import Pesanan Marketplace')
+            ->assertSee('Tiga langkah singkat')
+            ->assertSee('id="marketplaceImportForm"', false)
+            ->assertSee('id="importDropzone"', false)
+            ->assertSee('id="previewImportButton"', false)
+            ->assertSee('data-selected-store-id="'.$store->id.'"', false)
+            ->assertSee('value="'.$channel->id.'" selected', false);
+        $this->assertFalse($importPage->viewData('channels')->contains('id', $offlineChannel->id));
     }
 
     public function test_completed_import_batch_can_be_deleted_from_ui(): void
@@ -164,7 +186,7 @@ class MarketplaceTikTokImportTest extends TestCase
 
         $owner = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'TTK-DELETE-' . uniqid(),
+            'employee_code' => 'TTK-DELETE-'.uniqid(),
         ]);
 
         $csv = implode("\n", [
@@ -227,7 +249,7 @@ class MarketplaceTikTokImportTest extends TestCase
 
         $admin = User::factory()->create([
             'role' => 'admin',
-            'employee_code' => 'ADMIN-CRUD-' . uniqid(),
+            'employee_code' => 'ADMIN-CRUD-'.uniqid(),
         ]);
 
         $createResponse = $this->actingAs($admin)->postJson('/api/marketplace/stores', [
@@ -241,7 +263,7 @@ class MarketplaceTikTokImportTest extends TestCase
         $storeId = $createResponse->json('store.id');
 
         $this->actingAs($admin)
-            ->patchJson('/api/marketplace/stores/' . $storeId, [
+            ->patchJson('/api/marketplace/stores/'.$storeId, [
                 'name' => 'Toko Edit Test',
                 'region' => 'ID-JK',
             ])
@@ -254,7 +276,7 @@ class MarketplaceTikTokImportTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->deleteJson('/api/marketplace/stores/' . $storeId)
+            ->deleteJson('/api/marketplace/stores/'.$storeId)
             ->assertOk()
             ->assertJsonPath('message', 'Toko berhasil dihapus karena belum memiliki riwayat pesanan.');
 
@@ -369,7 +391,7 @@ class MarketplaceTikTokImportTest extends TestCase
 
         $user = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'TTK-DESCRIPTION-' . uniqid(),
+            'employee_code' => 'TTK-DESCRIPTION-'.uniqid(),
         ]);
 
         $csv = implode("\n", [
@@ -434,10 +456,10 @@ class MarketplaceTikTokImportTest extends TestCase
         ]);
         $owner = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'TTK-XLSX-' . uniqid(),
+            'employee_code' => 'TTK-XLSX-'.uniqid(),
         ]);
 
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('OrderSKUList');
         $sheet->fromArray([
@@ -445,14 +467,16 @@ class MarketplaceTikTokImportTest extends TestCase
             ['Platform unique order ID.', 'Current order status.', 'Seller sku input by the seller in the product system.', 'Platform product name.', 'SKU sold quantity in the order.', 'Subtotal after discount.', 'Order total amount paid by the buyer.', 'Order created time.', 'The order tracking number.', 'The order package ID.', ''],
             ['', 'Dikirim', 'TTC-BLK-XL', 'Tracktop Jacket', 1, 50000, 85000, '12/10/2026 10:30:00', 'JY-XLSX-001', '', 'TikTok'],
             ['', 'Dikirim', 'K5BLK', 'Jogger Hitam', 1, 35000, 85000, '12/10/2026 10:30:00', 'JY-XLSX-001', '', 'TikTok'],
+            ['', 'Dikirim', 'S3RDM', 'Boxer Random', 1, 12000, 85000, '12/10/2026 10:30:00', 'JY-XLSX-001', '', 'TikTok'],
             ['586455555555555555', 'Dikirim', 'K7BLK', 'Jogger Tokopedia', 2, 33000, 66000, '12/10/2026 10:40:00', 'JY-XLSX-002', 'PKG-TOKO-001', 'Tokopedia'],
         ]);
         $orderId = '586444444444444444';
         $packageId = '1213665526886401636';
-        foreach ([3, 4] as $row) {
-            $sheet->setCellValueExplicit("A{$row}", $orderId . "\t", DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit("J{$row}", $packageId . "\t", DataType::TYPE_STRING);
+        foreach ([3, 4, 5] as $row) {
+            $sheet->setCellValueExplicit("A{$row}", $orderId."\t", DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("J{$row}", ($row === 5 ? '1213665526886401637' : $packageId)."\t", DataType::TYPE_STRING);
         }
+        $sheet->setCellValue('I5', 'JY-XLSX-001B');
 
         $path = tempnam(sys_get_temp_dir(), 'tiktok-xlsx-');
         (new Xlsx($spreadsheet))->save($path);
@@ -478,8 +502,8 @@ class MarketplaceTikTokImportTest extends TestCase
             unlink($path);
         }
 
-        $this->assertSame(2, session('mp_import_preview.stats.shipments_parsed'));
-        $this->assertSame(3, session('mp_import_preview.stats.items_parsed'));
+        $this->assertSame(3, session('mp_import_preview.stats.shipments_parsed'));
+        $this->assertSame(4, session('mp_import_preview.stats.items_parsed'));
         $this->assertSame(1, session('mp_import_preview.stats.purchase_channels.tiktok.orders'));
         $this->assertSame(1, session('mp_import_preview.stats.purchase_channels.tokopedia.orders'));
 
@@ -494,6 +518,10 @@ class MarketplaceTikTokImportTest extends TestCase
         $this->assertSame($packageId, $shipment->platform_shipment_id);
         $this->assertSame('JY-XLSX-001', $shipment->tracking_no);
         $this->assertSame(2, $shipment->items()->count());
+        $this->assertSame(2, MpShipment::query()
+            ->where('store_id', $store->id)
+            ->where('platform_order_id', $orderId)
+            ->count());
         $this->assertSame('tiktok', $shipment->purchase_channel);
         $this->assertDatabaseHas('mp_shipments', [
             'store_id' => $store->id,
@@ -510,8 +538,14 @@ class MarketplaceTikTokImportTest extends TestCase
             'channel_order_id' => '586455555555555555',
             'purchase_channel' => 'tokopedia',
         ]);
+        $marketplaceOrder = MarketplaceOrder::query()
+            ->where('store_id', $store->id)
+            ->where('channel_order_id', $orderId)
+            ->firstOrFail();
+        $this->assertSame(3, $marketplaceOrder->items()->count());
+        $this->assertSame(3, (int) $marketplaceOrder->items()->sum('qty'));
 
-        $this->actingAs($owner)
+        $combinedDashboard = $this->actingAs($owner)
             ->get(route('marketplace.dashboard.sales', [
                 'store_id' => $store->id,
                 'date_from' => '2026-10-12',
@@ -519,7 +553,41 @@ class MarketplaceTikTokImportTest extends TestCase
             ]))
             ->assertOk()
             ->assertSee($orderId)
-            ->assertSee('Tracktop Jacket');
+            ->assertSee('Tracktop Jacket')
+            ->assertSee('name="purchase_channel"', false)
+            ->assertSee("document.querySelector('#sales-platform-filter')", false)
+            ->assertSee('TikTok Shop')
+            ->assertSee('Tokopedia')
+            ->assertDontSee('platform:OFFL', false)
+            ->assertDontSee('Kanal pesanan');
+        $this->assertSame(2, $combinedDashboard->viewData('summary')['orders']);
+        $this->assertSame(5, $combinedDashboard->viewData('summary')['qty']);
+
+        $tiktokDashboard = $this->get(route('marketplace.dashboard.sales', [
+            'store_id' => $store->id,
+            'purchase_channel' => 'tiktok',
+            'date_from' => '2026-10-12',
+            'date_to' => '2026-10-12',
+        ]))
+            ->assertOk()
+            ->assertSee('value="purchase:tiktok" selected', false);
+        $this->assertSame(1, $tiktokDashboard->viewData('summary')['orders']);
+        $this->assertSame(3, $tiktokDashboard->viewData('summary')['qty']);
+        $this->assertTrue($tiktokDashboard->viewData('products')->contains('marketplace_name', 'Tracktop Jacket'));
+        $this->assertFalse($tiktokDashboard->viewData('products')->contains('marketplace_name', 'Jogger Tokopedia'));
+
+        $tokopediaDashboard = $this->get(route('marketplace.dashboard.sales', [
+            'store_id' => $store->id,
+            'purchase_channel' => 'tokopedia',
+            'date_from' => '2026-10-12',
+            'date_to' => '2026-10-12',
+        ]))
+            ->assertOk()
+            ->assertSee('value="purchase:tokopedia" selected', false);
+        $this->assertSame(1, $tokopediaDashboard->viewData('summary')['orders']);
+        $this->assertSame(2, $tokopediaDashboard->viewData('summary')['qty']);
+        $this->assertTrue($tokopediaDashboard->viewData('products')->contains('marketplace_name', 'Jogger Tokopedia'));
+        $this->assertFalse($tokopediaDashboard->viewData('products')->contains('marketplace_name', 'Tracktop Jacket'));
     }
 
     public function test_unknown_purchase_channel_blocks_preview_commit(): void
@@ -678,8 +746,7 @@ class MarketplaceTikTokImportTest extends TestCase
         string $purchaseChannel,
         int $qty = 1,
         string $shippedAt = '12/10/2026 11:00:00',
-    ): string
-    {
+    ): string {
         $path = tempnam(sys_get_temp_dir(), 'ttk-stage-one-');
         $rows = [
             ['Order ID', 'Order Status', 'Seller SKU', 'Product Name', 'Quantity', 'SKU Unit Original Price', 'SKU Subtotal After Discount', 'Order Amount', 'Created Time', 'Shipped Time', 'Tracking ID', 'Package ID', 'Purchase Channel'],
@@ -715,7 +782,7 @@ class MarketplaceTikTokImportTest extends TestCase
 
         $owner = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'TTK-EMPTY-' . uniqid(),
+            'employee_code' => 'TTK-EMPTY-'.uniqid(),
         ]);
 
         $this->actingAs($owner)
@@ -767,7 +834,7 @@ class MarketplaceTikTokImportTest extends TestCase
 
         $user = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'INCOME-TEST-' . uniqid(),
+            'employee_code' => 'INCOME-TEST-'.uniqid(),
         ]);
 
         $this->actingAs($user)
@@ -791,5 +858,234 @@ class MarketplaceTikTokImportTest extends TestCase
 
         $this->assertDatabaseMissing('mp_incomes', ['store_id' => $store->id]);
         $this->assertDatabaseHas('channels', ['id' => $tiktok->id, 'code' => 'TTK']);
+    }
+
+    public function test_imported_order_maps_tiktok_sku_to_hpp_snapshot(): void
+    {
+        $store = $this->makeTiktokStore('TTK-HPP-SNAPSHOT');
+        $item = Item::create([
+            'code' => 'K5BLK',
+            'name' => 'Jogger Hitam',
+            'type' => 'finished',
+            'hpp' => 33000,
+            'active' => true,
+        ]);
+        SkuMapping::create([
+            'marketplace_sku' => 'K5BLK',
+            'channel_code' => 'tiktok',
+            'item_id' => $item->id,
+        ]);
+        $path = $this->makeTiktokCsv('HPP-IMPORT-001', 'PKG-HPP-001', 'JY-HPP-001', 'TikTok');
+
+        try {
+            app(MpImportService::class)->import('tiktok', $path, $store->id, 'hpp-import.csv');
+        } finally {
+            unlink($path);
+        }
+
+        $order = MarketplaceOrder::where('channel_order_id', 'HPP-IMPORT-001')->firstOrFail();
+        $orderItem = $order->items()->firstOrFail();
+
+        $this->assertSame($item->id, $orderItem->internal_item_id);
+        $this->assertSame('mapped', $orderItem->mapping_status);
+        $this->assertSame('complete', $orderItem->cost_status);
+        $this->assertSame('complete', $orderItem->profit_status);
+        $this->assertSame('valid', $orderItem->data_status);
+        $this->assertSame(33000.0, (float) $orderItem->hpp_snapshot);
+        $this->assertSame(33000.0, (float) $orderItem->hpp_unit_snapshot);
+        $this->assertSame(33000.0, (float) $orderItem->hpp_total_snapshot);
+    }
+
+    public function test_income_reconciliation_marks_aggregate_profit_incomplete_and_shows_badge(): void
+    {
+        $store = $this->makeTiktokStore('TTK-INCOME-QUALITY');
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'INCOME-QUALITY-'.uniqid(),
+        ]);
+        $item = Item::create([
+            'code' => 'K5BLK-INCOME',
+            'name' => 'Jogger Hitam Income',
+            'type' => 'finished',
+            'hpp' => 33000,
+            'active' => true,
+        ]);
+        SkuMapping::create([
+            'marketplace_sku' => 'K5BLK',
+            'channel_code' => 'TTK',
+            'item_id' => $item->id,
+        ]);
+        $path = $this->makeTiktokCsv('INCOME-ORDER-001', 'PKG-INCOME-001', 'JY-INCOME-001', 'TikTok');
+
+        try {
+            app(MpImportService::class)->import('tiktok', $path, $store->id, 'income-order.csv');
+        } finally {
+            unlink($path);
+        }
+
+        $result = app(ImportedMarketplaceIncomeSyncService::class)->syncFromParsedRows(
+            $store->id,
+            ['INCOME-ORDER-001'],
+            ['INCOME-ORDER-001' => [
+                'platform_order_id' => 'INCOME-ORDER-001',
+                'platform_fee_total' => 5000,
+                'refund_total' => 0,
+                'net_payout_actual' => 28000,
+                'released_at' => '2026-10-13 09:00:00',
+            ]],
+            'income-batch-001',
+            'income-tiktok.xlsx',
+        );
+
+        $order = MarketplaceOrder::where('channel_order_id', 'INCOME-ORDER-001')->firstOrFail();
+        $settlement = $order->settlement()->firstOrFail();
+        $this->assertSame(1, $result['settlements_created']);
+        $this->assertSame(1, $result['profit_incomplete']);
+        $this->assertSame('COMPLETED', $order->order_status);
+        $this->assertSame('incomplete', $order->financial_data_status);
+        $this->assertSame('settlement_data_incomplete', $order->financial_issue_reason);
+        $this->assertSame(28000.0, (float) $settlement->final_income);
+        $this->assertSame('incomplete', $settlement->data_status);
+        $this->assertSame('marketplace_income_import', data_get($settlement->data_quality_flags, 'source'));
+        $this->assertSame('income_breakdown_incomplete', data_get($settlement->data_quality_flags, 'reason'));
+
+        $this->actingAs($owner)
+            ->get(route('marketplace.dashboard.sales', [
+                'store_id' => $store->id,
+                'date_from' => '2026-10-12',
+                'date_to' => '2026-10-12',
+            ]))
+            ->assertOk()
+            ->assertSee('Profit belum lengkap');
+    }
+
+    public function test_income_reconciliation_preserves_authoritative_api_settlement(): void
+    {
+        $store = $this->makeTiktokStore('TTK-INCOME-API-SAFE');
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'API-INCOME-001',
+            'external_order_id' => 'API-INCOME-001',
+            'order_status' => 'COMPLETED',
+            'status' => 'completed',
+            'ordered_at' => '2026-10-12 10:00:00',
+            'order_date' => '2026-10-12 10:00:00',
+            'total_amount' => 100000,
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+            'raw_json' => ['source' => 'api'],
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'item_name' => 'API Item',
+            'item_sku' => 'API-SKU-001',
+            'qty' => 1,
+            'data_status' => 'valid',
+            'mapping_status' => 'mapped',
+            'cost_status' => 'complete',
+            'profit_status' => 'complete',
+            'hpp_snapshot' => 30000,
+        ]);
+        $settlement = MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => 'API-INCOME-001',
+            'buyer_payment_amount' => 100000,
+            'final_income' => 80000,
+            'data_status' => 'complete',
+            'data_quality_flags' => ['source' => 'escrow_detail'],
+            'raw_json' => [
+                'buyer_total_amount' => 100000,
+                'commission_fee' => 5000,
+                'service_fee' => 5000,
+                'transaction_fee' => 1000,
+                'affiliate_fee' => 0,
+                'voucher_from_seller' => 0,
+                'seller_coin_cash_back' => 0,
+                'actual_shipping_fee' => 0,
+                'shopee_shipping_rebate' => 0,
+                'reverse_shipping_fee' => 0,
+                'shipping_insurance_fee' => 0,
+                'activity_fee' => 0,
+                'drc_adjustable_refund' => 0,
+                'escrow_tax' => 0,
+                'final_income' => 80000,
+            ],
+        ]);
+
+        $result = app(ImportedMarketplaceIncomeSyncService::class)->syncFromParsedRows(
+            $store->id,
+            ['API-INCOME-001'],
+            ['API-INCOME-001' => [
+                'net_payout_actual' => 79000,
+                'platform_fee_total' => 21000,
+                'refund_total' => 0,
+                'released_at' => '2026-10-13 09:00:00',
+            ]],
+            'income-batch-api',
+            'income-api-check.xlsx',
+        );
+
+        $settlement->refresh();
+        $order->refresh();
+        $this->assertSame(1, $result['api_settlements_preserved']);
+        $this->assertSame(1, $result['income_mismatches']);
+        $this->assertSame(80000.0, (float) $settlement->final_income);
+        $this->assertSame('mismatch', data_get($settlement->data_quality_flags, 'income_import_reconciliation.status'));
+        $this->assertSame(-1000.0, (float) data_get($settlement->data_quality_flags, 'income_import_reconciliation.difference'));
+        $this->assertSame('ready', $order->financial_data_status);
+    }
+
+    public function test_tiktok_income_file_reconciles_into_order_settlement(): void
+    {
+        $store = $this->makeTiktokStore('TTK-INCOME-END-TO-END');
+        $item = Item::create([
+            'code' => 'K5BLK-E2E',
+            'name' => 'Jogger Income E2E',
+            'type' => 'finished',
+            'hpp' => 33000,
+            'active' => true,
+        ]);
+        SkuMapping::create([
+            'marketplace_sku' => 'K5BLK',
+            'channel_code' => 'tiktok',
+            'item_id' => $item->id,
+        ]);
+        $orderPath = $this->makeTiktokCsv('INCOME-E2E-001', 'PKG-E2E-001', 'JY-E2E-001', 'TikTok');
+        try {
+            app(MpImportService::class)->import('tiktok', $orderPath, $store->id, 'order-e2e.csv');
+        } finally {
+            unlink($orderPath);
+        }
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Detail Pesanan');
+        $sheet->fromArray([
+            ['Order/Adjustment ID', 'Type', 'Order Settled Time', 'Total Settlement Amount', 'Total Fees'],
+            ['INCOME-E2E-001', 'Order', '13/10/2026 09:00:00', 28000, -5000],
+        ]);
+        $incomePath = tempnam(sys_get_temp_dir(), 'tiktok-income-e2e-');
+        (new Xlsx($spreadsheet))->save($incomePath);
+        $spreadsheet->disconnectWorksheets();
+
+        try {
+            $result = app(MpIncomeImportService::class)->import(
+                'tiktok',
+                $incomePath,
+                'income-e2e.xlsx',
+                $store->id,
+            );
+        } finally {
+            unlink($incomePath);
+        }
+
+        $order = MarketplaceOrder::where('channel_order_id', 'INCOME-E2E-001')->firstOrFail();
+        $this->assertSame(1, $result['stats']['orders_matched_marketplace']);
+        $this->assertSame(1, $result['stats']['settlements_created']);
+        $this->assertSame(1, $result['stats']['profit_incomplete']);
+        $this->assertSame(28000.0, (float) $order->settlement()->value('final_income'));
+        $this->assertSame('settlement_data_incomplete', $order->fresh()->financial_issue_reason);
     }
 }

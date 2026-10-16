@@ -195,6 +195,9 @@ class AdsDashboardService
 
                         // Jangan biarkan snapshot hourly sementara yang semuanya
                         // nol menghapus fakta daily yang masih valid.
+                        // An hourly API response can temporarily contain a zero
+                        // snapshot while the daily fact already has the latest
+                        // non-zero value.
                         if ($dailyRow && ! $hourlyHasData) {
                             continue;
                         }

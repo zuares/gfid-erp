@@ -5,9 +5,16 @@ namespace App\Services\Marketplace\Import;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MpShipment;
+use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
+use App\Services\MarketplaceIssueService;
 
 class ImportedMarketplaceOrderSyncService
 {
+    public function __construct(
+        protected MarketplaceIssueService $issueService,
+        protected MarketplaceFinancialDataQualityService $financialQuality,
+    ) {}
+
     /**
      * Mirror a manually imported shipment into the order tables used by the
      * sales dashboard. API-owned orders are only linked; their richer payload
@@ -42,6 +49,33 @@ class ImportedMarketplaceOrderSyncService
                 'updated' => false,
                 'linked' => true,
             ];
+        }
+
+        $shipment->loadMissing('store.channel');
+        $channelCode = $shipment->store?->channel?->code ?: $shipment->channel;
+
+        // A single marketplace order may contain multiple shipments/packages.
+        // Rebuild the order item snapshot from every package so importing the
+        // later package cannot erase the items from the earlier one.
+        $packageItems = MpShipment::query()
+            ->with('items')
+            ->where('store_id', (int) $shipment->store_id)
+            ->where('platform_order_id', $orderKey)
+            ->get()
+            ->flatMap(fn (MpShipment $package) => $package->items->map(fn ($item) => [
+                'sku_code' => $item->sku_code,
+                'sku_parent' => $item->sku_parent,
+                'product_name' => $item->product_name,
+                'variant_name' => $item->variant_name,
+                'qty' => (int) $item->qty,
+                'unit_price' => (float) $item->unit_price,
+                'subtotal' => (float) $item->subtotal,
+                'raw_line' => $item->raw_line,
+            ]))
+            ->values()
+            ->all();
+        if ($packageItems !== []) {
+            $items = $packageItems;
         }
 
         $payload = $this->orderPayload($shipment, $normalized, $items, $batchId, $timestamp);
@@ -81,8 +115,19 @@ class ImportedMarketplaceOrderSyncService
             $sku = trim((string) ($item['sku_code'] ?? $item['sku_parent'] ?? '')) ?: null;
             $name = trim((string) ($item['product_name'] ?? '')) ?: null;
             $variant = trim((string) ($item['variant_name'] ?? '')) ?: null;
+            $mapping = $this->issueService->buildMappingAttributes(
+                $sku,
+                $sku,
+                $sku,
+                $channelCode,
+                $name,
+                $variant,
+            );
+            $hpp = isset($mapping['hpp_snapshot']) && (float) $mapping['hpp_snapshot'] > 0
+                ? (float) $mapping['hpp_snapshot']
+                : null;
 
-            MarketplaceOrderItem::create([
+            MarketplaceOrderItem::create(array_merge([
                 'order_id' => $order->id,
                 'marketplace_order_id' => $order->id,
                 'line_no' => $lineNo + 1,
@@ -108,14 +153,20 @@ class ImportedMarketplaceOrderSyncService
                 'line_discount' => $lineDiscount,
                 'line_gross_amount' => $lineGross,
                 'line_net_amount' => $lineNet,
+                // Kolom legacy ini NOT NULL. Status semantik tetap dibaca dari
+                // hpp_snapshot/data_status, sehingga 0 di sini bukan dianggap HPP valid.
+                'hpp_unit_snapshot' => $hpp ?? 0,
+                'hpp_total_snapshot' => $hpp !== null ? $hpp * $qty : 0,
                 'raw_json' => [
                     'source' => 'marketplace_shipment_import',
                     'source_file' => $normalized['source_file'] ?? null,
                     'promotion_breakdown' => $item['promotion_breakdown'] ?? null,
                     'raw_line' => $item['raw_line'] ?? null,
                 ],
-            ]);
+            ], $mapping));
         }
+
+        $this->financialQuality->refreshOrder($order->fresh(['settlement', 'items']));
 
         return [
             'order_id' => (int) $order->id,

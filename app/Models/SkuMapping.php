@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 
 class SkuMapping extends Model
 {
@@ -27,8 +28,9 @@ class SkuMapping extends Model
     {
         // 1. Cari yang spesifik per channel
         if ($channelCode) {
+            $aliases = static::channelAliases($channelCode);
             $id = static::where('marketplace_sku', $sku)
-                ->where('channel_code', $channelCode)
+                ->whereIn(DB::raw('LOWER(channel_code)'), $aliases)
                 ->value('item_id');
             if ($id) return $id;
         }
@@ -37,5 +39,24 @@ class SkuMapping extends Model
         return static::where('marketplace_sku', $sku)
             ->whereNull('channel_code')
             ->value('item_id');
+    }
+
+    /**
+     * Mapping lama menyimpan nama channel (tiktok/shopee), sedangkan Store
+     * memakai kode singkat (TTK/SHP). Terima keduanya agar hasil import tidak
+     * gagal menemukan HPP hanya karena variasi kode channel.
+     *
+     * @return array<int, string>
+     */
+    private static function channelAliases(string $channelCode): array
+    {
+        $normalized = strtolower(trim($channelCode));
+
+        return match ($normalized) {
+            'shopee', 'shp' => ['shopee', 'shp'],
+            'tiktok', 'tiktok shop', 'ttk' => ['tiktok', 'tiktok shop', 'ttk'],
+            'tokopedia', 'tkp' => ['tokopedia', 'tkp'],
+            default => [$normalized],
+        };
     }
 }

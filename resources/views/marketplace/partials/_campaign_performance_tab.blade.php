@@ -541,8 +541,18 @@
         color: var(--text, #0f172a);
         background: var(--card-bg, #fff);
     }
+    .perf-category-table-scroll-shell .perf-category-campaign-table thead tr:first-child th:first-child,
+    .perf-category-table-scroll-shell .perf-category-campaign-table tbody td:first-child {
+        position: sticky;
+        left: 0;
+        background: var(--card-bg, #fff);
+        box-shadow: 1px 0 0 var(--dsh-border, #e2e8f0);
+    }
+    .perf-category-table-scroll-shell .perf-category-campaign-table thead tr:first-child th:first-child { z-index: 9; }
+    .perf-category-table-scroll-shell .perf-category-campaign-table tbody td:first-child { z-index: 2; }
     body[data-theme="dark"] .perf-category-table-scroll-shell .perf-category-campaign-table tbody td { border-bottom-color: rgba(71, 85, 105, .55); }
-    body[data-theme="dark"] .perf-category-table-scroll-shell .perf-category-campaign-table thead th { background: var(--card-bg, #111827); }
+    body[data-theme="dark"] .perf-category-table-scroll-shell .perf-category-campaign-table thead th,
+    body[data-theme="dark"] .perf-category-table-scroll-shell .perf-category-campaign-table tbody td:first-child { background: var(--card-bg, #111827); }
     body[data-theme="dark"] .perf-sticky-scrollbar { background: #0f172a !important; border-color: #475569; box-shadow: 0 -2px 10px rgba(0, 0, 0, .4); scrollbar-color: #94a3b8 #1e293b; }
     body[data-theme="dark"] .perf-sticky-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
     body[data-theme="dark"] .perf-sticky-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; border-color: #1e293b; }
@@ -773,6 +783,21 @@
         font-weight: 700;
         letter-spacing: .01em;
         text-transform: none;
+    }
+    .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > thead tr:first-child th:first-child,
+    .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > tbody > tr.perf-row > td:first-child,
+    .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > tbody > tr.perf-category-row > td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 3;
+        background: var(--card-bg, #fff);
+        box-shadow: 1px 0 0 var(--dsh-border, #e2e8f0);
+    }
+    .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > thead tr:first-child th:first-child {
+        z-index: 9;
+    }
+    .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > tbody > tr:hover > td:first-child {
+        background: var(--card-bg, #fff);
     }
     body[data-theme="dark"] .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > tbody > tr > td {
         border-bottom-color: rgba(71, 85, 105, .55);

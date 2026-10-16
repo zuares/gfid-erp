@@ -13,7 +13,9 @@
   $ordersParsed = (int)($stats['orders_parsed'] ?? 0);
   $matched = (int)($stats['orders_matched_shipments'] ?? 0);
   $unmatched = (int)($stats['orders_unmatched_shipments'] ?? max(0, $ordersParsed - $matched));
-  $matchRate = $ordersParsed > 0 ? round(($matched / $ordersParsed) * 100, 1) : 0;
+  $financeMatched = (int)($stats['orders_matched_marketplace'] ?? 0);
+  $financeUnmatched = (int)($stats['orders_unmatched_marketplace'] ?? max(0, $ordersParsed - $financeMatched));
+  $matchRate = $ordersParsed > 0 ? round(($financeMatched / $ordersParsed) * 100, 1) : 0;
   $canCommit = $ordersParsed > 0 && empty($draft_file_missing);
 
   $money = function ($n) {
@@ -399,14 +401,14 @@
       <div class="preview-kpi-sub">Order unik berdasarkan platform ID</div>
     </div>
     <div class="preview-kpi matched">
-      <div class="preview-kpi-label">Matched shipments</div>
-      <div class="preview-kpi-value">{{ number_format($matched) }}</div>
-      <div class="preview-kpi-sub">{{ $matchRate }}% dapat langsung di-apply</div>
+      <div class="preview-kpi-label">Order keuangan</div>
+      <div class="preview-kpi-value">{{ number_format($financeMatched) }}</div>
+      <div class="preview-kpi-sub">{{ $matchRate }}% cocok · {{ number_format($matched) }} shipment</div>
     </div>
     <div class="preview-kpi unmatched">
-      <div class="preview-kpi-label">Unmatched</div>
-      <div class="preview-kpi-value">{{ number_format($unmatched) }}</div>
-      <div class="preview-kpi-sub">Akan dicocokkan saat shipment tersedia</div>
+      <div class="preview-kpi-label">Belum cocok</div>
+      <div class="preview-kpi-value">{{ number_format($financeUnmatched) }}</div>
+      <div class="preview-kpi-sub">Menunggu order marketplace tersedia</div>
     </div>
     <div class="preview-kpi updated">
       <div class="preview-kpi-label">Shipments updated</div>
@@ -465,10 +467,10 @@
         @if(!empty($stats['error'])) {{ $stats['error'] }} @endif
         @if(!empty($stats['warnings'])) {{ implode(' ', array_map('strval', (array)$stats['warnings'])) }} @endif
       </div>
-    @elseif($unmatched > 0)
+    @elseif($financeUnmatched > 0)
       <div class="preview-warning">
-        <strong><i class="bi bi-info-circle"></i> Shipment belum match:</strong>
-        {{ number_format($unmatched) }} income tetap bisa di-commit. Nilai akan otomatis diterapkan ketika shipment dengan order ID yang sama tersedia.
+        <strong><i class="bi bi-info-circle"></i> Order belum cocok:</strong>
+        {{ number_format($financeUnmatched) }} income tetap bisa di-commit, tetapi belum masuk perhitungan profit sampai order marketplace dengan ID yang sama tersedia.
       </div>
     @endif
   </section>
