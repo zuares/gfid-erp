@@ -729,14 +729,23 @@
             'sewing' => 'Sewing',
             'daily' => 'Harian',
         ];
+        $statusLabels = [
+            'draft' => 'Draft',
+            'final' => 'Final',
+            'paid' => 'Sudah dibayar',
+            'all' => 'Semua status',
+        ];
         $activeModule = $module ?? 'all';
+        $activeStatus = $status ?? 'draft';
         $tabUrl = fn(string $tab) => route('payroll.piecework.overview', array_filter([
             'module' => $tab === 'all' ? null : $tab,
+            'status' => $activeStatus,
             'from' => request('from'),
             'to' => request('to'),
         ], fn($value) => $value !== null && $value !== ''));
         $resetFilterUrl = route('payroll.piecework.overview', array_filter([
             'module' => $activeModule === 'all' ? null : $activeModule,
+            'status' => 'draft',
         ], fn($value) => $value !== null && $value !== ''));
         $moduleRoute = function (string $module, string $action, $period) {
             if ($module === 'daily') {
@@ -849,20 +858,25 @@
             <div class="pw-card-h">
                 <div>
                     <strong>Daftar Periode</strong>
-                    <div class="pw-sub">{{ $kpis['period_count'] ?? $periods->total() }} periode · filter aktif: {{ $moduleLabels[$activeModule] }}</div>
+                    <div class="pw-sub">{{ $kpis['period_count'] ?? $periods->total() }} periode · filter aktif: {{ $moduleLabels[$activeModule] }} · {{ $statusLabels[$activeStatus] ?? 'Draft' }}</div>
                 </div>
 
                 <form class="pw-row" method="GET" action="{{ route('payroll.piecework.overview') }}" id="pw-filter-form">
                     @if ($activeModule !== 'all')
                         <input type="hidden" name="module" value="{{ $activeModule }}">
                     @endif
+                    <select class="pw-select pw-status-filter" name="status" aria-label="Status payroll">
+                        @foreach ($statusLabels as $statusValue => $statusLabel)
+                            <option value="{{ $statusValue }}" @selected($activeStatus === $statusValue)>{{ $statusLabel }}</option>
+                        @endforeach
+                    </select>
                     <input type="hidden" name="from" id="pw-filter-from" value="{{ $filterFrom }}" data-gf-date="off">
                     <input type="hidden" name="to" id="pw-filter-to" value="{{ $filterTo }}" data-gf-date="off">
                     <input class="pw-in pw-date-range" type="text" id="pw-filter-range"
                         value="" placeholder="Pilih rentang tanggal" aria-label="Rentang tanggal"
                         autocomplete="off" readonly data-gf-date="off">
                     <button class="pw-btn" type="submit">Terapkan</button>
-                    @if (request()->filled('from') || request()->filled('to'))
+                    @if (request()->filled('from') || request()->filled('to') || $activeStatus !== 'draft')
                         <a class="pw-btn pw-reset-filter" href="{{ $resetFilterUrl }}">Reset</a>
                     @endif
                 </form>
@@ -898,7 +912,7 @@
                                 <td class="pw-period-cell">
                                     <div class="pw-period-heading">
                                         <div class="pw-period-week">Minggu ke-{{ $periodWeek }} <span class="pw-sub" style="display:inline">· {{ $periodMonth }}</span></div>
-                                        @if ($period->status === 'final')
+                                        @if (in_array($period->status, ['final', 'posted'], true))
                                             <span class="pw-chip final">FINAL</span>
                                         @else
                                             <span class="pw-chip draft">DRAFT</span>
@@ -954,7 +968,7 @@
                     <article class="pw-period-card" data-pw-detail-url="{{ $moduleRoute($periodModule, 'show', $period) }}" tabindex="0">
                         <div class="pw-period-card-top">
                             <span class="pw-chip {{ $periodModule }}">{{ $moduleLabels[$periodModule] ?? ucfirst($periodModule) }}</span>
-                            @if ($period->status === 'final')
+                            @if (in_array($period->status, ['final', 'posted'], true))
                                 <span class="pw-chip final">FINAL</span>
                             @else
                                 <span class="pw-chip draft">DRAFT</span>

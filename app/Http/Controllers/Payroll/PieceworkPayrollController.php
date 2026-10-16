@@ -71,6 +71,8 @@ class PieceworkPayrollController extends Controller
     {
         $module = strtolower((string) $request->input('module', 'all'));
         $allowedModules = ['all', 'cutting', 'sewing', 'daily'];
+        $allowedStatuses = ['all', 'draft', 'final', 'paid'];
+        $status = strtolower(trim((string) $request->input('status', 'draft')));
         $filterFrom = $request->filled('from')
             ? (string) $request->input('from')
             : '';
@@ -80,6 +82,10 @@ class PieceworkPayrollController extends Controller
 
         if (!in_array($module, $allowedModules, true)) {
             $module = 'all';
+        }
+
+        if (!in_array($status, $allowedStatuses, true)) {
+            $status = 'draft';
         }
 
         $query = PieceworkPayrollPeriod::query()
@@ -96,6 +102,15 @@ class PieceworkPayrollController extends Controller
 
         if ($module !== 'all') {
             $query->where('module', $module);
+        }
+
+        if ($status === 'draft') {
+            $query->where('status', 'draft');
+        } elseif ($status === 'final') {
+            // `posted` is kept here for periods created by the older payroll flow.
+            $query->whereIn('status', ['final', 'posted']);
+        } elseif ($status === 'paid') {
+            $query->whereNotNull('paid_at');
         }
 
         if ($filterFrom !== '' && $filterTo !== '') {
@@ -145,6 +160,7 @@ class PieceworkPayrollController extends Controller
         return view('payroll.piecework.overview', [
             'module' => $module,
             'periods' => $periods,
+            'status' => $status,
             'filterFrom' => $filterFrom,
             'filterTo' => $filterTo,
             'kpis' => $kpis,
