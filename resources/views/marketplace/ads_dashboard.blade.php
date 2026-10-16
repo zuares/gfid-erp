@@ -3657,49 +3657,49 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="ads-tab-panel mb-3">
                 <div class="ads-tab-panel-head">
                     <div>
-                        <div class="ads-tab-panel-title"><i class="bi bi-clipboard2-pulse text-primary"></i> Evaluasi Perubahan Iklan</div>
-                        <div class="ads-tab-panel-note">Bandingkan baseline dan observation untuk menilai dampak perubahan harga atau target ROAS.</div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-clipboard2-pulse text-primary"></i> Hasil Perubahan Iklan</div>
+                        <div class="ads-tab-panel-note">Bandingkan kondisi sebelum dan sesudah perubahan.</div>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <button type="button" id="btnOpenRecordAdChange" class="btn btn-primary btn-sm" style="border-radius:9px; font-size:.74rem; font-weight:800;">
-                            <i class="bi bi-plus-circle"></i> Catat perubahan
+                            <i class="bi bi-plus-circle"></i> Tambah evaluasi
                         </button>
                         <button type="button" id="btnReloadExperiments" class="btn btn-sm" style="border:1px solid var(--dsh-border); color:var(--text); background:var(--card-bg); border-radius:9px; font-size:.74rem; font-weight:700;">
-                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                            <i class="bi bi-arrow-clockwise"></i> Muat ulang
                         </button>
                     </div>
                 </div>
                 <div class="p-3">
                     <div class="row g-2 align-items-end mb-3">
                         <div class="col-12 col-md-3">
-                            <label for="experimentChangeFilter" class="form-label mb-1" style="font-size:.7rem; font-weight:800; color:var(--dsh-muted);">Perubahan</label>
+                            <label for="experimentChangeFilter" class="form-label mb-1" style="font-size:.7rem; font-weight:800; color:var(--dsh-muted);">Yang diubah</label>
                             <select id="experimentChangeFilter" class="form-select form-select-sm" style="border-radius:9px; font-size:.76rem;">
                                 <option value="">Semua perubahan</option>
-                                <option value="creative">Foto / Creative</option>
+                                <option value="creative">Foto produk</option>
                                 <option value="price">Harga</option>
-                                <option value="target_roas">Target ROAS</option>
-                                <option value="budget">Budget</option>
-                                <option value="title">Judul / Deskripsi</option>
+                                <option value="target_roas">Target hasil iklan</option>
+                                <option value="budget">Biaya iklan</option>
+                                <option value="title">Judul / deskripsi</option>
                                 <option value="other">Lainnya</option>
                                 <option value="price_and_target_roas">Harga + Target ROAS</option>
                             </select>
                         </div>
                         <div class="col-12 col-md-3">
-                            <label for="experimentStatusFilter" class="form-label mb-1" style="font-size:.7rem; font-weight:800; color:var(--dsh-muted);">Status</label>
+                            <label for="experimentStatusFilter" class="form-label mb-1" style="font-size:.7rem; font-weight:800; color:var(--dsh-muted);">Hasil</label>
                             <select id="experimentStatusFilter" class="form-select form-select-sm" style="border-radius:9px; font-size:.76rem;">
                                 <option value="">Semua status</option>
-                                <option value="LEARNING">Learning</option>
-                                <option value="EARLY_SIGNAL">Early Signal</option>
-                                <option value="READY_TO_EVALUATE">Ready to Evaluate</option>
-                                <option value="INSUFFICIENT_DATA">Insufficient Data</option>
-                                <option value="CONFOUNDED">Confounded</option>
-                                <option value="INVALIDATED">Invalidated</option>
-                                <option value="COMPLETED">Completed</option>
+                                <option value="LEARNING">Sedang berjalan</option>
+                                <option value="EARLY_SIGNAL">Sinyal awal</option>
+                                <option value="READY_TO_EVALUATE">Siap dinilai</option>
+                                <option value="INSUFFICIENT_DATA">Data belum cukup</option>
+                                <option value="CONFOUNDED">Tidak bisa dipastikan</option>
+                                <option value="INVALIDATED">Dibatalkan</option>
+                                <option value="COMPLETED">Selesai</option>
                             </select>
                         </div>
                         <div class="col-12 col-md-6">
                             <div id="experimentDataNote" style="font-size:.74rem; color:var(--dsh-muted); line-height:1.45;">
-                                Data performa dibaca langsung dari fact table iklan. Hari perubahan tidak dihitung.
+                                Evaluasi membandingkan data sebelum dan sesudah perubahan.
                             </div>
                         </div>
                     </div>
@@ -3713,8 +3713,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <i class="bi bi-clipboard2-pulse" style="font-size:2rem; color:#93c5fd;"></i>
                         <div style="font-weight:800; color:var(--text); margin-top:.55rem;">Belum ada evaluasi</div>
                         <div style="font-size:.75rem; max-width:34rem; margin:.35rem auto 0; line-height:1.55;">
-                            Evaluasi akan tercatat setelah perubahan harga atau target ROAS dilakukan melalui Ads Dashboard.
-                            History lama belum di-backfill karena timestamp perubahan belum tersedia.
+                            Belum ada perubahan iklan yang bisa dievaluasi.
                         </div>
                     </div>
 
@@ -3724,12 +3723,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         <table class="dpanel-table align-middle mb-0" style="min-width:860px;">
                             <thead>
                                 <tr>
-                                    <th>Perubahan</th>
-                                    <th>Scope</th>
+                                    <th>Produk / Perubahan</th>
+                                    <th>Yang diubah</th>
                                     <th>Waktu</th>
-                                    <th>Status</th>
-                                    <th>Baseline</th>
-                                    <th>Observation</th>
+                                    <th>Hasil</th>
+                                    <th>Sebelum</th>
+                                    <th>Sesudah</th>
                                     <th></th>
                                 </tr>
                             </thead>
@@ -3742,8 +3741,8 @@ document.addEventListener('DOMContentLoaded', function() {
             <div id="experimentDetailPanel" class="ads-tab-panel mb-3" style="display:none;">
                 <div class="ads-tab-panel-head">
                     <div>
-                        <div class="ads-tab-panel-title"><i class="bi bi-layout-split text-primary"></i> Detail Experiment</div>
-                        <div class="ads-tab-panel-note" id="experimentDetailSubtitle">Baseline vs observation.</div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-layout-split text-primary"></i> Detail Hasil</div>
+                        <div class="ads-tab-panel-note" id="experimentDetailSubtitle">Sebelum dan sesudah perubahan.</div>
                     </div>
                     <button type="button" id="btnCloseExperimentDetail" class="btn btn-sm" style="border:1px solid var(--dsh-border); color:var(--text); background:var(--card-bg); border-radius:9px; font-size:.74rem; font-weight:700;">
                         Tutup
@@ -3754,13 +3753,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="row g-3">
                         <div class="col-12 col-lg-6">
                             <div style="border:1px solid var(--dsh-border); border-radius:12px; overflow:hidden;">
-                                <div style="padding:.7rem .85rem; background:rgba(148,163,184,.08); font-size:.75rem; font-weight:850;">Baseline</div>
+                                <div style="padding:.7rem .85rem; background:rgba(148,163,184,.08); font-size:.75rem; font-weight:850;"><i class="bi bi-clock-history me-1"></i> Sebelum perubahan</div>
                                 <div id="experimentBaselineMetrics" class="p-2"></div>
                             </div>
                         </div>
                         <div class="col-12 col-lg-6">
                             <div style="border:1px solid var(--dsh-border); border-radius:12px; overflow:hidden;">
-                                <div style="padding:.7rem .85rem; background:rgba(37,99,235,.08); font-size:.75rem; font-weight:850;">Observation</div>
+                                <div style="padding:.7rem .85rem; background:rgba(37,99,235,.08); font-size:.75rem; font-weight:850;"><i class="bi bi-arrow-right-circle me-1"></i> Sesudah perubahan</div>
                                 <div id="experimentObservationMetrics" class="p-2"></div>
                             </div>
                         </div>
@@ -3770,8 +3769,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div id="experimentImpactPanel" class="ads-phase3-impact" style="display:none;">
                         <div class="ads-phase3-impact-head">
                             <div>
-                                <div class="ads-phase3-impact-title"><i class="bi bi-signpost-split text-success"></i> Impact &amp; Verdict</div>
-                                <div style="font-size:.66rem; color:var(--dsh-muted); margin-top:.15rem;">Traffic → CTR → CVR → Qty → ROAS → Profit</div>
+                                <div class="ads-phase3-impact-title"><i class="bi bi-signpost-split text-success"></i> Dampak Perubahan</div>
+                                <div style="font-size:.66rem; color:var(--dsh-muted); margin-top:.15rem;">Dilihat → klik → pesanan → keuntungan</div>
                             </div>
                             <span id="experimentVerdictBadge" class="ads-tab-panel-note">INCONCLUSIVE</span>
                         </div>
@@ -3783,17 +3782,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div id="experimentSimulationPanel" class="ads-phase2-simulation" style="display:none;">
                         <div class="ads-phase2-simulation-head">
                             <div>
-                                <div class="ads-phase2-simulation-title"><i class="bi bi-sliders2-vertical text-primary"></i> Simulasi Phase 2</div>
-                                <div style="font-size:.66rem; color:var(--dsh-muted); margin-top:.15rem;">Hitung dampak harga dan target ROAS tanpa menyimpan perubahan.</div>
+                                <div class="ads-phase2-simulation-title"><i class="bi bi-sliders2-vertical text-primary"></i> Coba Skenario</div>
+                                <div style="font-size:.66rem; color:var(--dsh-muted); margin-top:.15rem;">Lihat perkiraan hasil dari harga atau target baru.</div>
                             </div>
-                            <span class="ads-tab-panel-note">Read-only</span>
+                            <span class="ads-tab-panel-note">Perkiraan</span>
                         </div>
                         <div class="row g-2 align-items-end">
                             <div class="col-6 col-md-3">
-                                <label for="experimentSimulationPeriod" class="form-label">Basis data</label>
+                                    <label for="experimentSimulationPeriod" class="form-label">Pakai data</label>
                                 <select id="experimentSimulationPeriod" class="form-select form-select-sm">
-                                    <option value="observation">Observation</option>
-                                    <option value="baseline">Baseline</option>
+                                    <option value="observation">Sesudah perubahan</option>
+                                    <option value="baseline">Sebelum perubahan</option>
                                 </select>
                             </div>
                             <div class="col-6 col-md-3">
@@ -3801,12 +3800,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <input id="experimentSimulationPrice" class="form-control form-control-sm" inputmode="decimal" placeholder="Harga">
                             </div>
                             <div class="col-6 col-md-3">
-                                <label for="experimentSimulationRoas" class="form-label">Target ROAS</label>
-                                <input id="experimentSimulationRoas" class="form-control form-control-sm" inputmode="decimal" placeholder="ROAS x">
+                                    <label for="experimentSimulationRoas" class="form-label">Target efisiensi</label>
+                                <input id="experimentSimulationRoas" class="form-control form-control-sm" inputmode="decimal" placeholder="Contoh: 4">
                             </div>
                             <div class="col-6 col-md-3">
                                 <button type="button" id="btnRunExperimentSimulation" class="btn btn-primary btn-sm w-100" style="min-height:35px; border-radius:9px; font-size:.72rem; font-weight:850;">
-                                    <i class="bi bi-calculator"></i> Hitung simulasi
+                                    <i class="bi bi-calculator"></i> Lihat perkiraan
                                 </button>
                             </div>
                         </div>
@@ -3827,24 +3826,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="modal-header border-0 pb-1">
                         <div>
                             <h5 class="modal-title fw-bold mb-1" id="modalInvalidateExperimentLabel">
-                                <i class="bi bi-archive text-secondary me-1"></i> Invalidasi perubahan
+                                <i class="bi bi-archive text-secondary me-1"></i> Batalkan evaluasi
                             </h5>
                             <div style="font-size:.72rem; color:var(--dsh-muted);">
-                                Record tidak dihapus. Record dikeluarkan dari evaluasi aktif dan tetap tersimpan untuk audit.
+                                Evaluasi tetap tersimpan sebagai riwayat.
                             </div>
                         </div>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                     </div>
                     <div class="modal-body pt-2">
                         <div id="invalidateExperimentLabel" style="font-size:.74rem; font-weight:800; margin-bottom:.7rem;"></div>
-                        <label for="invalidateExperimentReason" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Alasan invalidasi</label>
-                        <textarea id="invalidateExperimentReason" class="form-control form-control-sm" rows="3" maxlength="500" placeholder="Contoh: Foto #2 dan #3 tercatat bersamaan sehingga hasil tidak dapat dipisahkan." style="border-radius:9px;"></textarea>
+                        <label for="invalidateExperimentReason" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Alasan</label>
+                        <textarea id="invalidateExperimentReason" class="form-control form-control-sm" rows="3" maxlength="500" style="border-radius:9px;"></textarea>
                         <div id="invalidateExperimentError" style="display:none; margin-top:.65rem; padding:.6rem .7rem; border-radius:9px; color:#b91c1c; background:rgba(220,38,38,.07); border:1px solid rgba(220,38,38,.2); font-size:.72rem; font-weight:700;"></div>
                     </div>
                     <div class="modal-footer border-0 pt-0">
                         <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal" style="border-radius:9px;">Batal</button>
                         <button type="button" id="btnConfirmInvalidateExperiment" class="btn btn-secondary btn-sm" style="border-radius:9px; font-weight:800;">
-                            <i class="bi bi-archive"></i> Invalidasi record
+                            <i class="bi bi-archive"></i> Batalkan evaluasi
                         </button>
                     </div>
                 </div>
@@ -3858,20 +3857,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="modal-header border-0 pb-1">
                         <div>
                             <h5 class="modal-title fw-bold mb-1" id="modalRecordAdChangeLabel">
-                                <i class="bi bi-plus-circle text-primary me-1"></i> Catat perubahan iklan
+                                <i class="bi bi-plus-circle text-primary me-1"></i> Tambah evaluasi iklan
                             </h5>
                             <div style="font-size:.72rem; color:var(--dsh-muted);">
-                                Simpan baseline sebelum perubahan supaya hasilnya bisa dievaluasi dengan adil.
+                                Simpan perubahan untuk melihat hasilnya.
                             </div>
                         </div>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                     </div>
                     <form id="recordAdChangeForm">
                         <div class="modal-body pt-2">
-                            <div class="p-2 mb-3" style="border-radius:10px; background:rgba(37,99,235,.07); border:1px solid rgba(37,99,235,.16); font-size:.72rem; line-height:1.5; color:var(--dsh-muted);">
-                                <i class="bi bi-info-circle text-primary me-1"></i>
-                                Hari perubahan tidak dihitung. Sistem akan membandingkan 7 hari baseline dengan 7 hari observation.
-                            </div>
                             <div class="row g-2">
                                 <div class="col-12 col-md-6">
                                     <label for="recordAdChangeStore" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Toko</label>
@@ -3885,9 +3880,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </select>
                                 </div>
                                 <div class="col-12 col-md-6">
-                                    <label for="recordAdChangeCampaign" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Scope evaluasi</label>
+                                    <label for="recordAdChangeCampaign" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Produk / kampanye</label>
                                     <select id="recordAdChangeCampaign" name="channel_campaign_id" class="form-select form-select-sm" style="border-radius:9px;">
-                                        <option value="" data-store-id="">Level toko</option>
+                                        <option value="" data-store-id="">Semua produk</option>
                                         @foreach($evaluationCampaigns as $evaluationCampaign)
                                             @php
                                                 $evaluationCampaignId = (string) ($evaluationCampaign->channel_campaign_id ?? '');
@@ -3906,53 +3901,53 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <input type="hidden" id="recordAdChangeItem" name="channel_item_id">
                                 </div>
                                 <div class="col-12 col-md-5">
-                                    <label for="recordAdChangeType" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Jenis perubahan</label>
+                                    <label for="recordAdChangeType" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Yang diubah</label>
                                     <select id="recordAdChangeType" name="change_type" class="form-select form-select-sm" required style="border-radius:9px;">
-                                        <option value="creative">Ganti foto / creative</option>
-                                        <option value="target_roas">Update target ROAS</option>
-                                        <option value="price">Update harga</option>
-                                        <option value="budget">Update budget</option>
-                                        <option value="title">Update judul / deskripsi</option>
-                                        <option value="other">Perubahan lainnya</option>
+                                        <option value="creative">Foto produk</option>
+                                        <option value="target_roas">Target hasil iklan</option>
+                                        <option value="price">Harga</option>
+                                        <option value="budget">Biaya iklan</option>
+                                        <option value="title">Judul / deskripsi</option>
+                                        <option value="other">Lainnya</option>
                                     </select>
                                 </div>
                                 <div class="col-12 col-md-7">
-                                    <label for="recordAdChangeAt" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Waktu perubahan</label>
+                                    <label for="recordAdChangeAt" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Tanggal perubahan</label>
                                     <input type="datetime-local" id="recordAdChangeAt" name="changed_at" class="form-control form-control-sm" required style="border-radius:9px;">
                                 </div>
                                 <div class="col-12 col-md-6">
                                     <label for="recordAdChangeBefore" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Sebelum perubahan</label>
-                                    <input type="text" id="recordAdChangeBefore" name="before_value" class="form-control form-control-sm" required placeholder="Contoh: foto utama lama / 3.0 / Rp 150.000" style="border-radius:9px;">
+                                    <input type="text" id="recordAdChangeBefore" name="before_value" class="form-control form-control-sm" required style="border-radius:9px;">
                                 </div>
                                 <div class="col-12 col-md-6">
                                     <label for="recordAdChangeAfter" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Sesudah perubahan</label>
-                                    <input type="text" id="recordAdChangeAfter" name="after_value" class="form-control form-control-sm" required placeholder="Contoh: foto baru / 4.0 / Rp 175.000" style="border-radius:9px;">
+                                    <input type="text" id="recordAdChangeAfter" name="after_value" class="form-control form-control-sm" required style="border-radius:9px;">
                                 </div>
                                 <div class="col-12 col-md-7">
-                                    <label for="recordAdChangeObjective" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Tujuan perubahan</label>
-                                    <input type="text" id="recordAdChangeObjective" name="objective" class="form-control form-control-sm" required placeholder="Contoh: menaikkan CTR tanpa menurunkan ROAS" style="border-radius:9px;">
+                                    <label for="recordAdChangeObjective" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Tujuan</label>
+                                    <input type="text" id="recordAdChangeObjective" name="objective" class="form-control form-control-sm" required style="border-radius:9px;">
                                 </div>
                                 <div class="col-12 col-md-5">
-                                    <label for="recordAdChangeKpi" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">KPI utama</label>
+                                    <label for="recordAdChangeKpi" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Yang diutamakan</label>
                                     <select id="recordAdChangeKpi" name="primary_kpi" class="form-select form-select-sm" required style="border-radius:9px;">
-                                        <option value="roas">ROAS</option>
-                                        <option value="acos">ACOS</option>
-                                        <option value="orders">Order</option>
-                                        <option value="cvr">CVR</option>
-                                        <option value="profit">Profit</option>
-                                        <option value="gmv">GMV</option>
-                                        <option value="ctr">CTR</option>
+                                        <option value="roas">Efisiensi iklan</option>
+                                        <option value="acos">Biaya iklan</option>
+                                        <option value="orders">Pesanan</option>
+                                        <option value="cvr">Rasio pesanan</option>
+                                        <option value="profit">Keuntungan</option>
+                                        <option value="gmv">Penjualan</option>
+                                        <option value="ctr">Rasio klik</option>
                                     </select>
                                 </div>
                                 <div class="col-12">
                                     <label for="recordAdChangeNotes" class="form-label mb-1" style="font-size:.7rem; font-weight:800;">Catatan <span style="font-weight:500; color:var(--dsh-muted);">(opsional)</span></label>
-                                    <textarea id="recordAdChangeNotes" name="notes" class="form-control form-control-sm" rows="2" maxlength="2000" placeholder="Misalnya: perubahan lain yang sengaja tidak dilakukan selama periode evaluasi." style="border-radius:9px;"></textarea>
+                                    <textarea id="recordAdChangeNotes" name="notes" class="form-control form-control-sm" rows="2" maxlength="2000" style="border-radius:9px;"></textarea>
                                 </div>
                                 <div class="col-12">
                                     <div style="font-size:.7rem; font-weight:800; margin-bottom:.35rem;">Perubahan lain di waktu yang sama</div>
                                     <div class="d-flex flex-wrap gap-2" style="font-size:.7rem;">
-                                        <label class="form-check form-check-inline mb-0"><input class="form-check-input" type="checkbox" name="confounders[]" value="creative"> Foto / creative</label>
-                                        <label class="form-check form-check-inline mb-0"><input class="form-check-input" type="checkbox" name="confounders[]" value="target_roas"> Target ROAS</label>
+                                        <label class="form-check form-check-inline mb-0"><input class="form-check-input" type="checkbox" name="confounders[]" value="creative"> Foto produk</label>
+                                        <label class="form-check form-check-inline mb-0"><input class="form-check-input" type="checkbox" name="confounders[]" value="target_roas"> Target hasil</label>
                                         <label class="form-check form-check-inline mb-0"><input class="form-check-input" type="checkbox" name="confounders[]" value="price"> Harga</label>
                                         <label class="form-check form-check-inline mb-0"><input class="form-check-input" type="checkbox" name="confounders[]" value="budget"> Budget</label>
                                     </div>
@@ -3963,7 +3958,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="modal-footer border-0 pt-0">
                             <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal" style="border-radius:9px;">Batal</button>
                             <button type="submit" id="btnSubmitRecordAdChange" class="btn btn-primary btn-sm" style="border-radius:9px; font-weight:800;">
-                                <i class="bi bi-check2-circle"></i> Simpan &amp; mulai evaluasi
+                                <i class="bi bi-check2-circle"></i> Simpan evaluasi
                             </button>
                         </div>
                     </form>
@@ -7571,36 +7566,36 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!loading || !routes.experimentsIndex) return;
 
     const statusMap = {
-        LEARNING: ['Learning', '#2563eb', 'rgba(37,99,235,.1)'],
-        EARLY_SIGNAL: ['Early Signal', '#d97706', 'rgba(217,119,6,.12)'],
-        READY_TO_EVALUATE: ['Ready to Evaluate', '#15803d', 'rgba(21,128,61,.12)'],
-        INSUFFICIENT_DATA: ['Insufficient Data', '#b45309', 'rgba(180,83,9,.12)'],
-        CONFOUNDED: ['Confounded', '#b91c1c', 'rgba(185,28,28,.1)'],
-        INVALIDATED: ['Invalidated', '#64748b', 'rgba(100,116,139,.14)'],
-        COMPLETED: ['Completed', '#475569', 'rgba(71,85,105,.12)'],
+        LEARNING: ['Sedang berjalan', '#2563eb', 'rgba(37,99,235,.1)'],
+        EARLY_SIGNAL: ['Sinyal awal', '#d97706', 'rgba(217,119,6,.12)'],
+        READY_TO_EVALUATE: ['Siap dinilai', '#15803d', 'rgba(21,128,61,.12)'],
+        INSUFFICIENT_DATA: ['Data belum cukup', '#b45309', 'rgba(180,83,9,.12)'],
+        CONFOUNDED: ['Tidak bisa dipastikan', '#b91c1c', 'rgba(185,28,28,.1)'],
+        INVALIDATED: ['Dibatalkan', '#64748b', 'rgba(100,116,139,.14)'],
+        COMPLETED: ['Selesai', '#475569', 'rgba(71,85,105,.12)'],
     };
 
     const qualityLabels = {
-        partial_day_excluded: 'hari perubahan dikecualikan',
-        estimated_qty: 'qty memakai fallback order',
-        estimated_price: 'harga diestimasi dari GMV / qty',
-        estimated_profit: 'profit masih estimasi',
-        missing_mapping: 'mapping HPP belum tersedia',
+        partial_day_excluded: 'hari perubahan tidak dihitung',
+        estimated_qty: 'jumlah terjual masih perkiraan',
+        estimated_price: 'harga masih perkiraan',
+        estimated_profit: 'keuntungan masih perkiraan',
+        missing_mapping: 'produk belum terhubung ke HPP',
         missing_hpp: 'HPP belum tersedia',
         missing_price: 'harga belum tersedia',
-        missing_metric: 'metric belum tersedia',
-        low_volume: 'volume masih rendah',
-        confounded: 'ada perubahan lain yang overlap',
+        missing_metric: 'data belum tersedia',
+        low_volume: 'jumlah data masih sedikit',
+        confounded: 'ada perubahan lain di waktu yang sama',
     };
 
     const verdictMap = {
-        POSITIVE: ['Positive', '#15803d', 'rgba(21,128,61,.12)'],
-        NEGATIVE: ['Negative', '#b91c1c', 'rgba(185,28,28,.1)'],
-        MIXED: ['Mixed', '#b45309', 'rgba(180,83,9,.12)'],
-        NO_CLEAR_IMPACT: ['No clear impact', '#475569', 'rgba(71,85,105,.12)'],
-        INCONCLUSIVE: ['Inconclusive', '#b45309', 'rgba(180,83,9,.12)'],
-        INSUFFICIENT_DATA: ['Insufficient data', '#b45309', 'rgba(180,83,9,.12)'],
-        CONFOUNDED: ['Confounded', '#b91c1c', 'rgba(185,28,28,.1)'],
+        POSITIVE: ['Lebih baik', '#15803d', 'rgba(21,128,61,.12)'],
+        NEGATIVE: ['Lebih buruk', '#b91c1c', 'rgba(185,28,28,.1)'],
+        MIXED: ['Campuran', '#b45309', 'rgba(180,83,9,.12)'],
+        NO_CLEAR_IMPACT: ['Belum jelas', '#475569', 'rgba(71,85,105,.12)'],
+        INCONCLUSIVE: ['Belum bisa dinilai', '#b45309', 'rgba(180,83,9,.12)'],
+        INSUFFICIENT_DATA: ['Data belum cukup', '#b45309', 'rgba(180,83,9,.12)'],
+        CONFOUNDED: ['Tidak bisa dipastikan', '#b91c1c', 'rgba(185,28,28,.1)'],
     };
 
     function esc(value) {
@@ -7635,6 +7630,19 @@ document.addEventListener('DOMContentLoaded', function () {
         return number(value, key === 'qty' ? 1 : 0);
     }
 
+    function profitBasisLabel(value) {
+        const labels = {
+            net_hpp_ads: 'Keuntungan setelah HPP & iklan',
+            net_hpp: 'Keuntungan setelah HPP',
+            gross: 'Penjualan kotor',
+        };
+        return labels[value] || 'Keuntungan';
+    }
+
+    function mappingLabel(value) {
+        return value === 'mapped' ? 'Produk terhubung' : 'Produk belum terhubung';
+    }
+
     function statusBadge(status) {
         const info = statusMap[status] || [status || 'Unknown', '#475569', 'rgba(71,85,105,.12)'];
         return '<span style="display:inline-flex; align-items:center; padding:.28rem .5rem; border-radius:999px; color:' + info[1] + '; background:' + info[2] + '; font-size:.66rem; font-weight:850; white-space:nowrap;">' + esc(info[0]) + '</span>';
@@ -7652,27 +7660,27 @@ document.addEventListener('DOMContentLoaded', function () {
             return 'Harga · ' + (experiment.old_price === null ? 'N/A' : money(experiment.old_price)) + ' → ' + (experiment.new_price === null ? 'N/A' : money(experiment.new_price));
         }
         if (type === 'target_roas') {
-            return 'Target ROAS · ' + (experiment.old_target_roas === null ? 'N/A' : number(experiment.old_target_roas, 2) + 'x') + ' → ' + (experiment.new_target_roas === null ? 'N/A' : number(experiment.new_target_roas, 2) + 'x');
+            return 'Target efisiensi · ' + (experiment.old_target_roas === null ? 'N/A' : number(experiment.old_target_roas, 2) + 'x') + ' → ' + (experiment.new_target_roas === null ? 'N/A' : number(experiment.new_target_roas, 2) + 'x');
         }
-        if (type === 'creative') return 'Ganti foto / creative';
-        if (type === 'budget') return 'Budget';
+        if (type === 'creative') return 'Ganti foto produk';
+        if (type === 'budget') return 'Biaya iklan';
         if (type === 'title') return 'Judul / deskripsi';
-        if (type === 'other') return 'Perubahan lainnya';
-        return 'Harga + Target ROAS';
+        if (type === 'other') return 'Perubahan lain';
+        return 'Harga + target hasil';
     }
 
-    function scopeLabel(experiment) {
+    function scopeLabel(experiment, product) {
         const parts = [];
-        if (experiment.channel_campaign_id) parts.push('Campaign ' + experiment.channel_campaign_id);
-        if (experiment.channel_item_id) parts.push('Item ' + experiment.channel_item_id);
-        if (!parts.length) parts.push('Store-level');
+        if (experiment.channel_campaign_id) parts.push(product?.campaign_name || 'Kampanye ' + experiment.channel_campaign_id);
+        if (experiment.channel_item_id) parts.push(product?.name || 'Produk ' + experiment.channel_item_id);
+        if (!parts.length) parts.push('Semua produk di toko');
         return parts.join(' · ');
     }
 
     function openInvalidateModal(experiment) {
         if (!invalidateModal || !experiment?.id) return;
         invalidateExperimentId = experiment.id;
-        invalidateLabel.textContent = changeLabel(experiment) + ' · ' + scopeLabel(experiment);
+        invalidateLabel.textContent = changeLabel(experiment) + ' · ' + scopeLabel(experiment, experiment.product);
         invalidateReason.value = '';
         invalidateError.style.display = 'none';
         window.bootstrap?.Modal.getOrCreateInstance(invalidateModal).show();
@@ -7729,15 +7737,15 @@ document.addEventListener('DOMContentLoaded', function () {
     function periodSummary(period) {
         if (!period || Number(period.days_with_data || 0) === 0) {
             return '<div style="font-size:.7rem; line-height:1.65; color:var(--dsh-muted);">' +
-                '<b style="color:#b45309;">Menunggu data selesai</b><br>' +
+                '<b style="color:#b45309;">Menunggu data</b><br>' +
                 esc((period || {}).from || '-') + ' → ' + esc((period || {}).to || '-') +
                 '</div>';
         }
         const metrics = (period || {}).metrics || {};
         return '<div style="font-size:.7rem; line-height:1.65; color:var(--dsh-muted);">' +
-            '<b style="color:var(--text);">ROAS ' + esc(metricValue('roas', metrics.roas)) + '</b> · ' +
-            'Order ' + esc(metricValue('orders', metrics.orders)) + ' · ' +
-            'Spend ' + esc(metricValue('spend', metrics.spend)) +
+            '<b style="color:var(--text);">Efisiensi ' + esc(metricValue('roas', metrics.roas)) + '</b> · ' +
+            'Pesanan ' + esc(metricValue('orders', metrics.orders)) + ' · ' +
+            'Biaya ' + esc(metricValue('spend', metrics.spend)) +
             '</div>';
     }
 
@@ -7762,26 +7770,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
         empty.style.display = 'none';
         tableWrap.style.display = 'block';
-        dataNote.textContent = lastRows.length + ' experiment ditemukan. Profit actual belum dianggap siap sampai allocation ad cost lengkap.';
+        dataNote.textContent = lastRows.length + ' evaluasi ditemukan.';
 
         lastRows.forEach(function (row) {
             const experiment = row.experiment || {};
             const details = row.details || {};
+            const product = row.product || {};
+            const productName = product.name || (experiment.channel_item_id ? 'Produk ' + experiment.channel_item_id : 'Semua produk');
+            const productMedia = product.image_url
+                ? `<img src="${esc(product.image_url)}" alt="${esc(productName)}" loading="lazy" style="width:38px;height:38px;border-radius:9px;object-fit:cover;border:1px solid var(--dsh-border);background:#f1f5f9;" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span style="display:none;width:38px;height:38px;border-radius:9px;align-items:center;justify-content:center;background:#f1f5f9;color:var(--dsh-muted);border:1px solid var(--dsh-border);"><i class="bi bi-image"></i></span>`
+                : '<span style="display:inline-flex;width:38px;height:38px;border-radius:9px;align-items:center;justify-content:center;background:#f1f5f9;color:var(--dsh-muted);border:1px solid var(--dsh-border);"><i class="bi bi-image"></i></span>';
             const changedAt = (details.change || {}).effective_date || experiment.effective_date || '-';
             const status = details.lifecycle_status || experiment.lifecycle_status;
             const canInvalidate = status !== 'INVALIDATED' && !experiment.invalidated_at;
             const tr = document.createElement('tr');
             tr.innerHTML =
-                '<td><div style="font-weight:800; font-size:.72rem; color:var(--text);">' + esc(changeLabel(experiment)) + '</div>' +
-                    '<div style="font-size:.64rem; color:var(--dsh-muted); margin-top:.15rem;">' + esc(experiment.change_event_id || '') + '</div></td>' +
-                '<td><div style="font-size:.7rem; max-width:210px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(scopeLabel(experiment)) + '">' + esc(scopeLabel(experiment)) + '</div></td>' +
-                '<td><div style="font-size:.7rem; font-weight:700;">' + esc(changedAt) + '</div><div style="font-size:.64rem; color:var(--dsh-muted);">' + esc(experiment.profit_basis || 'incomplete') + '</div></td>' +
+                '<td><div style="display:flex;align-items:center;gap:.55rem;min-width:220px;">' + productMedia + '<div style="min-width:0;">' +
+                    '<div style="font-weight:800;font-size:.72rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px;" title="' + esc(productName) + '">' + esc(productName) + '</div>' +
+                    '<div style="font-size:.64rem;color:var(--dsh-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px;">' + esc(product.campaign_name || scopeLabel(experiment, product)) + '</div>' +
+                    '<div style="font-size:.62rem;color:var(--dsh-muted);margin-top:.12rem;">' + esc(changeLabel(experiment)) + '</div>' +
+                '</div></div></td>' +
+                '<td><div style="font-size:.7rem; max-width:210px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(scopeLabel(experiment, product)) + '">' + esc(scopeLabel(experiment, product)) + '</div></td>' +
+                '<td><div style="font-size:.7rem; font-weight:700;">' + esc(changedAt) + '</div></td>' +
                 '<td>' + statusBadge(status) + (details.invalidation?.reason ? '<div style="font-size:.62rem; color:var(--dsh-muted); margin-top:.25rem; max-width:150px;">' + esc(details.invalidation.reason) + '</div>' : '') + '</td>' +
                 '<td>' + periodSummary(details.baseline) + '</td>' +
                 '<td>' + periodSummary(details.observation) + '</td>' +
                 '<td><div class="d-flex flex-column gap-1 align-items-stretch">' +
-                    '<button type="button" class="btn btn-sm js-view-experiment" data-id="' + esc(experiment.id) + '" style="border:1px solid rgba(37,99,235,.25); color:var(--dsh-accent); background:rgba(37,99,235,.06); border-radius:8px; font-size:.68rem; font-weight:800;">Detail</button>' +
-                    (canInvalidate ? '<button type="button" class="btn btn-sm js-invalidate-experiment" data-id="' + esc(experiment.id) + '" style="border:1px solid rgba(100,116,139,.35); color:#64748b; background:rgba(100,116,139,.06); border-radius:8px; font-size:.66rem; font-weight:800;">Invalidasi</button>' : '') +
+                    '<button type="button" class="btn btn-sm js-view-experiment" data-id="' + esc(experiment.id) + '" style="border:1px solid rgba(37,99,235,.25); color:var(--dsh-accent); background:rgba(37,99,235,.06); border-radius:8px; font-size:.68rem; font-weight:800;"><i class="bi bi-eye me-1"></i>Lihat hasil</button>' +
+                    (canInvalidate ? '<button type="button" class="btn btn-sm js-invalidate-experiment" data-id="' + esc(experiment.id) + '" style="border:1px solid rgba(100,116,139,.35); color:#64748b; background:rgba(100,116,139,.06); border-radius:8px; font-size:.66rem; font-weight:800;"><i class="bi bi-archive me-1"></i>Batalkan</button>' : '') +
                 '</div></td>';
             tableBody.appendChild(tr);
         });
@@ -7796,7 +7812,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const row = lastRows.find(function (item) {
                     return String(item?.experiment?.id || '') === String(button.dataset.id || '');
                 });
-                openInvalidateModal(row?.experiment || {});
+                openInvalidateModal(Object.assign({}, row?.experiment || {}, { product: row?.product || null }));
             });
         });
     }
@@ -7834,19 +7850,19 @@ document.addEventListener('DOMContentLoaded', function () {
         const metrics = (period || {}).metrics || {};
         const hasData = Number((period || {}).days_with_data || 0) > 0;
         const rows = [
-            ['Impressions', 'impressions'],
-            ['Clicks', 'clicks'],
-            ['Orders', 'orders'],
-            ['Qty', 'qty'],
-            ['Revenue', 'revenue'],
-            ['Spend', 'spend'],
-            ['CTR', 'ctr'],
-            ['CVR', 'cvr'],
-            ['ROAS', 'roas'],
-            ['Profit', 'profit'],
-            ['BEP Qty', 'break_even_qty'],
-            ['CVR BEP', 'cvr_bep'],
-            ['BEP ROAS', 'break_even_roas'],
+            ['Dilihat', 'impressions'],
+            ['Klik', 'clicks'],
+            ['Pesanan', 'orders'],
+            ['Jumlah terjual', 'qty'],
+            ['Penjualan', 'revenue'],
+            ['Biaya iklan', 'spend'],
+            ['Rasio klik', 'ctr'],
+            ['Rasio pesanan', 'cvr'],
+            ['Efisiensi iklan', 'roas'],
+            ['Keuntungan', 'profit'],
+            ['Titik impas jumlah', 'break_even_qty'],
+            ['Rasio pesanan impas', 'cvr_bep'],
+            ['Efisiensi impas', 'break_even_roas'],
         ];
         target.innerHTML = '<div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:.45rem;">' +
             rows.map(function (item) {
@@ -7858,10 +7874,10 @@ document.addEventListener('DOMContentLoaded', function () {
             }).join('') + '</div>' +
             '<div style="font-size:.65rem; color:' + (hasData ? 'var(--dsh-muted)' : '#b45309') + '; margin-top:.55rem;">' +
                 (hasData
-                    ? 'Data: ' + esc((period || {}).source_table || 'belum tersedia') + ' · ' + number((period || {}).days_with_data || 0) + ' hari memiliki data'
+                    ? number((period || {}).days_with_data || 0) + ' hari memiliki data'
                     : ((period || {}).to
-                        ? 'Belum ada hari selesai dengan data · periode ' + esc((period || {}).from || '-') + ' → ' + esc((period || {}).to || '-')
-                        : 'Belum ada hari selesai setelah perubahan · mulai ' + esc((period || {}).from || '-'))) +
+                        ? 'Belum ada data selesai · ' + esc((period || {}).from || '-') + ' → ' + esc((period || {}).to || '-')
+                        : 'Menunggu data setelah perubahan · mulai ' + esc((period || {}).from || '-'))) +
             '</div>';
     }
 
@@ -7869,6 +7885,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const impact = data.impact || {};
         const steps = impact.steps || {};
         const labels = ['traffic', 'ctr', 'cvr', 'qty', 'roas', 'profit'];
+        const labelNames = {
+            traffic: 'Dilihat',
+            ctr: 'Rasio klik',
+            cvr: 'Rasio pesanan',
+            qty: 'Jumlah terjual',
+            roas: 'Efisiensi iklan',
+            profit: 'Keuntungan',
+        };
         const verdict = data.verdict || 'INCONCLUSIVE';
         const verdictInfo = verdictMap[verdict] || [verdict, '#475569', 'rgba(71,85,105,.12)'];
         verdictBadge.textContent = verdictInfo[0];
@@ -7887,11 +7911,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? metricValue(key, step.after)
                 : metricValue(key === 'traffic' ? 'impressions' : key, step.after);
             const measurement = key === 'profit'
-                ? ' · ' + (step.measurement === 'actual' ? 'actual' : (step.measurement === 'estimated' ? 'estimasi' : 'N/A'))
+                ? ' · ' + (step.measurement === 'actual' ? 'aktual' : (step.measurement === 'estimated' ? 'perkiraan' : 'belum ada'))
                 : '';
 
             return '<div class="ads-phase3-impact-step">' +
-                '<div class="ads-phase3-impact-label">' + esc(step.label || key) + esc(measurement) + '</div>' +
+                '<div class="ads-phase3-impact-label">' + esc(labelNames[key] || step.label || key) + esc(measurement) + '</div>' +
                 '<div class="ads-phase3-impact-value">' + esc(value) + '</div>' +
                 '<div class="ads-phase3-impact-delta" style="color:' + tone + ';">' + esc(delta) + '</div>' +
             '</div>';
@@ -7899,17 +7923,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const sufficiency = data.data_sufficiency || {};
         const reasons = sufficiency.reasons || [];
-        const reasonText = reasons.length ? ' · Alasan: ' + reasons.join(', ') : '';
-        sufficiencyNote.innerHTML = '<b style="color:var(--text);">Data sufficiency:</b> ' +
-            (sufficiency.metric_ready ? 'cukup untuk evaluasi metrik' : 'belum cukup untuk verdict') +
-            (sufficiency.profit_ready ? ' · profit actual siap' : ' · profit masih estimasi atau belum lengkap') +
-            esc(reasonText);
+        const reasonText = reasons.length ? reasons.map(function (reason) { return qualityLabels[reason] || reason; }).join(' · ') : '';
+        sufficiencyNote.innerHTML = '<b style="color:var(--text);">Kesiapan hasil:</b> ' +
+            (sufficiency.metric_ready ? 'data cukup untuk dinilai' : 'data belum cukup untuk menentukan hasil') +
+            ' · ' + (sufficiency.profit_ready ? 'keuntungan sudah aktual' : 'keuntungan masih perkiraan') +
+            (reasonText ? '<br><span style="color:var(--dsh-muted);">Catatan: ' + esc(reasonText) + '</span>' : '');
 
         const conflicts = data.conflicts || [];
         if (conflicts.length) {
-            conflictNote.textContent = 'Conflict terdeteksi: ' + conflicts.map(function (conflict) {
-                return conflict.reason + (conflict.experiment_id ? ' #' + conflict.experiment_id : '');
-            }).join(', ') + '. Verdict tidak dianggap kausal.';
+            conflictNote.textContent = 'Ada perubahan lain di waktu yang sama. Hasil belum bisa dianggap berasal dari satu perubahan saja.';
             conflictNote.style.display = 'block';
         } else {
             conflictNote.textContent = '';
@@ -7946,26 +7968,26 @@ document.addEventListener('DOMContentLoaded', function () {
         const current = result.current_quantity || {};
         const target = result.target_roas || {};
         const bep = result.break_even || {};
-        const profitLabel = current.actual_profit_ready ? 'Aktual' : 'Estimasi';
+        const profitLabel = current.actual_profit_ready ? 'Aktual' : 'Perkiraan';
         const profitTone = current.actual_profit_ready ? '#15803d' : '#b45309';
 
         simulationResult.innerHTML =
             '<div class="ads-phase2-result-grid">' +
-                simulationCard('Profit ' + profitLabel, metricValue('profit', current.profit), profitTone) +
-                simulationCard('BEP Qty', metricValue('break_even_qty', bep.qty), '#2563eb') +
-                simulationCard('CVR BEP', metricValue('cvr_bep', bep.cvr), '#2563eb') +
-                simulationCard('BEP ROAS', metricValue('break_even_roas', bep.roas), '#2563eb') +
+                simulationCard('Keuntungan ' + profitLabel, metricValue('profit', current.profit), profitTone) +
+                simulationCard('Titik impas jumlah', metricValue('break_even_qty', bep.qty), '#2563eb') +
+                simulationCard('Rasio pesanan impas', metricValue('cvr_bep', bep.cvr), '#2563eb') +
+                simulationCard('Efisiensi impas', metricValue('break_even_roas', bep.roas), '#2563eb') +
             '</div>' +
             '<div class="ads-phase2-result-grid">' +
-                simulationCard('GMV pada Target ROAS', money(target.target_gmv), '#0f766e') +
-                simulationCard('Qty pada Target ROAS', number(target.target_qty, 2), '#0f766e') +
-                simulationCard('CVR pada Target ROAS', target.target_cvr === null || target.target_cvr === undefined ? 'N/A' : number(target.target_cvr * 100, 1) + '%', '#0f766e') +
-                simulationCard('Profit Target', money(target.estimated_profit), target.estimated_profit !== null && target.estimated_profit < 0 ? '#b91c1c' : '#0f766e') +
+                simulationCard('Penjualan pada target', money(target.target_gmv), '#0f766e') +
+                simulationCard('Jumlah terjual pada target', number(target.target_qty, 2), '#0f766e') +
+                simulationCard('Rasio pesanan pada target', target.target_cvr === null || target.target_cvr === undefined ? 'N/A' : number(target.target_cvr * 100, 1) + '%', '#0f766e') +
+                simulationCard('Keuntungan pada target', money(target.estimated_profit), target.estimated_profit !== null && target.estimated_profit < 0 ? '#b91c1c' : '#0f766e') +
             '</div>' +
             '<div style="display:flex; gap:.45rem; flex-wrap:wrap; margin-top:.6rem; color:var(--dsh-muted); font-size:.65rem;">' +
-                '<span>Spend: ' + esc(money(result.assumptions?.spend)) + '</span>' +
-                '<span>·</span><span>Qty: ' + esc(number(result.assumptions?.qty, 2)) + (result.assumptions?.qty_estimated ? ' (estimasi)' : '') + '</span>' +
-                '<span>·</span><span>Basis: ' + esc(result.profit_basis || 'net_hpp_ads') + '</span>' +
+                '<span>Biaya iklan: ' + esc(money(result.assumptions?.spend)) + '</span>' +
+                '<span>·</span><span>Jumlah terjual: ' + esc(number(result.assumptions?.qty, 2)) + (result.assumptions?.qty_estimated ? ' (perkiraan)' : '') + '</span>' +
+                '<span>·</span><span>Dasar: ' + esc(profitBasisLabel(result.profit_basis || 'net_hpp_ads')) + '</span>' +
             '</div>';
         simulationResult.style.display = 'block';
     }
@@ -8047,13 +8069,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 const experiment = data.experiment || {};
                 const change = data.change || {};
                 const quality = data.data_quality || {};
+                const product = data.product || {};
+                const productName = product.name || (experiment.channel_item_id ? 'Produk ' + experiment.channel_item_id : 'Semua produk');
+                const productMedia = product.image_url
+                    ? `<img src="${esc(product.image_url)}" alt="${esc(productName)}" loading="lazy" style="width:48px;height:48px;border-radius:11px;object-fit:cover;border:1px solid var(--dsh-border);background:#f1f5f9;" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';"><span style="display:none;width:48px;height:48px;border-radius:11px;align-items:center;justify-content:center;background:#f1f5f9;color:var(--dsh-muted);border:1px solid var(--dsh-border);"><i class="bi bi-image"></i></span>`
+                    : '<span style="display:inline-flex;width:48px;height:48px;border-radius:11px;align-items:center;justify-content:center;background:#f1f5f9;color:var(--dsh-muted);border:1px solid var(--dsh-border);"><i class="bi bi-image"></i></span>';
+                experiment.product = product;
                 activeExperiment = experiment;
-                detailSubtitle.textContent = changeLabel(experiment) + ' · ' + (change.effective_date || '-');
+                detailSubtitle.textContent = productName + ' · ' + changeLabel(experiment) + ' · ' + (change.effective_date || '-');
                 detailMeta.innerHTML =
-                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Status</div><div style="margin-top:.25rem;">' + statusBadge(data.lifecycle_status || experiment.lifecycle_status) + '</div></div>' +
-                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Profit basis</div><div style="font-size:.78rem; font-weight:800; margin-top:.25rem;">' + esc(data.profit_basis || 'incomplete') + '</div></div>' +
-                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Scope</div><div style="font-size:.72rem; font-weight:800; margin-top:.25rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(scopeLabel(experiment)) + '">' + esc(scopeLabel(experiment)) + '</div></div>' +
-                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Verdict</div><div style="font-size:.78rem; font-weight:800; margin-top:.25rem;">' + esc(data.verdict || 'INCONCLUSIVE') + '</div></div>';
+                    '<div class="col-12"><div style="display:flex;align-items:center;gap:.7rem;padding:.7rem .8rem;border:1px solid var(--dsh-border);border-radius:12px;background:rgba(148,163,184,.05);">' + productMedia + '<div style="min-width:0;"><div style="font-weight:850;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(productName) + '</div><div style="font-size:.68rem;color:var(--dsh-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(product.campaign_name || scopeLabel(experiment, product)) + '</div></div></div></div>' +
+                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Hasil</div><div style="margin-top:.25rem;">' + statusBadge(data.lifecycle_status || experiment.lifecycle_status) + '</div></div>' +
+                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Dasar keuntungan</div><div style="font-size:.72rem; font-weight:800; margin-top:.25rem;">' + esc(profitBasisLabel(data.profit_basis)) + '</div></div>' +
+                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Yang diubah</div><div style="font-size:.72rem; font-weight:800; margin-top:.25rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(scopeLabel(experiment, product)) + '">' + esc(scopeLabel(experiment, product)) + '</div></div>' +
+                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Kesimpulan</div><div style="font-size:.78rem; font-weight:800; margin-top:.25rem;">' + esc((verdictMap[data.verdict] || [data.verdict || 'Belum bisa dinilai'])[0]) + '</div></div>';
                 renderMetricGrid(baselineMetrics, data.baseline);
                 renderMetricGrid(observationMetrics, data.observation);
                 renderImpact(data);
@@ -8076,25 +8105,25 @@ document.addEventListener('DOMContentLoaded', function () {
                     : 'Tidak ada flag tambahan.';
                 const observationDays = Number(data.observation?.days_with_data || 0);
                 const observationNote = observationDays === 0
-                    ? '<br><b style="color:#b45309;">Observation:</b> menunggu data hari selesai setelah periode perubahan.'
+                    ? '<br><b style="color:#b45309;">Data sesudah perubahan:</b> belum ada hari selesai.'
                     : '';
                 const profitNote = quality.actual_profit_ready
-                    ? 'actual'
-                    : 'belum aktual (mapping/HPP atau data observation belum lengkap)';
+                    ? 'aktual'
+                    : 'masih perkiraan';
                 const plan = data.calculation_snapshot || {};
                 const planHtml = plan.workflow === 'manual_optimization'
                     ? '<div style="padding:.7rem .8rem; margin-bottom:.6rem; border-radius:10px; background:rgba(37,99,235,.06); border:1px solid rgba(37,99,235,.18); color:var(--dsh-muted);">' +
                         '<b style="color:var(--text);">Tujuan:</b> ' + esc(plan.objective || '-') + '<br>' +
-                        '<b style="color:var(--text);">KPI utama:</b> ' + esc((plan.primary_kpi || '-').toUpperCase()) +
+                        '<b style="color:var(--text);">Yang diukur:</b> ' + esc((plan.primary_kpi || '-').toUpperCase()) +
                         (plan.notes ? '<br><b style="color:var(--text);">Catatan:</b> ' + esc(plan.notes) : '') +
                         '</div>'
                     : '';
                 qualityNote.innerHTML =
                     planHtml +
                     '<div style="padding:.7rem .8rem; border-radius:10px; background:rgba(148,163,184,.08); border:1px solid var(--dsh-border); color:var(--dsh-muted);">' +
-                    '<b style="color:var(--text);">Kualitas data:</b> ' + esc(flagText) + '<br>' +
-                    '<b style="color:var(--text);">Mapping:</b> ' + esc(quality.mapping_status || 'unknown') + ' · ' +
-                    '<b style="color:var(--text);">Profit:</b> ' + esc(profitNote) +
+                    '<b style="color:var(--text);">Catatan data:</b> ' + esc(flagText) + '<br>' +
+                    '<b style="color:var(--text);">Produk:</b> ' + esc(mappingLabel(quality.mapping_status)) + ' · ' +
+                    '<b style="color:var(--text);">Keuntungan:</b> ' + esc(profitNote) +
                     observationNote +
                     '</div>';
             })

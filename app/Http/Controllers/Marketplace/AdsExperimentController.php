@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Marketplace;
 use App\Http\Controllers\Controller;
 use App\Models\MarketplaceAdCampaign;
 use App\Models\MarketplaceAdExperiment;
+use App\Models\MarketplaceProduct;
 use App\Models\Store;
 use App\Services\Marketplace\Ads\AdsExperimentService;
+use Illuminate\Support\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -110,8 +112,11 @@ class AdsExperimentController extends Controller
             ->map(fn ($group) => $group->sortByDesc('changed_at')->sortByDesc('id')->first())
             ->values();
 
+        $productContexts = $this->productContexts($rows);
+
         $payload = $rows->map(fn (MarketplaceAdExperiment $experiment) => [
                 'experiment' => $experiment,
+                'product' => $productContexts->get($experiment->id),
                 'details' => $experiments->details($experiment),
             ]);
         if (isset($data['lifecycle_status'])) {
@@ -127,9 +132,55 @@ class AdsExperimentController extends Controller
     {
         $experiment->load(['store:id,name', 'internalItem:id,code,name']);
 
+        $details = $experiments->details($experiment);
+        $details['product'] = $this->productContexts(collect([$experiment]))->get($experiment->id);
+
         return response()->json([
-            'data' => $experiments->details($experiment),
+            'data' => $details,
         ]);
+    }
+
+    /**
+     * Resolve product-facing labels once for the evaluation list/detail UI.
+     * This is display context only and does not affect experiment calculations.
+     */
+    private function productContexts(Collection $experiments): Collection
+    {
+        $storeIds = $experiments->pluck('store_id')->filter()->unique()->values();
+        $itemIds = $experiments->pluck('channel_item_id')->filter()->map(fn ($id) => (string) $id)->unique()->values();
+        $campaignIds = $experiments->pluck('channel_campaign_id')->filter()->map(fn ($id) => (string) $id)->unique()->values();
+
+        $products = $storeIds->isNotEmpty() && $itemIds->isNotEmpty()
+            ? MarketplaceProduct::query()
+                ->whereIn('store_id', $storeIds->all())
+                ->whereIn('item_id', $itemIds->all())
+                ->get(['store_id', 'item_id', 'item_name', 'item_sku', 'image_url'])
+                ->keyBy(fn ($product) => $product->store_id . '|' . (string) $product->item_id)
+            : collect();
+
+        $campaigns = $storeIds->isNotEmpty() && $campaignIds->isNotEmpty()
+            ? MarketplaceAdCampaign::query()
+                ->whereIn('store_id', $storeIds->all())
+                ->whereIn('channel_campaign_id', $campaignIds->all())
+                ->get(['store_id', 'channel_campaign_id', 'campaign_name'])
+                ->keyBy(fn ($campaign) => $campaign->store_id . '|' . (string) $campaign->channel_campaign_id)
+            : collect();
+
+        return $experiments->mapWithKeys(function (MarketplaceAdExperiment $experiment) use ($products, $campaigns): array {
+            $product = $experiment->channel_item_id
+                ? $products->get($experiment->store_id . '|' . (string) $experiment->channel_item_id)
+                : null;
+            $campaign = $experiment->channel_campaign_id
+                ? $campaigns->get($experiment->store_id . '|' . (string) $experiment->channel_campaign_id)
+                : null;
+
+            return [$experiment->id => [
+                'name' => $product?->item_name ?: $experiment->internalItem?->name,
+                'sku' => $product?->item_sku,
+                'image_url' => $product?->image_url,
+                'campaign_name' => $campaign?->campaign_name,
+            ]];
+        });
     }
 
     public function invalidate(Request $request, MarketplaceAdExperiment $experiment, AdsExperimentService $experiments): JsonResponse

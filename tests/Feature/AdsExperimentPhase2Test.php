@@ -25,7 +25,7 @@ class AdsExperimentPhase2Test extends TestCase
             ->get(route('marketplace.ads.dashboard'));
 
         $response->assertOk()
-            ->assertSee('Simulasi Phase 2')
+            ->assertSee('Coba Skenario')
             ->assertSee('experimentSimulationPrice');
     }
 
