@@ -554,24 +554,53 @@
     .ads-kpi-funnel-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.2rem .45rem; margin-top:.35rem; font-size:.6rem; color:var(--dsh-muted); }
     .ads-kpi-funnel-grid b { color:var(--text); font-size:.7rem; }
     #campaignPerformanceSubtabKpis .perf-kpi-compare { font-size: .54rem; margin-top: .1rem; white-space: normal; overflow: visible; text-overflow: clip; }
-    .campaign-performance-panel > .p-3 { padding: .65rem .8rem !important; }
-    .campaign-performance-panel > .p-2 { padding: .35rem .8rem !important; }
-    .campaign-performance-panel [role="tablist"] { margin: .45rem .55rem !important; }
-    .campaign-performance-panel [role="tablist"] .btn { font-size: .64rem !important; padding: .3rem .7rem !important; }
-    .campaign-performance-panel .perf-table { font-size: .72rem !important; }
-    .campaign-performance-panel .perf-table th { padding: .42rem .45rem !important; font-size: .57rem; }
-    .campaign-performance-panel .perf-table td { padding: .42rem .45rem !important; }
-    .campaign-performance-panel .perf-main { gap: .18rem; }
-    .campaign-performance-panel .perf-main .perf-val { font-size: .72rem; }
+    /* Enterprise table treatment: ruang baca lebih lega, kontras terukur, dan
+       identitas campaign tetap terlihat saat user menggeser metrik. */
+    .campaign-performance-panel { border: 1px solid var(--dsh-border, #e2e8f0); border-radius: 16px; box-shadow: 0 8px 24px rgba(15, 23, 42, .06); }
+    .campaign-performance-panel .perf-panel-header { padding: 1.15rem 1.35rem !important; background: linear-gradient(135deg, var(--card-bg, #fff) 0%, rgba(239, 246, 255, .72) 100%) !important; }
+    .perf-panel-title { display: flex; align-items: flex-start; gap: .75rem; }
+    .perf-panel-title-icon { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; flex: none; border-radius: 11px; color: #1d4ed8; background: #dbeafe; font-size: 1.15rem; }
+    .perf-panel-title h6 { font-size: 1rem; letter-spacing: -.01em; }
+    .perf-panel-subtitle { margin-top: .2rem; color: var(--dsh-muted, #64748b); font-size: .72rem; line-height: 1.45; }
+    .perf-panel-meta { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: .45rem; }
+    .perf-panel-compare { display: inline-flex; align-items: center; gap: .35rem; padding: .42rem .65rem; border: 1px solid var(--dsh-border, #dbe2ea); border-radius: 8px; background: var(--card-bg, #fff); color: var(--dsh-muted, #64748b); font-size: .7rem; font-weight: 600; }
+    .perf-panel-compare select { min-width: 140px; border: 0; padding: 0 1.6rem 0 0; background-color: transparent; color: var(--text); font-size: .72rem; font-weight: 700; }
+    .perf-signal-legend { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; }
+    .perf-signal-legend .badge { padding: .4rem .55rem; border-radius: 6px; font-size: .64rem; font-weight: 700; }
+    .campaign-performance-panel > .p-2 { padding: .7rem 1.35rem !important; font-size: .7rem !important; background: rgba(248, 250, 252, .78); }
+    .campaign-performance-panel [role="tablist"] { margin: .85rem 1.35rem !important; gap: .5rem !important; }
+    .campaign-performance-panel [role="tablist"] .btn { min-height: 38px; font-size: .72rem !important; padding: .45rem .9rem !important; }
+    .campaign-performance-panel .perf-table { font-size: .82rem !important; }
+    .campaign-performance-panel .perf-table th { padding: .72rem .75rem !important; font-size: .65rem; }
+    .campaign-performance-panel .perf-table td { padding: .82rem .75rem !important; }
+    .campaign-performance-panel .perf-table > thead tr:first-child th { padding-top: .85rem !important; padding-bottom: .58rem !important; }
+    .campaign-performance-panel .perf-main { gap: .32rem; }
+    .campaign-performance-panel .perf-main .perf-val { font-size: .83rem; }
     .campaign-performance-panel .perf-sub,
-    .campaign-performance-panel .perf-previous { font-size: .54rem; line-height: 1.15; }
-    .campaign-performance-panel .perf-delta { font-size: .52rem; }
-    .campaign-performance-panel .perf-category-campaign-table { font-size: .65rem; }
+    .campaign-performance-panel .perf-previous { font-size: .64rem; line-height: 1.3; }
+    .campaign-performance-panel .perf-delta { font-size: .61rem; }
+    .campaign-performance-panel .perf-category-campaign-table { font-size: .76rem; }
     .campaign-performance-panel .perf-category-campaign-table th,
-    .campaign-performance-panel .perf-category-campaign-table td { padding: .3rem .35rem; }
+    .campaign-performance-panel .perf-category-campaign-table td { padding: .55rem .6rem; }
+    .campaign-performance-panel .perf-campaign-image,
+    .campaign-performance-panel .perf-campaign-image-empty { width: 38px; height: 38px; border-radius: 9px; }
+    .campaign-performance-panel .perf-campaign-controls { gap: .35rem; margin-top: .55rem; }
+    .campaign-performance-panel .perf-campaign-config { padding: .2rem .38rem; font-size: .64rem; }
+    .campaign-performance-panel .perf-campaign-action { width: 29px; height: 29px; }
+    .campaign-performance-panel .perf-decision-filters { gap: .55rem; margin-left: 1.35rem !important; margin-right: 1.35rem !important; padding: .65rem; border-radius: 10px; }
+    .campaign-performance-panel .perf-decision-filters select,
+    .campaign-performance-panel .perf-decision-filters input { min-height: 36px; font-size: .72rem; }
+    .campaign-performance-panel .perf-decision-filters .perf-filter-search .input-group-text { font-size: .72rem; padding: .35rem .6rem; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis { padding-left: 1.35rem !important; padding-right: 1.35rem !important; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .ads-kpi-grid { gap: .65rem; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .ads-kpi { padding: .8rem .9rem; border-radius: 12px; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .ads-kpi-value { font-size: 1.15rem; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .ads-kpi-label { font-size: .64rem; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .ads-kpi-sub,
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-compare { font-size: .62rem; }
     /* Urutan baca utama: identitas → keputusan → hasil → funnel. */
     .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table {
-        min-width: 1460px;
+        min-width: 1580px;
         border-collapse: separate;
         border-spacing: 0;
     }
@@ -584,7 +613,7 @@
     .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > thead tr:first-child th {
         padding-top: .55rem !important;
         padding-bottom: .4rem !important;
-        font-size: .56rem !important;
+        font-size: .62rem !important;
         letter-spacing: .08em;
     }
     .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > thead .perf-table-group-title {
@@ -594,6 +623,17 @@
     .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > tbody > tr > td {
         border-bottom: 1px solid rgba(226, 232, 240, .72);
         white-space: nowrap;
+    }
+    .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > tbody > tr.perf-row:nth-child(4n+1) > td,
+    .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > tbody > tr.perf-category-row:nth-child(4n+1) > td {
+        background: rgba(248, 250, 252, .42);
+    }
+    .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > thead tr:nth-child(2) th {
+        color: var(--text, #0f172a);
+        font-size: .68rem;
+        font-weight: 700;
+        letter-spacing: .01em;
+        text-transform: none;
     }
     .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > thead tr:first-child th:first-child,
     .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > tbody > tr.perf-row > td:first-child,
@@ -609,6 +649,19 @@
     }
     body[data-theme="dark"] .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > tbody > tr > td {
         border-bottom-color: rgba(71, 85, 105, .55);
+    }
+    body[data-theme="dark"] .campaign-performance-panel .perf-panel-header { background: linear-gradient(135deg, var(--card-bg, #111827) 0%, rgba(30, 58, 138, .25) 100%) !important; }
+    body[data-theme="dark"] .perf-panel-title-icon { color: #bfdbfe; background: rgba(37, 99, 235, .3); }
+    body[data-theme="dark"] .campaign-performance-panel > .p-2 { background: rgba(15, 23, 42, .55); }
+    body[data-theme="dark"] .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > tbody > tr.perf-row:nth-child(4n+1) > td,
+    body[data-theme="dark"] .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > tbody > tr.perf-category-row:nth-child(4n+1) > td { background: rgba(30, 41, 59, .32); }
+    @media (max-width: 767.98px) {
+        .campaign-performance-panel .perf-panel-header { align-items: flex-start !important; }
+        .perf-panel-meta { justify-content: flex-start; width: 100%; }
+        .perf-panel-compare { width: 100%; justify-content: space-between; }
+        .perf-panel-compare select { flex: 1; }
+        .campaign-performance-panel .perf-decision-filters { margin-left: .75rem !important; margin-right: .75rem !important; }
+        .campaign-performance-panel #campaignPerformanceSubtabKpis { padding-left: .75rem !important; padding-right: .75rem !important; }
     }
     @media (max-width: 991.98px) {
         #campaignPerformanceSubtabKpis .ads-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -672,19 +725,26 @@
 </div>
 
 <div class="dpanel p-0 overflow-hidden campaign-performance-panel">
-    <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2 bg-light">
-        <h6 class="mb-0 fw-bold"><i class="bi bi-list-nested text-primary me-2"></i>Tabel Performa Campaign</h6>
-        <div class="d-flex align-items-center flex-wrap gap-2">
-            <div class="d-flex align-items-center gap-1">
-                <span class="text-muted" style="font-size:.68rem;"><i class="bi bi-arrow-left-right"></i> Bandingkan:</span>
+    <div class="border-bottom d-flex justify-content-between align-items-center flex-wrap gap-3 perf-panel-header">
+        <div class="perf-panel-title">
+            <span class="perf-panel-title-icon"><i class="bi bi-bar-chart-line-fill"></i></span>
+            <div>
+                <h6 class="mb-0 fw-bold">Tabel Performa Campaign</h6>
+                <div class="perf-panel-subtitle">Pantau efisiensi, hasil penjualan, dan funnel campaign dalam satu tampilan operasional.</div>
+            </div>
+        </div>
+        <div class="perf-panel-meta">
+            <div class="perf-panel-compare">
+                <i class="bi bi-arrow-left-right"></i>
+                <span>Bandingkan</span>
                 <select onchange="const u=new URL(location); u.searchParams.set('compare_mode', this.value); u.hash='tab-campaign-performance'; location.assign(u.toString());"
-                        class="form-select form-select-sm" style="width:auto; font-size:.7rem; padding:.15rem 1.6rem .15rem .5rem;">
+                        class="form-select form-select-sm">
                     <option value="prev_period" {{ $perfCompareMode === 'prev_period' ? 'selected' : '' }}>Periode Sebelumnya</option>
                     <option value="prev_month" {{ $perfCompareMode === 'prev_month' ? 'selected' : '' }}>Bulan Lalu</option>
                     <option value="prev_year" {{ $perfCompareMode === 'prev_year' ? 'selected' : '' }}>Tahun Lalu (tanggal sama)</option>
                 </select>
             </div>
-            <div style="font-size:.7rem;">
+            <div class="perf-signal-legend">
                 <span class="badge bg-success" title="ROAS ≥ 1,2× target">Scale</span>
                 <span class="badge bg-info" title="ROAS memenuhi target">Aman</span>
                 <span class="badge bg-warning text-dark" title="Profit tapi di bawah target ROAS">Optimasi</span>
@@ -786,9 +846,16 @@
     <div class="perf-table-scroll-shell" data-perf-sticky-shell>
     <div class="table-responsive" data-perf-table-scroll>
         <table class="table table-hover align-middle mb-0 perf-table" style="font-size: 0.82rem;">
+            <colgroup>
+                <col style="width:340px;">
+                <col style="width:130px;">
+                <col style="width:118px;"><col style="width:100px;">
+                <col style="width:105px;"><col style="width:155px;"><col style="width:155px;"><col style="width:155px;"><col style="width:145px;">
+                <col style="width:120px;"><col style="width:110px;"><col style="width:105px;"><col style="width:105px;">
+            </colgroup>
             <thead class="table-light sticky-top" style="z-index: 2;">
                 <tr>
-                    <th rowspan="2" style="min-width:270px;">Kategori / Campaign</th>
+                    <th rowspan="2" style="min-width:340px;">Kategori / Campaign</th>
                     <th rowspan="2" class="text-center" data-bs-toggle="tooltip" title="Rekomendasi berdasarkan ROAS aktual vs Target ROAS">Sinyal</th>
                     <th colspan="2" class="text-center perf-table-group-title">Efisiensi</th>
                     <th colspan="5" class="text-center perf-table-group-title">Hasil</th>
