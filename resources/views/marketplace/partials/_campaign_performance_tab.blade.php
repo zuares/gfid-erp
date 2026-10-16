@@ -118,6 +118,7 @@
             $acosTarget = ($rowNetRatio - $rowCogsRatio - $rowTargetProfitFrac) / 1.11;
             $targetRoas = $acosTarget > 0 ? round(1 / $acosTarget, 2) : null;
         }
+        $bepCpa = ($bepRoas !== null && $rowAvgPrice > 0) ? round($rowAvgPrice / $bepRoas, 0) : null;
 
         // Net margin (% dari GMV) & biaya iklan riil (termasuk PPN 11%).
         $margin = ($profitAvailable && $gmv > 0) ? ($profit / $gmv) * 100 : null;
@@ -174,6 +175,7 @@
             'roas' => $roas,
             'target_roas' => $targetRoas,
             'bep_roas' => $bepRoas,
+            'bep_cpa' => $bepCpa,
             'configured_roas' => $camp->target_roas !== null ? (float) $camp->target_roas : null,
             'actual_vs_target_pct' => ((float) ($camp->target_roas ?? 0)) > 0
                 ? round(($roas / (float) $camp->target_roas) * 100, 1)
@@ -191,6 +193,7 @@
             'prev_gmv' => $prevGmv,
             'prev_orders' => $prevOrders,
             'prev_aov' => $prevOrders > 0 ? $prevGmv / $prevOrders : 0,
+            'prev_cpa' => $prevOrders > 0 ? $prevSpend / $prevOrders : 0,
             'prev_clicks' => $prevClicks,
             'prev_impressions' => $prevImpressions,
             'prev_ctr' => $prevImpressions > 0 ? ($prevClicks / $prevImpressions) * 100 : 0,
@@ -256,6 +259,8 @@
                 'gmv' => $gmv,
                 'orders' => $orders,
                 'aov' => $orders > 0 ? $gmv / $orders : 0,
+                'cpa' => $orders > 0 ? $spend / $orders : 0,
+                'bep_cpa' => $bepRoas !== null && $orders > 0 ? round(($gmv / $orders) / $bepRoas, 0) : null,
                 'clicks' => $clicks,
                 'impressions' => $impressions,
                 'ctr' => $impressions > 0 ? ($clicks / $impressions) * 100 : 0,
@@ -279,6 +284,7 @@
                 'prev_ctr' => $prevImpressions > 0 ? ($prevClicks / $prevImpressions) * 100 : 0,
                 'prev_cvr' => $prevClicks > 0 ? ($prevOrders / $prevClicks) * 100 : 0,
                 'prev_aov' => $prevOrders > 0 ? $prevGmv / $prevOrders : 0,
+                'prev_cpa' => $prevOrders > 0 ? $prevSpend / $prevOrders : 0,
                 'prev_roas' => $prevRoas,
                 'prev_profit' => $prevProfit,
                 'prev_profit_available' => $prevProfitRows->count() > 0,
@@ -610,6 +616,18 @@
     .campaign-performance-panel #campaignPerformanceSubtabKpis .ads-kpi-funnel .ads-kpi-funnel-grid { margin-top: .65rem; gap: .5rem .65rem; font-size: .64rem; }
     .campaign-performance-panel #campaignPerformanceSubtabKpis .ads-kpi-funnel .ads-kpi-funnel-grid span { display: flex; justify-content: space-between; gap: .35rem; }
     .campaign-performance-panel #campaignPerformanceSubtabKpis .ads-kpi-funnel .ads-kpi-funnel-grid b { font-size: .72rem; font-variant-numeric: tabular-nums; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-funnel-kpi-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; margin-top: .65rem; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-funnel-stat { min-width: 0; padding: .38rem .45rem; border: 1px solid rgba(148, 163, 184, .22); border-radius: 8px; background: rgba(248, 250, 252, .72); }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-funnel-stat span { display: block; color: var(--dsh-muted, #64748b); font-size: .57rem; line-height: 1.1; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-funnel-stat b { display: block; margin-top: .22rem; color: var(--text, #0f172a); font-size: .76rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-funnel-kpi-compare { display: flex; align-items: center; justify-content: space-between; gap: .35rem; margin-top: .42rem; padding-top: .38rem; border-top: 1px solid var(--dsh-border, #e2e8f0); color: var(--dsh-muted, #64748b); font-size: .57rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-funnel-kpi-compare b { color: var(--text, #334155); font-weight: 750; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-funnel-kpi-compare strong { display: inline-flex; align-items: center; gap: .25rem; color: var(--text, #0f172a); font-size: .61rem; font-weight: 750; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-funnel-kpi-compare .perf-delta { font-size: .55rem; }
+    body[data-theme="dark"] .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-funnel-stat { background: rgba(30, 41, 59, .5); border-color: rgba(148, 163, 184, .22); }
+    body[data-theme="dark"] .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-funnel-stat b,
+    body[data-theme="dark"] .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-funnel-kpi-compare b,
+    body[data-theme="dark"] .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-funnel-kpi-compare strong { color: var(--text, #f8fafc); }
     body[data-theme="dark"] .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card { box-shadow: none; }
     @media (max-width: 575.98px) {
         .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card { min-height: 138px; padding: .8rem !important; }
@@ -652,8 +670,8 @@
     .campaign-performance-panel .perf-category-row > td:nth-child(3) { background: rgba(37, 99, 235, .035); }
     .campaign-performance-panel .perf-row > td:nth-child(7),
     .campaign-performance-panel .perf-category-row > td:nth-child(7) { background: rgba(22, 163, 74, .035); }
-    .campaign-performance-panel .perf-row > td:nth-child(9),
-    .campaign-performance-panel .perf-category-row > td:nth-child(9) { background: rgba(245, 158, 11, .035); }
+    .campaign-performance-panel .perf-row > td:nth-child(11),
+    .campaign-performance-panel .perf-category-row > td:nth-child(11) { background: rgba(245, 158, 11, .035); }
     .campaign-performance-panel .perf-row > td:nth-child(2) .badge,
     .campaign-performance-panel .perf-category-row > td:nth-child(2) .badge { display: inline-flex; align-items: center; justify-content: center; min-width: 76px; padding: .42rem .55rem; border-radius: 999px; font-size: .66rem; font-weight: 750; }
     .campaign-performance-panel .perf-row > td:first-child .fw-bold,
@@ -665,11 +683,11 @@
     body[data-theme="dark"] .campaign-performance-panel .perf-category-row > td:nth-child(3) { background: rgba(37, 99, 235, .12); }
     body[data-theme="dark"] .campaign-performance-panel .perf-row > td:nth-child(7),
     body[data-theme="dark"] .campaign-performance-panel .perf-category-row > td:nth-child(7) { background: rgba(22, 163, 74, .1); }
-    body[data-theme="dark"] .campaign-performance-panel .perf-row > td:nth-child(9),
-    body[data-theme="dark"] .campaign-performance-panel .perf-category-row > td:nth-child(9) { background: rgba(245, 158, 11, .1); }
+    body[data-theme="dark"] .campaign-performance-panel .perf-row > td:nth-child(11),
+    body[data-theme="dark"] .campaign-performance-panel .perf-category-row > td:nth-child(11) { background: rgba(245, 158, 11, .1); }
     /* Urutan baca utama: identitas → keputusan → hasil → funnel. */
     .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table {
-        min-width: 1580px;
+        min-width: 1830px;
         border-collapse: separate;
         border-spacing: 0;
     }
@@ -895,14 +913,14 @@
             </div>
             <div class="dpanel ads-kpi perf-kpi-card ads-kpi-funnel">
                 <div class="ads-kpi-label"><i class="bi bi-funnel" aria-hidden="true"></i> Funnel</div>
-                <div class="ads-kpi-funnel-grid">
-                    <span>Impresi <b data-perf-kpi-value="impressions">{{ number_format($perfInitialKpi['impressions'], 0, ',', '.') }}</b></span>
-                    <span>Klik <b data-perf-kpi-value="clicks">{{ number_format($perfInitialKpi['clicks'], 0, ',', '.') }}</b></span>
-                    <span>CTR <b data-perf-kpi-value="ctr">{{ number_format($perfInitialKpi['ctr'], 2, ',', '.') }}%</b></span>
-                    <span>CVR <b data-perf-kpi-value="cvr">{{ number_format($perfInitialKpi['cvr'], 2, ',', '.') }}%</b></span>
+                <div class="perf-funnel-kpi-grid">
+                    <div class="perf-funnel-stat"><span>Impresi</span><b data-perf-kpi-value="impressions">{{ number_format($perfInitialKpi['impressions'], 0, ',', '.') }}</b></div>
+                    <div class="perf-funnel-stat"><span>Klik</span><b data-perf-kpi-value="clicks">{{ number_format($perfInitialKpi['clicks'], 0, ',', '.') }}</b></div>
+                    <div class="perf-funnel-stat"><span>CTR</span><b data-perf-kpi-value="ctr">{{ number_format($perfInitialKpi['ctr'], 2, ',', '.') }}%</b></div>
+                    <div class="perf-funnel-stat"><span>CVR</span><b data-perf-kpi-value="cvr">{{ number_format($perfInitialKpi['cvr'], 2, ',', '.') }}%</b></div>
                 </div>
-                <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}"><span class="perf-kpi-compare-label">CTR vs lalu</span><span data-perf-kpi-compare="ctr">{{ number_format($perfInitialKpi['prev_ctr'], 2, ',', '.') }}%</span></div>
-                <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}"><span class="perf-kpi-compare-label">CVR vs lalu</span><span data-perf-kpi-compare="cvr">{{ number_format($perfInitialKpi['prev_cvr'], 2, ',', '.') }}%</span></div>
+                <div class="perf-funnel-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}"><span><b>CTR</b> vs lalu</span><strong data-perf-kpi-compare="ctr">{{ number_format($perfInitialKpi['prev_ctr'], 2, ',', '.') }}%</strong></div>
+                <div class="perf-funnel-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}"><span><b>CVR</b> vs lalu</span><strong data-perf-kpi-compare="cvr">{{ number_format($perfInitialKpi['prev_cvr'], 2, ',', '.') }}%</strong></div>
             </div>
             <div class="dpanel ads-kpi perf-kpi-card kpi-profit">
                 <div class="ads-kpi-label"><i class="bi bi-cash-coin" aria-hidden="true"></i> Net Profit</div>
@@ -919,7 +937,7 @@
                 <col style="width:340px;">
                 <col style="width:130px;">
                 <col style="width:118px;"><col style="width:100px;">
-                <col style="width:105px;"><col style="width:145px;"><col style="width:155px;"><col style="width:155px;"><col style="width:155px;">
+                <col style="width:105px;"><col style="width:145px;"><col style="width:155px;"><col style="width:155px;"><col style="width:125px;"><col style="width:125px;"><col style="width:155px;">
                 <col style="width:120px;"><col style="width:110px;"><col style="width:105px;"><col style="width:105px;">
             </colgroup>
             <thead class="table-light sticky-top" style="z-index: 2;">
@@ -927,7 +945,7 @@
                     <th rowspan="2" style="min-width:340px;">Kategori / Campaign</th>
                     <th rowspan="2" class="text-center" data-bs-toggle="tooltip" title="Rekomendasi berdasarkan ROAS aktual vs Target ROAS">Sinyal</th>
                     <th colspan="2" class="text-center perf-table-group-title">Efisiensi</th>
-                    <th colspan="5" class="text-center perf-table-group-title">Hasil</th>
+                    <th colspan="7" class="text-center perf-table-group-title">Hasil</th>
                     <th colspan="4" class="text-center perf-table-group-title">Funnel</th>
                 </tr>
                 <tr class="perf-table-subheader">
@@ -937,6 +955,8 @@
                     <th class="text-end" data-bs-toggle="tooltip" title="Rata-rata omzet per order · Δ vs {{ $perfCompareLabel }}">AOV</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Omzet dari iklan · Δ vs {{ $perfCompareLabel }}">Omzet</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Biaya iklan setelah PPN 11% · Δ vs {{ $perfCompareLabel }}">Biaya + PPN</th>
+                    <th class="text-end" data-bs-toggle="tooltip" title="Biaya iklan setelah PPN 11% dibagi jumlah order · Δ vs {{ $perfCompareLabel }}">CPA</th>
+                    <th class="text-end" data-bs-toggle="tooltip" title="Batas biaya iklan per order agar tetap impas">BEP CPA</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Est. Net Profit & Margin · Δ vs {{ $perfCompareLabel }}">Profit</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Total impresi iklan · Δ vs {{ $perfCompareLabel }}">Impresi</th>
                     <th class="text-end" data-bs-toggle="tooltip" title="Total klik iklan · Δ vs {{ $perfCompareLabel }}">Klik</th>
@@ -970,6 +990,8 @@
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['aov'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['aov'], $categoryRow['prev_aov'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($categoryRow['prev_aov'], 0, ',', '.') }}</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val text-success">Rp {{ number_format($categoryRow['gmv'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['gmv'], $categoryRow['prev_gmv'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($categoryRow['prev_gmv'], 0, ',', '.') }}</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['spend'], $categoryRow['prev_spend'], null) !!}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($categoryRow['prev_spend'], 0, ',', '.') }}</div></td>
+                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['cpa'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['cpa'], $categoryRow['prev_cpa'], false) !!}</div><div class="perf-sub">biaya / order</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($categoryRow['prev_cpa'], 0, ',', '.') }}</div></td>
+                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ $categoryRow['bep_cpa'] === null ? '—' : 'Rp ' . number_format($categoryRow['bep_cpa'], 0, ',', '.') }}</span></div><div class="perf-sub">batas impas</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val {{ !$categoryRow['profit_available'] ? 'text-muted' : ($categoryRow['profit'] >= 0 ? 'text-success' : 'text-danger') }}">{{ !$categoryRow['profit_available'] ? 'N/A' : 'Rp ' . number_format($categoryRow['profit'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['profit'], $categoryRow['prev_profit'], true) !!}</div>@if($categoryRow['profit_available'])<div class="perf-sub">margin {{ $categoryRow['margin'] === null ? '—' : number_format($categoryRow['margin'], 1) . '%' }}</div>@endif<div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($categoryRow['prev_profit'], 0, ',', '.') }}</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['impressions'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['impressions'], $categoryRow['prev_impressions'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($categoryRow['prev_impressions'], 0, ',', '.') }}</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['clicks'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['clicks'], $categoryRow['prev_clicks'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($categoryRow['prev_clicks'], 0, ',', '.') }}</div></td>
@@ -977,7 +999,7 @@
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['cvr'], 2) }}%</span>{!! $fmtDelta($categoryRow['cvr'], $categoryRow['prev_cvr'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($categoryRow['prev_cvr'], 2) }}%</div></td>
                     </tr>
                     <tr class="perf-category-detail" data-perf-views="category" style="display:none;">
-                        <td colspan="13" class="bg-light">
+                        <td colspan="15" class="bg-light">
                             <div class="text-muted fw-bold mb-1" style="font-size:.66rem;">Daftar campaign dalam kategori {{ $categoryRow['category'] }}</div>
                             <div class="table-responsive">
                                 <table class="table table-sm table-hover align-middle mb-0 perf-category-campaign-table">
@@ -985,7 +1007,7 @@
                                         <tr>
                                             <th rowspan="2">Campaign / Item</th>
                                             <th colspan="2" class="text-center perf-table-group-title">Efisiensi</th>
-                                            <th colspan="5" class="text-center perf-table-group-title">Hasil</th>
+                                            <th colspan="7" class="text-center perf-table-group-title">Hasil</th>
                                             <th colspan="4" class="text-center perf-table-group-title">Funnel</th>
                                         </tr>
                                         <tr class="perf-table-subheader">
@@ -995,6 +1017,8 @@
                                             <th class="text-end">AOV</th>
                                             <th class="text-end">GMV</th>
                                             <th class="text-end">Biaya + PPN</th>
+                                            <th class="text-end">CPA</th>
+                                            <th class="text-end">BEP CPA</th>
                                             <th class="text-end">Profit</th>
                                             <th class="text-end">Impresi</th>
                                             <th class="text-end">Klik</th>
@@ -1064,6 +1088,14 @@
                                                 <td class="text-end">
                                                     <div>Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }} {!! $fmtDelta($campaignRow['spend'], $campaignRow['prev_spend'], null) !!}</div>
                                                     <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($campaignRow['prev_spend'], 0, ',', '.') }}</div>
+                                                </td>
+                                                <td class="text-end">
+                                                    <div>Rp {{ number_format($campaignRow['cpa'], 0, ',', '.') }} {!! $fmtDelta($campaignRow['cpa'], $campaignRow['prev_orders'] > 0 ? $campaignRow['prev_spend'] / $campaignRow['prev_orders'] : 0, false) !!}</div>
+                                                    <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($campaignRow['prev_orders'] > 0 ? $campaignRow['prev_spend'] / $campaignRow['prev_orders'] : 0, 0, ',', '.') }}</div>
+                                                </td>
+                                                <td class="text-end">
+                                                    <div>{{ $campaignRow['bep_cpa'] === null ? '—' : 'Rp ' . number_format($campaignRow['bep_cpa'], 0, ',', '.') }}</div>
+                                                    <div class="perf-sub">batas impas</div>
                                                 </td>
                                                 <td class="text-end {{ !$campaignRow['profit_available'] ? 'text-muted' : ($campaignRow['profit'] >= 0 ? 'text-success' : 'text-danger') }}">
                                                     <div>{{ !$campaignRow['profit_available'] ? 'N/A' : 'Rp ' . number_format($campaignRow['profit'], 0, ',', '.') }} {!! $fmtDelta($campaignRow['profit'], $campaignRow['prev_profit'], true) !!}</div>
@@ -1185,6 +1217,19 @@
                             <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($row['prev_spend'], 0, ',', '.') }}</div>
                         </td>
 
+                        {{-- CPA --}}
+                        <td class="text-end perf-cell">
+                            <div class="perf-main"><span class="perf-val">Rp {{ number_format($row['cpa'], 0, ',', '.') }}</span>{!! $fmtDelta($row['cpa'], $row['prev_cpa'], false) !!}</div>
+                            <div class="perf-sub">biaya / order</div>
+                            <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($row['prev_orders'] > 0 ? $row['prev_spend'] / $row['prev_orders'] : 0, 0, ',', '.') }}</div>
+                        </td>
+
+                        {{-- BEP CPA --}}
+                        <td class="text-end perf-cell">
+                            <div class="perf-main"><span class="perf-val">{{ $row['bep_cpa'] === null ? '—' : 'Rp ' . number_format($row['bep_cpa'], 0, ',', '.') }}</span></div>
+                            <div class="perf-sub">batas impas</div>
+                        </td>
+
                         {{-- Profit --}}
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val {{ !$row['profit_available'] ? 'text-muted' : ($row['profit'] >= 0 ? 'text-success' : 'text-danger') }}">{{ !$row['profit_available'] ? 'N/A' : 'Rp ' . number_format($row['profit'], 0, ',', '.') }}</span>@if($row['profit_available']){!! $fmtDelta($row['profit'], $row['prev_profit'], true) !!}@endif</div>
@@ -1215,7 +1260,7 @@
 
                     {{-- Detail (expand) --}}
                     <tr class="perf-detail" data-perf-views="{{ implode(' ', $row['performance_views'] ?? []) }}" style="display:none;">
-                        <td colspan="13" class="bg-light">
+                        <td colspan="15" class="bg-light">
                             <div class="perf-chips">
                                 <div class="perf-chip"><span>Jangkauan</span><b>{{ number_format($row['impressions'], 0, ',', '.') }}</b>{!! $fmtDelta($row['impressions'], $row['prev_impressions'], true) !!}</div>
                                 <div class="perf-chip"><span>CPM</span><b>Rp {{ number_format($row['cpm'], 0, ',', '.') }}</b></div>
@@ -1242,11 +1287,11 @@
                     </tr>
                 @empty
                     <tr class="perf-no-data">
-                        <td colspan="13" class="text-center py-4 text-muted">Belum ada data performa campaign yang memadai.</td>
+                        <td colspan="15" class="text-center py-4 text-muted">Belum ada data performa campaign yang memadai.</td>
                     </tr>
                 @endforelse
                 <tr class="perf-segment-empty" style="display:none;">
-                    <td colspan="13" class="text-center py-4 text-muted">Belum ada data untuk kategori ini.</td>
+                    <td colspan="15" class="text-center py-4 text-muted">Belum ada data untuk kategori ini.</td>
                 </tr>
             </tbody>
         </table>
