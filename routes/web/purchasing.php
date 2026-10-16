@@ -182,7 +182,8 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
         // OWNER + ADMIN — read + edit return (draft only), close PO, cancel PO
         Route::middleware('role:owner,admin')->group(function () {
 
-            // PO — Draft harus di-approve sebelum dapat dibuatkan GRN.
+            // Approval PO sementara disembunyikan/nonaktif. Route tetap
+            // didaftarkan agar URL lama memberi pesan yang jelas, bukan 404.
             Route::post('purchase-orders/{purchase_order}/approve', [PurchaseOrderController::class, 'approve'])
                 ->name('purchase_orders.approve');
 

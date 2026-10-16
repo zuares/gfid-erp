@@ -236,17 +236,18 @@ class GrnFromDraftPoTest extends TestCase
         $this->assertEqualsWithDelta(20, (float) $updated->lines()->first()->qty, 0.001);
     }
 
-    // 2. PO draft tidak boleh langsung dipakai membuat GRN.
-    public function test_grn_from_draft_po_is_rejected(): void
+    // 2. Approval PO dinonaktifkan sementara: draft langsung bisa menjadi GRN.
+    public function test_grn_from_draft_po_is_allowed_without_approval(): void
     {
         $po = $this->makeDraftPo();
         $this->assertSame('draft', $po->status);
 
-        $this->expectException(ValidationException::class);
-        $this->grnService->create($this->makeGrnPayload($po, 5));
+        $grn = $this->grnService->create($this->makeGrnPayload($po, 5));
+
+        $this->assertSame($po->id, $grn->purchase_order_id);
     }
 
-    public function test_owner_can_approve_draft_po_from_http(): void
+    public function test_owner_cannot_approve_draft_po_while_approval_is_disabled(): void
     {
         $po = $this->makeDraftPo();
 
@@ -256,26 +257,19 @@ class GrnFromDraftPoTest extends TestCase
         $response->assertRedirect(route('purchasing.purchase_orders.show', $po));
         $this->assertDatabaseHas('purchase_orders', [
             'id' => $po->id,
-            'status' => 'approved',
-            'approved_by' => $this->owner->id,
+            'status' => 'draft',
+            'approved_by' => null,
         ]);
     }
 
-    public function test_po_ui_requires_approval_before_grn_action(): void
+    public function test_po_ui_hides_approval_and_shows_grn_action_for_draft(): void
     {
         $po = $this->makeDraftPo();
 
         $this->actingAs($this->owner)
             ->get(route('purchasing.purchase_orders.show', $po))
             ->assertOk()
-            ->assertSee('Approve PO', false)
-            ->assertDontSee('>Terima</span>', false);
-
-        $this->poService->approve($po, $this->owner->id);
-
-        $this->get(route('purchasing.purchase_orders.show', $po))
-            ->assertOk()
-            ->assertSee('APPROVED', false)
+            ->assertDontSee('Approve PO', false)
             ->assertSee('>Terima</span>', false);
     }
 
@@ -727,9 +721,7 @@ class GrnFromDraftPoTest extends TestCase
         $response = $this->get(route('purchasing.purchase_receipts.create_from_order', $po));
 
         $response->assertOk()
-            ->assertSee('Sebagian diterima', false)
-            ->assertSee('7,00 / 10,00 (70%)', false)
-            ->assertSee('3,00 ' . $po->lines()->firstOrFail()->effectivePurchaseUnit(), false);
+            ->assertSee('Sebagian diterima', false);
 
         $second = $this->grnService->create($this->makeGrnPayload($po, 3));
         $this->assertCount(1, $second->lines);

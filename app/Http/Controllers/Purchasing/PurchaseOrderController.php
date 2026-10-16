@@ -832,6 +832,12 @@ class PurchaseOrderController extends Controller
      */
     public function approve(Request $request, PurchaseOrder $purchase_order)
     {
+        if (!config('purchasing.po_approval_enabled', false)) {
+            return redirect()
+                ->route('purchasing.purchase_orders.show', $purchase_order->id)
+                ->with('error', 'Approval PO sedang dinonaktifkan sementara.');
+        }
+
         try {
             $this->service->approve($purchase_order, (int) $request->user()->id);
 
@@ -1465,7 +1471,7 @@ class PurchaseOrderController extends Controller
     {
         $blockers = [];
 
-        if ($order->status !== 'approved') {
+        if (config('purchasing.po_approval_enabled', false) && $order->status !== 'approved') {
             $blockers[] = 'PO '.strtoupper($order->status ?? 'draft').', belum approved';
         }
 

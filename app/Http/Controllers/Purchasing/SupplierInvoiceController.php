@@ -106,14 +106,19 @@ class SupplierInvoiceController extends Controller
         }
 
         $suppliers = \App\Models\Supplier::orderBy('name')->get(['id', 'name', 'code']);
-        $approvedOrders = PurchaseOrder::where('status', 'approved')
+        $receivableOrders = PurchaseOrder::where(function ($query) {
+                $query->where('status', 'approved');
+                if (!config('purchasing.po_approval_enabled', false)) {
+                    $query->orWhere('status', 'draft');
+                }
+            })
             ->with('supplier')
             ->orderByDesc('date')
             ->limit(100)
             ->get(['id', 'code', 'supplier_id', 'grand_total', 'date']);
 
         return view('purchasing.supplier_invoices.create', compact(
-            'order', 'grnPostedTotal', 'returnTotal', 'suppliers', 'approvedOrders'
+            'order', 'grnPostedTotal', 'returnTotal', 'suppliers', 'receivableOrders'
         ));
     }
 

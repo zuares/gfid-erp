@@ -59,7 +59,7 @@
                         <label class="form-label">Purchase Order (Opsional)</label>
                         <select name="purchase_order_id" id="sel-po" class="form-select">
                             <option value="">— Tanpa PO / Pilih PO —</option>
-                            @foreach ($approvedOrders as $po)
+                            @foreach ($receivableOrders as $po)
                                 <option value="{{ $po->id }}"
                                     @selected((string) $selectedOrderId === (string) $po->id)>
                                     {{ $po->code }} — {{ optional($po->supplier)->name ?? '?' }}

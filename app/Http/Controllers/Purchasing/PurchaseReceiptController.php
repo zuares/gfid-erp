@@ -260,8 +260,13 @@ class PurchaseReceiptController extends Controller
                 });
             }], 'qty_reject')
             ->whereHas('purchaseOrder', function ($q) use ($selectedSupplierId) {
-                // GRN hanya boleh dari PO yang sudah approved.
-                $q->where('status', 'approved');
+                // Approval PO sementara dinonaktifkan: draft juga siap dibuatkan GRN.
+                $q->where(function ($statusQuery) {
+                    $statusQuery->where('status', 'approved');
+                    if (!config('purchasing.po_approval_enabled', false)) {
+                        $statusQuery->orWhere('status', 'draft');
+                    }
+                });
 
                 if (!empty($selectedSupplierId)) {
                     $q->where('supplier_id', (int) $selectedSupplierId);
@@ -312,11 +317,12 @@ class PurchaseReceiptController extends Controller
      */
     public function createFromOrder(PurchaseOrder $purchase_order)
     {
-        // GRN hanya boleh dari PO approved. Draft harus di-approve terlebih dahulu.
+        // Approval PO sementara dinonaktifkan, sehingga draft dapat langsung
+        // diproses ke GRN.
         if (!$purchase_order->isReceivableForGrn() || $purchase_order->status === 'cancelled') {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
-                ->with('error', 'GRN hanya bisa dibuat dari PO berstatus Approved. Approve PO terlebih dahulu.');
+                ->with('error', 'PO belum dapat diproses ke GRN.');
         }
 
         $purchase_order->load([
@@ -945,10 +951,11 @@ class PurchaseReceiptController extends Controller
             ]);
         }
 
-        // GRN hanya boleh dari PO approved; draft harus di-approve terlebih dahulu.
+        // Approval PO sementara dinonaktifkan, sehingga draft juga dapat
+        // dijadikan acuan GRN.
         if ($po->status === 'cancelled' || !$po->isReceivableForGrn()) {
             throw ValidationException::withMessages([
-                'purchase_order_id' => 'GRN hanya boleh mengacu ke PO berstatus Approved. Approve PO terlebih dahulu.',
+                'purchase_order_id' => 'PO belum dapat dijadikan acuan GRN.',
             ]);
         }
 

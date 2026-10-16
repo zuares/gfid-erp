@@ -45,7 +45,8 @@ class GoodsReceiptService
 
             // =====================================================
             // VALIDASI RELASI PO (defense-in-depth level Service)
-            // - PO wajib approved; draft harus di-approve terlebih dahulu.
+            // - PO approved selalu boleh; PO draft boleh saat approval
+            //   dinonaktifkan, selama belum cancelled.
             // - Supplier GRN wajib = supplier PO.
             // - Kunci baris PO agar tidak balapan dengan edit PO.
             // =====================================================
@@ -116,7 +117,8 @@ class GoodsReceiptService
 
     /**
      * Validasi PO boleh menjadi acuan GRN.
-     * Boleh: approved. Tolak: draft/cancelled/closed/tidak ada/supplier beda.
+     * Boleh: approved, atau draft saat approval PO dinonaktifkan.
+     * Tolak: cancelled/closed/tidak ada/supplier beda.
      */
     protected function assertPoReceivable(?PurchaseOrder $po, int $supplierId, int $poId): void
     {
@@ -134,7 +136,7 @@ class GoodsReceiptService
 
         if (! $po->isReceivableForGrn()) {
             throw ValidationException::withMessages([
-                'purchase_order_id' => 'GRN hanya boleh mengacu ke PO berstatus approved. Approve PO terlebih dahulu.',
+                'purchase_order_id' => 'PO belum dapat dijadikan acuan GRN.',
             ]);
         }
 

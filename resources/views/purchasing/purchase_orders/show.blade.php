@@ -367,7 +367,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                     </a>
                 </li>
             @endif
-            @if ($status === 'draft' && $user && ($user->isOwner() || $user->isDeveloper() || in_array($user->role ?? '', ['admin'], true)) && $grnCount === 0)
+            @if (config('purchasing.po_approval_enabled', false) && $status === 'draft' && $user && ($user->isOwner() || $user->isDeveloper() || in_array($user->role ?? '', ['admin'], true)) && $grnCount === 0)
                 <li>
                     <form action="{{ route('purchasing.purchase_orders.approve', $order->id) }}" method="POST"
                           onsubmit="return confirm('Approve PO ini? Setelah approved, PO dapat diproses ke GRN.');">
@@ -385,7 +385,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                     </button>
                 </li>
             @endif
-            @if ($status === 'approved' && $user && ($user->isOwner() || in_array($user->role ?? '', ['accounting', 'developer'])))
+            @if ($order->isReceivableForGrn() && $user && ($user->isOwner() || in_array($user->role ?? '', ['accounting', 'developer'])))
                 @if (\Illuminate\Support\Facades\Route::has('purchasing.supplier_invoices.create'))
                     <li>
                         <a class="dropdown-item py-2" href="{{ route('purchasing.supplier_invoices.create', ['purchase_order_id' => $order->id]) }}">

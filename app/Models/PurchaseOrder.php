@@ -177,10 +177,21 @@ class PurchaseOrder extends Model
         return !is_null($this->locked_at);
     }
 
-    /** Status yang boleh menjadi acuan GRN: hanya PO yang sudah approved. */
+    /**
+     * Status yang boleh menjadi acuan GRN.
+     *
+     * Saat approval PO dinonaktifkan sementara, PO draft tetap dapat dipakai
+     * sebagai acuan GRN. Approval lama tetap didukung bila fitur diaktifkan
+     * kembali melalui config/purchasing.php.
+     */
     public function isReceivableForGrn(): bool
     {
-        return $this->status === 'approved';
+        if ($this->status === 'approved') {
+            return true;
+        }
+
+        return !config('purchasing.po_approval_enabled', false)
+            && $this->status === 'draft';
     }
 
     /** Label turunan untuk UI: Draft / Receiving / Partially Received / Fully Received / Locked. */
