@@ -3753,17 +3753,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="row g-3">
                         <div class="col-12 col-lg-6">
                             <div style="border:1px solid var(--dsh-border); border-radius:12px; overflow:hidden;">
-                                <div style="padding:.7rem .85rem; background:rgba(148,163,184,.08); font-size:.75rem; font-weight:850;"><i class="bi bi-clock-history me-1"></i> Sebelum perubahan</div>
+                                <div style="padding:.7rem .85rem; background:rgba(148,163,184,.08); font-size:.75rem; font-weight:850;"><i class="bi bi-clock-history me-1"></i> Sebelum perubahan <span id="experimentBaselinePeriod" class="text-muted" style="font-size:.62rem; font-weight:600;"></span></div>
                                 <div id="experimentBaselineMetrics" class="p-2"></div>
                             </div>
                         </div>
                         <div class="col-12 col-lg-6">
                             <div style="border:1px solid var(--dsh-border); border-radius:12px; overflow:hidden;">
-                                <div style="padding:.7rem .85rem; background:rgba(37,99,235,.08); font-size:.75rem; font-weight:850;"><i class="bi bi-arrow-right-circle me-1"></i> Sesudah perubahan</div>
+                                <div style="padding:.7rem .85rem; background:rgba(37,99,235,.08); font-size:.75rem; font-weight:850;"><i class="bi bi-arrow-right-circle me-1"></i> Sesudah perubahan <span id="experimentObservationPeriod" class="text-muted" style="font-size:.62rem; font-weight:600;"></span></div>
                                 <div id="experimentObservationMetrics" class="p-2"></div>
                             </div>
                         </div>
                     </div>
+                    <div id="experimentQuickSummary" class="mt-3" style="display:none;"></div>
                     <div id="experimentQualityNote" class="mt-3" style="font-size:.74rem; line-height:1.55;"></div>
 
                     <div id="experimentImpactPanel" class="ads-phase3-impact" style="display:none;">
@@ -3774,6 +3775,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                             <span id="experimentVerdictBadge" class="ads-tab-panel-note">INCONCLUSIVE</span>
                         </div>
+                        <div id="experimentImpactSummary" style="margin:.7rem 0 0; padding:.65rem .75rem; border-radius:10px; background:rgba(148,163,184,.08); color:var(--text); font-size:.72rem; line-height:1.45;"></div>
                         <div id="experimentImpactGrid" class="ads-phase3-impact-grid"></div>
                         <div id="experimentSufficiencyNote" class="ads-phase3-note"></div>
                         <div id="experimentConflictNote" class="ads-phase3-note" style="display:none; border-color:rgba(220,38,38,.25); color:#b91c1c;"></div>
@@ -7526,9 +7528,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const detailSubtitle = document.getElementById('experimentDetailSubtitle');
     const baselineMetrics = document.getElementById('experimentBaselineMetrics');
     const observationMetrics = document.getElementById('experimentObservationMetrics');
+    const baselinePeriod = document.getElementById('experimentBaselinePeriod');
+    const observationPeriod = document.getElementById('experimentObservationPeriod');
+    const quickSummary = document.getElementById('experimentQuickSummary');
     const qualityNote = document.getElementById('experimentQualityNote');
     const impactPanel = document.getElementById('experimentImpactPanel');
     const impactGrid = document.getElementById('experimentImpactGrid');
+    const impactSummary = document.getElementById('experimentImpactSummary');
     const verdictBadge = document.getElementById('experimentVerdictBadge');
     const sufficiencyNote = document.getElementById('experimentSufficiencyNote');
     const conflictNote = document.getElementById('experimentConflictNote');
@@ -7588,6 +7594,17 @@ document.addEventListener('DOMContentLoaded', function () {
         confounded: 'ada perubahan lain di waktu yang sama',
     };
 
+    const sufficiencyLabels = {
+        baseline_clicks: 'klik sebelum perubahan belum cukup',
+        observation_clicks: 'klik sesudah perubahan belum cukup',
+        baseline_orders: 'pesanan sebelum perubahan belum cukup',
+        observation_orders: 'pesanan sesudah perubahan belum cukup',
+        baseline_impressions: 'jumlah dilihat sebelum perubahan belum cukup',
+        observation_impressions: 'jumlah dilihat sesudah perubahan belum cukup',
+        observation_window: 'periode sesudah perubahan belum selesai',
+        profit_not_actual: 'keuntungan belum aktual',
+    };
+
     const verdictMap = {
         POSITIVE: ['Lebih baik', '#15803d', 'rgba(21,128,61,.12)'],
         NEGATIVE: ['Lebih buruk', '#b91c1c', 'rgba(185,28,28,.1)'],
@@ -7643,6 +7660,13 @@ document.addEventListener('DOMContentLoaded', function () {
         return value === 'mapped' ? 'Produk terhubung' : 'Produk belum terhubung';
     }
 
+    function periodLabel(period) {
+        if (!period) return '';
+        const from = period.from || '-';
+        const to = period.to || '-';
+        return ' · ' + from + (period.to && to !== from ? ' – ' + to : (!period.to ? ' · berjalan' : ''));
+    }
+
     function statusBadge(status) {
         const info = statusMap[status] || [status || 'Unknown', '#475569', 'rgba(71,85,105,.12)'];
         return '<span style="display:inline-flex; align-items:center; padding:.28rem .5rem; border-radius:999px; color:' + info[1] + '; background:' + info[2] + '; font-size:.66rem; font-weight:850; white-space:nowrap;">' + esc(info[0]) + '</span>';
@@ -7671,10 +7695,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function scopeLabel(experiment, product) {
         const parts = [];
-        if (experiment.channel_campaign_id) parts.push(product?.campaign_name || 'Kampanye ' + experiment.channel_campaign_id);
-        if (experiment.channel_item_id) parts.push(product?.name || 'Produk ' + experiment.channel_item_id);
+        const campaignName = product?.campaign_name || (experiment.channel_campaign_id ? 'Kampanye ' + experiment.channel_campaign_id : '');
+        const productName = product?.name || (experiment.channel_item_id ? 'Produk ' + experiment.channel_item_id : '');
+        if (campaignName) parts.push(campaignName);
+        if (productName && productName.toLowerCase() !== campaignName.toLowerCase()) parts.push(productName);
         if (!parts.length) parts.push('Semua produk di toko');
         return parts.join(' · ');
+    }
+
+    function campaignLabel(experiment, product) {
+        const campaignName = product?.campaign_name || '';
+        const productName = product?.name || '';
+        if (campaignName && campaignName.toLowerCase() !== productName.toLowerCase()) return campaignName;
+        return experiment.channel_campaign_id ? 'Kampanye ' + experiment.channel_campaign_id : 'Semua produk di toko';
     }
 
     function openInvalidateModal(experiment) {
@@ -7787,7 +7820,7 @@ document.addEventListener('DOMContentLoaded', function () {
             tr.innerHTML =
                 '<td><div style="display:flex;align-items:center;gap:.55rem;min-width:220px;">' + productMedia + '<div style="min-width:0;">' +
                     '<div style="font-weight:800;font-size:.72rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px;" title="' + esc(productName) + '">' + esc(productName) + '</div>' +
-                    '<div style="font-size:.64rem;color:var(--dsh-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px;">' + esc(product.campaign_name || scopeLabel(experiment, product)) + '</div>' +
+                    '<div style="font-size:.64rem;color:var(--dsh-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px;">' + esc(campaignLabel(experiment, product)) + '</div>' +
                     '<div style="font-size:.62rem;color:var(--dsh-muted);margin-top:.12rem;">' + esc(changeLabel(experiment)) + '</div>' +
                 '</div></div></td>' +
                 '<td><div style="font-size:.7rem; max-width:210px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(scopeLabel(experiment, product)) + '">' + esc(scopeLabel(experiment, product)) + '</div></td>' +
@@ -7881,6 +7914,14 @@ document.addEventListener('DOMContentLoaded', function () {
             '</div>';
     }
 
+    function impactChangeText(step) {
+        if (!step || step.change_percent === null || step.change_percent === undefined) return 'belum cukup data';
+        const amount = number(Math.abs(step.change_percent), 1) + '%';
+        if (step.direction === 'up') return 'naik ' + amount;
+        if (step.direction === 'down') return 'turun ' + amount;
+        return 'tetap';
+    }
+
     function renderImpact(data) {
         const impact = data.impact || {};
         const steps = impact.steps || {};
@@ -7923,7 +7964,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const sufficiency = data.data_sufficiency || {};
         const reasons = sufficiency.reasons || [];
-        const reasonText = reasons.length ? reasons.map(function (reason) { return qualityLabels[reason] || reason; }).join(' · ') : '';
+        const reasonText = reasons.length ? reasons.map(function (reason) { return sufficiencyLabels[reason] || qualityLabels[reason] || reason; }).join(' · ') : '';
+        const quickSteps = ['traffic', 'ctr', 'cvr', 'profit']
+            .map(function (key) { return { key: key, step: steps[key] || {} }; })
+            .filter(function (item) { return item.step.change_percent !== null && item.step.change_percent !== undefined; });
+        if (quickSummary) {
+            quickSummary.innerHTML = quickSteps.length
+                ? '<div style="padding:.7rem .8rem;border-radius:11px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.16);font-size:.74rem;line-height:1.5;"><b style="color:var(--text);"><i class="bi bi-lightning-charge-fill text-warning me-1"></i>Ringkasan cepat</b><div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.45rem;">' + quickSteps.map(function (item) {
+                    const tone = item.step.direction === 'up' ? '#15803d' : (item.step.direction === 'down' ? '#b91c1c' : 'var(--dsh-muted)');
+                    return '<span style="padding:.28rem .5rem;border-radius:999px;background:var(--card-bg);border:1px solid var(--dsh-border);color:' + tone + ';">' + esc(labelNames[item.key]) + ': <b>' + esc(impactChangeText(item.step)) + '</b></span>';
+                }).join('') + '</div></div>'
+                : '<div style="padding:.7rem .8rem;border-radius:11px;background:rgba(180,83,9,.08);border:1px solid rgba(180,83,9,.2);font-size:.74rem;color:#92400e;"><i class="bi bi-hourglass-split me-1"></i>Belum cukup data untuk membaca perubahan.</div>';
+            quickSummary.style.display = 'block';
+        }
+        if (impactSummary) {
+            impactSummary.innerHTML = '<b>Kesimpulan sementara:</b> ' +
+                (sufficiency.metric_ready ? 'data sudah cukup untuk dibaca.' : 'data belum cukup untuk memastikan hasil.') +
+                (sufficiency.profit_ready ? ' Keuntungan sudah aktual.' : ' Keuntungan masih berupa perkiraan.') +
+                (reasons.length ? '<div style="margin-top:.25rem;color:var(--dsh-muted);">' + esc(reasonText) + '</div>' : '');
+        }
         sufficiencyNote.innerHTML = '<b style="color:var(--text);">Kesiapan hasil:</b> ' +
             (sufficiency.metric_ready ? 'data cukup untuk dinilai' : 'data belum cukup untuk menentukan hasil') +
             ' · ' + (sufficiency.profit_ready ? 'keuntungan sudah aktual' : 'keuntungan masih perkiraan') +
@@ -8048,9 +8107,16 @@ document.addEventListener('DOMContentLoaded', function () {
         detailMeta.innerHTML = '';
         baselineMetrics.innerHTML = '<div class="text-muted small p-2">Memuat...</div>';
         observationMetrics.innerHTML = '<div class="text-muted small p-2">Memuat...</div>';
+        if (baselinePeriod) baselinePeriod.textContent = '';
+        if (observationPeriod) observationPeriod.textContent = '';
+        if (quickSummary) {
+            quickSummary.innerHTML = '';
+            quickSummary.style.display = 'none';
+        }
         qualityNote.innerHTML = '';
         impactPanel.style.display = 'none';
         impactGrid.innerHTML = '';
+        if (impactSummary) impactSummary.innerHTML = '';
         sufficiencyNote.innerHTML = '';
         conflictNote.style.display = 'none';
         simulationPanel.style.display = 'none';
@@ -8076,9 +8142,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     : '<span style="display:inline-flex;width:48px;height:48px;border-radius:11px;align-items:center;justify-content:center;background:#f1f5f9;color:var(--dsh-muted);border:1px solid var(--dsh-border);"><i class="bi bi-image"></i></span>';
                 experiment.product = product;
                 activeExperiment = experiment;
-                detailSubtitle.textContent = productName + ' · ' + changeLabel(experiment) + ' · ' + (change.effective_date || '-');
+                detailSubtitle.textContent = changeLabel(experiment) + ' · ' + (change.effective_date || '-');
+                if (baselinePeriod) baselinePeriod.textContent = periodLabel(data.windows?.baseline);
+                if (observationPeriod) observationPeriod.textContent = periodLabel(data.windows?.observation);
                 detailMeta.innerHTML =
-                    '<div class="col-12"><div style="display:flex;align-items:center;gap:.7rem;padding:.7rem .8rem;border:1px solid var(--dsh-border);border-radius:12px;background:rgba(148,163,184,.05);">' + productMedia + '<div style="min-width:0;"><div style="font-weight:850;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(productName) + '</div><div style="font-size:.68rem;color:var(--dsh-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(product.campaign_name || scopeLabel(experiment, product)) + '</div></div></div></div>' +
+                    '<div class="col-12"><div style="display:flex;align-items:center;gap:.7rem;padding:.7rem .8rem;border:1px solid var(--dsh-border);border-radius:12px;background:rgba(148,163,184,.05);">' + productMedia + '<div style="min-width:0;"><div style="font-weight:850;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(productName) + '</div><div style="font-size:.68rem;color:var(--dsh-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(campaignLabel(experiment, product)) + '</div></div></div></div>' +
                     '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Hasil</div><div style="margin-top:.25rem;">' + statusBadge(data.lifecycle_status || experiment.lifecycle_status) + '</div></div>' +
                     '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Dasar keuntungan</div><div style="font-size:.72rem; font-weight:800; margin-top:.25rem;">' + esc(profitBasisLabel(data.profit_basis)) + '</div></div>' +
                     '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Yang diubah</div><div style="font-size:.72rem; font-weight:800; margin-top:.25rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(scopeLabel(experiment, product)) + '">' + esc(scopeLabel(experiment, product)) + '</div></div>' +
