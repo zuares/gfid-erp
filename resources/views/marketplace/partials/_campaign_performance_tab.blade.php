@@ -477,11 +477,19 @@
     .perf-chip > b { font-weight: 700; }
     /* Scrollbar horizontal tetap terlihat saat tabel performa panjang. */
     .perf-table-scroll-shell { position: relative; }
-    .perf-table-scroll-shell > .table-responsive { overflow-x: auto; }
+    .perf-table-scroll-shell > .table-responsive {
+        position: relative;
+        max-height: min(72vh, 760px);
+        overflow: auto;
+        scrollbar-color: #94a3b8 transparent;
+        scrollbar-width: thin;
+    }
+    .perf-table-scroll-shell > .table-responsive::-webkit-scrollbar { width: 9px; height: 0; }
+    .perf-table-scroll-shell > .table-responsive::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 999px; }
     .perf-sticky-scrollbar {
         position: sticky;
         bottom: .35rem;
-        z-index: 8;
+        z-index: 20;
         display: block;
         height: 14px;
         margin: 0 .75rem .35rem;
@@ -534,6 +542,9 @@
     .perf-campaign-image-empty { width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; border-radius:7px; flex:none; color:var(--dsh-muted, #6b7280); background:#f1f5f9; border:1px solid var(--dsh-border, rgba(0,0,0,.12)); }
     .perf-category-summary { display:flex; gap:.35rem; flex-wrap:wrap; margin-top:.25rem; font-size:.58rem; color:var(--dsh-muted, #6b7280); }
     .perf-category-summary b { color:var(--text); }
+    .perf-product-economics { display:flex; flex-wrap:wrap; gap:.25rem .45rem; margin-top:.18rem; color:var(--dsh-muted, #6b7280); font-size:.58rem; line-height:1.25; }
+    .perf-product-economics span { white-space:nowrap; }
+    .perf-product-economics b { color:var(--text); font-weight:750; }
     .perf-decision-filters { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; padding:.45rem; border:1px solid var(--dsh-border); border-radius:10px; background:var(--bg, #f8fafc); }
     .perf-decision-filters select, .perf-decision-filters input { min-height:30px; border-radius:7px; font-size:.65rem; }
     .perf-decision-filters .perf-filter-search { flex:1 1 190px; min-width:170px; }
@@ -685,17 +696,20 @@
     body[data-theme="dark"] .campaign-performance-panel .perf-category-row > td:nth-child(7) { background: rgba(22, 163, 74, .1); }
     body[data-theme="dark"] .campaign-performance-panel .perf-row > td:nth-child(11),
     body[data-theme="dark"] .campaign-performance-panel .perf-category-row > td:nth-child(11) { background: rgba(245, 158, 11, .1); }
-    /* Urutan baca utama: identitas → keputusan → hasil → funnel. */
+    /* Urutan baca utama: identitas → sinyal → efisiensi → hasil → funnel. */
     .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table {
         min-width: 1830px;
         border-collapse: separate;
         border-spacing: 0;
     }
     .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > thead th {
+        position: sticky;
+        top: 0;
         white-space: nowrap;
         vertical-align: middle;
         background: var(--card-bg, #fff);
         border-bottom: 1px solid var(--dsh-border, #e2e8f0);
+        z-index: 5;
     }
     .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > thead tr:first-child th {
         padding-top: .55rem !important;
@@ -716,6 +730,8 @@
         background: rgba(248, 250, 252, .42);
     }
     .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > thead tr:nth-child(2) th {
+        top: 34px;
+        z-index: 4;
         color: var(--text, #0f172a);
         font-size: .68rem;
         font-weight: 700;
@@ -730,6 +746,9 @@
         z-index: 3;
         background: var(--card-bg, #fff);
         box-shadow: 1px 0 0 var(--dsh-border, #e2e8f0);
+    }
+    .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > thead tr:first-child th:first-child {
+        z-index: 9;
     }
     .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > tbody > tr:hover > td:first-child {
         background: var(--card-bg, #fff);
@@ -935,9 +954,10 @@
         <table class="table table-hover align-middle mb-0 perf-table" style="font-size: 0.82rem;">
             <colgroup>
                 <col style="width:340px;">
-                <col style="width:130px;">
+                <col style="width:110px;">
                 <col style="width:118px;"><col style="width:100px;">
-                <col style="width:105px;"><col style="width:145px;"><col style="width:155px;"><col style="width:155px;"><col style="width:125px;"><col style="width:125px;"><col style="width:155px;">
+                <col style="width:145px;"><col style="width:125px;"><col style="width:125px;">
+                <col style="width:110px;"><col style="width:145px;"><col style="width:155px;"><col style="width:155px;">
                 <col style="width:120px;"><col style="width:110px;"><col style="width:105px;"><col style="width:105px;">
             </colgroup>
             <thead class="table-light sticky-top" style="z-index: 2;">
@@ -986,7 +1006,7 @@
                         </td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['roas'], 2) }}x</span>{!! $fmtDelta($categoryRow['roas'], $categoryRow['prev_roas'], true) !!}</div><div class="perf-sub {{ $categoryRow['actual_vs_target_pct'] !== null && $categoryRow['actual_vs_target_pct'] >= 100 ? 'text-success' : 'text-danger' }}">{{ $categoryRow['actual_vs_target_pct'] === null ? '—' : number_format($categoryRow['actual_vs_target_pct'], 1) . '% target' }}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($categoryRow['prev_roas'], 2) }}x</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ $categoryRow['bep_roas'] === null ? '—' : number_format($categoryRow['bep_roas'], 2) . 'x' }}</span></div><div class="perf-sub">impas</div></td>
-                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['orders'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['orders'], $categoryRow['prev_orders'], true) !!}</div><div class="perf-sub">CVR {{ number_format($categoryRow['cvr'], 2) }}%</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($categoryRow['prev_orders'], 0, ',', '.') }}</div></td>
+                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['orders'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['orders'], $categoryRow['prev_orders'], true) !!}</div><div class="perf-sub">orders</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($categoryRow['prev_orders'], 0, ',', '.') }}</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['aov'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['aov'], $categoryRow['prev_aov'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($categoryRow['prev_aov'], 0, ',', '.') }}</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val text-success">Rp {{ number_format($categoryRow['gmv'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['gmv'], $categoryRow['prev_gmv'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($categoryRow['prev_gmv'], 0, ',', '.') }}</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['spend'], $categoryRow['prev_spend'], null) !!}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($categoryRow['prev_spend'], 0, ',', '.') }}</div></td>
@@ -996,7 +1016,7 @@
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['impressions'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['impressions'], $categoryRow['prev_impressions'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($categoryRow['prev_impressions'], 0, ',', '.') }}</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['clicks'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['clicks'], $categoryRow['prev_clicks'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($categoryRow['prev_clicks'], 0, ',', '.') }}</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['ctr'], 2) }}%</span>{!! $fmtDelta($categoryRow['ctr'], $categoryRow['prev_ctr'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($categoryRow['prev_ctr'], 2) }}%</div></td>
-                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['cvr'], 2) }}%</span>{!! $fmtDelta($categoryRow['cvr'], $categoryRow['prev_cvr'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($categoryRow['prev_cvr'], 2) }}%</div></td>
+                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['cvr'], 2) }}%</span>{!! $fmtDelta($categoryRow['cvr'], $categoryRow['prev_cvr'], true) !!}</div><div class="perf-sub">klik → order</div></td>
                     </tr>
                     <tr class="perf-category-detail" data-perf-views="category" style="display:none;">
                         <td colspan="15" class="bg-light">
@@ -1006,6 +1026,7 @@
                                     <thead>
                                         <tr>
                                             <th rowspan="2">Campaign / Item</th>
+                                            <th rowspan="2" class="text-center">Sinyal</th>
                                             <th colspan="2" class="text-center perf-table-group-title">Efisiensi</th>
                                             <th colspan="7" class="text-center perf-table-group-title">Hasil</th>
                                             <th colspan="4" class="text-center perf-table-group-title">Funnel</th>
@@ -1015,7 +1036,7 @@
                                             <th class="text-end">BEP</th>
                                             <th class="text-end">Orders</th>
                                             <th class="text-end">AOV</th>
-                                            <th class="text-end">GMV</th>
+                                            <th class="text-end">Omzet</th>
                                             <th class="text-end">Biaya + PPN</th>
                                             <th class="text-end">CPA</th>
                                             <th class="text-end">BEP CPA</th>
@@ -1040,6 +1061,11 @@
                                                         <div style="min-width:0;">
                                                             <div class="fw-bold text-truncate" style="max-width:260px;" title="{{ $campaignRow['name'] }}">{{ $campaignRow['name'] }}</div>
                                                             <div class="text-muted text-truncate" style="font-size:.62rem; max-width:260px;">{{ $campaignRow['item_name'] }} @if($campaignRow['type']) · {{ strtoupper($campaignRow['type']) }}@endif</div>
+                                                            <div class="perf-product-economics">
+                                                                <span>COGS/unit <b>{{ $campaignRow['unit_cogs'] > 0 ? 'Rp ' . number_format($campaignRow['unit_cogs'], 0, ',', '.') : '—' }}</b></span>
+                                                                <span>BEP <b>{{ $campaignRow['bep_roas'] === null ? '—' : number_format($campaignRow['bep_roas'], 2) . 'x' }}</b></span>
+                                                                <span>CPA BEP <b>{{ $campaignRow['bep_cpa'] === null ? '—' : 'Rp ' . number_format($campaignRow['bep_cpa'], 0, ',', '.') }}</b></span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div class="perf-campaign-controls" onclick="event.stopPropagation()">
@@ -1067,6 +1093,7 @@
                                                         @endif
                                                     </div>
                                                 </td>
+                                                <td class="text-center"><span class="badge bg-{{ $campaignRow['recoColor'] }}">{{ $campaignRow['reco'] }}</span></td>
                                                 <td class="text-end fw-bold">
                                                     <div>{{ number_format($campaignRow['roas'], 2) }}x {!! $fmtDelta($campaignRow['roas'], $campaignRow['prev_roas'], true) !!}</div>
                                                     <div class="perf-sub {{ $campaignRow['actual_vs_target_pct'] !== null && $campaignRow['actual_vs_target_pct'] >= 100 ? 'text-success' : 'text-danger' }}">{{ $campaignRow['actual_vs_target_pct'] === null ? '—' : number_format($campaignRow['actual_vs_target_pct'], 1) . '% target' }}</div>
@@ -1093,10 +1120,7 @@
                                                     <div>Rp {{ number_format($campaignRow['cpa'], 0, ',', '.') }} {!! $fmtDelta($campaignRow['cpa'], $campaignRow['prev_orders'] > 0 ? $campaignRow['prev_spend'] / $campaignRow['prev_orders'] : 0, false) !!}</div>
                                                     <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($campaignRow['prev_orders'] > 0 ? $campaignRow['prev_spend'] / $campaignRow['prev_orders'] : 0, 0, ',', '.') }}</div>
                                                 </td>
-                                                <td class="text-end">
-                                                    <div>{{ $campaignRow['bep_cpa'] === null ? '—' : 'Rp ' . number_format($campaignRow['bep_cpa'], 0, ',', '.') }}</div>
-                                                    <div class="perf-sub">batas impas</div>
-                                                </td>
+                                                <td class="text-end"><div>{{ $campaignRow['bep_cpa'] === null ? '—' : 'Rp ' . number_format($campaignRow['bep_cpa'], 0, ',', '.') }}</div><div class="perf-sub">batas impas</div></td>
                                                 <td class="text-end {{ !$campaignRow['profit_available'] ? 'text-muted' : ($campaignRow['profit'] >= 0 ? 'text-success' : 'text-danger') }}">
                                                     <div>{{ !$campaignRow['profit_available'] ? 'N/A' : 'Rp ' . number_format($campaignRow['profit'], 0, ',', '.') }} {!! $fmtDelta($campaignRow['profit'], $campaignRow['prev_profit'], true) !!}</div>
                                                     <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($campaignRow['prev_profit'], 0, ',', '.') }}</div>
@@ -1141,7 +1165,11 @@
                                         @if($row['type'])<span class="badge bg-light text-dark border ms-1" style="font-size:.52rem;">{{ strtoupper($row['type']) }}</span>@endif
                                     </div>
                                     @if($row['item_name'] !== 'N/A')
-                                        <div class="text-muted" style="font-size:.6rem;">HPP {{ $row['unit_cogs'] > 0 ? 'Rp ' . number_format($row['unit_cogs'], 0, ',', '.') : '—' }}</div>
+                                        <div class="perf-product-economics">
+                                            <span>COGS/unit <b>{{ $row['unit_cogs'] > 0 ? 'Rp ' . number_format($row['unit_cogs'], 0, ',', '.') : '—' }}</b></span>
+                                            <span>BEP <b>{{ $row['bep_roas'] === null ? '—' : number_format($row['bep_roas'], 2) . 'x' }}</b></span>
+                                            <span>CPA BEP <b>{{ $row['bep_cpa'] === null ? '—' : 'Rp ' . number_format($row['bep_cpa'], 0, ',', '.') }}</b></span>
+                                        </div>
                                     @endif
                                 </div>
                             </div>
@@ -1179,58 +1207,44 @@
                             @endif
                         </td>
 
-                        {{-- ROAS Aktual --}}
+                        {{-- Efisiensi --}}
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val {{ $row['target_roas'] === null ? '' : ($meetsTarget ? 'text-success' : 'text-danger') }}">{{ number_format($row['roas'], 2) }}x</span>{!! $fmtDelta($row['roas'], $row['prev_roas'], true) !!}</div>
                             <div class="perf-sub {{ $row['actual_vs_target_pct'] !== null && $row['actual_vs_target_pct'] >= 100 ? 'text-success' : 'text-danger' }}">{{ $row['actual_vs_target_pct'] === null ? '—' : number_format($row['actual_vs_target_pct'], 1) . '% target' }}</div>
                             <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($row['prev_roas'], 2) }}x</div>
                         </td>
-
-                        {{-- BEP --}}
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val">{{ $row['bep_roas'] === null ? '—' : number_format($row['bep_roas'], 2) . 'x' }}</span></div>
                             <div class="perf-sub">impas</div>
                         </td>
 
-                        {{-- Orders --}}
+                        {{-- Hasil --}}
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val">{{ number_format($row['orders'], 0, ',', '.') }}</span>{!! $fmtDelta($row['orders'], $row['prev_orders'], true) !!}</div>
-                            <div class="perf-sub">CVR {{ number_format($row['cvr'], 2) }}%</div>
+                            <div class="perf-sub">orders</div>
                             <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($row['prev_orders'], 0, ',', '.') }}</div>
                         </td>
-
-                        {{-- AOV --}}
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val">Rp {{ number_format($row['aov'], 0, ',', '.') }}</span>{!! $fmtDelta($row['aov'], $row['prev_aov'], true) !!}</div>
                             <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($row['prev_aov'], 0, ',', '.') }}</div>
                         </td>
-
-                        {{-- Omzet --}}
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val text-success">Rp {{ number_format($row['gmv'], 0, ',', '.') }}</span>{!! $fmtDelta($row['gmv'], $row['prev_gmv'], true) !!}</div>
                             <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($row['prev_gmv'], 0, ',', '.') }}</div>
                         </td>
-
-                        {{-- Biaya setelah PPN 11% --}}
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val">Rp {{ number_format($row['spend'], 0, ',', '.') }}</span>{!! $fmtDelta($row['spend'], $row['prev_spend'], null) !!}</div>
                             <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($row['prev_spend'], 0, ',', '.') }}</div>
                         </td>
-
-                        {{-- CPA --}}
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val">Rp {{ number_format($row['cpa'], 0, ',', '.') }}</span>{!! $fmtDelta($row['cpa'], $row['prev_cpa'], false) !!}</div>
                             <div class="perf-sub">biaya / order</div>
-                            <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($row['prev_orders'] > 0 ? $row['prev_spend'] / $row['prev_orders'] : 0, 0, ',', '.') }}</div>
+                            <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($row['prev_cpa'], 0, ',', '.') }}</div>
                         </td>
-
-                        {{-- BEP CPA --}}
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val">{{ $row['bep_cpa'] === null ? '—' : 'Rp ' . number_format($row['bep_cpa'], 0, ',', '.') }}</span></div>
                             <div class="perf-sub">batas impas</div>
                         </td>
-
-                        {{-- Profit --}}
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val {{ !$row['profit_available'] ? 'text-muted' : ($row['profit'] >= 0 ? 'text-success' : 'text-danger') }}">{{ !$row['profit_available'] ? 'N/A' : 'Rp ' . number_format($row['profit'], 0, ',', '.') }}</span>@if($row['profit_available']){!! $fmtDelta($row['profit'], $row['prev_profit'], true) !!}@endif</div>
                             @if($row['profit_available'])
@@ -1267,6 +1281,7 @@
                                 <div class="perf-chip"><span>Klik</span><b>{{ number_format($row['clicks'], 0, ',', '.') }}</b>{!! $fmtDelta($row['clicks'], $row['prev_clicks'], true) !!}</div>
                                 <div class="perf-chip"><span>CPC</span><b>Rp {{ number_format($row['cpc'], 0, ',', '.') }}</b></div>
                                 <div class="perf-chip"><span>CTR</span><b>{{ number_format($row['ctr'], 2) }}%</b></div>
+                                <div class="perf-chip"><span>COGS/unit</span><b>{{ $row['unit_cogs'] > 0 ? 'Rp ' . number_format($row['unit_cogs'], 0, ',', '.') : '—' }}</b></div>
                                 <div class="perf-chip"><span>CPA</span><b>Rp {{ number_format($row['cpa'], 0, ',', '.') }}</b></div>
                                 <div class="perf-chip"><span>POAS</span><b>{{ $row['poas'] === null ? '—' : number_format($row['poas'], 2) . 'x' }}</b></div>
                                 <div class="perf-chip"><span>Biaya riil (PPN 11%)</span><b>Rp {{ number_format($row['spend_ppn'], 0, ',', '.') }}</b>{!! $fmtDelta($row['spend'], $row['prev_spend'], null) !!}</div>
@@ -1295,8 +1310,8 @@
                 </tr>
             </tbody>
         </table>
+        <div class="perf-sticky-scrollbar" data-perf-sticky-scrollbar aria-label="Geser tabel performa secara horizontal"><div></div></div>
     </div>
-    <div class="perf-sticky-scrollbar" data-perf-sticky-scrollbar aria-label="Geser tabel performa secara horizontal"><div></div></div>
     </div>
 </div>
 
@@ -1804,12 +1819,14 @@ function perfInitStickyScrollbar() {
         const tableScroll = shell.querySelector('[data-perf-table-scroll]');
         const stickyScroll = shell.querySelector('[data-perf-sticky-scrollbar]');
         const spacer = stickyScroll?.firstElementChild;
+        const table = tableScroll?.querySelector('.perf-table');
         if (!tableScroll || !stickyScroll || !spacer) return;
         shell.dataset.perfScrollbarReady = '1';
         let syncing = false;
         const syncWidth = () => {
-            spacer.style.width = `${tableScroll.scrollWidth}px`;
-            stickyScroll.style.display = tableScroll.scrollWidth > tableScroll.clientWidth + 2 ? 'block' : 'none';
+            const contentWidth = table?.scrollWidth || tableScroll.scrollWidth;
+            spacer.style.width = `${contentWidth}px`;
+            stickyScroll.style.display = contentWidth > tableScroll.clientWidth + 2 ? 'block' : 'none';
             if (!syncing) stickyScroll.scrollLeft = tableScroll.scrollLeft;
         };
         tableScroll.addEventListener('scroll', () => {
@@ -1826,6 +1843,7 @@ function perfInitStickyScrollbar() {
         }, { passive: true });
         if (typeof ResizeObserver !== 'undefined') {
             new ResizeObserver(syncWidth).observe(tableScroll);
+            if (table) new ResizeObserver(syncWidth).observe(table);
         } else {
             window.addEventListener('resize', syncWidth);
         }
