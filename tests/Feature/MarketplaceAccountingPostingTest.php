@@ -149,6 +149,7 @@ class MarketplaceAccountingPostingTest extends TestCase
             'employee_code' => 'OWNER-POSTING-ADS-' . uniqid(),
         ]);
         $store = $this->seedFinancialData();
+        $this->seedPositiveClearingBalance($store, 50);
         $this->createWalletAdTransaction($store, 'SPM-TOPUP-001', 'SPM_DEDUCT', -50, '2026-08-10 10:00:00');
         $this->createWalletAdTransaction($store, 'SPM-CHARGE-001', 'paid_ads_charge', -30, '2026-08-11 10:00:00');
 
@@ -177,6 +178,22 @@ class MarketplaceAccountingPostingTest extends TestCase
         $this->assertSame(50.0, (float) $preview['included_in_gl']['wallet_ad_topup']);
         $this->assertSame(30.0, (float) $preview['included_in_gl']['amount']);
         $this->assertSame($preview['total_debit'], $preview['total_credit']);
+    }
+
+    public function test_wallet_topup_is_blocked_without_positive_clearing_funding(): void
+    {
+        $store = $this->seedFinancialData();
+        $this->createWalletAdTransaction($store, 'SPM-TOPUP-UNFUNDED', 'SPM_DEDUCT', -50, '2026-08-10 10:00:00');
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->expectExceptionMessage('top up saldo iklan');
+
+        app(\App\Services\Marketplace\MarketplaceAccountingPostingService::class)->preview([
+            'store_id' => $store->id,
+            'date_basis' => 'ordered_at',
+            'date_from' => '2026-08-01',
+            'date_to' => '2026-08-31',
+        ]);
     }
 
     public function test_final_settlement_releases_pending_payout_against_clearing(): void
@@ -310,6 +327,30 @@ class MarketplaceAccountingPostingTest extends TestCase
             'status' => 'COMPLETED',
             'transaction_created_at' => $createdAt,
             'source_payload' => [],
+        ]);
+    }
+
+    private function seedPositiveClearingBalance(Store $store, float $amount): void
+    {
+        $journal = Journal::create([
+            'date' => '2026-08-01',
+            'description' => 'Positive marketplace clearing fixture',
+            'source_type' => 'test_fixture',
+            'source_id' => $store->id,
+            'posted_at' => now(),
+        ]);
+
+        JournalLine::create([
+            'journal_id' => $journal->id,
+            'account_id' => Account::where('code', '1302')->value('id'),
+            'debit' => $amount,
+            'credit' => 0,
+        ]);
+        JournalLine::create([
+            'journal_id' => $journal->id,
+            'account_id' => Account::where('code', '4101')->value('id'),
+            'debit' => 0,
+            'credit' => $amount,
         ]);
     }
 }
