@@ -53,6 +53,68 @@
         .mp-finance-page .summary-card .card-body { padding:.65rem; }
         .mp-finance-page .summary-card .fs-5 { font-size:1rem !important; }
     }
+
+    /* Enterprise finance treatment: stronger hierarchy, restrained color,
+       and dense audit-friendly surfaces while preserving the existing data. */
+    .mp-finance-page { --mp-ink:#12233d; --mp-muted:#64748b; --mp-line:#e2e8f0; max-width:1440px; padding:.9rem 1.15rem 4rem; color:#1e293b; }
+    .mp-finance-page .card { border-radius:14px; border-color:var(--mp-line); box-shadow:0 5px 18px rgba(15,23,42,.035)!important; }
+    .mp-finance-page .mp-finance-hero { position:relative; overflow:hidden; background:var(--mp-ink); border-color:#203555; padding:1.35rem 1.5rem 1.15rem; border-radius:18px; color:#fff; box-shadow:0 14px 34px rgba(15,35,61,.16); }
+    .mp-finance-page .mp-finance-hero::after { content:''; position:absolute; width:360px; height:360px; right:-150px; top:-190px; border:1px solid rgba(147,197,253,.15); border-radius:50%; box-shadow:0 0 0 28px rgba(147,197,253,.035), 0 0 0 56px rgba(147,197,253,.025); pointer-events:none; }
+    .mp-finance-page .mp-eyebrow { display:flex; align-items:center; gap:.55rem; text-transform:uppercase; letter-spacing:.12em; font-size:.63rem; font-weight:800; color:#a9b7ca; }
+    .mp-finance-page .mp-eyebrow-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.24rem .5rem; border:1px solid rgba(191,219,254,.2); border-radius:999px; color:#dbeafe; background:rgba(59,130,246,.13); letter-spacing:.08em; }
+    .mp-finance-page .mp-eyebrow-badge::before { content:''; width:6px; height:6px; border-radius:50%; background:#60a5fa; box-shadow:0 0 0 3px rgba(96,165,250,.16); }
+    .mp-finance-page .mp-finance-hero h4 { position:relative; z-index:1; margin:.6rem 0 .35rem!important; font-weight:800; letter-spacing:-.03em; font-size:clamp(1.45rem,2.5vw,2rem); }
+    .mp-finance-page .mp-finance-hero p { position:relative; z-index:1; color:#c7d2e2!important; font-size:.8rem; line-height:1.6; }
+    .mp-finance-page .mp-hero-status { position:relative; z-index:1; min-width:176px; margin-top:.2rem; padding:.7rem .8rem; border:1px solid rgba(191,219,254,.16); border-radius:11px; background:rgba(15,23,42,.26); }
+    .mp-finance-page .mp-hero-status strong { display:block; font-size:.76rem; color:#f8fafc; }
+    .mp-finance-page .mp-hero-status small { display:block; margin-top:.22rem; color:#a9b7ca; font-size:.66rem; }
+    .mp-finance-page .page-actions { position:relative; z-index:2; margin-top:1rem; padding-top:.9rem; border-top:1px solid rgba(191,219,254,.14); }
+    .mp-finance-page .mp-finance-hero .page-actions { flex:1 0 100%; }
+    .mp-finance-page .page-actions .btn { border-radius:8px; font-weight:700; font-size:.72rem; padding:.43rem .7rem; }
+    .mp-finance-page .page-actions .btn-primary { background:#3b82f6; border-color:#3b82f6; }
+    .mp-finance-page .page-actions .btn-outline-secondary { color:#dbeafe; border-color:rgba(191,219,254,.35); }
+    .mp-finance-page .page-actions .btn-outline-warning { color:#fde68a; border-color:rgba(253,230,138,.4); }
+    .mp-finance-page .page-actions .btn-outline-primary { color:#bfdbfe; border-color:rgba(147,197,253,.4); }
+    .mp-finance-page .mp-finance-hero + .mp-filter-card { margin-top:1rem; }
+    .mp-finance-page .mp-filter-card .card-body { padding:1rem 1.1rem 1.05rem; }
+    .mp-finance-page .mp-panel-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+    .mp-finance-page .mp-panel-heading p { margin:.2rem 0 0; color:#64748b; font-size:.7rem; }
+    .mp-finance-page .mp-filter-card .mp-section-title { font-size:.88rem; color:var(--mp-ink); }
+    .mp-finance-page .mp-filter-card .form-label { margin-bottom:.35rem; color:#475569; font-size:.68rem; font-weight:800!important; letter-spacing:.02em; }
+    .mp-finance-page .form-select, .mp-finance-page .form-control { min-height:37px; border-color:#d7e0eb; border-radius:8px; font-size:.77rem; box-shadow:none; }
+    .mp-finance-page .form-select:focus, .mp-finance-page .form-control:focus { border-color:#60a5fa; box-shadow:0 0 0 3px rgba(59,130,246,.12); }
+    .mp-finance-page .mp-filter-card .btn { min-height:37px; border-radius:8px; font-size:.73rem; font-weight:750; }
+    .mp-finance-page .mp-mode-switch { display:grid; grid-template-columns:1fr 1.2fr; gap:.25rem; padding:.22rem; min-height:37px; border:1px solid #d7e0eb; border-radius:8px; background:#f8fafc; }
+    .mp-finance-page .mp-mode-switch .btn { border:0; border-radius:6px!important; color:#64748b; font-size:.69rem; font-weight:750; }
+    .mp-finance-page .mp-mode-switch .btn-check:checked + .btn { background:#fff; color:#1d4ed8; box-shadow:0 1px 4px rgba(15,23,42,.11); }
+    .mp-finance-page .summary-card { border-width:0 0 0 4px!important; overflow:hidden; }
+    .mp-finance-page .summary-card .card-body { min-height:102px; padding:.9rem 1rem; }
+    .mp-finance-page .summary-card .text-muted { color:#64748b!important; font-weight:700; }
+    .mp-finance-page .summary-card .fs-5 { font-size:1.18rem!important; font-weight:800!important; letter-spacing:-.02em; }
+    .mp-finance-page .mp-status-strip { background:#fff; border:1px solid var(--mp-line); border-radius:11px; padding:.65rem .8rem; box-shadow:0 3px 12px rgba(15,23,42,.025); }
+    .mp-finance-page .mp-status-strip .badge { padding:.36rem .55rem; font-weight:750; }
+    .mp-finance-page .mp-tab-nav { position:sticky; top:.5rem; z-index:10; background:rgba(255,255,255,.92); border:1px solid var(--mp-line); border-radius:11px; padding:.28rem; gap:.25rem; box-shadow:0 5px 18px rgba(15,23,42,.05); backdrop-filter:blur(10px); }
+    .mp-finance-page .mp-tab-nav .nav-link { border-radius:7px; color:#64748b; font-weight:750; font-size:.72rem; padding:.45rem .8rem; }
+    .mp-finance-page .mp-tab-nav .nav-link.active { background:var(--mp-ink); color:#fff; box-shadow:0 2px 5px rgba(15,35,61,.16); }
+    .mp-finance-page .card-header { padding:.8rem 1rem; border-bottom-color:#eef2f7; background:#fff!important; }
+    .mp-finance-page .table-responsive { max-height:60vh; overflow:auto; }
+    .mp-finance-page .table thead th { background:#f8fafc; border-bottom:1px solid #e2e8f0; font-size:.62rem; text-transform:uppercase; letter-spacing:.06em; color:#64748b; }
+    .mp-finance-page .table td { border-color:#eef2f7; font-size:.75rem; }
+    .mp-finance-page .table tbody tr:hover { background:#f8fbff; }
+    .mp-finance-page .mp-status-strip a { color:#2563eb; font-weight:700; text-decoration:none; }
+    .mp-finance-page .mp-status-strip a:hover { text-decoration:underline; }
+    @media (max-width:767.98px) {
+        .mp-finance-page { padding-left:.65rem; padding-right:.65rem; }
+        .mp-finance-page .mp-finance-hero { padding:1.1rem; border-radius:14px; }
+        .mp-finance-page .mp-hero-status { width:100%; min-width:0; margin-top:.85rem; }
+        .mp-finance-page .page-actions { width:100%; }
+        .mp-finance-page .page-actions .btn, .mp-finance-page .page-actions form { flex:1 1 auto; }
+        .mp-finance-page .page-actions form .btn { width:100%; }
+        .mp-finance-page .summary-card .card-body { min-height:88px; padding:.7rem; }
+        .mp-finance-page .summary-card .fs-5 { font-size:1rem!important; }
+        .mp-finance-page .mp-tab-nav { overflow-x:auto; flex-wrap:nowrap; }
+        .mp-finance-page .mp-tab-nav .nav-item { flex:0 0 auto; }
+    }
 </style>
 @endpush
 
@@ -60,12 +122,16 @@
 <div class="container-fluid py-3 mp-finance-page">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3 mp-finance-hero">
         <div>
-            <div class="mp-eyebrow">Marketplace · Owner finance</div>
+            <div class="mp-eyebrow"><span class="mp-eyebrow-badge">Marketplace finance</span><span>Owner control center</span></div>
             <h4 class="mb-1">Laporan Keuangan Marketplace</h4>
             <p class="text-muted mb-0" style="max-width: 820px">
                 Laporan subledger marketplace berdasarkan settlement terverifikasi. Mode berjalan dapat menampilkan order shipped/to_confirm_receive
                 sebagai piutang provisional; hanya mode final yang dapat diposting ke jurnal umum.
             </p>
+        </div>
+        <div class="mp-hero-status">
+            <strong><i class="bi bi-shield-check me-1 text-info"></i>{{ $includeShipped ? 'Provisional monitoring' : 'Final ledger view' }}</strong>
+            <small>{{ $filters['date_from'] }} — {{ $filters['date_to'] }}</small>
         </div>
         <div class="d-flex flex-wrap gap-2 page-actions">
             <a class="btn btn-outline-secondary" href="{{ route('marketplace.reports.profit', $filters) }}"><i class="bi bi-graph-up-arrow me-1"></i> Detail Profit</a>
@@ -83,7 +149,13 @@
 
     <div class="card shadow-sm mb-3 mp-filter-card">
         <div class="card-body">
-            <div class="mp-section-title mb-3"><i class="bi bi-funnel"></i> Filter laporan</div>
+            <div class="mp-panel-heading">
+                <div>
+                    <div class="mp-section-title"><i class="bi bi-sliders2"></i> Parameter laporan</div>
+                    <p>Atur scope pengakuan dan basis tanggal sebelum melakukan review.</p>
+                </div>
+                <span class="badge rounded-pill bg-light text-secondary border">{{ $filters['date_basis'] === 'settlement_time' ? 'Cash / settlement basis' : 'Order basis' }}</span>
+            </div>
             <form method="GET" class="row g-2 align-items-end">
                 <div class="col-md-3">
                     <label class="form-label small fw-semibold">Toko</label>
@@ -96,11 +168,11 @@
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small fw-semibold">Mode laporan</label>
-                    <div class="btn-group w-100" role="group" aria-label="Mode laporan">
+                    <div class="btn-group w-100 mp-mode-switch" role="group" aria-label="Mode laporan">
                         <input type="radio" class="btn-check" name="report_scope" id="scope-final" value="final" @checked(!$includeShipped)>
-                        <label class="btn btn-outline-secondary" for="scope-final">Final</label>
+                        <label class="btn btn-outline-secondary" for="scope-final">Final ledger</label>
                         <input type="radio" class="btn-check" name="report_scope" id="scope-shipped" value="include_shipped" @checked($includeShipped)>
-                        <label class="btn btn-outline-info" for="scope-shipped">+ Shipped</label>
+                        <label class="btn btn-outline-info" for="scope-shipped">+ Provisional</label>
                     </div>
                 </div>
                 <div class="col-md-2">
@@ -112,7 +184,7 @@
                 </div>
                 <div class="col-md-2"><label class="form-label small fw-semibold">Dari</label><input type="date" name="date_from" class="form-control" value="{{ $filters['date_from'] }}"></div>
                 <div class="col-md-2"><label class="form-label small fw-semibold">Sampai</label><input type="date" name="date_to" class="form-control" value="{{ $filters['date_to'] }}"></div>
-                <div class="col-md-auto d-flex gap-2">
+                <div class="col-md-auto d-flex gap-2 mp-filter-actions">
                     <button class="btn btn-outline-primary"><i class="bi bi-funnel me-1"></i> Terapkan</button>
                     <a class="btn btn-outline-secondary" href="{{ route('marketplace.reports.financial-statement') }}" title="Kembalikan filter default"><i class="bi bi-arrow-counterclockwise"></i></a>
                 </div>
@@ -141,7 +213,7 @@
         <span class="small fw-semibold text-dark"><i class="bi bi-database-check me-1 text-success"></i>Data terakhir: {{ $dataLastDate }}</span>
         <span class="badge rounded-pill bg-success-subtle text-success-emphasis">{{ $fmt($summary['final_order_count'] ?? $summary['order_count']) }} final</span>
         @if ($includeShipped)
-            <span class="badge rounded-pill bg-info-subtle text-info-emphasis">{{ $fmt($summary['provisional_order_count'] ?? 0) }} shipped provisional</span>
+            <span class="badge rounded-pill bg-info-subtle text-info-emphasis">{{ $fmt($summary['provisional_order_count'] ?? 0) }} provisional</span>
         @endif
         <a class="small ms-auto" href="{{ route('marketplace.reports.financial-quality', ['store_id' => $filters['store_id'], 'date_from' => $filters['date_from'], 'date_to' => $filters['date_to']]) }}">Buka audit kualitas <i class="bi bi-arrow-up-right"></i></a>
     </div>
@@ -213,7 +285,7 @@
                 <div class="mp-section-title mb-3"><i class="bi bi-wallet2"></i> Piutang marketplace provisional</div>
                 <div class="row g-3">
                     <div class="col-6 col-md-3"><div class="text-muted small">Order final</div><div class="fs-5 fw-bold">{{ $fmt($summary['final_order_count'] ?? 0) }}</div></div>
-                    <div class="col-6 col-md-3"><div class="text-muted small">Order shipped</div><div class="fs-5 fw-bold text-info">{{ $fmt($summary['provisional_order_count'] ?? 0) }}</div></div>
+                    <div class="col-6 col-md-3"><div class="text-muted small">Order provisional</div><div class="fs-5 fw-bold text-info">{{ $fmt($summary['provisional_order_count'] ?? 0) }}</div></div>
                     <div class="col-6 col-md-3"><div class="text-muted small">Payout final</div><div class="fs-5 fw-bold">Rp {{ $fmt($summary['final']['payout'] ?? 0) }}</div></div>
                     <div class="col-6 col-md-3"><div class="text-muted small">Piutang provisional</div><div class="fs-5 fw-bold text-info">Rp {{ $fmt($summary['provisional_receivable'] ?? 0) }}</div></div>
                 </div>
@@ -342,7 +414,7 @@
         <div class="card-header bg-white d-flex justify-content-between align-items-center"><div class="mp-section-title"><i class="bi bi-receipt"></i> Detail order</div><span class="mp-table-caption">{{ $fmt(count($visibleOrders)) }} dari {{ $fmt(count($statement['orders'])) }} order</span></div>
         <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Order</th><th>Tanggal</th><th>Status</th><th>Toko</th><th class="text-end">Omzet</th><th class="text-end">Payout</th><th class="text-end">HPP</th><th class="text-end">Laba</th></tr></thead><tbody>
             @forelse ($visibleOrders as $row)
-                <tr><td class="fw-semibold">{{ $row['channel_order_id'] }}</td><td>{{ $row['ordered_at'] ?: '-' }}</td><td><span class="badge rounded-pill {{ ($row['recognition_status'] ?? 'final') === 'provisional' ? 'bg-info-subtle text-info-emphasis' : 'bg-success-subtle text-success-emphasis' }}">{{ ($row['recognition_status'] ?? 'final') === 'provisional' ? 'Shipped · provisional' : 'Final' }}</span></td><td>{{ $row['store_name'] }}</td><td class="text-end">Rp {{ $fmt($row['gross_sales']) }}</td><td class="text-end">Rp {{ $fmt($row['payout']) }}</td><td class="text-end">Rp {{ $fmt($row['hpp']) }}</td><td class="text-end fw-semibold">Rp {{ $fmt($row['operating_profit']) }}</td></tr>
+                <tr><td class="fw-semibold">{{ $row['channel_order_id'] }}</td><td>{{ $row['ordered_at'] ?: '-' }}</td><td><span class="badge rounded-pill {{ ($row['recognition_status'] ?? 'final') === 'provisional' ? 'bg-info-subtle text-info-emphasis' : 'bg-success-subtle text-success-emphasis' }}">{{ ($row['recognition_status'] ?? 'final') === 'provisional' ? str_replace('_', ' ', strtoupper($row['order_status'] ?? 'provisional')) . ' · provisional' : 'Final' }}</span></td><td>{{ $row['store_name'] }}</td><td class="text-end">Rp {{ $fmt($row['gross_sales']) }}</td><td class="text-end">Rp {{ $fmt($row['payout']) }}</td><td class="text-end">Rp {{ $fmt($row['hpp']) }}</td><td class="text-end fw-semibold">Rp {{ $fmt($row['operating_profit']) }}</td></tr>
             @empty
                 <tr><td colspan="8" class="text-center text-muted py-4">Belum ada order pada periode ini.</td></tr>
             @endforelse
