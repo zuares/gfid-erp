@@ -7791,6 +7791,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return '<div style="font-size:.7rem; line-height:1.65; color:var(--dsh-muted);">' +
             '<b style="color:var(--text);">Efisiensi ' + esc(metricValue('roas', metrics.roas)) + '</b> · ' +
             'Pesanan ' + esc(metricValue('orders', metrics.orders)) + ' · ' +
+            'Penghasilan ' + esc(metricValue('net_revenue', metrics.net_revenue)) + ' · ' +
             'HPP ' + esc(metricValue('total_cogs', metrics.total_cogs)) + ' · ' +
             'Biaya ' + esc(metricValue('spend', metrics.spend)) +
             '</div>';
@@ -7921,14 +7922,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const rows = [
             ['Dilihat', 'impressions'],
             ['Klik', 'clicks'],
+            ['Rasio klik', 'ctr'],
             ['Pesanan', 'orders'],
             ['Jumlah terjual', 'qty'],
+            ['Rasio pesanan', 'cvr'],
             ['Penjualan', 'revenue'],
+            ['Penghasilan bersih (est.)', 'net_revenue'],
             ['HPP / pcs', 'hpp'],
             ['Total HPP (COGS)', 'total_cogs'],
             ['Biaya iklan', 'spend'],
-            ['Rasio klik', 'ctr'],
-            ['Rasio pesanan', 'cvr'],
             ['Efisiensi iklan', 'roas'],
             ['Keuntungan', 'profit'],
             ['Titik impas jumlah', 'break_even_qty'],
