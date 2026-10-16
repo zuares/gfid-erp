@@ -91,7 +91,7 @@ class MarketplaceFinancePostingServiceTest extends TestCase
         $this->assertSame(1, Journal::where('source_type', 'marketplace_settlement')->count());
         $this->assertSame($journal->id, $settlement->fresh()->journal_id);
         $this->assertJournalLines($journal, '1101', 95000, 0);
-        $this->assertJournalLines($journal, '1302', 0, 95000);
+        $this->assertJournalLines($journal, '2301', 0, 95000);
     }
 
     public function test_unreceived_settlement_is_blocked_and_creates_no_journal(): void
@@ -177,6 +177,7 @@ class MarketplaceFinancePostingServiceTest extends TestCase
         foreach ([
             ['1101', 'Bank Test', 'asset', true],
             ['1302', 'Saldo Marketplace / Clearing', 'asset', false],
+            ['2301', 'Payout Marketplace Belum Direkonsiliasi', 'liability', false],
             ['4101', 'Penjualan', 'revenue', false],
             ['5101', 'Harga Pokok Penjualan', 'expense', false],
             ['6202', 'Biaya Komisi', 'expense', false],

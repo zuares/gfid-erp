@@ -10,6 +10,7 @@ use App\Models\Journal;
 use App\Models\MarketplaceFinanceSettlement;
 use App\Models\MarketplaceFinancialClosing;
 use App\Models\MarketplaceFinancialTransaction;
+use App\Models\JournalLine;
 use App\Services\Accounting\JournalService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -134,15 +135,22 @@ class MarketplaceFinancePostingService
                 throw ValidationException::withMessages(['account' => 'Akun bank settlement tidak ditemukan atau tidak aktif.']);
             }
             $receivable = $this->mappedAccount('marketplace_receivable', 'Piutang Shopee');
+            $pendingPayout = $this->mappedAccount('marketplace_payout_pending', 'Payout Marketplace Belum Direkonsiliasi');
+            $matchedAmount = min($amount, $this->positiveBalance($receivable->id));
+            $pendingAmount = round($amount - $matchedAmount, 2);
+            $lines = [$this->line($bank, $amount, 0)];
+            if ($matchedAmount > 0) {
+                $lines[] = $this->line($receivable, 0, $matchedAmount);
+            }
+            if ($pendingAmount > 0) {
+                $lines[] = $this->line($pendingPayout, 0, $pendingAmount);
+            }
             $journal = $this->journalService->post(
                 $locked->settlement_date?->toDateString() ?? now()->toDateString(),
                 JournalService::SRC_MARKETPLACE_SETTLEMENT,
                 $locked->id,
                 "Marketplace settlement {$locked->external_settlement_id}",
-                [
-                    $this->line($bank, $amount, 0),
-                    $this->line($receivable, 0, $amount),
-                ],
+                $lines,
                 $this->meta("SETTLEMENT-{$locked->id}", 'SETTLEMENT_RECEIVED', $userId),
             );
 
@@ -196,6 +204,17 @@ class MarketplaceFinancePostingService
         }
 
         return $account;
+    }
+
+    private function positiveBalance(int $accountId): float
+    {
+        $balance = (float) JournalLine::query()
+            ->where('account_id', $accountId)
+            ->whereHas('journal', fn ($query) => $query->whereNull('voided_at'))
+            ->selectRaw('COALESCE(SUM(debit - credit), 0) as balance')
+            ->value('balance');
+
+        return max(round($balance, 2), 0);
     }
 
     private function componentAccountKey(string $code): string
