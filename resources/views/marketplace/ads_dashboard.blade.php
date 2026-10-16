@@ -7791,6 +7791,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return '<div style="font-size:.7rem; line-height:1.65; color:var(--dsh-muted);">' +
             '<b style="color:var(--text);">Efisiensi ' + esc(metricValue('roas', metrics.roas)) + '</b> · ' +
             'Pesanan ' + esc(metricValue('orders', metrics.orders)) + ' · ' +
+            'HPP ' + esc(metricValue('total_cogs', metrics.total_cogs)) + ' · ' +
             'Biaya ' + esc(metricValue('spend', metrics.spend)) +
             '</div>';
     }
@@ -7923,6 +7924,8 @@ document.addEventListener('DOMContentLoaded', function () {
             ['Pesanan', 'orders'],
             ['Jumlah terjual', 'qty'],
             ['Penjualan', 'revenue'],
+            ['HPP / pcs', 'hpp'],
+            ['Total HPP (COGS)', 'total_cogs'],
             ['Biaya iklan', 'spend'],
             ['Rasio klik', 'ctr'],
             ['Rasio pesanan', 'cvr'],
