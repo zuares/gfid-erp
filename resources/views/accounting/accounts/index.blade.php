@@ -22,7 +22,7 @@
 @push('head')
 @include('production.dashboard.partials._gf-styles')
 <style>
-.coa-shell { gap: .75rem; }
+.coa-shell { width: 100%; max-width: 1120px; margin-inline: auto; gap: .75rem; }
 .coa-wrap { width: 100%; max-width: 1120px; margin: 0 auto; display: grid; gap: 1rem; }
 
 /* Header */
