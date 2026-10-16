@@ -1911,29 +1911,29 @@ document.addEventListener('DOMContentLoaded', function () {
     const ADS_GROUPS = [
         { id: 'grp-ringkasan', panes: [
             ['tab-campaigns', 'Ringkasan', 'bi-grid-1x2'],
-            ['tab-analysis', 'Analisa', 'bi-graph-up'],
-            ['tab-alerts', 'Alerts & Actions', 'bi-bell'],
+            ['tab-analysis', 'Analisis', 'bi-graph-up'],
+            ['tab-alerts', 'Perlu Dicek', 'bi-bell'],
         ]},
         { id: 'grp-performa', panes: [
-            ['tab-campaign-performance', 'Campaign', 'bi-bar-chart-steps'],
-            ['tab-traffic', 'Traffic', 'bi-stoplights'],
+            ['tab-campaign-performance', 'Kampanye', 'bi-bar-chart-steps'],
+            ['tab-traffic', 'Iklan', 'bi-stoplights'],
             ['tab-items', 'Produk', 'bi-box-seam'],
         ]},
         { id: 'grp-profit', panes: [
-            ['tab-profit', 'Profit', 'bi-cash-coin'],
+            ['tab-profit', 'Keuntungan', 'bi-cash-coin'],
         ]},
         { id: 'grp-funnel', panes: [
-            ['tab-funnel', 'Funnel', 'bi-funnel'],
-            ['tab-creative', 'Creative & Audience', 'bi-person-video2'],
+            ['tab-funnel', 'Alur Penjualan', 'bi-funnel'],
+            ['tab-creative', 'Konten & Pemirsa', 'bi-person-video2'],
         ]},
         { id: 'grp-ltv', panes: [
-            ['tab-ltv', 'Customer & LTV', 'bi-person-heart'],
+            ['tab-ltv', 'Pelanggan', 'bi-person-heart'],
         ]},
         { id: 'grp-experiment', panes: [
             ['tab-experiments', 'Evaluasi', 'bi-clipboard2-pulse'],
         ]},
         { id: 'grp-control', panes: [
-            ['tab-control', 'Control Panel', 'bi-toggles'],
+            ['tab-control', 'Kelola Iklan', 'bi-toggles'],
         ]},
         { id: 'grp-settings', panes: [
             ['tab-settings', 'Pengaturan', 'bi-sliders'],
@@ -1942,17 +1942,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const ADS_TAB_CONTEXTS = {
         'tab-campaigns': { title: 'Ringkasan', description: 'Ringkasan kesehatan iklan dan prioritas tindakan.', icon: 'bi-grid-1x2' },
-        'tab-analysis': { title: 'Analisa', description: 'Bandingkan periode dan temukan pola waktu terbaik.', icon: 'bi-graph-up' },
-        'tab-alerts': { title: 'Alerts & Actions', description: 'Prioritaskan anomali, kebocoran budget, dan peluang scale-up.', icon: 'bi-bell' },
-        'tab-campaign-performance': { title: 'Campaign Performance', description: 'Bandingkan efisiensi dan profitabilitas setiap kampanye.', icon: 'bi-bar-chart-steps' },
-        'tab-traffic': { title: 'Traffic', description: 'Pantau alur impresi, klik, pesanan, dan biaya iklan.', icon: 'bi-stoplights' },
+        'tab-analysis': { title: 'Analisis', description: 'Bandingkan periode dan temukan pola waktu terbaik.', icon: 'bi-graph-up' },
+        'tab-alerts': { title: 'Perlu Dicek', description: 'Prioritaskan anomali, kebocoran budget, dan peluang scale-up.', icon: 'bi-bell' },
+        'tab-campaign-performance': { title: 'Performa Kampanye', description: 'Bandingkan efisiensi dan profitabilitas setiap kampanye.', icon: 'bi-bar-chart-steps' },
+        'tab-traffic': { title: 'Performa Iklan', description: 'Pantau iklan dari dilihat sampai menghasilkan pesanan.', icon: 'bi-stoplights' },
         'tab-items': { title: 'Produk', description: 'Temukan produk hero, loss maker, dan risiko stok.', icon: 'bi-box-seam' },
-        'tab-profit': { title: 'Profit', description: 'Rekonsiliasi omzet, HPP, biaya iklan, dan profit bersih.', icon: 'bi-cash-coin' },
-        'tab-funnel': { title: 'Funnel', description: 'Cari titik drop-off dari impresi hingga pembelian.', icon: 'bi-funnel' },
-        'tab-creative': { title: 'Creative & Audience', description: 'Evaluasi hook visual dan kualitas intent audiens.', icon: 'bi-person-video2' },
-        'tab-ltv': { title: 'Customer & LTV', description: 'Lihat CAC blended, repeat rate, dan frekuensi order.', icon: 'bi-person-heart' },
+        'tab-profit': { title: 'Keuntungan', description: 'Rekonsiliasi omzet, HPP, biaya iklan, dan profit bersih.', icon: 'bi-cash-coin' },
+        'tab-funnel': { title: 'Alur Penjualan', description: 'Cari titik drop-off dari impresi hingga pembelian.', icon: 'bi-funnel' },
+        'tab-creative': { title: 'Konten & Pemirsa', description: 'Evaluasi hook visual dan kualitas intent audiens.', icon: 'bi-person-video2' },
+        'tab-ltv': { title: 'Pelanggan', description: 'Lihat CAC blended, repeat rate, dan frekuensi order.', icon: 'bi-person-heart' },
         'tab-experiments': { title: 'Evaluasi', description: 'Ukur dampak perubahan iklan dengan baseline yang konsisten.', icon: 'bi-clipboard2-pulse' },
-        'tab-control': { title: 'Control Panel', description: 'Kelola target, budget, status, dan jadwal kampanye.', icon: 'bi-toggles' },
+        'tab-control': { title: 'Kelola Iklan', description: 'Kelola target, budget, status, dan jadwal kampanye.', icon: 'bi-toggles' },
         'tab-settings': { title: 'Pengaturan', description: 'Kelola integrasi, fee, target, dan sinkronisasi data.', icon: 'bi-sliders' },
     };
 
@@ -2401,10 +2401,10 @@ function trafficRenderFunnel(kpi) {
     });
 
     document.querySelectorAll('[data-traffic-funnel-rate="ctr"]').forEach(function(el) {
-        el.textContent = 'CTR ' + trafficFormatNumber(kpi.ctr, 2) + '%';
+        el.textContent = 'Rasio klik ' + trafficFormatNumber(kpi.ctr, 2) + '%';
     });
     document.querySelectorAll('[data-traffic-funnel-rate="cvr"]').forEach(function(el) {
-        el.textContent = 'CVR ' + trafficFormatNumber(kpi.cvr, 2) + '%';
+        el.textContent = 'Rasio pesanan ' + trafficFormatNumber(kpi.cvr, 2) + '%';
     });
 }
 
@@ -2423,14 +2423,14 @@ function trafficRenderQualityChart(view) {
     const ctrMedian = trafficMedian(rows.map(row => row.x));
     const cvrMedian = trafficMedian(rows.map(row => row.y));
     const colors = {
-        'CTR & CVR tinggi': 'rgba(16, 185, 129, .72)',
-        'CTR tinggi · CVR rendah': 'rgba(245, 158, 11, .72)',
-        'CTR rendah · CVR tinggi': 'rgba(139, 92, 246, .72)',
-        'CTR & CVR rendah': 'rgba(239, 68, 68, .72)',
+        'Klik & pesanan tinggi': 'rgba(16, 185, 129, .72)',
+        'Banyak klik, sedikit pesanan': 'rgba(245, 158, 11, .72)',
+        'Sedikit klik, banyak pesanan': 'rgba(139, 92, 246, .72)',
+        'Klik & pesanan rendah': 'rgba(239, 68, 68, .72)',
     };
     const groupFor = row => row.x >= ctrMedian
-        ? (row.y >= cvrMedian ? 'CTR & CVR tinggi' : 'CTR tinggi · CVR rendah')
-        : (row.y >= cvrMedian ? 'CTR rendah · CVR tinggi' : 'CTR & CVR rendah');
+        ? (row.y >= cvrMedian ? 'Klik & pesanan tinggi' : 'Banyak klik, sedikit pesanan')
+        : (row.y >= cvrMedian ? 'Sedikit klik, banyak pesanan' : 'Klik & pesanan rendah');
 
     if (trafficQualityChart) trafficQualityChart.destroy();
     trafficQualityChart = new Chart(canvas, {
@@ -2460,10 +2460,10 @@ function trafficRenderQualityChart(view) {
                             const money = value => 'Rp ' + Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });
                             return [
                                 row.name,
-                                'CTR: ' + trafficFormatNumber(row.ctr, 2) + '% · CVR: ' + trafficFormatNumber(row.cvr, 2) + '%',
-                                'Jangkauan: ' + trafficFormatNumber(row.impressions, 0) + ' · Klik: ' + trafficFormatNumber(row.clicks, 0),
-                                'Orders: ' + trafficFormatNumber(row.orders, 0) + ' · CPC: ' + money(row.cpc),
-                                'AOV: ' + money(row.aov),
+                                'Rasio klik: ' + trafficFormatNumber(row.ctr, 2) + '% · Rasio pesanan: ' + trafficFormatNumber(row.cvr, 2) + '%',
+                                'Dilihat: ' + trafficFormatNumber(row.impressions, 0) + ' · Diklik: ' + trafficFormatNumber(row.clicks, 0),
+                                'Pesanan: ' + trafficFormatNumber(row.orders, 0) + ' · Biaya per klik: ' + money(row.cpc),
+                                'Rata-rata pesanan: ' + money(row.aov),
                             ];
                         },
                     },
@@ -2472,12 +2472,12 @@ function trafficRenderQualityChart(view) {
             scales: {
                 x: {
                     beginAtZero: true,
-                    title: { display: true, text: 'CTR (%)', font: { size: 10 } },
+                    title: { display: true, text: 'Rasio klik (%)', font: { size: 10 } },
                     ticks: { callback: value => value + '%' },
                 },
                 y: {
                     beginAtZero: true,
-                    title: { display: true, text: 'CVR (%)', font: { size: 10 } },
+                    title: { display: true, text: 'Rasio pesanan (%)', font: { size: 10 } },
                     ticks: { callback: value => value + '%' },
                 },
             },
@@ -2485,7 +2485,7 @@ function trafficRenderQualityChart(view) {
     });
 
     const hint = document.getElementById('trafficScatterHint');
-    if (hint) hint.textContent = 'Median CTR ' + trafficFormatNumber(ctrMedian, 2) + '% · CVR ' + trafficFormatNumber(cvrMedian, 2) + '%';
+    if (hint) hint.textContent = 'Rata-rata klik ' + trafficFormatNumber(ctrMedian, 2) + '% · pesanan ' + trafficFormatNumber(cvrMedian, 2) + '%';
 }
 
 function trafficUpdateKpis(view) {
@@ -3144,7 +3144,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="ads-tab-panel-head">
                     <div>
                         <div class="ads-tab-panel-title"><i class="bi bi-stoplights text-primary"></i> Analisa Traffic</div>
-                        <div class="ads-tab-panel-note">Jangkauan → klik → pesanan, plus efisiensi biaya iklan.</div>
+                        <div class="ads-tab-panel-note">Lihat iklan yang menghasilkan perhatian, klik, dan pesanan.</div>
                     </div>
                 </div>
                 
@@ -3172,7 +3172,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trSpend, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-eye me-1"></i> Jangkauan</div>
+                        <div class="kpi-label"><i class="bi bi-eye me-1"></i> Dilihat</div>
                         <div class="kpi-value fw-bold text-dark">{{ number_format($trImp, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
@@ -3180,31 +3180,31 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="kpi-value fw-bold text-dark">{{ number_format($trClicks, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-percent me-1"></i> CTR</div>
+                        <div class="kpi-label"><i class="bi bi-percent me-1"></i> Rasio Klik</div>
                         <div class="kpi-value fw-bold text-dark">{{ number_format($trCtr, 2, ',', '.') }}%</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-currency-dollar me-1"></i> CPC</div>
+                        <div class="kpi-label"><i class="bi bi-currency-dollar me-1"></i> Biaya / Klik</div>
                         <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trCpc, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-tags me-1"></i> CPM</div>
+                        <div class="kpi-label"><i class="bi bi-tags me-1"></i> Biaya / 1.000 Dilihat</div>
                         <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trCpm, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-bag-check me-1"></i> Gross Sales</div>
+                        <div class="kpi-label"><i class="bi bi-bag-check me-1"></i> Penjualan</div>
                         <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trGmv, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-funnel me-1"></i> CVR</div>
+                        <div class="kpi-label"><i class="bi bi-funnel me-1"></i> Rasio Pesanan</div>
                         <div class="kpi-value fw-bold text-dark">{{ number_format($trCvr, 2, ',', '.') }}%</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label"><i class="bi bi-cash-coin me-1"></i> CPA</div>
+                        <div class="kpi-label"><i class="bi bi-cash-coin me-1"></i> Biaya / Pesanan</div>
                         <div class="kpi-value fw-bold text-dark">Rp {{ number_format($trCpa, 0, ',', '.') }}</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label" title="Laba bersih setelah iklan ÷ biaya iklan setelah PPN"><i class="bi bi-graph-up-arrow me-1"></i> POAS</div>
+                        <div class="kpi-label" title="Keuntungan bersih dari setiap rupiah biaya iklan"><i class="bi bi-graph-up-arrow me-1"></i> Keuntungan Iklan</div>
                         <div class="kpi-value fw-bold text-dark">{{ number_format($trPoas, 2, ',', '.') }}x</div>
                     </div>
                 </div>
@@ -3216,7 +3216,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <div>
                                     <div class="fw-bold" style="font-size:.78rem;"><i class="bi bi-calendar3 text-primary me-1"></i> Tren Harian Traffic</div>
-                                    <div class="text-muted" style="font-size:.65rem;">Impression, klik, CTR, dan CVR mengikuti periode yang dipilih.</div>
+                                    <div class="text-muted" style="font-size:.65rem;">Performa iklan dari hari ke hari.</div>
                                 </div>
                                 <span class="badge bg-light text-dark border" style="font-size:.6rem;">
                                     {{ date('d M Y', strtotime($dateFrom)) }} – {{ date('d M Y', strtotime($dateTo)) }}
@@ -3224,13 +3224,13 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                             <div class="row g-3 mt-1">
                                 <div class="col-12 col-xl-6">
-                                    <div class="small text-muted fw-bold mb-1">Volume Traffic</div>
+                                    <div class="small text-muted fw-bold mb-1">Jumlah Dilihat & Klik</div>
                                     <div style="position:relative; height:220px; width:100%;">
                                         <canvas id="chartTrafficVolume"></canvas>
                                     </div>
                                 </div>
                                 <div class="col-12 col-xl-6">
-                                    <div class="small text-muted fw-bold mb-1">Kualitas Traffic</div>
+                                    <div class="small text-muted fw-bold mb-1">Rasio Klik & Pesanan</div>
                                     <div style="position:relative; height:220px; width:100%;">
                                         <canvas id="chartTrafficRates"></canvas>
                                     </div>
@@ -3287,6 +3287,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         'row' => $row,
                         'name' => $row->campaign_name ?: 'Tanpa Nama',
                         'id' => $row->channel_campaign_id,
+                        'item_name' => $row->marketplace_item_name ?: ($row->internalItem?->name ?? 'Produk belum terpetakan'),
+                        'image_url' => $row->marketplace_item_image_url ?? null,
                         'category' => $isGms ? 'GMV Max Auto' : ($row->item_category ?? $row->internalItem?->category?->name ?? 'Belum termapping'),
                         'is_gms' => $isGms,
                         'views' => $isGms
@@ -3309,24 +3311,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 $trafficImpressionsMedian = $trafficRows->filter(fn ($row) => $row['impressions'] > 0)->median('impressions') ?? 0;
                 $trafficSignal = function ($row) use ($trafficCtrMedian, $trafficCvrMedian, $trafficImpressionsMedian) {
                     if ($row['impressions'] < max(100, $trafficImpressionsMedian * 0.25)) {
-                        return ['label' => 'Data Rendah', 'class' => 'secondary', 'icon' => 'bi-dash-circle'];
+                        return ['label' => 'Data sedikit', 'class' => 'secondary', 'icon' => 'bi-dash-circle'];
                     }
 
                     $ctrHigh = $trafficCtrMedian > 0 && $row['ctr'] >= $trafficCtrMedian;
                     $cvrHigh = $trafficCvrMedian > 0 && $row['cvr'] >= $trafficCvrMedian;
                     if ($ctrHigh && $cvrHigh) {
                         return $row['impressions'] < $trafficImpressionsMedian
-                            ? ['label' => 'Potensi Scale', 'class' => 'info', 'icon' => 'bi-rocket-takeoff']
-                            : ['label' => 'Traffic Optimal', 'class' => 'success', 'icon' => 'bi-check-circle'];
+                            ? ['label' => 'Bisa dinaikkan', 'class' => 'info', 'icon' => 'bi-rocket-takeoff']
+                            : ['label' => 'Bagus', 'class' => 'success', 'icon' => 'bi-check-circle'];
                     }
                     if (!$ctrHigh && $cvrHigh) {
-                        return ['label' => 'Perbaiki Kreatif', 'class' => 'warning', 'icon' => 'bi-image'];
+                        return ['label' => 'Perbaiki gambar', 'class' => 'warning', 'icon' => 'bi-image'];
                     }
                     if ($ctrHigh && !$cvrHigh) {
-                        return ['label' => 'Evaluasi Produk', 'class' => 'danger', 'icon' => 'bi-cart-x'];
+                        return ['label' => 'Cek produk', 'class' => 'danger', 'icon' => 'bi-cart-x'];
                     }
 
-                    return ['label' => 'Optimasi Traffic', 'class' => 'danger', 'icon' => 'bi-exclamation-triangle'];
+                    return ['label' => 'Perlu diperbaiki', 'class' => 'danger', 'icon' => 'bi-exclamation-triangle'];
                 };
                 $trafficRows = $trafficRows->map(function ($row) use ($trafficSignal) {
                     return array_merge($row, ['signal' => $trafficSignal($row)]);
@@ -3428,43 +3430,45 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-funnel-value { font-size:.78rem; font-weight:800; }
                 .traffic-funnel-rate { font-size:.6rem; opacity:.9; white-space:nowrap; }
                 .traffic-funnel-arrow { color:var(--dsh-muted); font-size:.65rem; line-height:.5; }
+                .traffic-product-image { width:32px; height:32px; border-radius:8px; object-fit:cover; flex:none; border:1px solid var(--dsh-border); background:#f1f5f9; }
+                .traffic-product-image-empty { width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; flex:none; color:var(--dsh-muted); background:#f1f5f9; border:1px solid var(--dsh-border); }
             </style>
 
             {{-- TABEL TRAFFIC --}}
             <div class="ads-tab-panel mb-4">
                 <div class="ads-tab-panel-head">
                     <div>
-                        <div class="ads-tab-panel-title"><i class="bi bi-list-columns-reverse text-primary"></i> Performa Campaign (Traffic)</div>
-                        <div class="ads-tab-panel-note">Jangkauan, klik, pesanan, konversi, dan efisiensi biaya per campaign.</div>
+                        <div class="ads-tab-panel-title"><i class="bi bi-list-columns-reverse text-primary"></i> Performa Iklan</div>
+                        <div class="ads-tab-panel-note">Lihat iklan yang paling banyak dilihat, diklik, dan menghasilkan pesanan.</div>
                     </div>
                 </div>
                 <div style="display:flex; gap:.35rem; margin:.75rem .75rem .75rem; overflow-x:auto;" role="tablist" aria-label="Jenis tampilan traffic">
-                    <button type="button" id="btnTrafficCategory" class="btn fw-bold" onclick="__trafficPerformanceView('category')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Per Kategori</button>
-                    <button type="button" id="btnTrafficRoas" class="btn fw-bold" onclick="__trafficPerformanceView('roas')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max ROAS</button>
-                    <button type="button" id="btnTrafficGms" class="btn fw-bold" onclick="__trafficPerformanceView('gms')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max Auto</button>
-                    <button type="button" id="btnTrafficUnmapped" class="btn fw-bold" onclick="__trafficPerformanceView('unmapped')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Produk Bermasalah</button>
+                    <button type="button" id="btnTrafficCategory" class="btn fw-bold" onclick="__trafficPerformanceView('category')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Semua Kategori</button>
+                    <button type="button" id="btnTrafficRoas" class="btn fw-bold" onclick="__trafficPerformanceView('roas')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Target ROAS</button>
+                    <button type="button" id="btnTrafficGms" class="btn fw-bold" onclick="__trafficPerformanceView('gms')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Otomatis</button>
+                    <button type="button" id="btnTrafficUnmapped" class="btn fw-bold" onclick="__trafficPerformanceView('unmapped')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Perlu Dicek</button>
                 </div>
                 <div class="px-3 pb-2">
                     <div class="ads-kpi-grid mb-2">
                         <div class="dpanel ads-kpi kpi-revenue">
-                            <div class="ads-kpi-label"><i class="bi bi-list-nested"></i> Campaign</div>
+                            <div class="ads-kpi-label"><i class="bi bi-list-nested"></i> Jumlah Iklan</div>
                             <div class="ads-kpi-value" data-traffic-kpi-value="campaigns">{{ number_format($trafficInitialKpi['campaigns'], 0, ',', '.') }}</div>
-                            <div class="ads-kpi-sub">sesuai subtab aktif</div>
+                            <div class="ads-kpi-sub">yang tampil</div>
                         </div>
                         <div class="dpanel ads-kpi kpi-spend">
                             <div class="ads-kpi-label"><i class="bi bi-wallet2"></i> Belanja Iklan</div>
                             <div class="ads-kpi-value" data-traffic-kpi-value="spend">Rp {{ number_format($trafficInitialKpi['spend'], 0, ',', '.') }}</div>
-                            <div class="ads-kpi-sub">CPC <span data-traffic-kpi-value="cpc">Rp {{ number_format($trafficInitialKpi['cpc'], 0, ',', '.') }}</span></div>
+                            <div class="ads-kpi-sub">Biaya per klik <span data-traffic-kpi-value="cpc">Rp {{ number_format($trafficInitialKpi['cpc'], 0, ',', '.') }}</span></div>
                         </div>
                         <div class="dpanel ads-kpi">
-                            <div class="ads-kpi-label"><i class="bi bi-eye"></i> Jangkauan</div>
+                            <div class="ads-kpi-label"><i class="bi bi-eye"></i> Dilihat</div>
                             <div class="ads-kpi-value" data-traffic-kpi-value="impressions">{{ number_format($trafficInitialKpi['impressions'], 0, ',', '.') }}</div>
-                            <div class="ads-kpi-sub"><span data-traffic-kpi-value="clicks">{{ number_format($trafficInitialKpi['clicks'], 0, ',', '.') }}</span> klik</div>
+                            <div class="ads-kpi-sub"><span data-traffic-kpi-value="clicks">{{ number_format($trafficInitialKpi['clicks'], 0, ',', '.') }}</span> orang klik</div>
                         </div>
                         <div class="dpanel ads-kpi">
-                            <div class="ads-kpi-label"><i class="bi bi-percent"></i> CTR</div>
+                            <div class="ads-kpi-label"><i class="bi bi-percent"></i> Rasio Klik</div>
                             <div class="ads-kpi-value" data-traffic-kpi-value="ctr">{{ number_format($trafficInitialKpi['ctr'], 2, ',', '.') }}%</div>
-                            <div class="ads-kpi-sub">klik dibanding jangkauan</div>
+                            <div class="ads-kpi-sub">yang melihat lalu klik</div>
                         </div>
                     </div>
                 </div>
@@ -3472,22 +3476,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="row g-3 px-3 pb-3" id="trafficVisuals">
                     <div class="col-12 col-xl-5">
                         <div class="p-3 border rounded h-100" style="background:var(--card-bg);">
-                            <div class="fw-bold mb-1" style="font-size:.75rem;">Funnel Traffic</div>
-                            <div class="small text-muted mb-2" style="font-size:.65rem;">Impression → klik → order</div>
+                                <div class="fw-bold mb-1" style="font-size:.75rem;"><i class="bi bi-arrow-down-right text-primary me-1"></i> Alur Iklan</div>
                             <div class="traffic-funnel">
                                 <div class="traffic-funnel-stage" data-traffic-funnel-stage="impressions">
-                                    <span class="traffic-funnel-label">Jangkauan</span>
+                                    <span class="traffic-funnel-label">Dilihat</span>
                                     <span class="text-end"><span class="traffic-funnel-value" data-traffic-funnel-value="impressions">{{ number_format($trafficInitialKpi['impressions'], 0, ',', '.') }}</span><br><span class="traffic-funnel-rate">100%</span></span>
                                 </div>
                                 <div class="traffic-funnel-arrow">▼</div>
                                 <div class="traffic-funnel-stage" data-traffic-funnel-stage="clicks">
-                                    <span class="traffic-funnel-label">Klik</span>
-                                    <span class="text-end"><span class="traffic-funnel-value" data-traffic-funnel-value="clicks">{{ number_format($trafficInitialKpi['clicks'], 0, ',', '.') }}</span><br><span class="traffic-funnel-rate" data-traffic-funnel-rate="ctr">CTR {{ number_format($trafficInitialKpi['ctr'], 2, ',', '.') }}%</span></span>
+                                    <span class="traffic-funnel-label">Diklik</span>
+                                    <span class="text-end"><span class="traffic-funnel-value" data-traffic-funnel-value="clicks">{{ number_format($trafficInitialKpi['clicks'], 0, ',', '.') }}</span><br><span class="traffic-funnel-rate" data-traffic-funnel-rate="ctr">Rasio {{ number_format($trafficInitialKpi['ctr'], 2, ',', '.') }}%</span></span>
                                 </div>
                                 <div class="traffic-funnel-arrow">▼</div>
                                 <div class="traffic-funnel-stage" data-traffic-funnel-stage="orders">
-                                    <span class="traffic-funnel-label">Orders</span>
-                                    <span class="text-end"><span class="traffic-funnel-value" data-traffic-funnel-value="orders">{{ number_format($trafficInitialKpi['orders'], 0, ',', '.') }}</span><br><span class="traffic-funnel-rate" data-traffic-funnel-rate="cvr">CVR {{ number_format($trafficInitialKpi['cvr'], 2, ',', '.') }}%</span></span>
+                                    <span class="traffic-funnel-label">Pesanan</span>
+                                    <span class="text-end"><span class="traffic-funnel-value" data-traffic-funnel-value="orders">{{ number_format($trafficInitialKpi['orders'], 0, ',', '.') }}</span><br><span class="traffic-funnel-rate" data-traffic-funnel-rate="cvr">Rasio {{ number_format($trafficInitialKpi['cvr'], 2, ',', '.') }}%</span></span>
                                 </div>
                             </div>
                         </div>
@@ -3495,10 +3498,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="col-12 col-xl-7">
                         <div class="p-3 border rounded h-100" style="background:var(--card-bg);">
                             <div class="d-flex justify-content-between align-items-center mb-1">
-                                <div class="fw-bold" style="font-size:.75rem;">Kualitas Traffic: CTR vs CVR</div>
-                                <span id="trafficScatterHint" class="badge bg-light text-dark border" style="font-size:.58rem;">Median subtab</span>
+                                <div class="fw-bold" style="font-size:.75rem;"><i class="bi bi-bullseye text-primary me-1"></i> Kualitas Iklan</div>
+                                <span id="trafficScatterHint" class="badge bg-light text-dark border" style="font-size:.58rem;">Rata-rata</span>
                             </div>
-                            <div class="small text-muted mb-2" style="font-size:.65rem;">Bubble lebih besar = jangkauan lebih besar.</div>
+                            <div class="small text-muted mb-2" style="font-size:.65rem;">Semakin ke kanan dan atas, semakin baik.</div>
                             <div style="position:relative; height:230px; width:100%;"><canvas id="trafficQualityChart"></canvas></div>
                         </div>
                     </div>
@@ -3508,15 +3511,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     <table class="dpanel-table" id="trafficTable">
                         <thead style="position: sticky; top: 0; z-index: 10;">
                             <tr>
-                                <th onclick="sortTrafficTable('campaign_name')" style="cursor:pointer">Kategori / Campaign <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th>Sinyal</th>
-                                <th class="text-end" onclick="sortTrafficTable('impressions')" style="cursor:pointer">Jangkauan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th onclick="sortTrafficTable('campaign_name')" style="cursor:pointer">Produk / Iklan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th>Status</th>
+                                <th class="text-end" onclick="sortTrafficTable('impressions')" style="cursor:pointer">Dilihat <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('clicks')" style="cursor:pointer">Klik <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('ctr')" style="cursor:pointer">CTR <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('ctr')" style="cursor:pointer">Rasio Klik <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('orders')" style="cursor:pointer">Pesanan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('cvr')" style="cursor:pointer">CVR <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('cvr')" style="cursor:pointer">Rasio Pesanan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                                 <th class="text-end" onclick="sortTrafficTable('spend')" style="cursor:pointer">Biaya Iklan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('cpc')" style="cursor:pointer">CPC <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" onclick="sortTrafficTable('cpc')" style="cursor:pointer">Biaya / Klik <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -3546,18 +3549,29 @@ document.addEventListener('DOMContentLoaded', function() {
                                             <div class="table-responsive">
                                                 <table class="table table-sm table-hover align-middle mb-0" style="font-size:.72rem;">
                                                     <thead>
-                                                        <tr><th>Campaign</th><th>Sinyal</th><th class="text-end">Impresi</th><th class="text-end">Klik</th><th class="text-end">CTR</th><th class="text-end">Pesanan</th><th class="text-end">CVR</th><th class="text-end">Belanja Iklan</th><th class="text-end">CPC</th><th class="text-end">CPM</th></tr>
+                                                <tr><th>Produk / Iklan</th><th>Status</th><th class="text-end">Dilihat</th><th class="text-end">Klik</th><th class="text-end">Rasio Klik</th><th class="text-end">Pesanan</th><th class="text-end">Rasio Pesanan</th><th class="text-end">Biaya Iklan</th><th class="text-end">Biaya / Klik</th><th class="text-end">Biaya / 1.000 Dilihat</th></tr>
                                                     </thead>
                                                     <tbody>
                                                         @foreach($trafficCategoryCampaignRows->get($categoryRow['category'], collect()) as $campaignRow)
                                                             <tr>
                                                                 <td>
-                                                                    @if(data_get($campaignRow, 'row.id'))
-                                                                        <a href="{{ route('marketplace.ads.campaign.detail', ['campaign' => $campaignRow['row']->id, 'store_id' => $campaignRow['row']->store_id, 'date_from' => $dateFrom ?? null, 'date_to' => $dateTo ?? null]) }}" onclick="event.stopPropagation();" class="fw-bold text-truncate d-block" style="max-width:260px; color:inherit; text-decoration:none;" title="Buka detail campaign {{ $campaignRow['name'] }}">{{ $campaignRow['name'] }} <i class="bi bi-box-arrow-up-right" style="font-size:.58rem;color:#2563eb;"></i></a>
-                                                                    @else
-                                                                        <span class="fw-bold text-truncate d-block" style="max-width:260px;">{{ $campaignRow['name'] }}</span>
-                                                                    @endif
-                                                                    <div class="text-muted" style="font-size:.62rem;">ID: {{ $campaignRow['id'] }}</div>
+                                                                    <div class="d-flex align-items-center gap-2">
+                                                                        @if($campaignRow['image_url'] ?? null)
+                                                                            <img src="{{ $campaignRow['image_url'] }}" alt="{{ $campaignRow['item_name'] }}" class="traffic-product-image" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';">
+                                                                            <span class="traffic-product-image-empty" style="display:none;"><i class="bi bi-image"></i></span>
+                                                                        @else
+                                                                            <span class="traffic-product-image-empty"><i class="bi bi-image"></i></span>
+                                                                        @endif
+                                                                        <div style="min-width:0;">
+                                                                            @if(data_get($campaignRow, 'row.id'))
+                                                                                <a href="{{ route('marketplace.ads.campaign.detail', ['campaign' => $campaignRow['row']->id, 'store_id' => $campaignRow['row']->store_id, 'date_from' => $dateFrom ?? null, 'date_to' => $dateTo ?? null]) }}" onclick="event.stopPropagation();" class="fw-bold text-truncate d-block" style="max-width:260px; color:inherit; text-decoration:none;" title="Buka detail campaign {{ $campaignRow['name'] }}">{{ $campaignRow['name'] }} <i class="bi bi-box-arrow-up-right" style="font-size:.58rem;color:#2563eb;"></i></a>
+                                                                            @else
+                                                                                <span class="fw-bold text-truncate d-block" style="max-width:260px;">{{ $campaignRow['name'] }}</span>
+                                                                            @endif
+                                                                            <div class="text-muted text-truncate" style="font-size:.62rem; max-width:260px;" title="{{ $campaignRow['item_name'] }}"><i class="bi bi-box"></i> {{ $campaignRow['item_name'] }}</div>
+                                                                            <div class="text-muted" style="font-size:.58rem;">ID: {{ $campaignRow['id'] }}</div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                                 <td><span class="badge bg-{{ $campaignRow['signal']['class'] }}" style="font-size:.58rem;">{{ $campaignRow['signal']['label'] }}</span></td>
                                                                 <td class="text-end">{{ number_format($campaignRow['impressions'], 0, ',', '.') }}</td>
@@ -3587,12 +3601,23 @@ document.addEventListener('DOMContentLoaded', function() {
                                         data-cpc="{{ $trafficRow['cpc'] }}"
                                         data-cpm="{{ $trafficRow['cpm'] }}">
                                         <td>
-                                            @if(data_get($trafficRow, 'row.id'))
-                                                <a href="{{ route('marketplace.ads.campaign.detail', ['campaign' => $trafficRow['row']->id, 'store_id' => $trafficRow['row']->store_id, 'date_from' => $dateFrom ?? null, 'date_to' => $dateTo ?? null]) }}" onclick="event.stopPropagation();" class="fw-bold d-block" style="font-size:.78rem; color:inherit; text-decoration:none;" title="Buka detail campaign {{ $trafficRow['name'] }}">{{ $trafficRow['name'] }} <i class="bi bi-box-arrow-up-right" style="font-size:.58rem;color:#2563eb;"></i></a>
-                                            @else
-                                                <span class="fw-bold d-block" style="font-size:.78rem;">{{ $trafficRow['name'] }}</span>
-                                            @endif
-                                            <div class="text-muted" style="font-size: 0.65rem;">ID: {{ $trafficRow['id'] }}</div>
+                                            <div class="d-flex align-items-center gap-2">
+                                                @if($trafficRow['image_url'] ?? null)
+                                                    <img src="{{ $trafficRow['image_url'] }}" alt="{{ $trafficRow['item_name'] }}" class="traffic-product-image" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';">
+                                                    <span class="traffic-product-image-empty" style="display:none;"><i class="bi bi-image"></i></span>
+                                                @else
+                                                    <span class="traffic-product-image-empty"><i class="bi bi-image"></i></span>
+                                                @endif
+                                                <div style="min-width:0;">
+                                                    @if(data_get($trafficRow, 'row.id'))
+                                                        <a href="{{ route('marketplace.ads.campaign.detail', ['campaign' => $trafficRow['row']->id, 'store_id' => $trafficRow['row']->store_id, 'date_from' => $dateFrom ?? null, 'date_to' => $dateTo ?? null]) }}" onclick="event.stopPropagation();" class="fw-bold d-block text-truncate" style="font-size:.78rem; max-width:260px; color:inherit; text-decoration:none;" title="Buka detail campaign {{ $trafficRow['name'] }}">{{ $trafficRow['name'] }} <i class="bi bi-box-arrow-up-right" style="font-size:.58rem;color:#2563eb;"></i></a>
+                                                    @else
+                                                        <span class="fw-bold d-block text-truncate" style="font-size:.78rem; max-width:260px;">{{ $trafficRow['name'] }}</span>
+                                                    @endif
+                                                    <div class="text-muted text-truncate" style="font-size:.65rem; max-width:260px;" title="{{ $trafficRow['item_name'] }}"><i class="bi bi-box"></i> {{ $trafficRow['item_name'] }}</div>
+                                                    <div class="text-muted" style="font-size: .58rem;">ID: {{ $trafficRow['id'] }}</div>
+                                                </div>
+                                            </div>
                                         </td>
                                         <td><span class="badge bg-{{ $trafficRow['signal']['class'] }}" style="font-size:.6rem;"><i class="bi {{ $trafficRow['signal']['icon'] }} me-1"></i>{{ $trafficRow['signal']['label'] }}</span></td>
                                         <td class="text-end">{{ number_format($trafficRow['impressions'], 0, ',', '.') }}</td>
