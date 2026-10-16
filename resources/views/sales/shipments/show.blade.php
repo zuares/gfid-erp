@@ -351,6 +351,60 @@ body[data-theme="dark"] .sd-order-item-code{color:#f1f5f9}
 }
 .sd-order-group .sd-order-items { background: #fff; }
 .sd-order-group .sd-order-item { padding: .48rem .7rem; }
+.sd-order-filters {
+  margin: .1rem 0 .65rem;
+  padding: .22rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #f8fafc;
+}
+.sd-order-search { padding: .35rem .3rem .55rem; }
+.sd-order-search input {
+  width: 100%;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: .3rem .55rem;
+  border: 1px solid #dbe3ee;
+  border-radius: 7px;
+  color: #334155;
+  background: #fff;
+  font-size: .75rem;
+}
+.sd-order-search input:focus { outline: 0; border-color: #2563eb; box-shadow: 0 0 0 .16rem rgba(37,99,235,.12); }
+.sd-order-filter-tabs { display: flex; gap: .3rem; overflow-x: auto; scrollbar-width: none; }
+.sd-order-filter-tabs::-webkit-scrollbar { display: none; }
+.sd-order-filter-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .3rem;
+  min-height: 32px;
+  flex: 1 0 0;
+  padding: .24rem .55rem;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #64748b;
+  background: transparent;
+  font-size: .68rem;
+  font-weight: 750;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sd-order-filter-tab:hover { color: #334155; background: #f1f5f9; }
+.sd-order-filter-tab.active { color: #334155; border-color: #dbe3ee; background: #fff; box-shadow: 0 1px 2px rgba(15,23,42,.06); }
+.sd-order-filter-tab[data-marketplace-filter="shopee"].active { color: #c2410c; border-color: #fed7aa; background: #fff7ed; }
+.sd-order-filter-tab[data-marketplace-filter="tiktok"].active { color: #0f716e; border-color: #bfe9e4; background: #f0fdfa; }
+.sd-order-filter-tab[data-marketplace-filter="anomaly"].active { color: #a16207; border-color: #fde68a; background: #fffbeb; }
+.sd-order-filter-tab[data-marketplace-filter="problem"].active { color: #b91c1c; border-color: #fecaca; background: #fff1f2; }
+.sd-order-filter-tab[data-link-filter="linked"].active { color: #047857; border-color: #a7f3d0; background: #ecfdf5; }
+.sd-order-filter-tab[data-link-filter="unlinked"].active { color: #b45309; border-color: #fde68a; background: #fffbeb; }
+.sd-order-filter-count { color: #94a3b8; font-size: .62rem; font-weight: 850; }
+.sd-order-filter-divider { margin: .3rem 0 0; padding-top: .3rem; border-top: 1px solid #e2e8f0; }
+.sd-order-card[hidden] { display: none !important; }
+body[data-theme="dark"] .sd-order-filters,
+body[data-theme="dark"] .sd-order-search input,
+body[data-theme="dark"] .sd-order-filter-tab.active { background: #111827; border-color: rgba(71,85,105,.75); }
+body[data-theme="dark"] .sd-order-filter-divider { border-color: rgba(71,85,105,.75); }
 
 body[data-theme="dark"] .sd-topbar,
 body[data-theme="dark"] .sd-card,
@@ -397,6 +451,38 @@ body[data-theme="dark"] .sd-grid .sd-kpi { background: #1e293b; border-color: rg
     $singleOrderFallbackLines = $orderScans->count() === 1 ? $ungroupedLines : collect();
     $pendingOrders = $orderScans->where('status', 'pending')->count();
     $skippedOrders = $orderScans->where('status', 'skip')->count();
+    $marketplaceGroup = static function ($orderNo): string {
+        $code = strtoupper(trim((string) $orderNo));
+        if (str_starts_with($code, 'SPX') || str_starts_with($code, 'SHP') || str_contains($code, 'SHOPEE')) {
+            return 'shopee';
+        }
+        if (str_starts_with($code, 'JY') || str_starts_with($code, 'TTK') || str_contains($code, 'TIKTOK')) {
+            return 'tiktok';
+        }
+        return 'anomaly';
+    };
+    $marketplaceCounts = ['all' => (int) $orderScans->count(), 'shopee' => 0, 'tiktok' => 0, 'anomaly' => 0, 'problem' => 0];
+    $linkCounts = ['all' => (int) $orderScans->count(), 'linked' => 0, 'unlinked' => 0];
+    foreach ($orderScans as $orderScan) {
+        $marketplaceCounts[$marketplaceGroup($orderScan->order_no)]++;
+        $orderScanLines = $orderScan->lines->merge($singleOrderFallbackLines);
+        if ($orderScanLines->isEmpty()) {
+            $marketplaceCounts['problem']++;
+        }
+        $hasMarketplaceLink = (bool) (
+            $orderScan->fulfillment?->marketplaceOrder
+            || $orderScan->source === 'marketplace'
+            || data_get($orderScan->raw_payload, 'linked_source') === 'marketplace_order'
+        );
+        $linkCounts[$hasMarketplaceLink ? 'linked' : 'unlinked']++;
+    }
+    if ($orderScans->count() > 1 && $ungroupedLines->isNotEmpty()) {
+        $marketplaceCounts['all']++;
+        $marketplaceCounts['anomaly']++;
+        $marketplaceCounts['problem']++;
+        $linkCounts['all']++;
+        $linkCounts['unlinked']++;
+    }
     $flowStage = $statusKey === 'draft'
         ? ($orderScans->isNotEmpty() ? 'confirm' : ($shipment->lines->isNotEmpty() ? 'scan_order' : 'scan_item'))
         : 'done';
@@ -528,6 +614,28 @@ body[data-theme="dark"] .sd-grid .sd-kpi { background: #1e293b; border-color: rg
                     @endif
                 </div>
             @else
+                <div class="sd-order-filters" aria-label="Filter order shipment">
+                    <div class="sd-order-search">
+                        <label class="visually-hidden" for="sdOrderSearch">Cari nomor order atau resi</label>
+                        <input id="sdOrderSearch" type="search" placeholder="Cari nomor order atau resi" autocomplete="off">
+                    </div>
+                    <div class="sd-order-filter-tabs" role="tablist" aria-label="Filter marketplace">
+                        @foreach(['all' => 'Semua', 'shopee' => 'Shopee', 'tiktok' => 'TikTok', 'anomaly' => 'Anomali', 'problem' => 'Perlu Diperiksa'] as $filterKey => $filterLabel)
+                            <button type="button" class="sd-order-filter-tab {{ $filterKey === 'all' ? 'active' : '' }}" data-marketplace-filter="{{ $filterKey }}" role="tab" aria-selected="{{ $filterKey === 'all' ? 'true' : 'false' }}">
+                                {{ $filterLabel }} <span class="sd-order-filter-count">{{ number_format((int) ($marketplaceCounts[$filterKey] ?? 0), 0, ',', '.') }}</span>
+                            </button>
+                        @endforeach
+                    </div>
+                    <div class="sd-order-filter-divider">
+                        <div class="sd-order-filter-tabs" role="tablist" aria-label="Filter status tautan order">
+                            @foreach(['all' => 'Semua', 'linked' => 'Tertaut', 'unlinked' => 'Belum Tertaut'] as $filterKey => $filterLabel)
+                                <button type="button" class="sd-order-filter-tab {{ $filterKey === 'all' ? 'active' : '' }}" data-link-filter="{{ $filterKey }}" role="tab" aria-selected="{{ $filterKey === 'all' ? 'true' : 'false' }}">
+                                    {{ $filterLabel }} <span class="sd-order-filter-count">{{ number_format((int) ($linkCounts[$filterKey] ?? 0), 0, ',', '.') }}</span>
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
                 <div class="sd-list">
                     @foreach($orderScans->sortBy('id') as $scan)
                         @php
@@ -537,8 +645,19 @@ body[data-theme="dark"] .sd-grid .sd-kpi { background: #1e293b; border-color: rg
                                 ->merge($singleOrderFallbackLines)
                                 ->values();
                             $orderQty = (int) $orderLines->sum('qty_scanned');
+                            $orderMarketplace = $marketplaceGroup($scan->order_no);
+                            $orderNeedsReview = $orderLines->isEmpty();
+                            $orderLinked = (bool) (
+                                $scan->fulfillment?->marketplaceOrder
+                                || $scan->source === 'marketplace'
+                                || data_get($scan->raw_payload, 'linked_source') === 'marketplace_order'
+                            );
                         @endphp
-                        <div class="sd-order sd-order-group">
+                        <div class="sd-order sd-order-group sd-order-card"
+                             data-marketplace="{{ $orderMarketplace }}"
+                             data-link-status="{{ $orderLinked ? 'linked' : 'unlinked' }}"
+                             data-needs-review="{{ $orderNeedsReview ? '1' : '0' }}"
+                             data-order-search="{{ strtolower(trim((string) $scan->order_no . ' ' . (string) $scan->source)) }}">
                             <div class="sd-order-lead">
                                 <span class="sd-order-num">{{ $loop->iteration }}</span>
                                 <div>
@@ -574,7 +693,11 @@ body[data-theme="dark"] .sd-grid .sd-kpi { background: #1e293b; border-color: rg
                         </div>
                     @endforeach
                     @if($orderScans->count() > 1 && $ungroupedLines->isNotEmpty())
-                        <div class="sd-order sd-order-group">
+                        <div class="sd-order sd-order-group sd-order-card"
+                             data-marketplace="anomaly"
+                             data-link-status="unlinked"
+                             data-needs-review="1"
+                             data-order-search="belum dikelompokkan item lama scan tanpa order">
                             <div class="sd-order-lead">
                                 <span class="sd-order-num">—</span>
                                 <div>
@@ -726,6 +849,50 @@ body[data-theme="dark"] .sd-grid .sd-kpi { background: #1e293b; border-color: rg
     });
     var hash = (location.hash || '').replace('#','');
     if (['pesanan','item','info'].indexOf(hash) !== -1) activate(hash);
+
+    /* ── filter order grouping, mengikuti halaman confirm ── */
+    var orderCards = Array.prototype.slice.call(document.querySelectorAll('.sd-order-card'));
+    var marketplaceFilter = 'all';
+    var linkFilter = 'all';
+    var orderSearch = document.getElementById('sdOrderSearch');
+    function applyOrderFilters(){
+        var query = orderSearch ? orderSearch.value.trim().toLowerCase() : '';
+        orderCards.forEach(function(card){
+            var marketplace = card.dataset.marketplace || 'anomaly';
+            var linkStatus = card.dataset.linkStatus || 'unlinked';
+            var needsReview = card.dataset.needsReview === '1';
+            var text = card.dataset.orderSearch || card.textContent.toLowerCase();
+            var marketplaceMatch = marketplaceFilter === 'all'
+                || marketplace === marketplaceFilter
+                || (marketplaceFilter === 'problem' && needsReview);
+            var linkMatch = linkFilter === 'all' || linkStatus === linkFilter;
+            var searchMatch = !query || text.indexOf(query) !== -1;
+            card.hidden = !(marketplaceMatch && linkMatch && searchMatch);
+        });
+    }
+    document.querySelectorAll('[data-marketplace-filter]').forEach(function(button){
+        button.addEventListener('click', function(){
+            marketplaceFilter = button.dataset.marketplaceFilter || 'all';
+            document.querySelectorAll('[data-marketplace-filter]').forEach(function(item){
+                var active = item === button;
+                item.classList.toggle('active', active);
+                item.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            applyOrderFilters();
+        });
+    });
+    document.querySelectorAll('[data-link-filter]').forEach(function(button){
+        button.addEventListener('click', function(){
+            linkFilter = button.dataset.linkFilter || 'all';
+            document.querySelectorAll('[data-link-filter]').forEach(function(item){
+                var active = item === button;
+                item.classList.toggle('active', active);
+                item.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            applyOrderFilters();
+        });
+    });
+    if (orderSearch) orderSearch.addEventListener('input', applyOrderFilters);
 
     /* ── accordion Item Batch per kategori (default tertutup) ── */
     var batchTable = document.getElementById('sdBatchTable');
