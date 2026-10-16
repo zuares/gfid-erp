@@ -286,6 +286,16 @@ class AdsDashboardController extends Controller
                 ],
             ]);
         } catch (\Throwable $exception) {
+            if ($exception instanceof \App\Exceptions\ShopeeAdsRateLimitException) {
+                $retryAfter = max(1, (int) $exception->retryAfter);
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Shopee sedang membatasi permintaan. Coba lagi dalam {$retryAfter} detik.",
+                    'retry_after' => $retryAfter,
+                ], 429)->header('Retry-After', (string) $retryAfter);
+            }
+
             report($exception);
 
             return response()->json([

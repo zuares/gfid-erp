@@ -193,6 +193,28 @@ class AdsModuleTest extends TestCase
         });
     }
 
+    public function test_recommended_keyword_endpoint_exposes_rate_limit_retry_time()
+    {
+        $user = $this->createUser('admin');
+        $store = $this->createStore('KEYWORD-RATE-LIMIT');
+        $api = \Mockery::mock(\App\Services\Marketplace\Ads\ShopeeAdsApiService::class);
+        $api->shouldReceive('getRecommendedKeywordList')
+            ->once()
+            ->andThrow(new \App\Exceptions\ShopeeAdsRateLimitException(42));
+        $this->app->instance(\App\Services\Marketplace\Ads\ShopeeAdsApiService::class, $api);
+
+        $response = $this->actingAs($user)->getJson(route('marketplace.ads.keyword.recommendations', [
+            'store_id' => $store->id,
+            'item_id' => 123456789,
+        ]));
+
+        $response->assertStatus(429)
+            ->assertHeader('Retry-After', '42')
+            ->assertJsonPath('status', 'error')
+            ->assertJsonPath('retry_after', 42)
+            ->assertJsonPath('message', 'Shopee sedang membatasi permintaan. Coba lagi dalam 42 detik.');
+    }
+
     public function test_dashboard_auto_sync_uses_selected_recent_range()
     {
         $store = $this->createStore('AUTODATE');
