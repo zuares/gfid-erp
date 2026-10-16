@@ -849,71 +849,107 @@ class AdsExperimentService
                 ->orOn('mo.id', '=', 'moi.marketplace_order_id');
         };
 
-        $matchedItems = DB::table('marketplace_order_items as moi')
+        $matchedItemsQuery = DB::table('marketplace_order_items as moi')
             ->join('marketplace_orders as mo', $orderLink)
             ->where('moi.external_item_id', $experiment->channel_item_id)
             ->selectRaw("COALESCE(moi.order_id, moi.marketplace_order_id) as order_id, mo.channel_order_id, mo.external_order_id, SUM({$itemValueExpression}) as item_value")
             ->groupByRaw('COALESCE(moi.order_id, moi.marketplace_order_id), mo.channel_order_id, mo.external_order_id');
-        $applyOrderScope($matchedItems, 'mo');
+        $applyOrderScope($matchedItemsQuery, 'mo');
+        $matchedItems = $matchedItemsQuery->get();
+
+        if ($matchedItems->isEmpty()) {
+            return ['amount' => 0.0, 'rows' => 0, 'available' => false, 'source' => 'unavailable'];
+        }
+
+        $orderIds = $matchedItems
+            ->pluck('order_id')
+            ->filter(fn ($id): bool => $id !== null && $id !== '')
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($orderIds->isEmpty()) {
+            return ['amount' => 0.0, 'rows' => 0, 'available' => false, 'source' => 'unavailable'];
+        }
 
         $orderItemTotals = DB::table('marketplace_order_items as moi')
-            ->whereExists(function ($query) use ($applyOrderScope): void {
+            ->where(function ($query) use ($orderIds): void {
                 $query
-                    ->selectRaw('1')
-                    ->from('marketplace_orders as mo_total')
-                    ->where(function ($linkQuery): void {
-                        $linkQuery
-                            ->whereColumn('mo_total.id', 'moi.order_id')
-                            ->orWhereColumn('mo_total.id', 'moi.marketplace_order_id');
-                    });
-                $applyOrderScope($query, 'mo_total');
+                    ->whereIn('moi.order_id', $orderIds->all())
+                    ->orWhereIn('moi.marketplace_order_id', $orderIds->all());
             })
             ->selectRaw("COALESCE(moi.order_id, moi.marketplace_order_id) as order_id, SUM({$itemValueExpression}) as order_item_value")
-            ->where(function ($query): void {
-                $query->whereNotNull('moi.order_id')
-                    ->orWhereNotNull('moi.marketplace_order_id');
-            })
-            ->groupByRaw('COALESCE(moi.order_id, moi.marketplace_order_id)');
+            ->groupByRaw('COALESCE(moi.order_id, moi.marketplace_order_id)')
+            ->pluck('order_item_value', 'order_id');
 
-        $payoutImport = DB::table('mp_incomes as mpi')
-            ->joinSub($matchedItems, 'mi', function ($join): void {
-                $join->on('mpi.platform_order_id', '=', 'mi.channel_order_id')
-                    ->orOn('mpi.platform_order_id', '=', 'mi.external_order_id');
-            })
-            ->joinSub($orderItemTotals, 'ot', fn ($join) => $join->on('ot.order_id', '=', 'mi.order_id'))
-            ->where('mpi.store_id', $experiment->store_id)
-            ->whereNotNull('mpi.net_payout_actual')
-            ->whereRaw('ot.order_item_value > 0')
-            ->selectRaw('COALESCE(SUM((mpi.net_payout_actual * mi.item_value) / NULLIF(ot.order_item_value, 0)), 0) as payout_amount')
-            ->selectRaw('COUNT(DISTINCT mpi.id) as payout_rows')
-            ->first();
+        $platformOrderIds = $matchedItems
+            ->flatMap(fn ($row) => [$row->channel_order_id, $row->external_order_id])
+            ->filter(fn ($id): bool => $id !== null && $id !== '')
+            ->map(fn ($id): string => (string) $id)
+            ->unique()
+            ->values();
 
-        $payoutImportRows = (int) ($payoutImport->payout_rows ?? 0);
-        if ($payoutImportRows > 0) {
+        $payoutImports = $platformOrderIds->isEmpty()
+            ? collect()
+            : DB::table('mp_incomes as mpi')
+                ->where('mpi.store_id', $experiment->store_id)
+                ->whereNotNull('mpi.net_payout_actual')
+                ->whereIn('mpi.platform_order_id', $platformOrderIds->all())
+                ->pluck('mpi.net_payout_actual', 'mpi.platform_order_id');
+
+        $allocate = function ($payouts, callable $keyResolver) use ($matchedItems, $orderItemTotals): array {
+            $amount = 0.0;
+            $rows = 0;
+
+            foreach ($matchedItems as $matchedItem) {
+                $payout = $keyResolver($payouts, $matchedItem);
+                $orderTotal = (float) ($orderItemTotals->get($matchedItem->order_id) ?? 0);
+                $itemValue = (float) ($matchedItem->item_value ?? 0);
+                if ($payout === null || $orderTotal <= 0 || $itemValue <= 0) {
+                    continue;
+                }
+
+                $amount += ((float) $payout * $itemValue) / $orderTotal;
+                $rows++;
+            }
+
+            return ['amount' => $amount, 'rows' => $rows];
+        };
+
+        $payoutImport = $allocate($payoutImports, function ($payouts, $matchedItem): ?float {
+            foreach ([$matchedItem->channel_order_id, $matchedItem->external_order_id] as $platformOrderId) {
+                if ($platformOrderId !== null && $platformOrderId !== '' && $payouts->has((string) $platformOrderId)) {
+                    return (float) $payouts->get((string) $platformOrderId);
+                }
+            }
+
+            return null;
+        });
+
+        if ($payoutImport['rows'] > 0) {
             return [
-                'amount' => (float) ($payoutImport->payout_amount ?? 0),
-                'rows' => $payoutImportRows,
+                'amount' => (float) $payoutImport['amount'],
+                'rows' => $payoutImport['rows'],
                 'available' => true,
                 'source' => 'mp_incomes',
             ];
         }
 
-        $payout = DB::table('marketplace_order_settlements as mos')
-            ->joinSub($matchedItems, 'mi', fn ($join) => $join->on('mi.order_id', '=', 'mos.order_id'))
-            ->joinSub($orderItemTotals, 'ot', fn ($join) => $join->on('ot.order_id', '=', 'mos.order_id'))
+        $settlements = DB::table('marketplace_order_settlements as mos')
+            ->whereIn('mos.order_id', $orderIds->all())
             ->whereNotNull('mos.final_income')
-            ->whereRaw('ot.order_item_value > 0')
-            ->selectRaw('COALESCE(SUM((mos.final_income * mi.item_value) / NULLIF(ot.order_item_value, 0)), 0) as payout_amount')
-            ->selectRaw('COUNT(DISTINCT mos.id) as payout_rows')
-            ->first();
-
-        $rows = (int) ($payout->payout_rows ?? 0);
+            ->pluck('mos.final_income', 'mos.order_id');
+        $payout = $allocate($settlements, function ($payouts, $matchedItem): ?float {
+            return $payouts->has((int) $matchedItem->order_id)
+                ? (float) $payouts->get((int) $matchedItem->order_id)
+                : null;
+        });
 
         return [
-            'amount' => (float) ($payout->payout_amount ?? 0),
-            'rows' => $rows,
-            'available' => $rows > 0,
-            'source' => $rows > 0 ? 'marketplace_order_settlements' : 'unavailable',
+            'amount' => (float) $payout['amount'],
+            'rows' => $payout['rows'],
+            'available' => $payout['rows'] > 0,
+            'source' => $payout['rows'] > 0 ? 'marketplace_order_settlements' : 'unavailable',
         ];
     }
 
