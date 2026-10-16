@@ -3738,6 +3738,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
 
+            <style>
+                #experimentsTableBody .experiment-accordion-row > td { padding:0; border-top:0; background:rgba(37,99,235,.025); }
+                #experimentsTableBody .experiment-accordion-cell > .ads-tab-panel { margin:.35rem .5rem .65rem; box-shadow:0 5px 18px rgba(15,23,42,.06); }
+            </style>
+            <div id="experimentDetailMount"></div>
             <div id="experimentDetailPanel" class="ads-tab-panel mb-3" style="display:none;">
                 <div class="ads-tab-panel-head">
                     <div>
@@ -7524,6 +7529,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const tableWrap = document.getElementById('experimentsTableWrap');
     const tableBody = document.getElementById('experimentsTableBody');
     const detailPanel = document.getElementById('experimentDetailPanel');
+    const detailMount = document.getElementById('experimentDetailMount');
     const detailMeta = document.getElementById('experimentDetailMeta');
     const detailSubtitle = document.getElementById('experimentDetailSubtitle');
     const baselineMetrics = document.getElementById('experimentBaselineMetrics');
@@ -7567,6 +7573,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const recordSubmit = document.getElementById('btnSubmitRecordAdChange');
     let lastRows = [];
     let activeExperiment = null;
+    let activeDetailRow = null;
     let invalidateExperimentId = null;
 
     if (!loading || !routes.experimentsIndex) return;
@@ -7762,9 +7769,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 window.bootstrap?.Modal.getOrCreateInstance(invalidateModal).hide();
                 if (window.showToast) window.showToast(data.message || 'Record berhasil di-invalidasi.');
                 loadList();
-                if (activeExperiment && String(activeExperiment.id) === String(invalidateExperimentId)) {
-                    loadDetail(invalidateExperimentId);
-                }
             })
             .catch(function (err) {
                 invalidateError.textContent = err.message || 'Record gagal di-invalidasi.';
@@ -7800,7 +7804,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function closeExperimentDetail() {
+        if (detailMount && detailPanel.parentNode !== detailMount) {
+            detailMount.appendChild(detailPanel);
+        }
+        detailPanel.style.display = 'none';
+        if (activeDetailRow) activeDetailRow.style.display = 'none';
+        activeDetailRow = null;
+    }
+
     function renderList(rows) {
+        closeExperimentDetail();
         lastRows = rows || [];
         tableBody.innerHTML = '';
         if (!lastRows.length) {
@@ -7843,11 +7857,22 @@ document.addEventListener('DOMContentLoaded', function () {
                     (canInvalidate ? '<button type="button" class="btn btn-sm js-invalidate-experiment" data-id="' + esc(experiment.id) + '" style="border:1px solid rgba(100,116,139,.35); color:#64748b; background:rgba(100,116,139,.06); border-radius:8px; font-size:.66rem; font-weight:800;"><i class="bi bi-archive me-1"></i>Batalkan</button>' : '') +
                 '</div></td>';
             tableBody.appendChild(tr);
+
+            const detailRow = document.createElement('tr');
+            detailRow.className = 'experiment-accordion-row';
+            detailRow.style.display = 'none';
+            detailRow.innerHTML = '<td colspan="7" class="experiment-accordion-cell"></td>';
+            tableBody.appendChild(detailRow);
         });
 
         tableBody.querySelectorAll('.js-view-experiment').forEach(function (button) {
             button.addEventListener('click', function () {
-                loadDetail(button.dataset.id);
+                const detailRow = button.closest('tr')?.nextElementSibling;
+                if (activeDetailRow === detailRow && detailPanel.style.display !== 'none') {
+                    closeExperimentDetail();
+                    return;
+                }
+                loadDetail(button.dataset.id, detailRow);
             });
         });
         tableBody.querySelectorAll('.js-invalidate-experiment').forEach(function (button) {
@@ -8109,9 +8134,18 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
-    function loadDetail(id) {
+    function loadDetail(id, accordionRow) {
         if (!routes.experimentsShow || !id) return;
         const url = routes.experimentsShow.replace('__EXPERIMENT_ID__', encodeURIComponent(id));
+        if (activeDetailRow && activeDetailRow !== accordionRow) {
+            activeDetailRow.style.display = 'none';
+        }
+        if (accordionRow) {
+            const accordionCell = accordionRow.querySelector('.experiment-accordion-cell');
+            if (accordionCell) accordionCell.appendChild(detailPanel);
+            accordionRow.style.display = 'table-row';
+            activeDetailRow = accordionRow;
+        }
         detailPanel.style.display = 'block';
         detailSubtitle.textContent = 'Memuat detail experiment...';
         detailMeta.innerHTML = '';
@@ -8133,7 +8167,7 @@ document.addEventListener('DOMContentLoaded', function () {
         simulationResult.style.display = 'none';
         simulationError.style.display = 'none';
         activeExperiment = null;
-        detailPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        detailPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
         fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
             .then(function (response) {
@@ -8356,7 +8390,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('btnReloadExperiments')?.addEventListener('click', loadList);
     document.getElementById('btnCloseExperimentDetail')?.addEventListener('click', function () {
-        detailPanel.style.display = 'none';
+        closeExperimentDetail();
     });
     invalidateButton?.addEventListener('click', submitInvalidate);
     simulationButton?.addEventListener('click', runSimulation);
