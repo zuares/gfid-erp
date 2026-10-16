@@ -81,6 +81,71 @@ class AdsExperimentPhase2Test extends TestCase
         $this->assertFalse($metrics['profit_estimated']);
     }
 
+    public function test_details_include_same_date_last_month_comparison_and_historical_target_roas(): void
+    {
+        $store = $this->store('PHASE2-MONTH-COMPARE');
+        $item = Item::create([
+            'code' => 'PHASE2-ITEM-MONTH-COMPARE',
+            'name' => 'Phase 2 Month Compare Item',
+            'type' => 'finished',
+            'hpp' => 30,
+            'active' => true,
+        ]);
+        $effective = Carbon::today()->subMonthsNoOverflow(2)->startOfDay();
+        $experiment = $this->experiment($store, $item, [
+            'channel_campaign_id' => 'C-PHASE2-MONTH-COMPARE',
+            'channel_item_id' => 'ITEM-PHASE2-MONTH-COMPARE',
+            'effective_date' => $effective->toDateString(),
+            'changed_at' => $effective,
+        ]);
+
+        MarketplaceAdExperiment::create([
+            'store_id' => $store->id,
+            'change_event_id' => (string) Str::uuid(),
+            'channel_campaign_id' => $experiment->channel_campaign_id,
+            'channel_item_id' => $experiment->channel_item_id,
+            'internal_item_id' => $item->id,
+            'change_type' => MarketplaceAdExperiment::CHANGE_TARGET_ROAS,
+            'old_target_roas' => 2,
+            'new_target_roas' => 3,
+            'changed_at' => $effective->copy()->subMonthNoOverflow()->subDay(),
+            'effective_date' => $effective->copy()->subMonthNoOverflow()->subDay()->toDateString(),
+            'lifecycle_status' => MarketplaceAdExperiment::STATUS_COMPLETED,
+            'profit_basis' => 'net_hpp_ads',
+            'source_granularity' => 'campaign',
+            'mapping_status' => 'mapped',
+        ]);
+
+        foreach (range(1, 7) as $days) {
+            $currentDate = $effective->copy()->addDays($days);
+            $previousDate = $currentDate->copy()->subMonthNoOverflow();
+            $this->campaignFact($store, $experiment->channel_campaign_id, $currentDate, [
+                'clicks' => 30,
+                'impressions' => 300,
+                'expense' => 100,
+                'broad_order' => 2,
+                'broad_order_amount' => 2,
+                'broad_gmv' => 240,
+            ]);
+            $this->campaignFact($store, $experiment->channel_campaign_id, $previousDate, [
+                'clicks' => 20,
+                'impressions' => 200,
+                'expense' => 80,
+                'broad_order' => 1,
+                'broad_order_amount' => 1,
+                'broad_gmv' => 100,
+            ]);
+        }
+
+        $details = app(\App\Services\Marketplace\Ads\AdsExperimentService::class)->details($experiment);
+
+        $this->assertSame('observation', $details['month_comparison']['basis']);
+        $this->assertSame(7, $details['month_comparison']['current']['days_with_data']);
+        $this->assertSame(7, $details['month_comparison']['previous_month']['days_with_data']);
+        $this->assertSame(3.0, (float) $details['month_comparison']['previous_target_roas']);
+        $this->assertSame('riwayat perubahan ROAS', $details['month_comparison']['previous_target_roas_source']);
+    }
+
     public function test_legacy_item_granularity_on_regular_campaign_reads_campaign_facts(): void
     {
         $store = $this->store('PHASE2-LEGACY-SOURCE');

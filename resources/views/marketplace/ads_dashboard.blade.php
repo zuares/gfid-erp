@@ -3769,6 +3769,28 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         </div>
                     </div>
+                    <div id="experimentMonthComparisonPanel" class="mt-3" style="display:none; border:1px solid var(--dsh-border); border-radius:12px; overflow:hidden;">
+                        <div style="padding:.75rem .85rem; background:rgba(124,58,237,.08);">
+                            <div style="font-size:.76rem; font-weight:850;"><i class="bi bi-calendar3 me-1" style="color:#7c3aed;"></i> Bandingkan dengan tanggal yang sama bulan lalu</div>
+                            <div id="experimentMonthComparisonPeriod" style="font-size:.66rem; color:var(--dsh-muted); margin-top:.15rem;"></div>
+                        </div>
+                        <div class="p-2">
+                            <div id="experimentMonthComparisonRoas" class="row g-2 mb-2"></div>
+                            <div class="table-responsive">
+                                <table class="dpanel-table align-middle mb-0" style="min-width:520px;">
+                                    <thead>
+                                        <tr>
+                                            <th>Metrik</th>
+                                            <th class="text-end">Periode ini</th>
+                                            <th class="text-end">Bulan lalu</th>
+                                            <th class="text-end">Perubahan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="experimentMonthComparisonMetrics"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                     <div id="experimentQuickSummary" class="mt-3" style="display:none;"></div>
                     <div id="experimentQualityNote" class="mt-3" style="font-size:.74rem; line-height:1.55;"></div>
 
@@ -7536,6 +7558,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const observationMetrics = document.getElementById('experimentObservationMetrics');
     const baselinePeriod = document.getElementById('experimentBaselinePeriod');
     const observationPeriod = document.getElementById('experimentObservationPeriod');
+    const monthComparisonPanel = document.getElementById('experimentMonthComparisonPanel');
+    const monthComparisonPeriod = document.getElementById('experimentMonthComparisonPeriod');
+    const monthComparisonRoas = document.getElementById('experimentMonthComparisonRoas');
+    const monthComparisonMetrics = document.getElementById('experimentMonthComparisonMetrics');
     const quickSummary = document.getElementById('experimentQuickSummary');
     const qualityNote = document.getElementById('experimentQualityNote');
     const impactPanel = document.getElementById('experimentImpactPanel');
@@ -7721,9 +7747,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const value = experiment.change_type === 'target_roas' || experiment.change_type === 'price_and_target_roas'
             ? experiment.new_target_roas
             : product?.target_roas;
-        return value === null || value === undefined || value === ''
+        return value === null || value === undefined || value === '' || Number(value) <= 0
             ? 'Target ROAS: Auto'
             : 'Target ROAS: ' + number(value, 2) + 'x';
+    }
+
+    function targetRoasValue(value) {
+        return value === null || value === undefined || value === '' || Number(value) <= 0
+            ? 'Auto'
+            : number(value, 2) + 'x';
     }
 
     function openInvalidateModal(experiment) {
@@ -7954,6 +7986,53 @@ document.addEventListener('DOMContentLoaded', function () {
             '</div>';
     }
 
+    function renderMonthComparison(comparison, experiment, product) {
+        if (!monthComparisonPanel || !comparison?.current || !comparison?.previous_month) return;
+
+        const current = comparison.current;
+        const previous = comparison.previous_month;
+        const currentMetrics = current.metrics || {};
+        const previousMetrics = previous.metrics || {};
+        const currentHasData = Number(current.days_with_data || 0) > 0;
+        const previousHasData = Number(previous.days_with_data || 0) > 0;
+        const basisLabel = comparison.basis === 'observation' ? 'hasil sesudah perubahan' : 'data sebelum perubahan';
+        const currentTargetRoas = experiment.change_type === 'target_roas' || experiment.change_type === 'price_and_target_roas'
+            ? experiment.new_target_roas
+            : product?.target_roas;
+        monthComparisonPanel.style.display = 'block';
+        monthComparisonPeriod.textContent = basisLabel + ': ' + (current.from || '-') + ' → ' + (current.to || '-') + ' · bulan lalu: ' + (previous.from || '-') + ' → ' + (previous.to || '-');
+
+        monthComparisonRoas.innerHTML =
+            '<div class="col-6"><div style="padding:.55rem .65rem; border:1px solid var(--dsh-border); border-radius:9px;"><div style="font-size:.62rem; color:var(--dsh-muted);">Setting ROAS sekarang</div><div style="font-size:.8rem; font-weight:850; margin-top:.1rem;">' + esc(targetRoasValue(currentTargetRoas)) + '</div></div></div>' +
+            '<div class="col-6"><div style="padding:.55rem .65rem; border:1px solid rgba(124,58,237,.22); border-radius:9px; background:rgba(124,58,237,.04);"><div style="font-size:.62rem; color:var(--dsh-muted);">Setting ROAS bulan lalu</div><div style="font-size:.8rem; font-weight:850; margin-top:.1rem;">' + esc(targetRoasValue(comparison.previous_target_roas)) + '</div><div style="font-size:.6rem; color:var(--dsh-muted); margin-top:.1rem;">' + esc(comparison.previous_target_roas_source || 'belum ada histori') + '</div></div></div>';
+
+        const rows = [
+            ['Dilihat', 'impressions'],
+            ['Klik', 'clicks'],
+            ['Rasio klik', 'ctr'],
+            ['Pesanan', 'orders'],
+            ['Jumlah terjual', 'qty'],
+            ['Penjualan', 'revenue'],
+            ['Penghasilan bersih (est.)', 'net_revenue'],
+            ['Total HPP', 'total_cogs'],
+            ['Biaya iklan', 'spend'],
+            ['Efisiensi iklan', 'roas'],
+            ['Keuntungan', 'profit'],
+        ];
+        monthComparisonMetrics.innerHTML = rows.map(function (item) {
+            const key = item[1];
+            const currentValue = currentHasData ? currentMetrics[key] : null;
+            const previousValue = previousHasData ? previousMetrics[key] : null;
+            const currentText = currentHasData ? metricValue(key, currentValue) : '—';
+            const previousText = previousHasData ? metricValue(key, previousValue) : '—';
+            const canCompare = currentValue !== null && currentValue !== undefined && previousValue !== null && previousValue !== undefined && Number(previousValue) !== 0;
+            const change = canCompare ? ((Number(currentValue) - Number(previousValue)) / Math.abs(Number(previousValue))) * 100 : null;
+            const changeText = change === null ? '—' : (change > 0 ? '+' : '') + number(change, 1) + '%';
+            const changeColor = change === null ? 'var(--dsh-muted)' : (change > 0 ? '#15803d' : (change < 0 ? '#b91c1c' : 'var(--dsh-muted)'));
+            return '<tr><td style="font-size:.7rem; font-weight:700;">' + esc(item[0]) + '</td><td class="text-end" style="font-size:.7rem;">' + esc(currentText) + '</td><td class="text-end" style="font-size:.7rem; color:var(--dsh-muted);">' + esc(previousText) + '</td><td class="text-end" style="font-size:.7rem; font-weight:800; color:' + changeColor + ';">' + esc(changeText) + '</td></tr>';
+        }).join('');
+    }
+
     function impactChangeText(step) {
         if (!step || step.change_percent === null || step.change_percent === undefined) return 'belum cukup data';
         const amount = number(Math.abs(step.change_percent), 1) + '%';
@@ -8158,6 +8237,10 @@ document.addEventListener('DOMContentLoaded', function () {
         observationMetrics.innerHTML = '<div class="text-muted small p-2">Memuat...</div>';
         if (baselinePeriod) baselinePeriod.textContent = '';
         if (observationPeriod) observationPeriod.textContent = '';
+        if (monthComparisonPanel) monthComparisonPanel.style.display = 'none';
+        if (monthComparisonPeriod) monthComparisonPeriod.textContent = '';
+        if (monthComparisonRoas) monthComparisonRoas.innerHTML = '';
+        if (monthComparisonMetrics) monthComparisonMetrics.innerHTML = '';
         if (quickSummary) {
             quickSummary.innerHTML = '';
             quickSummary.style.display = 'none';
@@ -8203,6 +8286,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Setting ROAS</div><div style="font-size:.78rem; font-weight:800; margin-top:.25rem;">' + esc(targetRoasLabel(experiment, product).replace('Target ROAS: ', '')) + '</div></div>';
                 renderMetricGrid(baselineMetrics, data.baseline);
                 renderMetricGrid(observationMetrics, data.observation);
+                renderMonthComparison(data.month_comparison, experiment, product);
                 renderImpact(data);
                 const observationPrice = data.observation?.metrics?.price;
                 simulationPrice.value = number(change.new_price ?? change.old_price ?? observationPrice, 0) === 'N/A'

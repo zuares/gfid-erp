@@ -406,6 +406,7 @@ class AdsExperimentService
                 $experiment->new_price !== null ? (float) $experiment->new_price : ($experiment->old_price !== null ? (float) $experiment->old_price : null),
             )
             : $this->emptyPeriod($observationFrom, null);
+        $monthComparison = $this->sameDateLastMonthComparison($experiment, $baseline, $observation);
 
         $completedObservationDays = $observationTo !== null
             ? $observationFrom->diffInDays($observationTo) + 1
@@ -468,6 +469,7 @@ class AdsExperimentService
             'verdict' => $verdict,
             'baseline' => $baseline,
             'observation' => $observation,
+            'month_comparison' => $monthComparison,
             'metric_delta' => $this->metricDelta($baseline['metrics'], $observation['metrics']),
             'impact' => $impact,
             'data_sufficiency' => $dataSufficiency,
@@ -782,6 +784,85 @@ class AdsExperimentService
             'metrics' => array_merge($baseMetrics, $calculatedMetrics),
             'data_quality' => array_values(array_unique($quality)),
         ];
+    }
+
+    /**
+     * Build a like-for-like comparison against the same date range one month
+     * earlier. Prefer the completed observation period; while it is still
+     * open, use the completed baseline period so the panel remains useful.
+     */
+    private function sameDateLastMonthComparison(
+        MarketplaceAdExperiment $experiment,
+        array $baseline,
+        array $observation,
+    ): array {
+        $useObservation = ! empty($observation['to'])
+            && (int) ($observation['days_with_data'] ?? 0) > 0;
+        $current = $useObservation ? $observation : $baseline;
+        $timezone = config('app.timezone', 'Asia/Jakarta');
+        $currentFrom = Carbon::parse((string) $current['from'], $timezone);
+        $currentTo = Carbon::parse((string) ($current['to'] ?: $current['from']), $timezone);
+        $previousFrom = $currentFrom->copy()->subMonthNoOverflow();
+        $previousTo = $currentTo->copy()->subMonthNoOverflow();
+        $previous = $this->periodMetrics($experiment, $previousFrom, $previousTo);
+        $targetRoas = $this->targetRoasAtDate($experiment, $previousTo);
+
+        return [
+            'basis' => $useObservation ? 'observation' : 'baseline',
+            'current' => $current,
+            'previous_month' => $previous,
+            'previous_target_roas' => $targetRoas['value'],
+            'previous_target_roas_source' => $targetRoas['source'],
+        ];
+    }
+
+    /**
+     * Resolve the last known target ROAS as of a historical date from the
+     * experiment audit trail. The current target setting is intentionally not
+     * used as historical data.
+     *
+     * @return array{value: float|null, source: string}
+     */
+    private function targetRoasAtDate(
+        MarketplaceAdExperiment $experiment,
+        CarbonInterface $date,
+    ): array {
+        $history = MarketplaceAdExperiment::query()
+            ->where('store_id', $experiment->store_id)
+            ->where('channel_campaign_id', $experiment->channel_campaign_id)
+            ->where('channel_item_id', $experiment->channel_item_id)
+            ->whereIn('change_type', [
+                MarketplaceAdExperiment::CHANGE_TARGET_ROAS,
+                MarketplaceAdExperiment::CHANGE_PRICE_AND_TARGET_ROAS,
+            ])
+            ->whereNull('invalidated_at')
+            ->whereDate('effective_date', '<=', $date->toDateString())
+            ->orderByDesc('effective_date')
+            ->orderByDesc('id')
+            ->first(['new_target_roas']);
+
+        if ($history && $history->new_target_roas !== null) {
+            return [
+                'value' => (float) $history->new_target_roas,
+                'source' => 'riwayat perubahan ROAS',
+            ];
+        }
+
+        // If this experiment itself is a target-ROAS change and predates the
+        // comparison month, its old value is the best recorded setting before
+        // the current change. Mark the source so the UI can call it an acuan.
+        $isTargetChange = in_array($experiment->change_type, [
+            MarketplaceAdExperiment::CHANGE_TARGET_ROAS,
+            MarketplaceAdExperiment::CHANGE_PRICE_AND_TARGET_ROAS,
+        ], true);
+        if ($isTargetChange && $experiment->old_target_roas !== null) {
+            return [
+                'value' => (float) $experiment->old_target_roas,
+                'source' => 'acuan sebelum perubahan',
+            ];
+        }
+
+        return ['value' => null, 'source' => 'belum ada histori'];
     }
 
     private function factQuery(MarketplaceAdExperiment $experiment, CarbonInterface $from, CarbonInterface $to): array
