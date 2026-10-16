@@ -162,7 +162,7 @@ class AdsExperimentController extends Controller
             ? MarketplaceAdCampaign::query()
                 ->whereIn('store_id', $storeIds->all())
                 ->whereIn('channel_campaign_id', $campaignIds->all())
-                ->get(['store_id', 'channel_campaign_id', 'campaign_name'])
+                ->get(['store_id', 'channel_campaign_id', 'campaign_name', 'target_roas'])
                 ->keyBy(fn ($campaign) => $campaign->store_id . '|' . (string) $campaign->channel_campaign_id)
             : collect();
 
@@ -179,6 +179,7 @@ class AdsExperimentController extends Controller
                 'sku' => $product?->item_sku,
                 'image_url' => $product?->image_url,
                 'campaign_name' => $campaign?->campaign_name,
+                'target_roas' => $campaign?->target_roas !== null ? (float) $campaign->target_roas : null,
             ]];
         });
     }

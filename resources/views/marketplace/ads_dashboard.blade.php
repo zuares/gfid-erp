@@ -7710,6 +7710,15 @@ document.addEventListener('DOMContentLoaded', function () {
         return experiment.channel_campaign_id ? 'Kampanye ' + experiment.channel_campaign_id : 'Semua produk di toko';
     }
 
+    function targetRoasLabel(experiment, product) {
+        const value = experiment.change_type === 'target_roas' || experiment.change_type === 'price_and_target_roas'
+            ? experiment.new_target_roas
+            : product?.target_roas;
+        return value === null || value === undefined || value === ''
+            ? 'Target ROAS: Auto'
+            : 'Target ROAS: ' + number(value, 2) + 'x';
+    }
+
     function openInvalidateModal(experiment) {
         if (!invalidateModal || !experiment?.id) return;
         invalidateExperimentId = experiment.id;
@@ -7821,6 +7830,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 '<td><div style="display:flex;align-items:center;gap:.55rem;min-width:220px;">' + productMedia + '<div style="min-width:0;">' +
                     '<div style="font-weight:800;font-size:.72rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px;" title="' + esc(productName) + '">' + esc(productName) + '</div>' +
                     '<div style="font-size:.64rem;color:var(--dsh-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px;">' + esc(campaignLabel(experiment, product)) + '</div>' +
+                    '<div style="font-size:.62rem;color:var(--dsh-muted);margin-top:.1rem;"><i class="bi bi-bullseye me-1"></i>' + esc(targetRoasLabel(experiment, product)) + '</div>' +
                     '<div style="font-size:.62rem;color:var(--dsh-muted);margin-top:.12rem;">' + esc(changeLabel(experiment)) + '</div>' +
                 '</div></div></td>' +
                 '<td><div style="font-size:.7rem; max-width:210px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(scopeLabel(experiment, product)) + '">' + esc(scopeLabel(experiment, product)) + '</div></td>' +
@@ -7907,7 +7917,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }).join('') + '</div>' +
             '<div style="font-size:.65rem; color:' + (hasData ? 'var(--dsh-muted)' : '#b45309') + '; margin-top:.55rem;">' +
                 (hasData
-                    ? number((period || {}).days_with_data || 0) + ' hari memiliki data'
+                    ? 'Data tersedia selama ' + number((period || {}).days_with_data || 0) + ' hari'
                     : ((period || {}).to
                         ? 'Belum ada data selesai · ' + esc((period || {}).from || '-') + ' → ' + esc((period || {}).to || '-')
                         : 'Menunggu data setelah perubahan · mulai ' + esc((period || {}).from || '-'))) +
@@ -8150,7 +8160,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Hasil</div><div style="margin-top:.25rem;">' + statusBadge(data.lifecycle_status || experiment.lifecycle_status) + '</div></div>' +
                     '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Dasar keuntungan</div><div style="font-size:.72rem; font-weight:800; margin-top:.25rem;">' + esc(profitBasisLabel(data.profit_basis)) + '</div></div>' +
                     '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Yang diubah</div><div style="font-size:.72rem; font-weight:800; margin-top:.25rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(scopeLabel(experiment, product)) + '">' + esc(scopeLabel(experiment, product)) + '</div></div>' +
-                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Kesimpulan</div><div style="font-size:.78rem; font-weight:800; margin-top:.25rem;">' + esc((verdictMap[data.verdict] || [data.verdict || 'Belum bisa dinilai'])[0]) + '</div></div>';
+                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Kesimpulan</div><div style="font-size:.78rem; font-weight:800; margin-top:.25rem;">' + esc((verdictMap[data.verdict] || [data.verdict || 'Belum bisa dinilai'])[0]) + '</div></div>' +
+                    '<div class="col-6 col-md-3"><div style="font-size:.64rem; color:var(--dsh-muted);">Setting ROAS</div><div style="font-size:.78rem; font-weight:800; margin-top:.25rem;">' + esc(targetRoasLabel(experiment, product).replace('Target ROAS: ', '')) + '</div></div>';
                 renderMetricGrid(baselineMetrics, data.baseline);
                 renderMetricGrid(observationMetrics, data.observation);
                 renderImpact(data);
