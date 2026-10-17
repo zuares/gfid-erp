@@ -1206,6 +1206,13 @@ class AdsDashboardService
             return $camp;
         });
 
+        $campaignBestPerformance = $this->getCampaignBestPerformance($campaigns, $dateFrom, $dateTo);
+        $campaigns = $campaigns->map(function ($camp) use ($campaignBestPerformance) {
+            $key = $camp->store_id . '|' . (string) $camp->channel_campaign_id;
+            $camp->best_performance = $campaignBestPerformance[$key] ?? [];
+            return $camp;
+        });
+
         // Label produk marketplace untuk daftar campaign/SKU yang belum
         // termapping. Ini hanya satu query tambahan dan tidak mengubah angka.
         $campaignItemIds = $campaigns->pluck('channel_item_id')
@@ -1571,6 +1578,76 @@ class AdsDashboardService
         } catch (\Throwable) {
             return $fallback->toDateString();
         }
+    }
+
+    /**
+     * Cari nilai dan tanggal harian terbaik untuk metric yang tampil di tabel.
+     * Nilai ini sengaja dihitung dari daily fact agar tanggal yang ditampilkan
+     * benar-benar tanggal performa terbaik, bukan tanggal akhir filter.
+     */
+    private function getCampaignBestPerformance(Collection $campaigns, string $dateFrom, string $dateTo): array
+    {
+        $storeIds = $campaigns->pluck('store_id')->filter()->unique()->values()->all();
+        if ($storeIds === []) {
+            return [];
+        }
+
+        $dailyRows = DB::table('marketplace_ad_campaign_dailies')
+            ->whereIn('store_id', $storeIds)
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->select('date', 'store_id', 'channel_campaign_id')
+            ->selectRaw('COALESCE(SUM(expense), 0) as spend')
+            ->selectRaw('COALESCE(SUM(broad_gmv), 0) as gmv')
+            ->selectRaw('COALESCE(SUM(broad_order), 0) as orders')
+            ->selectRaw('COALESCE(SUM(broad_order_amount), 0) as items_sold')
+            ->groupBy('date', 'store_id', 'channel_campaign_id')
+            ->orderBy('date')
+            ->get();
+
+        $campaignByKey = $campaigns->keyBy(fn ($camp) => $camp->store_id . '|' . (string) $camp->channel_campaign_id);
+        $best = [];
+        foreach ($dailyRows as $daily) {
+            $key = $daily->store_id . '|' . (string) $daily->channel_campaign_id;
+            $campaign = $campaignByKey->get($key);
+            if (!$campaign) {
+                continue;
+            }
+
+            $spend = (float) $daily->spend * 1.11;
+            $gmv = (float) $daily->gmv;
+            $orders = (int) $daily->orders;
+            $itemsSold = (float) $daily->items_sold > 0 ? (float) $daily->items_sold : (float) $orders;
+            $metrics = [
+                'roas' => $spend > 0 ? $gmv / $spend : null,
+                'orders' => $orders > 0 ? (float) $orders : null,
+                'gmv' => $gmv > 0 ? $gmv : null,
+                'spend' => $spend > 0 ? $spend : null,
+                'profit' => null,
+            ];
+
+            if ((float) ($campaign->unit_cogs ?? 0) > 0 && $gmv > 0) {
+                $netRatio = (float) ($campaign->net_revenue_ratio ?? self::DEFAULT_NET_REVENUE_RATIO);
+                $cogs = (float) $campaign->unit_cogs * $itemsSold;
+                $metrics['profit'] = ($gmv * $netRatio) - $cogs - $spend;
+            }
+
+            foreach ($metrics as $metric => $value) {
+                if ($value === null) {
+                    continue;
+                }
+                $higherIsBetter = !in_array($metric, ['spend'], true);
+                $currentBest = $best[$key][$metric]['value'] ?? null;
+                $isBetter = $currentBest === null || ($higherIsBetter ? $value > $currentBest : $value < $currentBest);
+                if ($isBetter) {
+                    $best[$key][$metric] = [
+                        'value' => round($value, 2),
+                        'date' => substr((string) $daily->date, 0, 10),
+                    ];
+                }
+            }
+        }
+
+        return $best;
     }
 
     /**
