@@ -80,6 +80,7 @@
         $prevSpend = (float) ($camp->prev_spend ?? 0) * 1.11;
         $prevGmv = (float) ($camp->prev_gmv ?? 0);
         $prevOrders = (int) ($camp->prev_orders ?? 0);
+        $prevItemsSold = (int) ($camp->prev_items_sold ?? $prevOrders);
         $prevClicks = (int) ($camp->prev_clicks ?? 0);
         $prevImpressions = (int) ($camp->prev_impressions ?? 0);
         $prevProfit = $camp->prev_profit_after_ads !== null ? (float) $camp->prev_profit_after_ads : null;
@@ -123,6 +124,7 @@
         }
         $bepCpa = ($bepRoas !== null && $rowAvgPrice > 0) ? round($rowAvgPrice / $bepRoas, 0) : null;
         $totalHpp = $rowUnitCogs > 0 && $itemsSold > 0 ? $rowUnitCogs * $itemsSold : 0;
+        $prevTotalHpp = $rowUnitCogs > 0 && $prevItemsSold > 0 ? $rowUnitCogs * $prevItemsSold : 0;
 
         // Net margin (% dari GMV) & biaya iklan riil (termasuk PPN 11%).
         $margin = ($profitAvailable && $gmv > 0) ? ($profit / $gmv) * 100 : null;
@@ -201,6 +203,8 @@
             'prev_spend' => $prevSpend,
             'prev_gmv' => $prevGmv,
             'prev_orders' => $prevOrders,
+            'prev_items_sold' => $prevItemsSold,
+            'prev_total_hpp' => $prevTotalHpp,
             'prev_aov' => $prevOrders > 0 ? $prevGmv / $prevOrders : 0,
             'prev_cpa' => $prevOrders > 0 ? $prevSpend / $prevOrders : 0,
             'prev_clicks' => $prevClicks,
@@ -208,6 +212,7 @@
             'prev_ctr' => $prevImpressions > 0 ? ($prevClicks / $prevImpressions) * 100 : 0,
             'prev_cvr' => $prevClicks > 0 ? ($prevOrders / $prevClicks) * 100 : 0,
             'prev_profit' => $prevProfit,
+            'prev_profit_per_order' => $prevProfit !== null && $prevOrders > 0 ? $prevProfit / $prevOrders : null,
             'prev_roas' => $prevRoas,
             'reco' => $reco,
             'recoColor' => $recoColor,
@@ -251,6 +256,8 @@
             $prevSpend = $group->sum('prev_spend');
             $prevGmv = $group->sum('prev_gmv');
             $prevOrders = $group->sum('prev_orders');
+            $prevItemsSold = $group->sum('prev_items_sold');
+            $prevTotalHpp = $group->sum('prev_total_hpp');
             $prevClicks = $group->sum('prev_clicks');
             $prevImpressions = $group->sum('prev_impressions');
             $prevProfitRows = $group->filter(fn ($row) => $row['prev_profit'] !== null);
@@ -295,6 +302,8 @@
                 'prev_spend' => $prevSpend,
                 'prev_gmv' => $prevGmv,
                 'prev_orders' => $prevOrders,
+                'prev_items_sold' => $prevItemsSold,
+                'prev_total_hpp' => $prevTotalHpp,
                 'prev_clicks' => $prevClicks,
                 'prev_impressions' => $prevImpressions,
                 'prev_ctr' => $prevImpressions > 0 ? ($prevClicks / $prevImpressions) * 100 : 0,
@@ -303,6 +312,7 @@
                 'prev_cpa' => $prevOrders > 0 ? $prevSpend / $prevOrders : 0,
                 'prev_roas' => $prevRoas,
                 'prev_profit' => $prevProfit,
+                'prev_profit_per_order' => $prevOrders > 0 ? $prevProfit / $prevOrders : null,
                 'prev_profit_available' => $prevProfitRows->count() > 0,
                 'reco' => $reco,
                 'empty_variant_count' => $emptyVariantCount,
@@ -805,7 +815,7 @@
     .campaign-performance-panel .perf-cell .perf-main { min-height: 1.45rem; align-items: center; }
     .campaign-performance-panel .perf-cell .perf-val { font-size: .86rem; font-weight: 750; letter-spacing: -.01em; }
     .campaign-performance-panel .perf-cell .perf-sub { display: inline-block; margin-top: .18rem; padding: .16rem .35rem; border-radius: 5px; background: rgba(148, 163, 184, .1); font-size: .63rem; font-weight: 650; }
-    .campaign-performance-panel .perf-cell .perf-previous { display: flex; justify-content: flex-end; align-items: center; gap: .2rem; min-width: 100%; margin-top: .35rem; padding-top: .28rem; border-top: 1px dashed rgba(148, 163, 184, .35); font-size: .62rem; }
+    .campaign-performance-panel .perf-cell .perf-previous { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: .12rem .2rem; min-width: 100%; margin-top: .35rem; padding-top: .28rem; border-top: 1px dashed rgba(148, 163, 184, .35); font-size: .62rem; line-height: 1.2; white-space: normal; overflow-wrap: anywhere; text-align: right; }
     .campaign-performance-panel .perf-delta { display: inline-flex; align-items: center; padding: .18rem .32rem; border-radius: 999px; background: rgba(100, 116, 139, .1); font-size: .61rem; line-height: 1; font-weight: 750; }
     .campaign-performance-panel .perf-delta.text-success { background: rgba(22, 163, 74, .11); }
     .campaign-performance-panel .perf-delta.text-danger { background: rgba(220, 38, 38, .1); }
@@ -1251,10 +1261,10 @@
                             @endif
                         </td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['roas'], 2) }}x</span>{!! $fmtDelta($categoryRow['roas'], $categoryRow['prev_roas'], true) !!}</div><div class="perf-sub {{ $categoryRow['actual_vs_target_pct'] !== null && $categoryRow['actual_vs_target_pct'] >= 100 ? 'text-success' : 'text-danger' }}">{{ $categoryRow['actual_vs_target_pct'] === null ? '—' : number_format($categoryRow['actual_vs_target_pct'], 1) . '% target' }}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($categoryRow['prev_roas'], 2) }}x</div></td>
-                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['orders'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['orders'], $categoryRow['prev_orders'], true) !!}</div><div class="perf-sub text-muted">{{ number_format($categoryRow['items_sold'], 0, ',', '.') }} pcs</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($categoryRow['prev_orders'], 0, ',', '.') }}</div></td>
-                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val text-success">Rp {{ number_format($categoryRow['gmv'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['gmv'], $categoryRow['prev_gmv'], true) !!}</div><div class="perf-sub">COGS {{ $categoryRow['total_hpp'] > 0 ? 'Rp ' . number_format($categoryRow['total_hpp'], 0, ',', '.') : '—' }}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($categoryRow['prev_gmv'], 0, ',', '.') }}</div></td>
-                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['spend'], $categoryRow['prev_spend'], false) !!}</div><div class="perf-sub text-muted">CPA Rp {{ number_format($categoryRow['cpa'], 0, ',', '.') }}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($categoryRow['prev_spend'], 0, ',', '.') }}</div></td>
-                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val {{ !$categoryRow['profit_available'] ? 'text-muted' : ($categoryRow['profit'] >= 0 ? 'text-success' : 'text-danger') }}">{{ !$categoryRow['profit_available'] ? 'N/A' : 'Rp ' . number_format($categoryRow['profit'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['profit'], $categoryRow['prev_profit'], true) !!}</div>@if($categoryRow['profit_available'])<div class="perf-sub">Profit/order {{ $categoryRow['profit_per_order'] === null ? '—' : 'Rp ' . number_format($categoryRow['profit_per_order'], 0, ',', '.') }}</div>@endif<div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($categoryRow['prev_profit'], 0, ',', '.') }}</div></td>
+                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['orders'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['orders'], $categoryRow['prev_orders'], true) !!}</div><div class="perf-sub text-muted">{{ number_format($categoryRow['items_sold'], 0, ',', '.') }} pcs</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($categoryRow['prev_orders'], 0, ',', '.') }} orders · {{ number_format($categoryRow['prev_items_sold'], 0, ',', '.') }} pcs</div></td>
+                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val text-success">Rp {{ number_format($categoryRow['gmv'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['gmv'], $categoryRow['prev_gmv'], true) !!}</div><div class="perf-sub">COGS {{ $categoryRow['total_hpp'] > 0 ? 'Rp ' . number_format($categoryRow['total_hpp'], 0, ',', '.') : '—' }}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ GMV Rp {{ number_format($categoryRow['prev_gmv'], 0, ',', '.') }} · COGS Rp {{ $categoryRow['prev_total_hpp'] > 0 ? number_format($categoryRow['prev_total_hpp'], 0, ',', '.') : '—' }}</div></td>
+                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['spend'], $categoryRow['prev_spend'], false) !!}</div><div class="perf-sub text-muted">CPA Rp {{ number_format($categoryRow['cpa'], 0, ',', '.') }}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Biaya Rp {{ number_format($categoryRow['prev_spend'], 0, ',', '.') }} · CPA Rp {{ number_format($categoryRow['prev_cpa'], 0, ',', '.') }}</div></td>
+                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val {{ !$categoryRow['profit_available'] ? 'text-muted' : ($categoryRow['profit'] >= 0 ? 'text-success' : 'text-danger') }}">{{ !$categoryRow['profit_available'] ? 'N/A' : 'Rp ' . number_format($categoryRow['profit'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['profit'], $categoryRow['prev_profit'], true) !!}</div>@if($categoryRow['profit_available'])<div class="perf-sub">Profit/order {{ $categoryRow['profit_per_order'] === null ? '—' : 'Rp ' . number_format($categoryRow['profit_per_order'], 0, ',', '.') }}</div>@endif<div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Profit Rp {{ number_format($categoryRow['prev_profit'], 0, ',', '.') }} · Profit/order {{ $categoryRow['prev_profit_per_order'] === null ? '—' : 'Rp ' . number_format($categoryRow['prev_profit_per_order'], 0, ',', '.') }}</div></td>
                     </tr>
                     <tr class="perf-category-detail" data-perf-views="category" style="display:none;">
                         <td colspan="7" class="bg-light">
@@ -1321,24 +1331,24 @@
                                                 <td class="text-end">
                                                     <div>{{ number_format($campaignRow['orders'], 0, ',', '.') }} {!! $fmtDelta($campaignRow['orders'], $campaignRow['prev_orders'], true) !!}</div>
                                                     <div class="perf-sub text-muted">{{ number_format($campaignRow['items_sold'], 0, ',', '.') }} pcs</div>
-                                                    <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($campaignRow['prev_orders'], 0, ',', '.') }}</div>
+                                                    <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($campaignRow['prev_orders'], 0, ',', '.') }} orders · {{ number_format($campaignRow['prev_items_sold'], 0, ',', '.') }} pcs</div>
                                                 </td>
                                                 <td class="text-end text-success">
                                                     <div>Rp {{ number_format($campaignRow['gmv'], 0, ',', '.') }} {!! $fmtDelta($campaignRow['gmv'], $campaignRow['prev_gmv'], true) !!}</div>
                                                     <div class="perf-sub">COGS {{ $campaignRow['total_hpp'] > 0 ? 'Rp ' . number_format($campaignRow['total_hpp'], 0, ',', '.') : '—' }}</div>
-                                                    <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($campaignRow['prev_gmv'], 0, ',', '.') }}</div>
+                                                    <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ GMV Rp {{ number_format($campaignRow['prev_gmv'], 0, ',', '.') }} · COGS Rp {{ $campaignRow['prev_total_hpp'] > 0 ? number_format($campaignRow['prev_total_hpp'], 0, ',', '.') : '—' }}</div>
                                                 </td>
                                                 <td class="text-end">
                                                     <div>Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }} {!! $fmtDelta($campaignRow['spend'], $campaignRow['prev_spend'], false) !!}</div>
                                                     <div class="perf-sub text-muted">CPA Rp {{ number_format($campaignRow['cpa'], 0, ',', '.') }}</div>
-                                                    <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($campaignRow['prev_spend'], 0, ',', '.') }}</div>
+                                                    <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Biaya Rp {{ number_format($campaignRow['prev_spend'], 0, ',', '.') }} · CPA Rp {{ number_format($campaignRow['prev_cpa'], 0, ',', '.') }}</div>
                                                 </td>
                                                 <td class="text-end {{ !$campaignRow['profit_available'] ? 'text-muted' : ($campaignRow['profit'] >= 0 ? 'text-success' : 'text-danger') }}">
                                                     <div>{{ !$campaignRow['profit_available'] ? 'N/A' : 'Rp ' . number_format($campaignRow['profit'], 0, ',', '.') }} {!! $fmtDelta($campaignRow['profit'], $campaignRow['prev_profit'], true) !!}</div>
                                                     @if($campaignRow['profit_available'])
                                                         <div class="perf-sub">Profit/order {{ $campaignRow['profit_per_order'] === null ? '—' : 'Rp ' . number_format($campaignRow['profit_per_order'], 0, ',', '.') }}</div>
                                                     @endif
-                                                    <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($campaignRow['prev_profit'], 0, ',', '.') }}</div>
+                                                    <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Profit Rp {{ number_format($campaignRow['prev_profit'], 0, ',', '.') }} · Profit/order {{ $campaignRow['prev_profit_per_order'] === null ? '—' : 'Rp ' . number_format($campaignRow['prev_profit_per_order'], 0, ',', '.') }}</div>
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -1413,24 +1423,24 @@
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val">{{ number_format($row['orders'], 0, ',', '.') }}</span>{!! $fmtDelta($row['orders'], $row['prev_orders'], true) !!}</div>
                             <div class="perf-sub text-muted">{{ number_format($row['items_sold'], 0, ',', '.') }} pcs</div>
-                            <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($row['prev_orders'], 0, ',', '.') }}</div>
+                            <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($row['prev_orders'], 0, ',', '.') }} orders · {{ number_format($row['prev_items_sold'], 0, ',', '.') }} pcs</div>
                         </td>
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val text-success">Rp {{ number_format($row['gmv'], 0, ',', '.') }}</span>{!! $fmtDelta($row['gmv'], $row['prev_gmv'], true) !!}</div>
                             <div class="perf-sub">COGS {{ $row['total_hpp'] > 0 ? 'Rp ' . number_format($row['total_hpp'], 0, ',', '.') : '—' }}</div>
-                            <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($row['prev_gmv'], 0, ',', '.') }}</div>
+                            <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ GMV Rp {{ number_format($row['prev_gmv'], 0, ',', '.') }} · COGS Rp {{ $row['prev_total_hpp'] > 0 ? number_format($row['prev_total_hpp'], 0, ',', '.') : '—' }}</div>
                         </td>
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val">Rp {{ number_format($row['spend'], 0, ',', '.') }}</span>{!! $fmtDelta($row['spend'], $row['prev_spend'], false) !!}</div>
                             <div class="perf-sub text-muted">CPA Rp {{ number_format($row['cpa'], 0, ',', '.') }}</div>
-                            <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($row['prev_spend'], 0, ',', '.') }}</div>
+                            <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Biaya Rp {{ number_format($row['prev_spend'], 0, ',', '.') }} · CPA Rp {{ number_format($row['prev_cpa'], 0, ',', '.') }}</div>
                         </td>
                         <td class="text-end perf-cell">
                             <div class="perf-main"><span class="perf-val {{ !$row['profit_available'] ? 'text-muted' : ($row['profit'] >= 0 ? 'text-success' : 'text-danger') }}">{{ !$row['profit_available'] ? 'N/A' : 'Rp ' . number_format($row['profit'], 0, ',', '.') }}</span>@if($row['profit_available']){!! $fmtDelta($row['profit'], $row['prev_profit'], true) !!}@endif</div>
                             @if($row['profit_available'])
                                 <div class="perf-sub">Profit/order {{ $row['profit_per_order'] === null ? '—' : 'Rp ' . number_format($row['profit_per_order'], 0, ',', '.') }}</div>
                             @endif
-                            <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($row['prev_profit'], 0, ',', '.') }}</div>
+                            <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Profit Rp {{ number_format($row['prev_profit'], 0, ',', '.') }} · Profit/order {{ $row['prev_profit_per_order'] === null ? '—' : 'Rp ' . number_format($row['prev_profit_per_order'], 0, ',', '.') }}</div>
                         </td>
 
                     </tr>
