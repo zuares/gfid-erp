@@ -3703,8 +3703,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 .traffic-table-scroll-shell > .traffic-table-scroll::-webkit-scrollbar { width:9px; height:0; }
                 .traffic-table-scroll-shell > .traffic-table-scroll::-webkit-scrollbar-thumb { background:#94a3b8; border-radius:999px; }
+                .traffic-table-scroll-shell > .traffic-table-scroll { cursor:grab; }
+                .traffic-table-scroll-shell > .traffic-table-scroll:active { cursor:grabbing; }
+                .traffic-scroll-hint {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:.25rem;
+                    margin-left:.5rem;
+                    color:var(--dsh-muted,#64748b);
+                    font-size:.62rem;
+                    font-weight:650;
+                    white-space:nowrap;
+                }
+                .traffic-scroll-hint i { color:#2563eb; }
                 .traffic-table {
-                    min-width:1040px;
+                    min-width:1700px;
                     width:100%;
                     table-layout:fixed;
                     border-collapse:separate;
@@ -3873,8 +3886,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     line-height:1.2;
                 }
                 .traffic-kpi-card .ads-kpi-value {
-                    overflow:hidden;
-                    text-overflow:ellipsis;
+                    overflow:visible;
+                    text-overflow:clip;
                 }
                 .traffic-kpi-compare {
                     display:flex;
@@ -3893,8 +3906,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 .traffic-kpi-compare > span {
                     min-width:0;
-                    overflow:hidden;
-                    text-overflow:ellipsis;
+                    overflow:visible;
+                    text-overflow:clip;
                 }
                 .traffic-kpi-compare .perf-delta { margin-left:.25rem; }
                 .traffic-chart-card {
@@ -3948,18 +3961,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     justify-content:flex-end;
                     gap:.08rem;
                     min-width:0;
-                    overflow:hidden;
+                    width:100%;
+                    overflow:visible;
                     white-space:nowrap;
+                }
+                .traffic-performance-table-panel .traffic-metric-cell {
+                    position:relative;
                 }
                 .traffic-performance-table-panel .traffic-metric-cell .perf-val {
                     min-width:0;
-                    overflow:hidden;
-                    text-overflow:ellipsis;
+                    justify-self:end;
+                    overflow:visible;
+                    text-overflow:clip;
                     white-space:nowrap;
                     font-variant-numeric:tabular-nums;
                 }
                 .traffic-performance-table-panel .traffic-metric-cell .perf-delta {
-                    flex:0 0 auto;
+                    position:absolute;
+                    right:.45rem;
+                    bottom:.25rem;
+                    z-index:2;
                     padding:.1rem .2rem;
                     font-size:.48rem;
                     white-space:nowrap;
@@ -4007,7 +4028,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-table tbody tr.traffic-category-row > td:first-child .fw-bold,
                 .traffic-table tbody tr.traffic-performance-row > td:first-child .fw-bold { letter-spacing:-.01em; }
                 .traffic-category-campaign-table {
-                    min-width:1040px;
+                    min-width:1700px;
                     width:100%;
                     table-layout:fixed;
                     font-variant-numeric:tabular-nums;
@@ -4020,9 +4041,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-category-campaign-table .traffic-metric-cell .perf-main { min-height:1rem; }
                 .traffic-table .traffic-metric-cell .perf-previous,
                 .traffic-category-campaign-table .traffic-metric-cell .perf-previous {
+                    min-width:0;
                     max-width:100%;
-                    overflow:hidden;
-                    text-overflow:ellipsis;
+                    min-height:1rem;
+                    padding-right:3.25rem;
+                    text-align:left;
+                    overflow:visible;
+                    text-overflow:clip;
+                    white-space:nowrap;
                 }
                 .traffic-table tbody tr.traffic-category-row { cursor:pointer; }
                 .traffic-table tbody tr.traffic-category-row:hover,
@@ -4044,7 +4070,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-table .traffic-category-detail > td { padding:.6rem .7rem !important; background:rgba(248,250,252,.72); }
                 .traffic-category-table-scroll-shell { margin-top:.35rem; }
                 .traffic-category-table-scroll-shell > .traffic-category-table-scroll { max-height:min(58vh,520px); overflow:auto; scrollbar-color:#94a3b8 transparent; scrollbar-width:thin; }
-                .traffic-category-table-scroll-shell .traffic-category-campaign-table { min-width:1040px; width:1040px; table-layout:fixed; border-collapse:separate; border-spacing:0; }
+                .traffic-category-table-scroll-shell .traffic-category-campaign-table { min-width:1700px; width:1700px; table-layout:fixed; border-collapse:separate; border-spacing:0; }
                 .traffic-category-campaign-table thead th { position:sticky; top:0; z-index:5; white-space:normal; overflow-wrap:anywhere; background:var(--card-bg,#fff); border-bottom:1px solid var(--dsh-border,#e2e8f0); color:var(--dsh-muted,#6b7280); font-size:.61rem; text-transform:uppercase; letter-spacing:.02em; }
                 .traffic-category-campaign-table thead tr:first-child th { padding-top:.5rem !important; padding-bottom:.38rem !important; font-size:.58rem; letter-spacing:.07em; }
                 .traffic-category-campaign-table thead tr:first-child .traffic-table-group-title { background:rgba(37,99,235,.07); color:#475569; border-bottom-color:rgba(37,99,235,.16); }
@@ -4074,7 +4100,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     .traffic-performance-table-panel .perf-kpi-card .ads-kpi-value { font-size:.94rem; }
                     .traffic-kpi-compare { font-size:.5rem; }
                     .traffic-status-dot { width:1.08rem; height:1.08rem; font-size:.52rem; }
-                    .traffic-table { min-width:1040px; width:1040px; }
+                    .traffic-table { min-width:1700px; width:1700px; }
                     .traffic-table thead th { padding:.5rem .48rem !important; font-size:.58rem !important; }
                     .traffic-table tbody td { padding:.55rem .48rem !important; font-size:.67rem !important; }
                     .traffic-table thead th:first-child,
@@ -4098,7 +4124,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
                 <div class="p-2 px-3 border-bottom text-muted traffic-panel-hint">
-                    <i class="bi bi-info-circle me-1" aria-hidden="true"></i> Klik baris kategori untuk melihat detail iklan. Klik subheader untuk mengurutkan data.
+                    <i class="bi bi-info-circle me-1" aria-hidden="true"></i> Klik baris kategori untuk melihat detail iklan. Klik subheader untuk mengurutkan data.<span class="traffic-scroll-hint"><i class="bi bi-arrows-move" aria-hidden="true"></i> Geser horizontal untuk melihat semua kolom</span>
                 </div>
                 <div class="traffic-view-tabs" role="tablist" aria-label="Jenis tampilan traffic">
                     <button type="button" id="btnTrafficCategory" class="btn fw-bold" onclick="__trafficPerformanceView('category')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Semua Kategori</button>
