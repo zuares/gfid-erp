@@ -122,7 +122,10 @@ class AdsDashboardController extends Controller
             // tetapi jangan membuat job auto-sync dengan tanggal yang tidak valid.
         }
 
-        if ($autoSyncRange) {
+        // Perubahan mode pembanding hanya mengganti basis perbandingan.
+        // Jangan jalankan auto-sync lagi karena periode data aktif tidak berubah
+        // dan request ini seharusnya tidak menunggu proses sinkronisasi.
+        if ($autoSyncRange && ! $request->boolean('skip_sync')) {
             $autoSyncKey = 'ads_dashboard_autosync:' . $storeId . ':' . $autoSyncRange['from'] . ':' . $autoSyncRange['to'];
             try {
                 if (! \Illuminate\Support\Facades\Cache::has($autoSyncKey)) {

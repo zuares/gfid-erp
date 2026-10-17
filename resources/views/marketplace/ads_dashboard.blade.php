@@ -2363,7 +2363,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const compareModeHidden = document.getElementById('compareModeHidden');
     const compareModeStatus = document.getElementById('compareModeStatus');
     const compareModeTabs = document.getElementById('compareModeTabs');
+    let compareNavigationPending = false;
     const submitCompareMode = value => {
+        const currentValue = compareModeHidden?.value || new URLSearchParams(window.location.search).get('compare_mode') || 'prev_period';
+        if (compareNavigationPending || currentValue === value) return;
         if (compareModeHidden) compareModeHidden.value = value;
         if (compareModeSelect) compareModeSelect.value = value;
         compareModeTabs?.querySelectorAll('[data-compare-mode]').forEach(tab => {
@@ -2376,11 +2379,21 @@ document.addEventListener('DOMContentLoaded', function () {
         if (summaryTable) summaryTable.style.opacity = '.45';
         if (compareModeSelect) compareModeSelect.disabled = true;
         compareModeTabs?.querySelectorAll('[data-compare-mode]').forEach(tab => { tab.disabled = true; });
-        // KPI dan tabel traffic berasal dari render server. Reload seluruh
-        // dashboard agar periode pembanding ikut mengubah data di semua tab,
-        // bukan hanya tabel historis yang diperbarui lewat AJAX.
         window.__dashLoading?.();
-        window.submitAdsFilters(filterForm);
+        compareNavigationPending = true;
+
+        // Mode pembanding memengaruhi KPI dan tabel di semua tab, jadi tetap
+        // memakai render server. Navigasi langsung mencegah request ganda dari
+        // requestSubmit/change event dan skip auto-sync karena tidak ada
+        // perubahan periode data yang perlu disinkronkan.
+        if (filterForm) {
+            const url = new URL(filterForm.action, window.location.origin);
+            const params = new URLSearchParams(new FormData(filterForm));
+            params.set('compare_mode', value);
+            params.set('skip_sync', '1');
+            url.search = params.toString();
+            window.location.assign(url.toString());
+        }
     };
     compareModeSelect?.addEventListener('change', function () {
         submitCompareMode(this.value);
@@ -2780,16 +2793,20 @@ function trafficUpdateKpis(view) {
         const previousValue = Number(previous || 0);
         if (previousValue === 0) {
             return currentValue > 0
-                ? '<span class="text-primary perf-delta">Baru</span>'
-                : '<span class="text-muted perf-delta">—</span>';
+                ? '<span class="perf-delta perf-delta--new" title="Data baru">Baru</span>'
+                : '<span class="perf-delta perf-delta--neutral" title="Tidak ada perubahan">—</span>';
         }
         const change = ((currentValue - previousValue) / Math.abs(previousValue)) * 100;
-        const up = change >= 0;
-        const arrow = up ? '▲' : '▼';
-        const className = Math.abs(change) < 0.5
-            ? 'text-muted'
-            : ((direction ? up : !up) ? 'text-success' : 'text-danger');
-        return formatter(previousValue) + ' <span class="' + className + ' perf-delta">' + arrow + ' ' + Math.abs(change).toFixed(0) + '%</span>';
+        if (direction === null || Math.abs(change) < 0.5) {
+            return formatter(previousValue) + ' <span class="perf-delta perf-delta--neutral" title="Stabil dibanding periode sebelumnya">→ 0%</span>';
+        }
+        const up = change > 0;
+        const isGood = direction ? up : !up;
+        const className = isGood ? 'perf-delta--positive' : 'perf-delta--negative';
+        const arrow = up ? '↑' : '↓';
+        const trend = up ? 'Naik' : 'Turun';
+        const meaning = isGood ? 'lebih baik' : 'perlu perhatian';
+        return formatter(previousValue) + ' <span class="perf-delta ' + className + '" title="' + trend + ' ' + Math.abs(change).toFixed(0) + '% · ' + meaning + '">' + arrow + ' ' + Math.abs(change).toFixed(0) + '%</span>';
     };
 
     setValue('campaigns', trafficFormatNumber(kpi.campaigns, 0));
@@ -3393,18 +3410,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 $trafficFmtDelta = function ($current, $previous, $direction = true) {
                     if ($previous === null || (float) $previous == 0) {
                         return (float) $current > 0
-                            ? '<span class="text-primary perf-delta">Baru</span>'
-                            : '<span class="text-muted perf-delta">—</span>';
+                            ? '<span class="perf-delta perf-delta--new" title="Data baru">Baru</span>'
+                            : '<span class="perf-delta perf-delta--neutral" title="Tidak ada perubahan">—</span>';
                     }
                     $change = (((float) $current - (float) $previous) / abs((float) $previous)) * 100;
-                    $up = $change >= 0;
-                    $arrow = $up ? '▲' : '▼';
                     if ($direction === null || abs($change) < 0.5) {
-                        $class = 'text-muted';
-                    } else {
-                        $class = ($direction ? $up : ! $up) ? 'text-success' : 'text-danger';
+                        return '<span class="perf-delta perf-delta--neutral" title="Stabil dibanding periode sebelumnya">→ 0%</span>';
                     }
-                    return '<span class="' . $class . ' perf-delta">' . $arrow . ' ' . number_format(abs($change), 0) . '%</span>';
+                    $up = $change > 0;
+                    $isGood = $direction ? $up : ! $up;
+                    $class = $isGood ? 'perf-delta--positive' : 'perf-delta--negative';
+                    $arrow = $up ? '↑' : '↓';
+                    $trend = $up ? 'Naik' : 'Turun';
+                    $meaning = $isGood ? 'lebih baik' : 'perlu perhatian';
+                    return '<span class="perf-delta ' . $class . '" title="' . $trend . ' ' . number_format(abs($change), 0) . '% · ' . $meaning . '">' . $arrow . ' ' . number_format(abs($change), 0) . '%</span>';
                 };
                 $trafficFmtPrevious = function ($value, $prefix = '', $suffix = '') {
                     if ($value === null || (float) $value == 0) {
@@ -3717,7 +3736,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 .traffic-scroll-hint i { color:#2563eb; }
                 .traffic-table {
-                    min-width:1700px;
+                    min-width:1200px;
                     width:100%;
                     table-layout:fixed;
                     border-collapse:separate;
@@ -3910,6 +3929,62 @@ document.addEventListener('DOMContentLoaded', function() {
                     text-overflow:clip;
                 }
                 .traffic-kpi-compare .perf-delta { margin-left:.25rem; }
+                .traffic-performance-table-panel .perf-delta {
+                    display:inline-flex;
+                    align-items:center;
+                    justify-content:center;
+                    min-height:1.05rem;
+                    padding:.12rem .3rem;
+                    border:1px solid transparent;
+                    border-radius:999px;
+                    font-size:.49rem;
+                    font-weight:800;
+                    line-height:1;
+                    letter-spacing:.01em;
+                    font-variant-numeric:tabular-nums;
+                    white-space:nowrap;
+                }
+                .traffic-performance-table-panel .perf-delta--positive {
+                    color:#15803d;
+                    background:#ecfdf3;
+                    border-color:#bbf7d0;
+                }
+                .traffic-performance-table-panel .perf-delta--negative {
+                    color:#b91c1c;
+                    background:#fef2f2;
+                    border-color:#fecaca;
+                }
+                .traffic-performance-table-panel .perf-delta--neutral {
+                    color:#64748b;
+                    background:#f8fafc;
+                    border-color:#e2e8f0;
+                }
+                .traffic-performance-table-panel .perf-delta--new {
+                    color:#1d4ed8;
+                    background:#eff6ff;
+                    border-color:#bfdbfe;
+                }
+                body[data-theme="dark"] .traffic-performance-table-panel .perf-delta--positive { color:#86efac; background:rgba(22,101,52,.28); border-color:rgba(74,222,128,.35); }
+                body[data-theme="dark"] .traffic-performance-table-panel .perf-delta--negative { color:#fca5a5; background:rgba(127,29,29,.3); border-color:rgba(248,113,113,.35); }
+                body[data-theme="dark"] .traffic-performance-table-panel .perf-delta--neutral { color:#cbd5e1; background:rgba(51,65,85,.45); border-color:rgba(148,163,184,.3); }
+                body[data-theme="dark"] .traffic-performance-table-panel .perf-delta--new { color:#93c5fd; background:rgba(30,64,175,.3); border-color:rgba(96,165,250,.35); }
+                .traffic-delta-legend {
+                    display:flex;
+                    align-items:center;
+                    justify-content:flex-end;
+                    flex-wrap:wrap;
+                    gap:.35rem .65rem;
+                    padding:.48rem .85rem;
+                    color:var(--dsh-muted,#64748b);
+                    background:var(--card-bg,#fff);
+                    border-bottom:1px solid var(--dsh-border,#e2e8f0);
+                    font-size:.57rem;
+                    line-height:1.2;
+                }
+                .traffic-delta-legend .perf-delta { min-height:.95rem; padding:.1rem .25rem; font-size:.46rem; }
+                .traffic-delta-legend-note { flex:1 1 100%; text-align:right; }
+                @media (min-width:768px) { .traffic-delta-legend-note { flex:0 1 auto; } }
+                body[data-theme="dark"] .traffic-delta-legend { background:var(--card-bg,#111827); }
                 .traffic-chart-card {
                     height:100%;
                     padding:.85rem;
@@ -4003,6 +4078,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     line-height:1;
                     opacity:.9;
                 }
+                .traffic-product-status {
+                    flex:0 0 auto;
+                    width:.95rem;
+                    height:.95rem;
+                    font-size:.45rem;
+                }
                 .traffic-status-dot.status-success { color:#15803d; background:rgba(34,197,94,.1); }
                 .traffic-status-dot.status-info { color:#0369a1; background:rgba(14,165,233,.1); }
                 .traffic-status-dot.status-warning { color:#b45309; background:rgba(245,158,11,.12); }
@@ -4028,7 +4109,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-table tbody tr.traffic-category-row > td:first-child .fw-bold,
                 .traffic-table tbody tr.traffic-performance-row > td:first-child .fw-bold { letter-spacing:-.01em; }
                 .traffic-category-campaign-table {
-                    min-width:1700px;
+                    min-width:1500px;
                     width:100%;
                     table-layout:fixed;
                     font-variant-numeric:tabular-nums;
@@ -4070,7 +4151,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-table .traffic-category-detail > td { padding:.6rem .7rem !important; background:rgba(248,250,252,.72); }
                 .traffic-category-table-scroll-shell { margin-top:.35rem; }
                 .traffic-category-table-scroll-shell > .traffic-category-table-scroll { max-height:min(58vh,520px); overflow:auto; scrollbar-color:#94a3b8 transparent; scrollbar-width:thin; }
-                .traffic-category-table-scroll-shell .traffic-category-campaign-table { min-width:1700px; width:1700px; table-layout:fixed; border-collapse:separate; border-spacing:0; }
+                .traffic-category-table-scroll-shell .traffic-category-campaign-table { min-width:1500px; width:1500px; table-layout:fixed; border-collapse:separate; border-spacing:0; }
                 .traffic-category-campaign-table thead th { position:sticky; top:0; z-index:5; white-space:normal; overflow-wrap:anywhere; background:var(--card-bg,#fff); border-bottom:1px solid var(--dsh-border,#e2e8f0); color:var(--dsh-muted,#6b7280); font-size:.61rem; text-transform:uppercase; letter-spacing:.02em; }
                 .traffic-category-campaign-table thead tr:first-child th { padding-top:.5rem !important; padding-bottom:.38rem !important; font-size:.58rem; letter-spacing:.07em; }
                 .traffic-category-campaign-table thead tr:first-child .traffic-table-group-title { background:rgba(37,99,235,.07); color:#475569; border-bottom-color:rgba(37,99,235,.16); }
@@ -4078,11 +4159,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-category-campaign-table th,
                 .traffic-category-campaign-table td { padding:.42rem .38rem !important; white-space:normal; overflow-wrap:anywhere; }
                 .traffic-category-campaign-table th:first-child,
-                .traffic-category-campaign-table td:first-child { width:22%; min-width:0 !important; }
-                .traffic-category-campaign-table th:nth-child(2),
-                .traffic-category-campaign-table td:nth-child(2) { width:5%; }
-                .traffic-category-campaign-table th:nth-child(n+3),
-                .traffic-category-campaign-table td:nth-child(n+3) { width:7.3%; }
+                .traffic-category-campaign-table td:first-child { width:27%; min-width:0 !important; }
+                .traffic-category-campaign-table th:nth-child(n+2),
+                .traffic-category-campaign-table td:nth-child(n+2) { width:10.43%; }
                 .traffic-category-campaign-table tbody td { border-bottom:1px solid rgba(226,232,240,.72); font-size:.68rem; }
                 .traffic-category-table-scroll-shell .traffic-category-campaign-table thead tr:first-child th:first-child,
                 .traffic-category-table-scroll-shell .traffic-category-campaign-table tbody td:first-child { position:sticky; left:0; z-index:3; background:var(--card-bg,#fff); box-shadow:1px 0 0 var(--dsh-border,#e2e8f0); }
@@ -4100,7 +4179,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     .traffic-performance-table-panel .perf-kpi-card .ads-kpi-value { font-size:.94rem; }
                     .traffic-kpi-compare { font-size:.5rem; }
                     .traffic-status-dot { width:1.08rem; height:1.08rem; font-size:.52rem; }
-                    .traffic-table { min-width:1700px; width:1700px; }
+                    .traffic-table { min-width:1200px; width:1200px; }
                     .traffic-table thead th { padding:.5rem .48rem !important; font-size:.58rem !important; }
                     .traffic-table tbody td { padding:.55rem .48rem !important; font-size:.67rem !important; }
                     .traffic-table thead th:first-child,
@@ -4205,37 +4284,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 
                 <div class="traffic-table-scroll-shell perf-table-scroll-shell" data-perf-sticky-shell>
+                <div class="traffic-delta-legend" role="note" aria-label="Legenda warna perbandingan">
+                    <span><span class="perf-delta perf-delta--positive">Baik</span> dampak positif</span>
+                    <span><span class="perf-delta perf-delta--negative">Perhatian</span> perlu ditinjau</span>
+                    <span><span class="perf-delta perf-delta--neutral">Stabil</span> perubahan kecil</span>
+                    <span class="traffic-delta-legend-note">CPM, CPA: turun = lebih baik</span>
+                </div>
                 <div class="table-responsive traffic-table-scroll" data-perf-table-scroll>
                     <table class="dpanel-table table table-hover align-middle mb-0 perf-table traffic-table" id="trafficTable">
                         <colgroup>
-                            <col style="width:22%;">
-                            <col style="width:5%;">
-                            <col span="10" style="width:7.3%;">
+                            <col style="width:27%;">
+                            <col span="7" style="width:10.43%;">
                         </colgroup>
                         <thead>
                             <tr>
                                 <th rowspan="2" data-traffic-sort="campaign_name" onclick="sortTrafficTable('campaign_name')" aria-sort="none">Produk / Iklan <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
-                                <th rowspan="2">Status</th>
-                                <th colspan="7" class="text-center traffic-table-group-title">Funnel & Efisiensi</th>
-                                <th colspan="3" class="text-center traffic-table-group-title">Hasil Iklan</th>
+                                <th colspan="5" class="text-center traffic-table-group-title">Funnel &amp; Efisiensi</th>
+                                <th colspan="2" class="text-center traffic-table-group-title">Hasil Iklan</th>
                             </tr>
                             <tr class="traffic-table-subheader">
                                 <th class="text-end" data-traffic-sort="impressions" onclick="sortTrafficTable('impressions')" aria-sort="none">Impresi <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
                                 <th class="text-end" data-traffic-sort="cpm" onclick="sortTrafficTable('cpm')" aria-sort="none">CPM <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
-                                <th class="text-end" data-traffic-sort="clicks" onclick="sortTrafficTable('clicks')" aria-sort="none">Klik <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
-                                <th class="text-end" data-traffic-sort="cpc" onclick="sortTrafficTable('cpc')" aria-sort="none">CPC <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
                                 <th class="text-end" data-traffic-sort="ctr" onclick="sortTrafficTable('ctr')" aria-sort="none">CTR <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
                                 <th class="text-end" data-traffic-sort="cvr" onclick="sortTrafficTable('cvr')" aria-sort="none">CVR <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
                                 <th class="text-end" data-traffic-sort="cpa" onclick="sortTrafficTable('cpa')" aria-sort="none">CPA <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
                                 <th class="text-end" data-traffic-sort="orders" onclick="sortTrafficTable('orders')" aria-sort="none">Pesanan <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
-                                <th class="text-end" data-traffic-sort="aov" onclick="sortTrafficTable('aov')" aria-sort="none">AOV <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
                                 <th class="text-end" data-traffic-sort="spend" onclick="sortTrafficTable('spend')" aria-sort="none">Biaya Iklan <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
                             </tr>
                         </thead>
                         <tbody>
                             @if($trafficRows->isEmpty())
                                 <tr class="traffic-no-data">
-                                    <td colspan="12" class="text-center text-muted py-4">Belum ada data traffic di periode ini.</td>
+                                    <td colspan="8" class="text-center text-muted py-4">Belum ada data traffic di periode ini.</td>
                                 </tr>
                             @else
                                 @foreach($trafficCategoryRows as $categoryRow)
@@ -4246,23 +4326,19 @@ document.addEventListener('DOMContentLoaded', function() {
                                         data-aov="{{ $categoryRow['aov'] }}" data-cpc="{{ $categoryRow['cpc'] }}" data-cpa="{{ $categoryRow['cpa'] }}"
                                         onclick="trafficToggleCategory(this)">
                                         <td>
-                                            <div class="d-flex align-items-center gap-1"><i class="bi bi-chevron-right traffic-caret text-muted" style="font-size:.7rem;"></i><div class="fw-bold" style="font-size: 0.78rem;">{{ $categoryRow['category'] }}</div></div>
+                                            <div class="d-flex align-items-center gap-1"><i class="bi bi-chevron-right traffic-caret text-muted" style="font-size:.7rem;"></i><div class="fw-bold" style="font-size: 0.78rem;">{{ $categoryRow['category'] }}</div><span class="traffic-status-dot traffic-product-status status-{{ $categoryRow['signal']['class'] }}" title="{{ $categoryRow['signal']['label'] }}" aria-label="{{ $categoryRow['signal']['label'] }}"><i class="bi {{ $categoryRow['signal']['icon'] }}"></i><span class="visually-hidden">{{ $categoryRow['signal']['label'] }}</span></span></div>
                                             <div class="text-muted" style="font-size: 0.65rem;">{{ number_format($categoryRow['campaigns'], 0, ',', '.') }} campaign</div>
                                         </td>
-                                        <td class="traffic-status-cell"><span class="traffic-status-dot status-{{ $categoryRow['signal']['class'] }}" title="{{ $categoryRow['signal']['label'] }}" aria-label="{{ $categoryRow['signal']['label'] }}"><i class="bi {{ $categoryRow['signal']['icon'] }}"></i><span class="visually-hidden">{{ $categoryRow['signal']['label'] }}</span></span></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['impressions'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($categoryRow['impressions'], $categoryRow['prev_impressions'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_impressions']) !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['cpm'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($categoryRow['cpm'], $categoryRow['prev_cpm'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_cpm'], 'Rp ') !!}</div></td>
-                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['clicks'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($categoryRow['clicks'], $categoryRow['prev_clicks'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_clicks']) !!}</div></td>
-                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['cpc'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($categoryRow['cpc'], $categoryRow['prev_cpc'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_cpc'], 'Rp ') !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['ctr'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($categoryRow['ctr'], $categoryRow['prev_ctr'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_ctr'], '', '%') !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['cvr'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($categoryRow['cvr'], $categoryRow['prev_cvr'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_cvr'], '', '%') !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['cpa'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($categoryRow['cpa'], $categoryRow['prev_cpa'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_cpa'], 'Rp ') !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['orders'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($categoryRow['orders'], $categoryRow['prev_orders'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_orders']) !!}</div></td>
-                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['aov'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($categoryRow['aov'], $categoryRow['prev_aov'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_aov'], 'Rp ') !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($categoryRow['spend'], $categoryRow['prev_spend'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_spend'], 'Rp ') !!}</div></td>
                                     </tr>
                                     <tr class="traffic-category-detail" style="display:none;">
-                                        <td colspan="12" class="bg-light">
+                                        <td colspan="8" class="bg-light">
                                             <div class="text-muted fw-bold mb-1" style="font-size:.66rem;">Daftar campaign dalam kategori {{ $categoryRow['category'] }}</div>
                                             <div class="traffic-category-table-scroll-shell perf-table-scroll-shell" data-perf-sticky-shell>
                                             <div class="table-responsive traffic-category-table-scroll" data-perf-table-scroll>
@@ -4270,20 +4346,16 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     <thead>
                                                         <tr>
                                                             <th rowspan="2">Produk / Iklan</th>
-                                                            <th rowspan="2">Status</th>
-                                                            <th colspan="7" class="text-center traffic-table-group-title">Funnel &amp; Efisiensi</th>
-                                                            <th colspan="3" class="text-center traffic-table-group-title">Hasil Iklan</th>
+                                                            <th colspan="5" class="text-center traffic-table-group-title">Funnel &amp; Efisiensi</th>
+                                                            <th colspan="2" class="text-center traffic-table-group-title">Hasil Iklan</th>
                                                         </tr>
                                                         <tr class="traffic-table-subheader">
                                                             <th class="text-end">Impresi</th>
                                                             <th class="text-end">CPM</th>
-                                                            <th class="text-end">Klik</th>
-                                                            <th class="text-end">CPC</th>
                                                             <th class="text-end">CTR</th>
                                                             <th class="text-end">CVR</th>
                                                             <th class="text-end">CPA</th>
                                                             <th class="text-end">Pesanan</th>
-                                                            <th class="text-end">AOV</th>
                                                             <th class="text-end">Biaya Iklan</th>
                                                         </tr>
                                                     </thead>
@@ -4292,6 +4364,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                                             <tr>
                                                                 <td>
                                                                     <div class="d-flex align-items-center gap-2">
+                                                                        <span class="traffic-status-dot traffic-product-status status-{{ $campaignRow['signal']['class'] }}" title="{{ $campaignRow['signal']['label'] }}" aria-label="{{ $campaignRow['signal']['label'] }}"><i class="bi {{ $campaignRow['signal']['icon'] }}"></i><span class="visually-hidden">{{ $campaignRow['signal']['label'] }}</span></span>
                                                                         @if($campaignRow['image_url'] ?? null)
                                                                             <img src="{{ $campaignRow['image_url'] }}" alt="{{ $campaignRow['item_name'] }}" class="traffic-product-image" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';">
                                                                             <span class="traffic-product-image-empty" style="display:none;"><i class="bi bi-image"></i></span>
@@ -4309,16 +4382,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                                                         </div>
                                                                     </div>
                                                                 </td>
-                                                                <td class="traffic-status-cell"><span class="traffic-status-dot status-{{ $campaignRow['signal']['class'] }}" title="{{ $campaignRow['signal']['label'] }}" aria-label="{{ $campaignRow['signal']['label'] }}"><i class="bi {{ $campaignRow['signal']['icon'] }}"></i><span class="visually-hidden">{{ $campaignRow['signal']['label'] }}</span></span></td>
                                                                 <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($campaignRow['impressions'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($campaignRow['impressions'], $campaignRow['prev_impressions'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_impressions']) !!}</div></td>
                                                                 <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($campaignRow['cpm'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($campaignRow['cpm'], $campaignRow['prev_cpm'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_cpm'], 'Rp ') !!}</div></td>
-                                                                <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($campaignRow['clicks'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($campaignRow['clicks'], $campaignRow['prev_clicks'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_clicks']) !!}</div></td>
-                                                                <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($campaignRow['cpc'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($campaignRow['cpc'], $campaignRow['prev_cpc'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_cpc'], 'Rp ') !!}</div></td>
                                                                 <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($campaignRow['ctr'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($campaignRow['ctr'], $campaignRow['prev_ctr'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_ctr'], '', '%') !!}</div></td>
                                                                 <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($campaignRow['cvr'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($campaignRow['cvr'], $campaignRow['prev_cvr'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_cvr'], '', '%') !!}</div></td>
                                                                 <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($campaignRow['cpa'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($campaignRow['cpa'], $campaignRow['prev_cpa'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_cpa'], 'Rp ') !!}</div></td>
                                                                 <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($campaignRow['orders'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($campaignRow['orders'], $campaignRow['prev_orders'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_orders']) !!}</div></td>
-                                                                <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($campaignRow['aov'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($campaignRow['aov'], $campaignRow['prev_aov'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_aov'], 'Rp ') !!}</div></td>
                                                                 <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($campaignRow['spend'], $campaignRow['prev_spend'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_spend'], 'Rp ') !!}</div></td>
                                                             </tr>
                                                         @endforeach
@@ -4344,6 +4413,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         data-cpm="{{ $trafficRow['cpm'] }}">
                                         <td>
                                             <div class="d-flex align-items-center gap-2">
+                                                <span class="traffic-status-dot traffic-product-status status-{{ $trafficRow['signal']['class'] }}" title="{{ $trafficRow['signal']['label'] }}" aria-label="{{ $trafficRow['signal']['label'] }}"><i class="bi {{ $trafficRow['signal']['icon'] }}"></i><span class="visually-hidden">{{ $trafficRow['signal']['label'] }}</span></span>
                                                 @if($trafficRow['image_url'] ?? null)
                                                     <img src="{{ $trafficRow['image_url'] }}" alt="{{ $trafficRow['item_name'] }}" class="traffic-product-image" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';">
                                                     <span class="traffic-product-image-empty" style="display:none;"><i class="bi bi-image"></i></span>
@@ -4361,22 +4431,18 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td class="traffic-status-cell"><span class="traffic-status-dot status-{{ $trafficRow['signal']['class'] }}" title="{{ $trafficRow['signal']['label'] }}" aria-label="{{ $trafficRow['signal']['label'] }}"><i class="bi {{ $trafficRow['signal']['icon'] }}"></i><span class="visually-hidden">{{ $trafficRow['signal']['label'] }}</span></span></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($trafficRow['impressions'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($trafficRow['impressions'], $trafficRow['prev_impressions'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_impressions']) !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($trafficRow['cpm'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($trafficRow['cpm'], $trafficRow['prev_cpm'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_cpm'], 'Rp ') !!}</div></td>
-                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($trafficRow['clicks'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($trafficRow['clicks'], $trafficRow['prev_clicks'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_clicks']) !!}</div></td>
-                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($trafficRow['cpc'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($trafficRow['cpc'], $trafficRow['prev_cpc'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_cpc'], 'Rp ') !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($trafficRow['ctr'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($trafficRow['ctr'], $trafficRow['prev_ctr'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_ctr'], '', '%') !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($trafficRow['cvr'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($trafficRow['cvr'], $trafficRow['prev_cvr'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_cvr'], '', '%') !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($trafficRow['cpa'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($trafficRow['cpa'], $trafficRow['prev_cpa'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_cpa'], 'Rp ') !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($trafficRow['orders'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($trafficRow['orders'], $trafficRow['prev_orders'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_orders']) !!}</div></td>
-                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($trafficRow['aov'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($trafficRow['aov'], $trafficRow['prev_aov'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_aov'], 'Rp ') !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($trafficRow['spend'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($trafficRow['spend'], $trafficRow['prev_spend'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_spend'], 'Rp ') !!}</div></td>
                                     </tr>
                                 @endforeach
                             @endif
                             <tr class="traffic-view-empty" style="display:none;">
-                                        <td colspan="12" class="text-center text-muted py-4">Belum ada data untuk kategori ini.</td>
+                                        <td colspan="8" class="text-center text-muted py-4">Belum ada data untuk kategori ini.</td>
                             </tr>
                         </tbody>
                     </table>
