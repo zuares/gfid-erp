@@ -3979,7 +3979,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-performance-table-panel .traffic-metric-cell .perf-delta {
                     position:absolute;
                     right:.05rem;
-                    bottom:.25rem;
+                    top:50%;
+                    transform:translateY(-50%);
                     z-index:2;
                     padding:.1rem .2rem;
                     font-size:.48rem;
