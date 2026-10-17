@@ -2840,76 +2840,6 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     @endif
 
-    {{-- ==============================================
-         OFFICIAL READ-ONLY API INTEGRATION
-    ============================================== --}}
-    <section class="dpanel ads-integration-card">
-        <div class="ads-integration-head" style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
-            <div>
-                <div style="display:flex; align-items:center; gap:.45rem; font-size:.9rem; font-weight:800; color:#1e3a8a;">
-                    <i class="bi bi-shield-lock-fill"></i> Integrasi API Ads · Read-only
-                    <span style="font-size:.58rem; padding:.18rem .42rem; border-radius:999px; background:#dcfce7; color:#166534; letter-spacing:.05em;">AMAN</span>
-                </div>
-                <div class="ads-integration-description" style="font-size:.72rem; color:#475569; margin-top:.28rem; max-width:720px;">
-                    Token hanya diperoleh melalui OAuth resmi provider, disimpan terenkripsi, memiliki masa berlaku, dan tidak pernah diterima sebagai input manual.
-                    Profil izin minimum: <b>ads.read</b> · <b>shop.read</b>.
-                    Endpoint perubahan kampanye/produk diblokir untuk koneksi ini.
-                </div>
-            </div>
-            <div style="font-size:.65rem; color:#64748b; display:flex; gap:.35rem; align-items:center;">
-                <i class="bi bi-arrow-repeat"></i> Penarikan otomatis mengikuti scheduler
-            </div>
-        </div>
-
-        @if($integrationStores->isEmpty())
-            <div style="margin-top:.75rem; padding:.65rem .75rem; border-radius:10px; background:rgba(255,255,255,.72); color:#64748b; font-size:.75rem;">
-                Belum ada toko yang dapat dihubungkan. Tambahkan toko dari menu Marketplace terlebih dahulu.
-            </div>
-        @else
-            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:.55rem; margin-top:.75rem;">
-                @foreach($integrationStores as $integrationStore)
-                    @php
-                        $integrationStatus = $integrationStore->readOnlyAdsIntegrationStatus();
-                        $providerCode = strtolower((string) ($integrationStore->channel?->code ?? ''));
-                        $connectRoute = in_array($providerCode, ['tiktok'], true)
-                            ? route('marketplace.tiktok.connect', ['store_id' => $integrationStore->id, 'integration' => 'ads_read_only'])
-                            : route('marketplace.shopee.connect', ['store_id' => $integrationStore->id, 'integration' => 'ads_read_only']);
-                    @endphp
-                    <div id="adsIntegrationCard{{ $integrationStore->id }}" style="display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.65rem .75rem; border-radius:11px; background:rgba(255,255,255,.78); border:1px solid rgba(148,163,184,.22);">
-                        <div style="min-width:0;">
-                            <div style="font-size:.77rem; font-weight:800; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                {{ $integrationStore->name }}
-                                <span style="font-weight:600; color:#64748b;">· {{ $integrationStore->channel?->name ?? 'Marketplace' }}</span>
-                            </div>
-                            <div style="font-size:.66rem; margin-top:.18rem; color:{{ $integrationStatus === 'connected' ? '#15803d' : ($integrationStatus === 'expired' ? '#b45309' : '#64748b') }};">
-                                @if($integrationStatus === 'connected')
-                                    <i class="bi bi-check-circle-fill"></i> Terhubung · berlaku sampai {{ optional($integrationStore->token_expires_at)->timezone(config('app.timezone'))->format('d M Y H:i') }}
-                                @elseif($integrationStatus === 'expired')
-                                    <i class="bi bi-clock-history"></i> Token kedaluwarsa · hubungkan ulang
-                                @elseif($integrationStatus === 'revoked')
-                                    <i class="bi bi-slash-circle"></i> Akses dicabut
-                                @else
-                                    <i class="bi bi-dash-circle"></i> Belum terhubung
-                                @endif
-                            </div>
-                        </div>
-                        <div style="display:flex; gap:.35rem; flex-shrink:0;">
-                            @if($integrationStatus !== 'connected')
-                                <a href="{{ $connectRoute }}" class="btn btn-sm btn-primary" style="font-size:.66rem; font-weight:800; border-radius:8px;">
-                                    <i class="bi bi-box-arrow-up-right"></i> Hubungkan resmi
-                                </a>
-                            @else
-                                <button type="button" class="btn btn-sm btn-outline-danger" style="font-size:.66rem; font-weight:800; border-radius:8px;" onclick="revokeAdsIntegration({{ $integrationStore->id }}, @js($integrationStore->name))">
-                                    <i class="bi bi-shield-x"></i> Cabut
-                                </button>
-                            @endif
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-        @endif
-    </section>
-
     @php
         // ================= Target Profit & ROAS (per toko) =================
         // net & COGS ratio dari KPI agregat (data yang sudah dihitung service).
@@ -2983,20 +2913,6 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div class="ads-tabs-wrap" id="adsSubTabsWrap" style="overflow-x: auto; padding-top: 0.35rem; padding-bottom: 0.25rem; scrollbar-width: none;">
             <div class="dash-tabs-modern" id="adsSubTabs" role="tablist" aria-label="Tab dashboard iklan"></div>
-        </div>
-        <div id="adsTabContext" class="ads-tab-context" role="status" aria-live="polite">
-            <div class="ads-tab-context-main">
-                <span id="adsTabContextIcon" class="ads-tab-context-icon"><i class="bi bi-grid-1x2"></i></span>
-                <div style="min-width:0;">
-                    <div id="adsTabContextTitle" class="ads-tab-context-title">Ringkasan</div>
-                    <div id="adsTabContextDescription" class="ads-tab-context-description">Ringkasan kesehatan iklan dan prioritas tindakan.</div>
-                </div>
-            </div>
-            <div class="ads-tab-context-meta">
-                <span class="ads-tab-context-chip"><i class="bi bi-shop"></i> <span id="adsTabContextStore">Semua toko</span></span>
-                <span class="ads-tab-context-chip"><i class="bi bi-calendar2-week"></i> <span id="adsTabContextPeriod">{{ $dateFrom }} — {{ $dateTo }}</span></span>
-                <span class="ads-tab-context-chip"><i class="bi bi-arrow-repeat"></i> <span id="adsTabContextSync">{{ ($lastSyncTime ?? '') ?: 'Belum sync' }}</span></span>
-            </div>
         </div>
     @endif
 
@@ -4429,9 +4345,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 $controlIsGms = str_starts_with($controlId, 'GMS-') || ($controlCampaign->ad_type ?? null) === 'auto';
                                 $controlStatus = strtolower((string) ($controlCampaign->campaign_status ?? 'ongoing'));
                                 $controlType = $controlIsGms ? 'GMV Max' : 'Regular';
-                                $controlSpend = (float) ($controlCampaign->spend ?? $controlCampaign->sum_expense ?? 0) * 1.11;
-                                $controlGmv = (float) ($controlCampaign->gmv ?? ($controlCampaign->sum_broad_gmv ?? 0) + ($controlCampaign->sum_direct_gmv ?? 0));
-                                $controlOrders = (int) ($controlCampaign->orders ?? ($controlCampaign->sum_broad_orders ?? 0) + ($controlCampaign->sum_direct_orders ?? 0));
+                                // ROAS Aktual dan Orders harus memakai basis atribusi yang sama.
+                                // broad_* adalah total atribusi iklan; direct_* dapat mereferensikan
+                                // order yang sama sehingga tidak boleh dijumlahkan lagi.
+                                $controlSpend = (float) ($controlCampaign->sum_expense ?? $controlCampaign->spend ?? 0) * 1.11;
+                                $controlGmv = (float) ($controlCampaign->sum_broad_gmv ?? 0);
+                                $controlOrders = (int) ($controlCampaign->sum_broad_orders ?? 0);
                                 $controlImpressions = (int) ($controlCampaign->impressions ?? $controlCampaign->sum_impressions ?? 0);
                                 $controlClicks = (int) ($controlCampaign->clicks ?? $controlCampaign->sum_clicks ?? 0);
                                 $controlCtr = $controlImpressions > 0 ? ($controlClicks / $controlImpressions) * 100 : 0;

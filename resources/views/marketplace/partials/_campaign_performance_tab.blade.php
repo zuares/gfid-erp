@@ -34,7 +34,7 @@
     //       null = netral (tanpa warna baik/buruk).
     $fmtDelta = function ($cur, $prev, $dir = true) {
         if ($prev === null || $prev == 0) {
-            return '<span class="text-muted" style="font-size:.58rem;">—</span>';
+            return '<span class="text-muted perf-delta">—</span>';
         }
         $chg = (($cur - $prev) / abs($prev)) * 100;
         $up = $chg >= 0;
@@ -336,6 +336,8 @@
         $prevOrders = $rows->sum('prev_orders');
         $impressions = $rows->sum('impressions');
         $clicks = $rows->sum('clicks');
+        $configuredTargets = $rows->pluck('configured_roas')->filter(fn ($target) => $target !== null);
+        $setRoas = $configuredTargets->isNotEmpty() ? round($configuredTargets->avg(), 2) : null;
         $prevImpressions = $rows->sum('prev_impressions');
         $prevClicks = $rows->sum('prev_clicks');
         $prevProfitRows = $rows->filter(fn ($row) => $row['prev_profit'] !== null);
@@ -354,6 +356,10 @@
             'aov' => $rows->sum('orders') > 0 ? $gmv / $rows->sum('orders') : 0,
             'cpa' => $rows->sum('orders') > 0 ? $spend / $rows->sum('orders') : 0,
             'roas' => $spend > 0 ? $gmv / $spend : 0,
+            'set_roas' => $setRoas,
+            'target_pct' => $setRoas !== null && $setRoas > 0 && $spend > 0
+                ? round((($gmv / $spend) / $setRoas) * 100, 1)
+                : null,
             'profit' => $knownProfitRows->sum('profit'),
             'profit_per_order' => $rows->sum('orders') > 0 ? $knownProfitRows->sum('profit') / $rows->sum('orders') : 0,
             'profit_unknown' => $rows->count() - $knownProfitRows->count(),
@@ -426,6 +432,9 @@
         $categoryKpi['aov'] = $overallCurrentOrders > 0 ? $overallCurrentGmv / $overallCurrentOrders : 0;
         $categoryKpi['cpa'] = $overallCurrentOrders > 0 ? $totalSpend / $overallCurrentOrders : 0;
         $categoryKpi['roas'] = $totalSpend > 0 ? $overallCurrentGmv / $totalSpend : 0;
+        $categoryKpi['target_pct'] = $categoryKpi['set_roas'] !== null && $categoryKpi['set_roas'] > 0 && $categoryKpi['roas'] > 0
+            ? round(($categoryKpi['roas'] / $categoryKpi['set_roas']) * 100, 1)
+            : null;
         $categoryKpi['profit'] = $totalProfit;
         $categoryKpi['profit_per_order'] = $overallCurrentOrders > 0 ? $totalProfit / $overallCurrentOrders : 0;
         $categoryKpi['prev_spend'] = $overallPreviousSpend;
@@ -503,6 +512,8 @@
         position: relative;
         max-height: min(72vh, 760px);
         overflow: auto;
+        scrollbar-gutter: stable;
+        overscroll-behavior: contain;
         scrollbar-color: #94a3b8 transparent;
         scrollbar-width: thin;
     }
@@ -514,7 +525,10 @@
         z-index: 20;
         display: block;
         height: 14px;
-        margin: 0 .75rem .35rem;
+        width: 100%;
+        max-width: 100%;
+        margin: 0 0 .35rem;
+        box-sizing: border-box;
         overflow-x: auto;
         overflow-y: hidden;
         background: #ffffff !important;
@@ -533,6 +547,8 @@
     .perf-category-table-scroll-shell > .perf-category-table-scroll {
         max-height: min(58vh, 520px);
         overflow: auto;
+        scrollbar-gutter: stable;
+        overscroll-behavior: contain;
         scrollbar-color: #94a3b8 transparent;
         scrollbar-width: thin;
     }
@@ -560,7 +576,7 @@
         padding-bottom: .4rem;
     }
     .perf-category-table-scroll-shell .perf-category-campaign-table thead tr:nth-child(2) th {
-        top: 34px;
+        top: 2.15rem;
         z-index: 5;
         color: var(--text, #0f172a);
         background: var(--card-bg, #fff);
@@ -719,6 +735,17 @@
     .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card { min-width: 0; display: flex; flex-direction: column; }
     .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card .ads-kpi-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card .ads-kpi-value { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card .perf-kpi-value-split { display: flex; align-items: baseline; justify-content: space-between; gap: .55rem; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card .perf-kpi-value-split > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card .perf-kpi-inline-meta { display: inline-flex; min-width: 0; flex: 0 1 auto; flex-direction: column; align-items: flex-end; color: var(--dsh-muted, #64748b); font-size: .47rem; font-weight: 700; line-height: 1.1; letter-spacing: 0; text-align: right; white-space: nowrap; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card .perf-kpi-inline-meta b { color: var(--text, #334155); font-size: .68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card .perf-kpi-target-pct { display: inline-flex; align-items: center; margin-top: .16rem; padding: .1rem .22rem; border-radius: 999px; background: rgba(100, 116, 139, .1); font-size: .44rem; font-weight: 800; line-height: 1; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card .perf-kpi-value-split > .perf-kpi-target-pct { flex: 0 0 auto; align-self: center; margin-top: 0; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card .perf-kpi-target-pct.text-success { background: rgba(22, 163, 74, .11); }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card .perf-kpi-target-pct.text-danger { background: rgba(220, 38, 38, .1); }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .kpi-signal .ads-kpi-label { overflow: visible; text-overflow: clip; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .kpi-signal .perf-kpi-value-split > span:first-child { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+    .campaign-performance-panel #campaignPerformanceSubtabKpis .kpi-signal .perf-kpi-inline-meta { white-space: normal; }
     .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card .ads-kpi-sub { min-width: 0; flex-wrap: wrap; overflow-wrap: anywhere; }
     .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card .ads-kpi-sub > span { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
     .campaign-performance-panel #campaignPerformanceSubtabKpis .perf-kpi-card .perf-kpi-compare { min-width: 0; overflow-wrap: anywhere; }
@@ -811,8 +838,10 @@
         background: var(--card-bg, #fff);
         border-bottom: 1px solid var(--dsh-border, #e2e8f0);
         z-index: 5;
+        background-clip: padding-box;
     }
     .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > thead tr:first-child th {
+        top: 0;
         padding-top: .55rem !important;
         padding-bottom: .4rem !important;
         font-size: .62rem !important;
@@ -838,7 +867,7 @@
         background: rgba(248, 250, 252, .42);
     }
     .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > thead tr:nth-child(2) th {
-        top: 34px;
+        top: 2.15rem;
         z-index: 4;
         color: var(--text, #0f172a);
         font-size: .68rem;
@@ -981,21 +1010,21 @@
     <div class="px-3 pb-2" id="campaignPerformanceSubtabKpis">
         <div class="ads-kpi-grid mb-2">
             <div class="dpanel ads-kpi perf-kpi-card kpi-signal">
-                <div class="ads-kpi-label"><i class="bi bi-broadcast-pin" aria-hidden="true"></i> Sinyal</div>
-                <div class="ads-kpi-value"><span data-perf-kpi-value="campaigns">{{ number_format($perfInitialKpi['campaigns'], 0, ',', '.') }}</span> campaign</div>
+                <div class="ads-kpi-label"><i class="bi bi-megaphone" aria-hidden="true"></i> Campaign</div>
+                <div class="ads-kpi-value perf-kpi-value-split"><span data-perf-kpi-value="campaigns">{{ number_format($perfInitialKpi['campaigns'], 0, ',', '.') }}</span><span class="perf-kpi-inline-meta"><span>Set ROAS</span><b data-perf-kpi-value="set_roas">{{ $perfInitialKpi['set_roas'] === null ? '—' : number_format($perfInitialKpi['set_roas'], 2, ',', '.') . 'x' }}</b></span></div>
                 <div class="ads-kpi-sub"><span><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i><span data-perf-kpi-value="losses">{{ number_format($perfInitialKpi['losses'], 0, ',', '.') }}</span> rugi</span></div>
                 <div class="perf-kpi-compare"><span class="perf-kpi-compare-label">Status</span><span>berdasarkan target ROAS</span></div>
             </div>
             <div class="dpanel ads-kpi perf-kpi-card">
-                <div class="ads-kpi-label"><i class="bi bi-speedometer2" aria-hidden="true"></i> ROAS Aktual</div>
-                <div class="ads-kpi-value" data-perf-kpi-value="roas">{{ number_format($perfInitialKpi['roas'], 2, ',', '.') }}x</div>
-                <div class="ads-kpi-sub">GMV / biaya + PPN</div>
+                <div class="ads-kpi-label"><i class="bi bi-speedometer2" aria-hidden="true"></i> ROAS</div>
+                <div class="ads-kpi-value perf-kpi-value-split"><span data-perf-kpi-value="roas">{{ number_format($perfInitialKpi['roas'], 2, ',', '.') }}x</span><small class="perf-kpi-target-pct text-muted" data-perf-kpi-value="target_pct">{{ $perfInitialKpi['target_pct'] === null ? '—' : number_format($perfInitialKpi['target_pct'], 1, ',', '.') . '% target' }}</small></div>
+                <div class="ads-kpi-sub">CPA <span data-perf-kpi-value="cpa">Rp {{ number_format($perfInitialKpi['cpa'], 0, ',', '.') }}</span></div>
                 <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}"><span data-perf-kpi-compare="roas">{{ number_format($perfInitialKpi['prev_roas'], 2, ',', '.') }}x {!! $fmtDelta($perfInitialKpi['roas'], $perfInitialKpi['prev_roas'], true) !!}</span></div>
             </div>
             <div class="dpanel ads-kpi perf-kpi-card">
                 <div class="ads-kpi-label"><i class="bi bi-box-seam" aria-hidden="true"></i> Orders</div>
-                <div class="ads-kpi-value" data-perf-kpi-value="orders">{{ number_format($perfInitialKpi['orders'], 0, ',', '.') }}</div>
-                <div class="ads-kpi-sub"><span data-perf-kpi-value="items_sold">{{ number_format($perfInitialKpi['items_sold'], 0, ',', '.') }}</span> pcs</div>
+                <div class="ads-kpi-value perf-kpi-value-split"><span data-perf-kpi-value="orders">{{ number_format($perfInitialKpi['orders'], 0, ',', '.') }}</span><span class="perf-kpi-inline-meta"><b data-perf-kpi-value="items_sold">{{ number_format($perfInitialKpi['items_sold'], 0, ',', '.') }}</b> pcs</span></div>
+                <div class="ads-kpi-sub">AOV <span data-perf-kpi-value="aov">Rp {{ number_format($perfInitialKpi['aov'], 0, ',', '.') }}</span></div>
                 <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}"><span data-perf-kpi-compare="orders">{{ number_format($perfInitialKpi['prev_orders'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['orders'], $perfInitialKpi['prev_orders'], true) !!}</span></div>
             </div>
             <div class="dpanel ads-kpi perf-kpi-card kpi-revenue">
@@ -1804,6 +1833,7 @@ function perfInitStickyScrollbar() {
         const syncWidth = () => {
             const contentWidth = table?.scrollWidth || tableScroll.scrollWidth;
             spacer.style.width = `${contentWidth}px`;
+            stickyScroll.style.width = `${tableScroll.clientWidth}px`;
             stickyScroll.style.display = contentWidth > tableScroll.clientWidth + 2 ? 'block' : 'none';
             if (!syncing) stickyScroll.scrollLeft = tableScroll.scrollLeft;
         };
@@ -2013,6 +2043,7 @@ const perfFilterData = {!! json_encode($perfRows->map(function ($row) {
         'aov' => $row['aov'],
         'cpa' => $row['cpa'],
         'roas' => $row['roas'],
+        'configured_roas' => $row['configured_roas'],
         'prev_spend' => $row['prev_spend'],
         'prev_gmv' => $row['prev_gmv'],
         'prev_orders' => $row['prev_orders'],
@@ -2046,7 +2077,7 @@ function perfKpiCompare(current, previous, formatter, direction) {
     const currentValue = Number(current || 0);
     const previousValue = Number(previous || 0);
     if (previousValue === 0) {
-        return formatter(previousValue) + ' <span class="text-muted">—</span>';
+        return '<span class="text-muted perf-delta">—</span>';
     }
 
     const change = ((currentValue - previousValue) / Math.abs(previousValue)) * 100;
@@ -2084,6 +2115,14 @@ function perfUpdateKpis(segment, overrideKpi = null) {
     setValue('ctr', perfKpiNumber(kpi.ctr, 2) + '%');
     setValue('cvr', perfKpiNumber(kpi.cvr, 2) + '%');
     setValue('roas', perfKpiNumber(kpi.roas, 2) + 'x');
+    setValue('set_roas', kpi.set_roas === null || kpi.set_roas === undefined ? '—' : perfKpiNumber(kpi.set_roas, 2) + 'x');
+    setValue('target_pct', kpi.target_pct === null || kpi.target_pct === undefined ? '—' : perfKpiNumber(kpi.target_pct, 1) + '% target');
+    document.querySelectorAll('[data-perf-kpi-value="target_pct"]').forEach(function(el) {
+        el.classList.remove('text-success', 'text-danger', 'text-muted');
+        el.classList.add(kpi.target_pct === null || kpi.target_pct === undefined
+            ? 'text-muted'
+            : Number(kpi.target_pct) >= 100 ? 'text-success' : 'text-danger');
+    });
     setValue('profit', 'Rp ' + perfKpiNumber(kpi.profit, 0));
     setValue('profit_per_order', 'Rp ' + perfKpiNumber(kpi.profit_per_order, 0));
     setValue('profit_unknown', perfKpiNumber(kpi.profit_unknown, 0));
@@ -2156,6 +2195,11 @@ function perfKpiFromRows(rows) {
     const orders = sum('orders');
     const itemsSold = sum('items_sold');
     const totalHpp = sum('total_hpp');
+    const configuredTargets = rows
+        .map(row => row.configured_roas)
+        .filter(value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value)))
+        .map(value => Number(value));
+    const setRoas = configuredTargets.length > 0 ? configuredTargets.reduce((total, value) => total + value, 0) / configuredTargets.length : null;
     const impressions = sum('impressions');
     const clicks = sum('clicks');
     const prevSpend = sum('prev_spend');
@@ -2174,6 +2218,8 @@ function perfKpiFromRows(rows) {
         aov: orders > 0 ? gmv / orders : 0,
         cpa: orders > 0 ? spend / orders : 0,
         roas: spend > 0 ? gmv / spend : 0,
+        set_roas: setRoas,
+        target_pct: setRoas !== null && setRoas > 0 && spend > 0 ? (gmv / spend) / setRoas * 100 : null,
         profit,
         profit_per_order: orders > 0 ? profit / orders : 0,
         profit_unknown: rows.length - knownProfit.length,
