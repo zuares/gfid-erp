@@ -489,6 +489,12 @@
     .perf-table th { font-size: .66rem; text-transform: uppercase; letter-spacing: .02em; color: var(--dsh-muted, #6b7280); }
     .perf-table-group-title { background: rgba(37, 99, 235, .06) !important; color: var(--bs-primary, #2563eb) !important; font-size: .59rem !important; letter-spacing: .08em !important; }
     .perf-table-subheader th { background: rgba(248, 250, 252, .92); }
+    .perf-table-subheader th[data-perf-sort] { cursor: pointer; user-select: none; white-space: nowrap; transition: background-color .15s ease, color .15s ease; }
+    .perf-table-subheader th[data-perf-sort]:hover,
+    .perf-table-subheader th[data-perf-sort]:focus-visible { background: rgba(37, 99, 235, .1); color: var(--bs-primary, #2563eb); outline: none; }
+    .perf-sort-indicator { display: inline-block; margin-left: .2rem; color: var(--dsh-muted, #94a3b8); font-size: .58rem; line-height: 1; vertical-align: .05em; }
+    .perf-table-subheader th[aria-sort="ascending"] .perf-sort-indicator,
+    .perf-table-subheader th[aria-sort="descending"] .perf-sort-indicator { color: var(--bs-primary, #2563eb); font-weight: 800; }
     .perf-category-campaign-table .perf-table-group-title { background: rgba(37, 99, 235, .05) !important; }
     .perf-row { cursor: pointer; }
     .perf-row:hover { background: rgba(37, 99, 235, .04); }
@@ -685,11 +691,22 @@
     .perf-panel-title-icon { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; flex: none; border-radius: 11px; color: #1d4ed8; background: #dbeafe; font-size: 1.15rem; }
     .perf-panel-title h6 { font-size: 1rem; letter-spacing: -.01em; }
     .perf-panel-subtitle { margin-top: .2rem; color: var(--dsh-muted, #64748b); font-size: .72rem; line-height: 1.45; }
-    .perf-panel-meta { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: .45rem; }
-    .perf-panel-compare { display: inline-flex; align-items: center; gap: .35rem; padding: .42rem .65rem; border: 1px solid var(--dsh-border, #dbe2ea); border-radius: 8px; background: var(--card-bg, #fff); color: var(--dsh-muted, #64748b); font-size: .7rem; font-weight: 600; }
-    .perf-panel-compare select { min-width: 140px; border: 0; padding: 0 1.6rem 0 0; background-color: transparent; color: var(--text); font-size: .72rem; font-weight: 700; }
-    .perf-signal-legend { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; }
-    .perf-signal-legend .badge { padding: .4rem .55rem; border-radius: 6px; font-size: .64rem; font-weight: 700; }
+    .perf-panel-meta { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; min-width: 0; }
+    .perf-panel-compare { display: inline-flex; align-items: center; gap: .55rem; min-width: 0; padding: .42rem .62rem; border: 1px solid var(--dsh-border, #dbe2ea); border-radius: 9px; background: var(--card-bg, #fff); color: var(--dsh-muted, #64748b); font-size: .68rem; font-weight: 600; box-shadow: 0 1px 2px rgba(15, 23, 42, .03); }
+    .perf-compare-label { display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap; }
+    .perf-compare-label i { color: #2563eb; font-size: .78rem; }
+    .perf-panel-compare select { min-width: 172px; max-width: 230px; border: 0; padding: .05rem 1.6rem .05rem 0; background-color: transparent; color: var(--text); font-size: .68rem; font-weight: 750; }
+    .perf-panel-compare select:focus { box-shadow: none; outline: 2px solid rgba(37, 99, 235, .2); outline-offset: 2px; border-radius: 5px; }
+    .perf-compare-status { display: inline-flex; align-items: center; gap: .2rem; color: var(--dsh-muted, #64748b); font-size: .6rem; white-space: nowrap; }
+    .perf-signal-legend { display: inline-flex; align-items: center; flex-wrap: wrap; gap: .28rem .5rem; min-width: 0; padding: .38rem .55rem; border: 1px solid var(--dsh-border, #dbe2ea); border-radius: 9px; background: rgba(248, 250, 252, .72); color: var(--dsh-muted, #64748b); }
+    .perf-legend-title { margin-right: .12rem; color: var(--text); font-size: .6rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+    .perf-signal-item { display: inline-flex; align-items: center; gap: .25rem; white-space: nowrap; font-size: .62rem; font-weight: 650; }
+    .perf-signal-dot { width: .42rem; height: .42rem; flex: none; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255, 255, 255, .85); }
+    .perf-signal-dot.is-scale { background: #198754; }
+    .perf-signal-dot.is-safe { background: #0dcaf0; }
+    .perf-signal-dot.is-optimize { background: #f59e0b; }
+    .perf-signal-dot.is-stop { background: #dc3545; }
+    .perf-signal-dot.is-no-data { background: #6c757d; }
     .campaign-performance-panel > .p-2 { padding: .7rem 1.35rem !important; font-size: .7rem !important; background: rgba(248, 250, 252, .78); }
     .campaign-performance-panel [role="tablist"] { margin: .85rem 1.35rem !important; gap: .5rem !important; }
     .campaign-performance-panel [role="tablist"] .btn { min-height: 38px; font-size: .72rem !important; padding: .45rem .9rem !important; }
@@ -896,6 +913,8 @@
     }
     body[data-theme="dark"] .campaign-performance-panel .perf-panel-header { background: linear-gradient(135deg, var(--card-bg, #111827) 0%, rgba(30, 58, 138, .25) 100%) !important; }
     body[data-theme="dark"] .perf-panel-title-icon { color: #bfdbfe; background: rgba(37, 99, 235, .3); }
+    body[data-theme="dark"] .perf-signal-legend { background: rgba(15, 23, 42, .5); }
+    body[data-theme="dark"] .perf-signal-dot { box-shadow: 0 0 0 2px #1e293b; }
     body[data-theme="dark"] .campaign-performance-panel > .p-2 { background: rgba(15, 23, 42, .55); }
     body[data-theme="dark"] .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > tbody > tr.perf-row:nth-child(4n+1) > td,
     body[data-theme="dark"] .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > tbody > tr.perf-category-row:nth-child(4n+1) > td { background: rgba(30, 41, 59, .32); }
@@ -1125,21 +1144,21 @@
         </div>
         <div class="perf-panel-meta">
             <div class="perf-panel-compare">
-                <i class="bi bi-arrow-left-right"></i>
-                <span>Bandingkan</span>
-                <select onchange="const u=new URL(location); u.searchParams.set('compare_mode', this.value); u.hash='tab-campaign-performance'; location.assign(u.toString());"
-                        class="form-select form-select-sm">
+                <span class="perf-compare-label"><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span>Bandingkan dengan</span></span>
+                <select id="perfCompareMode" class="form-select form-select-sm" aria-label="Pilih periode pembanding">
                     <option value="prev_period" {{ $perfCompareMode === 'prev_period' ? 'selected' : '' }}>Periode Sebelumnya</option>
                     <option value="prev_month" {{ $perfCompareMode === 'prev_month' ? 'selected' : '' }}>Bulan Lalu</option>
                     <option value="prev_year" {{ $perfCompareMode === 'prev_year' ? 'selected' : '' }}>Tahun Lalu (tanggal sama)</option>
                 </select>
+                <span id="perfCompareStatus" class="perf-compare-status" aria-live="polite" hidden><i class="bi bi-arrow-repeat spin-icon" aria-hidden="true"></i> Memuat</span>
             </div>
-            <div class="perf-signal-legend">
-                <span class="badge bg-success" title="ROAS ≥ 1,2× target">Scale</span>
-                <span class="badge bg-info" title="ROAS memenuhi target">Aman</span>
-                <span class="badge bg-warning text-dark" title="Profit tapi di bawah target ROAS">Optimasi</span>
-                <span class="badge bg-danger" title="Rugi (profit ≤ 0)">Stop</span>
-                <span class="badge bg-secondary" title="HPP belum tersedia">Data HPP</span>
+            <div class="perf-signal-legend" aria-label="Legenda status campaign">
+                <span class="perf-legend-title">Sinyal</span>
+                <span class="perf-signal-item" title="ROAS minimal 1,2 kali target"><i class="perf-signal-dot is-scale" aria-hidden="true"></i>Scale</span>
+                <span class="perf-signal-item" title="ROAS memenuhi target"><i class="perf-signal-dot is-safe" aria-hidden="true"></i>Aman</span>
+                <span class="perf-signal-item" title="Profit ada, tetapi ROAS di bawah target"><i class="perf-signal-dot is-optimize" aria-hidden="true"></i>Optimasi</span>
+                <span class="perf-signal-item" title="Profit nol atau negatif"><i class="perf-signal-dot is-stop" aria-hidden="true"></i>Stop</span>
+                <span class="perf-signal-item" title="HPP belum tersedia"><i class="perf-signal-dot is-no-data" aria-hidden="true"></i>Data HPP</span>
             </div>
         </div>
     </div>
@@ -1152,42 +1171,6 @@
         <button type="button" id="btnPerformanceRoas" class="btn fw-bold" onclick="__campaignPerformanceView('roas')" data-perf-count="{{ $perfSegmentCounts['roas'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max ROAS</button>
         <button type="button" id="btnPerformanceGms" class="btn fw-bold" onclick="__campaignPerformanceView('gms')" data-perf-count="{{ $perfSegmentCounts['gms'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max Auto</button>
         <button type="button" id="btnPerformanceUnmapped" class="btn fw-bold" onclick="__campaignPerformanceView('unmapped')" data-perf-count="{{ $perfSegmentCounts['unmapped'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Produk Bermasalah</button>
-    </div>
-    <div class="perf-decision-filters mx-3 mb-2" role="search" aria-label="Filter campaign">
-        <div class="input-group input-group-sm perf-filter-search">
-            <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input type="search" id="perfCampaignSearch" class="form-control" placeholder="Cari campaign / produk" autocomplete="off">
-        </div>
-        <select id="perfStatusFilter" class="form-select form-select-sm" aria-label="Filter status campaign">
-            <option value="all">Semua status</option>
-            <option value="ongoing">Aktif</option>
-            <option value="paused">Jeda</option>
-            <option value="closed">Selesai</option>
-        </select>
-        <select id="perfDecisionFilter" class="form-select form-select-sm" aria-label="Filter keputusan campaign">
-            <option value="all">Semua keputusan</option>
-            <option value="loss">Campaign rugi</option>
-            <option value="scale">Layak scale</option>
-            <option value="optimize">Perlu optimasi</option>
-            <option value="safe">Aman</option>
-            <option value="no_data">Data HPP</option>
-        </select>
-        <select id="perfTrafficFilter" class="form-select form-select-sm" aria-label="Filter funnel campaign">
-            <option value="all">Semua funnel</option>
-            <option value="no_traffic">Tanpa impresi</option>
-            <option value="no_click">Tanpa klik</option>
-            <option value="low_ctr">CTR rendah</option>
-            <option value="low_cvr">CVR rendah</option>
-        </select>
-        <select id="perfSortFilter" class="form-select form-select-sm" aria-label="Urutkan campaign">
-            <option value="spend">Biaya terbesar</option>
-            <option value="profit_desc">Profit terbesar</option>
-            <option value="roas_desc">ROAS tertinggi</option>
-            <option value="orders_desc">Orders terbanyak</option>
-            <option value="ctr_desc">CTR tertinggi</option>
-            <option value="cvr_desc">CVR tertinggi</option>
-        </select>
-        <button type="button" id="perfFilterReset" class="btn btn-sm btn-light" title="Reset filter"><i class="bi bi-arrow-counterclockwise"></i></button>
     </div>
     <div class="px-3 pb-2" id="campaignPerformanceSubtabKpis">
         <div class="ads-kpi-grid mb-2">
@@ -1219,7 +1202,7 @@
                 <div class="ads-kpi-label"><i class="bi bi-wallet2" aria-hidden="true"></i> Biaya + PPN</div>
                 <div class="ads-kpi-value" data-perf-kpi-value="spend">Rp {{ number_format($perfInitialKpi['spend'], 0, ',', '.') }}</div>
                 <div class="ads-kpi-sub">CPA <span data-perf-kpi-value="cpa">Rp {{ number_format($perfInitialKpi['cpa'], 0, ',', '.') }}</span></div>
-                <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}"><span data-perf-kpi-compare="spend">Rp {{ number_format($perfInitialKpi['prev_spend'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['spend'], $perfInitialKpi['prev_spend'], null) !!}</span></div>
+                <div class="perf-kpi-compare" title="Perbandingan: {{ $perfCompareLabel }}"><span data-perf-kpi-compare="spend">Rp {{ number_format($perfInitialKpi['prev_spend'], 0, ',', '.') }} {!! $fmtDelta($perfInitialKpi['spend'], $perfInitialKpi['prev_spend'], false) !!}</span></div>
             </div>
             <div class="dpanel ads-kpi perf-kpi-card kpi-profit">
                 <div class="ads-kpi-label"><i class="bi bi-cash-coin" aria-hidden="true"></i> Profit</div>
@@ -1249,16 +1232,16 @@
                     <th colspan="4" class="text-center perf-table-group-title">Hasil</th>
                 </tr>
                 <tr class="perf-table-subheader">
-                    <th class="text-end" data-bs-toggle="tooltip" title="ROAS aktual berdasarkan GMV dibagi biaya iklan">ROAS Aktual</th>
-                    <th class="text-end" data-bs-toggle="tooltip" title="Jumlah order dan perbandingannya">Orders</th>
-                    <th class="text-end" data-bs-toggle="tooltip" title="Omzet dari iklan · Δ vs {{ $perfCompareLabel }}">GMV</th>
-                    <th class="text-end" data-bs-toggle="tooltip" title="Biaya iklan setelah PPN 11% · Δ vs {{ $perfCompareLabel }}">Biaya + PPN</th>
-                    <th class="text-end" data-bs-toggle="tooltip" title="Est. Net Profit & Margin · Δ vs {{ $perfCompareLabel }}">Profit</th>
+                    <th class="text-end" data-perf-sort="roas" data-bs-toggle="tooltip" title="Klik untuk urutkan ROAS aktual">ROAS Aktual <span class="perf-sort-indicator" aria-hidden="true">↕</span></th>
+                    <th class="text-end" data-perf-sort="orders" data-bs-toggle="tooltip" title="Klik untuk urutkan orders">Orders <span class="perf-sort-indicator" aria-hidden="true">↕</span></th>
+                    <th class="text-end" data-perf-sort="gmv" data-bs-toggle="tooltip" title="Klik untuk urutkan GMV">GMV <span class="perf-sort-indicator" aria-hidden="true">↕</span></th>
+                    <th class="text-end" data-perf-sort="spend" data-bs-toggle="tooltip" title="Klik untuk urutkan Biaya + PPN">Biaya + PPN <span class="perf-sort-indicator" aria-hidden="true">↕</span></th>
+                    <th class="text-end" data-perf-sort="profit" data-bs-toggle="tooltip" title="Klik untuk urutkan Profit">Profit <span class="perf-sort-indicator" aria-hidden="true">↕</span></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($perfCategoryRows as $categoryRow)
-                    <tr class="perf-category-row" data-perf-views="category" data-perf-name="{{ strtolower($categoryRow['category']) }}" data-perf-status="all" data-perf-reco="{{ strtolower($categoryRow['reco']['label']) }}" data-perf-profit="{{ $categoryRow['profit'] }}" data-perf-roas="{{ $categoryRow['roas'] }}" data-perf-spend="{{ $categoryRow['spend'] }}" data-perf-orders="{{ $categoryRow['orders'] }}" data-perf-impressions="{{ $categoryRow['impressions'] }}" data-perf-clicks="{{ $categoryRow['clicks'] }}" data-perf-ctr="{{ $categoryRow['ctr'] }}" data-perf-cvr="{{ $categoryRow['cvr'] }}" onclick="perfToggleCategory(this)">
+                    <tr class="perf-category-row" data-perf-views="category" data-perf-name="{{ strtolower($categoryRow['category']) }}" data-perf-status="all" data-perf-reco="{{ strtolower($categoryRow['reco']['label']) }}" data-perf-profit="{{ $categoryRow['profit'] }}" data-perf-roas="{{ $categoryRow['roas'] }}" data-perf-gmv="{{ $categoryRow['gmv'] }}" data-perf-spend="{{ $categoryRow['spend'] }}" data-perf-orders="{{ $categoryRow['orders'] }}" data-perf-impressions="{{ $categoryRow['impressions'] }}" data-perf-clicks="{{ $categoryRow['clicks'] }}" data-perf-ctr="{{ $categoryRow['ctr'] }}" data-perf-cvr="{{ $categoryRow['cvr'] }}" onclick="perfToggleCategory(this)">
                         <td>
                             <div class="d-flex align-items-start gap-1">
                                 <i class="bi bi-chevron-right perf-caret text-muted" style="font-size:.7rem; margin-top:.15rem;"></i>
@@ -1279,7 +1262,7 @@
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['roas'], 2) }}x</span>{!! $fmtDelta($categoryRow['roas'], $categoryRow['prev_roas'], true) !!}</div><div class="perf-sub {{ $categoryRow['actual_vs_target_pct'] !== null && $categoryRow['actual_vs_target_pct'] >= 100 ? 'text-success' : 'text-danger' }}">{{ $categoryRow['actual_vs_target_pct'] === null ? '—' : number_format($categoryRow['actual_vs_target_pct'], 1) . '% target' }}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($categoryRow['prev_roas'], 2) }}x</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['orders'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['orders'], $categoryRow['prev_orders'], true) !!}</div><div class="perf-sub text-muted">{{ number_format($categoryRow['items_sold'], 0, ',', '.') }} pcs</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ {{ number_format($categoryRow['prev_orders'], 0, ',', '.') }}</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val text-success">Rp {{ number_format($categoryRow['gmv'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['gmv'], $categoryRow['prev_gmv'], true) !!}</div><div class="perf-sub">COGS {{ $categoryRow['total_hpp'] > 0 ? 'Rp ' . number_format($categoryRow['total_hpp'], 0, ',', '.') : '—' }}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($categoryRow['prev_gmv'], 0, ',', '.') }}</div></td>
-                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['spend'], $categoryRow['prev_spend'], null) !!}</div><div class="perf-sub text-muted">CPA Rp {{ number_format($categoryRow['cpa'], 0, ',', '.') }}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($categoryRow['prev_spend'], 0, ',', '.') }}</div></td>
+                        <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['spend'], $categoryRow['prev_spend'], false) !!}</div><div class="perf-sub text-muted">CPA Rp {{ number_format($categoryRow['cpa'], 0, ',', '.') }}</div><div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($categoryRow['prev_spend'], 0, ',', '.') }}</div></td>
                         <td class="text-end perf-cell"><div class="perf-main"><span class="perf-val {{ !$categoryRow['profit_available'] ? 'text-muted' : ($categoryRow['profit'] >= 0 ? 'text-success' : 'text-danger') }}">{{ !$categoryRow['profit_available'] ? 'N/A' : 'Rp ' . number_format($categoryRow['profit'], 0, ',', '.') }}</span>{!! $fmtDelta($categoryRow['profit'], $categoryRow['prev_profit'], true) !!}</div>@if($categoryRow['profit_available'])<div class="perf-sub">Profit/order {{ $categoryRow['profit_per_order'] === null ? '—' : 'Rp ' . number_format($categoryRow['profit_per_order'], 0, ',', '.') }}</div>@endif<div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($categoryRow['prev_profit'], 0, ',', '.') }}</div></td>
                     </tr>
                     <tr class="perf-category-detail" data-perf-views="category" style="display:none;">
@@ -1355,7 +1338,7 @@
                                                     <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($campaignRow['prev_gmv'], 0, ',', '.') }}</div>
                                                 </td>
                                                 <td class="text-end">
-                                                    <div>Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }} {!! $fmtDelta($campaignRow['spend'], $campaignRow['prev_spend'], null) !!}</div>
+                                                    <div>Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }} {!! $fmtDelta($campaignRow['spend'], $campaignRow['prev_spend'], false) !!}</div>
                                                     <div class="perf-sub text-muted">CPA Rp {{ number_format($campaignRow['cpa'], 0, ',', '.') }}</div>
                                                     <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($campaignRow['prev_spend'], 0, ',', '.') }}</div>
                                                 </td>
@@ -1380,7 +1363,7 @@
                     @php
                         $meetsTarget = $row['target_roas'] !== null && $row['roas'] >= $row['target_roas'];
                     @endphp
-                    <tr class="perf-row" data-perf-views="{{ implode(' ', $row['performance_views'] ?? []) }}" data-perf-name="{{ strtolower(($row['name'] ?? '') . ' ' . ($row['item_name'] ?? '')) }}" data-perf-status="{{ strtolower((string) ($row['status'] ?? '')) }}" data-perf-reco="{{ strtolower($row['reco']) }}" data-perf-profit="{{ $row['profit'] ?? 0 }}" data-perf-profit-available="{{ $row['profit_available'] ? '1' : '0' }}" data-perf-roas="{{ $row['roas'] }}" data-perf-spend="{{ $row['spend'] }}" data-perf-orders="{{ $row['orders'] }}" data-perf-ctr="{{ $row['ctr'] }}" data-perf-cvr="{{ $row['cvr'] }}" data-perf-hourly-store-id="{{ e((string) $row['store_id']) }}" data-perf-hourly-campaign-id="{{ e((string) $row['campaign_id']) }}" data-perf-hourly-name="{{ e((string) ($row['name'] ?? 'Campaign')) }}" onclick="perfToggle(this)">
+                    <tr class="perf-row" data-perf-views="{{ implode(' ', $row['performance_views'] ?? []) }}" data-perf-name="{{ strtolower(($row['name'] ?? '') . ' ' . ($row['item_name'] ?? '')) }}" data-perf-status="{{ strtolower((string) ($row['status'] ?? '')) }}" data-perf-reco="{{ strtolower($row['reco']) }}" data-perf-profit="{{ $row['profit'] ?? 0 }}" data-perf-profit-available="{{ $row['profit_available'] ? '1' : '0' }}" data-perf-roas="{{ $row['roas'] }}" data-perf-gmv="{{ $row['gmv'] }}" data-perf-spend="{{ $row['spend'] }}" data-perf-orders="{{ $row['orders'] }}" data-perf-ctr="{{ $row['ctr'] }}" data-perf-cvr="{{ $row['cvr'] }}" data-perf-hourly-store-id="{{ e((string) $row['store_id']) }}" data-perf-hourly-campaign-id="{{ e((string) $row['campaign_id']) }}" data-perf-hourly-name="{{ e((string) ($row['name'] ?? 'Campaign')) }}" onclick="perfToggle(this)">
                         {{-- Campaign / Item --}}
                         <td>
                             <div class="d-flex align-items-start gap-1">
@@ -1447,7 +1430,7 @@
                             <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($row['prev_gmv'], 0, ',', '.') }}</div>
                         </td>
                         <td class="text-end perf-cell">
-                            <div class="perf-main"><span class="perf-val">Rp {{ number_format($row['spend'], 0, ',', '.') }}</span>{!! $fmtDelta($row['spend'], $row['prev_spend'], null) !!}</div>
+                            <div class="perf-main"><span class="perf-val">Rp {{ number_format($row['spend'], 0, ',', '.') }}</span>{!! $fmtDelta($row['spend'], $row['prev_spend'], false) !!}</div>
                             <div class="perf-sub text-muted">CPA Rp {{ number_format($row['cpa'], 0, ',', '.') }}</div>
                             <div class="perf-previous" title="Perbandingan: {{ $perfCompareLabel }}">↔ Rp {{ number_format($row['prev_spend'], 0, ',', '.') }}</div>
                         </td>
@@ -1473,7 +1456,7 @@
                                 <div class="perf-chip"><span>COGS/unit</span><b>{{ $row['unit_cogs'] > 0 ? 'Rp ' . number_format($row['unit_cogs'], 0, ',', '.') : '—' }}</b></div>
                                 <div class="perf-chip"><span>CPA</span><b>Rp {{ number_format($row['cpa'], 0, ',', '.') }}</b></div>
                                 <div class="perf-chip"><span>POAS</span><b>{{ $row['poas'] === null ? '—' : number_format($row['poas'], 2) . 'x' }}</b></div>
-                                <div class="perf-chip"><span>Biaya riil (PPN 11%)</span><b>Rp {{ number_format($row['spend_ppn'], 0, ',', '.') }}</b>{!! $fmtDelta($row['spend'], $row['prev_spend'], null) !!}</div>
+                                <div class="perf-chip"><span>Biaya riil (PPN 11%)</span><b>Rp {{ number_format($row['spend_ppn'], 0, ',', '.') }}</b>{!! $fmtDelta($row['spend'], $row['prev_spend'], false) !!}</div>
                             </div>
                             <div class="perf-hourly-panel" data-perf-hourly-panel data-store-id="{{ e((string) $row['store_id']) }}" data-campaign-id="{{ e((string) $row['campaign_id']) }}" data-campaign-name="{{ e((string) ($row['name'] ?? 'Campaign')) }}">
                                 <div class="perf-hourly-header">
@@ -2310,7 +2293,7 @@ function perfUpdateKpis(segment, overrideKpi = null) {
     setValue('profit_unknown', perfKpiNumber(kpi.profit_unknown, 0));
 
     const compareValues = {
-        spend: perfKpiCompare(kpi.spend, kpi.prev_spend, value => 'Rp ' + perfKpiNumber(value, 0), null),
+        spend: perfKpiCompare(kpi.spend, kpi.prev_spend, value => 'Rp ' + perfKpiNumber(value, 0), false),
         orders: perfKpiCompare(kpi.orders, kpi.prev_orders, value => perfKpiNumber(value, 0), true),
         cpa: perfKpiCompare(kpi.cpa, kpi.prev_cpa, value => 'Rp ' + perfKpiNumber(value, 0), null),
         gmv: perfKpiCompare(kpi.gmv, kpi.prev_gmv, value => 'Rp ' + perfKpiNumber(value, 0), true),
@@ -2335,7 +2318,7 @@ function perfUpdateKpis(segment, overrideKpi = null) {
     }
 }
 
-const perfDecisionFilters = { search: '', status: 'all', decision: 'all', traffic: 'all', sort: 'spend' };
+const perfDecisionFilters = { search: '', status: 'all', decision: 'all', traffic: 'all', sort: 'spend', sortDirection: 'desc' };
 
 function perfFilterIsActive() {
     return perfDecisionFilters.search !== ''
@@ -2422,21 +2405,42 @@ function perfKpiFromRows(rows) {
 }
 
 function perfSortRows() {
-    if (perfActiveSegment === 'category') return;
     const tbody = document.querySelector('.campaign-performance-panel .perf-table tbody');
     if (!tbody) return;
     const sortKey = {
         spend: 'spend',
-        profit_desc: 'profit',
-        roas_desc: 'roas',
-        orders_desc: 'orders',
-        ctr_desc: 'ctr',
-        cvr_desc: 'cvr',
+        profit: 'profit',
+        roas: 'roas',
+        orders: 'orders',
+        gmv: 'gmv',
     }[perfDecisionFilters.sort] || 'spend';
-    const pairs = Array.from(tbody.querySelectorAll('tr.perf-row'))
+    const rowSelector = perfActiveSegment === 'category' ? 'tr.perf-category-row' : 'tr.perf-row';
+    const detailClass = perfActiveSegment === 'category' ? 'perf-category-detail' : 'perf-detail';
+    const direction = perfDecisionFilters.sortDirection === 'asc' ? 1 : -1;
+    const pairs = Array.from(tbody.querySelectorAll(rowSelector))
         .map(row => ({ row, detail: row.nextElementSibling, value: Number(row.dataset['perf' + sortKey.charAt(0).toUpperCase() + sortKey.slice(1)] || 0) }));
-    pairs.sort((a, b) => b.value - a.value);
-    pairs.forEach(pair => { tbody.appendChild(pair.row); if (pair.detail?.classList.contains('perf-detail')) tbody.appendChild(pair.detail); });
+    pairs.sort((a, b) => (a.value - b.value) * direction);
+    pairs.forEach(pair => { tbody.appendChild(pair.row); if (pair.detail?.classList.contains(detailClass)) tbody.appendChild(pair.detail); });
+}
+
+function perfUpdateSortIndicators() {
+    document.querySelectorAll('.campaign-performance-panel .perf-table > thead .perf-table-subheader th[data-perf-sort]').forEach(header => {
+        const active = header.dataset.perfSort === perfDecisionFilters.sort;
+        header.setAttribute('aria-sort', active ? (perfDecisionFilters.sortDirection === 'asc' ? 'ascending' : 'descending') : 'none');
+        const indicator = header.querySelector('.perf-sort-indicator');
+        if (indicator) indicator.textContent = active ? (perfDecisionFilters.sortDirection === 'asc' ? '↑' : '↓') : '↕';
+    });
+}
+
+function perfSortByHeader(sortKey) {
+    if (perfDecisionFilters.sort === sortKey) {
+        perfDecisionFilters.sortDirection = perfDecisionFilters.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        perfDecisionFilters.sort = sortKey;
+        perfDecisionFilters.sortDirection = 'desc';
+    }
+    perfApplyDecisionFilters();
+    perfUpdateSortIndicators();
 }
 
 function perfApplyDecisionFilters() {
@@ -2552,6 +2556,18 @@ window.__campaignPerformanceView = function(view) {
 
 // Kembali ke tab Campaign setelah reload akibat ganti periode pembanding.
 document.addEventListener('DOMContentLoaded', function() {
+    const compareMode = document.getElementById('perfCompareMode');
+    const compareStatus = document.getElementById('perfCompareStatus');
+    compareMode?.addEventListener('change', function() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('compare_mode', this.value);
+        url.hash = 'tab-campaign-performance';
+        this.disabled = true;
+        if (compareStatus) compareStatus.hidden = false;
+        window.__dashLoading?.();
+        window.location.assign(url.toString());
+    });
+
     const search = document.getElementById('perfCampaignSearch');
     const status = document.getElementById('perfStatusFilter');
     const decision = document.getElementById('perfDecisionFilter');
@@ -2576,6 +2592,19 @@ document.addEventListener('DOMContentLoaded', function() {
         if (sort) sort.value = 'spend';
         applyFilters();
     });
+
+    document.querySelectorAll('.campaign-performance-panel .perf-table > thead .perf-table-subheader th[data-perf-sort]').forEach(header => {
+        header.setAttribute('role', 'button');
+        header.setAttribute('tabindex', '0');
+        header.addEventListener('click', () => perfSortByHeader(header.dataset.perfSort));
+        header.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                perfSortByHeader(header.dataset.perfSort);
+            }
+        });
+    });
+    perfUpdateSortIndicators();
 
     const categoryButton = document.getElementById('btnPerformanceCategory');
     if (categoryButton) {
