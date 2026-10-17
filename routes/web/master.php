@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Master\CustomerController;
+use App\Http\Controllers\Master\ContactController;
 use App\Http\Controllers\Master\EmployeeController;
 use App\Http\Controllers\Master\ItemBomController;
 use App\Http\Controllers\Master\ItemCategoryController;
@@ -79,6 +80,8 @@ Route::middleware(['web', 'auth', 'access:master'])->group(function () {
         |--------------------------------------------------------------------------
          */
         Route::resource('customers', CustomerController::class)->except(['show']);
+
+        Route::get('contacts', [ContactController::class, 'index'])->name('contacts.index');
 
         /*
         |--------------------------------------------------------------------------

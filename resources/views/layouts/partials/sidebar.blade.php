@@ -76,6 +76,7 @@
     $hasMasterItemsIndex = $router->has('master.items.index');
     $hasMasterItemCategoriesIndex = $router->has('master.item_categories.index');
     $hasMasterCustomersIndex = $router->has('master.customers.index');
+    $hasContactsIndex = $router->has('master.contacts.index');
     $hasMasterSuppliersIndex = $router->has('master.suppliers.index');
     $hasMasterItemBomsIndex = $router->has('master.item_boms.index');
     $hasMasterEmployeesIndex = $router->has('master.employees.index');
@@ -2933,6 +2934,13 @@
                         <x-sidebar.sub-link href="{{ route('master.customers.index') }}" icon="bi bi-person"
                             :active="request()->routeIs('master.customers.*')">
                             Pelanggan
+                        </x-sidebar.sub-link>
+                    @endif
+
+                    @if ($hasContactsIndex)
+                        <x-sidebar.sub-link href="{{ route('master.contacts.index') }}" icon="bi bi-person-lines-fill"
+                            :active="request()->routeIs('master.contacts.*')">
+                            Kontak
                         </x-sidebar.sub-link>
                     @endif
 

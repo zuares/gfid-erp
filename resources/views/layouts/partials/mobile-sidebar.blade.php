@@ -320,6 +320,7 @@
     // Data Master
     $hasMasterItemsIndex = $router->has('master.items.index');
     $hasMasterCustomersIndex = $router->has('master.customers.index');
+    $hasContactsIndex = $router->has('master.contacts.index');
     $hasMasterSuppliersIndex = $router->has('master.suppliers.index');
     $hasMasterItemBomsIndex = $router->has('master.item_boms.index');
     $hasMasterEmployeesIndex = $router->has('master.employees.index');
@@ -482,6 +483,7 @@
         // Admin hanya mendapat akses CRUD Master Item, bukan seluruh Master Data.
         $hasMasterItemsIndex = $isAdmin || $isOwner;
         $hasMasterCustomersIndex = false;
+        $hasContactsIndex = false;
         $hasMasterSuppliersIndex = $hasMasterItemBomsIndex = $hasMasterEmployeesIndex = false;
     }
 
@@ -1717,6 +1719,13 @@
                                 <a href="{{ route('master.customers.index') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('master.customers.*') ? 'active' : '' }}">
                                     <span class="icon">👤</span><span>Pelanggan</span>
+                                </a>
+                            @endif
+
+                            @if ($hasContactsIndex)
+                                <a href="{{ route('master.contacts.index') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('master.contacts.*') ? 'active' : '' }}">
+                                    <span class="icon">📇</span><span>Kontak</span>
                                 </a>
                             @endif
 

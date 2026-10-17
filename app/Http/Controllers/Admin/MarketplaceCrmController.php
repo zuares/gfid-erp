@@ -1328,7 +1328,7 @@ class MarketplaceCrmController extends Controller
             ->get();
     }
 
-    private function customerProfiles(?int $storeId = null)
+    public function customerProfileQuery(?int $storeId = null)
     {
         $usernameKey = "NULLIF(LOWER(TRIM(marketplace_orders.buyer_username)), '')";
         $legacyKey = "CASE WHEN NULLIF(TRIM(marketplace_orders.buyer_username), '') IS NULL THEN COALESCE(marketplace_orders.customer_id, marketplace_orders.id) ELSE NULL END";
@@ -1338,17 +1338,15 @@ class MarketplaceCrmController extends Controller
             ->where('marketplace_orders.status', '!=', 'cancelled')
             ->when($storeId, fn ($q) => $q->where('marketplace_orders.store_id', $storeId));
 
-        // Recency harus dibandingkan dengan hari ini. Menggunakan tanggal order
-        // terakhir di dataset membuat data historis terlihat lebih baru dari
-        // kondisi sebenarnya dan mengacaukan segment Lost/At Risk.
-        $analysisDate = now()->startOfDay();
-        $profiles = $baseQuery
+        return $baseQuery
             ->selectRaw("{$usernameKey} as username_key")
             ->selectRaw("{$legacyKey} as legacy_key")
             ->selectRaw('MIN(customers.id) as id')
             ->selectRaw('GROUP_CONCAT(DISTINCT customers.id) as customer_ids')
             ->selectRaw("MAX(NULLIF(TRIM(marketplace_orders.buyer_username), '')) as buyer_username")
             ->selectRaw("COALESCE(MAX(NULLIF(TRIM(customers.name), '')), MAX(NULLIF(TRIM(marketplace_orders.buyer_name), '')), 'Buyer Marketplace') as name")
+            ->selectRaw("MAX(NULLIF(TRIM(customers.code), '')) as code")
+            ->selectRaw("MAX(NULLIF(TRIM(customers.email), '')) as email")
             ->selectRaw("COALESCE(MAX(NULLIF(TRIM(customers.phone), '')), MAX(NULLIF(TRIM(marketplace_orders.buyer_phone), ''))) as phone")
             ->selectRaw("COALESCE(MAX(NULLIF(TRIM(customers.city), '')), MAX(NULLIF(TRIM(marketplace_orders.shipping_city), ''))) as city")
             ->selectRaw("COALESCE(MAX(NULLIF(TRIM(customers.province), '')), MAX(NULLIF(TRIM(marketplace_orders.shipping_province), ''))) as province")
@@ -1358,7 +1356,13 @@ class MarketplaceCrmController extends Controller
             ->selectRaw('MAX(marketplace_orders.payment_method) as marketplace_payment_method')
             ->selectRaw('MAX(COALESCE(marketplace_orders.ordered_at, marketplace_orders.order_date)) as last_marketplace_order_at')
             ->selectRaw('MIN(COALESCE(marketplace_orders.ordered_at, marketplace_orders.order_date)) as first_marketplace_order_at')
-            ->groupByRaw("{$usernameKey}, {$legacyKey}")
+            ->groupByRaw("{$usernameKey}, {$legacyKey}");
+    }
+
+    public function customerProfiles(?int $storeId = null, bool $includeWhatsappStats = true)
+    {
+        $analysisDate = now()->startOfDay();
+        $profiles = $this->customerProfileQuery($storeId)
             ->get()
             ->map(function ($customer) {
                 $customer->customer_ids = collect(explode(',', (string) $customer->customer_ids))
@@ -1375,6 +1379,25 @@ class MarketplaceCrmController extends Controller
 
                 return $customer;
             });
+
+        if (! $includeWhatsappStats) {
+            return $profiles->map(function ($customer) {
+                $customer->whatsapp_message_count = 0;
+                $customer->whatsapp_sent_count = 0;
+                $customer->whatsapp_last_status = null;
+                $customer->days_since_last_order = $customer->last_marketplace_order_at
+                    ? Carbon::parse($customer->last_marketplace_order_at)->startOfDay()->diffInDays(now()->startOfDay())
+                    : 99999;
+                $customer->segment = self::classify(
+                    (int) $customer->marketplace_order_count,
+                    (int) $customer->days_since_last_order,
+                    (float) $customer->marketplace_total_spent
+                );
+                $customer->wa_phone = $this->normalizePhone($customer->phone);
+
+                return $customer;
+            });
+        }
 
         $customerIds = $profiles->flatMap(fn ($customer) => $customer->customer_ids)
             ->unique()
