@@ -3569,6 +3569,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'items_sold' => $itemsSold,
                         'gmv' => $gmv,
                         'total_cogs' => $totalCogs !== null ? (float) $totalCogs : null,
+                        'net_profit' => $profitAfterAds !== null ? (float) $profitAfterAds : null,
                         'margin' => $profitAfterAds !== null && $gmv > 0 ? ((float) $profitAfterAds / $gmv) * 100 : null,
                         'cogs' => $cogs,
                         'cvr' => $cvr,
@@ -3585,6 +3586,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'prev_items_sold' => $prevItemsSold,
                         'prev_gmv' => $prevGmv,
                         'prev_total_cogs' => $prevTotalCogs !== null ? (float) $prevTotalCogs : null,
+                        'prev_net_profit' => $prevProfitAfterAds !== null ? (float) $prevProfitAfterAds : null,
                         'prev_margin' => $prevProfitAfterAds !== null && $prevGmv > 0 ? ((float) $prevProfitAfterAds / $prevGmv) * 100 : null,
                         'prev_cogs' => $prevCogs,
                         'prev_ctr' => $prevImpressions > 0 ? ($prevClicks / $prevImpressions) * 100 : 0,
@@ -3658,6 +3660,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     $prevOrders = $group->sum('prev_orders');
                     $prevItemsSold = $group->sum('prev_items_sold');
                     $prevGmv = $group->sum('prev_gmv');
+                    $profitRows = $group->filter(fn ($row) => $row['net_profit'] !== null);
+                    $prevProfitRows = $group->filter(fn ($row) => $row['prev_net_profit'] !== null);
+                    $netProfit = $profitRows->isNotEmpty() ? $profitRows->sum('net_profit') : null;
+                    $prevNetProfit = $prevProfitRows->isNotEmpty() ? $prevProfitRows->sum('prev_net_profit') : null;
                     $marginRows = $group->filter(fn ($row) => $row['margin'] !== null && $row['gmv'] > 0);
                     $prevMarginRows = $group->filter(fn ($row) => $row['prev_margin'] !== null && $row['prev_gmv'] > 0);
                     $margin = $marginRows->sum('gmv') > 0
@@ -3688,6 +3694,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'items_sold' => $itemsSold,
                         'cvr' => $clicks > 0 ? ($orders / $clicks) * 100 : 0,
                         'gmv' => $gmv,
+                        'net_profit' => $netProfit,
                         'margin' => $margin,
                         'cogs' => $cogs,
                         'aov' => $orders > 0 ? $gmv / $orders : 0,
@@ -3713,6 +3720,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'prev_acos' => $prevGmv > 0 ? ($prevSpend / $prevGmv) * 100 : 0,
                         'prev_bep_acos' => $prevBepAcos,
                         'prev_gmv' => $prevGmv,
+                        'prev_net_profit' => $prevNetProfit,
                         'prev_margin' => $prevMargin,
                         'prev_cogs' => $prevCogs,
                     ];
@@ -3812,8 +3820,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-product-meta { display:flex; flex-wrap:wrap; align-items:center; gap:.16rem .38rem; margin-top:.16rem; color:var(--dsh-muted,#64748b); font-size:.56rem; line-height:1.2; font-variant-numeric:tabular-nums; }
                 .traffic-product-meta span { white-space:nowrap; }
                 .traffic-product-meta b { color:var(--text,#334155); font-weight:750; }
-                .traffic-product-meta .traffic-product-meta-acos { color:#2563eb; }
-                .traffic-product-meta .traffic-product-meta-bep { color:#7c3aed; }
+                .traffic-product-meta .traffic-product-meta-spend b { color:#dc2626; }
+                .traffic-product-meta .traffic-product-meta-profit.is-positive b { color:#15803d; }
+                .traffic-product-meta .traffic-product-meta-profit.is-negative b { color:#dc2626; }
                 .traffic-product-meta .traffic-product-meta-na { color:#b45309; }
                 .traffic-table-scroll-shell { position:relative; }
                 .traffic-table-scroll-shell > .traffic-table-scroll {
@@ -4571,8 +4580,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <td>
                                             <div class="d-flex align-items-center gap-1"><i class="bi bi-chevron-right traffic-caret text-muted" style="font-size:.7rem;"></i><div class="fw-bold" style="font-size: 0.78rem;">{{ $categoryRow['category'] }}</div><span class="traffic-status-dot traffic-product-status status-{{ $categoryRow['signal']['class'] }}" title="{{ $categoryRow['signal']['label'] }}" aria-label="{{ $categoryRow['signal']['label'] }}"><i class="bi {{ $categoryRow['signal']['icon'] }}"></i><span class="visually-hidden">{{ $categoryRow['signal']['label'] }}</span></span></div>
                                             <div class="text-muted" style="font-size: 0.65rem;">{{ number_format($categoryRow['campaigns'], 0, ',', '.') }} campaign</div>
-                                            <div class="traffic-product-meta" title="COGS/unit {{ $categoryRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($categoryRow['cogs'], 0, ',', '.') }}">
+                                            <div class="traffic-product-meta" title="Biaya iklan Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }} · Net profit {{ $categoryRow['net_profit'] === null ? 'belum tersedia' : 'Rp ' . number_format($categoryRow['net_profit'], 0, ',', '.') }} · COGS/unit {{ $categoryRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($categoryRow['cogs'], 0, ',', '.') }}">
                                                 <span>COGS/unit <b>{{ $categoryRow['cogs'] === null ? '—' : 'Rp ' . number_format($categoryRow['cogs'], 0, ',', '.') }}</b></span>
+                                                <span class="traffic-product-meta-spend">Iklan <b>Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</b></span>
+                                                <span class="traffic-product-meta-profit {{ $categoryRow['net_profit'] !== null ? ($categoryRow['net_profit'] >= 0 ? 'is-positive' : 'is-negative') : '' }}">Net profit <b>{{ $categoryRow['net_profit'] === null ? '—' : 'Rp ' . number_format($categoryRow['net_profit'], 0, ',', '.') }}</b></span>
                                             </div>
                                         </td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['impressions'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($categoryRow['impressions'], $categoryRow['prev_impressions'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_impressions']) !!}</div></td>
@@ -4633,8 +4644,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                                                                 <span class="fw-bold text-truncate d-block" style="max-width:260px;">{{ $campaignRow['name'] }}</span>
                                                                             @endif
                                                                             <div class="text-muted" style="font-size:.58rem;">ID: {{ $campaignRow['id'] }}</div>
-                                                                            <div class="traffic-product-meta" title="COGS/unit {{ $campaignRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($campaignRow['cogs'], 0, ',', '.') }}">
+                                                                            <div class="traffic-product-meta" title="Biaya iklan Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }} · Net profit {{ $campaignRow['net_profit'] === null ? 'belum tersedia' : 'Rp ' . number_format($campaignRow['net_profit'], 0, ',', '.') }} · COGS/unit {{ $campaignRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($campaignRow['cogs'], 0, ',', '.') }}">
                                                                                 <span>COGS/unit <b>{{ $campaignRow['cogs'] === null ? '—' : 'Rp ' . number_format($campaignRow['cogs'], 0, ',', '.') }}</b></span>
+                                                                                <span class="traffic-product-meta-spend">Iklan <b>Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }}</b></span>
+                                                                                <span class="traffic-product-meta-profit {{ $campaignRow['net_profit'] !== null ? ($campaignRow['net_profit'] >= 0 ? 'is-positive' : 'is-negative') : '' }}">Net profit <b>{{ $campaignRow['net_profit'] === null ? '—' : 'Rp ' . number_format($campaignRow['net_profit'], 0, ',', '.') }}</b></span>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -4693,8 +4706,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                                         <span class="fw-bold d-block text-truncate" style="font-size:.78rem; max-width:260px;">{{ $trafficRow['name'] }}</span>
                                                     @endif
                                                     <div class="text-muted" style="font-size: .58rem;">ID: {{ $trafficRow['id'] }}</div>
-                                                    <div class="traffic-product-meta" title="COGS/unit {{ $trafficRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($trafficRow['cogs'], 0, ',', '.') }}">
+                                                    <div class="traffic-product-meta" title="Biaya iklan Rp {{ number_format($trafficRow['spend'], 0, ',', '.') }} · Net profit {{ $trafficRow['net_profit'] === null ? 'belum tersedia' : 'Rp ' . number_format($trafficRow['net_profit'], 0, ',', '.') }} · COGS/unit {{ $trafficRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($trafficRow['cogs'], 0, ',', '.') }}">
                                                         <span>COGS/unit <b>{{ $trafficRow['cogs'] === null ? '—' : 'Rp ' . number_format($trafficRow['cogs'], 0, ',', '.') }}</b></span>
+                                                        <span class="traffic-product-meta-spend">Iklan <b>Rp {{ number_format($trafficRow['spend'], 0, ',', '.') }}</b></span>
+                                                        <span class="traffic-product-meta-profit {{ $trafficRow['net_profit'] !== null ? ($trafficRow['net_profit'] >= 0 ? 'is-positive' : 'is-negative') : '' }}">Net profit <b>{{ $trafficRow['net_profit'] === null ? '—' : 'Rp ' . number_format($trafficRow['net_profit'], 0, ',', '.') }}</b></span>
                                                     </div>
                                                 </div>
                                             </div>
