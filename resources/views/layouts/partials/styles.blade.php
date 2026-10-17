@@ -47,6 +47,7 @@
     /* ========= GLOBAL SHELL DIMENSIONS ========= */
     --sidebar-width-tablet:210px;
     --sidebar-width-desktop:240px;
+    --app-content-max-width:1100px;
 
     /* Android baseline viewport helper (dipakai layout kamu) */
     --app-vh: 100vh;
@@ -202,7 +203,7 @@
 
   .page-wrap{
     width:100%;
-    max-width:1760px;
+    max-width:var(--app-content-max-width);
     min-width:0;
     margin-inline:auto;
     padding-inline:1rem;

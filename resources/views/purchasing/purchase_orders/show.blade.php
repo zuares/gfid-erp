@@ -5,8 +5,8 @@
 
 @push('head')
     <style>
-.po-wrap{max-width:1080px;margin-inline:auto;padding:.7rem .75rem 3rem}
-.po-topbar{position:sticky;top:0;z-index:250;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;width:100%;max-width:1080px;margin-inline:auto;padding:.55rem .75rem;background:var(--card,#fff);border-bottom:1px solid rgba(148,163,184,.18)}
+.po-wrap{max-width:var(--app-content-max-width, 1100px);margin-inline:auto;padding:.7rem .75rem 3rem}
+.po-topbar{position:sticky;top:0;z-index:250;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;width:100%;max-width:var(--app-content-max-width, 1100px);margin-inline:auto;padding:.55rem .75rem;background:var(--card,#fff);border-bottom:1px solid rgba(148,163,184,.18)}
 .po-code{font-weight:900;font-size:1.05rem;color:#111827;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .po-supplier{font-size:.8rem;color:#64748b;margin-left:.25rem}
 .po-spacer{flex:1}

@@ -14,7 +14,7 @@
         --dsh-muted: #9ca3af;
     }
 
-    .dash { display: grid; gap: .9rem; max-width: 1100px; margin-inline: auto; }
+    .dash { display: grid; gap: .9rem; max-width: var(--app-content-max-width, 1100px); margin-inline: auto; }
 
     /* ---------- Header (mirip ship-topbar) ---------- */
     .dash-hero {

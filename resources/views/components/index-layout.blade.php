@@ -12,7 +12,7 @@
         --shp-border: rgba(148,163,184,.18);
         --shp-muted: #64748b;
     }
-    .page-wrap { max-width: 1040px; margin-inline: auto; padding: .75rem .75rem 4rem; background: transparent !important; }
+    .page-wrap { max-width: var(--app-content-max-width, 1100px); margin-inline: auto; padding: .75rem .75rem 4rem; background: transparent !important; }
 
     .card-main {
         background: var(--card, #fff);
