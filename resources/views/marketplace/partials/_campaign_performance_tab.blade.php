@@ -1016,6 +1016,36 @@
         bottom: .35rem;
         z-index: 20;
     }
+    /* Sticky header per baris: background solid dan offset dikunci agar
+       data body tidak terlihat menembus header saat tabel digeser. */
+    .campaign-performance-panel [data-perf-table-scroll] > table > thead th {
+        position: sticky !important;
+        box-sizing: border-box;
+        opacity: 1 !important;
+        background-image: none !important;
+        background-clip: padding-box;
+        isolation: isolate;
+    }
+    .campaign-performance-panel [data-perf-table-scroll] > table > thead > tr:first-child > th {
+        top: 0 !important;
+        height: 2rem;
+        background: #eff6ff !important;
+        color: #1e3a8a !important;
+        z-index: 30 !important;
+    }
+    .campaign-performance-panel [data-perf-table-scroll] > table > thead > tr:nth-child(2) > th {
+        top: 2rem !important;
+        height: 1.8rem;
+        background: #f8fafc !important;
+        color: #0f172a !important;
+        z-index: 29 !important;
+        box-shadow: 0 3px 8px -6px rgba(15, 23, 42, .6), inset 0 -1px 0 #cbd5e1;
+    }
+    .campaign-performance-panel [data-perf-table-scroll] > table > thead > tr:first-child > th:first-child {
+        left: 0 !important;
+        z-index: 40 !important;
+        background: #eff6ff !important;
+    }
     @media (max-width: 991.98px) {
         .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table,
         .campaign-performance-panel .perf-category-table-scroll-shell .perf-category-campaign-table {
@@ -1043,6 +1073,17 @@
     }
     body[data-theme="dark"] .campaign-performance-panel [data-perf-table-scroll] > table > thead tr:first-child th:first-child {
         box-shadow: 1px 0 0 #475569, 5px 0 10px -9px rgba(0, 0, 0, .9), inset 0 -1px 0 #334155;
+    }
+    body[data-theme="dark"] .campaign-performance-panel [data-perf-table-scroll] > table > thead,
+    body[data-theme="dark"] .campaign-performance-panel [data-perf-table-scroll] > table > thead > tr {
+        background: #111827 !important;
+    }
+    body[data-theme="dark"] .campaign-performance-panel [data-perf-table-scroll] > table > thead > tr:first-child,
+    body[data-theme="dark"] .campaign-performance-panel [data-perf-table-scroll] > table > thead > tr:first-child > th:first-child {
+        background: #172554 !important;
+    }
+    body[data-theme="dark"] .campaign-performance-panel [data-perf-table-scroll] > table > thead > tr:nth-child(2) {
+        background: #1e293b !important;
     }
 
 </style>
