@@ -15,26 +15,27 @@ class ContactController extends Controller
     {
         $search = trim($request->string('q')->toString());
         $filter = $request->string('filter')->toString();
-        $filter = in_array($filter, ['all', 'whatsapp', 'email'], true) ? $filter : 'all';
+        $filter = $filter === 'whatsapp' ? 'phone' : $filter;
+        $filter = in_array($filter, ['all', 'phone', 'email'], true) ? $filter : 'all';
         $storeId = $request->integer('store_id') ?: null;
 
         $profiles = $marketplaceCrm->customerProfileQuery($storeId);
         $profileStats = fn () => DB::query()->fromSub(clone $profiles, 'contact_profiles');
         $stats = [
             'total' => $profileStats()->count(),
-            'whatsapp' => $profileStats()->whereRaw("TRIM(COALESCE(contact_profiles.phone, '')) <> ''")->count(),
+            'whatsapp' => $profileStats()->whereRaw("TRIM(COALESCE(contact_profiles.phone, '')) <> '' AND contact_profiles.phone NOT LIKE '%*%' AND LOWER(contact_profiles.phone) NOT LIKE '%x%'")->count(),
             'email' => $profileStats()->whereRaw("TRIM(COALESCE(contact_profiles.email, '')) <> ''")->count(),
         ];
 
         if ($search !== '') {
             $needle = '%'.mb_strtolower($search).'%';
             $profiles->havingRaw(
-                "LOWER(COALESCE(name, '')) LIKE ? OR LOWER(COALESCE(code, '')) LIKE ? OR LOWER(COALESCE(phone, '')) LIKE ? OR LOWER(COALESCE(email, '')) LIKE ? OR LOWER(COALESCE(buyer_username, '')) LIKE ? OR LOWER(COALESCE(city, '')) LIKE ?",
+                "(LOWER(COALESCE(name, '')) LIKE ? OR LOWER(COALESCE(code, '')) LIKE ? OR LOWER(COALESCE(phone, '')) LIKE ? OR LOWER(COALESCE(email, '')) LIKE ? OR LOWER(COALESCE(buyer_username, '')) LIKE ? OR LOWER(COALESCE(city, '')) LIKE ?)",
                 [$needle, $needle, $needle, $needle, $needle, $needle],
             );
         }
-        if ($filter === 'whatsapp') {
-            $profiles->havingRaw("TRIM(COALESCE(phone, '')) <> ''");
+        if ($filter === 'phone') {
+            $profiles->havingRaw("TRIM(COALESCE(phone, '')) <> '' AND phone NOT LIKE '%*%' AND LOWER(phone) NOT LIKE '%x%'");
         } elseif ($filter === 'email') {
             $profiles->havingRaw("TRIM(COALESCE(email, '')) <> ''");
         }

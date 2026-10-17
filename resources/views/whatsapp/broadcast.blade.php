@@ -46,7 +46,11 @@
 
 @section('content')
 @php
-    $selectedIds = collect(old('customer_ids', []))->map(fn ($id) => (int) $id)->all();
+    $normalizeRecipientPhone = function (?string $phone): string {
+        $phone = preg_replace('/\D+/', '', (string) $phone) ?? '';
+        return str_starts_with($phone, '0') ? '62' . substr($phone, 1) : $phone;
+    };
+    $selectedPhones = collect(old('recipient_phones', []))->map($normalizeRecipientPhone)->filter()->all();
     $manualPhones = collect(old('manual_phones', []))->filter()->values();
     $firstRecipient = $recipients->first();
 @endphp
@@ -69,9 +73,10 @@
 
     <form method="POST" action="{{ route('whatsapp.broadcast.send') }}" id="broadcastForm" onsubmit="return confirmBroadcast();">
         @csrf
+        <div id="recipientNames"></div>
         <div class="wa-broadcast-grid">
             <section class="wa-broadcast-card">
-                <div class="wa-broadcast-card-head"><div><h2 class="wa-broadcast-card-title">Pilih penerima</h2><p class="wa-broadcast-card-subtitle">Hanya customer dengan nomor WhatsApp yang ditampilkan.</p></div><div class="wa-step">1</div></div>
+                <div class="wa-broadcast-card-head"><div><h2 class="wa-broadcast-card-title">Pilih penerima</h2><p class="wa-broadcast-card-subtitle">Nomor diambil dari import order, tanpa sensor, dengan fallback ke master customer.</p></div><div class="wa-step">1</div></div>
                 <div class="wa-broadcast-card-body">
                     <div class="wa-manual-test">
                         <div class="wa-manual-test-head"><span class="wa-manual-test-icon"><i class="bi bi-phone"></i></span><div><div class="wa-manual-test-title">Testing cepat dengan nomor manual</div><div class="wa-manual-test-subtitle">Tambahkan satu atau beberapa nomor. Nomor manual bisa digabung dengan customer terpilih.</div></div></div>
@@ -79,7 +84,7 @@
                         <div class="row g-2"><div class="col-md-7"><label class="wa-label" for="manual_name">Nama label nomor manual <span class="fw-normal text-secondary">(opsional)</span></label><input class="form-control" type="text" id="manual_name" name="manual_name" value="{{ old('manual_name') }}" placeholder="Test Recipient"></div><div class="col-md-5 d-flex align-items-end"><div class="small text-secondary pb-2"><span id="manualPhoneCount">0</span> nomor manual ditambahkan</div></div></div>
                     </div>
                     <div class="wa-audience-tabs">
-                        <a class="wa-audience-tab {{ $audience === 'all' ? 'active' : '' }}" href="{{ route('whatsapp.broadcast', ['audience' => 'all', 'q' => $search]) }}"><strong>Semua customer</strong><span>Database customer</span></a>
+                        <a class="wa-audience-tab {{ $audience === 'all' ? 'active' : '' }}" href="{{ route('whatsapp.broadcast', ['audience' => 'all', 'q' => $search]) }}"><strong>Semua customer</strong><span>Import order + master</span></a>
                         <a class="wa-audience-tab {{ $audience === 'recent_90' ? 'active' : '' }}" href="{{ route('whatsapp.broadcast', ['audience' => 'recent_90', 'q' => $search]) }}"><strong>Aktif 90 hari</strong><span>Order terbaru</span></a>
                         <a class="wa-audience-tab {{ $audience === 'repeat' ? 'active' : '' }}" href="{{ route('whatsapp.broadcast', ['audience' => 'repeat', 'q' => $search]) }}"><strong>Repeat buyer</strong><span>Min. 2 order</span></a>
                     </div>
@@ -94,7 +99,8 @@
                     <div class="wa-recipient-list" id="recipientList">
                         @forelse($recipients as $recipient)
                             <label class="wa-recipient">
-                                <input type="checkbox" name="customer_ids[]" value="{{ $recipient->id }}" @checked(in_array((int) $recipient->id, $selectedIds, true))>
+                                @php $recipientPhone = $normalizeRecipientPhone($recipient->phone); @endphp
+                                <input type="checkbox" name="recipient_phones[]" value="{{ $recipientPhone }}" data-recipient-name="{{ $recipient->name ?: 'Customer' }}" @checked(in_array($recipientPhone, $selectedPhones, true))>
                                 <span class="wa-recipient-avatar">{{ strtoupper(mb_substr(trim($recipient->name ?: 'C'), 0, 1)) }}</span>
                                 <span class="wa-recipient-main"><span class="wa-recipient-name">{{ $recipient->name ?: 'Customer' }}</span><span class="wa-recipient-meta">{{ $recipient->phone }}{{ $recipient->email ? ' · ' . $recipient->email : '' }}</span></span>
                                 <span class="wa-recipient-order">{{ (int) $recipient->marketplace_order_count }} order</span>
@@ -115,7 +121,7 @@
                         <div class="wa-field"><label class="wa-label" for="template_key">Template pesan <span class="fw-normal text-secondary">(opsional)</span></label><select id="template_key" name="template_key" class="form-select"><option value="">Pesan custom</option>@foreach($templates as $template)<option value="{{ $template->key }}" @selected(old('template_key') === $template->key)>{{ $template->name }}</option>@endforeach</select><div class="wa-template-help">Nama penerima akan diisi otomatis dari <code>{customer_name}</code>.</div></div>
                         <div class="wa-field"><label class="wa-label" for="message">Isi pesan</label><textarea id="message" name="message" class="form-control wa-message" maxlength="4000" required>{{ old('message') }}</textarea><div class="wa-message-meta"><span>Pesan dipersonalisasi per penerima</span><span id="messageCount">0/4000</span></div></div>
                         <div class="wa-preview"><div class="wa-preview-label"><i class="bi bi-eye me-1"></i>Preview pesan</div><div class="wa-preview-bubble" id="previewMessage">Tulis pesan untuk melihat preview.</div></div>
-                        <div class="wa-summary"><div class="wa-summary-item"><div class="wa-summary-value" id="selectedCount">{{ count($selectedIds) }}</div><div class="wa-summary-label">Penerima dipilih</div></div><div class="wa-summary-item"><div class="wa-summary-value">100</div><div class="wa-summary-label">Batas per kirim</div></div></div>
+                        <div class="wa-summary"><div class="wa-summary-item"><div class="wa-summary-value" id="selectedCount">{{ count($selectedPhones) }}</div><div class="wa-summary-label">Penerima dipilih</div></div><div class="wa-summary-item"><div class="wa-summary-value">100</div><div class="wa-summary-label">Batas per kirim</div></div></div>
                         <button class="wa-send" type="submit" id="sendBroadcast" @disabled(!$isConfigured)><i class="bi bi-send-fill"></i>Kirim broadcast</button>
                         @if(!$isConfigured)<div class="small text-warning mt-2"><i class="bi bi-exclamation-triangle me-1"></i>Atur token Fonnte di <a href="{{ route('settings.whatsapp.index') }}" class="text-warning fw-bold">Pengaturan WhatsApp</a>.</div>@endif
                         <a class="wa-cancel" href="{{ route('whatsapp.index') }}">Batal dan kembali</a>
@@ -144,6 +150,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const preview = document.getElementById('previewMessage');
     const selectedCount = document.getElementById('selectedCount');
     const list = document.getElementById('recipientList');
+    const broadcastForm = document.getElementById('broadcastForm');
+    const recipientNames = document.getElementById('recipientNames');
     const selectVisible = document.getElementById('selectVisible');
     const manualPhoneInput = document.getElementById('manualPhoneInput');
     const addManualPhone = document.getElementById('addManualPhone');
@@ -166,7 +174,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     function addManualPhones(value) {
         const incoming = String(value || '').split(/[\s,;]+/).map(digits).filter(phone => phone.length >= 8);
-        const available = Math.max(0, maxRecipients - document.querySelectorAll('input[name="customer_ids[]"]:checked').length);
+        const available = Math.max(0, maxRecipients - document.querySelectorAll('input[name="recipient_phones[]"]:checked').length);
         manualPhones = [...manualPhones, ...incoming].slice(0, available);
         if (manualPhoneInput) manualPhoneInput.value = '';
         renderManualPhones();
@@ -178,21 +186,21 @@ document.addEventListener('DOMContentLoaded', function () {
         if (preview) preview.textContent = value ? value.replaceAll('{customer_name}', @json($firstRecipient?->name ?: 'Customer')) : 'Tulis pesan untuk melihat preview.';
     }
     function updateSelected() {
-        const checked = list ? list.querySelectorAll('input[name="customer_ids[]"]:checked') : [];
+        const checked = list ? list.querySelectorAll('input[name="recipient_phones[]"]:checked') : [];
         if (selectedCount) selectedCount.textContent = checked.length + manualPhones.length;
-        if (selectVisible) selectVisible.textContent = checked.length === (list?.querySelectorAll('input[name="customer_ids[]"]').length || 0) ? 'Batalkan pilihan halaman' : 'Pilih semua di halaman';
+        if (selectVisible) selectVisible.textContent = checked.length === (list?.querySelectorAll('input[name="recipient_phones[]"]').length || 0) ? 'Batalkan pilihan halaman' : 'Pilih semua di halaman';
     }
-    document.querySelectorAll('input[name="customer_ids[]"]').forEach(function (input) {
+    document.querySelectorAll('input[name="recipient_phones[]"]').forEach(function (input) {
         input.addEventListener('change', function () {
-            const checked = list.querySelectorAll('input[name="customer_ids[]"]:checked').length;
+            const checked = list.querySelectorAll('input[name="recipient_phones[]"]:checked').length;
             if (checked > maxRecipients) { this.checked = false; alert('Maksimal 100 penerima per broadcast.'); }
             updateSelected();
         });
     });
     selectVisible?.addEventListener('click', function () {
-        const inputs = [...list.querySelectorAll('input[name="customer_ids[]"]')];
+        const inputs = [...list.querySelectorAll('input[name="recipient_phones[]"]')];
         const allChecked = inputs.length > 0 && inputs.every(input => input.checked);
-        if (!allChecked && inputs.filter(input => !input.checked).length > maxRecipients - list.querySelectorAll('input[name="customer_ids[]"]:checked').length - manualPhones.length) { alert('Maksimal 100 penerima per broadcast.'); return; }
+        if (!allChecked && inputs.filter(input => !input.checked).length > maxRecipients - list.querySelectorAll('input[name="recipient_phones[]"]:checked').length - manualPhones.length) { alert('Maksimal 100 penerima per broadcast.'); return; }
         inputs.forEach(input => input.checked = !allChecked);
         updateSelected();
     });
@@ -209,10 +217,21 @@ document.addEventListener('DOMContentLoaded', function () {
     searchRecipients?.addEventListener('click', applySearch);
     recipientSearch?.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); applySearch(); } });
     message?.addEventListener('input', updateMessage);
+    broadcastForm?.addEventListener('submit', function () {
+        if (!recipientNames) return;
+        recipientNames.innerHTML = '';
+        list?.querySelectorAll('input[name="recipient_phones[]"]:checked').forEach(function (input) {
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'recipient_names[]';
+            hidden.value = input.dataset.recipientName || 'Customer';
+            recipientNames.appendChild(hidden);
+        });
+    });
     renderManualPhones(); updateMessage(); updateSelected();
 });
 function confirmBroadcast() {
-    const count = document.querySelectorAll('input[name="customer_ids[]"]:checked').length;
+    const count = document.querySelectorAll('input[name="recipient_phones[]"]:checked').length;
     const manualCount = document.querySelectorAll('input[name="manual_phones[]"]').length;
     if (!count && !manualCount) { alert('Pilih minimal satu penerima atau tambahkan nomor manual untuk testing.'); return false; }
     const total = count + manualCount;

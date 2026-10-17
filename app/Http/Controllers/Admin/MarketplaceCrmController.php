@@ -1347,7 +1347,10 @@ class MarketplaceCrmController extends Controller
             ->selectRaw("COALESCE(MAX(NULLIF(TRIM(customers.name), '')), MAX(NULLIF(TRIM(marketplace_orders.buyer_name), '')), 'Buyer Marketplace') as name")
             ->selectRaw("MAX(NULLIF(TRIM(customers.code), '')) as code")
             ->selectRaw("MAX(NULLIF(TRIM(customers.email), '')) as email")
-            ->selectRaw("COALESCE(MAX(NULLIF(TRIM(customers.phone), '')), MAX(NULLIF(TRIM(marketplace_orders.buyer_phone), ''))) as phone")
+            // Nomor dari hasil import order adalah sumber utama karena biasanya
+            // berisi nomor penerima yang paling lengkap; master customer hanya
+            // menjadi fallback untuk histori lama.
+            ->selectRaw("COALESCE(MAX(NULLIF(TRIM(marketplace_orders.buyer_phone), '')), MAX(NULLIF(TRIM(customers.phone), ''))) as phone")
             ->selectRaw("COALESCE(MAX(NULLIF(TRIM(customers.city), '')), MAX(NULLIF(TRIM(marketplace_orders.shipping_city), ''))) as city")
             ->selectRaw("COALESCE(MAX(NULLIF(TRIM(customers.province), '')), MAX(NULLIF(TRIM(marketplace_orders.shipping_province), ''))) as province")
             ->selectRaw('COUNT(DISTINCT marketplace_orders.id) as marketplace_order_count')

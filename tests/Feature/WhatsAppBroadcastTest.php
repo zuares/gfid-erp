@@ -40,4 +40,33 @@ class WhatsAppBroadcastTest extends TestCase
             ->assertRedirect(route('whatsapp.broadcast'))
             ->assertSessionHas('success', 'Broadcast selesai: 1 terkirim.');
     }
+
+    public function test_owner_can_send_broadcast_to_imported_order_recipient(): void
+    {
+        config(['services.fonnte.token' => 'test-token']);
+
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-IMPORT-BROADCAST-' . uniqid(),
+        ]);
+        $service = Mockery::mock(WhatsAppMessageService::class);
+        $service->shouldReceive('sendText')
+            ->once()
+            ->with('628987654321', 'Halo Buyer Import', Mockery::type('array'), 'Buyer Import', null)
+            ->andReturnUsing(function () {
+                $message = Mockery::mock(WhatsAppMessage::class);
+                $message->shouldReceive('isSent')->andReturn(true);
+                return $message;
+            });
+        $this->app->instance(WhatsAppMessageService::class, $service);
+
+        $this->actingAs($owner)
+            ->post(route('whatsapp.broadcast.send'), [
+                'recipient_phones' => ['08987654321'],
+                'recipient_names' => ['Buyer Import'],
+                'message' => 'Halo {customer_name}',
+            ])
+            ->assertRedirect(route('whatsapp.broadcast'))
+            ->assertSessionHas('success', 'Broadcast selesai: 1 terkirim.');
+    }
 }

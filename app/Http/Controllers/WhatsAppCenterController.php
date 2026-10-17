@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Admin\MarketplaceCrmController;
 use App\Models\PurchaseOrder;
 use App\Models\Customer;
-use App\Models\MarketplaceOrder;
 use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppTemplate;
 use App\Services\WhatsApp\PurchaseOrderWhatsAppMessageBuilder;
@@ -35,13 +35,13 @@ class WhatsAppCenterController extends Controller
         return view('whatsapp.index', compact('messages', 'templates', 'activeTemplates', 'modules'));
     }
 
-    public function broadcast(Request $request): View
+    public function broadcast(Request $request, MarketplaceCrmController $marketplaceCrm): View
     {
         $audience = $request->string('audience')->toString();
         $audience = in_array($audience, ['all', 'recent_90', 'repeat'], true) ? $audience : 'all';
         $search = trim($request->string('q')->toString());
 
-        $recipientQuery = $this->broadcastRecipientsQuery($audience, $search);
+        $recipientQuery = $this->broadcastRecipientsQuery($marketplaceCrm, $audience, $search);
         $recipients = (clone $recipientQuery)
             ->orderByRaw("CASE WHEN name IS NULL OR name = '' THEN 1 ELSE 0 END")
             ->orderBy('name')
@@ -75,6 +75,10 @@ class WhatsAppCenterController extends Controller
         $data = $request->validate([
             'customer_ids' => ['nullable', 'array', 'max:100'],
             'customer_ids.*' => ['integer', 'distinct', 'exists:customers,id'],
+            'recipient_phones' => ['nullable', 'array', 'max:100'],
+            'recipient_phones.*' => ['string', 'max:30'],
+            'recipient_names' => ['nullable', 'array', 'max:100'],
+            'recipient_names.*' => ['nullable', 'string', 'max:160'],
             'manual_phones' => ['nullable', 'array', 'max:100'],
             'manual_phones.*' => ['string', 'max:30'],
             'manual_name' => ['nullable', 'string', 'max:160'],
@@ -88,11 +92,24 @@ class WhatsAppCenterController extends Controller
             ->unique()
             ->values();
         $customerIds = collect($data['customer_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->unique()->values();
+        $recipientNames = collect($data['recipient_names'] ?? [])->values();
+        $selectedRecipients = collect($data['recipient_phones'] ?? [])
+            ->values()
+            ->map(function ($phone, $index) use ($recipientNames): array {
+                return [
+                    'phone' => preg_replace('/\D+/', '', (string) $phone) ?: '',
+                    'name' => trim((string) ($recipientNames->get($index) ?? '')) ?: 'Customer',
+                ];
+            })
+            ->filter(fn (array $recipient) => strlen($recipient['phone']) >= 8)
+            ->unique('phone')
+            ->values();
+        $requestedRecipientInputs = $customerIds->count() + $selectedRecipients->count();
 
-        if ($manualPhones->isEmpty() && $customerIds->isEmpty()) {
+        if ($manualPhones->isEmpty() && $customerIds->isEmpty() && $selectedRecipients->isEmpty()) {
             return back()->withInput()->with('error', 'Tambahkan minimal satu nomor manual atau pilih satu customer.');
         }
-        if ($manualPhones->count() + $customerIds->count() > 100) {
+        if ($manualPhones->count() + $customerIds->count() + $selectedRecipients->count() > 100) {
             return back()->withInput()->with('error', 'Maksimal 100 penerima per broadcast, termasuk nomor manual dan customer terpilih.');
         }
 
@@ -115,6 +132,8 @@ class WhatsAppCenterController extends Controller
             ->whereIn('id', $customerIds)
             ->whereNotNull('phone')
             ->where('phone', '!=', '')
+            ->where('phone', 'not like', '%*%')
+            ->whereRaw("LOWER(phone) NOT LIKE '%x%'")
             ->get(['id', 'name', 'phone']);
 
         $normalizePhone = static function (?string $phone): string {
@@ -124,18 +143,28 @@ class WhatsAppCenterController extends Controller
                 ? '62' . substr($phone, 1)
                 : $phone;
         };
-        $customerPhones = $customers
-            ->map(fn ($customer) => $normalizePhone($customer->phone))
-            ->filter()
+        $selectedRecipients = $selectedRecipients
+            ->map(fn (array $recipient): array => [
+                'phone' => $normalizePhone($recipient['phone']),
+                'name' => $recipient['name'],
+            ])
+            ->filter(fn (array $recipient) => $recipient['phone'] !== '')
+            ->merge($customers->map(fn ($customer): array => [
+                'phone' => $normalizePhone($customer->phone),
+                'name' => trim((string) $customer->name) ?: 'Customer',
+            ]))
+            ->filter(fn (array $recipient) => $recipient['phone'] !== '')
+            ->unique('phone')
             ->values();
+        $selectedPhones = $selectedRecipients->pluck('phone');
         $manualRecipients = $manualPhones
             ->map(fn ($phone) => $normalizePhone($phone))
             ->filter()
             ->unique()
-            ->reject(fn ($phone) => $customerPhones->contains($phone))
+            ->reject(fn ($phone) => $selectedPhones->contains($phone))
             ->values();
 
-        if ($customers->isEmpty() && $manualRecipients->isEmpty()) {
+        if ($selectedRecipients->isEmpty() && $manualRecipients->isEmpty()) {
             return back()->withInput()->with('error', 'Tidak ada penerima valid dengan nomor WhatsApp.');
         }
 
@@ -165,16 +194,16 @@ class WhatsAppCenterController extends Controller
             $log->isSent() ? $sent++ : $failed++;
         };
 
-        foreach ($customers as $customer) {
-            $send($customer->phone, $customer->name, 'Broadcast WhatsApp');
+        foreach ($selectedRecipients as $recipient) {
+            $send($recipient['phone'], $recipient['name'], 'Broadcast WhatsApp');
         }
         $manualRecipientName = trim((string) ($data['manual_name'] ?? '')) ?: 'Test Recipient';
         foreach ($manualRecipients as $phone) {
             $send($phone, $manualRecipientName, 'Test broadcast manual');
         }
 
-        $requestedRecipients = $customerIds->count() + $manualPhones->count();
-        $skipped = max(0, $requestedRecipients - $customers->count() - $manualRecipients->count());
+        $requestedRecipients = $requestedRecipientInputs + $manualPhones->count();
+        $skipped = max(0, $requestedRecipients - $selectedRecipients->count() - $manualRecipients->count());
         $flashMessage = "Broadcast selesai: {$sent} terkirim";
         if ($failed > 0) {
             $flashMessage .= ", {$failed} gagal";
@@ -189,37 +218,26 @@ class WhatsAppCenterController extends Controller
             ->with($failed > 0 ? 'error' : 'success', $flashMessage);
     }
 
-    private function broadcastRecipientsQuery(string $audience, string $search)
+    private function broadcastRecipientsQuery(MarketplaceCrmController $marketplaceCrm, string $audience, string $search)
     {
-        return Customer::query()
-            ->select('customers.*')
-            ->whereNotNull('customers.phone')
-            ->where('customers.phone', '!=', '')
-            ->withCount(['marketplaceOrders as marketplace_order_count' => fn ($query) => $query->where('status', '!=', 'cancelled')])
-            ->withMax(['marketplaceOrders as last_marketplace_order_at' => fn ($query) => $query->where('status', '!=', 'cancelled')], 'order_date')
-            ->when($audience === 'recent_90', fn ($query) => $query->whereIn(
-                'customers.id',
-                MarketplaceOrder::query()
-                    ->whereNotNull('customer_id')
-                    ->where('status', '!=', 'cancelled')
-                    ->where('order_date', '>=', now()->subDays(90)->startOfDay())
-                    ->select('customer_id')
-                    ->distinct(),
-            ))
-            ->when($audience === 'repeat', fn ($query) => $query->whereIn(
-                'customers.id',
-                MarketplaceOrder::query()
-                    ->whereNotNull('customer_id')
-                    ->where('status', '!=', 'cancelled')
-                    ->select('customer_id')
-                    ->groupBy('customer_id')
-                    ->havingRaw('COUNT(*) >= 2'),
-            ))
-            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search) {
-                $query->where('customers.name', 'like', "%{$search}%")
-                    ->orWhere('customers.phone', 'like', "%{$search}%")
-                    ->orWhere('customers.email', 'like', "%{$search}%");
-            }));
+        $query = $marketplaceCrm->customerProfileQuery();
+        $query->havingRaw("TRIM(COALESCE(phone, '')) <> '' AND phone NOT LIKE '%*%' AND LOWER(phone) NOT LIKE '%x%'");
+
+        if ($audience === 'recent_90') {
+            $query->having('last_marketplace_order_at', '>=', now()->subDays(90)->startOfDay());
+        } elseif ($audience === 'repeat') {
+            $query->having('marketplace_order_count', '>=', 2);
+        }
+
+        if ($search !== '') {
+            $needle = '%'.mb_strtolower($search).'%';
+            $query->havingRaw(
+                "(LOWER(COALESCE(name, '')) LIKE ? OR LOWER(COALESCE(phone, '')) LIKE ? OR LOWER(COALESCE(email, '')) LIKE ? OR LOWER(COALESCE(buyer_username, '')) LIKE ?)",
+                [$needle, $needle, $needle, $needle],
+            );
+        }
+
+        return $query;
     }
 
     public function composePurchaseOrder(
