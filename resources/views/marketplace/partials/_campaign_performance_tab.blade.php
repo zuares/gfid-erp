@@ -979,16 +979,26 @@
         opacity: 1;
         isolation: isolate;
         background-clip: padding-box;
+        vertical-align: middle;
+        line-height: 1.15;
+        box-shadow: inset 0 -1px 0 #dbe4ef;
     }
     .campaign-performance-panel [data-perf-table-scroll] > table > thead tr:first-child th {
         top: 0;
+        height: 2rem;
+        padding-top: .45rem !important;
+        padding-bottom: .45rem !important;
         background: #eff6ff !important;
         color: #1e3a8a !important;
     }
     .campaign-performance-panel [data-perf-table-scroll] > table > thead tr:nth-child(2) th {
-        top: 2.15rem;
+        top: 2rem;
+        height: 1.8rem;
+        padding-top: .35rem !important;
+        padding-bottom: .35rem !important;
         background: #f8fafc !important;
         color: #0f172a !important;
+        box-shadow: 0 3px 8px -6px rgba(15, 23, 42, .6), inset 0 -1px 0 #cbd5e1;
     }
     .campaign-performance-panel [data-perf-table-scroll] > table > thead tr:first-child th:first-child {
         z-index: 9;
@@ -996,6 +1006,10 @@
     }
     .campaign-performance-panel [data-perf-table-scroll] > table > tbody > tr > td:first-child {
         background: #ffffff !important;
+        box-shadow: 1px 0 0 #dbe4ef, 5px 0 10px -9px rgba(15, 23, 42, .7);
+    }
+    .campaign-performance-panel [data-perf-table-scroll] > table > thead tr:first-child th:first-child {
+        box-shadow: 1px 0 0 #cbd5e1, 5px 0 10px -9px rgba(15, 23, 42, .7), inset 0 -1px 0 #dbe4ef;
     }
     .campaign-performance-panel .perf-sticky-scrollbar {
         position: sticky;
@@ -1025,6 +1039,10 @@
     }
     body[data-theme="dark"] .campaign-performance-panel [data-perf-table-scroll] > table > tbody > tr > td:first-child {
         background: #111827 !important;
+        box-shadow: 1px 0 0 #334155, 5px 0 10px -9px rgba(0, 0, 0, .9);
+    }
+    body[data-theme="dark"] .campaign-performance-panel [data-perf-table-scroll] > table > thead tr:first-child th:first-child {
+        box-shadow: 1px 0 0 #475569, 5px 0 10px -9px rgba(0, 0, 0, .9), inset 0 -1px 0 #334155;
     }
 
 </style>
@@ -1172,7 +1190,7 @@
                 <col style="width:13%;">
                 <col style="width:13%;">
             </colgroup>
-            <thead class="table-light sticky-top" style="z-index: 2;">
+            <thead class="table-light">
                 <tr>
                     <th rowspan="2">Kategori / Campaign</th>
                     <th rowspan="2" class="text-center" data-bs-toggle="tooltip" title="Rekomendasi berdasarkan ROAS aktual vs Target ROAS">Sinyal</th>
