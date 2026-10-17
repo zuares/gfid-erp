@@ -224,6 +224,12 @@
                     <option value="closed" @selected(request('status') === 'closed')>Closed</option>
                 </select>
 
+                <select name="group_by" id="grn-pdf-group-by" class="form-select form-select-sm" style="max-width:170px;" aria-label="Pengelompokan PDF">
+                    <option value="">PDF: Detail</option>
+                    <option value="po" @selected(request('group_by') === 'po')>PDF: Group by PO</option>
+                    <option value="item" @selected(request('group_by') === 'item')>PDF: Group by Item</option>
+                </select>
+
                 @php
                     $idMonthsGrn = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
                     $grnRangeDisplay = '';
@@ -244,14 +250,13 @@
                     autocomplete="off" data-gf-date="off" class="form-control form-control-sm"
                     style="max-width:200px;cursor:pointer;" readonly />
 
-                @if (request()->filled('q') || request()->filled('supplier_id') || request()->filled('warehouse_id') || request()->filled('status') || request()->filled('from_date') || request()->filled('to_date'))
+                @if (request()->filled('q') || request()->filled('supplier_id') || request()->filled('warehouse_id') || request()->filled('status') || request()->filled('from_date') || request()->filled('to_date') || request()->filled('group_by'))
                     <a href="{{ route('purchasing.purchase_receipts.index') }}" class="btn btn-sm btn-ship-outline btn-pill">
                         <i class="bi bi-x me-1"></i>Reset
                     </a>
                 @endif
                 <button type="button" id="btnPreviewGrnPdf" class="btn btn-sm btn-ship-primary btn-pill"
-                        data-preview-url="{{ route('purchasing.purchase_receipts.export', array_merge(request()->except('page'), ['preview' => 1])) }}"
-                        data-download-url="{{ route('purchasing.purchase_receipts.export', request()->except('page')) }}">
+                        data-export-url="{{ route('purchasing.purchase_receipts.export') }}">
                     <i class="bi bi-eye me-1"></i>Preview PDF
                 </button>
             </div>
@@ -329,10 +334,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const previewFrame = document.getElementById('grnPdfPreviewFrame');
     const downloadButton = document.getElementById('btnDownloadGrnPdf');
     const previewModal = document.getElementById('grnPdfPreviewModal');
+    function buildPdfUrl(preview) {
+        const exportUrl = new URL(previewButton?.dataset.exportUrl || '', window.location.origin);
+        const params = new URLSearchParams(new FormData(form));
+        if (preview) params.set('preview', '1');
+        else params.delete('preview');
+        exportUrl.search = params.toString();
+        return exportUrl.toString();
+    }
     previewButton?.addEventListener('click', function () {
         if (!previewFrame || !previewModal) return;
-        previewFrame.src = previewButton.dataset.previewUrl || '';
-        if (downloadButton) downloadButton.href = previewButton.dataset.downloadUrl || '#';
+        previewFrame.src = buildPdfUrl(true);
+        if (downloadButton) downloadButton.href = buildPdfUrl(false);
         bootstrap.Modal.getOrCreateInstance(previewModal).show();
     });
     previewModal?.addEventListener('hidden.bs.modal', function () {

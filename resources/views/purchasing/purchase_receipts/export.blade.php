@@ -33,6 +33,8 @@
         .data th { background: #1e3a5f; color: #fff; font-size: 7px; font-weight: 700; padding: 5px 4px; text-align: left; }
         .data td { border-bottom: 1px solid #dbe4ee; padding: 3px 4px; vertical-align: top; word-wrap: break-word; line-height: 1.22; }
         .data tr:nth-child(even) td { background: #f8fafc; }
+        .group-heading td { background: #e8f0f8; color: #1e3a5f; border-top: 1px solid #9fb7d0; border-bottom: 1px solid #b9cbe0; font-size: 8px; font-weight: 700; padding: 5px 4px; }
+        .group-subtotal td { background: #f1f5f9; color: #1e3a5f; border-top: 1px solid #b9cbe0; font-weight: 700; }
         .right { text-align: right !important; }
         .center { text-align: center !important; }
         .date-primary { color: #1e3a5f; font-size: 9px; font-weight: 700; white-space: nowrap; }
@@ -97,6 +99,17 @@
     $fromLabel = $formatFilterDate($filters['from_date'] ?? null);
     $toLabel = $formatFilterDate($filters['to_date'] ?? null);
     $period = $fromLabel && $toLabel ? $fromLabel . ' s/d ' . $toLabel : ($fromLabel ?: ($toLabel ?: 'Semua tanggal'));
+    $groupBy = $groupBy ?? ($filters['group_by'] ?? null);
+    $groupModeLabel = match ($groupBy) {
+        'po' => 'Group by PO',
+        'item' => 'Group by Item',
+        default => 'Detail penerimaan',
+    };
+    $groupedRows = $groupBy === 'po'
+        ? $rows->groupBy(fn ($line) => $line->receipt?->order?->id ?: 'tanpa-po')
+        : ($groupBy === 'item'
+            ? $rows->groupBy(fn ($line) => $line->item?->id ?: 'tanpa-item-' . $line->id)
+            : collect());
 @endphp
 
 <div class="document-header">
@@ -110,7 +123,7 @@
             <td class="document-heading">
                 <div class="eyebrow">Dokumen Verifikasi</div>
                 <div class="title">Laporan Verifikasi<br>Penerimaan Barang</div>
-                <div class="subtitle">Pencocokan barang diterima dengan purchase order.</div>
+                <div class="subtitle">Pencocokan barang diterima dengan purchase order.<br>Tampilan: {{ $groupModeLabel }}</div>
             </td>
         </tr>
     </table>
@@ -161,36 +174,67 @@
         </tr>
     </thead>
     <tbody>
-    @forelse ($rows as $line)
-        @php
-            $receipt = $line->receipt;
-            $poLine = $line->purchaseOrderLine;
-        @endphp
-        <tr>
-            <td class="center">{{ $loop->iteration }}</td>
-            <td>
-                <div class="date-primary">{{ $formatDate($receipt?->date) }}</div>
-                <div class="po-secondary">PO: {{ $receipt?->order?->code ?: '-' }}</div>
-            </td>
-            <td>
-                <div class="strong">{{ $line->item?->name ?: '-' }}</div>
-                <div class="muted">{{ $line->item?->code ? 'Kode: ' . $line->item->code : '-' }}</div>
-            </td>
-            <td class="right">{{ $poLine ? $formatQty($poLine->qty, $line->effectivePurchaseUnit()) : '-' }}</td>
-            <td class="right">
-                <div class="strong">{{ $formatQty($line->stockQtyReceived(), $line->effectiveStockUnit()) }}</div>
-                <div class="muted">{{ $formatQty($line->qty_received, $line->effectivePurchaseUnit()) }}</div>
-            </td>
-            <td class="right">
-                <div class="strong">{{ $formatQty($line->stockQtyReject(), $line->effectiveStockUnit()) }}</div>
-                <div class="muted">{{ $formatQty($line->qty_reject, $line->effectivePurchaseUnit()) }}</div>
-            </td>
-            <td class="right nowrap">Rp {{ number_format((float) $line->unit_price, 0, ',', '.') }}</td>
-            <td class="right nowrap">Rp {{ number_format((float) $line->line_total, 0, ',', '.') }}</td>
-        </tr>
-    @empty
-        <tr><td colspan="8" class="empty">Tidak ada data penerimaan sesuai filter.</td></tr>
-    @endforelse
+    @php $rowNumber = 0; @endphp
+    @if ($groupBy)
+        @forelse ($groupedRows as $groupRows)
+            @php
+                $groupFirst = $groupRows->first();
+                $groupTitle = $groupBy === 'po'
+                    ? 'PO: ' . ($groupFirst?->receipt?->order?->code ?: 'Tanpa PO')
+                    : 'Item: ' . ($groupFirst?->item?->name ?: 'Tanpa item') . ($groupFirst?->item?->code ? ' (' . $groupFirst->item->code . ')' : '');
+                $groupReceived = $groupRows->groupBy(fn ($line) => $line->effectiveStockUnit())->map(fn ($items) => $items->sum(fn ($line) => $line->stockQtyReceived()));
+                $groupReject = $groupRows->groupBy(fn ($line) => $line->effectiveStockUnit())->map(fn ($items) => $items->sum(fn ($line) => $line->stockQtyReject()));
+            @endphp
+            <tr class="group-heading"><td colspan="8">{{ $groupTitle }} — {{ $groupRows->count() }} baris</td></tr>
+            @foreach ($groupRows as $line)
+                @php
+                    $rowNumber++;
+                    $receipt = $line->receipt;
+                    $poLine = $line->purchaseOrderLine;
+                @endphp
+                <tr>
+                    <td class="center">{{ $rowNumber }}</td>
+                    <td><div class="date-primary">{{ $formatDate($receipt?->date) }}</div><div class="po-secondary">PO: {{ $receipt?->order?->code ?: '-' }}</div></td>
+                    <td><div class="strong">{{ $line->item?->name ?: '-' }}</div><div class="muted">{{ $line->item?->code ? 'Kode: ' . $line->item->code : '-' }}</div></td>
+                    <td class="right">{{ $poLine ? $formatQty($poLine->qty, $line->effectivePurchaseUnit()) : '-' }}</td>
+                    <td class="right"><div class="strong">{{ $formatQty($line->stockQtyReceived(), $line->effectiveStockUnit()) }}</div><div class="muted">{{ $formatQty($line->qty_received, $line->effectivePurchaseUnit()) }}</div></td>
+                    <td class="right"><div class="strong">{{ $formatQty($line->stockQtyReject(), $line->effectiveStockUnit()) }}</div><div class="muted">{{ $formatQty($line->qty_reject, $line->effectivePurchaseUnit()) }}</div></td>
+                    <td class="right nowrap">Rp {{ number_format((float) $line->unit_price, 0, ',', '.') }}</td>
+                    <td class="right nowrap">Rp {{ number_format((float) $line->line_total, 0, ',', '.') }}</td>
+                </tr>
+            @endforeach
+            <tr class="group-subtotal">
+                <td colspan="3">Subtotal {{ $groupTitle }}</td>
+                <td class="right">{{ $groupRows->count() }} baris</td>
+                <td class="right">{{ $formatUnits($groupReceived) }}</td>
+                <td class="right">{{ $formatUnits($groupReject) }}</td>
+                <td></td>
+                <td class="right nowrap">Rp {{ number_format((float) $groupRows->sum(fn ($line) => (float) $line->line_total), 0, ',', '.') }}</td>
+            </tr>
+        @empty
+            <tr><td colspan="8" class="empty">Tidak ada data penerimaan sesuai filter.</td></tr>
+        @endforelse
+    @else
+        @forelse ($rows as $line)
+            @php
+                $rowNumber++;
+                $receipt = $line->receipt;
+                $poLine = $line->purchaseOrderLine;
+            @endphp
+            <tr>
+                <td class="center">{{ $rowNumber }}</td>
+                <td><div class="date-primary">{{ $formatDate($receipt?->date) }}</div><div class="po-secondary">PO: {{ $receipt?->order?->code ?: '-' }}</div></td>
+                <td><div class="strong">{{ $line->item?->name ?: '-' }}</div><div class="muted">{{ $line->item?->code ? 'Kode: ' . $line->item->code : '-' }}</div></td>
+                <td class="right">{{ $poLine ? $formatQty($poLine->qty, $line->effectivePurchaseUnit()) : '-' }}</td>
+                <td class="right"><div class="strong">{{ $formatQty($line->stockQtyReceived(), $line->effectiveStockUnit()) }}</div><div class="muted">{{ $formatQty($line->qty_received, $line->effectivePurchaseUnit()) }}</div></td>
+                <td class="right"><div class="strong">{{ $formatQty($line->stockQtyReject(), $line->effectiveStockUnit()) }}</div><div class="muted">{{ $formatQty($line->qty_reject, $line->effectivePurchaseUnit()) }}</div></td>
+                <td class="right nowrap">Rp {{ number_format((float) $line->unit_price, 0, ',', '.') }}</td>
+                <td class="right nowrap">Rp {{ number_format((float) $line->line_total, 0, ',', '.') }}</td>
+            </tr>
+        @empty
+            <tr><td colspan="8" class="empty">Tidak ada data penerimaan sesuai filter.</td></tr>
+        @endforelse
+    @endif
     </tbody>
 </table>
 

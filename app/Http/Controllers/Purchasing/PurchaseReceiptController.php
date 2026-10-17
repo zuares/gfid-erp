@@ -140,6 +140,9 @@ class PurchaseReceiptController extends Controller
      */
     public function export(Request $request)
     {
+        $groupBy = $request->input('group_by');
+        $groupBy = in_array($groupBy, ['po', 'item'], true) ? $groupBy : null;
+
         $query = PurchaseReceiptLine::query()
             ->with(['receipt.supplier', 'receipt.warehouse', 'receipt.order', 'item', 'purchaseOrderLine'])
             ->whereHas('receipt', function ($receiptQuery) use ($request) {
@@ -189,6 +192,25 @@ class PurchaseReceiptController extends Controller
         $filename = 'grn-penerimaan-' . now()->format('Ymd-His') . '.pdf';
 
         $rows = $query->limit(2000)->get();
+
+        // Pengelompokan dilakukan setelah filter diterapkan agar semua baris
+        // dalam satu PO/item tampil berurutan di PDF, tanpa menghilangkan
+        // detail penerimaan per GRN.
+        if ($groupBy === 'po') {
+            $rows = $rows->sortBy([
+                [fn ($line) => strtolower((string) ($line->receipt?->order?->code ?: 'ZZZ')), 'asc'],
+                [fn ($line) => $line->receipt?->date?->timestamp ?? 0, 'desc'],
+                [fn ($line) => (int) $line->purchase_receipt_id, 'desc'],
+                [fn ($line) => (int) $line->id, 'asc'],
+            ])->values();
+        } elseif ($groupBy === 'item') {
+            $rows = $rows->sortBy([
+                [fn ($line) => strtolower((string) ($line->item?->code ?: $line->item?->name ?: 'ZZZ')), 'asc'],
+                [fn ($line) => strtolower((string) ($line->item?->name ?: '')), 'asc'],
+                [fn ($line) => $line->receipt?->date?->timestamp ?? 0, 'desc'],
+                [fn ($line) => (int) $line->id, 'asc'],
+            ])->values();
+        }
         $supplier = $request->filled('supplier_id')
             ? Supplier::find((int) $request->supplier_id)
             : null;
@@ -206,7 +228,9 @@ class PurchaseReceiptController extends Controller
                 'q' => $request->input('q'),
                 'warehouse_id' => $request->input('warehouse_id'),
                 'status' => $request->input('status'),
+                'group_by' => $groupBy,
             ],
+            'groupBy' => $groupBy,
         ])->setPaper('a4', 'landscape');
 
         $pdfContent = $pdf->output();

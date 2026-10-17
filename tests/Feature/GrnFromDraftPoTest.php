@@ -209,6 +209,23 @@ class GrnFromDraftPoTest extends TestCase
         $this->assertStringContainsString('inline;', strtolower((string) $preview->headers->get('Content-Disposition')));
     }
 
+    public function test_grn_export_preview_supports_po_and_item_grouping(): void
+    {
+        $po = $this->makeApprovedPo(2, 1000);
+        $this->grnService->create($this->makeGrnPayload($po, 1));
+
+        foreach (['po', 'item'] as $groupBy) {
+            $response = $this->get(route('purchasing.purchase_receipts.export', [
+                'group_by' => $groupBy,
+                'preview' => 1,
+            ]));
+
+            $response->assertOk();
+            $this->assertStringStartsWith('%PDF-', $response->getContent());
+            $this->assertStringContainsString('inline;', strtolower((string) $response->headers->get('Content-Disposition')));
+        }
+    }
+
     public function test_purchase_order_defaults_legacy_type_when_type_is_omitted(): void
     {
         $po = $this->poService->create([
