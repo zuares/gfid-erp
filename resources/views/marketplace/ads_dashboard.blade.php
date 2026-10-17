@@ -2090,6 +2090,44 @@ body[data-theme="dark"] .dash-sec{
     .ads-dashboard .dpanel-table tbody td,
     .ads-dashboard table.table tbody td { padding-inline: .42rem !important; font-size: .67rem !important; }
 }
+
+/* Slot KPI konsisten: label, nilai, subteks, dan pembanding sejajar. */
+.ads-dashboard .ads-kpi-grid { align-items: stretch; }
+.ads-dashboard .ads-kpi { min-width: 0; min-height: 124px; }
+.ads-dashboard .ads-kpi-label {
+    display: flex;
+    align-items: flex-start;
+    min-width: 0;
+    min-height: 1.35rem;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.ads-dashboard .ads-kpi-value {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: 1.35rem;
+    max-width: 100%;
+    line-height: 1.15;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    font-variant-numeric: tabular-nums;
+}
+.ads-dashboard .ads-kpi-sub {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: .15rem .3rem;
+    min-width: 0;
+    min-height: 1.65rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+@media (max-width: 767.98px) {
+    .ads-dashboard .ads-kpi { min-height: 112px; }
+}
 </style>
 
 @endpush

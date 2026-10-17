@@ -59,7 +59,7 @@
     body[data-theme="dark"] .kpi-featured { border-color: rgba(96,165,250,.5); background: linear-gradient(145deg, rgba(30,58,138,.28), var(--card, #0f172a) 72%); }
     body[data-theme="dark"] .kpi-benchmark { background: linear-gradient(145deg, rgba(30,41,59,.75), var(--card, #0f172a) 72%); }
     a.kpi:hover { border-color: var(--dsh-border-strong); background: rgba(148,163,184,.05); color: inherit; }
-    .kpi-label { color: var(--dsh-muted); font-size: .72rem; font-weight: 600; display: flex; align-items: flex-start; gap: .4rem; min-width: 0; line-height: 1.25; overflow-wrap: anywhere; }
+    .kpi-label { color: var(--dsh-muted); font-size: .72rem; font-weight: 600; display: flex; align-items: flex-start; gap: .4rem; min-width: 0; min-height: 2.5em; line-height: 1.25; overflow-wrap: anywhere; }
     .kpi-label .ico {
         width: 22px; height: 22px; flex: none; border-radius: 6px; display: grid; place-items: center;
         font-size: .8rem; background: rgba(148,163,184,.14); color: var(--dsh-accent);
@@ -70,7 +70,7 @@
     .kpi.amber  .ico { background: rgba(245,158,11,.14); color: #b45309; }
     .kpi.red    .ico { background: rgba(239,68,68,.12);  color: #dc2626; }
     .kpi.violet .ico { background: rgba(139,92,246,.14); color: #7c3aed; }
-    .kpi-value { font-size: 1.4rem; font-weight: 700; color: var(--text, #0f172a); line-height: 1.15; margin-top: .35rem; overflow-wrap: anywhere; }
+    .kpi-value { display: flex; align-items: center; min-height: 1.6em; font-size: 1.4rem; font-weight: 700; color: var(--text, #0f172a); line-height: 1.15; margin-top: .35rem; overflow-wrap: anywhere; }
     .kpi-value.sm { font-size: 1.1rem; }
     .kpi-sub { color: var(--dsh-muted); font-size: .72rem; font-weight: 500; margin-top: .2rem; min-height: 2.6em; line-height: 1.3; overflow-wrap: anywhere; }
     .kpi-comparisons { display: grid; gap: .3rem; margin-top: auto; padding-top: .42rem; border-top: 1px dashed var(--dsh-border); min-width: 0; }

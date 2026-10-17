@@ -914,6 +914,119 @@
         #campaignPerformanceSubtabKpis .ads-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
+    /* Semua KPI performa memakai slot vertikal yang sama agar card sejajar. */
+    #campaignPerformanceSubtabKpis .ads-kpi-grid { align-items: stretch; }
+    #campaignPerformanceSubtabKpis .perf-kpi-card {
+        min-width: 0;
+        min-height: 138px;
+        display: flex;
+        flex-direction: column;
+    }
+    #campaignPerformanceSubtabKpis .perf-kpi-card .ads-kpi-label {
+        min-width: 0;
+        min-height: 1.1rem;
+        line-height: 1.2;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+    #campaignPerformanceSubtabKpis .perf-kpi-card .ads-kpi-value {
+        min-width: 0;
+        min-height: 1.35rem;
+        max-width: 100%;
+        line-height: 1.15;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        font-variant-numeric: tabular-nums;
+    }
+    #campaignPerformanceSubtabKpis .perf-kpi-card .ads-kpi-sub {
+        min-width: 0;
+        min-height: 1.15rem;
+        flex-wrap: wrap;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+    #campaignPerformanceSubtabKpis .perf-kpi-card .perf-kpi-compare {
+        min-width: 0;
+        min-height: 1rem;
+        margin-top: auto;
+        overflow-wrap: anywhere;
+    }
+
+    /* Header tabel kategori/campaign selalu solid dan scrollbar horizontal
+       tetap mudah ditemukan saat tabel digeser. */
+    .campaign-performance-panel [data-perf-table-scroll] {
+        scrollbar-gutter: stable;
+        scrollbar-color: #64748b #e2e8f0;
+        scrollbar-width: thin;
+    }
+    .campaign-performance-panel [data-perf-table-scroll]::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    .campaign-performance-panel [data-perf-table-scroll]::-webkit-scrollbar-track {
+        background: #e2e8f0;
+        border-radius: 999px;
+    }
+    .campaign-performance-panel [data-perf-table-scroll]::-webkit-scrollbar-thumb {
+        background: #64748b;
+        border: 2px solid #e2e8f0;
+        border-radius: 999px;
+    }
+    .campaign-performance-panel [data-perf-table-scroll] > table > thead th {
+        position: sticky;
+        background: #ffffff !important;
+        background-image: none !important;
+        opacity: 1;
+        isolation: isolate;
+        background-clip: padding-box;
+    }
+    .campaign-performance-panel [data-perf-table-scroll] > table > thead tr:first-child th {
+        top: 0;
+        background: #eff6ff !important;
+        color: #1e3a8a !important;
+    }
+    .campaign-performance-panel [data-perf-table-scroll] > table > thead tr:nth-child(2) th {
+        top: 2.15rem;
+        background: #f8fafc !important;
+        color: #0f172a !important;
+    }
+    .campaign-performance-panel [data-perf-table-scroll] > table > thead tr:first-child th:first-child {
+        z-index: 9;
+        background: #eff6ff !important;
+    }
+    .campaign-performance-panel [data-perf-table-scroll] > table > tbody > tr > td:first-child {
+        background: #ffffff !important;
+    }
+    .campaign-performance-panel .perf-sticky-scrollbar {
+        position: sticky;
+        bottom: .35rem;
+        z-index: 20;
+    }
+    @media (max-width: 991.98px) {
+        .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table,
+        .campaign-performance-panel .perf-category-table-scroll-shell .perf-category-campaign-table {
+            min-width: 980px;
+        }
+    }
+    body[data-theme="dark"] .campaign-performance-panel [data-perf-table-scroll]::-webkit-scrollbar-track {
+        background: #1e293b;
+    }
+    body[data-theme="dark"] .campaign-performance-panel [data-perf-table-scroll]::-webkit-scrollbar-thumb {
+        background: #94a3b8;
+        border-color: #1e293b;
+    }
+    body[data-theme="dark"] .campaign-performance-panel [data-perf-table-scroll] > table > thead tr:first-child th {
+        background: #172554 !important;
+        color: #dbeafe !important;
+    }
+    body[data-theme="dark"] .campaign-performance-panel [data-perf-table-scroll] > table > thead tr:nth-child(2) th {
+        background: #1e293b !important;
+        color: #f8fafc !important;
+    }
+    body[data-theme="dark"] .campaign-performance-panel [data-perf-table-scroll] > table > tbody > tr > td:first-child {
+        background: #111827 !important;
+    }
+
 </style>
 
 <div class="row g-3 mb-4">
