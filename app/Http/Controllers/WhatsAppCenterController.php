@@ -73,13 +73,28 @@ class WhatsAppCenterController extends Controller
     public function sendBroadcast(Request $request, WhatsAppMessageService $whatsapp): RedirectResponse
     {
         $data = $request->validate([
-            'customer_ids' => ['nullable', 'array', 'max:100', 'required_without:manual_phone'],
+            'customer_ids' => ['nullable', 'array', 'max:100'],
             'customer_ids.*' => ['integer', 'distinct', 'exists:customers,id'],
-            'manual_phone' => ['nullable', 'string', 'max:30', 'required_without:customer_ids'],
+            'manual_phones' => ['nullable', 'array', 'max:100'],
+            'manual_phones.*' => ['string', 'max:30'],
             'manual_name' => ['nullable', 'string', 'max:160'],
             'message' => ['required', 'string', 'max:4000'],
             'template_key' => ['nullable', 'string', 'exists:whatsapp_templates,key'],
         ]);
+
+        $manualPhones = collect($data['manual_phones'] ?? [])
+            ->map(fn ($phone) => preg_replace('/\D+/', '', (string) $phone))
+            ->filter(fn ($phone) => strlen($phone) >= 8)
+            ->unique()
+            ->values();
+        $customerIds = collect($data['customer_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->unique()->values();
+
+        if ($manualPhones->isEmpty() && $customerIds->isEmpty()) {
+            return back()->withInput()->with('error', 'Tambahkan minimal satu nomor manual atau pilih satu customer.');
+        }
+        if ($manualPhones->count() + $customerIds->count() > 100) {
+            return back()->withInput()->with('error', 'Maksimal 100 penerima per broadcast, termasuk nomor manual dan customer terpilih.');
+        }
 
         if (! filled(config('services.fonnte.token'))) {
             return back()->withInput()->with('error', 'Token Fonnte belum dikonfigurasi. Atur koneksi WhatsApp sebelum mengirim broadcast.');
@@ -96,70 +111,70 @@ class WhatsAppCenterController extends Controller
             return back()->withInput()->with('error', 'Template WhatsApp tidak aktif atau tidak ditemukan.');
         }
 
-        if (filled($data['manual_phone'] ?? null)) {
-            $recipientName = trim((string) ($data['manual_name'] ?? '')) ?: 'Test Recipient';
-            $message = str_replace('{customer_name}', $recipientName, $data['message']);
-            $message = mb_substr($message, 0, 4000);
-
-            $log = $whatsapp->sendText(
-                $data['manual_phone'],
-                $message,
-                [
-                    'module' => 'whatsapp_broadcast',
-                    'reference_type' => self::class,
-                    'reference_label' => 'Test broadcast manual',
-                ],
-                $recipientName,
-                $template?->key,
-            );
-
-            return redirect()
-                ->route('whatsapp.broadcast')
-                ->with(
-                    $log->isSent() ? 'success' : 'error',
-                    $log->isSent()
-                        ? 'Test broadcast berhasil dikirim ke nomor manual.'
-                        : 'Test broadcast gagal dikirim ke nomor manual. Periksa koneksi WhatsApp.',
-                );
-        }
-
         $customers = Customer::query()
-            ->whereIn('id', $data['customer_ids'])
+            ->whereIn('id', $customerIds)
             ->whereNotNull('phone')
             ->where('phone', '!=', '')
             ->get(['id', 'name', 'phone']);
 
-        if ($customers->isEmpty()) {
+        $normalizePhone = static function (?string $phone): string {
+            $phone = preg_replace('/\D+/', '', (string) $phone) ?? '';
+
+            return str_starts_with($phone, '0')
+                ? '62' . substr($phone, 1)
+                : $phone;
+        };
+        $customerPhones = $customers
+            ->map(fn ($customer) => $normalizePhone($customer->phone))
+            ->filter()
+            ->values();
+        $manualRecipients = $manualPhones
+            ->map(fn ($phone) => $normalizePhone($phone))
+            ->filter()
+            ->unique()
+            ->reject(fn ($phone) => $customerPhones->contains($phone))
+            ->values();
+
+        if ($customers->isEmpty() && $manualRecipients->isEmpty()) {
             return back()->withInput()->with('error', 'Tidak ada penerima valid dengan nomor WhatsApp.');
         }
 
         $sent = 0;
         $failed = 0;
-        foreach ($customers as $customer) {
+        $send = function (string $phone, ?string $recipientName, string $referenceLabel) use ($data, $template, $whatsapp, &$sent, &$failed): void {
+            $recipientName = trim((string) $recipientName) ?: 'Customer';
             $message = str_replace(
                 '{customer_name}',
-                $customer->name ?: 'Customer',
+                $recipientName,
                 $data['message'],
             );
             $message = mb_substr($message, 0, 4000);
 
             $log = $whatsapp->sendText(
-                $customer->phone,
+                $phone,
                 $message,
                 [
                     'module' => 'whatsapp_broadcast',
                     'reference_type' => self::class,
-                    'reference_id' => $customer->id,
-                    'reference_label' => 'Broadcast WhatsApp',
+                    'reference_label' => $referenceLabel,
                 ],
-                $customer->name,
+                $recipientName,
                 $template?->key,
             );
 
             $log->isSent() ? $sent++ : $failed++;
+        };
+
+        foreach ($customers as $customer) {
+            $send($customer->phone, $customer->name, 'Broadcast WhatsApp');
+        }
+        $manualRecipientName = trim((string) ($data['manual_name'] ?? '')) ?: 'Test Recipient';
+        foreach ($manualRecipients as $phone) {
+            $send($phone, $manualRecipientName, 'Test broadcast manual');
         }
 
-        $skipped = count($data['customer_ids']) - $customers->count();
+        $requestedRecipients = $customerIds->count() + $manualPhones->count();
+        $skipped = max(0, $requestedRecipients - $customers->count() - $manualRecipients->count());
         $flashMessage = "Broadcast selesai: {$sent} terkirim";
         if ($failed > 0) {
             $flashMessage .= ", {$failed} gagal";

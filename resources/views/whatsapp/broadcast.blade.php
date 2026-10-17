@@ -19,6 +19,7 @@
 .wa-step{width:28px;height:28px;display:grid;place-items:center;border-radius:9px;background:#dcfce7;color:#166534;font-size:.78rem;font-weight:950;flex:0 0 auto}
 .wa-broadcast-card-body{padding:1rem 1.1rem}
 .wa-manual-test{border:1px solid #bbf7d0;border-radius:13px;background:#f0fdf4;padding:.8rem;margin-bottom:1rem}.wa-manual-test-head{display:flex;align-items:flex-start;gap:.55rem;margin-bottom:.65rem}.wa-manual-test-icon{width:28px;height:28px;display:grid;place-items:center;border-radius:9px;background:#25d366;color:#fff;font-size:.78rem;flex:0 0 auto}.wa-manual-test-title{font-size:.78rem;font-weight:950;color:#166534}.wa-manual-test-subtitle{font-size:.69rem;color:#4d7c5a;margin-top:.1rem}.wa-manual-test .form-control{border-color:#bbf7d0;background:#fff}.wa-manual-test .form-control:focus{border-color:#22c55e;box-shadow:0 0 0 .2rem rgba(34,197,94,.12)}
+.wa-manual-input{display:flex;gap:.45rem}.wa-manual-input .form-control{min-width:0}.wa-manual-add{display:inline-flex;align-items:center;gap:.3rem;border:1px solid #16a34a;border-radius:10px;background:#16a34a;color:#fff;padding:.4rem .7rem;font-size:.75rem;font-weight:900;white-space:nowrap}.wa-manual-add:hover{background:#15803d;color:#fff}.wa-manual-chips{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem}.wa-manual-chip{display:inline-flex;align-items:center;gap:.35rem;border:1px solid #bbf7d0;border-radius:999px;background:#fff;color:#166534;padding:.25rem .35rem .25rem .55rem;font-size:.72rem;font-weight:850}.wa-manual-chip button{width:19px;height:19px;display:grid;place-items:center;border:0;border-radius:50%;background:#dcfce7;color:#166534;padding:0;cursor:pointer;font-size:.7rem}.wa-manual-chip button:hover{background:#bbf7d0}.wa-manual-help{font-size:.68rem;color:#4d7c5a;margin-top:.4rem}
 .wa-audience-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:.85rem}
 .wa-audience-tab{position:relative;display:block;padding:.65rem .7rem;border:1px solid #e2e8f0;border-radius:12px;color:#475569;text-decoration:none;background:#fff;transition:.15s ease}
 .wa-audience-tab:hover{border-color:#86efac;background:#f0fdf4;color:#166534}
@@ -46,6 +47,7 @@
 @section('content')
 @php
     $selectedIds = collect(old('customer_ids', []))->map(fn ($id) => (int) $id)->all();
+    $manualPhones = collect(old('manual_phones', []))->filter()->values();
     $firstRecipient = $recipients->first();
 @endphp
 <div class="wa-broadcast">
@@ -72,8 +74,9 @@
                 <div class="wa-broadcast-card-head"><div><h2 class="wa-broadcast-card-title">Pilih penerima</h2><p class="wa-broadcast-card-subtitle">Hanya customer dengan nomor WhatsApp yang ditampilkan.</p></div><div class="wa-step">1</div></div>
                 <div class="wa-broadcast-card-body">
                     <div class="wa-manual-test">
-                        <div class="wa-manual-test-head"><span class="wa-manual-test-icon"><i class="bi bi-phone"></i></span><div><div class="wa-manual-test-title">Testing cepat dengan nomor manual</div><div class="wa-manual-test-subtitle">Isi nomor di bawah untuk uji coba. Jika diisi, daftar customer akan diabaikan.</div></div></div>
-                        <div class="row g-2"><div class="col-md-7"><label class="wa-label" for="manual_phone">Nomor WhatsApp</label><input class="form-control" type="text" id="manual_phone" name="manual_phone" value="{{ old('manual_phone') }}" placeholder="08xxxxxxxxxx / 628xxxxxxxxxx"></div><div class="col-md-5"><label class="wa-label" for="manual_name">Nama penerima <span class="fw-normal text-secondary">(opsional)</span></label><input class="form-control" type="text" id="manual_name" name="manual_name" value="{{ old('manual_name') }}" placeholder="Test Recipient"></div></div>
+                        <div class="wa-manual-test-head"><span class="wa-manual-test-icon"><i class="bi bi-phone"></i></span><div><div class="wa-manual-test-title">Testing cepat dengan nomor manual</div><div class="wa-manual-test-subtitle">Tambahkan satu atau beberapa nomor. Nomor manual bisa digabung dengan customer terpilih.</div></div></div>
+                        <div class="wa-field mb-2"><label class="wa-label" for="manualPhoneInput">Nomor WhatsApp manual</label><div class="wa-manual-input"><input class="form-control" type="text" id="manualPhoneInput" placeholder="Ketik nomor lalu tekan Enter"><button class="wa-manual-add" type="button" id="addManualPhone"><i class="bi bi-plus-lg"></i>Tambah</button></div><div id="manualPhoneChips" class="wa-manual-chips"></div><div class="wa-manual-help"><i class="bi bi-lightbulb me-1"></i>Paste banyak nomor sekaligus, pisahkan dengan Enter, koma, atau spasi.</div></div>
+                        <div class="row g-2"><div class="col-md-7"><label class="wa-label" for="manual_name">Nama label nomor manual <span class="fw-normal text-secondary">(opsional)</span></label><input class="form-control" type="text" id="manual_name" name="manual_name" value="{{ old('manual_name') }}" placeholder="Test Recipient"></div><div class="col-md-5 d-flex align-items-end"><div class="small text-secondary pb-2"><span id="manualPhoneCount">0</span> nomor manual ditambahkan</div></div></div>
                     </div>
                     <div class="wa-audience-tabs">
                         <a class="wa-audience-tab {{ $audience === 'all' ? 'active' : '' }}" href="{{ route('whatsapp.broadcast', ['audience' => 'all', 'q' => $search]) }}"><strong>Semua customer</strong><span>Database customer</span></a>
@@ -123,7 +126,7 @@
                     <div class="wa-broadcast-card-head"><div><h2 class="wa-broadcast-card-title">Aktivitas terakhir</h2><p class="wa-broadcast-card-subtitle">Log broadcast terbaru.</p></div><i class="bi bi-clock-history text-secondary"></i></div>
                     <div class="wa-broadcast-card-body py-2">
                         @forelse($broadcastMessages as $broadcastMessage)
-                            <div class="wa-history-row"><div class="wa-history-icon"><i class="bi bi-whatsapp"></i></div><div class="wa-history-main"><div class="wa-history-name">{{ $broadcastMessage->recipient_name ?: $broadcastMessage->recipient_phone }}</div><div class="wa-history-meta">{{ $broadcastMessage->created_at?->diffForHumans() }} · {{ IlluminateSupportStr::limit($broadcastMessage->message, 42) }}</div></div><span class="wa-history-status {{ $broadcastMessage->status }}">{{ strtoupper($broadcastMessage->status) }}</span></div>
+                            <div class="wa-history-row"><div class="wa-history-icon"><i class="bi bi-whatsapp"></i></div><div class="wa-history-main"><div class="wa-history-name">{{ $broadcastMessage->recipient_name ?: $broadcastMessage->recipient_phone }}</div><div class="wa-history-meta">{{ $broadcastMessage->created_at?->diffForHumans() }} · {{ \Illuminate\Support\Str::limit($broadcastMessage->message, 42) }}</div></div><span class="wa-history-status {{ $broadcastMessage->status }}">{{ strtoupper($broadcastMessage->status) }}</span></div>
                         @empty
                             <div class="text-secondary small py-3">Belum ada aktivitas broadcast.</div>
                         @endforelse
@@ -142,11 +145,32 @@ document.addEventListener('DOMContentLoaded', function () {
     const selectedCount = document.getElementById('selectedCount');
     const list = document.getElementById('recipientList');
     const selectVisible = document.getElementById('selectVisible');
-    const manualPhone = document.getElementById('manual_phone');
+    const manualPhoneInput = document.getElementById('manualPhoneInput');
+    const addManualPhone = document.getElementById('addManualPhone');
+    const manualPhoneChips = document.getElementById('manualPhoneChips');
+    const manualPhoneCount = document.getElementById('manualPhoneCount');
     const recipientSearch = document.getElementById('recipientSearch');
     const searchRecipients = document.getElementById('searchRecipients');
     const maxRecipients = 100;
+    let manualPhones = @json($manualPhones->values());
     const bodies = @json($templates->mapWithKeys(fn ($template) => [$template->key => $template->body]));
+
+    function digits(value) { return String(value || '').replace(/\D+/g, ''); }
+    function renderManualPhones() {
+        manualPhones = [...new Set(manualPhones.map(digits).filter(phone => phone.length >= 8))].slice(0, maxRecipients);
+        if (manualPhoneChips) {
+            manualPhoneChips.innerHTML = manualPhones.map((phone, index) => '<span class="wa-manual-chip">' + phone + '<button type="button" data-remove-manual="' + index + '" aria-label="Hapus nomor ' + phone + '"><i class="bi bi-x"></i></button><input type="hidden" name="manual_phones[]" value="' + phone + '"></span>').join('');
+        }
+        if (manualPhoneCount) manualPhoneCount.textContent = manualPhones.length;
+        updateSelected();
+    }
+    function addManualPhones(value) {
+        const incoming = String(value || '').split(/[\s,;]+/).map(digits).filter(phone => phone.length >= 8);
+        const available = Math.max(0, maxRecipients - document.querySelectorAll('input[name="customer_ids[]"]:checked').length);
+        manualPhones = [...manualPhones, ...incoming].slice(0, available);
+        if (manualPhoneInput) manualPhoneInput.value = '';
+        renderManualPhones();
+    }
 
     function updateMessage() {
         const value = message?.value || '';
@@ -155,7 +179,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     function updateSelected() {
         const checked = list ? list.querySelectorAll('input[name="customer_ids[]"]:checked') : [];
-        if (selectedCount) selectedCount.textContent = manualPhone?.value.trim() ? '1 manual' : checked.length;
+        if (selectedCount) selectedCount.textContent = checked.length + manualPhones.length;
         if (selectVisible) selectVisible.textContent = checked.length === (list?.querySelectorAll('input[name="customer_ids[]"]').length || 0) ? 'Batalkan pilihan halaman' : 'Pilih semua di halaman';
     }
     document.querySelectorAll('input[name="customer_ids[]"]').forEach(function (input) {
@@ -168,10 +192,14 @@ document.addEventListener('DOMContentLoaded', function () {
     selectVisible?.addEventListener('click', function () {
         const inputs = [...list.querySelectorAll('input[name="customer_ids[]"]')];
         const allChecked = inputs.length > 0 && inputs.every(input => input.checked);
-        if (!allChecked && inputs.filter(input => !input.checked).length > maxRecipients - list.querySelectorAll('input[name="customer_ids[]"]:checked').length) { alert('Maksimal 100 penerima per broadcast.'); return; }
+        if (!allChecked && inputs.filter(input => !input.checked).length > maxRecipients - list.querySelectorAll('input[name="customer_ids[]"]:checked').length - manualPhones.length) { alert('Maksimal 100 penerima per broadcast.'); return; }
         inputs.forEach(input => input.checked = !allChecked);
         updateSelected();
     });
+    addManualPhone?.addEventListener('click', function () { addManualPhones(manualPhoneInput?.value); });
+    manualPhoneInput?.addEventListener('keydown', function (event) { if (event.key === 'Enter' || event.key === ',') { event.preventDefault(); addManualPhones(this.value); } });
+    manualPhoneInput?.addEventListener('paste', function () { setTimeout(() => { if (/[\s,;]/.test(this.value)) addManualPhones(this.value); }, 0); });
+    manualPhoneChips?.addEventListener('click', function (event) { const button = event.target.closest('[data-remove-manual]'); if (!button) return; manualPhones.splice(Number(button.dataset.removeManual), 1); renderManualPhones(); });
     document.getElementById('template_key')?.addEventListener('change', function () { if (this.value && bodies[this.value] !== undefined) message.value = bodies[this.value]; updateMessage(); });
     function applySearch() {
         const params = new URLSearchParams({ audience: @json($audience) });
@@ -181,14 +209,14 @@ document.addEventListener('DOMContentLoaded', function () {
     searchRecipients?.addEventListener('click', applySearch);
     recipientSearch?.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); applySearch(); } });
     message?.addEventListener('input', updateMessage);
-    manualPhone?.addEventListener('input', updateSelected);
-    updateMessage(); updateSelected();
+    renderManualPhones(); updateMessage(); updateSelected();
 });
 function confirmBroadcast() {
     const count = document.querySelectorAll('input[name="customer_ids[]"]:checked').length;
-    const manualPhone = document.getElementById('manual_phone')?.value.trim();
-    if (!count && !manualPhone) { alert('Pilih minimal satu penerima atau isi nomor manual untuk testing.'); return false; }
-    return confirm(manualPhone ? 'Kirim test WhatsApp ke nomor manual ini?' : 'Kirim broadcast WhatsApp ke ' + count + ' penerima?');
+    const manualCount = document.querySelectorAll('input[name="manual_phones[]"]').length;
+    if (!count && !manualCount) { alert('Pilih minimal satu penerima atau tambahkan nomor manual untuk testing.'); return false; }
+    const total = count + manualCount;
+    return confirm('Kirim broadcast WhatsApp ke ' + total + ' penerima?');
 }
 </script>
 @endsection
