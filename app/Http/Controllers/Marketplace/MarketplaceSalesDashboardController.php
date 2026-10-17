@@ -712,7 +712,13 @@ class MarketplaceSalesDashboardController extends Controller
         $products = $products->map(function ($product, $productIndex) use ($adMetricsByInternalItem, $adMetricsByChannelItem, $productExternalIds, $productsByExternalId, $products) {
             $internalItemId = (int) ($product->internal_item_id ?? 0);
             $externalIds = collect($productExternalIds->get($productIndex, collect()));
-            $productAdMetrics = ['spend' => 0.0, 'sales' => 0.0, 'conversions' => 0];
+            $productAdMetrics = [
+                'spend' => 0.0,
+                'sales' => 0.0,
+                'conversions' => 0.0,
+                'impressions' => 0.0,
+                'clicks' => 0.0,
+            ];
             $hasExternalMetrics = false;
 
             foreach ($externalIds as $externalId) {
@@ -731,7 +737,9 @@ class MarketplaceSalesDashboardController extends Controller
                 $metrics = $adMetricsByChannelItem->get($externalId);
                 $productAdMetrics['spend'] += (float) ($metrics['spend'] ?? 0) * $allocationShare;
                 $productAdMetrics['sales'] += (float) ($metrics['sales'] ?? 0) * $allocationShare;
-                $productAdMetrics['conversions'] += (int) round((int) ($metrics['conversions'] ?? 0) * $allocationShare);
+                $productAdMetrics['conversions'] += (float) ($metrics['conversions'] ?? 0) * $allocationShare;
+                $productAdMetrics['impressions'] += (float) ($metrics['impressions'] ?? 0) * $allocationShare;
+                $productAdMetrics['clicks'] += (float) ($metrics['clicks'] ?? 0) * $allocationShare;
                 $hasExternalMetrics = true;
             }
 
@@ -747,14 +755,18 @@ class MarketplaceSalesDashboardController extends Controller
                 $productAdMetrics = [
                     'spend' => (float) ($internalMetrics['spend'] ?? 0) * $allocationShare,
                     'sales' => (float) ($internalMetrics['sales'] ?? 0) * $allocationShare,
-                    'conversions' => (int) round((int) ($internalMetrics['conversions'] ?? 0) * $allocationShare),
+                    'conversions' => (float) ($internalMetrics['conversions'] ?? 0) * $allocationShare,
+                    'impressions' => (float) ($internalMetrics['impressions'] ?? 0) * $allocationShare,
+                    'clicks' => (float) ($internalMetrics['clicks'] ?? 0) * $allocationShare,
                 ];
             }
 
             $product->ad_spend_matched = $hasExternalMetrics || ($internalItemId > 0 && $adMetricsByInternalItem->has($internalItemId));
             $product->ad_spend = (float) ($productAdMetrics['spend'] ?? 0);
             $product->ad_sales = (float) ($productAdMetrics['sales'] ?? 0);
-            $product->ad_conversions = (int) ($productAdMetrics['conversions'] ?? 0);
+            $product->ad_conversions = (float) ($productAdMetrics['conversions'] ?? 0);
+            $product->ad_impressions = (float) ($productAdMetrics['impressions'] ?? 0);
+            $product->ad_clicks = (float) ($productAdMetrics['clicks'] ?? 0);
             $product->hpp_total = (float) ($product->hpp ?? 0) * max(0, (int) ($product->qty ?? 0));
             $product->hpp_available = (float) ($product->hpp ?? 0) > 0;
             $product->gross_profit = $product->hpp_available

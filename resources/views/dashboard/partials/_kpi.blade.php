@@ -9,8 +9,10 @@
     $color = $color ?? '';
     $small = $small ?? false;
     $comparisons = $comparisons ?? [];
+    $variant = $variant ?? '';
+    $featured = $featured ?? false;
 @endphp
-<{{ $tag }} class="kpi {{ $color }}" @if(!empty($url)) href="{{ $url }}" @endif>
+<{{ $tag }} class="kpi {{ $color }} {{ $variant }} {{ $featured ? 'kpi-featured' : '' }}" @if(!empty($url)) href="{{ $url }}" @endif>
     <span class="kpi-label"><span class="ico"><i class="bi {{ $icon ?? 'bi-dot' }}"></i></span> {{ $label }}</span>
     <div class="kpi-value {{ $small ? 'sm' : '' }}">{{ $value }}</div>
     @if(!empty($sub))
@@ -21,7 +23,12 @@
             @foreach($comparisons as $comparison)
                 <span class="kpi-compare {{ $comparison['tone'] ?? 'muted' }}">
                     <span>{{ $comparison['label'] }}</span>
-                    <strong>{{ $comparison['value'] }}</strong>
+                    <strong>
+                        {{ $comparison['value'] }}
+                        @if(!empty($comparison['delta']))
+                            <small class="kpi-compare-delta {{ $comparison['delta_tone'] ?? 'muted' }}">{{ $comparison['delta'] }}</small>
+                        @endif
+                    </strong>
                 </span>
             @endforeach
         </div>

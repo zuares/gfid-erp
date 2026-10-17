@@ -294,7 +294,7 @@ class AdsDashboardService
      * tanpa menambahkan biaya parent sebagai biaya kedua.
      *
      * @param  array<int>  $storeIds
-     * @return array{internal: Collection<int, array{spend: float, sales: float, conversions: int}>, external: Collection<string, array{spend: float, sales: float, conversions: int}>}
+     * @return array{internal: Collection<int, array{spend: float, sales: float, conversions: int, impressions: int, clicks: int}>, external: Collection<string, array{spend: float, sales: float, conversions: int, impressions: int, clicks: int}>}
      */
     public function getProductAdMetrics(array $storeIds, int|string|null $storeId, string $dateFrom, string $dateTo): array
     {
@@ -311,7 +311,15 @@ class AdsDashboardService
         $internalSpend = collect();
         $externalSpend = collect();
 
-        $addMetrics = static function (Collection $target, int|string|null $key, float $spend, float $sales, int $conversions): void {
+        $addMetrics = static function (
+            Collection $target,
+            int|string|null $key,
+            float $spend,
+            float $sales,
+            int $conversions,
+            int $impressions,
+            int $clicks,
+        ): void {
             if ($key === null || (string) $key === '') {
                 return;
             }
@@ -321,11 +329,15 @@ class AdsDashboardService
                 'spend' => 0.0,
                 'sales' => 0.0,
                 'conversions' => 0,
+                'impressions' => 0,
+                'clicks' => 0,
             ]);
             $target[$normalizedKey] = [
                 'spend' => (float) $current['spend'] + $spend,
                 'sales' => (float) $current['sales'] + $sales,
                 'conversions' => (int) $current['conversions'] + $conversions,
+                'impressions' => (int) $current['impressions'] + $impressions,
+                'clicks' => (int) $current['clicks'] + $clicks,
             ];
         };
 
@@ -349,6 +361,8 @@ class AdsDashboardService
             ->selectRaw('COALESCE(SUM(daily.expense), 0) as spend')
             ->selectRaw('COALESCE(SUM(daily.broad_gmv), 0) as sales')
             ->selectRaw('COALESCE(SUM(daily.broad_order), 0) as conversions')
+            ->selectRaw('COALESCE(SUM(daily.impressions), 0) as impressions')
+            ->selectRaw('COALESCE(SUM(daily.clicks), 0) as clicks')
             ->groupBy('daily.store_id', 'campaign.channel_item_id', 'campaign.internal_item_id')
             ->get();
 
@@ -356,8 +370,10 @@ class AdsDashboardService
             $spend = (float) ($row->spend ?? 0);
             $sales = (float) ($row->sales ?? 0);
             $conversions = (int) ($row->conversions ?? 0);
-            $addMetrics($internalSpend, $row->internal_item_id, $spend, $sales, $conversions);
-            $addMetrics($externalSpend, $row->channel_item_id, $spend, $sales, $conversions);
+            $impressions = (int) ($row->impressions ?? 0);
+            $clicks = (int) ($row->clicks ?? 0);
+            $addMetrics($internalSpend, $row->internal_item_id, $spend, $sales, $conversions, $impressions, $clicks);
+            $addMetrics($externalSpend, $row->channel_item_id, $spend, $sales, $conversions, $impressions, $clicks);
         }
 
         $gmsRows = DB::table('marketplace_ads_item_dailies as daily')
@@ -369,6 +385,8 @@ class AdsDashboardService
             ->selectRaw('COALESCE(SUM(daily.expense), 0) as spend')
             ->selectRaw('COALESCE(SUM(daily.broad_gmv), 0) as sales')
             ->selectRaw('COALESCE(SUM(daily.broad_order), 0) as conversions')
+            ->selectRaw('COALESCE(SUM(daily.impressions), 0) as impressions')
+            ->selectRaw('COALESCE(SUM(daily.clicks), 0) as clicks')
             ->groupBy('daily.store_id', 'daily.channel_item_id')
             ->get();
 
@@ -400,6 +418,8 @@ class AdsDashboardService
                 $spend,
                 (float) ($row->sales ?? 0),
                 (int) ($row->conversions ?? 0),
+                (int) ($row->impressions ?? 0),
+                (int) ($row->clicks ?? 0),
             );
         }
 
@@ -425,6 +445,8 @@ class AdsDashboardService
                 'spend' => (float) ($row->spend ?? 0) * (float) ($gmsSpendScaleByStore[$row->store_id] ?? 1.0),
                 'sales' => (float) ($row->sales ?? 0),
                 'conversions' => (int) ($row->conversions ?? 0),
+                'impressions' => (int) ($row->impressions ?? 0),
+                'clicks' => (int) ($row->clicks ?? 0),
             ];
             $addMetrics(
                 $internalSpend,
@@ -432,6 +454,8 @@ class AdsDashboardService
                 (float) $gmsMetrics['spend'],
                 (float) $gmsMetrics['sales'],
                 (int) $gmsMetrics['conversions'],
+                (int) $gmsMetrics['impressions'],
+                (int) $gmsMetrics['clicks'],
             );
         }
 

@@ -6,89 +6,160 @@
 
 @php
     $marketplaceKpi = $d['marketplace_kpi'] ?? [];
+    $marketplaceTodayKpi = $d['marketplace_today_kpi'] ?? [];
+    $marketplaceYesterdayKpi = $d['marketplace_yesterday_kpi'] ?? [];
+    $marketplaceSameDatePreviousKpi = $d['marketplace_same_date_previous_kpi'] ?? [];
+    $marketplaceMonthKpi = $d['marketplace_month_kpi'] ?? $marketplaceKpi;
+    $marketplaceMonthPreviousKpi = $d['marketplace_month_previous_kpi'] ?? [];
+    $periodToday = \Carbon\Carbon::now();
+    $previousMonthDate = $periodToday->copy()->subMonthNoOverflow();
+    $previousPeriodLabel = $previousMonthDate->copy()->startOfMonth()->format('d') . '–' . $previousMonthDate->format('d M');
+    $monthComparison = function (string $key, callable $format) use ($marketplaceMonthKpi, $marketplaceMonthPreviousKpi, $previousPeriodLabel): array {
+        $comparison = $marketplaceMonthKpi['comparisons'][$key] ?? [];
+
+        return [
+            'label' => 'Bln lalu · ' . $previousPeriodLabel,
+            'value' => $format($marketplaceMonthPreviousKpi[$key] ?? 0),
+            'tone' => 'muted',
+            'delta' => $comparison['value'] ?? '—',
+            'delta_tone' => $comparison['tone'] ?? 'muted',
+        ];
+    };
+    $money = fn ($value) => rupiah($value);
+    $count = fn ($value) => number_format((int) $value, 0, ',', '.');
+    $percent = fn ($value) => number_format((float) $value, 1, ',', '.') . '%';
+    $multiple = fn ($value) => $value === null ? '—' : number_format((float) $value, 2, ',', '.') . 'x';
+    $todayComparison = function (string $key, callable $format) use ($marketplaceTodayKpi, $marketplaceYesterdayKpi, $marketplaceSameDatePreviousKpi, $periodToday): array {
+        $comparison = $marketplaceTodayKpi['comparisons'][$key] ?? [];
+        $sameDate = $periodToday->copy()->subMonthNoOverflow();
+
+        return [
+            [
+                'label' => 'Kemarin · ' . $periodToday->copy()->subDay()->format('d M'),
+                'value' => $format($marketplaceYesterdayKpi[$key] ?? 0),
+                'tone' => 'muted',
+                'delta' => $comparison['yesterday']['value'] ?? '—',
+                'delta_tone' => $comparison['yesterday']['tone'] ?? 'muted',
+            ],
+            [
+                'label' => 'Tgl sama · ' . $sameDate->format('d M'),
+                'value' => $format($marketplaceSameDatePreviousKpi[$key] ?? 0),
+                'tone' => 'muted',
+                'delta' => $comparison['same_date']['value'] ?? '—',
+                'delta_tone' => $comparison['same_date']['tone'] ?? 'muted',
+            ],
+        ];
+    };
     $marketplaceAnalyticsUrl = $r('marketplace.analytics', [
-        'date_from' => now()->toDateString(),
+        'date_from' => now()->startOfMonth()->toDateString(),
         'date_to' => now()->toDateString(),
-        'compare_mode' => 'prev_period',
+        'compare_mode' => 'prev_month',
     ]);
-    $marketplaceExceptions = (int) ($marketplaceKpi['cancelled_count'] ?? 0) + (int) ($marketplaceKpi['return_refund_order_count'] ?? 0);
-    $marketplaceRoas = $marketplaceKpi['roas_net'] ?? null;
+    $marketplaceExceptions = (int) ($marketplaceMonthKpi['exception_total'] ?? 0);
+    $marketplaceRoas = $marketplaceMonthKpi['roas_net'] ?? null;
 @endphp
-<div class="dash-sec"><i class="bi bi-graph-up-arrow"></i> Penjualan (hari ini)</div>
+<div class="dash-sec"><i class="bi bi-graph-up-arrow"></i> Penjualan (bulan berjalan)</div>
 <div class="dash-grid">
     @include('dashboard.partials._kpi', [
-        'label' => 'Penjualan net marketplace', 'icon' => 'bi-cart-check', 'color' => 'blue',
-        'value' => rupiah($marketplaceKpi['net_order_revenue'] ?? 0),
+        'label' => 'Order hari ini', 'icon' => 'bi-receipt', 'color' => 'green',
+        'value' => number_format((int) ($marketplaceTodayKpi['order_total'] ?? 0), 0, ',', '.'),
+        'sub' => 'Order setelah batal/refund/return',
+        'comparisons' => $todayComparison('order_total', $count),
+    ])
+    @include('dashboard.partials._kpi', [
+        'label' => 'AOV hari ini', 'icon' => 'bi-calculator', 'color' => 'violet',
+        'value' => rupiah($marketplaceTodayKpi['net_aov'] ?? 0),
+        'sub' => 'Net Sales ÷ order hari ini',
+        'comparisons' => $todayComparison('net_aov', $money),
+    ])
+    @include('dashboard.partials._kpi', [
+        'label' => 'Net Sales hari ini', 'icon' => 'bi-lightning-charge', 'color' => 'blue',
+        'value' => rupiah($marketplaceTodayKpi['net_order_revenue'] ?? 0),
+        'sub' => 'Setelah potongan penjual',
+        'comparisons' => $todayComparison('net_order_revenue', $money),
+    ])
+    @include('dashboard.partials._kpi', [
+        'label' => 'Net Sales setelah potongan penjual', 'icon' => 'bi-cart-check', 'color' => 'blue',
+        'featured' => true,
+        'value' => rupiah($marketplaceMonthKpi['net_order_revenue'] ?? 0),
         'sub' => 'Setelah batal, refund, return, dan voucher seller',
         'comparisons' => [
-            ['label' => 'vs minggu lalu', 'value' => $marketplaceKpi['net_revenue_vs_week']['value'] ?? '—', 'tone' => $marketplaceKpi['net_revenue_vs_week']['tone'] ?? 'muted'],
-            ['label' => 'vs bulan lalu', 'value' => $marketplaceKpi['net_revenue_vs_month']['value'] ?? '—', 'tone' => $marketplaceKpi['net_revenue_vs_month']['tone'] ?? 'muted'],
+            $monthComparison('net_order_revenue', $money),
         ],
         'url' => $marketplaceAnalyticsUrl, 'cta' => 'Buka analytics',
     ])
     @include('dashboard.partials._kpi', [
-        'label' => 'GMV eligible', 'icon' => 'bi-bag-check', 'color' => 'green',
-        'value' => rupiah($marketplaceKpi['gmv'] ?? 0),
+        'label' => 'GMV bulan ini', 'icon' => 'bi-bag-check', 'color' => 'green',
+        'value' => rupiah($marketplaceMonthKpi['gmv'] ?? 0),
         'sub' => 'Nilai order eligible sebelum biaya marketplace',
+        'comparisons' => [$monthComparison('gmv', $money)],
     ])
     @include('dashboard.partials._kpi', [
-        'label' => 'Order eligible', 'icon' => 'bi-receipt', 'color' => 'blue',
-        'value' => number_format((int) ($marketplaceKpi['order_total'] ?? 0), 0, ',', '.'),
+        'label' => 'Order bulan ini', 'icon' => 'bi-receipt', 'color' => 'blue',
+        'value' => number_format((int) ($marketplaceMonthKpi['order_total'] ?? 0), 0, ',', '.'),
         'sub' => 'Order setelah batal/refund/return',
+        'comparisons' => [$monthComparison('order_total', $count)],
     ])
     @include('dashboard.partials._kpi', [
-        'label' => 'Produk terjual', 'icon' => 'bi-box-seam', 'color' => 'violet',
-        'value' => number_format((int) ($marketplaceKpi['product_qty'] ?? 0), 0, ',', '.'),
+        'label' => 'Produk terjual bulan ini', 'icon' => 'bi-box-seam', 'color' => 'violet',
+        'value' => number_format((int) ($marketplaceMonthKpi['product_qty'] ?? 0), 0, ',', '.'),
         'sub' => 'Qty dari order eligible',
+        'comparisons' => [$monthComparison('product_qty', $count)],
     ])
     @include('dashboard.partials._kpi', [
-        'label' => 'AOV net', 'icon' => 'bi-calculator', 'color' => 'blue',
-        'value' => rupiah($marketplaceKpi['net_aov'] ?? 0),
-        'sub' => 'Penjualan net ÷ order eligible',
+        'label' => 'AOV net bulan ini', 'icon' => 'bi-calculator', 'color' => 'blue',
+        'value' => rupiah($marketplaceMonthKpi['net_aov'] ?? 0),
+        'sub' => 'Net Sales ÷ order bulan ini',
+        'comparisons' => [$monthComparison('net_aov', $money)],
     ])
 </div>
 
-<div class="dash-sec"><i class="bi bi-speedometer2"></i> KPI Marketplace (hari ini)</div>
+<div class="dash-sec"><i class="bi bi-speedometer2"></i> KPI Marketplace (bulan berjalan)</div>
 <div class="dash-grid">
     @include('dashboard.partials._kpi', [
-        'label' => 'Estimasi profit', 'icon' => 'bi-piggy-bank', 'color' => (float) ($marketplaceKpi['estimated_profit'] ?? 0) >= 0 ? 'green' : 'red',
-        'value' => rupiah($marketplaceKpi['estimated_profit'] ?? 0),
+        'label' => 'Estimasi profit bulan ini', 'icon' => 'bi-piggy-bank', 'color' => (float) ($marketplaceMonthKpi['estimated_profit'] ?? 0) >= 0 ? 'green' : 'red',
+        'value' => rupiah($marketplaceMonthKpi['estimated_profit'] ?? 0),
         'sub' => 'Setelah fee, HPP, refund, dan iklan',
         'comparisons' => [
-            ['label' => 'vs minggu lalu', 'value' => $marketplaceKpi['profit_vs_week']['value'] ?? '—', 'tone' => $marketplaceKpi['profit_vs_week']['tone'] ?? 'muted'],
-            ['label' => 'vs bulan lalu', 'value' => $marketplaceKpi['profit_vs_month']['value'] ?? '—', 'tone' => $marketplaceKpi['profit_vs_month']['tone'] ?? 'muted'],
+            $monthComparison('estimated_profit', $money),
         ],
         'url' => $marketplaceAnalyticsUrl, 'cta' => 'Lihat profit',
     ])
     @include('dashboard.partials._kpi', [
-        'label' => 'Margin estimasi', 'icon' => 'bi-percent', 'color' => (float) ($marketplaceKpi['estimated_profit_margin'] ?? 0) >= 10 ? 'green' : 'amber',
-        'value' => number_format((float) ($marketplaceKpi['estimated_profit_margin'] ?? 0), 1, ',', '.') . '%',
-        'sub' => 'Profit estimasi ÷ penjualan net',
+        'label' => 'Margin estimasi', 'icon' => 'bi-percent', 'color' => (float) ($marketplaceMonthKpi['estimated_profit_margin'] ?? 0) >= 10 ? 'green' : 'amber',
+        'value' => number_format((float) ($marketplaceMonthKpi['estimated_profit_margin'] ?? 0), 1, ',', '.') . '%',
+        'sub' => 'Profit estimasi ÷ Net Sales bulan ini',
+        'comparisons' => [$monthComparison('estimated_profit_margin', $percent)],
     ])
     @include('dashboard.partials._kpi', [
         'label' => 'Payout cair', 'icon' => 'bi-wallet2', 'color' => 'green',
-        'value' => rupiah($marketplaceKpi['cash_payout'] ?? 0),
+        'value' => rupiah($marketplaceMonthKpi['cash_payout'] ?? 0),
         'sub' => 'Penghasilan settlement yang sudah cair',
+        'comparisons' => [$monthComparison('cash_payout', $money)],
     ])
     @include('dashboard.partials._kpi', [
         'label' => 'Biaya marketplace', 'icon' => 'bi-receipt-cutoff', 'color' => 'amber',
-        'value' => rupiah($marketplaceKpi['cash_marketplace_fees'] ?? 0),
+        'value' => rupiah($marketplaceMonthKpi['cash_marketplace_fees'] ?? 0),
         'sub' => 'Fee aktual dari settlement',
+        'comparisons' => [$monthComparison('cash_marketplace_fees', $money)],
     ])
     @include('dashboard.partials._kpi', [
         'label' => 'Biaya iklan incl. PPN', 'icon' => 'bi-megaphone', 'color' => 'amber',
-        'value' => rupiah($marketplaceKpi['ad_cost'] ?? 0),
-        'sub' => 'Spend iklan marketplace hari ini',
+        'value' => rupiah($marketplaceMonthKpi['ad_cost'] ?? 0),
+        'sub' => 'Spend iklan marketplace bulan ini',
+        'comparisons' => [$monthComparison('ad_cost', $money)],
     ])
     @include('dashboard.partials._kpi', [
         'label' => 'ROAS net', 'icon' => 'bi-graph-up-arrow', 'color' => $marketplaceRoas !== null && $marketplaceRoas >= 3 ? 'green' : 'amber',
         'value' => $marketplaceRoas === null ? '—' : number_format((float) $marketplaceRoas, 2, ',', '.') . 'x', 'small' => true,
         'sub' => 'Penjualan net ÷ biaya iklan incl. PPN',
+        'comparisons' => [$monthComparison('roas_net', $multiple)],
     ])
     @include('dashboard.partials._kpi', [
         'label' => 'Affiliate / AMS', 'icon' => 'bi-person-check', 'color' => 'violet',
-        'value' => rupiah($marketplaceKpi['cash_affiliate_fees'] ?? $marketplaceKpi['affiliate_fees_actual'] ?? 0),
-        'sub' => 'Biaya affiliate & activity aktual',
+        'value' => rupiah($marketplaceMonthKpi['cash_affiliate_fees'] ?? $marketplaceMonthKpi['affiliate_fees_actual'] ?? 0),
+        'sub' => 'Biaya affiliate & activity bulan ini',
+        'comparisons' => [$monthComparison('cash_affiliate_fees', $money)],
     ])
 </div>
 
@@ -97,7 +168,8 @@
     @include('dashboard.partials._kpi', [
         'label' => 'Batal + refund', 'icon' => 'bi-exclamation-triangle', 'color' => $marketplaceExceptions > 0 ? 'amber' : 'green',
         'value' => number_format($marketplaceExceptions, 0, ',', '.'), 'small' => true,
-        'sub' => number_format((int) ($marketplaceKpi['cancelled_count'] ?? 0), 0, ',', '.') . ' dibatalkan · ' . number_format((int) ($marketplaceKpi['return_refund_order_count'] ?? 0), 0, ',', '.') . ' refund/return',
+        'sub' => number_format((int) ($marketplaceMonthKpi['cancelled_count'] ?? 0), 0, ',', '.') . ' dibatalkan · ' . number_format((int) ($marketplaceMonthKpi['return_refund_order_count'] ?? 0), 0, ',', '.') . ' refund/return bulan ini',
+        'comparisons' => [$monthComparison('exception_total', $count)],
         'url' => $marketplaceAnalyticsUrl, 'cta' => 'Audit exception',
     ])
     @include('dashboard.partials._kpi', [
@@ -112,9 +184,10 @@
         'sub' => 'Paket keluar sepekan',
     ])
     @include('dashboard.partials._kpi', [
-        'label' => 'Belum settlement', 'icon' => 'bi-hourglass-bottom', 'color' => (int) ($marketplaceKpi['cash_unsettled_order_count'] ?? 0) > 0 ? 'amber' : 'green',
-        'value' => number_format((int) ($marketplaceKpi['cash_unsettled_order_count'] ?? 0), 0, ',', '.'), 'small' => true,
-        'sub' => 'Order belum cair atau menunggu konfirmasi',
+        'label' => 'Belum settlement', 'icon' => 'bi-hourglass-bottom', 'color' => (int) ($marketplaceMonthKpi['cash_unsettled_order_count'] ?? 0) > 0 ? 'amber' : 'green',
+        'value' => number_format((int) ($marketplaceMonthKpi['cash_unsettled_order_count'] ?? 0), 0, ',', '.'), 'small' => true,
+        'sub' => 'Order bulan ini belum cair atau menunggu konfirmasi',
+        'comparisons' => [$monthComparison('cash_unsettled_order_count', $count)],
         'url' => $marketplaceAnalyticsUrl, 'cta' => 'Lihat detail',
     ])
 </div>

@@ -73,59 +73,88 @@ class DashboardController extends Controller
     {
         $today = Carbon::today();
 
-        $marketplaceSummary = $this->safe(
-            fn () => $this->marketplaceAnalytics->summary([
+        $monthKpiResponse = $this->safe(
+            fn () => $this->marketplaceAnalytics->kpis([
+                'store_id' => null,
+                'date_from' => $today->copy()->startOfMonth()->toDateString(),
+                'date_to' => $today->toDateString(),
+                'compare_mode' => 'prev_month',
+            ]),
+            ['current' => [], 'previous' => []],
+        );
+        $marketplaceMonthKpi = $monthKpiResponse['current'] ?? [];
+        $marketplaceMonthPreviousKpi = $monthKpiResponse['previous'] ?? [];
+        $todayKpiResponse = $this->safe(
+            fn () => $this->marketplaceAnalytics->kpis([
                 'store_id' => null,
                 'date_from' => $today->toDateString(),
                 'date_to' => $today->toDateString(),
                 'compare_mode' => 'prev_period',
             ]),
-            ['current' => []],
+            ['current' => [], 'previous' => []],
         );
-        $marketplaceKpi = $marketplaceSummary['current'] ?? [];
-        $marketplaceAdCost = (float) ($marketplaceKpi['ad_cost'] ?? 0);
-        $marketplaceNetRevenue = (float) ($marketplaceKpi['net_order_revenue'] ?? 0);
-        $marketplaceKpi['roas_net'] = $marketplaceAdCost > 0
-            ? $marketplaceNetRevenue / $marketplaceAdCost
-            : null;
-        $marketplaceKpi['net_aov'] = (int) ($marketplaceKpi['order_total'] ?? 0) > 0
-            ? $marketplaceNetRevenue / (int) $marketplaceKpi['order_total']
+        $todaySameDateResponse = $this->safe(
+            fn () => $this->marketplaceAnalytics->kpis([
+                'store_id' => null,
+                'date_from' => $today->toDateString(),
+                'date_to' => $today->toDateString(),
+                'compare_mode' => 'prev_month',
+            ]),
+            ['current' => [], 'previous' => []],
+        );
+        $marketplaceTodayKpi = $todayKpiResponse['current'] ?? [];
+        $marketplaceYesterdayKpi = $todayKpiResponse['previous'] ?? [];
+        $marketplaceSameDatePreviousKpi = $todaySameDateResponse['previous'] ?? [];
+        foreach ([&$marketplaceTodayKpi, &$marketplaceYesterdayKpi, &$marketplaceSameDatePreviousKpi] as &$todaySnapshot) {
+            $todaySnapshot['net_aov'] = (int) ($todaySnapshot['order_total'] ?? 0) > 0
+                ? (float) ($todaySnapshot['net_order_revenue'] ?? 0) / (int) $todaySnapshot['order_total']
+                : 0;
+        }
+        unset($todaySnapshot);
+        foreach (['net_order_revenue', 'order_total', 'net_aov'] as $todayComparisonKey) {
+            $marketplaceTodayKpi['comparisons'][$todayComparisonKey] = [
+                'yesterday' => $this->percentageComparison(
+                    (float) ($marketplaceTodayKpi[$todayComparisonKey] ?? 0),
+                    (float) ($marketplaceYesterdayKpi[$todayComparisonKey] ?? 0),
+                ),
+                'same_date' => $this->percentageComparison(
+                    (float) ($marketplaceTodayKpi[$todayComparisonKey] ?? 0),
+                    (float) ($marketplaceSameDatePreviousKpi[$todayComparisonKey] ?? 0),
+                ),
+            ];
+        }
+        $monthNetRevenue = (float) ($marketplaceMonthKpi['net_order_revenue'] ?? 0);
+        $monthAdCost = (float) ($marketplaceMonthKpi['ad_cost'] ?? 0);
+        $marketplaceMonthKpi['net_aov'] = (int) ($marketplaceMonthKpi['order_total'] ?? 0) > 0
+            ? $monthNetRevenue / (int) $marketplaceMonthKpi['order_total']
             : 0;
-
-        $weekAgoKpi = $this->safe(
-            fn () => $this->marketplaceAnalytics->kpis([
-                'store_id' => null,
-                'date_from' => $today->copy()->subDays(7)->toDateString(),
-                'date_to' => $today->copy()->subDays(7)->toDateString(),
-            ]),
-            ['current' => []],
-        )['current'] ?? [];
-        $monthAgoKpi = $this->safe(
-            fn () => $this->marketplaceAnalytics->kpis([
-                'store_id' => null,
-                'date_from' => $today->copy()->subMonthNoOverflow()->toDateString(),
-                'date_to' => $today->copy()->subMonthNoOverflow()->toDateString(),
-            ]),
-            ['current' => []],
-        )['current'] ?? [];
-
-        $marketplaceKpi['net_revenue_vs_week'] = $this->percentageComparison(
-            $marketplaceNetRevenue,
-            (float) ($weekAgoKpi['net_order_revenue'] ?? 0),
-        );
-        $marketplaceKpi['net_revenue_vs_month'] = $this->percentageComparison(
-            $marketplaceNetRevenue,
-            (float) ($monthAgoKpi['net_order_revenue'] ?? 0),
-        );
-        $marketplaceKpi['profit_vs_week'] = $this->percentageComparison(
-            (float) ($marketplaceKpi['estimated_profit'] ?? 0),
-            (float) ($weekAgoKpi['estimated_profit'] ?? 0),
-        );
-        $marketplaceKpi['profit_vs_month'] = $this->percentageComparison(
-            (float) ($marketplaceKpi['estimated_profit'] ?? 0),
-            (float) ($monthAgoKpi['estimated_profit'] ?? 0),
-        );
-
+        $marketplaceMonthKpi['roas_net'] = $monthAdCost > 0
+            ? $monthNetRevenue / $monthAdCost
+            : null;
+        $previousMonthNetRevenue = (float) ($marketplaceMonthPreviousKpi['net_order_revenue'] ?? 0);
+        $previousMonthAdCost = (float) ($marketplaceMonthPreviousKpi['ad_cost'] ?? 0);
+        $marketplaceMonthPreviousKpi['net_aov'] = (int) ($marketplaceMonthPreviousKpi['order_total'] ?? 0) > 0
+            ? $previousMonthNetRevenue / (int) $marketplaceMonthPreviousKpi['order_total']
+            : 0;
+        $marketplaceMonthPreviousKpi['roas_net'] = $previousMonthAdCost > 0
+            ? $previousMonthNetRevenue / $previousMonthAdCost
+            : null;
+        $marketplaceMonthKpi['exception_total'] = (int) ($marketplaceMonthKpi['cancelled_count'] ?? 0)
+            + (int) ($marketplaceMonthKpi['return_refund_order_count'] ?? 0);
+        $marketplaceMonthPreviousKpi['exception_total'] = (int) ($marketplaceMonthPreviousKpi['cancelled_count'] ?? 0)
+            + (int) ($marketplaceMonthPreviousKpi['return_refund_order_count'] ?? 0);
+        $comparisonKeys = [
+            'net_order_revenue', 'gmv', 'order_total', 'product_qty', 'net_aov',
+            'estimated_profit', 'estimated_profit_margin', 'cash_payout',
+            'cash_marketplace_fees', 'ad_cost', 'roas_net', 'cash_affiliate_fees',
+            'exception_total', 'cash_unsettled_order_count',
+        ];
+        foreach ($comparisonKeys as $comparisonKey) {
+            $marketplaceMonthKpi['comparisons'][$comparisonKey] = $this->percentageComparison(
+                (float) ($marketplaceMonthKpi[$comparisonKey] ?? 0),
+                (float) ($marketplaceMonthPreviousKpi[$comparisonKey] ?? 0),
+            );
+        }
         // Read-only forecast dari Inventory Intelligence. Jika data stok belum
         // lengkap, dashboard tetap tampil dan hanya menunjukkan saran 0.
         $intelligenceRows = $this->safe(
@@ -167,7 +196,12 @@ class DashboardController extends Controller
         } catch (\Throwable $e) {}
 
         return [
-            'marketplace_kpi'      => $marketplaceKpi,
+            'marketplace_today_kpi' => $marketplaceTodayKpi,
+            'marketplace_yesterday_kpi' => $marketplaceYesterdayKpi,
+            'marketplace_same_date_previous_kpi' => $marketplaceSameDatePreviousKpi,
+            'marketplace_kpi'      => $marketplaceMonthKpi,
+            'marketplace_month_kpi' => $marketplaceMonthKpi,
+            'marketplace_month_previous_kpi' => $marketplaceMonthPreviousKpi,
             'orders_todo'         => $this->mpUnshippedCount(),
             'orders_ready'        => $this->mpStatusCount(['READY_TO_SHIP']),
             'orders_shipped_7'    => $this->mpStatusCount(['SHIPPED'], 6),

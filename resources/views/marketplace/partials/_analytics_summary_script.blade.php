@@ -219,7 +219,7 @@
         const points = chartPoints(rows), previousPoints = chartPoints(previousRows || []);
         if (!points.length && !previousPoints.length) { $('revenueChart').innerHTML = '<div class="an-empty">Belum ada order selesai untuk dibandingkan.</div>'; return; }
         const labelsSource = points.length ? points : previousPoints;
-        const modeLabel = {prev_period:'periode lalu',prev_month:'tanggal sama bulan lalu',prev_quarter:'tanggal sama 3 bulan lalu',prev_year:'tanggal sama tahun lalu'}[$('anCompare')?.value] || 'periode lalu';
+        const modeLabel = {prev_period:'periode lalu',prev_month:'tanggal sama bulan lalu',prev_quarter:'tanggal sama 3 bulan lalu',prev_year:'tanggal sama tahun lalu'}[$('anCompare')?.value] || 'tanggal sama bulan lalu';
         $('chartCompareNote').textContent = `vs ${modeLabel}`;
         if (!window.Chart) {
             $('revenueChart').innerHTML = '<div class="an-empty">Menyiapkan grafik…</div>';

@@ -1102,9 +1102,9 @@ class MarketplaceAnalyticsSummaryService
             'store_id' => ! empty($filters['store_id']) ? (int) $filters['store_id'] : null,
             'date_from' => $from,
             'date_to' => $to,
-            'compare_mode' => in_array($filters['compare_mode'] ?? 'prev_period', ['prev_period', 'prev_month', 'prev_quarter', 'prev_year'], true)
-                ? ($filters['compare_mode'] ?? 'prev_period')
-                : 'prev_period',
+            'compare_mode' => in_array($filters['compare_mode'] ?? 'prev_month', ['prev_period', 'prev_month', 'prev_quarter', 'prev_year'], true)
+                ? ($filters['compare_mode'] ?? 'prev_month')
+                : 'prev_month',
         ];
     }
 

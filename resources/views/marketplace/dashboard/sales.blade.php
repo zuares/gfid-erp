@@ -1591,7 +1591,9 @@
         $adProducts = $rows->filter(fn ($product) => $product->ad_spend_matched ?? false);
         $adSpend = (float) $adProducts->sum('ad_spend');
         $adSales = (float) $adProducts->sum('ad_sales');
-        $adConversions = (int) $adProducts->sum('ad_conversions');
+        $adConversions = (int) round((float) $adProducts->sum('ad_conversions'));
+        $adImpressions = (int) round((float) $adProducts->sum('ad_impressions'));
+        $adClicks = (int) round((float) $adProducts->sum('ad_clicks'));
         $contributionProfit = (float) $costedProducts->sum(fn ($product) => (float) ($product->contribution_profit ?? ((float) ($product->gross_profit ?? 0) - (float) ($product->ad_spend ?? 0))));
         $mappedProducts = $rows->filter(fn ($product) => (int) ($product->internal_item_id ?? 0) > 0)->count();
 
@@ -1621,6 +1623,8 @@
             'hpp_coverage' => $rows->count() > 0 ? ($costedProducts->count() / $rows->count()) * 100 : 0,
             'ad_spend' => $adSpend,
             'ad_sales' => $adSales,
+            'ad_impressions' => $adImpressions,
+            'ad_clicks' => $adClicks,
             'acos' => $adSales > 0 ? ($adSpend / $adSales) * 100 : null,
             'roas' => $adSpend > 0 ? $adSales / $adSpend : null,
             'cpa' => $adConversions > 0 ? $adSpend / $adConversions : null,
@@ -1668,6 +1672,8 @@
         ['group' => 'Profitabilitas & iklan', 'label' => 'Margin Kontribusi', 'key' => 'contribution_margin', 'format' => $percentDisplay, 'delta_mode' => 'points'],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Penjualan Atribusi Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas & iklan', 'label' => 'Dilihat', 'key' => 'ad_impressions', 'format' => $numberDisplay],
+        ['group' => 'Profitabilitas & iklan', 'label' => 'Klik Iklan', 'key' => 'ad_clicks', 'format' => $numberDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'ACOS', 'key' => 'acos', 'format' => $percentDisplay, 'delta_mode' => 'points'],
         ['group' => 'Profitabilitas & iklan', 'label' => 'ROAS Blended', 'key' => 'roas', 'format' => $multipleDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'CPA', 'key' => 'cpa', 'format' => $currencyDisplay],
@@ -2021,7 +2027,9 @@
         $grossProfit = (float) $costedProducts->sum('gross_profit');
         $adSpend = (float) $adProducts->sum('ad_spend');
         $adSales = (float) $adProducts->sum('ad_sales');
-        $adConversions = (int) $adProducts->sum('ad_conversions');
+        $adConversions = (int) round((float) $adProducts->sum('ad_conversions'));
+        $adImpressions = (int) round((float) $adProducts->sum('ad_impressions'));
+        $adClicks = (int) round((float) $adProducts->sum('ad_clicks'));
         $contributionProfit = (float) $costedProducts->sum(fn ($product) => (float) ($product->contribution_profit ?? ((float) ($product->gross_profit ?? 0) - (float) ($product->ad_spend ?? 0))));
         $mappedProducts = $rows->filter(fn ($product) => (int) ($product->internal_item_id ?? 0) > 0)->count();
 
@@ -2051,6 +2059,8 @@
             'hpp_coverage' => $rows->count() > 0 ? ($costedProducts->count() / $rows->count()) * 100 : 0,
             'ad_spend' => $adSpend,
             'ad_sales' => $adSales,
+            'ad_impressions' => $adImpressions,
+            'ad_clicks' => $adClicks,
             'acos' => $adSales > 0 ? ($adSpend / $adSales) * 100 : null,
             'roas' => $adSpend > 0 ? $adSales / $adSpend : null,
             'cpa' => $adConversions > 0 ? $adSpend / $adConversions : null,
@@ -2130,6 +2140,8 @@
         ['group' => 'Profitabilitas & iklan', 'label' => 'Margin Kontribusi', 'key' => 'contribution_margin', 'format' => $percentDisplay, 'delta_mode' => 'points'],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'Penjualan Atribusi Iklan', 'key' => 'ad_sales', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas & iklan', 'label' => 'Dilihat', 'key' => 'ad_impressions', 'format' => $numberDisplay],
+        ['group' => 'Profitabilitas & iklan', 'label' => 'Klik Iklan', 'key' => 'ad_clicks', 'format' => $numberDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'ACOS', 'key' => 'acos', 'format' => $percentDisplay, 'delta_mode' => 'points'],
         ['group' => 'Profitabilitas & iklan', 'label' => 'ROAS Blended', 'key' => 'roas', 'format' => $multipleDisplay],
         ['group' => 'Profitabilitas & iklan', 'label' => 'CPA', 'key' => 'cpa', 'format' => $currencyDisplay],
@@ -3331,7 +3343,7 @@
                                     $comparisonDetailId = 'product-comparison-detail-'.$loop->index;
                                     $comparisonChartUnit = in_array($row['key'], ['contribution_margin', 'gross_margin', 'acos', 'mapping_rate', 'hpp_coverage'], true)
                                         ? 'percent'
-                                        : (in_array($row['key'], ['roas'], true) ? 'multiple' : (in_array($row['key'], ['orders', 'qty', 'products', 'variants', 'variants_sold', 'active_products', 'active_variants', 'unsold_variants'], true) ? 'number' : 'currency'));
+                                        : (in_array($row['key'], ['roas'], true) ? 'multiple' : (in_array($row['key'], ['orders', 'qty', 'products', 'variants', 'variants_sold', 'active_products', 'active_variants', 'unsold_variants', 'ad_impressions', 'ad_clicks'], true) ? 'number' : 'currency'));
                                     $comparisonChartData = collect($productComparisonPeriods)->reverse()->values()->map(function ($period) use ($row, $dateRangeLabel) {
                                         $value = $period['metrics'][$row['key']] ?? null;
 
@@ -3412,18 +3424,20 @@
                     <table class="table table-sm align-middle sales-table sales-category-summary-table mb-0">
                         <colgroup>
                             <col style="width: 4%">
-                            <col style="width: 19%">
+                            <col style="width: 17%">
+                            <col style="width: 5.5%">
+                            <col style="width: 5.5%">
                             <col style="width: 6.5%">
-                            <col style="width: 6.5%">
-                            <col style="width: 7%">
-                            <col style="width: 5%">
+                            <col style="width: 4.5%">
                             <col style="width: 4%">
-                            <col style="width: 8%">
-                            <col style="width: 10%">
+                            <col style="width: 5.5%">
+                            <col style="width: 5%">
+                            <col style="width: 7%">
                             <col style="width: 9%">
+                            <col style="width: 8%">
                             <col style="width: 7%">
                             <col style="width: 6%">
-                            <col style="width: 8%">
+                            <col style="width: 5.5%">
                         </colgroup>
                         <thead>
                             <tr>
@@ -3431,6 +3445,7 @@
                                 <th rowspan="2">Kategori Item</th>
                                 <th class="sales-category-table-group-head" colspan="3">Katalog Aktif</th>
                                 <th class="sales-category-table-group-head" colspan="2">Transaksi</th>
+                                <th class="sales-category-table-group-head" colspan="2">Traffic Iklan</th>
                                 <th class="sales-category-table-group-head" colspan="2">Pendapatan</th>
                                 <th class="sales-category-table-group-head" colspan="4">Profitabilitas</th>
                             </tr>
@@ -3440,6 +3455,8 @@
                                 <th>Variant Tidak Terjual</th>
                                 <th>Order</th>
                                 <th>Unit</th>
+                                <th>Dilihat</th>
+                                <th>Klik Iklan</th>
                                 <th>Kontribusi Penjualan</th>
                                 <th>Penjualan Netto</th>
                                 <th>Estimasi Penghasilan</th>
@@ -3472,6 +3489,8 @@
                                     <td data-label="Variant Tidak Terjual">{{ number_format($activeCategoryMetrics['unsold_variants']) }}</td>
                                     <td data-label="Order">{{ number_format($activeCategoryMetrics['orders']) }}</td>
                                     <td data-label="Unit">{{ number_format($activeCategoryMetrics['qty']) }}</td>
+                                    <td data-label="Dilihat">{{ number_format($activeCategoryMetrics['ad_impressions']) }}</td>
+                                    <td data-label="Klik Iklan">{{ number_format($activeCategoryMetrics['ad_clicks']) }}</td>
                                     <td class="text-end" data-label="Kontribusi Penjualan">{{ $percentDisplay($categoryRow['share']) }}</td>
                                     <td class="text-end" data-label="Penjualan Netto">
                                         <span class="sales-category-metric">
@@ -3489,7 +3508,7 @@
                                     <td class="text-end pe-3" data-label="Laba Bersih">{{ $fmt($activeCategoryMetrics['net_profit']) }}</td>
                                 </tr>
                                 <tr id="{{ $categoryKey }}-detail" class="sales-category-comparison-detail" data-sales-category-comparison-items="{{ $categoryKey }}" hidden>
-                                    <td colspan="10">
+                                    <td colspan="15">
                                         <div class="sales-category-comparison-detail-card">
                                             <div class="sales-category-detail-header d-flex align-items-start justify-content-between gap-2 mb-2">
                                                 <div>

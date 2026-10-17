@@ -23,7 +23,7 @@ class MarketplaceAnalyticsController extends Controller
             'date_from' => $request->query('date_from', $monthFrom),
             'date_to' => $request->query('date_to', $today),
             'store_id' => $request->query('store_id'),
-            'compare_mode' => $request->query('compare_mode', 'prev_period'),
+            'compare_mode' => $request->query('compare_mode', 'prev_month'),
         ];
 
         return view('marketplace.analytics', compact('filters'));
@@ -142,7 +142,7 @@ class MarketplaceAnalyticsController extends Controller
             (string) ($filters['store_id'] ?? 'all'),
             Carbon::parse($filters['date_from'])->toDateString(),
             Carbon::parse($filters['date_to'])->toDateString(),
-            (string) ($filters['compare_mode'] ?? 'prev_period'),
+            (string) ($filters['compare_mode'] ?? 'prev_month'),
         ]));
     }
 
