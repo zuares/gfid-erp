@@ -71,26 +71,7 @@ class DashboardController extends Controller
 
     private function ownerData(): array
     {
-        $sales7  = $this->mpSales(6);
-        $salesTd = $this->mpSales(0);
         $today = Carbon::today();
-
-        $salesTodayPreviousPeriod = $this->mpSalesRange(
-            $today->copy()->subDay(),
-            $today->copy()->subDay(),
-        );
-        $salesTodayPreviousMonth = $this->mpSalesRange(
-            $today->copy()->subMonthNoOverflow(),
-            $today->copy()->subMonthNoOverflow(),
-        );
-        $sales7PreviousPeriod = $this->mpSalesRange(
-            $today->copy()->subDays(13),
-            $today->copy()->subDays(7),
-        );
-        $sales7PreviousMonth = $this->mpSalesRange(
-            $today->copy()->subDays(6)->subMonthNoOverflow(),
-            $today->copy()->subMonthNoOverflow(),
-        );
 
         $marketplaceSummary = $this->safe(
             fn () => $this->marketplaceAnalytics->summary([
@@ -107,6 +88,43 @@ class DashboardController extends Controller
         $marketplaceKpi['roas_net'] = $marketplaceAdCost > 0
             ? $marketplaceNetRevenue / $marketplaceAdCost
             : null;
+        $marketplaceKpi['net_aov'] = (int) ($marketplaceKpi['order_total'] ?? 0) > 0
+            ? $marketplaceNetRevenue / (int) $marketplaceKpi['order_total']
+            : 0;
+
+        $weekAgoKpi = $this->safe(
+            fn () => $this->marketplaceAnalytics->kpis([
+                'store_id' => null,
+                'date_from' => $today->copy()->subDays(7)->toDateString(),
+                'date_to' => $today->copy()->subDays(7)->toDateString(),
+            ]),
+            ['current' => []],
+        )['current'] ?? [];
+        $monthAgoKpi = $this->safe(
+            fn () => $this->marketplaceAnalytics->kpis([
+                'store_id' => null,
+                'date_from' => $today->copy()->subMonthNoOverflow()->toDateString(),
+                'date_to' => $today->copy()->subMonthNoOverflow()->toDateString(),
+            ]),
+            ['current' => []],
+        )['current'] ?? [];
+
+        $marketplaceKpi['net_revenue_vs_week'] = $this->percentageComparison(
+            $marketplaceNetRevenue,
+            (float) ($weekAgoKpi['net_order_revenue'] ?? 0),
+        );
+        $marketplaceKpi['net_revenue_vs_month'] = $this->percentageComparison(
+            $marketplaceNetRevenue,
+            (float) ($monthAgoKpi['net_order_revenue'] ?? 0),
+        );
+        $marketplaceKpi['profit_vs_week'] = $this->percentageComparison(
+            (float) ($marketplaceKpi['estimated_profit'] ?? 0),
+            (float) ($weekAgoKpi['estimated_profit'] ?? 0),
+        );
+        $marketplaceKpi['profit_vs_month'] = $this->percentageComparison(
+            (float) ($marketplaceKpi['estimated_profit'] ?? 0),
+            (float) ($monthAgoKpi['estimated_profit'] ?? 0),
+        );
 
         // Read-only forecast dari Inventory Intelligence. Jika data stok belum
         // lengkap, dashboard tetap tampil dan hanya menunjukkan saran 0.
@@ -149,14 +167,6 @@ class DashboardController extends Controller
         } catch (\Throwable $e) {}
 
         return [
-            'sales_today_count'   => $salesTd['count'],
-            'sales_today_amount'  => $salesTd['amount'],
-            'sales_today_compare_period' => $this->salesComparison($salesTd, $salesTodayPreviousPeriod),
-            'sales_today_compare_month'  => $this->salesComparison($salesTd, $salesTodayPreviousMonth),
-            'sales_7_count'       => $sales7['count'],
-            'sales_7_amount'      => $sales7['amount'],
-            'sales_7_compare_period' => $this->salesComparison($sales7, $sales7PreviousPeriod),
-            'sales_7_compare_month'  => $this->salesComparison($sales7, $sales7PreviousMonth),
             'marketplace_kpi'      => $marketplaceKpi,
             'orders_todo'         => $this->mpUnshippedCount(),
             'orders_ready'        => $this->mpStatusCount(['READY_TO_SHIP']),
@@ -248,6 +258,24 @@ class DashboardController extends Controller
         );
     }
 
+    /** Perbandingan persentase terhadap hari pembanding dengan metrik yang sama. */
+    private function percentageComparison(float $current, float $previous): array
+    {
+        if ($previous === 0.0) {
+            return [
+                'value' => $current > 0 ? 'Baru' : '—',
+                'tone' => $current > 0 ? 'up' : 'muted',
+            ];
+        }
+
+        $delta = round((($current - $previous) / abs($previous)) * 100, 1);
+
+        return [
+            'value' => ($delta >= 0 ? '↑ ' : '↓ ') . number_format(abs($delta), 1, ',', '.') . '%',
+            'tone' => $delta == 0.0 ? 'muted' : ($delta > 0 ? 'up' : 'down'),
+        ];
+    }
+
     /** Penjualan marketplace pada rentang tanggal inklusif. */
     private function mpSalesRange(Carbon $from, Carbon $to): array
     {
@@ -268,31 +296,6 @@ class DashboardController extends Controller
                 'amount' => (float) (clone $q)->sum(DB::raw($amountExpr)),
             ];
         }, ['count' => 0, 'amount' => 0]);
-    }
-
-    /** Perubahan omzet terhadap rentang pembanding yang setara. */
-    private function salesComparison(array $current, array $previous): array
-    {
-        $currentAmount = (float) ($current['amount'] ?? 0);
-        $previousAmount = (float) ($previous['amount'] ?? 0);
-
-        if ($previousAmount === 0.0) {
-            return [
-                'delta_pct' => null,
-                'label' => $currentAmount > 0 ? 'Baru' : '—',
-                'tone' => $currentAmount > 0 ? 'up' : 'muted',
-                'previous_amount' => $previousAmount,
-            ];
-        }
-
-        $delta = round((($currentAmount - $previousAmount) / abs($previousAmount)) * 100, 1);
-
-        return [
-            'delta_pct' => $delta,
-            'label' => ($delta >= 0 ? '↑ ' : '↓ ') . number_format(abs($delta), 1, ',', '.') . '%',
-            'tone' => $delta == 0.0 ? 'muted' : ($delta > 0 ? 'up' : 'down'),
-            'previous_amount' => $previousAmount,
-        ];
     }
 
     private function mpOrdersInPeriod(int $daysBack): int
