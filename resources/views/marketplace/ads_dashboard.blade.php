@@ -3542,6 +3542,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'cpc' => $clicks > 0 ? $spend / $clicks : 0,
                         'cpa' => $orders > 0 ? $spend / $orders : 0,
                         'cpm' => $impressions > 0 ? ($spend / $impressions) * 1000 : 0,
+                        'acos' => (float) ($row->gmv ?? 0) > 0 ? ($spend / (float) $row->gmv) * 100 : 0,
                         'prev_spend' => $prevSpend,
                         'prev_impressions' => $prevImpressions,
                         'prev_clicks' => $prevClicks,
@@ -3553,6 +3554,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'prev_cpc' => $prevClicks > 0 ? $prevSpend / $prevClicks : 0,
                         'prev_cpa' => $prevOrders > 0 ? $prevSpend / $prevOrders : 0,
                         'prev_cpm' => $prevImpressions > 0 ? ($prevSpend / $prevImpressions) * 1000 : 0,
+                        'prev_acos' => $prevGmv > 0 ? ($prevSpend / $prevGmv) * 100 : 0,
                     ];
                 })->values();
                 $trafficCtrMedian = $trafficRows->filter(fn ($row) => $row['impressions'] > 0)->median('ctr') ?? 0;
@@ -3627,6 +3629,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'cpc' => $clicks > 0 ? $spend / $clicks : 0,
                         'cpa' => $orders > 0 ? $spend / $orders : 0,
                         'cpm' => $impressions > 0 ? ($spend / $impressions) * 1000 : 0,
+                        'acos' => $gmv > 0 ? ($spend / $gmv) * 100 : 0,
                         'prev_spend' => $prevSpend,
                         'prev_impressions' => $prevImpressions,
                         'prev_impression_share' => $trafficPreviousTotalImpressions > 0 ? ($prevImpressions / $trafficPreviousTotalImpressions) * 100 : 0,
@@ -3640,6 +3643,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'prev_cpc' => $prevClicks > 0 ? $prevSpend / $prevClicks : 0,
                         'prev_cpa' => $prevOrders > 0 ? $prevSpend / $prevOrders : 0,
                         'prev_cpm' => $prevImpressions > 0 ? ($prevSpend / $prevImpressions) * 1000 : 0,
+                        'prev_acos' => $prevGmv > 0 ? ($prevSpend / $prevGmv) * 100 : 0,
                         'prev_gmv' => $prevGmv,
                     ];
                 })->map(function ($row) use ($trafficSignal) {
@@ -3758,7 +3762,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 .traffic-scroll-hint i { color:#2563eb; }
                 .traffic-table {
-                    min-width:1200px;
+                    min-width:1320px;
                     width:100%;
                     table-layout:fixed;
                     border-collapse:separate;
@@ -4198,7 +4202,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-category-campaign-table th:first-child,
                 .traffic-category-campaign-table td:first-child { width:26%; min-width:0 !important; }
                 .traffic-category-campaign-table th:nth-child(n+2),
-                .traffic-category-campaign-table td:nth-child(n+2) { width:7.4%; }
+                .traffic-category-campaign-table td:nth-child(n+2) { width:6.73%; }
                 .traffic-category-campaign-table tbody td { border-bottom:1px solid rgba(226,232,240,.72); font-size:.68rem; }
                 .traffic-category-table-scroll-shell .traffic-category-campaign-table thead tr:first-child th:first-child,
                 .traffic-category-table-scroll-shell .traffic-category-campaign-table tbody td:first-child { position:sticky; left:0; z-index:3; background:var(--card-bg,#fff); box-shadow:1px 0 0 var(--dsh-border,#e2e8f0); }
@@ -4248,7 +4252,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-performance-table-panel .traffic-table col:first-child,
                 .traffic-performance-table-panel .traffic-category-campaign-table col:first-child { width:26% !important; }
                 .traffic-performance-table-panel .traffic-table col:nth-child(n+2),
-                .traffic-performance-table-panel .traffic-category-campaign-table col:nth-child(n+2) { width:7.4% !important; }
+                .traffic-performance-table-panel .traffic-category-campaign-table col:nth-child(n+2) { width:6.73% !important; }
                 .traffic-performance-table-panel .traffic-table > thead tr:first-child th,
                 .traffic-performance-table-panel .traffic-category-campaign-table > thead tr:first-child th {
                     height:2rem;
@@ -4332,7 +4336,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     .traffic-performance-table-panel .perf-kpi-card .ads-kpi-value { font-size:.94rem; }
                     .traffic-kpi-compare { font-size:.5rem; }
                     .traffic-status-dot { width:1.08rem; height:1.08rem; font-size:.52rem; }
-                    .traffic-table { min-width:1200px; width:1200px; }
+                    .traffic-table { min-width:1320px; width:1320px; }
                     .traffic-table thead th { padding:.5rem .48rem !important; font-size:.58rem !important; }
                     .traffic-table tbody td { padding:.55rem .48rem !important; font-size:.67rem !important; }
                     .traffic-table thead th:first-child,
@@ -4450,7 +4454,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <table class="dpanel-table table table-hover align-middle mb-0 perf-table traffic-table" id="trafficTable">
                         <colgroup>
                             <col style="width:26%;">
-                            <col span="10" style="width:7.4%;">
+                            <col span="11" style="width:6.73%;">
                         </colgroup>
                         <thead>
                             <tr>
@@ -4458,6 +4462,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <th colspan="5" class="text-center traffic-table-group-title">Funnel &amp; Efisiensi</th>
                                 <th colspan="2" class="text-center traffic-table-group-title">Hasil Iklan</th>
                                 <th colspan="3" class="text-center traffic-table-group-title">Proporsi</th>
+                                <th colspan="1" class="text-center traffic-table-group-title">Efisiensi</th>
                             </tr>
                             <tr class="traffic-table-subheader">
                                 <th class="text-end" data-traffic-sort="impressions" onclick="sortTrafficTable('impressions')" aria-sort="none">Impresi <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
@@ -4465,17 +4470,18 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <th class="text-end" data-traffic-sort="ctr" onclick="sortTrafficTable('ctr')" aria-sort="none">CTR <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
                                 <th class="text-end" data-traffic-sort="cvr" onclick="sortTrafficTable('cvr')" aria-sort="none">CVR <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
                                 <th class="text-end" data-traffic-sort="cpa" onclick="sortTrafficTable('cpa')" aria-sort="none">CPA <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
-                                <th class="text-end" data-traffic-sort="orders" onclick="sortTrafficTable('orders')" aria-sort="none">Pesanan <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
-                                <th class="text-end" data-traffic-sort="spend" onclick="sortTrafficTable('spend')" aria-sort="none">Biaya Iklan <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
-                                <th class="text-end" data-traffic-sort="impression_share" onclick="sortTrafficTable('impression_share')" aria-sort="none">Porsi Impresi <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
-                                <th class="text-end" data-traffic-sort="spend_share" onclick="sortTrafficTable('spend_share')" aria-sort="none">Porsi Biaya <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
-                                <th class="text-end" data-traffic-sort="click_share" onclick="sortTrafficTable('click_share')" aria-sort="none">Porsi Klik <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
+                                <th class="text-end" data-traffic-sort="orders" onclick="sortTrafficTable('orders')" aria-sort="none">Order <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
+                                <th class="text-end" data-traffic-sort="spend" onclick="sortTrafficTable('spend')" aria-sort="none">Biaya <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
+                                <th class="text-end" data-traffic-sort="impression_share" onclick="sortTrafficTable('impression_share')" aria-sort="none">Proporsi Impresi <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
+                                <th class="text-end" data-traffic-sort="spend_share" onclick="sortTrafficTable('spend_share')" aria-sort="none">Proporsi Biaya <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
+                                <th class="text-end" data-traffic-sort="click_share" onclick="sortTrafficTable('click_share')" aria-sort="none">Proporsi Klik <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
+                                <th class="text-end" data-traffic-sort="acos" onclick="sortTrafficTable('acos')" aria-sort="none">ACOS <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
                             </tr>
                         </thead>
                         <tbody>
                             @if($trafficRows->isEmpty())
                                 <tr class="traffic-no-data">
-                                    <td colspan="11" class="text-center text-muted py-4">Belum ada data traffic di periode ini.</td>
+                                    <td colspan="12" class="text-center text-muted py-4">Belum ada data traffic di periode ini.</td>
                                 </tr>
                             @else
                                 @foreach($trafficCategoryRows as $categoryRow)
@@ -4483,6 +4489,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         data-spend="{{ $categoryRow['spend'] }}" data-impressions="{{ $categoryRow['impressions'] }}"
                                         data-impression_share="{{ $categoryRow['impression_share'] }}"
                                         data-spend_share="{{ $categoryRow['spend_share'] }}" data-click_share="{{ $categoryRow['click_share'] }}"
+                                        data-acos="{{ $categoryRow['acos'] }}"
                                         data-clicks="{{ $categoryRow['clicks'] }}" data-ctr="{{ $categoryRow['ctr'] }}"
                                         data-orders="{{ $categoryRow['orders'] }}" data-cvr="{{ $categoryRow['cvr'] }}"
                                         data-aov="{{ $categoryRow['aov'] }}" data-cpc="{{ $categoryRow['cpc'] }}" data-cpa="{{ $categoryRow['cpa'] }}"
@@ -4498,12 +4505,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['cpa'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($categoryRow['cpa'], $categoryRow['prev_cpa'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_cpa'], 'Rp ') !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['orders'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($categoryRow['orders'], $categoryRow['prev_orders'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_orders']) !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($categoryRow['spend'], $categoryRow['prev_spend'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_spend'], 'Rp ') !!}</div></td>
-                                        <td class="text-end traffic-metric-cell" title="Porsi dari total impresi pada periode aktif"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['impression_share'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($categoryRow['impression_share'], $categoryRow['prev_impression_share'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_impression_share'], '', '%') !!}</div></td>
+                                        <td class="text-end traffic-metric-cell" title="Proporsi dari total impresi pada periode aktif"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['impression_share'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($categoryRow['impression_share'], $categoryRow['prev_impression_share'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_impression_share'], '', '%') !!}</div></td>
                                         <td class="text-end traffic-metric-cell" title="Proporsi biaya iklan dari total biaya periode aktif"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['spend_share'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($categoryRow['spend_share'], $categoryRow['prev_spend_share'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_spend_share'], '', '%') !!}</div></td>
                                         <td class="text-end traffic-metric-cell" title="Proporsi klik dari total klik periode aktif"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['click_share'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($categoryRow['click_share'], $categoryRow['prev_click_share'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_click_share'], '', '%') !!}</div></td>
+                                        <td class="text-end traffic-metric-cell" title="ACOS = biaya iklan dibanding GMV"><div class="perf-main"><span class="perf-val">{{ number_format($categoryRow['acos'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($categoryRow['acos'], $categoryRow['prev_acos'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($categoryRow['prev_acos'], '', '%') !!}</div></td>
                                     </tr>
                                     <tr class="traffic-category-detail" style="display:none;">
-                                        <td colspan="11" class="bg-light">
+                                        <td colspan="12" class="bg-light">
                                             <div class="text-muted fw-bold mb-1" style="font-size:.66rem;">Daftar campaign dalam kategori {{ $categoryRow['category'] }}</div>
                                             <div class="traffic-category-table-scroll-shell perf-table-scroll-shell" data-perf-sticky-shell>
                                             <div class="table-responsive traffic-category-table-scroll" data-perf-table-scroll>
@@ -4514,6 +4522,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                                             <th colspan="5" class="text-center traffic-table-group-title">Funnel &amp; Efisiensi</th>
                                                             <th colspan="2" class="text-center traffic-table-group-title">Hasil Iklan</th>
                                                             <th colspan="3" class="text-center traffic-table-group-title">Proporsi</th>
+                                                            <th colspan="1" class="text-center traffic-table-group-title">Efisiensi</th>
                                                         </tr>
                                                         <tr class="traffic-table-subheader">
                                                             <th class="text-end">Impresi</th>
@@ -4521,11 +4530,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                                             <th class="text-end">CTR</th>
                                                             <th class="text-end">CVR</th>
                                                             <th class="text-end">CPA</th>
-                                                            <th class="text-end">Pesanan</th>
-                                                            <th class="text-end">Biaya Iklan</th>
-                                                            <th class="text-end">Porsi Impresi</th>
-                                                            <th class="text-end">Porsi Biaya</th>
-                                                            <th class="text-end">Porsi Klik</th>
+                                                            <th class="text-end">Order</th>
+                                                            <th class="text-end">Biaya</th>
+                                                            <th class="text-end">Proporsi Impresi</th>
+                                                            <th class="text-end">Proporsi Biaya</th>
+                                                            <th class="text-end">Proporsi Klik</th>
+                                                            <th class="text-end">ACOS</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -4558,9 +4568,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                                                 <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($campaignRow['cpa'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($campaignRow['cpa'], $campaignRow['prev_cpa'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_cpa'], 'Rp ') !!}</div></td>
                                                                 <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($campaignRow['orders'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($campaignRow['orders'], $campaignRow['prev_orders'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_orders']) !!}</div></td>
                                                                 <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($campaignRow['spend'], $campaignRow['prev_spend'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_spend'], 'Rp ') !!}</div></td>
-                                                                <td class="text-end traffic-metric-cell" title="Porsi dari total impresi pada periode aktif"><div class="perf-main"><span class="perf-val">{{ number_format($campaignRow['impression_share'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($campaignRow['impression_share'], $campaignRow['prev_impression_share'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_impression_share'], '', '%') !!}</div></td>
+                                                                <td class="text-end traffic-metric-cell" title="Proporsi dari total impresi pada periode aktif"><div class="perf-main"><span class="perf-val">{{ number_format($campaignRow['impression_share'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($campaignRow['impression_share'], $campaignRow['prev_impression_share'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_impression_share'], '', '%') !!}</div></td>
                                                                 <td class="text-end traffic-metric-cell" title="Proporsi biaya iklan dari total biaya periode aktif"><div class="perf-main"><span class="perf-val">{{ number_format($campaignRow['spend_share'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($campaignRow['spend_share'], $campaignRow['prev_spend_share'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_spend_share'], '', '%') !!}</div></td>
                                                                 <td class="text-end traffic-metric-cell" title="Proporsi klik dari total klik periode aktif"><div class="perf-main"><span class="perf-val">{{ number_format($campaignRow['click_share'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($campaignRow['click_share'], $campaignRow['prev_click_share'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_click_share'], '', '%') !!}</div></td>
+                                                                <td class="text-end traffic-metric-cell" title="ACOS = biaya iklan dibanding GMV"><div class="perf-main"><span class="perf-val">{{ number_format($campaignRow['acos'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($campaignRow['acos'], $campaignRow['prev_acos'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($campaignRow['prev_acos'], '', '%') !!}</div></td>
                                                             </tr>
                                                         @endforeach
                                                     </tbody>
@@ -4577,6 +4588,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         data-impressions="{{ $trafficRow['impressions'] }}"
                                         data-impression_share="{{ $trafficRow['impression_share'] }}"
                                         data-spend_share="{{ $trafficRow['spend_share'] }}" data-click_share="{{ $trafficRow['click_share'] }}"
+                                        data-acos="{{ $trafficRow['acos'] }}"
                                         data-clicks="{{ $trafficRow['clicks'] }}"
                                         data-ctr="{{ $trafficRow['ctr'] }}"
                                         data-orders="{{ $trafficRow['orders'] }}"
@@ -4612,14 +4624,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($trafficRow['cpa'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($trafficRow['cpa'], $trafficRow['prev_cpa'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_cpa'], 'Rp ') !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($trafficRow['orders'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($trafficRow['orders'], $trafficRow['prev_orders'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_orders']) !!}</div></td>
                                         <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($trafficRow['spend'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($trafficRow['spend'], $trafficRow['prev_spend'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_spend'], 'Rp ') !!}</div></td>
-                                        <td class="text-end traffic-metric-cell" title="Porsi dari total impresi pada periode aktif"><div class="perf-main"><span class="perf-val">{{ number_format($trafficRow['impression_share'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($trafficRow['impression_share'], $trafficRow['prev_impression_share'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_impression_share'], '', '%') !!}</div></td>
+                                        <td class="text-end traffic-metric-cell" title="Proporsi dari total impresi pada periode aktif"><div class="perf-main"><span class="perf-val">{{ number_format($trafficRow['impression_share'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($trafficRow['impression_share'], $trafficRow['prev_impression_share'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_impression_share'], '', '%') !!}</div></td>
                                         <td class="text-end traffic-metric-cell" title="Proporsi biaya iklan dari total biaya periode aktif"><div class="perf-main"><span class="perf-val">{{ number_format($trafficRow['spend_share'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($trafficRow['spend_share'], $trafficRow['prev_spend_share'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_spend_share'], '', '%') !!}</div></td>
                                         <td class="text-end traffic-metric-cell" title="Proporsi klik dari total klik periode aktif"><div class="perf-main"><span class="perf-val">{{ number_format($trafficRow['click_share'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($trafficRow['click_share'], $trafficRow['prev_click_share'], true) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_click_share'], '', '%') !!}</div></td>
+                                        <td class="text-end traffic-metric-cell" title="ACOS = biaya iklan dibanding GMV"><div class="perf-main"><span class="perf-val">{{ number_format($trafficRow['acos'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($trafficRow['acos'], $trafficRow['prev_acos'], false) !!}</div><div class="perf-previous" title="Perbandingan: {{ $trafficCompareLabel }}">↔ {!! $trafficFmtPrevious($trafficRow['prev_acos'], '', '%') !!}</div></td>
                                     </tr>
                                 @endforeach
                             @endif
                             <tr class="traffic-view-empty" style="display:none;">
-                                        <td colspan="11" class="text-center text-muted py-4">Belum ada data untuk kategori ini.</td>
+                                        <td colspan="12" class="text-center text-muted py-4">Belum ada data untuk kategori ini.</td>
                             </tr>
                         </tbody>
                     </table>
