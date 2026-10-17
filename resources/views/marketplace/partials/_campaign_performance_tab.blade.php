@@ -1046,6 +1046,16 @@
         z-index: 40 !important;
         background: #eff6ff !important;
     }
+    .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > thead tr:first-child th,
+    .campaign-performance-panel .perf-category-table-scroll-shell > [data-perf-table-scroll] > .perf-category-campaign-table > thead tr:first-child th {
+        background: #eff6ff !important;
+        background-color: #eff6ff !important;
+    }
+    .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table > thead tr:nth-child(2) th,
+    .campaign-performance-panel .perf-category-table-scroll-shell > [data-perf-table-scroll] > .perf-category-campaign-table > thead tr:nth-child(2) th {
+        background: #f8fafc !important;
+        background-color: #f8fafc !important;
+    }
     @media (max-width: 991.98px) {
         .campaign-performance-panel > .perf-table-scroll-shell > [data-perf-table-scroll] > .perf-table,
         .campaign-performance-panel .perf-category-table-scroll-shell .perf-category-campaign-table {
