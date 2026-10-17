@@ -2335,6 +2335,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const compareModeHidden = document.getElementById('compareModeHidden');
     const compareModeStatus = document.getElementById('compareModeStatus');
     const compareModeTabs = document.getElementById('compareModeTabs');
+    const trafficCompareMode = document.getElementById('trafficCompareMode');
+    const trafficCompareStatus = document.getElementById('trafficCompareStatus');
     const submitCompareMode = value => {
         if (compareModeHidden) compareModeHidden.value = value;
         if (compareModeSelect) compareModeSelect.value = value;
@@ -2365,6 +2367,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 submitCompareMode(tab.dataset.compareMode);
             }
         });
+    });
+    trafficCompareMode?.addEventListener('change', function () {
+        const url = new URL(window.location.href);
+        url.searchParams.set('compare_mode', this.value);
+        url.hash = 'tab-traffic';
+        try { localStorage.setItem('adsDashboardActivePane', 'tab-traffic'); } catch (e) {}
+        this.disabled = true;
+        if (trafficCompareStatus) trafficCompareStatus.hidden = false;
+        window.__dashLoading?.();
+        window.location.assign(url.toString());
     });
 
     function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
@@ -3708,8 +3720,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     letter-spacing:.08em;
                 }
                 .traffic-table thead tr:first-child .traffic-table-group-title {
-                    background:rgba(37,99,235,.045) !important;
-                    color:var(--dsh-muted,#64748b) !important;
+                    background:rgba(37,99,235,.07) !important;
+                    color:#475569 !important;
+                    border-bottom-color:rgba(37,99,235,.16);
                 }
                 .traffic-table thead tr:nth-child(2) th {
                     top:34px;
@@ -3750,6 +3763,46 @@ document.addEventListener('DOMContentLoaded', function() {
                     font-size:.62rem;
                     background:rgba(248,250,252,.78);
                 }
+                .traffic-panel-header {
+                    min-height:4rem;
+                    padding:.8rem 1rem !important;
+                    background:var(--card-bg,#fff);
+                }
+                .traffic-panel-header .perf-panel-title-icon {
+                    width:1.8rem;
+                    height:1.8rem;
+                    border-radius:.55rem;
+                    background:rgba(37,99,235,.1);
+                    color:#2563eb;
+                }
+                .traffic-panel-header .perf-panel-subtitle {
+                    max-width:52rem;
+                    margin-top:.2rem;
+                    font-size:.62rem;
+                    line-height:1.35;
+                }
+                .traffic-view-tabs {
+                    display:flex;
+                    align-items:center;
+                    gap:.35rem;
+                    margin:.7rem .85rem .75rem;
+                    padding:.22rem;
+                    overflow-x:auto;
+                    border:1px solid var(--dsh-border,#e2e8f0);
+                    border-radius:10px;
+                    background:rgba(248,250,252,.74);
+                    scrollbar-width:none;
+                }
+                .traffic-view-tabs::-webkit-scrollbar { display:none; }
+                .traffic-view-tabs .btn { flex:0 0 auto; }
+                .traffic-view-tabs .btn:focus-visible { outline:2px solid #2563eb; outline-offset:1px; }
+                .traffic-table-scroll-shell {
+                    margin:0 .85rem .85rem;
+                    border:1px solid var(--dsh-border,#e2e8f0);
+                    border-radius:10px;
+                    overflow:hidden;
+                    background:var(--card-bg,#fff);
+                }
                 .traffic-performance-table-panel .ads-kpi-grid {
                     align-items:stretch;
                     gap:.65rem;
@@ -3765,9 +3818,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     display:flex;
                     flex-direction:column;
                     padding:.78rem .85rem !important;
+                    background:var(--card-bg,#fff);
                     border:1px solid var(--dsh-border,#e2e8f0);
                     border-radius:11px;
                     box-shadow:0 3px 10px rgba(15,23,42,.035);
+                }
+                .traffic-performance-table-panel .perf-kpi-card:hover {
+                    border-color:rgba(37,99,235,.28);
+                    box-shadow:0 6px 16px rgba(15,23,42,.06);
                 }
                 .traffic-performance-table-panel .perf-kpi-card .ads-kpi-label {
                     display:flex;
@@ -3912,6 +3970,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-status-dot.status-secondary { color:#64748b; background:rgba(148,163,184,.12); }
                 .traffic-status-dot:hover { opacity:1; transform:translateY(-1px); }
                 body[data-theme="dark"] .traffic-panel-hint { background:rgba(15,23,42,.55); }
+                body[data-theme="dark"] .traffic-panel-header { background:var(--card-bg,#111827); }
+                body[data-theme="dark"] .traffic-view-tabs { background:rgba(15,23,42,.55); }
+                body[data-theme="dark"] .traffic-table thead tr:first-child .traffic-table-group-title { color:#cbd5e1 !important; }
                 body[data-theme="dark"] .traffic-performance-table-panel .perf-kpi-card { box-shadow:0 3px 10px rgba(0,0,0,.18); }
                 .traffic-table tbody td {
                     white-space:normal;
@@ -3921,6 +3982,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     font-size:.72rem !important;
                     line-height:1.25;
                 }
+                .traffic-table tbody tr { transition:background-color .15s ease; }
+                .traffic-table tbody tr.traffic-category-row > td,
+                .traffic-table tbody tr.traffic-performance-row > td { color:var(--text,#0f172a); }
+                .traffic-table tbody tr.traffic-category-row > td:first-child .fw-bold,
+                .traffic-table tbody tr.traffic-performance-row > td:first-child .fw-bold { letter-spacing:-.01em; }
                 .traffic-category-campaign-table {
                     min-width:1040px;
                     width:100%;
@@ -3962,7 +4028,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-category-table-scroll-shell .traffic-category-campaign-table { min-width:1040px; width:1040px; table-layout:fixed; border-collapse:separate; border-spacing:0; }
                 .traffic-category-campaign-table thead th { position:sticky; top:0; z-index:5; white-space:normal; overflow-wrap:anywhere; background:var(--card-bg,#fff); border-bottom:1px solid var(--dsh-border,#e2e8f0); color:var(--dsh-muted,#6b7280); font-size:.61rem; text-transform:uppercase; letter-spacing:.02em; }
                 .traffic-category-campaign-table thead tr:first-child th { padding-top:.5rem !important; padding-bottom:.38rem !important; font-size:.58rem; letter-spacing:.07em; }
-                .traffic-category-campaign-table thead tr:first-child .traffic-table-group-title { background:rgba(37,99,235,.045); color:var(--dsh-muted,#64748b); }
+                .traffic-category-campaign-table thead tr:first-child .traffic-table-group-title { background:rgba(37,99,235,.07); color:#475569; border-bottom-color:rgba(37,99,235,.16); }
                 .traffic-category-campaign-table thead tr:nth-child(2) th { top:31px; z-index:4; color:var(--text,#0f172a); font-size:.62rem; font-weight:700; letter-spacing:.01em; text-transform:none; }
                 .traffic-category-campaign-table th,
                 .traffic-category-campaign-table td { padding:.42rem .38rem !important; white-space:normal; overflow-wrap:anywhere; }
@@ -4003,7 +4069,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             {{-- TABEL TRAFFIC --}}
             <div class="ads-tab-panel mb-4 campaign-performance-panel traffic-performance-table-panel">
-                <div class="border-bottom d-flex justify-content-between align-items-center flex-wrap gap-3 perf-panel-header">
+                <div class="border-bottom d-flex justify-content-between align-items-center flex-wrap gap-3 perf-panel-header traffic-panel-header">
                     <div class="perf-panel-title">
                         <span class="perf-panel-title-icon"><i class="bi bi-list-columns-reverse"></i></span>
                         <div>
@@ -4011,11 +4077,22 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="perf-panel-subtitle">Lihat iklan yang paling banyak dilihat, diklik, dan menghasilkan pesanan.</div>
                         </div>
                     </div>
+                    <div class="perf-panel-meta">
+                        <div class="perf-panel-compare">
+                            <span class="perf-compare-label"><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span>Bandingkan dengan</span></span>
+                            <select id="trafficCompareMode" class="form-select form-select-sm" aria-label="Pilih periode pembanding iklan">
+                                <option value="prev_period" {{ ($compareMode ?? 'prev_period') === 'prev_period' ? 'selected' : '' }}>Periode Sebelumnya</option>
+                                <option value="prev_month" {{ ($compareMode ?? 'prev_period') === 'prev_month' ? 'selected' : '' }}>Bulan Lalu</option>
+                                <option value="prev_year" {{ ($compareMode ?? 'prev_period') === 'prev_year' ? 'selected' : '' }}>Tahun Lalu (tanggal sama)</option>
+                            </select>
+                            <span id="trafficCompareStatus" class="perf-compare-status" aria-live="polite" hidden><i class="bi bi-arrow-repeat spin-icon" aria-hidden="true"></i> Memuat</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="p-2 px-3 border-bottom text-muted traffic-panel-hint">
                     <i class="bi bi-info-circle me-1" aria-hidden="true"></i> Klik baris kategori untuk melihat detail iklan. Klik subheader untuk mengurutkan data.
                 </div>
-                <div style="display:flex; gap:.35rem; margin:.75rem .75rem .75rem; overflow-x:auto;" role="tablist" aria-label="Jenis tampilan traffic">
+                <div class="traffic-view-tabs" role="tablist" aria-label="Jenis tampilan traffic">
                     <button type="button" id="btnTrafficCategory" class="btn fw-bold" onclick="__trafficPerformanceView('category')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Semua Kategori</button>
                     <button type="button" id="btnTrafficRoas" class="btn fw-bold" onclick="__trafficPerformanceView('roas')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Target ROAS</button>
                     <button type="button" id="btnTrafficGms" class="btn fw-bold" onclick="__trafficPerformanceView('gms')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Otomatis</button>

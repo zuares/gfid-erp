@@ -1143,15 +1143,6 @@
             </div>
         </div>
         <div class="perf-panel-meta">
-            <div class="perf-panel-compare">
-                <span class="perf-compare-label"><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span>Bandingkan dengan</span></span>
-                <select id="perfCompareMode" class="form-select form-select-sm" aria-label="Pilih periode pembanding">
-                    <option value="prev_period" {{ $perfCompareMode === 'prev_period' ? 'selected' : '' }}>Periode Sebelumnya</option>
-                    <option value="prev_month" {{ $perfCompareMode === 'prev_month' ? 'selected' : '' }}>Bulan Lalu</option>
-                    <option value="prev_year" {{ $perfCompareMode === 'prev_year' ? 'selected' : '' }}>Tahun Lalu (tanggal sama)</option>
-                </select>
-                <span id="perfCompareStatus" class="perf-compare-status" aria-live="polite" hidden><i class="bi bi-arrow-repeat spin-icon" aria-hidden="true"></i> Memuat</span>
-            </div>
             <div class="perf-signal-legend" aria-label="Legenda status campaign">
                 <span class="perf-legend-title">Sinyal</span>
                 <span class="perf-signal-item" title="ROAS minimal 1,2 kali target"><i class="perf-signal-dot is-scale" aria-hidden="true"></i>Scale</span>
@@ -2554,20 +2545,7 @@ window.__campaignPerformanceView = function(view) {
     try { localStorage.setItem('adsPerformanceView', view); } catch (e) {}
 };
 
-// Kembali ke tab Campaign setelah reload akibat ganti periode pembanding.
 document.addEventListener('DOMContentLoaded', function() {
-    const compareMode = document.getElementById('perfCompareMode');
-    const compareStatus = document.getElementById('perfCompareStatus');
-    compareMode?.addEventListener('change', function() {
-        const url = new URL(window.location.href);
-        url.searchParams.set('compare_mode', this.value);
-        url.hash = 'tab-campaign-performance';
-        this.disabled = true;
-        if (compareStatus) compareStatus.hidden = false;
-        window.__dashLoading?.();
-        window.location.assign(url.toString());
-    });
-
     const search = document.getElementById('perfCampaignSearch');
     const status = document.getElementById('perfStatusFilter');
     const decision = document.getElementById('perfDecisionFilter');
