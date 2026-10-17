@@ -107,7 +107,7 @@ class WhatsAppCenterController extends Controller
                 ->first()
             : null;
 
-        if ($data['template_key'] && ! $template) {
+        if (! empty($data['template_key']) && ! $template) {
             return back()->withInput()->with('error', 'Template WhatsApp tidak aktif atau tidak ditemukan.');
         }
 
