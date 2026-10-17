@@ -98,9 +98,36 @@ body {
     background: var(--card-bg);
     box-shadow: 0 1px 3px rgba(15,23,42,.12);
 }
+.ads-filter-compare-field { min-width:0; }
+.ads-filter-compare-control { display:flex; align-items:center; min-width:0; }
+.ads-filter-compare-control .ads-compare-select-wrap {
+    display:flex;
+    align-items:center;
+    gap:.42rem;
+    width:100%;
+    min-height:34px;
+    padding:0 .65rem;
+    border:1px solid var(--ads-line,#e2e8f0);
+    border-radius:.55rem;
+    background:var(--ads-card,#fff);
+}
+.ads-filter-compare-control .ads-compare-select-wrap i { color:var(--accent,#2563eb); font-size:.82rem; }
+.ads-filter-compare-control .ads-compare-select {
+    width:100%;
+    min-width:0;
+    padding:.1rem 1.7rem .1rem 0;
+    border:0;
+    outline:0;
+    background:transparent;
+    color:var(--ads-ink,#0f172a);
+    font-size:.74rem;
+    font-weight:650;
+    cursor:pointer;
+}
+.ads-filter-compare-control .ads-compare-select:focus { box-shadow:none; }
 @media (max-width: 768px) {
     .compare-mode-tabs { display: none; }
-    #compareModeSelect { display: block !important; min-width: 180px !important; }
+    #compareModeSelect { display: block !important; min-width: 0 !important; }
 }
 
 .spin-icon { animation: spin 1.5s linear infinite; }
@@ -1630,7 +1657,7 @@ body[data-theme="dark"] .dash-sec{
 
 .ads-dashboard #filterForm {
     display: grid !important;
-    grid-template-columns: minmax(220px, .8fr) minmax(260px, 1.2fr);
+    grid-template-columns: minmax(180px, .75fr) minmax(250px, 1.1fr) minmax(230px, 1fr);
     gap: .75rem;
     align-items: end;
     width: 100%;
@@ -1661,6 +1688,7 @@ body[data-theme="dark"] .dash-sec{
     font-size: .8rem !important;
     font-weight: 600 !important;
 }
+.ads-dashboard #filterForm .ads-compare-select-wrap { border-color:var(--ads-line) !important; }
 
 .ads-dashboard #filterForm .form-select:focus,
 .ads-dashboard #rangePicker:focus {
@@ -2335,8 +2363,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const compareModeHidden = document.getElementById('compareModeHidden');
     const compareModeStatus = document.getElementById('compareModeStatus');
     const compareModeTabs = document.getElementById('compareModeTabs');
-    const trafficCompareMode = document.getElementById('trafficCompareMode');
-    const trafficCompareStatus = document.getElementById('trafficCompareStatus');
     const submitCompareMode = value => {
         if (compareModeHidden) compareModeHidden.value = value;
         if (compareModeSelect) compareModeSelect.value = value;
@@ -2367,16 +2393,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 submitCompareMode(tab.dataset.compareMode);
             }
         });
-    });
-    trafficCompareMode?.addEventListener('change', function () {
-        const url = new URL(window.location.href);
-        url.searchParams.set('compare_mode', this.value);
-        url.hash = 'tab-traffic';
-        try { localStorage.setItem('adsDashboardActivePane', 'tab-traffic'); } catch (e) {}
-        this.disabled = true;
-        if (trafficCompareStatus) trafficCompareStatus.hidden = false;
-        window.__dashLoading?.();
-        window.location.assign(url.toString());
     });
 
     function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
@@ -2938,6 +2954,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 <input type="hidden" name="compare_mode" id="compareModeHidden" value="{{ $compareMode ?? 'prev_period' }}">
             </div>
         </div>
+        <div class="ads-filter-field ads-filter-compare-field">
+            <label class="ads-filter-label" for="compareModeSelect">Bandingkan dengan</label>
+            <div class="ads-filter-compare-control">
+                <div class="ads-compare-select-wrap">
+                    <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+                    <select id="compareModeSelect" class="ads-compare-select" aria-label="Pilih periode pembanding">
+                        <option value="prev_period" {{ ($compareMode ?? 'prev_period') === 'prev_period' ? 'selected' : '' }}>Periode sebelumnya</option>
+                        <option value="prev_month" {{ ($compareMode ?? 'prev_period') === 'prev_month' ? 'selected' : '' }}>Bulan lalu</option>
+                        <option value="prev_year" {{ ($compareMode ?? 'prev_period') === 'prev_year' ? 'selected' : '' }}>Tahun lalu (tanggal sama)</option>
+                    </select>
+                    <span id="compareModeStatus" aria-live="polite" style="display:none; font-size:.64rem; color:var(--dsh-muted);"><i class="bi bi-arrow-repeat spin-icon"></i></span>
+                </div>
+            </div>
+        </div>
     </form>
 
     @if(session('error'))
@@ -3051,21 +3081,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="ads-tab-panel-title"><i class="bi bi-clock-history text-primary"></i> Komparasi</div>
                         <div class="ads-tab-panel-note">Perbandingan rentang saat ini vs sebelumnya.</div>
                     </div>
-                    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                        <label for="compareModeSelect" class="d-flex align-items-center gap-1 mb-0" style="font-size:.66rem; color:var(--dsh-muted); font-weight:700;">
-                            <i class="bi bi-arrow-left-right"></i> Bandingkan dengan
-                        </label>
-                        <div id="compareModeTabs" class="compare-mode-tabs" role="tablist" aria-label="Pilih periode pembanding">
-                            <button type="button" class="compare-mode-tab {{ ($compareMode ?? 'prev_period') === 'prev_period' ? 'active' : '' }}" data-compare-mode="prev_period" role="tab" aria-selected="{{ ($compareMode ?? 'prev_period') === 'prev_period' ? 'true' : 'false' }}"><i class="bi bi-calendar2-week me-1"></i>Rentang</button>
-                            <button type="button" class="compare-mode-tab {{ ($compareMode ?? 'prev_period') === 'prev_month' ? 'active' : '' }}" data-compare-mode="prev_month" role="tab" aria-selected="{{ ($compareMode ?? 'prev_period') === 'prev_month' ? 'true' : 'false' }}"><i class="bi bi-calendar2-month me-1"></i>Bulan</button>
-                            <button type="button" class="compare-mode-tab {{ ($compareMode ?? 'prev_period') === 'prev_year' ? 'active' : '' }}" data-compare-mode="prev_year" role="tab" aria-selected="{{ ($compareMode ?? 'prev_period') === 'prev_year' ? 'true' : 'false' }}"><i class="bi bi-calendar3 me-1"></i>Tahun</button>
-                        </div>
-                        <select id="compareModeSelect" class="form-select form-select-sm" aria-label="Pilih periode pembanding" style="display:none; width:auto; min-width:190px; font-size:.68rem; border-radius:8px;">
-                            <option value="prev_period" {{ ($compareMode ?? 'prev_period') === 'prev_period' ? 'selected' : '' }}>Periode sebelumnya (rentang sama)</option>
-                            <option value="prev_month" {{ ($compareMode ?? 'prev_period') === 'prev_month' ? 'selected' : '' }}>Bulan sebelumnya</option>
-                            <option value="prev_year" {{ ($compareMode ?? 'prev_period') === 'prev_year' ? 'selected' : '' }}>Tahun sebelumnya</option>
-                        </select>
-                        <span id="compareModeStatus" aria-live="polite" style="display:none; font-size:.64rem; color:var(--dsh-muted);"><i class="bi bi-arrow-repeat spin-icon"></i> Memuat...</span>
                     <div style="overflow-x:auto; scrollbar-width:none;">
                         <input type="hidden" id="histMetricSelect" value="roas">
                         <div class="dash-tabs-modern" id="histMetricChips" style="padding:.2rem;">
@@ -3079,7 +3094,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             <button class="dash-tab-sm" data-val="cvr"><i class="bi bi-funnel"></i> CVR</button>
                             <button class="dash-tab-sm" data-val="profit"><i class="bi bi-cash-stack"></i> Profit setelah admin</button>
                         </div>
-                    </div>
                     </div>
                 </div>
                 <div class="p-3 pt-0">
@@ -4075,17 +4089,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div>
                             <h6 class="mb-0 fw-bold">Performa Iklan</h6>
                             <div class="perf-panel-subtitle">Lihat iklan yang paling banyak dilihat, diklik, dan menghasilkan pesanan.</div>
-                        </div>
-                    </div>
-                    <div class="perf-panel-meta">
-                        <div class="perf-panel-compare">
-                            <span class="perf-compare-label"><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span>Bandingkan dengan</span></span>
-                            <select id="trafficCompareMode" class="form-select form-select-sm" aria-label="Pilih periode pembanding iklan">
-                                <option value="prev_period" {{ ($compareMode ?? 'prev_period') === 'prev_period' ? 'selected' : '' }}>Periode Sebelumnya</option>
-                                <option value="prev_month" {{ ($compareMode ?? 'prev_period') === 'prev_month' ? 'selected' : '' }}>Bulan Lalu</option>
-                                <option value="prev_year" {{ ($compareMode ?? 'prev_period') === 'prev_year' ? 'selected' : '' }}>Tahun Lalu (tanggal sama)</option>
-                            </select>
-                            <span id="trafficCompareStatus" class="perf-compare-status" aria-live="polite" hidden><i class="bi bi-arrow-repeat spin-icon" aria-hidden="true"></i> Memuat</span>
                         </div>
                     </div>
                 </div>
