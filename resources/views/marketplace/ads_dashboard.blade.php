@@ -4206,9 +4206,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 .traffic-product-status {
                     flex:0 0 auto;
-                    width:.95rem;
-                    height:.95rem;
-                    font-size:.45rem;
+                }
+                .traffic-status-chip.traffic-product-status {
+                    width:auto;
+                    height:auto;
+                    font-size:.48rem;
                 }
                 .traffic-status-dot.status-success { color:#15803d; background:rgba(34,197,94,.1); }
                 .traffic-status-dot.status-info { color:#0369a1; background:rgba(14,165,233,.1); }
@@ -4216,6 +4218,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-status-dot.status-danger { color:#b91c1c; background:rgba(239,68,68,.1); }
                 .traffic-status-dot.status-secondary { color:#64748b; background:rgba(148,163,184,.12); }
                 .traffic-status-dot:hover { opacity:1; transform:translateY(-1px); }
+                .traffic-status-chip {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:.18rem;
+                    min-width:max-content;
+                    padding:.14rem .32rem;
+                    border:1px solid currentColor;
+                    border-radius:999px;
+                    font-size:.48rem;
+                    font-weight:750;
+                    line-height:1;
+                    white-space:nowrap;
+                }
+                .traffic-status-chip i { font-size:.5rem; }
+                .traffic-status-chip.status-success { color:#15803d; background:rgba(34,197,94,.1); }
+                .traffic-status-chip.status-info { color:#0369a1; background:rgba(14,165,233,.1); }
+                .traffic-status-chip.status-warning { color:#b45309; background:rgba(245,158,11,.12); }
+                .traffic-status-chip.status-danger { color:#b91c1c; background:rgba(239,68,68,.1); }
+                .traffic-status-chip.status-secondary { color:#64748b; background:rgba(148,163,184,.12); }
+                .traffic-status-chip:hover { opacity:1; transform:translateY(-1px); }
                 body[data-theme="dark"] .traffic-panel-hint { background:rgba(15,23,42,.55); }
                 body[data-theme="dark"] .traffic-panel-header { background:var(--card-bg,#111827); }
                 body[data-theme="dark"] .traffic-view-tabs { background:rgba(15,23,42,.55); }
@@ -4421,6 +4443,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     .traffic-performance-table-panel .perf-kpi-card .ads-kpi-value { font-size:.94rem; }
                     .traffic-kpi-compare { font-size:.5rem; }
                     .traffic-status-dot { width:1.08rem; height:1.08rem; font-size:.52rem; }
+                    .traffic-status-chip { font-size:.46rem; padding:.13rem .28rem; }
                     .traffic-table { min-width:1320px; width:1320px; }
                     .traffic-table thead th { padding:.5rem .48rem !important; font-size:.58rem !important; }
                     .traffic-table tbody td { padding:.55rem .48rem !important; font-size:.67rem !important; }
@@ -4578,7 +4601,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         data-aov="{{ $categoryRow['aov'] }}" data-margin="{{ $categoryRow['margin'] ?? 0 }}" data-acos="{{ $categoryRow['acos'] }}" data-bep_acos="{{ $categoryRow['bep_acos'] ?? 0 }}" data-cpc="{{ $categoryRow['cpc'] }}"
                                         onclick="trafficToggleCategory(this)">
                                         <td>
-                                            <div class="d-flex align-items-center gap-1"><i class="bi bi-chevron-right traffic-caret text-muted" style="font-size:.7rem;"></i><div class="fw-bold" style="font-size: 0.78rem;">{{ $categoryRow['category'] }}</div><span class="traffic-status-dot traffic-product-status status-{{ $categoryRow['signal']['class'] }}" title="{{ $categoryRow['signal']['label'] }}" aria-label="{{ $categoryRow['signal']['label'] }}"><i class="bi {{ $categoryRow['signal']['icon'] }}"></i><span class="visually-hidden">{{ $categoryRow['signal']['label'] }}</span></span></div>
+                                            <div class="d-flex align-items-center gap-1"><i class="bi bi-chevron-right traffic-caret text-muted" style="font-size:.7rem;"></i><div class="fw-bold" style="font-size: 0.78rem;">{{ $categoryRow['category'] }}</div><span class="traffic-status-chip traffic-product-status status-{{ $categoryRow['signal']['class'] }}" title="{{ $categoryRow['signal']['label'] }}" aria-label="{{ $categoryRow['signal']['label'] }}"><i class="bi {{ $categoryRow['signal']['icon'] }}"></i><span>{{ $categoryRow['signal']['label'] }}</span></span></div>
                                             <div class="text-muted" style="font-size: 0.65rem;">{{ number_format($categoryRow['campaigns'], 0, ',', '.') }} campaign</div>
                                             <div class="traffic-product-meta" title="Biaya iklan Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }} · Net profit {{ $categoryRow['net_profit'] === null ? 'belum tersedia' : 'Rp ' . number_format($categoryRow['net_profit'], 0, ',', '.') }} · COGS/unit {{ $categoryRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($categoryRow['cogs'], 0, ',', '.') }}">
                                                 <span>COGS/unit <b>{{ $categoryRow['cogs'] === null ? '—' : 'Rp ' . number_format($categoryRow['cogs'], 0, ',', '.') }}</b></span>
@@ -4630,7 +4653,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                                             <tr>
                                                                 <td>
                                                                     <div class="d-flex align-items-center gap-2">
-                                                                        <span class="traffic-status-dot traffic-product-status status-{{ $campaignRow['signal']['class'] }}" title="{{ $campaignRow['signal']['label'] }}" aria-label="{{ $campaignRow['signal']['label'] }}"><i class="bi {{ $campaignRow['signal']['icon'] }}"></i><span class="visually-hidden">{{ $campaignRow['signal']['label'] }}</span></span>
+                                                                        <span class="traffic-status-chip traffic-product-status status-{{ $campaignRow['signal']['class'] }}" title="{{ $campaignRow['signal']['label'] }}" aria-label="{{ $campaignRow['signal']['label'] }}"><i class="bi {{ $campaignRow['signal']['icon'] }}"></i><span>{{ $campaignRow['signal']['label'] }}</span></span>
                                                                         @if($campaignRow['image_url'] ?? null)
                                                                             <img src="{{ $campaignRow['image_url'] }}" alt="{{ $campaignRow['item_name'] }}" class="traffic-product-image" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';">
                                                                             <span class="traffic-product-image-empty" style="display:none;"><i class="bi bi-image"></i></span>
@@ -4692,7 +4715,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         data-cpm="{{ $trafficRow['cpm'] }}">
                                         <td>
                                             <div class="d-flex align-items-center gap-2">
-                                                <span class="traffic-status-dot traffic-product-status status-{{ $trafficRow['signal']['class'] }}" title="{{ $trafficRow['signal']['label'] }}" aria-label="{{ $trafficRow['signal']['label'] }}"><i class="bi {{ $trafficRow['signal']['icon'] }}"></i><span class="visually-hidden">{{ $trafficRow['signal']['label'] }}</span></span>
+                                                <span class="traffic-status-chip traffic-product-status status-{{ $trafficRow['signal']['class'] }}" title="{{ $trafficRow['signal']['label'] }}" aria-label="{{ $trafficRow['signal']['label'] }}"><i class="bi {{ $trafficRow['signal']['icon'] }}"></i><span>{{ $trafficRow['signal']['label'] }}</span></span>
                                                 @if($trafficRow['image_url'] ?? null)
                                                     <img src="{{ $trafficRow['image_url'] }}" alt="{{ $trafficRow['item_name'] }}" class="traffic-product-image" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';">
                                                     <span class="traffic-product-image-empty" style="display:none;"><i class="bi bi-image"></i></span>
