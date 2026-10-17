@@ -164,8 +164,10 @@
     <thead>
         <tr>
             <th style="width: 4%;" class="center">No</th>
-            <th style="width: 18%;">Tanggal / PO</th>
-            <th style="width: 25%;">Item</th>
+            @if ($groupBy !== 'item')
+                <th style="width: 18%;">Tanggal / PO</th>
+            @endif
+            <th style="width: {{ $groupBy === 'item' ? '35%' : '25%' }};">Item</th>
             <th style="width: 10%;" class="right">Qty PO</th>
             <th style="width: 14%;" class="right">Diterima</th>
             <th style="width: 11%;" class="right">Reject</th>
@@ -185,7 +187,7 @@
                 $groupReceived = $groupRows->groupBy(fn ($line) => $line->effectiveStockUnit())->map(fn ($items) => $items->sum(fn ($line) => $line->stockQtyReceived()));
                 $groupReject = $groupRows->groupBy(fn ($line) => $line->effectiveStockUnit())->map(fn ($items) => $items->sum(fn ($line) => $line->stockQtyReject()));
             @endphp
-            <tr class="group-heading"><td colspan="8">{{ $groupTitle }} — {{ $groupRows->count() }} baris</td></tr>
+            <tr class="group-heading"><td colspan="{{ $groupBy === 'item' ? 7 : 8 }}">{{ $groupTitle }} — {{ $groupRows->count() }} baris</td></tr>
             @foreach ($groupRows as $line)
                 @php
                     $rowNumber++;
@@ -194,7 +196,9 @@
                 @endphp
                 <tr>
                     <td class="center">{{ $rowNumber }}</td>
-                    <td><div class="date-primary">{{ $formatDate($receipt?->date) }}</div><div class="po-secondary">PO: {{ $receipt?->order?->code ?: '-' }}</div></td>
+                    @if ($groupBy !== 'item')
+                        <td><div class="date-primary">{{ $formatDate($receipt?->date) }}</div><div class="po-secondary">PO: {{ $receipt?->order?->code ?: '-' }}</div></td>
+                    @endif
                     <td><div class="strong">{{ $line->item?->name ?: '-' }}</div><div class="muted">{{ $line->item?->code ? 'Kode: ' . $line->item->code : '-' }}</div></td>
                     <td class="right">{{ $poLine ? $formatQty($poLine->qty, $line->effectivePurchaseUnit()) : '-' }}</td>
                     <td class="right"><div class="strong">{{ $formatQty($line->stockQtyReceived(), $line->effectiveStockUnit()) }}</div><div class="muted">{{ $formatQty($line->qty_received, $line->effectivePurchaseUnit()) }}</div></td>
@@ -204,7 +208,7 @@
                 </tr>
             @endforeach
             <tr class="group-subtotal">
-                <td colspan="3">Subtotal {{ $groupTitle }}</td>
+                <td colspan="{{ $groupBy === 'item' ? 2 : 3 }}">Subtotal {{ $groupTitle }}</td>
                 <td class="right">{{ $groupRows->count() }} baris</td>
                 <td class="right">{{ $formatUnits($groupReceived) }}</td>
                 <td class="right">{{ $formatUnits($groupReject) }}</td>
@@ -212,7 +216,7 @@
                 <td class="right nowrap">Rp {{ number_format((float) $groupRows->sum(fn ($line) => (float) $line->line_total), 0, ',', '.') }}</td>
             </tr>
         @empty
-            <tr><td colspan="8" class="empty">Tidak ada data penerimaan sesuai filter.</td></tr>
+            <tr><td colspan="{{ $groupBy === 'item' ? 7 : 8 }}" class="empty">Tidak ada data penerimaan sesuai filter.</td></tr>
         @endforelse
     @else
         @forelse ($rows as $line)
@@ -223,7 +227,9 @@
             @endphp
             <tr>
                 <td class="center">{{ $rowNumber }}</td>
-                <td><div class="date-primary">{{ $formatDate($receipt?->date) }}</div><div class="po-secondary">PO: {{ $receipt?->order?->code ?: '-' }}</div></td>
+                @if ($groupBy !== 'item')
+                    <td><div class="date-primary">{{ $formatDate($receipt?->date) }}</div><div class="po-secondary">PO: {{ $receipt?->order?->code ?: '-' }}</div></td>
+                @endif
                 <td><div class="strong">{{ $line->item?->name ?: '-' }}</div><div class="muted">{{ $line->item?->code ? 'Kode: ' . $line->item->code : '-' }}</div></td>
                 <td class="right">{{ $poLine ? $formatQty($poLine->qty, $line->effectivePurchaseUnit()) : '-' }}</td>
                 <td class="right"><div class="strong">{{ $formatQty($line->stockQtyReceived(), $line->effectiveStockUnit()) }}</div><div class="muted">{{ $formatQty($line->qty_received, $line->effectivePurchaseUnit()) }}</div></td>
