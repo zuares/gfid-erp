@@ -2567,13 +2567,12 @@ function sortTrafficTable(col) {
         sortTrafficDir = 'desc';
     }
 
+    trafficUpdateSortIndicators();
+
     const tbody = document.querySelector('#trafficTable tbody');
     if (!tbody) return;
-    
-    const rows = Array.from(tbody.querySelectorAll('tr[data-campaign_name]'));
-    if (rows.length === 0) return;
 
-    rows.sort((a, b) => {
+    const compareRows = (a, b) => {
         let valA, valB;
         if (col === 'campaign_name') {
             valA = a.getAttribute('data-campaign_name') || '';
@@ -2584,9 +2583,30 @@ function sortTrafficTable(col) {
             valB = parseFloat(b.getAttribute('data-' + col)) || 0;
             return sortTrafficDir === 'asc' ? valA - valB : valB - valA;
         }
-    });
+    };
 
-    rows.forEach(row => tbody.appendChild(row));
+    const categoryRows = Array.from(tbody.querySelectorAll('tr.traffic-category-row'));
+    const campaignRows = Array.from(tbody.querySelectorAll('tr.traffic-performance-row'));
+    if (categoryRows.length === 0 && campaignRows.length === 0) return;
+
+    categoryRows.sort(compareRows);
+    campaignRows.sort(compareRows);
+
+    categoryRows.forEach(row => {
+        const detail = row.nextElementSibling;
+        tbody.appendChild(row);
+        if (detail?.classList.contains('traffic-category-detail')) tbody.appendChild(detail);
+    });
+    campaignRows.forEach(row => tbody.appendChild(row));
+}
+
+function trafficUpdateSortIndicators() {
+    document.querySelectorAll('#trafficTable [data-traffic-sort]').forEach(header => {
+        const active = header.dataset.trafficSort === sortTrafficCol;
+        header.setAttribute('aria-sort', active ? (sortTrafficDir === 'asc' ? 'ascending' : 'descending') : 'none');
+        const indicator = header.querySelector('.traffic-sort-indicator');
+        if (indicator) indicator.textContent = active ? (sortTrafficDir === 'asc' ? '↑' : '↓') : '↕';
+    });
 }
 
 function trafficToggleCategory(row) {
@@ -2783,10 +2803,22 @@ window.__trafficPerformanceView = function(view) {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('#trafficTable [data-traffic-sort]').forEach(header => {
+        header.setAttribute('role', 'button');
+        header.setAttribute('tabindex', '0');
+        header.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                sortTrafficTable(header.dataset.trafficSort);
+            }
+        });
+    });
+
     let savedView = null;
     try { savedView = localStorage.getItem('adsTrafficView'); } catch (e) {}
     const validViews = ['category', 'roas', 'gms', 'unmapped'];
     window.__trafficPerformanceView(validViews.includes(savedView) ? savedView : 'category');
+    trafficUpdateSortIndicators();
 });
 </script>
 
@@ -3585,6 +3617,82 @@ document.addEventListener('DOMContentLoaded', function() {
                     text-transform:none;
                     background:var(--card-bg,#fff) !important;
                 }
+                .traffic-table thead th[data-traffic-sort] {
+                    cursor:pointer;
+                    user-select:none;
+                    white-space:nowrap;
+                    transition:background-color .15s ease, color .15s ease;
+                }
+                .traffic-table thead th[data-traffic-sort]:hover,
+                .traffic-table thead th[data-traffic-sort]:focus-visible {
+                    background:rgba(37,99,235,.1) !important;
+                    color:#2563eb;
+                    outline:none;
+                }
+                .traffic-sort-indicator {
+                    display:inline-block;
+                    margin-left:.18rem;
+                    color:var(--dsh-muted,#94a3b8);
+                    font-size:.58rem;
+                    line-height:1;
+                    vertical-align:.05em;
+                }
+                .traffic-table thead th[aria-sort="ascending"] .traffic-sort-indicator,
+                .traffic-table thead th[aria-sort="descending"] .traffic-sort-indicator {
+                    color:#2563eb;
+                    font-weight:800;
+                }
+                .traffic-panel-hint {
+                    font-size:.62rem;
+                    background:rgba(248,250,252,.78);
+                }
+                .traffic-performance-table-panel .ads-kpi-grid {
+                    align-items:stretch;
+                    gap:.65rem;
+                }
+                .traffic-performance-table-panel .perf-kpi-card {
+                    min-width:0;
+                    min-height:132px;
+                    display:flex;
+                    flex-direction:column;
+                    padding:.78rem .85rem !important;
+                    border:1px solid var(--dsh-border,#e2e8f0);
+                    border-radius:11px;
+                    box-shadow:0 3px 10px rgba(15,23,42,.035);
+                }
+                .traffic-performance-table-panel .perf-kpi-card .ads-kpi-label {
+                    display:flex;
+                    align-items:center;
+                    gap:.3rem;
+                    color:var(--dsh-muted,#64748b);
+                    font-size:.61rem;
+                    font-weight:700;
+                    letter-spacing:.015em;
+                    line-height:1.1;
+                    text-transform:uppercase;
+                }
+                .traffic-performance-table-panel .perf-kpi-card .ads-kpi-label i { color:#2563eb; font-size:.76rem; }
+                .traffic-performance-table-panel .perf-kpi-card .ads-kpi-value {
+                    margin-top:.48rem;
+                    font-size:1.04rem;
+                    font-weight:800;
+                    letter-spacing:-.015em;
+                    line-height:1.15;
+                    font-variant-numeric:tabular-nums;
+                }
+                .traffic-performance-table-panel .perf-kpi-card .ads-kpi-sub {
+                    display:flex;
+                    align-items:flex-start;
+                    flex-wrap:wrap;
+                    gap:.15rem .3rem;
+                    min-height:.95rem;
+                    margin-top:.3rem;
+                    color:var(--dsh-muted,#64748b);
+                    font-size:.57rem;
+                    line-height:1.2;
+                }
+                body[data-theme="dark"] .traffic-panel-hint { background:rgba(15,23,42,.55); }
+                body[data-theme="dark"] .traffic-performance-table-panel .perf-kpi-card { box-shadow:0 3px 10px rgba(0,0,0,.18); }
                 .traffic-table tbody td {
                     white-space:normal;
                     overflow-wrap:anywhere;
@@ -3648,12 +3756,18 @@ document.addEventListener('DOMContentLoaded', function() {
             </style>
 
             {{-- TABEL TRAFFIC --}}
-            <div class="ads-tab-panel mb-4">
-                <div class="ads-tab-panel-head">
-                    <div>
-                        <div class="ads-tab-panel-title"><i class="bi bi-list-columns-reverse text-primary"></i> Performa Iklan</div>
-                        <div class="ads-tab-panel-note">Lihat iklan yang paling banyak dilihat, diklik, dan menghasilkan pesanan.</div>
+            <div class="ads-tab-panel mb-4 campaign-performance-panel traffic-performance-table-panel">
+                <div class="border-bottom d-flex justify-content-between align-items-center flex-wrap gap-3 perf-panel-header">
+                    <div class="perf-panel-title">
+                        <span class="perf-panel-title-icon"><i class="bi bi-list-columns-reverse"></i></span>
+                        <div>
+                            <h6 class="mb-0 fw-bold">Performa Iklan</h6>
+                            <div class="perf-panel-subtitle">Lihat iklan yang paling banyak dilihat, diklik, dan menghasilkan pesanan.</div>
+                        </div>
                     </div>
+                </div>
+                <div class="p-2 px-3 border-bottom text-muted traffic-panel-hint">
+                    <i class="bi bi-info-circle me-1" aria-hidden="true"></i> Klik baris kategori untuk melihat detail iklan. Klik subheader untuk mengurutkan data.
                 </div>
                 <div style="display:flex; gap:.35rem; margin:.75rem .75rem .75rem; overflow-x:auto;" role="tablist" aria-label="Jenis tampilan traffic">
                     <button type="button" id="btnTrafficCategory" class="btn fw-bold" onclick="__trafficPerformanceView('category')" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Semua Kategori</button>
@@ -3663,22 +3777,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="px-3 pb-2">
                     <div class="ads-kpi-grid mb-2">
-                        <div class="dpanel ads-kpi kpi-revenue">
+                        <div class="dpanel ads-kpi perf-kpi-card kpi-revenue">
                             <div class="ads-kpi-label"><i class="bi bi-list-nested"></i> Jumlah Iklan</div>
                             <div class="ads-kpi-value" data-traffic-kpi-value="campaigns">{{ number_format($trafficInitialKpi['campaigns'], 0, ',', '.') }}</div>
                             <div class="ads-kpi-sub">yang tampil</div>
                         </div>
-                        <div class="dpanel ads-kpi kpi-spend">
+                        <div class="dpanel ads-kpi perf-kpi-card kpi-spend">
                             <div class="ads-kpi-label"><i class="bi bi-wallet2"></i> Belanja Iklan</div>
                             <div class="ads-kpi-value" data-traffic-kpi-value="spend">Rp {{ number_format($trafficInitialKpi['spend'], 0, ',', '.') }}</div>
                             <div class="ads-kpi-sub">Biaya per klik <span data-traffic-kpi-value="cpc">Rp {{ number_format($trafficInitialKpi['cpc'], 0, ',', '.') }}</span></div>
                         </div>
-                        <div class="dpanel ads-kpi">
+                        <div class="dpanel ads-kpi perf-kpi-card">
                             <div class="ads-kpi-label"><i class="bi bi-eye"></i> Dilihat</div>
                             <div class="ads-kpi-value" data-traffic-kpi-value="impressions">{{ number_format($trafficInitialKpi['impressions'], 0, ',', '.') }}</div>
                             <div class="ads-kpi-sub"><span data-traffic-kpi-value="clicks">{{ number_format($trafficInitialKpi['clicks'], 0, ',', '.') }}</span> orang klik</div>
                         </div>
-                        <div class="dpanel ads-kpi">
+                        <div class="dpanel ads-kpi perf-kpi-card">
                             <div class="ads-kpi-label"><i class="bi bi-percent"></i> Rasio Klik</div>
                             <div class="ads-kpi-value" data-traffic-kpi-value="ctr">{{ number_format($trafficInitialKpi['ctr'], 2, ',', '.') }}%</div>
                             <div class="ads-kpi-sub">yang melihat lalu klik</div>
@@ -3731,21 +3845,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         </colgroup>
                         <thead>
                             <tr>
-                                <th rowspan="2" onclick="sortTrafficTable('campaign_name')" style="cursor:pointer">Produk / Iklan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th rowspan="2" data-traffic-sort="campaign_name" onclick="sortTrafficTable('campaign_name')" aria-sort="none">Produk / Iklan <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
                                 <th rowspan="2">Status</th>
                                 <th colspan="4" class="text-center traffic-table-group-title">Funnel</th>
                                 <th colspan="5" class="text-center traffic-table-group-title">Hasil Iklan</th>
                             </tr>
                             <tr class="traffic-table-subheader">
-                                <th class="text-end" onclick="sortTrafficTable('impressions')" style="cursor:pointer">Impresi <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('clicks')" style="cursor:pointer">Klik <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('ctr')" style="cursor:pointer">CTR <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('cvr')" style="cursor:pointer">CVR <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('orders')" style="cursor:pointer">Pesanan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('aov')" style="cursor:pointer">AOV <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('spend')" style="cursor:pointer">Biaya Iklan <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('cpc')" style="cursor:pointer">Biaya / Klik <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
-                                <th class="text-end" onclick="sortTrafficTable('cpa')" style="cursor:pointer">CPA <i class="bi bi-arrow-down-up" style="font-size: 0.6rem; opacity: 0.5;"></i></th>
+                                <th class="text-end" data-traffic-sort="impressions" onclick="sortTrafficTable('impressions')" aria-sort="none">Impresi <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
+                                <th class="text-end" data-traffic-sort="clicks" onclick="sortTrafficTable('clicks')" aria-sort="none">Klik <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
+                                <th class="text-end" data-traffic-sort="ctr" onclick="sortTrafficTable('ctr')" aria-sort="none">CTR <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
+                                <th class="text-end" data-traffic-sort="cvr" onclick="sortTrafficTable('cvr')" aria-sort="none">CVR <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
+                                <th class="text-end" data-traffic-sort="orders" onclick="sortTrafficTable('orders')" aria-sort="none">Pesanan <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
+                                <th class="text-end" data-traffic-sort="aov" onclick="sortTrafficTable('aov')" aria-sort="none">AOV <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
+                                <th class="text-end" data-traffic-sort="spend" onclick="sortTrafficTable('spend')" aria-sort="none">Biaya Iklan <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
+                                <th class="text-end" data-traffic-sort="cpc" onclick="sortTrafficTable('cpc')" aria-sort="none">Biaya / Klik <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
+                                <th class="text-end" data-traffic-sort="cpa" onclick="sortTrafficTable('cpa')" aria-sort="none">CPA <span class="traffic-sort-indicator" aria-hidden="true">↕</span></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -3755,7 +3869,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </tr>
                             @else
                                 @foreach($trafficCategoryRows as $categoryRow)
-                                    <tr class="traffic-category-row" data-traffic-views="category" onclick="trafficToggleCategory(this)">
+                                    <tr class="traffic-category-row" data-traffic-views="category" data-campaign_name="{{ strtolower($categoryRow['category']) }}"
+                                        data-spend="{{ $categoryRow['spend'] }}" data-impressions="{{ $categoryRow['impressions'] }}"
+                                        data-clicks="{{ $categoryRow['clicks'] }}" data-ctr="{{ $categoryRow['ctr'] }}"
+                                        data-orders="{{ $categoryRow['orders'] }}" data-cvr="{{ $categoryRow['cvr'] }}"
+                                        data-aov="{{ $categoryRow['aov'] }}" data-cpc="{{ $categoryRow['cpc'] }}" data-cpa="{{ $categoryRow['cpa'] }}"
+                                        onclick="trafficToggleCategory(this)">
                                         <td>
                                             <div class="d-flex align-items-center gap-1"><i class="bi bi-chevron-right traffic-caret text-muted" style="font-size:.7rem;"></i><div class="fw-bold" style="font-size: 0.78rem;">{{ $categoryRow['category'] }}</div></div>
                                             <div class="text-muted" style="font-size: 0.65rem;">{{ number_format($categoryRow['campaigns'], 0, ',', '.') }} campaign</div>
