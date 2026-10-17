@@ -3505,18 +3505,22 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
 
             @php
-                $trafficBepAcos = function ($row, $gmv, $orders) {
-                    $storedBepAcos = data_get($row, 'break_even_acos_pct');
-                    if ($storedBepAcos !== null) {
-                        return (float) $storedBepAcos;
+                $trafficBepAcos = function ($row, $gmv, $orders, $totalCogs = null) {
+                    // Override manual tetap dipakai bila campaign memang memilikinya.
+                    // Nilainya tersimpan sebagai rasio 0-1, sedangkan tampilan memakai persen.
+                    $manualBepAcos = data_get($row, 'break_even_acos');
+                    if ($manualBepAcos !== null) {
+                        return (float) $manualBepAcos * 100;
                     }
 
                     $netRevenueRatio = (float) ($row->net_revenue_ratio ?? .781);
-                    $averagePrice = $orders > 0 && $gmv > 0 ? $gmv / $orders : 0;
-                    $cogsRatio = (float) ($row->cogs_ratio ?? 0);
-                    if ($cogsRatio <= 0 && (float) ($row->unit_cogs ?? 0) > 0 && $averagePrice > 0) {
-                        $cogsRatio = (float) $row->unit_cogs / $averagePrice;
-                    }
+                    $aov = $orders > 0 && $gmv > 0 ? $gmv / $orders : 0;
+                    $totalCogs = $totalCogs ?? data_get($row, 'total_cogs');
+                    // Total COGS / (AOV x orders) = COGS per order / AOV.
+                    // Ini menghasilkan rasio yang sebanding dengan ACOS.
+                    $cogsRatio = $aov > 0 && $orders > 0 && (float) $totalCogs > 0
+                        ? ((float) $totalCogs / $orders) / $aov
+                        : 0;
 
                     return $cogsRatio > 0 && $netRevenueRatio > $cogsRatio
                         ? (($netRevenueRatio - $cogsRatio) / 1.11) * 100
@@ -3530,8 +3534,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     $spend = (float) ($row->spend ?? 0) * 1.11;
                     $orders = (int) ($row->orders ?? 0);
                     $gmv = (float) ($row->gmv ?? 0);
-                    $cogs = $row->total_cogs !== null ? (float) $row->total_cogs : null;
-                    $prevCogs = $row->prev_total_cogs !== null ? (float) $row->prev_total_cogs : null;
+                    $totalCogs = data_get($row, 'total_cogs');
+                    $prevTotalCogs = data_get($row, 'prev_total_cogs');
+                    $cogs = (float) ($row->unit_cogs ?? 0) > 0 ? (float) $row->unit_cogs : null;
+                    $prevCogs = $cogs;
                     $ctr = $impressions > 0 ? ($clicks / $impressions) * 100 : 0;
                     $cvr = $clicks > 0 ? ($orders / $clicks) * 100 : 0;
                     $prevSpend = (float) ($row->prev_spend ?? 0) * 1.11;
@@ -3557,6 +3563,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'ctr' => $ctr,
                         'orders' => $orders,
                         'gmv' => $gmv,
+                        'total_cogs' => $totalCogs !== null ? (float) $totalCogs : null,
                         'cogs' => $cogs,
                         'cvr' => $cvr,
                         'aov' => $orders > 0 ? $gmv / $orders : 0,
@@ -3564,12 +3571,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         'cpa' => $orders > 0 ? $spend / $orders : 0,
                         'cpm' => $impressions > 0 ? ($spend / $impressions) * 1000 : 0,
                         'acos' => $gmv > 0 ? ($spend / $gmv) * 100 : 0,
-                        'bep_acos' => $trafficBepAcos($row, $gmv, $orders),
+                        'bep_acos' => $trafficBepAcos($row, $gmv, $orders, $totalCogs),
                         'prev_spend' => $prevSpend,
                         'prev_impressions' => $prevImpressions,
                         'prev_clicks' => $prevClicks,
                         'prev_orders' => $prevOrders,
                         'prev_gmv' => $prevGmv,
+                        'prev_total_cogs' => $prevTotalCogs !== null ? (float) $prevTotalCogs : null,
                         'prev_cogs' => $prevCogs,
                         'prev_ctr' => $prevImpressions > 0 ? ($prevClicks / $prevImpressions) * 100 : 0,
                         'prev_cvr' => $prevClicks > 0 ? ($prevOrders / $prevClicks) * 100 : 0,
@@ -3578,7 +3586,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'prev_cpa' => $prevOrders > 0 ? $prevSpend / $prevOrders : 0,
                         'prev_cpm' => $prevImpressions > 0 ? ($prevSpend / $prevImpressions) * 1000 : 0,
                         'prev_acos' => $prevGmv > 0 ? ($prevSpend / $prevGmv) * 100 : 0,
-                        'prev_bep_acos' => $trafficBepAcos($row, $prevGmv, $prevOrders),
+                        'prev_bep_acos' => $trafficBepAcos($row, $prevGmv, $prevOrders, $prevTotalCogs),
                     ];
                 })->values();
                 $trafficCtrMedian = $trafficRows->filter(fn ($row) => $row['impressions'] > 0)->median('ctr') ?? 0;
@@ -3633,8 +3641,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     $gmv = $group->sum('gmv');
                     $cogsRows = $group->filter(fn ($row) => $row['cogs'] !== null);
                     $prevCogsRows = $group->filter(fn ($row) => $row['prev_cogs'] !== null);
-                    $cogs = $cogsRows->isNotEmpty() ? $cogsRows->sum('cogs') : null;
-                    $prevCogs = $prevCogsRows->isNotEmpty() ? $prevCogsRows->sum('prev_cogs') : null;
+                    $cogs = $cogsRows->isNotEmpty() ? $cogsRows->avg('cogs') : null;
+                    $prevCogs = $prevCogsRows->isNotEmpty() ? $prevCogsRows->avg('prev_cogs') : null;
                     $prevSpend = $group->sum('prev_spend');
                     $prevImpressions = $group->sum('prev_impressions');
                     $prevClicks = $group->sum('prev_clicks');
@@ -3784,6 +3792,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-product-meta b { color:var(--text,#334155); font-weight:750; }
                 .traffic-product-meta .traffic-product-meta-acos { color:#2563eb; }
                 .traffic-product-meta .traffic-product-meta-bep { color:#7c3aed; }
+                .traffic-product-meta .traffic-product-meta-acos b,
+                .traffic-product-meta .traffic-product-meta-bep b { font-size:.5rem; }
                 .traffic-product-meta .traffic-product-meta-na { color:#b45309; }
                 .traffic-table-scroll-shell { position:relative; }
                 .traffic-table-scroll-shell > .traffic-table-scroll {
@@ -4540,8 +4550,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <td>
                                             <div class="d-flex align-items-center gap-1"><i class="bi bi-chevron-right traffic-caret text-muted" style="font-size:.7rem;"></i><div class="fw-bold" style="font-size: 0.78rem;">{{ $categoryRow['category'] }}</div><span class="traffic-status-dot traffic-product-status status-{{ $categoryRow['signal']['class'] }}" title="{{ $categoryRow['signal']['label'] }}" aria-label="{{ $categoryRow['signal']['label'] }}"><i class="bi {{ $categoryRow['signal']['icon'] }}"></i><span class="visually-hidden">{{ $categoryRow['signal']['label'] }}</span></span></div>
                                             <div class="text-muted" style="font-size: 0.65rem;">{{ number_format($categoryRow['campaigns'], 0, ',', '.') }} campaign</div>
-                                            <div class="traffic-product-meta" title="COGS {{ $categoryRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($categoryRow['cogs'], 0, ',', '.') }} · ACOS {{ $categoryRow['gmv'] > 0 ? number_format($categoryRow['acos'], 2, ',', '.') . '%' : '—' }} · BEP ACOS {{ $categoryRow['bep_acos'] === null ? '—' : number_format($categoryRow['bep_acos'], 2, ',', '.') . '%' }}">
-                                                <span>COGS <b>{{ $categoryRow['cogs'] === null ? '—' : 'Rp ' . number_format($categoryRow['cogs'], 0, ',', '.') }}</b></span>
+                                            <div class="traffic-product-meta" title="COGS/unit {{ $categoryRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($categoryRow['cogs'], 0, ',', '.') }} · ACOS {{ $categoryRow['gmv'] > 0 ? number_format($categoryRow['acos'], 2, ',', '.') . '%' : '—' }} · BEP ACOS {{ $categoryRow['bep_acos'] === null ? '—' : number_format($categoryRow['bep_acos'], 2, ',', '.') . '%' }}">
+                                                <span>COGS/unit <b>{{ $categoryRow['cogs'] === null ? '—' : 'Rp ' . number_format($categoryRow['cogs'], 0, ',', '.') }}</b></span>
                                                 <span class="traffic-product-meta-acos">ACOS <b>{{ $categoryRow['gmv'] > 0 ? number_format($categoryRow['acos'], 2, ',', '.') . '%' : '—' }}</b></span>
                                                 <span class="traffic-product-meta-bep">BEP ACOS <b>{{ $categoryRow['bep_acos'] === null ? '—' : number_format($categoryRow['bep_acos'], 2, ',', '.') . '%' }}</b></span>
                                             </div>
@@ -4603,8 +4613,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                                                             @endif
                                                                             <div class="text-muted text-truncate" style="font-size:.62rem; max-width:260px;" title="{{ $campaignRow['item_name'] }}"><i class="bi bi-box"></i> {{ $campaignRow['item_name'] }}</div>
                                                                             <div class="text-muted" style="font-size:.58rem;">ID: {{ $campaignRow['id'] }}</div>
-                                                                            <div class="traffic-product-meta" title="COGS {{ $campaignRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($campaignRow['cogs'], 0, ',', '.') }} · ACOS {{ $campaignRow['gmv'] > 0 ? number_format($campaignRow['acos'], 2, ',', '.') . '%' : '—' }} · BEP ACOS {{ $campaignRow['bep_acos'] === null ? '—' : number_format($campaignRow['bep_acos'], 2, ',', '.') . '%' }}">
-                                                                                <span>COGS <b>{{ $campaignRow['cogs'] === null ? '—' : 'Rp ' . number_format($campaignRow['cogs'], 0, ',', '.') }}</b></span>
+                                                                            <div class="traffic-product-meta" title="COGS/unit {{ $campaignRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($campaignRow['cogs'], 0, ',', '.') }} · ACOS {{ $campaignRow['gmv'] > 0 ? number_format($campaignRow['acos'], 2, ',', '.') . '%' : '—' }} · BEP ACOS {{ $campaignRow['bep_acos'] === null ? '—' : number_format($campaignRow['bep_acos'], 2, ',', '.') . '%' }}">
+                                                                                <span>COGS/unit <b>{{ $campaignRow['cogs'] === null ? '—' : 'Rp ' . number_format($campaignRow['cogs'], 0, ',', '.') }}</b></span>
                                                                                 <span class="traffic-product-meta-acos">ACOS <b>{{ $campaignRow['gmv'] > 0 ? number_format($campaignRow['acos'], 2, ',', '.') . '%' : '—' }}</b></span>
                                                                                 <span class="traffic-product-meta-bep">BEP ACOS <b>{{ $campaignRow['bep_acos'] === null ? '—' : number_format($campaignRow['bep_acos'], 2, ',', '.') . '%' }}</b></span>
                                                                             </div>
@@ -4662,8 +4672,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     @endif
                                                     <div class="text-muted text-truncate" style="font-size:.65rem; max-width:260px;" title="{{ $trafficRow['item_name'] }}"><i class="bi bi-box"></i> {{ $trafficRow['item_name'] }}</div>
                                                     <div class="text-muted" style="font-size: .58rem;">ID: {{ $trafficRow['id'] }}</div>
-                                                    <div class="traffic-product-meta" title="COGS {{ $trafficRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($trafficRow['cogs'], 0, ',', '.') }} · ACOS {{ $trafficRow['gmv'] > 0 ? number_format($trafficRow['acos'], 2, ',', '.') . '%' : '—' }} · BEP ACOS {{ $trafficRow['bep_acos'] === null ? '—' : number_format($trafficRow['bep_acos'], 2, ',', '.') . '%' }}">
-                                                        <span>COGS <b>{{ $trafficRow['cogs'] === null ? '—' : 'Rp ' . number_format($trafficRow['cogs'], 0, ',', '.') }}</b></span>
+                                                    <div class="traffic-product-meta" title="COGS/unit {{ $trafficRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($trafficRow['cogs'], 0, ',', '.') }} · ACOS {{ $trafficRow['gmv'] > 0 ? number_format($trafficRow['acos'], 2, ',', '.') . '%' : '—' }} · BEP ACOS {{ $trafficRow['bep_acos'] === null ? '—' : number_format($trafficRow['bep_acos'], 2, ',', '.') . '%' }}">
+                                                        <span>COGS/unit <b>{{ $trafficRow['cogs'] === null ? '—' : 'Rp ' . number_format($trafficRow['cogs'], 0, ',', '.') }}</b></span>
                                                         <span class="traffic-product-meta-acos">ACOS <b>{{ $trafficRow['gmv'] > 0 ? number_format($trafficRow['acos'], 2, ',', '.') . '%' : '—' }}</b></span>
                                                         <span class="traffic-product-meta-bep">BEP ACOS <b>{{ $trafficRow['bep_acos'] === null ? '—' : number_format($trafficRow['bep_acos'], 2, ',', '.') . '%' }}</b></span>
                                                     </div>
