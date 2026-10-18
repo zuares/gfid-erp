@@ -2276,6 +2276,7 @@ function perfUpdateMarketplaceGroups() {
         const hasMatches = members.some(row => row.dataset.perfMatch !== '0');
         const isOpen = groupRow.dataset.perfOpen === '1';
         groupRow.style.display = active && hasMatches ? '' : 'none';
+        if (!active) return;
         groupRow.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
         groupRow.classList.toggle('is-open', isOpen);
         members.forEach(function(row) {
