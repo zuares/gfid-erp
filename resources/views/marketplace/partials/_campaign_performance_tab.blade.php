@@ -2273,6 +2273,14 @@ function perfMarketplaceGroupMembers(groupRow) {
     });
 }
 
+function perfMainTable() {
+    // Halaman dashboard juga memiliki tabel traffic dengan class panel yang
+    // sama. Ambil tabel yang benar-benar berisi baris campaign agar grouping
+    // tidak berhenti di tabel traffic yang kosong untuk data campaign.
+    return Array.from(document.querySelectorAll('.campaign-performance-panel .perf-table'))
+        .find(table => table.querySelector('tbody tr.perf-row')) || null;
+}
+
 function perfUpdateMarketplaceGroupLabels() {
     document.querySelectorAll('.campaign-performance-panel tr.perf-marketplace-category-group-row').forEach(function(groupRow) {
         const member = perfMarketplaceGroupMembers(groupRow)[0];
@@ -2307,7 +2315,8 @@ function perfUpdateMarketplaceGroups() {
 }
 
 function perfArrangeMarketplaceGroups() {
-    const tbody = document.querySelector('.campaign-performance-panel .perf-table > tbody');
+    const table = perfMainTable();
+    const tbody = table?.querySelector('tbody');
     if (!tbody) return;
     const openState = new Map();
     tbody.querySelectorAll('tr.perf-marketplace-category-group-row').forEach(function(groupRow) {
@@ -2563,7 +2572,8 @@ function perfKpiFromRows(rows) {
 }
 
 function perfSortRows() {
-    const tbody = document.querySelector('.campaign-performance-panel .perf-table tbody');
+    const table = perfMainTable();
+    const tbody = table?.querySelector('tbody');
     if (!tbody) return;
     if (perfActiveSegment === 'marketplace_category') {
         const sortKey = {
@@ -2662,6 +2672,12 @@ function perfApplyDecisionFilters() {
         if (detail?.classList.contains('perf-detail')) { detail.style.display = 'none'; detail.style.visibility = matches ? '' : 'hidden'; }
     });
     perfSortRows();
+    // Group marketplace dibangun dari baris campaign yang sudah dirender.
+    // Setelah perpindahan subtab/filter, urutan DOM dapat berubah sehingga
+    // pastikan group selalu tersedia sebelum menghitung empty state.
+    if (marketplaceCategoryView && !document.querySelector('.campaign-performance-panel tr.perf-marketplace-category-group-row')) {
+        perfArrangeMarketplaceGroups();
+    }
     perfUpdateMarketplaceGroups();
     if (activeFilter && !categoryView) perfUpdateKpis(segment, perfKpiFromRows(filteredData));
     else perfUpdateKpis(segment);
