@@ -2544,6 +2544,59 @@
 
         return $orders > 0 ? ((float) collect($daily)->sum($field) / $orders) * 100 : 0;
     };
+    $profitLossMetrics = function ($summary, $adSpend): array {
+        $summary = (array) $summary;
+        $payout = (float) data_get($summary, 'final_income', 0);
+        $cogs = (float) data_get($summary, 'cogs', 0);
+        $grossProfit = $payout - $cogs;
+        $adSpend = (float) $adSpend;
+        $adVat = $adSpend * 0.11;
+        $operatingExpense = $adSpend + $adVat;
+
+        return [
+            'payout' => $payout,
+            'cogs' => $cogs,
+            'gross_profit' => $grossProfit,
+            'ad_spend' => $adSpend,
+            'ad_vat' => $adVat,
+            'operating_expense' => $operatingExpense,
+            'net_profit' => $grossProfit - $operatingExpense,
+            'refund_amount' => (float) data_get($summary, 'refund_amount', 0),
+            'failed_shipping_value' => (float) data_get($summary, 'failed_shipping_value', 0),
+        ];
+    };
+    $profitLossComparisonMonth = $profitLossMetrics(
+        data_get($comparisonMonthData, 'incomeSummary', []),
+        data_get($comparisonMonthData, 'adSpendTotal', 0),
+    );
+    $profitLossComparisonPeriod = $profitLossMetrics(
+        data_get($comparisonPeriodData, 'incomeSummary', []),
+        data_get($comparisonPeriodData, 'adSpendTotal', 0),
+    );
+    $profitLossComparisonSources = $comparisonMode === 'month'
+        ? [
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'metrics' => $profitLossSummary],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonth['from'] ?? null, $comparisonMonth['to'] ?? null, 'Bulan -1'), 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'metrics' => $profitLossComparisonMonth],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonthPrevious['from'] ?? null, $comparisonMonthPrevious['to'] ?? null, 'Bulan -2'), 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'metrics' => $profitLossMetrics(data_get($comparisonMonthPreviousData, 'incomeSummary', []), data_get($comparisonMonthPreviousData, 'adSpendTotal', 0))],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonthPreviousTwo['from'] ?? null, $comparisonMonthPreviousTwo['to'] ?? null, 'Bulan -3'), 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'metrics' => $profitLossMetrics(data_get($comparisonMonthPreviousTwoData, 'incomeSummary', []), data_get($comparisonMonthPreviousTwoData, 'adSpendTotal', 0))],
+        ]
+        : [
+            ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'metrics' => $profitLossSummary],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriod['from'] ?? null, $comparisonPeriod['to'] ?? null, 'Periode -1'), 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'metrics' => $profitLossComparisonPeriod],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriodPrevious['from'] ?? null, $comparisonPeriodPrevious['to'] ?? null, 'Periode -2'), 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'metrics' => $profitLossMetrics(data_get($comparisonPeriodPreviousData, 'incomeSummary', []), data_get($comparisonPeriodPreviousData, 'adSpendTotal', 0))],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriodPreviousTwo['from'] ?? null, $comparisonPeriodPreviousTwo['to'] ?? null, 'Periode -3'), 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'metrics' => $profitLossMetrics(data_get($comparisonPeriodPreviousTwoData, 'incomeSummary', []), data_get($comparisonPeriodPreviousTwoData, 'adSpendTotal', 0))],
+        ];
+    $profitLossComparisonRows = [
+        ['group' => 'Pendapatan', 'label' => 'Payout Sudah Cair', 'key' => 'payout', 'format' => $currencyDisplay],
+        ['group' => 'Beban Pokok', 'label' => 'COGS / HPP', 'key' => 'cogs', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas', 'label' => 'Laba Kotor', 'key' => 'gross_profit', 'format' => $currencyDisplay],
+        ['group' => 'Beban Operasional', 'label' => 'Biaya Iklan', 'key' => 'ad_spend', 'format' => $currencyDisplay],
+        ['group' => 'Beban Operasional', 'label' => 'PPN Iklan (11%)', 'key' => 'ad_vat', 'format' => $currencyDisplay],
+        ['group' => 'Beban Operasional', 'label' => 'Total Beban Operasional', 'key' => 'operating_expense', 'format' => $currencyDisplay],
+        ['group' => 'Profitabilitas', 'label' => 'Laba Bersih Operasional', 'key' => 'net_profit', 'format' => $currencyDisplay],
+        ['group' => 'Informasi Settlement', 'label' => 'Pengembalian Dana', 'key' => 'refund_amount', 'format' => $currencyDisplay],
+        ['group' => 'Informasi Settlement', 'label' => 'Pengiriman Gagal', 'key' => 'failed_shipping_value', 'format' => $currencyDisplay],
+    ];
 @endphp
 
 <div class="container-fluid py-4 sales-dashboard">
@@ -3322,13 +3375,84 @@
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Laba Rugi',
             'kpis' => [
-                ['group' => 'Pendapatan', 'label' => 'Payout Sudah Cair', 'value' => $fmt($profitLossSummary['payout']), 'note' => 'pendapatan aktual settlement', 'icon' => 'bi-wallet2', 'variant' => 'sales-kpi--success'],
-                ['group' => 'Beban Pokok', 'label' => 'COGS / HPP', 'value' => $fmt($profitLossSummary['cogs']), 'note' => 'harga terakhir sampai akhir periode', 'icon' => 'bi-box-seam'],
-                ['group' => 'Profitabilitas', 'label' => 'Laba Kotor', 'value' => $fmt($profitLossSummary['gross_profit']), 'note' => 'Payout − COGS / HPP', 'icon' => 'bi-graph-up-arrow', 'variant' => 'sales-kpi--success'],
-                ['group' => 'Beban Operasional', 'label' => 'Total Beban Operasional', 'value' => $fmt($profitLossSummary['operating_expense']), 'note' => 'Biaya Iklan + PPN 11%', 'icon' => 'bi-megaphone'],
-                ['group' => 'Profitabilitas', 'label' => 'Laba Bersih Operasional', 'value' => $fmt($profitLossSummary['net_profit']), 'note' => 'Laba Kotor − Total Beban Operasional', 'icon' => 'bi-piggy-bank', 'variant' => 'sales-kpi--success'],
+                ['group' => 'Pendapatan', 'label' => 'Payout Sudah Cair', 'value' => $fmt($profitLossSummary['payout']), 'note' => 'pendapatan aktual settlement', 'icon' => 'bi-wallet2', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($profitLossSummary['payout'], $profitLossComparisonMonth['payout'], $profitLossComparisonPeriod['payout'], $currencyDisplay)],
+                ['group' => 'Beban Pokok', 'label' => 'COGS / HPP', 'value' => $fmt($profitLossSummary['cogs']), 'note' => 'harga terakhir sampai akhir periode', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($profitLossSummary['cogs'], $profitLossComparisonMonth['cogs'], $profitLossComparisonPeriod['cogs'], $currencyDisplay, 'relative', false)],
+                ['group' => 'Profitabilitas', 'label' => 'Laba Kotor', 'value' => $fmt($profitLossSummary['gross_profit']), 'note' => 'Payout − COGS / HPP', 'icon' => 'bi-graph-up-arrow', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($profitLossSummary['gross_profit'], $profitLossComparisonMonth['gross_profit'], $profitLossComparisonPeriod['gross_profit'], $currencyDisplay)],
+                ['group' => 'Beban Operasional', 'label' => 'Total Beban Operasional', 'value' => $fmt($profitLossSummary['operating_expense']), 'note' => 'Biaya Iklan + PPN 11%', 'icon' => 'bi-megaphone', 'comparisons' => $kpiComparisons($profitLossSummary['operating_expense'], $profitLossComparisonMonth['operating_expense'], $profitLossComparisonPeriod['operating_expense'], $currencyDisplay, 'relative', false)],
+                ['group' => 'Profitabilitas', 'label' => 'Laba Bersih Operasional', 'value' => $fmt($profitLossSummary['net_profit']), 'note' => 'Laba Kotor − Total Beban Operasional', 'icon' => 'bi-piggy-bank', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($profitLossSummary['net_profit'], $profitLossComparisonMonth['net_profit'], $profitLossComparisonPeriod['net_profit'], $currencyDisplay)],
             ],
         ])
+
+        @if ($activeComparison)
+            <section class="card sales-card sales-comparison-section shadow-sm mb-4" aria-labelledby="profit-loss-comparison-title">
+                <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-2">
+                    <div>
+                        <div class="sales-kicker mb-1">Perbandingan periode</div>
+                        <h2 id="profit-loss-comparison-title" class="sales-section-title mb-1">Perbandingan Laba Rugi</h2>
+                        <div class="sales-section-subtitle d-block">Periode aktif dibandingkan dengan periode sebelumnya.</div>
+                    </div>
+                    <span class="badge sales-badge rounded-pill px-3 py-2"><i class="bi bi-columns-gap me-1" aria-hidden="true"></i>{{ count($profitLossComparisonSources) }} periode</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle sales-table sales-sales-comparison-table mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">Metrik</th>
+                                @foreach ($profitLossComparisonSources as $periodIndex => $period)
+                                    <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
+                                        <span class="sales-period-label">{{ $period['label'] }}</span>
+                                        <span class="sales-period-range">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
+                                    </th>
+                                @endforeach
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @php $profitLossComparisonGroup = null; @endphp
+                            @foreach ($profitLossComparisonRows as $row)
+                                @if ($row['group'] !== $profitLossComparisonGroup)
+                                    <tr class="sales-table-section-row" role="presentation">
+                                        <td colspan="{{ 1 + count($profitLossComparisonSources) }}">{{ $row['group'] }}</td>
+                                    </tr>
+                                    @php $profitLossComparisonGroup = $row['group']; @endphp
+                                @endif
+                                <tr>
+                                    <td class="ps-3 sales-comparison-metric">{{ $row['label'] }}</td>
+                                    @foreach ($profitLossComparisonSources as $periodIndex => $period)
+                                        @php
+                                            $comparisonValue = $period['metrics'][$row['key']] ?? null;
+                                            $comparisonMeta = $periodIndex > 0
+                                                ? $comparisonCellMeta(
+                                                    $profitLossComparisonSources[0]['metrics'][$row['key']] ?? null,
+                                                    $comparisonValue,
+                                                    $row['format'],
+                                                    'relative',
+                                                    in_array($row['key'], ['cogs', 'ad_spend', 'ad_vat', 'operating_expense', 'refund_amount', 'failed_shipping_value'], true),
+                                                )
+                                                : null;
+                                        @endphp
+                                        <td class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
+                                            <span class="sales-comparison-cell">
+                                                <span class="sales-comparison-value-row">
+                                                    {{ $comparisonValue === null ? '—' : $row['format']($comparisonValue) }}
+                                                    @if ($comparisonMeta)
+                                                        <span class="sales-comparison-delta {{ $comparisonMeta['tone'] }}" title="Perubahan dibanding periode aktif">
+                                                            <i class="bi {{ $comparisonMeta['arrow'] }}" aria-hidden="true"></i>{{ $comparisonMeta['percentage'] }}
+                                                        </span>
+                                                    @endif
+                                                </span>
+                                                @if ($comparisonMeta)
+                                                    <span class="sales-comparison-difference {{ $comparisonMeta['tone'] }}">{{ $comparisonMeta['difference'] }}</span>
+                                                @endif
+                                            </span>
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        @endif
 
         <section class="card sales-card shadow-sm mb-4">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
