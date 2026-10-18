@@ -2685,6 +2685,38 @@ function trafficArrangeMarketplaceCategoryGroups() {
     campaignRows
         .filter(row => !groupedCampaigns.has(row))
         .forEach(row => tbody.appendChild(row));
+
+    if (window.__adsTrafficView === 'marketplace_category') {
+        groupRows.forEach(function(groupRow) {
+            const categoryKey = groupRow.dataset.marketplaceCategoryKey || groupRow.dataset.marketplaceCategoryId || '';
+            const open = groupRow.classList.contains('open');
+            campaignRows
+                .filter(row => (row.dataset.marketplaceCategoryKey || row.dataset.marketplaceCategoryId || '') === categoryKey)
+                .forEach(row => { row.style.display = open ? '' : 'none'; });
+        });
+    }
+}
+
+function trafficToggleMarketplaceCategory(row) {
+    row.classList.toggle('open');
+    const open = row.classList.contains('open');
+    row.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const categoryKey = row.dataset.marketplaceCategoryKey || row.dataset.marketplaceCategoryId || '';
+    const tbody = row.closest('tbody');
+    if (!tbody) return;
+    tbody.querySelectorAll('tr.traffic-performance-row').forEach(function(campaignRow) {
+        const campaignKey = campaignRow.dataset.marketplaceCategoryKey || campaignRow.dataset.marketplaceCategoryId || '';
+        if (campaignKey === categoryKey) campaignRow.style.display = open ? '' : 'none';
+    });
+    if (typeof perfRefreshStickyScrollbars === 'function') {
+        requestAnimationFrame(perfRefreshStickyScrollbars);
+    }
+}
+
+function trafficHandleMarketplaceCategoryKeydown(event, row) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    trafficToggleMarketplaceCategory(row);
 }
 
 function trafficRegroupMarketplaceCategories() {
@@ -2933,15 +2965,22 @@ window.__trafficPerformanceView = function(view) {
         const isCategoryView = view === 'category';
         const isMarketplaceCategoryView = view === 'marketplace_category';
         const isMarketplaceGroup = row.classList.contains('traffic-marketplace-category-row');
-        const visible = isCategoryView
+        let visible = isCategoryView
             ? row.classList.contains('traffic-category-row') && !isMarketplaceGroup
             : isMarketplaceCategoryView
                 ? isMarketplaceGroup || (row.classList.contains('traffic-performance-row')
                     && (row.dataset.trafficViews || '').split(/\s+/).includes(view))
                 : row.classList.contains('traffic-performance-row')
                     && (row.dataset.trafficViews || '').split(/\s+/).includes(view);
+        if (visible && isMarketplaceCategoryView && row.classList.contains('traffic-marketplace-category-member')) {
+            const categoryKey = row.dataset.marketplaceCategoryKey || row.dataset.marketplaceCategoryId || '';
+            const groupRow = rows.find(candidate => candidate.classList.contains('traffic-marketplace-category-row')
+                && (candidate.dataset.marketplaceCategoryKey || candidate.dataset.marketplaceCategoryId || '') === categoryKey);
+            visible = !!groupRow?.classList.contains('open');
+        }
         row.style.display = visible ? '' : 'none';
         row.classList.remove('open');
+        if (isMarketplaceGroup) row.setAttribute('aria-expanded', 'false');
         if (visible) visibleCount++;
     });
 
@@ -4142,7 +4181,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 .traffic-product-tooltip-row span { color:#cbd5e1; }
                 .traffic-product-tooltip-row strong { color:#fff; font-weight:800; }
-                .traffic-marketplace-category-row { display:none; }
+                .traffic-marketplace-category-row {
+                    display:none;
+                    cursor:pointer;
+                }
+                .traffic-marketplace-category-row:focus-visible {
+                    outline:2px solid rgba(37,99,235,.55);
+                    outline-offset:-2px;
+                }
+                .traffic-marketplace-category-row.open .traffic-caret { transform:rotate(90deg); }
                 .traffic-marketplace-category-row td {
                     padding:.48rem .7rem !important;
                     background:linear-gradient(90deg,rgba(37,99,235,.08),rgba(37,99,235,.025));
@@ -5078,10 +5125,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </tr>
                                 @endforeach
                                 @foreach($trafficMarketplaceCategoryRows as $marketplaceCategoryRow)
-                                    <tr class="traffic-marketplace-category-row" data-traffic-views="marketplace_category" data-marketplace-category-id="{{ $marketplaceCategoryRow['marketplace_category_id'] }}" data-marketplace-category-key="{{ $marketplaceCategoryRow['marketplace_category_id'] }}">
+                                    <tr class="traffic-marketplace-category-row" data-traffic-views="marketplace_category" data-marketplace-category-id="{{ $marketplaceCategoryRow['marketplace_category_id'] }}" data-marketplace-category-key="{{ $marketplaceCategoryRow['marketplace_category_id'] }}" role="button" tabindex="0" aria-expanded="false" onclick="trafficToggleMarketplaceCategory(this)" onkeydown="trafficHandleMarketplaceCategoryKeydown(event, this)">
                                         <td colspan="12">
                                             <div class="traffic-marketplace-category-group">
                                                 <div class="traffic-marketplace-category-group-title">
+                                                    <i class="bi bi-chevron-right traffic-caret" aria-hidden="true"></i>
                                                     <i class="bi bi-tags" aria-hidden="true"></i>
                                                     <span class="traffic-marketplace-category-group-label" data-marketplace-category-group data-category-id="{{ $marketplaceCategoryRow['marketplace_category_id'] }}">Kategori Marketplace #{{ $marketplaceCategoryRow['marketplace_category_id'] }}</span>
                                                 </div>
