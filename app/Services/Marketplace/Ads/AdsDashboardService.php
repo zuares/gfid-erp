@@ -1217,11 +1217,13 @@ class AdsDashboardService
             ? MarketplaceProduct::query()
                 ->whereIn('store_id', $storeIds)
                 ->whereIn('item_id', $campaignItemIds->all())
-                ->get(['store_id', 'item_id', 'item_name', 'item_sku', 'image_url'])
+                ->get(['id', 'store_id', 'item_id', 'item_name', 'item_sku', 'category_id', 'image_url'])
                 ->keyBy(fn ($product) => $product->store_id . '|' . $product->item_id)
             : collect();
         $campaigns = $campaigns->map(function ($camp) use ($productLabels) {
             $product = $productLabels->get($camp->store_id . '|' . $camp->channel_item_id);
+            $camp->marketplace_product_id = $product?->id;
+            $camp->marketplace_category_id = $product?->category_id;
             $camp->marketplace_item_name = $product?->item_name;
             $camp->marketplace_item_sku = $product?->item_sku;
             $camp->marketplace_item_image_url = $product?->image_url;

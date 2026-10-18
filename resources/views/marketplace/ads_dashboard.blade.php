@@ -3556,6 +3556,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         'id' => $row->channel_campaign_id,
                         'item_name' => $row->marketplace_item_name ?: ($row->internalItem?->name ?? 'Produk belum terpetakan'),
                         'image_url' => $row->marketplace_item_image_url ?? null,
+                        'marketplace_product_id' => $row->marketplace_product_id ?? null,
+                        'marketplace_category_id' => $row->marketplace_category_id ?? null,
                         'category' => $isGms ? 'GMV Max Auto' : ($row->item_category ?? $row->internalItem?->category?->name ?? 'Belum termapping'),
                         'is_gms' => $isGms,
                         'views' => $isGms
@@ -3849,6 +3851,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-product-copy { min-width:0; flex:1 1 auto; }
                 .traffic-product-title { min-width:0; }
                 .traffic-product-name { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.76rem !important; line-height:1.15; letter-spacing:-.01em; }
+                .traffic-marketplace-category { display:flex; align-items:center; gap:.18rem; max-width:100%; margin-top:.13rem; color:#64748b; font-size:.56rem; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+                .traffic-marketplace-category i { flex:none; color:#2563eb; font-size:.56rem; }
+                .traffic-marketplace-category span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+                .traffic-marketplace-aov { flex:none; color:var(--dsh-muted,#64748b); }
                 .traffic-product-id { margin-top:.12rem; color:var(--dsh-muted,#64748b); font-size:.52rem; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
                 .traffic-product-status-row { display:flex; align-items:center; gap:.3rem; min-width:0; margin-top:.16rem; }
                 .traffic-product-status-row .traffic-product-id { margin-top:0; }
@@ -4694,6 +4700,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                                                             @else
                                                                                 <span class="fw-bold traffic-product-name">{{ $campaignRow['name'] }}</span>
                                                                             @endif
+                                                                            @if(!empty($campaignRow['marketplace_product_id']) && filled($campaignRow['marketplace_category_id']))
+                                                                                <div class="traffic-marketplace-category" data-marketplace-category data-product-id="{{ $campaignRow['marketplace_product_id'] }}" data-category-id="{{ $campaignRow['marketplace_category_id'] }}" title="Kategori marketplace #{{ $campaignRow['marketplace_category_id'] }}"><i class="bi bi-tag" aria-hidden="true"></i><span data-marketplace-category-label>Kategori marketplace #{{ $campaignRow['marketplace_category_id'] }}</span>@if(($campaignRow['aov'] ?? 0) > 0)<span class="traffic-marketplace-aov">· AOV Rp {{ number_format($campaignRow['aov'], 0, ',', '.') }}</span>@endif</div>
+                                                                            @endif
                                                                             <div class="traffic-product-status-row"><span class="traffic-status-chip traffic-product-status status-{{ $campaignRow['signal']['class'] }}" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-container="body" title="{{ $campaignRow['signal']['label'] }}: {{ $trafficSignalMeaning($campaignRow['signal']) }}" aria-label="{{ $campaignRow['signal']['label'] }}: {{ $trafficSignalMeaning($campaignRow['signal']) }}"><i class="bi {{ $campaignRow['signal']['icon'] }}"></i><span>{{ $trafficSignalShortLabel($campaignRow['signal']) }}</span></span><span class="traffic-product-id">ID: {{ $campaignRow['id'] }}</span></div>
                                                                             <div class="traffic-product-meta" title="Biaya iklan Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }} · Net profit {{ $campaignRow['net_profit'] === null ? 'belum tersedia' : 'Rp ' . number_format($campaignRow['net_profit'], 0, ',', '.') }} · COGS/unit {{ $campaignRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($campaignRow['cogs'], 0, ',', '.') }}">
                                                                                 <span>COGS/unit <b>{{ $campaignRow['cogs'] === null ? '—' : 'Rp ' . number_format($campaignRow['cogs'], 0, ',', '.') }}</b></span>
@@ -4755,6 +4764,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     @else
                                                         <span class="fw-bold traffic-product-name">{{ $trafficRow['name'] }}</span>
                                                     @endif
+                                                    @if(!empty($trafficRow['marketplace_product_id']) && filled($trafficRow['marketplace_category_id']))
+                                                        <div class="traffic-marketplace-category" data-marketplace-category data-product-id="{{ $trafficRow['marketplace_product_id'] }}" data-category-id="{{ $trafficRow['marketplace_category_id'] }}" title="Kategori marketplace #{{ $trafficRow['marketplace_category_id'] }}"><i class="bi bi-tag" aria-hidden="true"></i><span data-marketplace-category-label>Kategori marketplace #{{ $trafficRow['marketplace_category_id'] }}</span>@if(($trafficRow['aov'] ?? 0) > 0)<span class="traffic-marketplace-aov">· AOV Rp {{ number_format($trafficRow['aov'], 0, ',', '.') }}</span>@endif</div>
+                                                    @endif
                                                         <div class="traffic-product-status-row"><span class="traffic-status-chip traffic-product-status status-{{ $trafficRow['signal']['class'] }}" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-container="body" title="{{ $trafficRow['signal']['label'] }}: {{ $trafficSignalMeaning($trafficRow['signal']) }}" aria-label="{{ $trafficRow['signal']['label'] }}: {{ $trafficSignalMeaning($trafficRow['signal']) }}"><i class="bi {{ $trafficRow['signal']['icon'] }}"></i><span>{{ $trafficSignalShortLabel($trafficRow['signal']) }}</span></span><span class="traffic-product-id">ID: {{ $trafficRow['id'] }}</span></div>
                                                     <div class="traffic-product-meta" title="Biaya iklan Rp {{ number_format($trafficRow['spend'], 0, ',', '.') }} · Net profit {{ $trafficRow['net_profit'] === null ? 'belum tersedia' : 'Rp ' . number_format($trafficRow['net_profit'], 0, ',', '.') }} · COGS/unit {{ $trafficRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($trafficRow['cogs'], 0, ',', '.') }}">
                                                         <span>COGS/unit <b>{{ $trafficRow['cogs'] === null ? '—' : 'Rp ' . number_format($trafficRow['cogs'], 0, ',', '.') }}</b></span>
@@ -4799,6 +4811,36 @@ document.addEventListener('DOMContentLoaded', function() {
                     placement: 'top',
                 });
             });
+        });
+
+        document.addEventListener('DOMContentLoaded', async function () {
+            const targets = Array.from(document.querySelectorAll('#trafficTable [data-marketplace-category]'));
+            const cache = new Map();
+            const loadCategory = async function (target) {
+                const productId = target.dataset.productId;
+                const categoryId = target.dataset.categoryId;
+                const cacheKey = `${productId}:${categoryId}`;
+                try {
+                    if (!cache.has(cacheKey)) {
+                        cache.set(cacheKey, fetch(`/api/marketplace/products/${encodeURIComponent(productId)}/category-info?category_id=${encodeURIComponent(categoryId)}`, {
+                            headers: { Accept: 'application/json' },
+                            credentials: 'same-origin',
+                        }).then(function (response) {
+                            if (!response.ok) throw new Error('category request failed');
+                            return response.json();
+                        }));
+                    }
+                    const result = await cache.get(cacheKey);
+                    const path = Array.isArray(result.category_path) ? result.category_path.filter(Boolean) : [];
+                    const label = path.length ? path.join(' › ') : (result.category_name || `Kategori marketplace #${categoryId}`);
+                    const labelTarget = target.querySelector('[data-marketplace-category-label]');
+                    if (labelTarget) labelTarget.textContent = label;
+                    target.title = `Kategori marketplace: ${label}`;
+                } catch (error) {
+                    target.title = `Kategori marketplace #${categoryId}`;
+                }
+            };
+            await Promise.all(targets.map(loadCategory));
         });
         </script>
 
