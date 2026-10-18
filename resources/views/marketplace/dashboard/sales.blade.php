@@ -640,6 +640,30 @@
         gap: .65rem;
         padding: 0 1.15rem 1rem;
     }
+    .sales-dashboard .sales-watchlist-metrics {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .65rem;
+        padding: 0 1.15rem 1rem;
+    }
+    .sales-dashboard .sales-watchlist-metric-card {
+        cursor: default;
+        border-color: color-mix(in srgb, var(--sales-accent) 22%, var(--sales-line) 78%);
+        background: color-mix(in srgb, var(--sales-accent-soft) 28%, var(--sales-card) 72%);
+    }
+    .sales-dashboard .sales-watchlist-metric-card:hover {
+        border-color: color-mix(in srgb, var(--sales-accent) 22%, var(--sales-line) 78%);
+        background: color-mix(in srgb, var(--sales-accent-soft) 28%, var(--sales-card) 72%);
+        box-shadow: none;
+        transform: none;
+    }
+    .sales-dashboard .sales-watchlist-metric-card .sales-watchlist-icon {
+        background: var(--sales-accent-soft);
+        color: var(--sales-accent);
+    }
+    .sales-dashboard .sales-watchlist-metric-card .sales-watchlist-value {
+        font-size: .95rem;
+    }
     .sales-dashboard .sales-watchlist-card {
         display: flex;
         min-width: 0;
@@ -1706,6 +1730,7 @@
             'net_sales' => $netSales,
             'buyer_payment' => $buyerPayment,
             'estimated_payout' => $estimatedPayout,
+            'aov_net_sales' => $orders > 0 ? $netSales / $orders : 0,
             'aov_sales' => $orders > 0 ? $sales / $orders : 0,
             'aov_payment' => $orders > 0 ? $buyerPayment / $orders : 0,
             'hpp' => $hpp,
@@ -1757,7 +1782,7 @@
         ['group' => 'Volume transaksi', 'label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
         ['group' => 'Pendapatan', 'label' => 'Penjualan Produk', 'key' => 'sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'Penjualan Netto', 'key' => 'net_sales', 'format' => $currencyDisplay],
-        ['group' => 'Pendapatan', 'label' => 'AOV Penjualan Netto', 'key' => 'aov_sales', 'format' => $currencyDisplay],
+        ['group' => 'Pendapatan', 'label' => 'AOV Penjualan Netto', 'key' => 'aov_net_sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'Pembayaran Pembeli', 'key' => 'buyer_payment', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'AOV Pembayaran', 'key' => 'aov_payment', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas', 'label' => 'Estimasi Penghasilan', 'key' => 'estimated_payout', 'format' => $currencyDisplay],
@@ -2142,6 +2167,7 @@
             'net_sales' => $netSales,
             'buyer_payment' => (float) $rows->sum('buyer_payment'),
             'estimated_payout' => $estimatedPayout,
+            'aov_net_sales' => $orders > 0 ? $netSales / $orders : 0,
             'aov_sales' => $orders > 0 ? $sales / $orders : 0,
             'aov_payment' => $orders > 0 ? ((float) $rows->sum('buyer_payment')) / $orders : 0,
             'hpp' => $hpp,
@@ -2225,7 +2251,7 @@
         ['group' => 'Volume transaksi', 'label' => 'Unit Terjual', 'key' => 'qty', 'format' => $numberDisplay],
         ['group' => 'Pendapatan', 'label' => 'Penjualan Produk', 'key' => 'sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'Penjualan Netto', 'key' => 'net_sales', 'format' => $currencyDisplay],
-        ['group' => 'Pendapatan', 'label' => 'AOV Penjualan Netto', 'key' => 'aov_sales', 'format' => $currencyDisplay],
+        ['group' => 'Pendapatan', 'label' => 'AOV Penjualan Netto', 'key' => 'aov_net_sales', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'Pembayaran Pembeli', 'key' => 'buyer_payment', 'format' => $currencyDisplay],
         ['group' => 'Pendapatan', 'label' => 'AOV Pembayaran', 'key' => 'aov_payment', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas', 'label' => 'Estimasi Penghasilan', 'key' => 'estimated_payout', 'format' => $currencyDisplay],
@@ -4138,6 +4164,24 @@
                 </div>
                 <span class="badge sales-badge rounded-pill px-3 py-2">{{ number_format($watchlistProducts->count()) }} produk perlu ditinjau</span>
             </div>
+            <div class="sales-watchlist-metrics" aria-label="Metrik nilai rata-rata per order">
+                <div class="sales-watchlist-card sales-watchlist-metric-card">
+                    <span class="sales-watchlist-icon"><i class="bi bi-bar-chart-line" aria-hidden="true"></i></span>
+                    <span class="sales-watchlist-content">
+                        <span class="sales-watchlist-label">AOV Netto</span>
+                        <span class="sales-watchlist-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_net_sales']) : '—' }}</span>
+                        <span class="sales-watchlist-impact">Penjualan netto per order</span>
+                    </span>
+                </div>
+                <div class="sales-watchlist-card sales-watchlist-metric-card">
+                    <span class="sales-watchlist-icon"><i class="bi bi-wallet2" aria-hidden="true"></i></span>
+                    <span class="sales-watchlist-content">
+                        <span class="sales-watchlist-label">AOV Pembayaran Pembeli</span>
+                        <span class="sales-watchlist-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_payment']) : '—' }}</span>
+                        <span class="sales-watchlist-impact">Pembayaran pembeli per order</span>
+                    </span>
+                </div>
+            </div>
             <div class="sales-watchlist-grid">
                 <button type="button" class="sales-watchlist-card is-active" data-watchlist-filter="all" aria-pressed="true">
                     <span class="sales-watchlist-icon"><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i></span>
@@ -4286,7 +4330,7 @@
                                 </td>
                             </tr>
                             <tr><td class="analysis-label" colspan="2">Unit per Order</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? number_format($activeProductKpi['qty'] / $activeProductKpi['orders'], 2, ',', '.') : '—' }}</td></tr>
-                            <tr><td class="analysis-label" colspan="2">AOV Penjualan Netto</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_sales']) : '—' }}</td></tr>
+                            <tr><td class="analysis-label" colspan="2">AOV Penjualan Netto</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_net_sales']) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">AOV Pembayaran</td><td class="text-end analysis-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_payment']) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Coverage Mapping Internal</td><td class="text-end analysis-value">{{ $productAnalysisProducts->count() > 0 ? $percentDisplay(($productAnalysisMappedCount / $productAnalysisProducts->count()) * 100) : '—' }}</td></tr>
                             <tr><td class="analysis-label" colspan="2">Coverage HPP</td><td class="text-end analysis-value">{{ $productAnalysisProducts->count() > 0 ? $percentDisplay($productAnalysisHppCoverage) : '—' }}</td></tr>
