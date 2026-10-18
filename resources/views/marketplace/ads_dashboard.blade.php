@@ -2668,6 +2668,7 @@ function trafficArrangeMarketplaceCategoryGroups() {
     const groupRows = Array.from(tbody.querySelectorAll('tr.traffic-marketplace-category-row'));
     const campaignRows = Array.from(tbody.querySelectorAll('tr.traffic-performance-row'));
     const groupedCampaigns = new Set();
+    campaignRows.forEach(row => row.classList.remove('traffic-marketplace-category-member'));
 
     groupRows.forEach(function(groupRow) {
         const categoryKey = groupRow.dataset.marketplaceCategoryKey || groupRow.dataset.marketplaceCategoryId || '';
@@ -2676,6 +2677,7 @@ function trafficArrangeMarketplaceCategoryGroups() {
             .filter(row => (row.dataset.marketplaceCategoryKey || row.dataset.marketplaceCategoryId || '') === categoryKey)
             .forEach(function(row) {
                 groupedCampaigns.add(row);
+                row.classList.add('traffic-marketplace-category-member');
                 tbody.appendChild(row);
             });
     });
@@ -4146,6 +4148,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     background:linear-gradient(90deg,rgba(37,99,235,.08),rgba(37,99,235,.025));
                     border-top:1px solid rgba(37,99,235,.18);
                     border-bottom:1px solid rgba(148,163,184,.18);
+                }
+                .traffic-marketplace-category-member > td {
+                    background:rgba(248,250,252,.5);
+                }
+                .traffic-marketplace-category-member > td:first-child {
+                    padding-left:1rem !important;
+                    border-left:2px solid rgba(37,99,235,.16);
+                }
+                .ads-dashboard[data-traffic-view="marketplace_category"] .traffic-marketplace-category-member .traffic-marketplace-category {
+                    display:none;
                 }
                 .traffic-marketplace-category-group {
                     display:flex;
