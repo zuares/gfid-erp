@@ -990,7 +990,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->groupByRaw("DATE({$dateExpression})")
             ->orderByDesc('day')
             ->get()
-            ->map(function ($row) {
+            ->map(function ($row) use ($cogsByDay, $estimatedPayoutByDay) {
                 $row->orders = (int) $row->orders;
                 $row->settled_orders = (int) $row->settled_orders;
                 $row->pending_orders = (int) $row->pending_orders;
@@ -998,6 +998,9 @@ class MarketplaceSalesDashboardController extends Controller
                 $row->settled_buyer_paid = (float) $row->settled_buyer_paid;
                 $row->pending_buyer_paid = (float) $row->pending_buyer_paid;
                 $row->final_income = (float) $row->final_income;
+                $row->cogs = (float) $cogsByDay->get((string) $row->day, 0);
+                $row->estimated_payout = (float) $estimatedPayoutByDay->get((string) $row->day, 0);
+                $row->gross_profit = $row->estimated_payout - $row->cogs;
 
                 return $row;
             });
@@ -1009,6 +1012,8 @@ class MarketplaceSalesDashboardController extends Controller
             'settled_buyer_paid' => (float) $incomeDaily->sum('settled_buyer_paid'),
             'pending_buyer_paid' => (float) $incomeDaily->sum('pending_buyer_paid'),
             'final_income' => (float) $incomeDaily->sum('final_income'),
+            'cogs' => (float) $incomeDaily->sum('cogs'),
+            'gross_profit' => (float) $incomeDaily->sum('gross_profit'),
         ];
 
         // Imported order files keep the actual product promotion on the item

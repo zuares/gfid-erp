@@ -976,7 +976,7 @@
     .sales-dashboard .sales-product-analysis-detail-table td { font-size: .67rem; }
     .sales-dashboard .sales-product-analysis-detail-title { display: block; max-width: 220px; overflow: hidden; color: var(--sales-ink); font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
     .sales-dashboard .sales-product-analysis-detail-code { display: inline-block; max-width: 150px; overflow: hidden; padding: .18rem .35rem; border: 1px solid color-mix(in srgb, var(--sales-line) 90%, transparent); border-radius: 5px; background: var(--sales-card); color: var(--sales-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .58rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
-    .sales-dashboard .sales-income-table { min-width: 1080px; }
+    .sales-dashboard .sales-income-table { min-width: 1240px; }
     .sales-dashboard .sales-income-table th,
     .sales-dashboard .sales-income-table td { white-space: nowrap; }
     .sales-dashboard .sales-income-table thead tr:first-child th {
@@ -3140,6 +3140,8 @@
                 ['label' => 'Pembayaran Pembeli', 'value' => $fmt($incomeSummary['buyer_paid']), 'note' => number_format($incomeSummary['orders']).' orders', 'icon' => 'bi-wallet2', 'comparisons' => $kpiComparisons($incomeSummary['buyer_paid'], $previousMonthIncomeSummary['buyer_paid'] ?? null, $previousPeriodIncomeSummary['buyer_paid'] ?? null, $currencyDisplay)],
                 ['label' => 'Dana Cair', 'value' => $fmt($incomeSummary['final_income']), 'note' => number_format($incomeSummary['settled_orders']).' order settled', 'icon' => 'bi-cash-coin', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($incomeSummary['final_income'], $previousMonthIncomeSummary['final_income'] ?? null, $previousPeriodIncomeSummary['final_income'] ?? null, $currencyDisplay)],
                 ['label' => 'Belum Cair', 'value' => $fmt($incomeSummary['pending_buyer_paid']), 'note' => number_format($incomeSummary['pending_orders']).' order pending', 'icon' => 'bi-hourglass-split', 'comparisons' => $kpiComparisons($incomeSummary['pending_buyer_paid'], $previousMonthIncomeSummary['pending_buyer_paid'] ?? null, $previousPeriodIncomeSummary['pending_buyer_paid'] ?? null, $currencyDisplay, 'relative', false)],
+                ['label' => 'COGS / HPP', 'value' => $fmt($incomeSummary['cogs']), 'note' => 'biaya produk terjual', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($incomeSummary['cogs'], $previousMonthIncomeSummary['cogs'] ?? null, $previousPeriodIncomeSummary['cogs'] ?? null, $currencyDisplay, 'relative', false)],
+                ['label' => 'Gross Profit', 'value' => $fmt($incomeSummary['gross_profit']), 'note' => 'estimasi payout − COGS', 'icon' => 'bi-graph-up-arrow', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($incomeSummary['gross_profit'], $previousMonthIncomeSummary['gross_profit'] ?? null, $previousPeriodIncomeSummary['gross_profit'] ?? null, $currencyDisplay)],
                 ['label' => 'Settlement Rate', 'value' => number_format($incomeSettlementRate, 1).'%','note' => 'berdasarkan jumlah order', 'icon' => 'bi-check2-circle', 'comparisons' => $kpiComparisons($incomeSettlementRate, $previousMonthIncomeSettlementRate, $previousPeriodIncomeSettlementRate, $percentDisplay, 'points')],
             ],
         ])
@@ -3164,6 +3166,7 @@
                                 <th class="text-end income-group-start" colspan="3">Sudah Cair</th>
                                 <th class="text-end income-group-start" colspan="3">Belum Cair</th>
                                 <th class="text-end income-group-start pe-3" colspan="2">Dana Cair</th>
+                                <th class="text-end income-group-start" colspan="2">Profitabilitas</th>
                             </tr>
                             <tr>
                                 <th class="text-end">Qty</th>
@@ -3177,6 +3180,8 @@
                                 <th class="text-end">%</th>
                                 <th class="text-end income-group-start pe-3">Nilai</th>
                                 <th class="text-end pe-3">%</th>
+                                <th class="text-end income-group-start">COGS / HPP</th>
+                                <th class="text-end">Gross Profit</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -3195,6 +3200,8 @@
                                     <td class="text-end income-percent">{{ $pct($income->pending_orders, $incomeSummary['orders']) }}%</td>
                                     <td class="text-end income-group-start pe-3 income-value">{{ $fmt($income->final_income) }}</td>
                                     <td class="text-end pe-3 income-percent">{{ $pct($income->final_income, $incomeSummary['final_income']) }}%</td>
+                                    <td class="text-end income-group-start income-value">{{ $fmt($income->cogs) }}</td>
+                                    <td class="text-end income-value">{{ $fmt($income->gross_profit) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
