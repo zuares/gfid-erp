@@ -1222,6 +1222,15 @@
         letter-spacing: .045em;
         text-transform: uppercase;
     }
+    .sales-dashboard .sales-kpi-group-inline {
+        margin-bottom: .55rem;
+        color: var(--sales-accent);
+        font-size: .56rem;
+        font-weight: 800;
+        letter-spacing: .1em;
+        line-height: 1;
+        text-transform: uppercase;
+    }
     .sales-dashboard .sales-kpi-value {
         font-size: clamp(1.05rem, 1.4vw, 1.32rem);
         font-variant-numeric: tabular-nums;
@@ -3316,8 +3325,8 @@
                 ['group' => 'Pendapatan', 'label' => 'Payout Sudah Cair', 'value' => $fmt($profitLossSummary['payout']), 'note' => 'pendapatan aktual settlement', 'icon' => 'bi-wallet2', 'variant' => 'sales-kpi--success'],
                 ['group' => 'Beban Pokok', 'label' => 'COGS / HPP', 'value' => $fmt($profitLossSummary['cogs']), 'note' => 'harga terakhir sampai akhir periode', 'icon' => 'bi-box-seam'],
                 ['group' => 'Profitabilitas', 'label' => 'Laba Kotor', 'value' => $fmt($profitLossSummary['gross_profit']), 'note' => 'Payout − COGS / HPP', 'icon' => 'bi-graph-up-arrow', 'variant' => 'sales-kpi--success'],
-                ['group' => 'Beban Operasional', 'label' => 'Biaya Iklan', 'value' => $fmt($profitLossSummary['ad_spend']), 'note' => 'iklan marketplace', 'icon' => 'bi-megaphone'],
-                ['group' => 'Profitabilitas', 'label' => 'Laba Bersih Operasional', 'value' => $fmt($profitLossSummary['net_profit']), 'note' => 'Laba Kotor − Biaya Iklan', 'icon' => 'bi-piggy-bank', 'variant' => 'sales-kpi--success'],
+                ['group' => 'Beban Operasional', 'label' => 'Total Beban Operasional', 'value' => $fmt($profitLossSummary['operating_expense']), 'note' => 'Biaya Iklan + PPN 11%', 'icon' => 'bi-megaphone'],
+                ['group' => 'Profitabilitas', 'label' => 'Laba Bersih Operasional', 'value' => $fmt($profitLossSummary['net_profit']), 'note' => 'Laba Kotor − Total Beban Operasional', 'icon' => 'bi-piggy-bank', 'variant' => 'sales-kpi--success'],
             ],
         ])
 
@@ -3372,13 +3381,25 @@
                             <td class="ps-4">Biaya iklan</td>
                             <td class="text-end">{{ $fmt($profitLossSummary['ad_spend']) }}</td>
                             <td class="text-end">{{ $pct($profitLossSummary['ad_spend'], $profitLossSummary['payout']) }}%</td>
-                            <td class="text-muted">Spend iklan marketplace</td>
+                            <td class="text-muted">Spend iklan marketplace, sebelum PPN</td>
+                        </tr>
+                        <tr>
+                            <td class="ps-4">PPN iklan (11%)</td>
+                            <td class="text-end">{{ $fmt($profitLossSummary['ad_vat']) }}</td>
+                            <td class="text-end">{{ $pct($profitLossSummary['ad_vat'], $profitLossSummary['payout']) }}%</td>
+                            <td class="text-muted">11% × biaya iklan</td>
+                        </tr>
+                        <tr class="fw-bold">
+                            <td>Total Beban Operasional</td>
+                            <td class="text-end">{{ $fmt($profitLossSummary['operating_expense']) }}</td>
+                            <td class="text-end">{{ $pct($profitLossSummary['operating_expense'], $profitLossSummary['payout']) }}%</td>
+                            <td class="text-muted">Biaya Iklan + PPN Iklan</td>
                         </tr>
                         <tr class="fw-bold">
                             <td>Laba Bersih Operasional</td>
                             <td class="text-end">{{ $fmt($profitLossSummary['net_profit']) }}</td>
                             <td class="text-end">{{ $pct($profitLossSummary['net_profit'], $profitLossSummary['payout']) }}%</td>
-                            <td class="text-muted">Laba Kotor − Biaya Iklan</td>
+                            <td class="text-muted">Laba Kotor − Total Beban Operasional</td>
                         </tr>
                         <tr class="table-light">
                             <td colspan="4" class="fw-bold">Informasi Settlement</td>
@@ -3420,6 +3441,8 @@
                                 <th class="text-end">COGS / HPP</th>
                                 <th class="text-end">Laba Kotor</th>
                                 <th class="text-end">Biaya Iklan</th>
+                                <th class="text-end">PPN Iklan (11%)</th>
+                                <th class="text-end">Total Beban Operasional</th>
                                 <th class="text-end">Laba Bersih</th>
                                 <th class="text-end">Margin Bersih</th>
                             </tr>
@@ -3433,6 +3456,8 @@
                                     <td class="text-end">{{ $fmt($profitLoss->cogs) }}</td>
                                     <td class="text-end fw-semibold">{{ $fmt($profitLoss->gross_profit) }}</td>
                                     <td class="text-end">{{ $fmt($profitLoss->ad_spend) }}</td>
+                                    <td class="text-end">{{ $fmt($profitLoss->ad_vat) }}</td>
+                                    <td class="text-end">{{ $fmt($profitLoss->operating_expense) }}</td>
                                     <td class="text-end fw-semibold">{{ $fmt($profitLoss->net_profit) }}</td>
                                     <td class="text-end">{{ $pct($profitLoss->net_profit, $profitLoss->payout) }}%</td>
                                 </tr>

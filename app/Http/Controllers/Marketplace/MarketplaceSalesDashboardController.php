@@ -17,6 +17,8 @@ class MarketplaceSalesDashboardController extends Controller
 {
     private const PROMOTION_DUMMY_SOURCE = 'promotion_dashboard_v1';
 
+    private const MARKETPLACE_AD_VAT_RATE = 0.11;
+
     private const PLATFORM_ALIASES = [
         'SHOPEE' => ['SHP'],
         'TIKTOK' => ['TTK'],
@@ -1523,6 +1525,8 @@ SQL;
                 $cogs = (float) $row->cogs;
                 $grossProfit = $payout - $cogs;
                 $adSpend = (float) $adSpendDaily->get((string) $row->day, 0);
+                $adVat = $adSpend * self::MARKETPLACE_AD_VAT_RATE;
+                $operatingExpense = $adSpend + $adVat;
 
                 return (object) [
                     'day' => (string) $row->day,
@@ -1530,7 +1534,9 @@ SQL;
                     'cogs' => $cogs,
                     'gross_profit' => $grossProfit,
                     'ad_spend' => $adSpend,
-                    'net_profit' => $grossProfit - $adSpend,
+                    'ad_vat' => $adVat,
+                    'operating_expense' => $operatingExpense,
+                    'net_profit' => $grossProfit - $operatingExpense,
                     'refund_amount' => (float) $row->refund_amount,
                     'failed_shipping_value' => (float) $row->failed_shipping_value,
                 ];
@@ -1547,7 +1553,9 @@ SQL;
                 'cogs' => 0.0,
                 'gross_profit' => 0.0,
                 'ad_spend' => (float) $adSpend,
-                'net_profit' => -((float) $adSpend),
+                'ad_vat' => (float) $adSpend * self::MARKETPLACE_AD_VAT_RATE,
+                'operating_expense' => (float) $adSpend * (1 + self::MARKETPLACE_AD_VAT_RATE),
+                'net_profit' => -((float) $adSpend * (1 + self::MARKETPLACE_AD_VAT_RATE)),
                 'refund_amount' => 0.0,
                 'failed_shipping_value' => 0.0,
             ]);
@@ -1558,6 +1566,8 @@ SQL;
             'cogs' => (float) $profitLossDaily->sum('cogs'),
             'gross_profit' => (float) $profitLossDaily->sum('gross_profit'),
             'ad_spend' => (float) $profitLossDaily->sum('ad_spend'),
+            'ad_vat' => (float) $profitLossDaily->sum('ad_vat'),
+            'operating_expense' => (float) $profitLossDaily->sum('operating_expense'),
             'net_profit' => (float) $profitLossDaily->sum('net_profit'),
             'refund_amount' => (float) $profitLossDaily->sum('refund_amount'),
             'failed_shipping_value' => (float) $profitLossDaily->sum('failed_shipping_value'),
