@@ -3981,8 +3981,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-funnel-value { font-size:.78rem; font-weight:800; }
                 .traffic-funnel-rate { font-size:.6rem; opacity:.9; white-space:nowrap; }
                 .traffic-funnel-arrow { color:var(--dsh-muted); font-size:.65rem; line-height:.5; }
-                .traffic-product-image { width:32px; height:32px; border-radius:8px; object-fit:cover; flex:none; border:1px solid var(--dsh-border); background:#f1f5f9; }
-                .traffic-product-image-empty { width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; flex:none; color:var(--dsh-muted); background:#f1f5f9; border:1px solid var(--dsh-border); }
+                .traffic-product-image { width:36px; height:36px; border-radius:9px; object-fit:cover; flex:none; border:1px solid var(--dsh-border); background:#f1f5f9; box-shadow:0 1px 2px rgba(15,23,42,.08); }
+                .traffic-product-image-empty { width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:9px; flex:none; color:var(--dsh-muted); background:linear-gradient(135deg,#f8fafc,#eef2f7); border:1px solid var(--dsh-border); }
                 .traffic-product-meta { display:flex; flex-wrap:wrap; align-items:center; gap:.16rem .38rem; margin-top:.16rem; color:var(--dsh-muted,#64748b); font-size:.56rem; line-height:1.2; font-variant-numeric:tabular-nums; }
                 .traffic-product-meta span { white-space:nowrap; }
                 .traffic-product-meta b { color:var(--text,#334155); font-weight:750; }
@@ -3990,16 +3990,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-product-meta .traffic-product-meta-profit.is-positive b { color:#15803d; }
                 .traffic-product-meta .traffic-product-meta-profit.is-negative b { color:#dc2626; }
                 .traffic-product-meta .traffic-product-meta-na { color:#b45309; }
-                .traffic-product-cell { min-width:0; }
-                .traffic-product-copy { min-width:0; flex:1 1 auto; }
-                .traffic-product-title { min-width:0; }
-                .traffic-product-name { display:block; max-width:100%; overflow:hidden !important; text-overflow:ellipsis; white-space:nowrap !important; overflow-wrap:normal; font-size:.76rem !important; line-height:1.15; letter-spacing:-.01em; }
-                .traffic-marketplace-category { display:flex; align-items:flex-start; gap:.18rem; max-width:100%; margin-top:.13rem; color:#64748b; font-size:.56rem; line-height:1.1; white-space:normal; overflow-wrap:anywhere; }
+                .traffic-product-cell { min-width:0; align-items:flex-start !important; gap:.58rem !important; }
+                .traffic-product-copy { display:flex; min-width:0; flex:1 1 auto; flex-direction:column; gap:.12rem; }
+                .traffic-product-title { display:flex; align-items:center; min-width:0; gap:.22rem; }
+                .traffic-product-name { display:block; min-width:0; max-width:100%; flex:1 1 auto; overflow:hidden !important; text-overflow:ellipsis; white-space:nowrap !important; overflow-wrap:normal; font-size:.74rem !important; line-height:1.2; letter-spacing:-.012em; }
+                .traffic-product-title a.traffic-product-name:hover { color:#2563eb !important; }
+                .traffic-product-title .bi-box-arrow-up-right { opacity:.65; transition:opacity .15s ease; }
+                .traffic-product-title a.traffic-product-name:hover .bi-box-arrow-up-right { opacity:1; }
+                .traffic-marketplace-category { display:flex; align-items:flex-start; gap:.22rem; max-width:100%; margin-top:0; color:#64748b; font-size:.56rem; line-height:1.15; white-space:normal; overflow-wrap:anywhere; }
                 .traffic-marketplace-category i { flex:none; color:#2563eb; font-size:.56rem; }
                 .traffic-marketplace-category span { min-width:0; overflow-wrap:anywhere; }
                 .traffic-product-id { margin-top:.12rem; color:var(--dsh-muted,#64748b); font-size:.52rem; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-                .traffic-product-status-row { display:flex; align-items:center; gap:.3rem; min-width:0; margin-top:.16rem; }
+                .traffic-product-status-row { display:flex; align-items:center; gap:.38rem; min-width:0; margin-top:.06rem; }
                 .traffic-product-status-row .traffic-product-id { margin-top:0; }
+                .traffic-product-status-row > .text-muted,
+                .traffic-product-status-row .traffic-product-id {
+                    display:inline-flex;
+                    align-items:center;
+                    min-width:0;
+                    padding:.08rem .25rem;
+                    border-radius:4px;
+                    background:rgba(148,163,184,.1);
+                    color:var(--dsh-muted,#64748b) !important;
+                    font-size:.52rem !important;
+                    line-height:1.1;
+                }
                 /* Compact P&L ledger: keep campaign economics aligned and readable inside the table cell. */
                 .traffic-product-meta {
                     display:grid;
@@ -4982,11 +4997,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                                                             <span class="traffic-product-image-empty"><i class="bi bi-image"></i></span>
                                                                         @endif
                                                                         <div class="traffic-product-copy">
-                                                                            @if(data_get($campaignRow, 'row.id'))
-                                                                                <a href="{{ route('marketplace.ads.campaign.detail', ['campaign' => $campaignRow['row']->id, 'store_id' => $campaignRow['row']->store_id, 'date_from' => $dateFrom ?? null, 'date_to' => $dateTo ?? null]) }}" onclick="event.stopPropagation();" class="fw-bold text-truncate traffic-product-name" style="color:inherit; text-decoration:none;" title="Buka detail campaign {{ $campaignRow['name'] }}">{{ $campaignRow['name'] }} <i class="bi bi-box-arrow-up-right" style="font-size:.55rem;color:#2563eb;"></i></a>
-                                                                            @else
-                                                                                <span class="fw-bold traffic-product-name">{{ $campaignRow['name'] }}</span>
-                                                                            @endif
+                                                                            <div class="traffic-product-title">
+                                                                                @if(data_get($campaignRow, 'row.id'))
+                                                                                    <a href="{{ route('marketplace.ads.campaign.detail', ['campaign' => $campaignRow['row']->id, 'store_id' => $campaignRow['row']->store_id, 'date_from' => $dateFrom ?? null, 'date_to' => $dateTo ?? null]) }}" onclick="event.stopPropagation();" class="fw-bold text-truncate traffic-product-name" style="color:inherit; text-decoration:none;" title="Buka detail campaign {{ $campaignRow['name'] }}">{{ $campaignRow['name'] }} <i class="bi bi-box-arrow-up-right" style="font-size:.55rem;color:#2563eb;"></i></a>
+                                                                                @else
+                                                                                    <span class="fw-bold traffic-product-name">{{ $campaignRow['name'] }}</span>
+                                                                                @endif
+                                                                            </div>
                                                                             @if(!empty($campaignRow['marketplace_product_id']) && filled($campaignRow['marketplace_category_id']))
                                                                                 <div class="traffic-marketplace-category" data-marketplace-category data-product-id="{{ $campaignRow['marketplace_product_id'] }}" data-category-id="{{ $campaignRow['marketplace_category_id'] }}" title="Kategori marketplace #{{ $campaignRow['marketplace_category_id'] }}"><i class="bi bi-tag" aria-hidden="true"></i><span data-marketplace-category-label>Kategori marketplace #{{ $campaignRow['marketplace_category_id'] }}</span></div>
                                                                             @endif
@@ -5072,11 +5089,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     <span class="traffic-product-image-empty"><i class="bi bi-image"></i></span>
                                                 @endif
                                                 <div class="traffic-product-copy">
-                                                    @if(data_get($trafficRow, 'row.id'))
-                                                        <a href="{{ route('marketplace.ads.campaign.detail', ['campaign' => $trafficRow['row']->id, 'store_id' => $trafficRow['row']->store_id, 'date_from' => $dateFrom ?? null, 'date_to' => $dateTo ?? null]) }}" onclick="event.stopPropagation();" class="fw-bold text-truncate traffic-product-name" style="color:inherit; text-decoration:none;" title="Buka detail campaign {{ $trafficRow['name'] }}">{{ $trafficRow['name'] }} <i class="bi bi-box-arrow-up-right" style="font-size:.55rem;color:#2563eb;"></i></a>
-                                                    @else
-                                                        <span class="fw-bold traffic-product-name">{{ $trafficRow['name'] }}</span>
-                                                    @endif
+                                                    <div class="traffic-product-title">
+                                                        @if(data_get($trafficRow, 'row.id'))
+                                                            <a href="{{ route('marketplace.ads.campaign.detail', ['campaign' => $trafficRow['row']->id, 'store_id' => $trafficRow['row']->store_id, 'date_from' => $dateFrom ?? null, 'date_to' => $dateTo ?? null]) }}" onclick="event.stopPropagation();" class="fw-bold text-truncate traffic-product-name" style="color:inherit; text-decoration:none;" title="Buka detail campaign {{ $trafficRow['name'] }}">{{ $trafficRow['name'] }} <i class="bi bi-box-arrow-up-right" style="font-size:.55rem;color:#2563eb;"></i></a>
+                                                        @else
+                                                            <span class="fw-bold traffic-product-name">{{ $trafficRow['name'] }}</span>
+                                                        @endif
+                                                    </div>
                                                     @if(!empty($trafficRow['marketplace_product_id']) && filled($trafficRow['marketplace_category_id']))
                                                         <div class="traffic-marketplace-category" data-marketplace-category data-product-id="{{ $trafficRow['marketplace_product_id'] }}" data-category-id="{{ $trafficRow['marketplace_category_id'] }}" title="Kategori marketplace #{{ $trafficRow['marketplace_category_id'] }}"><i class="bi bi-tag" aria-hidden="true"></i><span data-marketplace-category-label>Kategori marketplace #{{ $trafficRow['marketplace_category_id'] }}</span></div>
                                                     @endif
