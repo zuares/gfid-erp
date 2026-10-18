@@ -1513,6 +1513,56 @@ SQL;
         $incomeSummary['failed_shipping_orders'] = (int) $incomeDaily->sum('failed_shipping_orders');
         $incomeSummary['failed_shipping_value'] = (float) $incomeDaily->sum('failed_shipping_value');
 
+        // Laporan laba rugi marketplace memakai payout yang sudah cair sebagai
+        // pendapatan. Refund sudah tercermin di final_income, sedangkan order
+        // gagal kirim tidak masuk payout; keduanya tetap disediakan sebagai
+        // informasi agar tidak terpotong dua kali dari laba.
+        $profitLossDaily = $incomeDaily
+            ->map(function ($row) use ($adSpendDaily) {
+                $payout = (float) $row->final_income;
+                $cogs = (float) $row->cogs;
+                $grossProfit = $payout - $cogs;
+                $adSpend = (float) $adSpendDaily->get((string) $row->day, 0);
+
+                return (object) [
+                    'day' => (string) $row->day,
+                    'payout' => $payout,
+                    'cogs' => $cogs,
+                    'gross_profit' => $grossProfit,
+                    'ad_spend' => $adSpend,
+                    'net_profit' => $grossProfit - $adSpend,
+                    'refund_amount' => (float) $row->refund_amount,
+                    'failed_shipping_value' => (float) $row->failed_shipping_value,
+                ];
+            })
+            ->keyBy(fn ($row) => (string) $row->day);
+        $adSpendDaily->each(function ($adSpend, $day) use ($profitLossDaily) {
+            if ($profitLossDaily->has((string) $day)) {
+                return;
+            }
+
+            $profitLossDaily->put((string) $day, (object) [
+                'day' => (string) $day,
+                'payout' => 0.0,
+                'cogs' => 0.0,
+                'gross_profit' => 0.0,
+                'ad_spend' => (float) $adSpend,
+                'net_profit' => -((float) $adSpend),
+                'refund_amount' => 0.0,
+                'failed_shipping_value' => 0.0,
+            ]);
+        });
+        $profitLossDaily = $profitLossDaily->sortByDesc('day')->values();
+        $profitLossSummary = [
+            'payout' => (float) $profitLossDaily->sum('payout'),
+            'cogs' => (float) $profitLossDaily->sum('cogs'),
+            'gross_profit' => (float) $profitLossDaily->sum('gross_profit'),
+            'ad_spend' => (float) $profitLossDaily->sum('ad_spend'),
+            'net_profit' => (float) $profitLossDaily->sum('net_profit'),
+            'refund_amount' => (float) $profitLossDaily->sum('refund_amount'),
+            'failed_shipping_value' => (float) $profitLossDaily->sum('failed_shipping_value'),
+        ];
+
         // Katalog aktif berasal dari sinkronisasi marketplace, bukan dari
         // order pada periode. Dengan begitu produk tanpa transaksi tetap
         // masuk sebagai produk aktif marketplace.
@@ -1613,6 +1663,8 @@ SQL;
             'paymentSummary' => $paymentSummary,
             'incomeDaily' => $incomeDaily,
             'incomeSummary' => $incomeSummary,
+            'profitLossDaily' => $profitLossDaily,
+            'profitLossSummary' => $profitLossSummary,
             'promotionDaily' => $promotionDaily,
             'promotionOrders' => $promotionOrders,
             'adSpendDaily' => $adSpendDaily,

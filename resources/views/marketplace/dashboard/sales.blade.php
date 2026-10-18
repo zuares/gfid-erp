@@ -1183,7 +1183,7 @@
     $dateLabel = fn ($date) => \Carbon\Carbon::parse($date)->format('d M Y');
     $dateRangeLabel = fn ($from, $to) => $dateLabel($from).' – '.$dateLabel($to);
     $pct = fn ($value, $total) => $total > 0 ? number_format(((float) $value / (float) $total) * 100, 1, ',', '.') : '0,0';
-    $salesTabs = ['sales', 'event_day', 'products', 'payments', 'promotions', 'shipping', 'income', 'orders'];
+    $salesTabs = ['sales', 'event_day', 'products', 'payments', 'promotions', 'shipping', 'income', 'profit_loss', 'orders'];
     $activeTab = in_array(request('tab'), $salesTabs, true) ? request('tab') : 'sales';
     $comparisonMode = $filters['comparison_mode'] ?? 'month';
     $paydayDay = min(max((int) request('payday_day', 25), 1), 31);
@@ -2541,6 +2541,7 @@
         <button class="nav-link {{ $activeTab === 'promotions' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'promotions' ? 'true' : 'false' }}" data-sales-tab="promotions"><i class="bi bi-percent me-1"></i>Promosi</button>
         <button class="nav-link {{ $activeTab === 'shipping' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'shipping' ? 'true' : 'false' }}" data-sales-tab="shipping"><i class="bi bi-truck me-1"></i>Pengiriman</button>
         <button class="nav-link {{ $activeTab === 'income' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'income' ? 'true' : 'false' }}" data-sales-tab="income"><i class="bi bi-cash-coin me-1"></i>Penghasilan</button>
+        <button class="nav-link {{ $activeTab === 'profit_loss' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'profit_loss' ? 'true' : 'false' }}" data-sales-tab="profit_loss"><i class="bi bi-journal-richtext me-1"></i>Laba Rugi</button>
         <button class="nav-link {{ $activeTab === 'orders' ? 'active' : '' }}" type="button" role="tab" aria-selected="{{ $activeTab === 'orders' ? 'true' : 'false' }}" data-sales-tab="orders"><i class="bi bi-list-ul me-1"></i>Detail Pesanan</button>
         </nav>
     </div>
@@ -3212,6 +3213,141 @@
                                     <td class="text-end pe-3 income-percent">{{ $pct($income->final_income, $incomeSummary['final_income']) }}%</td>
                                     <td class="text-end income-group-start income-value">{{ $fmt($income->cogs) }}</td>
                                     <td class="text-end income-value">{{ $fmt($income->gross_profit) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </section>
+    </div>
+
+    <div class="sales-tab-pane {{ $activeTab === 'profit_loss' ? '' : 'is-hidden' }}" data-sales-pane="profit_loss" role="tabpanel" aria-hidden="{{ $activeTab === 'profit_loss' ? 'false' : 'true' }}">
+        @include('marketplace.dashboard.partials._kpis', [
+            'kpiTitle' => 'Laba Rugi',
+            'kpis' => [
+                ['group' => 'Pendapatan', 'label' => 'Payout Sudah Cair', 'value' => $fmt($profitLossSummary['payout']), 'note' => 'pendapatan aktual settlement', 'icon' => 'bi-wallet2', 'variant' => 'sales-kpi--success'],
+                ['group' => 'Beban Pokok', 'label' => 'COGS / HPP', 'value' => $fmt($profitLossSummary['cogs']), 'note' => 'harga terakhir sampai akhir periode', 'icon' => 'bi-box-seam'],
+                ['group' => 'Profitabilitas', 'label' => 'Laba Kotor', 'value' => $fmt($profitLossSummary['gross_profit']), 'note' => 'Payout − COGS / HPP', 'icon' => 'bi-graph-up-arrow', 'variant' => 'sales-kpi--success'],
+                ['group' => 'Beban Operasional', 'label' => 'Biaya Iklan', 'value' => $fmt($profitLossSummary['ad_spend']), 'note' => 'iklan marketplace', 'icon' => 'bi-megaphone'],
+                ['group' => 'Profitabilitas', 'label' => 'Laba Bersih Operasional', 'value' => $fmt($profitLossSummary['net_profit']), 'note' => 'Laba Kotor − Biaya Iklan', 'icon' => 'bi-piggy-bank', 'variant' => 'sales-kpi--success'],
+            ],
+        ])
+
+        <section class="card sales-card shadow-sm mb-4">
+            <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
+                <div>
+                    <div class="sales-kicker mb-1">Profit and loss statement</div>
+                    <h2 class="sales-section-title mb-1">Ringkasan Laba Rugi</h2>
+                    <p class="sales-section-subtitle mb-0">Berbasis payout yang sudah cair pada periode terpilih.</p>
+                </div>
+                <span class="badge sales-badge rounded-pill px-3 py-2">{{ $profitLossDaily->count() }} hari</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle sales-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Pos Laba Rugi</th>
+                            <th class="text-end">Nilai</th>
+                            <th class="text-end">% dari Payout</th>
+                            <th>Keterangan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="table-light">
+                            <td colspan="4" class="fw-bold">Pendapatan</td>
+                        </tr>
+                        <tr>
+                            <td class="ps-4">Payout sudah cair</td>
+                            <td class="text-end fw-semibold">{{ $fmt($profitLossSummary['payout']) }}</td>
+                            <td class="text-end">100,0%</td>
+                            <td class="text-muted">Final income dari settlement</td>
+                        </tr>
+                        <tr class="table-light">
+                            <td colspan="4" class="fw-bold">Beban Pokok Pendapatan</td>
+                        </tr>
+                        <tr>
+                            <td class="ps-4">COGS / HPP</td>
+                            <td class="text-end">{{ $fmt($profitLossSummary['cogs']) }}</td>
+                            <td class="text-end">{{ $pct($profitLossSummary['cogs'], $profitLossSummary['payout']) }}%</td>
+                            <td class="text-muted">Harga terakhir sampai akhir periode</td>
+                        </tr>
+                        <tr class="fw-bold">
+                            <td>Laba Kotor</td>
+                            <td class="text-end">{{ $fmt($profitLossSummary['gross_profit']) }}</td>
+                            <td class="text-end">{{ $pct($profitLossSummary['gross_profit'], $profitLossSummary['payout']) }}%</td>
+                            <td class="text-muted">Payout − COGS / HPP</td>
+                        </tr>
+                        <tr class="table-light">
+                            <td colspan="4" class="fw-bold">Beban Operasional</td>
+                        </tr>
+                        <tr>
+                            <td class="ps-4">Biaya iklan</td>
+                            <td class="text-end">{{ $fmt($profitLossSummary['ad_spend']) }}</td>
+                            <td class="text-end">{{ $pct($profitLossSummary['ad_spend'], $profitLossSummary['payout']) }}%</td>
+                            <td class="text-muted">Spend iklan marketplace</td>
+                        </tr>
+                        <tr class="fw-bold">
+                            <td>Laba Bersih Operasional</td>
+                            <td class="text-end">{{ $fmt($profitLossSummary['net_profit']) }}</td>
+                            <td class="text-end">{{ $pct($profitLossSummary['net_profit'], $profitLossSummary['payout']) }}%</td>
+                            <td class="text-muted">Laba Kotor − Biaya Iklan</td>
+                        </tr>
+                        <tr class="table-light">
+                            <td colspan="4" class="fw-bold">Informasi Settlement</td>
+                        </tr>
+                        <tr>
+                            <td class="ps-4">Pengembalian dana</td>
+                            <td class="text-end">{{ $fmt($profitLossSummary['refund_amount']) }}</td>
+                            <td class="text-end">{{ $pct($profitLossSummary['refund_amount'], $profitLossSummary['payout']) }}%</td>
+                            <td class="text-muted">Sudah tercermin dalam payout final</td>
+                        </tr>
+                        <tr>
+                            <td class="ps-4">Nilai pengiriman gagal</td>
+                            <td class="text-end">{{ $fmt($profitLossSummary['failed_shipping_value']) }}</td>
+                            <td class="text-end">{{ $pct($profitLossSummary['failed_shipping_value'], $profitLossSummary['payout']) }}%</td>
+                            <td class="text-muted">Tidak masuk payout; informasi exception</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="card sales-card shadow-sm">
+            <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
+                <div>
+                    <div class="sales-kicker mb-1">Daily breakdown</div>
+                    <h2 class="sales-section-title mb-1">Laba Rugi per Tanggal</h2>
+                </div>
+            </div>
+            @if ($profitLossDaily->isEmpty())
+                <div class="sales-empty text-center"><i class="bi bi-journal-x d-block fs-3 mb-2"></i>Belum ada data laba rugi pada periode ini.</div>
+            @else
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle sales-table sales-income-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>No.</th>
+                                <th>Tanggal</th>
+                                <th class="text-end">Payout</th>
+                                <th class="text-end">COGS / HPP</th>
+                                <th class="text-end">Laba Kotor</th>
+                                <th class="text-end">Biaya Iklan</th>
+                                <th class="text-end">Laba Bersih</th>
+                                <th class="text-end">Margin Bersih</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($profitLossDaily as $profitLoss)
+                                <tr>
+                                    <td>{{ $loop->iteration }}</td>
+                                    <td class="fw-semibold">{{ $dateLabel($profitLoss->day) }}</td>
+                                    <td class="text-end">{{ $fmt($profitLoss->payout) }}</td>
+                                    <td class="text-end">{{ $fmt($profitLoss->cogs) }}</td>
+                                    <td class="text-end fw-semibold">{{ $fmt($profitLoss->gross_profit) }}</td>
+                                    <td class="text-end">{{ $fmt($profitLoss->ad_spend) }}</td>
+                                    <td class="text-end fw-semibold">{{ $fmt($profitLoss->net_profit) }}</td>
+                                    <td class="text-end">{{ $pct($profitLoss->net_profit, $profitLoss->payout) }}%</td>
                                 </tr>
                             @endforeach
                         </tbody>
