@@ -2978,7 +2978,9 @@ window.__trafficPerformanceView = function(view) {
                 && (candidate.dataset.marketplaceCategoryKey || candidate.dataset.marketplaceCategoryId || '') === categoryKey);
             visible = !!groupRow?.classList.contains('open');
         }
-        row.style.display = visible ? '' : 'none';
+        row.style.display = visible
+            ? (isMarketplaceGroup ? 'table-row' : '')
+            : 'none';
         if (isMarketplaceGroup) {
             row.setAttribute('aria-expanded', row.classList.contains('open') ? 'true' : 'false');
         } else {
@@ -3698,7 +3700,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     $trafficViews = $isGms
                         ? ['category', 'gms']
                         : array_values(array_unique(array_merge(['category', 'roas'], $isProblematic ? ['unmapped'] : [])));
-                    if (!empty($row->marketplace_product_id) && filled($row->marketplace_category_id)) {
+                    if (filled($row->marketplace_category_id)) {
                         $trafficViews[] = 'marketplace_category';
                     }
                     $prevSpend = (float) ($row->prev_spend ?? 0) * 1.11;
