@@ -5196,7 +5196,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     <i class="bi bi-tags" aria-hidden="true"></i>
                                                     <span class="traffic-marketplace-category-group-label" data-marketplace-category-group data-category-id="{{ $marketplaceCategoryRow['marketplace_category_id'] }}">Kategori Marketplace #{{ $marketplaceCategoryRow['marketplace_category_id'] }}</span>
                                                     </div>
-                                                    <div class="traffic-marketplace-category-group-meta"><span><b>{{ number_format($marketplaceCategoryRow['campaigns'], 0, ',', '.') }}</b> iklan</span></div>
                                                 </div>
                                             </div>
                                         </td>
