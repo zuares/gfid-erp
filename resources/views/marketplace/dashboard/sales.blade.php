@@ -714,7 +714,7 @@
     .sales-dashboard .sales-watchlist-value { margin-top: .1rem; color: var(--sales-ink); font-size: .82rem; font-weight: 850; font-variant-numeric: tabular-nums; }
     .sales-dashboard .sales-watchlist-impact { overflow: hidden; margin-top: .08rem; color: var(--sales-muted); font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
     .sales-dashboard .sales-watchlist-table-wrap { padding: 0 1.15rem 1.15rem; overflow-x: auto; }
-    .sales-dashboard .sales-watchlist-table { width: 100%; min-width: 980px; table-layout: fixed; }
+    .sales-dashboard .sales-watchlist-table { width: 100%; min-width: 1180px; table-layout: fixed; }
     .sales-dashboard .sales-watchlist-table th,
     .sales-dashboard .sales-watchlist-table td { padding: .52rem .58rem; white-space: nowrap; }
     .sales-dashboard .sales-watchlist-table th { background: var(--sales-soft); color: var(--sales-muted); font-size: .59rem; font-weight: 800; letter-spacing: .035em; text-transform: uppercase; }
@@ -4021,6 +4021,15 @@
                 foreach ($sumFields as $field) {
                     $watchProduct->{$field} = $products->sum(fn ($product) => (float) ($product->{$field} ?? 0));
                 }
+                $watchOrderKeys = $products
+                    ->flatMap(fn ($product) => preg_split('/,/', (string) ($product->order_keys ?? ''), -1, PREG_SPLIT_NO_EMPTY))
+                    ->map(fn ($key) => trim((string) $key))
+                    ->filter()
+                    ->unique()
+                    ->values();
+                $watchProduct->orders = $watchOrderKeys->isNotEmpty()
+                    ? $watchOrderKeys->count()
+                    : (int) $products->sum(fn ($product) => (int) ($product->orders ?? 0));
 
                 $hasCompleteHpp = $products->every(fn ($product) => $product->gross_profit !== null);
                 $hasCompletePayout = $products->every(fn ($product) => $product->net_profit !== null);
@@ -4207,14 +4216,16 @@
                     <table class="table table-sm table-hover align-middle sales-table sales-watchlist-table mb-0">
                         <thead>
                             <tr>
-                                <th style="width: 8%">Prioritas</th>
-                                <th style="width: 25%">Produk</th>
-                                <th style="width: 19%">Indikasi</th>
-                                <th class="text-end" style="width: 10%">Penjualan Netto</th>
-                                <th class="text-end" style="width: 9%">Margin Bersih</th>
-                                <th class="text-end" style="width: 11%">Laba Bersih</th>
-                                <th class="text-end" style="width: 10%">Biaya Iklan</th>
-                                <th class="text-end" style="width: 7%">ROAS</th>
+                                <th style="width: 7%">Prioritas</th>
+                                <th style="width: 18%">Produk</th>
+                                <th style="width: 12%">Indikasi</th>
+                                <th class="text-end" style="width: 8%">Penjualan Netto</th>
+                                <th class="text-end" style="width: 8%">AOV Netto</th>
+                                <th class="text-end" style="width: 10%">AOV Pembayaran Pembeli</th>
+                                <th class="text-end" style="width: 7%">Margin Bersih</th>
+                                <th class="text-end" style="width: 8%">Laba Bersih</th>
+                                <th class="text-end" style="width: 6%">Biaya Iklan</th>
+                                <th class="text-end" style="width: 5%">ROAS</th>
                                 <th style="width: 11%">Status Data</th>
                             </tr>
                         </thead>
@@ -4227,6 +4238,9 @@
                                     $watchProductImage = trim((string) ($watchProduct->image_url ?? ''));
                                     $watchProductSku = trim((string) ($watchProduct->marketplace_sku ?? $watchProduct->sku ?? ''));
                                     $watchProductCode = trim((string) ($watchProduct->external_item_id ?? '')) ?: trim((string) ($watchProduct->sku ?? ''));
+                                    $watchOrders = (int) ($watchProduct->orders ?? 0);
+                                    $watchAovNetto = $watchOrders > 0 ? (float) ($watchProduct->net_sales ?? 0) / $watchOrders : null;
+                                    $watchAovBuyerPayment = $watchOrders > 0 ? (float) ($watchProduct->buyer_payment ?? 0) / $watchOrders : null;
                                     $watchNetMargin = $watchProduct->net_margin !== null ? (float) $watchProduct->net_margin : null;
                                     $watchNetProfit = $watchProduct->net_profit !== null ? (float) $watchProduct->net_profit : null;
                                     $watchMappingComplete = (bool) ($watchProduct->watchlist_mapping_complete ?? ((int) ($watchProduct->internal_item_id ?? 0) > 0));
@@ -4255,6 +4269,8 @@
                                     </td>
                                     <td><span class="sales-watchlist-badge {{ $watchTone }}">{{ implode(' · ', $watchRow['issues']) }}</span></td>
                                     <td class="text-end sales-watchlist-number">{{ $fmt($watchProduct->net_sales ?? 0) }}</td>
+                                    <td class="text-end sales-watchlist-number">{{ $watchAovNetto === null ? '—' : $fmt($watchAovNetto) }}</td>
+                                    <td class="text-end sales-watchlist-number">{{ $watchAovBuyerPayment === null ? '—' : $fmt($watchAovBuyerPayment) }}</td>
                                     <td class="text-end sales-watchlist-number">{{ $watchNetMargin === null ? '—' : $percentDisplay($watchNetMargin) }}</td>
                                     <td class="text-end sales-watchlist-number {{ ($watchNetProfit ?? 0) < 0 ? 'text-danger' : '' }}">{{ $watchNetProfit === null ? '—' : $fmt($watchNetProfit) }}</td>
                                     <td class="text-end sales-watchlist-number">{{ ($watchProduct->ad_spend_matched ?? false) ? $fmt($watchProduct->ad_spend ?? 0) : '—' }}</td>
