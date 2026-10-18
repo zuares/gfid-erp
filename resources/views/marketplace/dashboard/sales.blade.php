@@ -4177,7 +4177,7 @@
                 <div class="sales-watchlist-card sales-watchlist-metric-card">
                     <span class="sales-watchlist-icon"><i class="bi bi-bar-chart-line" aria-hidden="true"></i></span>
                     <span class="sales-watchlist-content">
-                        <span class="sales-watchlist-label">AOV Netto</span>
+                        <span class="sales-watchlist-label">AOV Penjualan Netto</span>
                         <span class="sales-watchlist-value">{{ $activeProductKpi['orders'] > 0 ? $fmt($activeProductKpi['aov_net_sales']) : '—' }}</span>
                         <span class="sales-watchlist-impact">Penjualan netto per order</span>
                     </span>
@@ -4220,7 +4220,7 @@
                                 <th style="width: 18%">Produk</th>
                                 <th style="width: 12%">Indikasi</th>
                                 <th class="text-end" style="width: 8%">Penjualan Netto</th>
-                                <th class="text-end" style="width: 8%">AOV Netto</th>
+                                <th class="text-end" style="width: 8%">AOV Penjualan Netto</th>
                                 <th class="text-end" style="width: 10%">AOV Pembayaran Pembeli</th>
                                 <th class="text-end" style="width: 7%">Margin Bersih</th>
                                 <th class="text-end" style="width: 8%">Laba Bersih</th>
