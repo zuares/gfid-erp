@@ -3849,6 +3849,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-product-copy { min-width:0; flex:1 1 auto; }
                 .traffic-product-title { min-width:0; }
                 .traffic-product-name { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.76rem !important; line-height:1.15; letter-spacing:-.01em; }
+                .traffic-product-category { display:block; max-width:100%; margin-top:.12rem; color:var(--dsh-muted,#64748b); font-size:.54rem; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
                 .traffic-product-id { margin-top:.12rem; color:var(--dsh-muted,#64748b); font-size:.52rem; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
                 .traffic-product-status-row { display:flex; align-items:center; gap:.3rem; min-width:0; margin-top:.16rem; }
                 .traffic-product-status-row .traffic-product-id { margin-top:0; }
@@ -4631,7 +4632,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         onclick="trafficToggleCategory(this)">
                                         <td>
                                             <div class="d-flex align-items-center gap-1 traffic-product-title"><i class="bi bi-chevron-right traffic-caret text-muted" style="font-size:.7rem;"></i><div class="fw-bold traffic-product-name">{{ $categoryRow['category'] }}</div></div>
-                                            <div class="traffic-product-status-row"><span class="traffic-status-chip traffic-product-status status-{{ $categoryRow['signal']['class'] }}" title="{{ $categoryRow['signal']['label'] }}: {{ $trafficSignalMeaning($categoryRow['signal']) }}" aria-label="{{ $categoryRow['signal']['label'] }}: {{ $trafficSignalMeaning($categoryRow['signal']) }}"><i class="bi {{ $categoryRow['signal']['icon'] }}"></i><span>{{ $trafficSignalShortLabel($categoryRow['signal']) }}</span></span><span class="text-muted" style="font-size:.58rem;">{{ number_format($categoryRow['campaigns'], 0, ',', '.') }} campaign</span></div>
+                                            <div class="traffic-product-status-row"><span class="traffic-status-chip traffic-product-status status-{{ $categoryRow['signal']['class'] }}" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-container="body" title="{{ $categoryRow['signal']['label'] }}: {{ $trafficSignalMeaning($categoryRow['signal']) }}" aria-label="{{ $categoryRow['signal']['label'] }}: {{ $trafficSignalMeaning($categoryRow['signal']) }}"><i class="bi {{ $categoryRow['signal']['icon'] }}"></i><span>{{ $trafficSignalShortLabel($categoryRow['signal']) }}</span></span><span class="text-muted" style="font-size:.58rem;">{{ number_format($categoryRow['campaigns'], 0, ',', '.') }} campaign</span></div>
                                             <div class="traffic-product-meta" title="Biaya iklan Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }} · Net profit {{ $categoryRow['net_profit'] === null ? 'belum tersedia' : 'Rp ' . number_format($categoryRow['net_profit'], 0, ',', '.') }} · COGS/unit {{ $categoryRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($categoryRow['cogs'], 0, ',', '.') }}">
                                                 <span>COGS/unit <b>{{ $categoryRow['cogs'] === null ? '—' : 'Rp ' . number_format($categoryRow['cogs'], 0, ',', '.') }}</b></span>
                                                 <span class="traffic-product-meta-spend">Iklan <b>Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</b></span>
@@ -4694,7 +4695,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                                                             @else
                                                                                 <span class="fw-bold traffic-product-name">{{ $campaignRow['name'] }}</span>
                                                                             @endif
-                                                                            <div class="traffic-product-status-row"><span class="traffic-status-chip traffic-product-status status-{{ $campaignRow['signal']['class'] }}" title="{{ $campaignRow['signal']['label'] }}: {{ $trafficSignalMeaning($campaignRow['signal']) }}" aria-label="{{ $campaignRow['signal']['label'] }}: {{ $trafficSignalMeaning($campaignRow['signal']) }}"><i class="bi {{ $campaignRow['signal']['icon'] }}"></i><span>{{ $trafficSignalShortLabel($campaignRow['signal']) }}</span></span><span class="traffic-product-id">ID: {{ $campaignRow['id'] }}</span></div>
+                                                                            <div class="traffic-product-category"><i class="bi bi-tag me-1" aria-hidden="true"></i>{{ $campaignRow['category'] }}</div>
+                                                                            <div class="traffic-product-status-row"><span class="traffic-status-chip traffic-product-status status-{{ $campaignRow['signal']['class'] }}" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-container="body" title="{{ $campaignRow['signal']['label'] }}: {{ $trafficSignalMeaning($campaignRow['signal']) }}" aria-label="{{ $campaignRow['signal']['label'] }}: {{ $trafficSignalMeaning($campaignRow['signal']) }}"><i class="bi {{ $campaignRow['signal']['icon'] }}"></i><span>{{ $trafficSignalShortLabel($campaignRow['signal']) }}</span></span><span class="traffic-product-id">ID: {{ $campaignRow['id'] }}</span></div>
                                                                             <div class="traffic-product-meta" title="Biaya iklan Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }} · Net profit {{ $campaignRow['net_profit'] === null ? 'belum tersedia' : 'Rp ' . number_format($campaignRow['net_profit'], 0, ',', '.') }} · COGS/unit {{ $campaignRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($campaignRow['cogs'], 0, ',', '.') }}">
                                                                                 <span>COGS/unit <b>{{ $campaignRow['cogs'] === null ? '—' : 'Rp ' . number_format($campaignRow['cogs'], 0, ',', '.') }}</b></span>
                                                                                 <span class="traffic-product-meta-spend">Iklan <b>Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }}</b></span>
@@ -4755,7 +4757,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     @else
                                                         <span class="fw-bold traffic-product-name">{{ $trafficRow['name'] }}</span>
                                                     @endif
-                                                        <div class="traffic-product-status-row"><span class="traffic-status-chip traffic-product-status status-{{ $trafficRow['signal']['class'] }}" title="{{ $trafficRow['signal']['label'] }}: {{ $trafficSignalMeaning($trafficRow['signal']) }}" aria-label="{{ $trafficRow['signal']['label'] }}: {{ $trafficSignalMeaning($trafficRow['signal']) }}"><i class="bi {{ $trafficRow['signal']['icon'] }}"></i><span>{{ $trafficSignalShortLabel($trafficRow['signal']) }}</span></span><span class="traffic-product-id">ID: {{ $trafficRow['id'] }}</span></div>
+                                                        <div class="traffic-product-category"><i class="bi bi-tag me-1" aria-hidden="true"></i>{{ $trafficRow['category'] }}</div>
+                                                        <div class="traffic-product-status-row"><span class="traffic-status-chip traffic-product-status status-{{ $trafficRow['signal']['class'] }}" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-container="body" title="{{ $trafficRow['signal']['label'] }}: {{ $trafficSignalMeaning($trafficRow['signal']) }}" aria-label="{{ $trafficRow['signal']['label'] }}: {{ $trafficSignalMeaning($trafficRow['signal']) }}"><i class="bi {{ $trafficRow['signal']['icon'] }}"></i><span>{{ $trafficSignalShortLabel($trafficRow['signal']) }}</span></span><span class="traffic-product-id">ID: {{ $trafficRow['id'] }}</span></div>
                                                     <div class="traffic-product-meta" title="Biaya iklan Rp {{ number_format($trafficRow['spend'], 0, ',', '.') }} · Net profit {{ $trafficRow['net_profit'] === null ? 'belum tersedia' : 'Rp ' . number_format($trafficRow['net_profit'], 0, ',', '.') }} · COGS/unit {{ $trafficRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($trafficRow['cogs'], 0, ',', '.') }}">
                                                         <span>COGS/unit <b>{{ $trafficRow['cogs'] === null ? '—' : 'Rp ' . number_format($trafficRow['cogs'], 0, ',', '.') }}</b></span>
                                                         <span class="traffic-product-meta-spend">Iklan <b>Rp {{ number_format($trafficRow['spend'], 0, ',', '.') }}</b></span>
@@ -4788,6 +4791,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
         </div>
+
+        <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (!window.bootstrap?.Tooltip) return;
+            document.querySelectorAll('#trafficTable [data-bs-toggle="tooltip"]').forEach(function (element) {
+                window.bootstrap.Tooltip.getOrCreateInstance(element, {
+                    container: 'body',
+                    boundary: 'viewport',
+                    placement: 'top',
+                });
+            });
+        });
+        </script>
 
         <!-- TAB PROFITABILITAS -->
         <div class="tab-pane" id="tab-profit">
