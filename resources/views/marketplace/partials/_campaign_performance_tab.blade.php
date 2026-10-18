@@ -157,6 +157,10 @@
         $performanceViews = $isGmvMax
             ? ['all', 'category', 'gms']
             : array_values(array_unique(array_merge(['all', 'category', 'roas'], $isUnmapped ? ['unmapped'] : [])));
+        if (filled($camp->marketplace_category_id)) {
+            $performanceViews[] = 'marketplace_category';
+        }
+        $performanceViews = array_values(array_unique($performanceViews));
 
         $perfRows->push([
             'id' => $camp->channel_campaign_id,
@@ -167,6 +171,7 @@
             'name' => $camp->campaign_name,
             'type' => $camp->ad_type,
             'performance_views' => $performanceViews,
+            'marketplace_category_id' => $camp->marketplace_category_id ?? null,
             'category' => $isGmvMax ? 'GMV Max Auto' : ($camp->item_category ?? $camp->internalItem?->category?->name ?? 'Belum termapping'),
             'status' => $camp->campaign_status,
             'spend' => $spend,
@@ -323,6 +328,7 @@
     $perfSegmentCounts = [
         'all' => $perfRows->count(),
         'category' => $perfCategoryRows->count(),
+        'marketplace_category' => $perfRows->filter(fn ($row) => in_array('marketplace_category', $row['performance_views'] ?? [], true))->count(),
         'roas' => $perfRows->filter(fn ($row) => in_array('roas', $row['performance_views'] ?? [], true))->count(),
         'gms' => $perfRows->filter(fn ($row) => in_array('gms', $row['performance_views'] ?? [], true))->count(),
         'unmapped' => $perfRows->filter(fn ($row) => in_array('unmapped', $row['performance_views'] ?? [], true))->count(),
@@ -333,6 +339,7 @@
     $perfSegmentRows = [
         'all' => $perfRows->filter(fn ($row) => in_array('all', $row['performance_views'] ?? [], true)),
         'category' => $perfRows->filter(fn ($row) => in_array('category', $row['performance_views'] ?? [], true)),
+        'marketplace_category' => $perfRows->filter(fn ($row) => in_array('marketplace_category', $row['performance_views'] ?? [], true)),
         'roas' => $perfRows->filter(fn ($row) => in_array('roas', $row['performance_views'] ?? [], true)),
         'gms' => $perfRows->filter(fn ($row) => in_array('gms', $row['performance_views'] ?? [], true)),
         'unmapped' => $perfRows->filter(fn ($row) => in_array('unmapped', $row['performance_views'] ?? [], true)),
@@ -1133,7 +1140,7 @@
         <div class="dpanel p-3">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-graph-up text-primary me-2"></i>Biaya Iklan vs Net Profit Terhitung</h6>
-                <span id="campaignScatterHint" class="badge bg-light text-dark border">Subtab: Semua Campaign</span>
+                <span id="campaignScatterHint" class="badge bg-light text-dark border">Subtab: Semua Kampanye</span>
             </div>
             <div style="height: 300px; position: relative;">
                 <canvas id="campaignScatterChart"></canvas>
@@ -1148,7 +1155,7 @@
         <div class="perf-panel-title">
             <span class="perf-panel-title-icon"><i class="bi bi-bar-chart-line-fill"></i></span>
             <div>
-                <h6 class="mb-0 fw-bold">Tabel Performa Campaign</h6>
+                <h6 class="mb-0 fw-bold">Tabel Performa Kampanye</h6>
                 <div class="perf-panel-subtitle">Pantau efisiensi, hasil penjualan, dan funnel campaign dalam satu tampilan operasional.</div>
             </div>
         </div>
@@ -1167,16 +1174,17 @@
         <i class="bi bi-info-circle me-1"></i> Klik baris untuk lihat detail performa.
     </div>
     <div style="display:flex; gap:.35rem; margin:.75rem .75rem .75rem; overflow-x:auto;" role="tablist" aria-label="Jenis tampilan performa">
-        <button type="button" id="btnPerformanceAll" class="btn fw-bold" onclick="__campaignPerformanceView('all')" data-perf-count="{{ $perfSegmentCounts['all'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Semua Campaign</button>
-        <button type="button" id="btnPerformanceCategory" class="btn fw-bold" onclick="__campaignPerformanceView('category')" data-perf-count="{{ $perfSegmentCounts['category'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Per Kategori</button>
-        <button type="button" id="btnPerformanceRoas" class="btn fw-bold" onclick="__campaignPerformanceView('roas')" data-perf-count="{{ $perfSegmentCounts['roas'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max ROAS</button>
-        <button type="button" id="btnPerformanceGms" class="btn fw-bold" onclick="__campaignPerformanceView('gms')" data-perf-count="{{ $perfSegmentCounts['gms'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">GMV Max Auto</button>
-        <button type="button" id="btnPerformanceUnmapped" class="btn fw-bold" onclick="__campaignPerformanceView('unmapped')" data-perf-count="{{ $perfSegmentCounts['unmapped'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;">Produk Bermasalah</button>
+        <button type="button" id="btnPerformanceAll" class="btn fw-bold" onclick="__campaignPerformanceView('all')" data-perf-count="{{ $perfSegmentCounts['all'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;"><i class="bi bi-grid-1x2 me-1" aria-hidden="true"></i>Semua Kampanye</button>
+        <button type="button" id="btnPerformanceCategory" class="btn fw-bold" onclick="__campaignPerformanceView('category')" data-perf-count="{{ $perfSegmentCounts['category'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;"><i class="bi bi-bar-chart-steps me-1" aria-hidden="true"></i>Performa Kategori</button>
+        <button type="button" id="btnPerformanceMarketplaceCategory" class="btn fw-bold" onclick="__campaignPerformanceView('marketplace_category')" data-perf-count="{{ $perfSegmentCounts['marketplace_category'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;"><i class="bi bi-tags me-1" aria-hidden="true"></i>Kategori Marketplace</button>
+        <button type="button" id="btnPerformanceRoas" class="btn fw-bold" onclick="__campaignPerformanceView('roas')" data-perf-count="{{ $perfSegmentCounts['roas'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;"><i class="bi bi-bullseye me-1" aria-hidden="true"></i>Target ROAS</button>
+        <button type="button" id="btnPerformanceGms" class="btn fw-bold" onclick="__campaignPerformanceView('gms')" data-perf-count="{{ $perfSegmentCounts['gms'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;"><i class="bi bi-lightning-charge me-1" aria-hidden="true"></i>Kampanye Otomatis</button>
+        <button type="button" id="btnPerformanceUnmapped" class="btn fw-bold" onclick="__campaignPerformanceView('unmapped')" data-perf-count="{{ $perfSegmentCounts['unmapped'] }}" aria-selected="false" style="border-radius:999px; font-size:.72rem; padding:.38rem .95rem; color:var(--dsh-muted); border:1px solid var(--dsh-border); background:transparent; white-space:nowrap;"><i class="bi bi-exclamation-circle me-1" aria-hidden="true"></i>Perlu Tinjauan</button>
     </div>
     <div class="px-3 pb-2" id="campaignPerformanceSubtabKpis">
         <div class="ads-kpi-grid mb-2">
             <div class="dpanel ads-kpi perf-kpi-card kpi-signal">
-                <div class="ads-kpi-label"><i class="bi bi-megaphone" aria-hidden="true"></i> Campaign</div>
+                <div class="ads-kpi-label"><i class="bi bi-megaphone" aria-hidden="true"></i> Kampanye</div>
                 <div class="ads-kpi-value perf-kpi-value-split"><span data-perf-kpi-value="campaigns">{{ number_format($perfInitialKpi['campaigns'], 0, ',', '.') }}</span><span class="perf-kpi-inline-meta"><span>Set ROAS</span><b data-perf-kpi-value="set_roas">{{ $perfInitialKpi['set_roas'] === null ? '—' : number_format($perfInitialKpi['set_roas'], 2, ',', '.') . 'x' }}</b></span></div>
                 <div class="ads-kpi-sub"><span><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i><span data-perf-kpi-value="losses">{{ number_format($perfInitialKpi['losses'], 0, ',', '.') }}</span> rugi</span></div>
                 <div class="perf-kpi-compare"><span class="perf-kpi-compare-label">Status</span><span>berdasarkan target ROAS</span></div>
@@ -1227,7 +1235,7 @@
             </colgroup>
             <thead class="table-light">
                 <tr>
-                    <th rowspan="2">Kategori / Campaign</th>
+                    <th rowspan="2">Kategori / Kampanye</th>
                     <th rowspan="2" class="text-center" data-bs-toggle="tooltip" title="Rekomendasi berdasarkan ROAS aktual vs Target ROAS">Sinyal</th>
                     <th colspan="1" class="text-center perf-table-group-title">Efisiensi</th>
                     <th colspan="4" class="text-center perf-table-group-title">Hasil</th>
@@ -2540,6 +2548,7 @@ window.__campaignPerformanceView = function(view) {
     const buttons = {
         all: document.getElementById('btnPerformanceAll'),
         category: document.getElementById('btnPerformanceCategory'),
+        marketplace_category: document.getElementById('btnPerformanceMarketplaceCategory'),
         roas: document.getElementById('btnPerformanceRoas'),
         gms: document.getElementById('btnPerformanceGms'),
         unmapped: document.getElementById('btnPerformanceUnmapped'),
@@ -2598,7 +2607,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (categoryButton) {
         let savedView = null;
         try { savedView = localStorage.getItem('adsPerformanceView'); } catch (e) {}
-        const validViews = ['all', 'category', 'roas', 'gms', 'unmapped'];
+        const validViews = ['all', 'category', 'marketplace_category', 'roas', 'gms', 'unmapped'];
         const initialView = validViews.includes(savedView) ? savedView : 'all';
         window.__campaignPerformanceView(initialView);
     }
@@ -2670,11 +2679,12 @@ function perfRenderScatter(segment) {
     if (!campaignScatterChart) return;
 
     const viewLabels = {
-        all: 'Semua Campaign',
-        category: 'Per Kategori',
-        roas: 'GMV Max ROAS',
-        gms: 'GMV Max Auto',
-        unmapped: 'Produk Bermasalah',
+        all: 'Semua Kampanye',
+        category: 'Performa Kategori',
+        marketplace_category: 'Kategori Marketplace',
+        roas: 'Target ROAS',
+        gms: 'Kampanye Otomatis',
+        unmapped: 'Perlu Tinjauan',
     };
     const visibleData = campaignScatterData.filter(function(data) {
         return Array.isArray(data.views) && data.views.includes(segment);
@@ -2693,6 +2703,6 @@ function perfRenderScatter(segment) {
     campaignScatterChart.update('none');
 
     const hint = document.getElementById('campaignScatterHint');
-    if (hint) hint.textContent = 'Subtab: ' + (viewLabels[segment] || 'Semua Campaign');
+    if (hint) hint.textContent = 'Subtab: ' + (viewLabels[segment] || 'Semua Kampanye');
 }
 </script>
