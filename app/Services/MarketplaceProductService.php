@@ -578,9 +578,9 @@ class MarketplaceProductService
      * get_item_base_info hanya mengembalikan category_id, sehingga nama dan
      * breadcrumb perlu dicocokkan dengan tree get_category.
      */
-    public function getCategoryInfo(MarketplaceProduct $product): array
+    public function getCategoryInfo(MarketplaceProduct $product, ?int $categoryId = null): array
     {
-        $categoryId = (int) ($product->category_id ?? 0);
+        $categoryId = (int) ($categoryId ?: ($product->category_id ?? 0));
         if ($categoryId <= 0) {
             return [
                 'category_id' => null,

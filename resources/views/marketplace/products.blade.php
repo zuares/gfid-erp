@@ -149,6 +149,13 @@
     .prd-edit-section{ border:1px solid var(--prd-border); border-radius:12px; padding:.8rem; margin-bottom:.75rem; background:rgba(148,163,184,.035); }
     .prd-edit-section-title{ font-size:.78rem; font-weight:800; margin-bottom:.6rem; color:var(--prd-accent); }
     .prd-edit-meta{ font-size:.7rem; color:var(--prd-muted); }
+    .prd-detail-metrics{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.45rem; margin:.7rem 0 .8rem; }
+    .prd-detail-metric{ min-width:0; padding:.55rem .65rem; border:1px solid var(--prd-border); border-radius:10px; background:var(--card,#fff); }
+    .prd-detail-metric-label{ color:#94a3b8; font-size:.59rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+    .prd-detail-metric-value{ margin-top:.16rem; color:var(--prd-accent); font-size:.8rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .prd-detail-metric-note{ margin-top:.12rem; color:#94a3b8; font-size:.61rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    body[data-theme="dark"] .prd-detail-metric{ background:rgba(15,23,42,.55); }
+    body[data-theme="dark"] .prd-detail-metric-value{ color:#e2e8f0; }
     .prd-category-card{ display:flex; align-items:center; gap:.7rem; min-height:58px; padding:.65rem .75rem; border:1px solid var(--prd-border); border-radius:11px; background:var(--card,#fff); }
     .prd-category-icon{ width:34px; height:34px; display:grid; place-items:center; flex:none; border-radius:9px; background:rgba(37,99,235,.1); color:#2563eb; }
     .prd-category-copy{ min-width:0; flex:1; }
@@ -855,7 +862,7 @@
             return;
         }
         try {
-            const result = await api(`${API}/${productId}/category-info`);
+            const result = await api(`${API}/${productId}/category-info?category_id=${encodeURIComponent(categoryId)}`);
             const path = result.category_path || [];
             const attributeCount = Number(result.attribute_count || 0);
             const requiredCount = Number(result.required_attribute_count || 0);
@@ -869,6 +876,22 @@
             nameTarget.textContent = 'Nama kategori belum tersedia';
             pathTarget.innerHTML = '<span>Breadcrumb kategori gagal dimuat</span>';
             metaTarget.textContent = `ID kategori ${categoryId} · Gagal memuat nama kategori`;
+        }
+    }
+
+    async function loadProductEditorMetrics(productId) {
+        const target = $('productEditorMetrics');
+        if (!target) return;
+        target.innerHTML = '<div class="prd-detail-metric"><div class="prd-detail-metric-label">Order</div><div class="prd-detail-metric-value">Memuat…</div></div><div class="prd-detail-metric"><div class="prd-detail-metric-label">AOV</div><div class="prd-detail-metric-value">Memuat…</div></div><div class="prd-detail-metric"><div class="prd-detail-metric-label">GMV</div><div class="prd-detail-metric-value">Memuat…</div></div>';
+        try {
+            const result = await api(`${API}/${productId}/orders?limit=200`);
+            const summary = result.summary || {};
+            const orders = Number(summary.orders ?? result.total ?? 0);
+            const aov = Number(summary.aov ?? 0);
+            const gmv = Number(summary.gmv ?? 0);
+            target.innerHTML = `<div class="prd-detail-metric"><div class="prd-detail-metric-label">Order</div><div class="prd-detail-metric-value">${orders.toLocaleString('id-ID')}</div><div class="prd-detail-metric-note">transaksi tervalidasi</div></div><div class="prd-detail-metric"><div class="prd-detail-metric-label">AOV</div><div class="prd-detail-metric-value">${rp(aov)}</div><div class="prd-detail-metric-note">rata-rata nilai order</div></div><div class="prd-detail-metric"><div class="prd-detail-metric-label">GMV</div><div class="prd-detail-metric-value">${rp(gmv)}</div><div class="prd-detail-metric-note">nilai produk terjual</div></div>`;
+        } catch (error) {
+            target.innerHTML = '<div class="prd-detail-metric" style="grid-column:1/-1"><div class="prd-detail-metric-note text-danger">Metrik penjualan belum dapat dimuat.</div></div>';
         }
     }
 
@@ -1209,6 +1232,7 @@
                     <div class="col-md-4 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">STATUS LISTING</label><input class="form-control form-control-sm prd-edit-readonly" value="${esc(product.item_status || '—')}" readonly></div>
                     <div class="col-md-8 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">KATEGORI MARKETPLACE</label><div class="prd-category-card"><span class="prd-category-icon"><i class="bi bi-diagram-3"></i></span><span class="prd-category-copy"><span class="prd-category-label">Shopee</span><span class="prd-category-name" id="productEditorCategoryName">Memuat nama kategori…</span><span class="prd-category-path" id="productEditorCategoryPath"><span>Menyiapkan breadcrumb kategori…</span></span><span class="prd-category-meta" id="productEditorCategoryMeta">ID kategori ${esc(product.category_id || '—')}</span></span><span class="prd-category-badge">READ ONLY</span></div></div>
                 </div>
+                <div class="prd-detail-metrics" id="productEditorMetrics" aria-live="polite"></div>
                 <label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">DESKRIPSI</label>
                 <textarea class="form-control form-control-sm" id="editorDescription" rows="5" maxlength="3000">${esc(product.description || '')}</textarea>
             </div>
@@ -1250,6 +1274,7 @@
 
         renderProductEditorGallery();
         loadProductCategoryLabel(product.local_id, product.category_id);
+        loadProductEditorMetrics(product.local_id);
         loadProductEditorLogs();
         $('productEditorSaveBtn').disabled = false;
         $('productEditorSaveStatus').textContent = 'Perubahan belum disimpan.';

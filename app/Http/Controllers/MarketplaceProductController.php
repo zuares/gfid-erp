@@ -172,10 +172,11 @@ class MarketplaceProductController extends Controller
         }
     }
 
-    public function categoryInfo(MarketplaceProduct $product)
+    public function categoryInfo(Request $request, MarketplaceProduct $product)
     {
         try {
-            $data = $this->products->getCategoryInfo($product);
+            $categoryId = $request->integer('category_id') ?: null;
+            $data = $this->products->getCategoryInfo($product, $categoryId);
 
             if (! empty($data['error'])) {
                 return response()->json([
@@ -904,6 +905,14 @@ class MarketplaceProductController extends Controller
                 'sku' => $product->item_sku,
             ],
             'total' => $orders->count(),
+            'summary' => [
+                'orders' => $orders->count(),
+                'gmv' => round((float) $orders->sum('line_total'), 2),
+                'buyer_payment' => round((float) $orders->sum('buyer_payment'), 2),
+                'aov' => $orders->count() > 0
+                    ? round((float) $orders->sum('buyer_payment') / $orders->count(), 2)
+                    : 0,
+            ],
             'orders' => $orders,
         ]);
     }
