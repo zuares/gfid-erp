@@ -976,7 +976,7 @@
     .sales-dashboard .sales-product-analysis-detail-table td { font-size: .67rem; }
     .sales-dashboard .sales-product-analysis-detail-title { display: block; max-width: 220px; overflow: hidden; color: var(--sales-ink); font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
     .sales-dashboard .sales-product-analysis-detail-code { display: inline-block; max-width: 150px; overflow: hidden; padding: .18rem .35rem; border: 1px solid color-mix(in srgb, var(--sales-line) 90%, transparent); border-radius: 5px; background: var(--sales-card); color: var(--sales-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .58rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
-    .sales-dashboard .sales-income-table { min-width: 1240px; }
+    .sales-dashboard .sales-income-table { min-width: 1480px; }
     .sales-dashboard .sales-income-table th,
     .sales-dashboard .sales-income-table td { white-space: nowrap; }
     .sales-dashboard .sales-income-table thead tr:first-child th {
@@ -3167,6 +3167,8 @@
                                 <th class="text-end income-group-start" colspan="3">Belum Cair</th>
                                 <th class="text-end income-group-start pe-3" colspan="2">Dana Cair</th>
                                 <th class="text-end income-group-start" colspan="2">Profitabilitas · Sudah Cair</th>
+                                <th class="text-end income-group-start" colspan="2">Pengembalian Dana</th>
+                                <th class="text-end income-group-start">Pengiriman Gagal</th>
                             </tr>
                             <tr>
                                 <th class="text-end">Qty</th>
@@ -3182,6 +3184,9 @@
                                 <th class="text-end pe-3">%</th>
                                 <th class="text-end income-group-start">COGS / HPP</th>
                                 <th class="text-end">Gross Profit</th>
+                                <th class="text-end income-group-start">Order</th>
+                                <th class="text-end">Nilai</th>
+                                <th class="text-end income-group-start">Order</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -3202,6 +3207,9 @@
                                     <td class="text-end pe-3 income-percent">{{ $pct($income->final_income, $incomeSummary['final_income']) }}%</td>
                                     <td class="text-end income-group-start income-value">{{ $fmt($income->cogs) }}</td>
                                     <td class="text-end income-value">{{ $fmt($income->gross_profit) }}</td>
+                                    <td class="text-end income-group-start income-value">{{ number_format($income->refund_orders) }}</td>
+                                    <td class="text-end income-value">{{ $fmt($income->refund_amount) }}</td>
+                                    <td class="text-end income-group-start income-value">{{ number_format($income->failed_shipping_orders) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>

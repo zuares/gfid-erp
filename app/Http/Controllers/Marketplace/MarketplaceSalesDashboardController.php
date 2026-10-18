@@ -1040,6 +1040,8 @@ class MarketplaceSalesDashboardController extends Controller
             ? ((float) $paymentDaily->sum('cod_amount') / $paymentSummary['buyer_paid']) * 100
             : 0;
 
+        $incomeFailedShippingStatusesSql = "'".implode("', '", self::SHIPPING_FAILED_STATUSES)."'";
+        $incomeFailedShippingCondition = "COALESCE(o.delivery_failed, 0) = 1 OR UPPER(COALESCE(NULLIF(o.tracking_status, ''), NULLIF(o.order_status, ''), NULLIF(o.status, ''), '')) IN ({$incomeFailedShippingStatusesSql})";
         $incomePaymentExpression = 'COALESCE(NULLIF(income_ms.buyer_payment_amount, 0), NULLIF(o.total_paid_customer, 0), NULLIF(o.total_amount, 0), NULLIF(o.subtotal_items, 0), 0)';
         $incomeBase = (clone $base)
             ->leftJoin('marketplace_order_settlements as income_ms', 'income_ms.order_id', '=', 'o.id');
@@ -1052,6 +1054,9 @@ class MarketplaceSalesDashboardController extends Controller
             ->selectRaw("COALESCE(SUM(CASE WHEN income_ms.settlement_time IS NOT NULL THEN ({$incomePaymentExpression}) ELSE 0 END), 0) as settled_buyer_paid")
             ->selectRaw("COALESCE(SUM(CASE WHEN income_ms.settlement_time IS NULL THEN ({$incomePaymentExpression}) ELSE 0 END), 0) as pending_buyer_paid")
             ->selectRaw('COALESCE(SUM(CASE WHEN income_ms.settlement_time IS NOT NULL THEN COALESCE(income_ms.final_income, 0) ELSE 0 END), 0) as final_income')
+            ->selectRaw('COUNT(DISTINCT CASE WHEN income_ms.settlement_time IS NOT NULL AND ABS(COALESCE(income_ms.drc_adjustable_refund, 0)) > 0 THEN o.id END) as refund_orders')
+            ->selectRaw('COALESCE(SUM(CASE WHEN income_ms.settlement_time IS NOT NULL THEN ABS(COALESCE(income_ms.drc_adjustable_refund, 0)) ELSE 0 END), 0) as refund_amount')
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$incomeFailedShippingCondition} THEN o.id END) as failed_shipping_orders")
             ->groupByRaw("DATE({$dateExpression})")
             ->orderByDesc('day')
             ->get()
@@ -1063,6 +1068,9 @@ class MarketplaceSalesDashboardController extends Controller
                 $row->settled_buyer_paid = (float) $row->settled_buyer_paid;
                 $row->pending_buyer_paid = (float) $row->pending_buyer_paid;
                 $row->final_income = (float) $row->final_income;
+                $row->refund_orders = (int) $row->refund_orders;
+                $row->refund_amount = (float) $row->refund_amount;
+                $row->failed_shipping_orders = (int) $row->failed_shipping_orders;
                 $row->cogs = (float) $settledCogsByDay->get((string) $row->day, 0);
                 $row->gross_profit = $row->final_income - $row->cogs;
 
@@ -1076,6 +1084,9 @@ class MarketplaceSalesDashboardController extends Controller
             'settled_buyer_paid' => (float) $incomeDaily->sum('settled_buyer_paid'),
             'pending_buyer_paid' => (float) $incomeDaily->sum('pending_buyer_paid'),
             'final_income' => (float) $incomeDaily->sum('final_income'),
+            'refund_orders' => (int) $incomeDaily->sum('refund_orders'),
+            'refund_amount' => (float) $incomeDaily->sum('refund_amount'),
+            'failed_shipping_orders' => (int) $incomeDaily->sum('failed_shipping_orders'),
             'cogs' => (float) $incomeDaily->sum('cogs'),
             'gross_profit' => (float) $incomeDaily->sum('gross_profit'),
         ];
