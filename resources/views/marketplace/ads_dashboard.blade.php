@@ -4077,10 +4077,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     display:none !important;
                 }
                 .ads-dashboard[data-traffic-view="roas"] .traffic-product-meta-summary {
-                    grid-template-columns:repeat(2,minmax(0,1fr));
+                    grid-template-columns:repeat(3,minmax(0,1fr));
+                    gap:.16rem .3rem;
                 }
                 .ads-dashboard[data-traffic-view="roas"] .traffic-product-meta-roas-only {
                     display:flex !important;
+                    flex-direction:column;
+                    align-items:flex-start;
+                    justify-content:center;
+                    min-width:0;
+                    gap:.02rem;
+                    padding:.1rem .16rem;
+                    border:1px solid rgba(148,163,184,.2);
+                    border-radius:4px;
+                    background:rgba(248,250,252,.62);
+                    font-size:.47rem;
+                    line-height:1.05;
+                    letter-spacing:-.01em;
+                    white-space:nowrap;
+                }
+                .ads-dashboard[data-traffic-view="roas"] .traffic-product-meta-roas-only b {
+                    min-width:0;
+                    max-width:100%;
+                    overflow:hidden;
+                    text-overflow:clip;
+                    font-size:.52rem;
+                    line-height:1.1;
+                    letter-spacing:-.025em;
+                    text-align:left;
                 }
                 .ads-dashboard[data-traffic-view="roas"] .traffic-product-meta-summary .traffic-product-meta-profit {
                     grid-column:1 / -1;
