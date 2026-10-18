@@ -698,7 +698,21 @@
     .perf-marketplace-category span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
     .perf-marketplace-category-group-row { cursor:pointer; background:rgba(239,246,255,.72); }
     .perf-marketplace-category-group-row:hover { background:rgba(219,234,254,.78); }
-    .perf-marketplace-category-group-row td { padding:.55rem .75rem !important; border-top:1px solid var(--dsh-border); border-bottom:1px solid var(--dsh-border); }
+    .perf-marketplace-category-group-row td { padding:.42rem .35rem !important; border-top:1px solid var(--dsh-border); border-bottom:1px solid var(--dsh-border); vertical-align:middle; }
+    .perf-marketplace-category-group-row > td:first-child { position:sticky; left:0; z-index:3; background:#eff6ff; box-shadow:1px 0 0 var(--dsh-border, #e2e8f0); }
+    .perf-marketplace-category-group-row > td:nth-child(3) { background:rgba(37,99,235,.055); }
+    .perf-marketplace-category-group-row > td:nth-child(5) { background:rgba(22,163,74,.055); }
+    .perf-marketplace-category-group-row > td:nth-child(7) { background:rgba(245,158,11,.055); }
+    .perf-marketplace-category-group-row .perf-cell { min-width:96px; line-height:1.25; }
+    .perf-marketplace-category-group-row .perf-cell .perf-main { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:.12rem; min-height:1.45rem; }
+    .perf-marketplace-category-group-row .perf-cell .perf-val { font-size:.73rem; font-weight:750; font-variant-numeric:tabular-nums; }
+    .perf-marketplace-category-group-row .perf-cell .perf-sub { display:inline-block; margin-top:.18rem; padding:.16rem .35rem; border-radius:5px; background:rgba(148,163,184,.1); font-size:.6rem; font-weight:650; white-space:nowrap; }
+    .perf-marketplace-category-group-row .perf-cell .perf-previous { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:.12rem .2rem; margin-top:.3rem; padding-top:.25rem; border-top:1px dashed rgba(148,163,184,.35); font-size:.52rem; line-height:1.2; white-space:normal; text-align:right; }
+    .perf-marketplace-category-group-row .perf-delta { display:inline-flex; align-items:center; padding:.16rem .27rem; font-size:.56rem; }
+    body[data-theme="dark"] .perf-marketplace-category-group-row > td:first-child { background:#172554; }
+    body[data-theme="dark"] .perf-marketplace-category-group-row > td:nth-child(3) { background:rgba(37,99,235,.12); }
+    body[data-theme="dark"] .perf-marketplace-category-group-row > td:nth-child(5) { background:rgba(22,163,74,.1); }
+    body[data-theme="dark"] .perf-marketplace-category-group-row > td:nth-child(7) { background:rgba(245,158,11,.1); }
     .perf-marketplace-category-group-copy { display:flex; align-items:center; gap:.45rem; min-width:0; }
     .perf-marketplace-category-group-copy i { color:#2563eb; font-size:.72rem; transition:transform .16s ease; }
     .perf-marketplace-category-group-row.is-open .perf-marketplace-category-group-copy i { transform:rotate(90deg); }
@@ -1400,7 +1414,7 @@
                     @php
                         $meetsTarget = $row['target_roas'] !== null && $row['roas'] >= $row['target_roas'];
                     @endphp
-                    <tr class="perf-row" data-perf-views="{{ implode(' ', $row['performance_views'] ?? []) }}" data-perf-name="{{ strtolower(($row['name'] ?? '') . ' ' . ($row['item_name'] ?? '')) }}" data-perf-status="{{ strtolower((string) ($row['status'] ?? '')) }}" data-perf-reco="{{ strtolower($row['reco']) }}" data-perf-profit="{{ $row['profit'] ?? 0 }}" data-perf-profit-available="{{ $row['profit_available'] ? '1' : '0' }}" data-perf-roas="{{ $row['roas'] }}" data-perf-gmv="{{ $row['gmv'] }}" data-perf-spend="{{ $row['spend'] }}" data-perf-orders="{{ $row['orders'] }}" data-perf-ctr="{{ $row['ctr'] }}" data-perf-cvr="{{ $row['cvr'] }}" data-perf-marketplace-category-id="{{ $row['marketplace_category_id'] ?? '' }}" data-perf-marketplace-category-label="Kategori marketplace #{{ $row['marketplace_category_id'] ?? '' }}" data-perf-hourly-store-id="{{ e((string) $row['store_id']) }}" data-perf-hourly-campaign-id="{{ e((string) $row['campaign_id']) }}" data-perf-hourly-name="{{ e((string) ($row['name'] ?? 'Campaign')) }}" onclick="perfToggle(this)">
+                    <tr class="perf-row" data-perf-views="{{ implode(' ', $row['performance_views'] ?? []) }}" data-perf-name="{{ strtolower(($row['name'] ?? '') . ' ' . ($row['item_name'] ?? '')) }}" data-perf-status="{{ strtolower((string) ($row['status'] ?? '')) }}" data-perf-reco="{{ strtolower($row['reco']) }}" data-perf-profit="{{ $row['profit'] ?? 0 }}" data-perf-profit-available="{{ $row['profit_available'] ? '1' : '0' }}" data-perf-roas="{{ $row['roas'] }}" data-perf-gmv="{{ $row['gmv'] }}" data-perf-spend="{{ $row['spend'] }}" data-perf-orders="{{ $row['orders'] }}" data-perf-items-sold="{{ $row['items_sold'] }}" data-perf-total-hpp="{{ $row['total_hpp'] }}" data-perf-prev-total-hpp="{{ $row['prev_total_hpp'] }}" data-perf-prev-roas="{{ $row['prev_roas'] }}" data-perf-prev-gmv="{{ $row['prev_gmv'] }}" data-perf-prev-spend="{{ $row['prev_spend'] }}" data-perf-prev-orders="{{ $row['prev_orders'] }}" data-perf-prev-items-sold="{{ $row['prev_items_sold'] }}" data-perf-prev-profit="{{ $row['prev_profit'] ?? 0 }}" data-perf-configured-roas="{{ $row['configured_roas'] ?? '' }}" data-perf-ctr="{{ $row['ctr'] }}" data-perf-cvr="{{ $row['cvr'] }}" data-perf-marketplace-category-id="{{ $row['marketplace_category_id'] ?? '' }}" data-perf-marketplace-category-label="Kategori marketplace #{{ $row['marketplace_category_id'] ?? '' }}" data-perf-hourly-store-id="{{ e((string) $row['store_id']) }}" data-perf-hourly-campaign-id="{{ e((string) $row['campaign_id']) }}" data-perf-hourly-name="{{ e((string) ($row['name'] ?? 'Campaign')) }}" onclick="perfToggle(this)">
                         {{-- Campaign / Item --}}
                         <td>
                             <div class="d-flex align-items-start gap-1">
@@ -2281,12 +2295,155 @@ function perfMainTable() {
         .find(table => table.querySelector('tbody tr.perf-row')) || null;
 }
 
+function perfMarketplaceNumber(value, decimals = 0) {
+    return Number(value || 0).toLocaleString('id-ID', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+    });
+}
+
+function perfMarketplaceCurrency(value) {
+    return 'Rp ' + perfMarketplaceNumber(value, 0);
+}
+
+function perfMarketplaceDelta(current, previous, direction = true) {
+    const cur = Number(current || 0);
+    const prev = Number(previous || 0);
+    if (!prev) return '<span class="text-muted perf-delta">—</span>';
+    const change = ((cur - prev) / Math.abs(prev)) * 100;
+    const up = change >= 0;
+    const good = direction === null ? false : direction ? up : !up;
+    const className = direction === null || Math.abs(change) < 0.5
+        ? 'text-muted'
+        : good ? 'text-success' : 'text-danger';
+    return '<span class="' + className + ' perf-delta">' + (up ? '▲' : '▼') + ' ' + Math.abs(change).toFixed(0) + '%</span>';
+}
+
+function perfAggregateMarketplaceGroup(members) {
+    const sum = function(key) {
+        return members.reduce((total, row) => total + Number(row.dataset[key] || 0), 0);
+    };
+    const spend = sum('perfSpend');
+    const gmv = sum('perfGmv');
+    const orders = sum('perfOrders');
+    const itemsSold = sum('perfItemsSold');
+    const totalHpp = sum('perfTotalHpp');
+    const prevSpend = sum('perfPrevSpend');
+    const prevGmv = sum('perfPrevGmv');
+    const prevOrders = sum('perfPrevOrders');
+    const prevItemsSold = sum('perfPrevItemsSold');
+    const prevTotalHpp = sum('perfPrevTotalHpp');
+    const profitRows = members.filter(row => row.dataset.perfProfitAvailable === '1');
+    const profitAvailable = members.length > 0 && profitRows.length === members.length;
+    const profit = profitRows.reduce((total, row) => total + Number(row.dataset.perfProfit || 0), 0);
+    const prevProfit = members.reduce((total, row) => total + Number(row.dataset.perfPrevProfit || 0), 0);
+    const configuredTargets = members
+        .map(row => Number(row.dataset.perfConfiguredRoas || 0))
+        .filter(value => value > 0);
+    const targetRoas = configuredTargets.length
+        ? configuredTargets.reduce((total, value) => total + value, 0) / configuredTargets.length
+        : null;
+    const roas = spend > 0 ? gmv / spend : 0;
+    const prevRoas = prevSpend > 0 ? prevGmv / prevSpend : 0;
+    const targetPct = targetRoas && targetRoas > 0 ? (roas / targetRoas) * 100 : null;
+    const cpa = orders > 0 ? spend / orders : 0;
+    const prevCpa = prevOrders > 0 ? prevSpend / prevOrders : 0;
+    const profitPerOrder = orders > 0 && profitAvailable ? profit / orders : null;
+    const prevProfitPerOrder = prevOrders > 0 ? prevProfit / prevOrders : null;
+
+    let reco = 'Data HPP';
+    let recoColor = 'secondary';
+    if (profitAvailable && targetRoas !== null) {
+        if (profit <= 0) {
+            reco = 'Stop';
+            recoColor = 'danger';
+        } else if (roas >= targetRoas * 1.2) {
+            reco = 'Scale';
+            recoColor = 'success';
+        } else if (roas >= targetRoas) {
+            reco = 'Aman';
+            recoColor = 'info';
+        } else {
+            reco = 'Optimasi';
+            recoColor = 'warning';
+        }
+    }
+
+    return {
+        spend, gmv, orders, itemsSold, totalHpp, prevSpend, prevGmv, prevOrders,
+        prevItemsSold, prevTotalHpp, profit, prevProfit, profitAvailable,
+        roas, prevRoas, targetRoas, targetPct, cpa, prevCpa, profitPerOrder,
+        prevProfitPerOrder, reco, recoColor,
+    };
+}
+
+function perfRenderMarketplaceGroupSummary(groupRow, members) {
+    const summary = perfAggregateMarketplaceGroup(members);
+    const label = groupRow.dataset.marketplaceCategoryLabel
+        || members[0]?.dataset?.perfMarketplaceCategoryLabel
+        || `Kategori marketplace #${groupRow.dataset.marketplaceCategoryId || '—'}`;
+    const targetClass = summary.targetPct === null
+        ? 'text-muted'
+        : summary.targetPct >= 100 ? 'text-success' : 'text-danger';
+    const profitValue = summary.profitAvailable ? perfMarketplaceCurrency(summary.profit) : 'N/A';
+    const profitClass = !summary.profitAvailable
+        ? 'text-muted'
+        : summary.profit >= 0 ? 'text-success' : 'text-danger';
+
+    groupRow.innerHTML = `
+        <td>
+            <div class="perf-marketplace-category-group-copy">
+                <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                <div class="min-w-0">
+                    <div class="perf-marketplace-category-group-label" data-perf-marketplace-category-group-label></div>
+                    <div class="perf-marketplace-category-group-count" data-perf-marketplace-category-group-count>${members.length} campaign</div>
+                </div>
+            </div>
+        </td>
+        <td class="text-center">
+            <span class="badge bg-${summary.recoColor} perf-signal-status">${summary.reco}</span>
+        </td>
+        <td class="text-end perf-cell">
+            <div class="perf-main"><span class="perf-val ${targetClass}">${perfMarketplaceNumber(summary.roas, 2)}x</span>${perfMarketplaceDelta(summary.roas, summary.prevRoas, true)}</div>
+            <div class="perf-sub ${targetClass}">${summary.targetPct === null ? '—' : perfMarketplaceNumber(summary.targetPct, 1) + '% target'}</div>
+            <div class="perf-previous" title="Perbandingan: ${perfCompareLabel}">↔ ${perfMarketplaceNumber(summary.prevRoas, 2)}x</div>
+        </td>
+        <td class="text-end perf-cell">
+            <div class="perf-main"><span class="perf-val">${perfMarketplaceNumber(summary.orders)}</span>${perfMarketplaceDelta(summary.orders, summary.prevOrders, true)}</div>
+            <div class="perf-sub text-muted">${perfMarketplaceNumber(summary.itemsSold)} pcs</div>
+            <div class="perf-previous" title="Perbandingan: ${perfCompareLabel}">↔ ${perfMarketplaceNumber(summary.prevOrders)} orders · ${perfMarketplaceNumber(summary.prevItemsSold)} pcs</div>
+        </td>
+        <td class="text-end perf-cell">
+            <div class="perf-main"><span class="perf-val text-success">${perfMarketplaceCurrency(summary.gmv)}</span>${perfMarketplaceDelta(summary.gmv, summary.prevGmv, true)}</div>
+            <div class="perf-sub">COGS ${summary.totalHpp > 0 ? perfMarketplaceCurrency(summary.totalHpp) : '—'}</div>
+            <div class="perf-previous" title="Perbandingan: ${perfCompareLabel}">↔ GMV ${perfMarketplaceCurrency(summary.prevGmv)} · COGS ${summary.prevTotalHpp > 0 ? perfMarketplaceCurrency(summary.prevTotalHpp) : '—'}</div>
+        </td>
+        <td class="text-end perf-cell">
+            <div class="perf-main"><span class="perf-val">${perfMarketplaceCurrency(summary.spend)}</span>${perfMarketplaceDelta(summary.spend, summary.prevSpend, false)}</div>
+            <div class="perf-sub text-muted">CPA ${perfMarketplaceCurrency(summary.cpa)}</div>
+            <div class="perf-previous" title="Perbandingan: ${perfCompareLabel}">↔ Biaya ${perfMarketplaceCurrency(summary.prevSpend)} · CPA ${perfMarketplaceCurrency(summary.prevCpa)}</div>
+        </td>
+        <td class="text-end perf-cell">
+            <div class="perf-main"><span class="perf-val ${profitClass}">${profitValue}</span>${summary.profitAvailable ? perfMarketplaceDelta(summary.profit, summary.prevProfit, true) : ''}</div>
+            <div class="perf-sub">Profit/order ${summary.profitPerOrder === null ? '—' : perfMarketplaceCurrency(summary.profitPerOrder)}</div>
+            <div class="perf-previous" title="Perbandingan: ${perfCompareLabel}">↔ Profit ${perfMarketplaceCurrency(summary.prevProfit)} · Profit/order ${summary.prevProfitPerOrder === null ? '—' : perfMarketplaceCurrency(summary.prevProfitPerOrder)}</div>
+        </td>`;
+    groupRow.dataset.perfGroupSummary = JSON.stringify(summary);
+    const labelTarget = groupRow.querySelector('[data-perf-marketplace-category-group-label]');
+    if (labelTarget) {
+        labelTarget.textContent = label;
+        labelTarget.title = label;
+    }
+}
+
 function perfUpdateMarketplaceGroupLabels() {
     document.querySelectorAll('.campaign-performance-panel tr.perf-marketplace-category-group-row').forEach(function(groupRow) {
         const member = perfMarketplaceGroupMembers(groupRow)[0];
         const label = member?.dataset?.perfMarketplaceCategoryLabel || `Kategori marketplace #${groupRow.dataset.marketplaceCategoryId || '—'}`;
+        groupRow.dataset.marketplaceCategoryLabel = label;
         const labelTarget = groupRow.querySelector('[data-perf-marketplace-category-group-label]');
         if (labelTarget) labelTarget.textContent = label;
+        if (labelTarget) labelTarget.title = label;
     });
 }
 
@@ -2296,6 +2453,7 @@ function perfUpdateMarketplaceGroups() {
         const members = perfMarketplaceGroupMembers(groupRow);
         const hasMatches = members.some(row => row.dataset.perfMatch !== '0');
         const isOpen = groupRow.dataset.perfOpen === '1';
+        perfRenderMarketplaceGroupSummary(groupRow, members);
         groupRow.style.display = active && hasMatches ? '' : 'none';
         if (!active) return;
         groupRow.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
@@ -2310,7 +2468,7 @@ function perfUpdateMarketplaceGroups() {
             }
         });
         const countTarget = groupRow.querySelector('[data-perf-marketplace-category-group-count]');
-        if (countTarget) countTarget.textContent = `${members.filter(row => row.dataset.perfMatch !== '0').length} campaign`;
+        if (countTarget) countTarget.textContent = `${members.length} campaign`;
     });
 }
 
@@ -2337,7 +2495,7 @@ function perfArrangeMarketplaceGroups() {
         groupRow.dataset.perfOpen = openState.get(categoryId) ? '1' : '0';
         groupRow.setAttribute('role', 'button');
         groupRow.setAttribute('tabindex', '0');
-        groupRow.innerHTML = '<td colspan="7"><div class="perf-marketplace-category-group-copy"><i class="bi bi-chevron-right" aria-hidden="true"></i><span class="perf-marketplace-category-group-label" data-perf-marketplace-category-group-label></span><span class="perf-marketplace-category-group-count" data-perf-marketplace-category-group-count></span></div></td>';
+        perfRenderMarketplaceGroupSummary(groupRow, members);
         groupRow.addEventListener('click', function() {
             groupRow.dataset.perfOpen = groupRow.dataset.perfOpen === '1' ? '0' : '1';
             perfUpdateMarketplaceGroups();
