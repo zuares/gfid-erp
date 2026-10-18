@@ -1395,6 +1395,7 @@ SQL;
 
         $shippingFailedStatusesSql = "'".implode("', '", self::SHIPPING_FAILED_STATUSES)."'";
         $shippingStatusExpression = "CASE WHEN COALESCE(o.delivery_failed, 0) = 1 OR UPPER(COALESCE(NULLIF(o.tracking_status, ''), '')) IN ({$shippingFailedStatusesSql}) THEN 'FAILED_DELIVERY' ELSE UPPER(COALESCE(NULLIF(o.order_status, ''), NULLIF(o.status, ''), 'BELUM DITENTUKAN')) END";
+        $shippingOrderValueExpression = 'COALESCE(NULLIF(o.total_paid_customer, 0), NULLIF(o.total_amount, 0), NULLIF(o.subtotal_items, 0), 0)';
         $shippingExcludedPlaceholders = implode(',', array_fill(0, count(self::SHIPPING_EXCLUDED_STATUSES), '?'));
         $shippingBase = DB::table('marketplace_orders as o')
             ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
@@ -1429,6 +1430,7 @@ SQL;
             ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} IN ('PROCESSED', 'READY_TO_HANDOVER', 'SHIPPED', 'TO_CONFIRM_RECEIVE') THEN o.id END) as transit_orders")
             ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} IN ('COMPLETED', 'SELESAI') THEN o.id END) as completed_orders")
             ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} = 'FAILED_DELIVERY' THEN o.id END) as failed_orders")
+            ->selectRaw("COALESCE(SUM(CASE WHEN {$shippingStatusExpression} = 'FAILED_DELIVERY' THEN ({$shippingOrderValueExpression}) ELSE 0 END), 0) as failed_value")
             ->selectRaw("COUNT(DISTINCT CASE WHEN {$shippingStatusExpression} IN ({$shippingReturnStatusesSql}) THEN o.id END) as return_orders")
             ->groupByRaw("DATE({$dateExpression})")
             ->orderByDesc('day')
@@ -1439,6 +1441,7 @@ SQL;
                 $row->transit_orders = (int) $row->transit_orders;
                 $row->completed_orders = (int) $row->completed_orders;
                 $row->failed_orders = (int) $row->failed_orders;
+                $row->failed_value = (float) $row->failed_value;
                 $row->return_orders = (int) $row->return_orders;
                 $row->other_orders = max(
                     0,
@@ -1454,6 +1457,7 @@ SQL;
             'transit' => (int) $shippingDaily->sum('transit_orders'),
             'completed' => (int) $shippingDaily->sum('completed_orders'),
             'failed' => (int) $shippingDaily->sum('failed_orders'),
+            'failed_value' => (float) $shippingDaily->sum('failed_value'),
             'return' => (int) $shippingDaily->sum('return_orders'),
         ];
         $shippingKpi['exception'] = $shippingKpi['failed'] + $shippingKpi['return'];
@@ -1472,11 +1476,42 @@ SQL;
                     'failed_orders',
                     0,
                 );
+                $row->failed_shipping_value = (float) data_get(
+                    $failedShippingByDay->get((string) $row->day),
+                    'failed_value',
+                    0,
+                );
 
                 return $row;
             })
-            ->values();
+            ->keyBy(fn ($row) => (string) $row->day);
+        $failedShippingByDay->each(function ($shippingRow, $day) use ($incomeDaily) {
+            if ($incomeDaily->has((string) $day) || (int) $shippingRow->failed_orders === 0) {
+                return;
+            }
+
+            // Hari yang hanya berisi order gagal tetap ditampilkan agar nilai
+            // exception tidak hilang dari tabel maupun ringkasan periode.
+            $incomeDaily->put((string) $day, (object) [
+                'day' => (string) $day,
+                'orders' => 0,
+                'settled_orders' => 0,
+                'pending_orders' => 0,
+                'buyer_paid' => 0.0,
+                'settled_buyer_paid' => 0.0,
+                'pending_buyer_paid' => 0.0,
+                'final_income' => 0.0,
+                'refund_orders' => 0,
+                'refund_amount' => 0.0,
+                'cogs' => 0.0,
+                'gross_profit' => 0.0,
+                'failed_shipping_orders' => (int) $shippingRow->failed_orders,
+                'failed_shipping_value' => (float) $shippingRow->failed_value,
+            ]);
+        });
+        $incomeDaily = $incomeDaily->sortByDesc('day')->values();
         $incomeSummary['failed_shipping_orders'] = (int) $incomeDaily->sum('failed_shipping_orders');
+        $incomeSummary['failed_shipping_value'] = (float) $incomeDaily->sum('failed_shipping_value');
 
         // Katalog aktif berasal dari sinkronisasi marketplace, bukan dari
         // order pada periode. Dengan begitu produk tanpa transaksi tetap
