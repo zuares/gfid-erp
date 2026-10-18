@@ -3715,6 +3715,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         ? $adminFeeRows->sum(fn ($row) => $row['admin_fee_pct'] * $row['gmv']) / $adminFeeRows->sum('gmv')
                         : 0;
                     $adminFeeAmount = $group->sum('admin_fee_amount');
+                    $totalCogsRows = $group->filter(fn ($row) => $row['total_cogs'] !== null);
+                    $totalCogs = $totalCogsRows->isNotEmpty() ? $totalCogsRows->sum('total_cogs') : null;
                     return [
                         'category' => $category,
                         'campaigns' => $group->count(),
@@ -3729,6 +3731,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'items_sold' => $itemsSold,
                         'cvr' => $clicks > 0 ? ($orders / $clicks) * 100 : 0,
                         'gmv' => $gmv,
+                        'total_cogs' => $totalCogs,
                         'net_profit' => $netProfit,
                         'margin' => $margin,
                         'cogs' => $cogs,
@@ -3873,7 +3876,55 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-product-id { margin-top:.12rem; color:var(--dsh-muted,#64748b); font-size:.52rem; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
                 .traffic-product-status-row { display:flex; align-items:center; gap:.3rem; min-width:0; margin-top:.16rem; }
                 .traffic-product-status-row .traffic-product-id { margin-top:0; }
-                .traffic-product-meta { margin-top:.24rem; padding-top:.22rem; border-top:1px solid rgba(148,163,184,.22); gap:.14rem .34rem; }
+                /* Compact P&L ledger: keep campaign economics aligned and readable inside the table cell. */
+                .traffic-product-meta {
+                    display:grid;
+                    grid-template-columns:repeat(2,minmax(0,1fr));
+                    align-items:stretch;
+                    gap:.18rem .5rem;
+                    margin-top:.28rem;
+                    padding-top:.28rem;
+                    border-top:1px solid rgba(148,163,184,.22);
+                    line-height:1.18;
+                }
+                .traffic-product-meta span {
+                    display:flex;
+                    min-width:0;
+                    align-items:baseline;
+                    justify-content:space-between;
+                    gap:.28rem;
+                    white-space:nowrap;
+                }
+                .traffic-product-meta span:not(.traffic-product-meta-profit) {
+                    overflow:hidden;
+                }
+                .traffic-product-meta span:not(.traffic-product-meta-profit)::first-letter { text-transform:uppercase; }
+                .traffic-product-meta b {
+                    min-width:0;
+                    overflow:hidden;
+                    text-overflow:ellipsis;
+                    text-align:right;
+                    font-weight:780;
+                }
+                .traffic-product-meta .traffic-product-meta-spend {
+                    color:#92400e;
+                }
+                .traffic-product-meta .traffic-product-meta-spend b { color:#b45309; }
+                .traffic-product-meta .traffic-product-meta-profit {
+                    grid-column:1 / -1;
+                    margin-top:.04rem;
+                    padding:.2rem .3rem;
+                    border-top:1px solid rgba(148,163,184,.2);
+                    border-radius:5px;
+                    background:rgba(22,163,74,.055);
+                }
+                .traffic-product-meta .traffic-product-meta-profit.is-negative {
+                    background:rgba(220,38,38,.055);
+                }
+                .traffic-product-meta .traffic-product-meta-profit b {
+                    font-size:.62rem;
+                    font-weight:850;
+                }
                 .traffic-table-scroll-shell { position:relative; }
                 .traffic-table-scroll-shell > .traffic-table-scroll {
                     max-height:min(72vh, 760px);
@@ -4654,10 +4705,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <td>
                                             <div class="d-flex align-items-center gap-1 traffic-product-title"><i class="bi bi-chevron-right traffic-caret text-muted" style="font-size:.7rem;"></i><div class="fw-bold traffic-product-name">{{ $categoryRow['category'] }}</div></div>
                                             <div class="traffic-product-status-row"><span class="traffic-status-chip traffic-product-status status-{{ $categoryRow['signal']['class'] }}" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-container="body" title="{{ $categoryRow['signal']['label'] }}: {{ $trafficSignalMeaning($categoryRow['signal']) }}" aria-label="{{ $categoryRow['signal']['label'] }}: {{ $trafficSignalMeaning($categoryRow['signal']) }}"><i class="bi {{ $categoryRow['signal']['icon'] }}"></i><span>{{ $trafficSignalShortLabel($categoryRow['signal']) }}</span></span><span class="text-muted" style="font-size:.58rem;">{{ number_format($categoryRow['campaigns'], 0, ',', '.') }} campaign</span></div>
-                                            <div class="traffic-product-meta" title="AOV {{ $categoryRow['aov'] > 0 ? 'Rp ' . number_format($categoryRow['aov'], 0, ',', '.') : 'belum tersedia' }} · Admin fee Rp {{ number_format($categoryRow['admin_fee_amount'], 0, ',', '.') }} · Biaya iklan Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }} · Net profit {{ $categoryRow['net_profit'] === null ? 'belum tersedia' : 'Rp ' . number_format($categoryRow['net_profit'], 0, ',', '.') }} · COGS/unit {{ $categoryRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($categoryRow['cogs'], 0, ',', '.') }}">
+                                            <div class="traffic-product-meta" title="AOV {{ $categoryRow['aov'] > 0 ? 'Rp ' . number_format($categoryRow['aov'], 0, ',', '.') : 'belum tersedia' }} · GMV {{ number_format($categoryRow['gmv'], 0, ',', '.') }} · COGS total {{ $categoryRow['total_cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($categoryRow['total_cogs'], 0, ',', '.') }} · COGS/unit {{ $categoryRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($categoryRow['cogs'], 0, ',', '.') }} · Admin fee Rp {{ number_format($categoryRow['admin_fee_amount'], 0, ',', '.') }} · Biaya iklan Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }} · Net profit {{ $categoryRow['net_profit'] === null ? 'belum tersedia' : 'Rp ' . number_format($categoryRow['net_profit'], 0, ',', '.') }}">
                                                 <span>AOV <b>{{ $categoryRow['aov'] > 0 ? 'Rp ' . number_format($categoryRow['aov'], 0, ',', '.') : '—' }}</b></span>
-                                                <span>Admin fee <b>Rp {{ number_format($categoryRow['admin_fee_amount'], 0, ',', '.') }}</b></span>
+                                                <span>GMV <b>Rp {{ number_format($categoryRow['gmv'], 0, ',', '.') }}</b></span>
+                                                <span>COGS total <b>{{ $categoryRow['total_cogs'] === null ? '—' : 'Rp ' . number_format($categoryRow['total_cogs'], 0, ',', '.') }}</b></span>
                                                 <span>COGS/unit <b>{{ $categoryRow['cogs'] === null ? '—' : 'Rp ' . number_format($categoryRow['cogs'], 0, ',', '.') }}</b></span>
+                                                <span>Admin fee <b>Rp {{ number_format($categoryRow['admin_fee_amount'], 0, ',', '.') }}</b></span>
                                                 <span class="traffic-product-meta-spend">Iklan <b>Rp {{ number_format($categoryRow['spend'], 0, ',', '.') }}</b></span>
                                                 <span class="traffic-product-meta-profit {{ $categoryRow['net_profit'] !== null ? ($categoryRow['net_profit'] >= 0 ? 'is-positive' : 'is-negative') : '' }}">Net profit <b>{{ $categoryRow['net_profit'] === null ? '—' : 'Rp ' . number_format($categoryRow['net_profit'], 0, ',', '.') }}</b></span>
                                             </div>
@@ -4722,10 +4775,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                                                                 <div class="traffic-marketplace-category" data-marketplace-category data-product-id="{{ $campaignRow['marketplace_product_id'] }}" data-category-id="{{ $campaignRow['marketplace_category_id'] }}" title="Kategori marketplace #{{ $campaignRow['marketplace_category_id'] }}"><i class="bi bi-tag" aria-hidden="true"></i><span data-marketplace-category-label>Kategori marketplace #{{ $campaignRow['marketplace_category_id'] }}</span></div>
                                                                             @endif
                                                                             <div class="traffic-product-status-row"><span class="traffic-status-chip traffic-product-status status-{{ $campaignRow['signal']['class'] }}" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-container="body" title="{{ $campaignRow['signal']['label'] }}: {{ $trafficSignalMeaning($campaignRow['signal']) }}" aria-label="{{ $campaignRow['signal']['label'] }}: {{ $trafficSignalMeaning($campaignRow['signal']) }}"><i class="bi {{ $campaignRow['signal']['icon'] }}"></i><span>{{ $trafficSignalShortLabel($campaignRow['signal']) }}</span></span><span class="traffic-product-id">ID: {{ $campaignRow['id'] }}</span></div>
-                                                                            <div class="traffic-product-meta" title="AOV {{ $campaignRow['aov'] > 0 ? 'Rp ' . number_format($campaignRow['aov'], 0, ',', '.') : 'belum tersedia' }} · Admin fee Rp {{ number_format($campaignRow['admin_fee_amount'], 0, ',', '.') }} · Biaya iklan Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }} · Net profit {{ $campaignRow['net_profit'] === null ? 'belum tersedia' : 'Rp ' . number_format($campaignRow['net_profit'], 0, ',', '.') }} · COGS/unit {{ $campaignRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($campaignRow['cogs'], 0, ',', '.') }}">
+                                                                            <div class="traffic-product-meta" title="AOV {{ $campaignRow['aov'] > 0 ? 'Rp ' . number_format($campaignRow['aov'], 0, ',', '.') : 'belum tersedia' }} · GMV {{ number_format($campaignRow['gmv'], 0, ',', '.') }} · COGS total {{ $campaignRow['total_cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($campaignRow['total_cogs'], 0, ',', '.') }} · COGS/unit {{ $campaignRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($campaignRow['cogs'], 0, ',', '.') }} · Admin fee Rp {{ number_format($campaignRow['admin_fee_amount'], 0, ',', '.') }} · Biaya iklan Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }} · Net profit {{ $campaignRow['net_profit'] === null ? 'belum tersedia' : 'Rp ' . number_format($campaignRow['net_profit'], 0, ',', '.') }}">
                                                                                 <span>AOV <b>{{ $campaignRow['aov'] > 0 ? 'Rp ' . number_format($campaignRow['aov'], 0, ',', '.') : '—' }}</b></span>
-                                                                                <span>Admin fee <b>Rp {{ number_format($campaignRow['admin_fee_amount'], 0, ',', '.') }}</b></span>
+                                                                                <span>GMV <b>Rp {{ number_format($campaignRow['gmv'], 0, ',', '.') }}</b></span>
+                                                                                <span>COGS total <b>{{ $campaignRow['total_cogs'] === null ? '—' : 'Rp ' . number_format($campaignRow['total_cogs'], 0, ',', '.') }}</b></span>
                                                                                 <span>COGS/unit <b>{{ $campaignRow['cogs'] === null ? '—' : 'Rp ' . number_format($campaignRow['cogs'], 0, ',', '.') }}</b></span>
+                                                                                <span>Admin fee <b>Rp {{ number_format($campaignRow['admin_fee_amount'], 0, ',', '.') }}</b></span>
                                                                                 <span class="traffic-product-meta-spend">Iklan <b>Rp {{ number_format($campaignRow['spend'], 0, ',', '.') }}</b></span>
                                                                                 <span class="traffic-product-meta-profit {{ $campaignRow['net_profit'] !== null ? ($campaignRow['net_profit'] >= 0 ? 'is-positive' : 'is-negative') : '' }}">Net profit <b>{{ $campaignRow['net_profit'] === null ? '—' : 'Rp ' . number_format($campaignRow['net_profit'], 0, ',', '.') }}</b></span>
                                                                             </div>
@@ -4788,10 +4843,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                                         <div class="traffic-marketplace-category" data-marketplace-category data-product-id="{{ $trafficRow['marketplace_product_id'] }}" data-category-id="{{ $trafficRow['marketplace_category_id'] }}" title="Kategori marketplace #{{ $trafficRow['marketplace_category_id'] }}"><i class="bi bi-tag" aria-hidden="true"></i><span data-marketplace-category-label>Kategori marketplace #{{ $trafficRow['marketplace_category_id'] }}</span></div>
                                                     @endif
                                                         <div class="traffic-product-status-row"><span class="traffic-status-chip traffic-product-status status-{{ $trafficRow['signal']['class'] }}" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-container="body" title="{{ $trafficRow['signal']['label'] }}: {{ $trafficSignalMeaning($trafficRow['signal']) }}" aria-label="{{ $trafficRow['signal']['label'] }}: {{ $trafficSignalMeaning($trafficRow['signal']) }}"><i class="bi {{ $trafficRow['signal']['icon'] }}"></i><span>{{ $trafficSignalShortLabel($trafficRow['signal']) }}</span></span><span class="traffic-product-id">ID: {{ $trafficRow['id'] }}</span></div>
-                                                    <div class="traffic-product-meta" title="AOV {{ $trafficRow['aov'] > 0 ? 'Rp ' . number_format($trafficRow['aov'], 0, ',', '.') : 'belum tersedia' }} · Admin fee Rp {{ number_format($trafficRow['admin_fee_amount'], 0, ',', '.') }} · Biaya iklan Rp {{ number_format($trafficRow['spend'], 0, ',', '.') }} · Net profit {{ $trafficRow['net_profit'] === null ? 'belum tersedia' : 'Rp ' . number_format($trafficRow['net_profit'], 0, ',', '.') }} · COGS/unit {{ $trafficRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($trafficRow['cogs'], 0, ',', '.') }}">
+                                                    <div class="traffic-product-meta" title="AOV {{ $trafficRow['aov'] > 0 ? 'Rp ' . number_format($trafficRow['aov'], 0, ',', '.') : 'belum tersedia' }} · GMV {{ number_format($trafficRow['gmv'], 0, ',', '.') }} · COGS total {{ $trafficRow['total_cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($trafficRow['total_cogs'], 0, ',', '.') }} · COGS/unit {{ $trafficRow['cogs'] === null ? 'belum tersedia' : 'Rp ' . number_format($trafficRow['cogs'], 0, ',', '.') }} · Admin fee Rp {{ number_format($trafficRow['admin_fee_amount'], 0, ',', '.') }} · Biaya iklan Rp {{ number_format($trafficRow['spend'], 0, ',', '.') }} · Net profit {{ $trafficRow['net_profit'] === null ? 'belum tersedia' : 'Rp ' . number_format($trafficRow['net_profit'], 0, ',', '.') }}">
                                                         <span>AOV <b>{{ $trafficRow['aov'] > 0 ? 'Rp ' . number_format($trafficRow['aov'], 0, ',', '.') : '—' }}</b></span>
-                                                        <span>Admin fee <b>Rp {{ number_format($trafficRow['admin_fee_amount'], 0, ',', '.') }}</b></span>
+                                                        <span>GMV <b>Rp {{ number_format($trafficRow['gmv'], 0, ',', '.') }}</b></span>
+                                                        <span>COGS total <b>{{ $trafficRow['total_cogs'] === null ? '—' : 'Rp ' . number_format($trafficRow['total_cogs'], 0, ',', '.') }}</b></span>
                                                         <span>COGS/unit <b>{{ $trafficRow['cogs'] === null ? '—' : 'Rp ' . number_format($trafficRow['cogs'], 0, ',', '.') }}</b></span>
+                                                        <span>Admin fee <b>Rp {{ number_format($trafficRow['admin_fee_amount'], 0, ',', '.') }}</b></span>
                                                         <span class="traffic-product-meta-spend">Iklan <b>Rp {{ number_format($trafficRow['spend'], 0, ',', '.') }}</b></span>
                                                         <span class="traffic-product-meta-profit {{ $trafficRow['net_profit'] !== null ? ($trafficRow['net_profit'] >= 0 ? 'is-positive' : 'is-negative') : '' }}">Net profit <b>{{ $trafficRow['net_profit'] === null ? '—' : 'Rp ' . number_format($trafficRow['net_profit'], 0, ',', '.') }}</b></span>
                                                     </div>
