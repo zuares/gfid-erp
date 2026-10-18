@@ -3924,15 +3924,72 @@ document.addEventListener('DOMContentLoaded', function() {
                     ->filter(fn ($row) => filled($row['marketplace_category_id']))
                     ->groupBy('marketplace_category_id');
                 $trafficMarketplaceCategoryRows = $trafficMarketplaceCategoryCampaignRows
-                    ->map(function ($group, $categoryId) {
+                    ->map(function ($group, $categoryId) use ($trafficTotalImpressions, $trafficPreviousTotalImpressions, $trafficTotalClicks, $trafficPreviousTotalClicks, $trafficTotalSpend, $trafficPreviousTotalSpend) {
+                        $impressions = $group->sum('impressions');
+                        $clicks = $group->sum('clicks');
+                        $spend = $group->sum('spend');
+                        $orders = $group->sum('orders');
+                        $gmv = $group->sum('gmv');
+                        $prevImpressions = $group->sum('prev_impressions');
+                        $prevClicks = $group->sum('prev_clicks');
+                        $prevSpend = $group->sum('prev_spend');
+                        $prevOrders = $group->sum('prev_orders');
+                        $prevGmv = $group->sum('prev_gmv');
+                        $profitRows = $group->filter(fn ($row) => $row['net_profit'] !== null);
+                        $prevProfitRows = $group->filter(fn ($row) => $row['prev_net_profit'] !== null);
+                        $netProfit = $profitRows->isNotEmpty() ? $profitRows->sum('net_profit') : null;
+                        $prevNetProfit = $prevProfitRows->isNotEmpty() ? $prevProfitRows->sum('prev_net_profit') : null;
+                        $marginRows = $group->filter(fn ($row) => $row['margin'] !== null && $row['gmv'] > 0);
+                        $prevMarginRows = $group->filter(fn ($row) => $row['prev_margin'] !== null && $row['prev_gmv'] > 0);
+                        $margin = $marginRows->sum('gmv') > 0
+                            ? $marginRows->sum(fn ($row) => $row['margin'] * $row['gmv']) / $marginRows->sum('gmv')
+                            : null;
+                        $prevMargin = $prevMarginRows->sum('prev_gmv') > 0
+                            ? $prevMarginRows->sum(fn ($row) => $row['prev_margin'] * $row['prev_gmv']) / $prevMarginRows->sum('prev_gmv')
+                            : null;
+                        $bepRows = $group->filter(fn ($row) => $row['bep_acos'] !== null && $row['gmv'] > 0);
+                        $prevBepRows = $group->filter(fn ($row) => $row['prev_bep_acos'] !== null && $row['prev_gmv'] > 0);
+                        $bepAcos = $bepRows->sum('gmv') > 0
+                            ? $bepRows->sum(fn ($row) => $row['bep_acos'] * $row['gmv']) / $bepRows->sum('gmv')
+                            : null;
+                        $prevBepAcos = $prevBepRows->sum('prev_gmv') > 0
+                            ? $prevBepRows->sum(fn ($row) => $row['prev_bep_acos'] * $row['prev_gmv']) / $prevBepRows->sum('prev_gmv')
+                            : null;
                         return [
                             'marketplace_category_id' => (string) $categoryId,
                             'campaigns' => $group->count(),
-                            'impressions' => $group->sum('impressions'),
-                            'clicks' => $group->sum('clicks'),
-                            'orders' => $group->sum('orders'),
-                            'spend' => $group->sum('spend'),
-                            'gmv' => $group->sum('gmv'),
+                            'impressions' => $impressions,
+                            'prev_impressions' => $prevImpressions,
+                            'clicks' => $clicks,
+                            'prev_clicks' => $prevClicks,
+                            'orders' => $orders,
+                            'prev_orders' => $prevOrders,
+                            'spend' => $spend,
+                            'prev_spend' => $prevSpend,
+                            'gmv' => $gmv,
+                            'prev_gmv' => $prevGmv,
+                            'ctr' => $impressions > 0 ? ($clicks / $impressions) * 100 : 0,
+                            'prev_ctr' => $prevImpressions > 0 ? ($prevClicks / $prevImpressions) * 100 : 0,
+                            'cvr' => $clicks > 0 ? ($orders / $clicks) * 100 : 0,
+                            'prev_cvr' => $prevClicks > 0 ? ($prevOrders / $prevClicks) * 100 : 0,
+                            'aov' => $orders > 0 ? $gmv / $orders : 0,
+                            'prev_aov' => $prevOrders > 0 ? $prevGmv / $prevOrders : 0,
+                            'cpm' => $impressions > 0 ? ($spend / $impressions) * 1000 : 0,
+                            'prev_cpm' => $prevImpressions > 0 ? ($prevSpend / $prevImpressions) * 1000 : 0,
+                            'margin' => $margin,
+                            'prev_margin' => $prevMargin,
+                            'acos' => $gmv > 0 ? ($spend / $gmv) * 100 : 0,
+                            'prev_acos' => $prevGmv > 0 ? ($prevSpend / $prevGmv) * 100 : 0,
+                            'bep_acos' => $bepAcos,
+                            'prev_bep_acos' => $prevBepAcos,
+                            'net_profit' => $netProfit,
+                            'prev_net_profit' => $prevNetProfit,
+                            'impression_share' => $trafficTotalImpressions > 0 ? ($impressions / $trafficTotalImpressions) * 100 : 0,
+                            'prev_impression_share' => $trafficPreviousTotalImpressions > 0 ? ($prevImpressions / $trafficPreviousTotalImpressions) * 100 : 0,
+                            'spend_share' => $trafficTotalSpend > 0 ? ($spend / $trafficTotalSpend) * 100 : 0,
+                            'prev_spend_share' => $trafficPreviousTotalSpend > 0 ? ($prevSpend / $trafficPreviousTotalSpend) * 100 : 0,
+                            'click_share' => $trafficTotalClicks > 0 ? ($clicks / $trafficTotalClicks) * 100 : 0,
+                            'prev_click_share' => $trafficPreviousTotalClicks > 0 ? ($prevClicks / $trafficPreviousTotalClicks) * 100 : 0,
                         ];
                     })
                     ->sortByDesc('spend')
@@ -5130,24 +5187,30 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </tr>
                                 @endforeach
                                 @foreach($trafficMarketplaceCategoryRows as $marketplaceCategoryRow)
-                                    <tr class="traffic-marketplace-category-row open" data-traffic-views="marketplace_category" data-marketplace-category-id="{{ $marketplaceCategoryRow['marketplace_category_id'] }}" data-marketplace-category-key="{{ $marketplaceCategoryRow['marketplace_category_id'] }}" role="button" tabindex="0" aria-expanded="true" onclick="trafficToggleMarketplaceCategory(this)" onkeydown="trafficHandleMarketplaceCategoryKeydown(event, this)">
-                                        <td colspan="12">
+                                    <tr class="traffic-marketplace-category-row" data-traffic-views="marketplace_category" data-marketplace-category-id="{{ $marketplaceCategoryRow['marketplace_category_id'] }}" data-marketplace-category-key="{{ $marketplaceCategoryRow['marketplace_category_id'] }}" role="button" tabindex="0" aria-expanded="false" onclick="trafficToggleMarketplaceCategory(this)" onkeydown="trafficHandleMarketplaceCategoryKeydown(event, this)">
+                                        <td class="traffic-marketplace-category-summary-cell">
                                             <div class="traffic-marketplace-category-group">
-                                                <div class="traffic-marketplace-category-group-title">
+                                                <div>
+                                                    <div class="traffic-marketplace-category-group-title">
                                                     <i class="bi bi-chevron-right traffic-caret" aria-hidden="true"></i>
                                                     <i class="bi bi-tags" aria-hidden="true"></i>
                                                     <span class="traffic-marketplace-category-group-label" data-marketplace-category-group data-category-id="{{ $marketplaceCategoryRow['marketplace_category_id'] }}">Kategori Marketplace #{{ $marketplaceCategoryRow['marketplace_category_id'] }}</span>
-                                                </div>
-                                                <div class="traffic-marketplace-category-group-meta">
-                                                    <span><b>{{ number_format($marketplaceCategoryRow['campaigns'], 0, ',', '.') }}</b> iklan</span>
-                                                    <span><b>{{ number_format($marketplaceCategoryRow['impressions'], 0, ',', '.') }}</b> impresi</span>
-                                                    <span><b>{{ number_format($marketplaceCategoryRow['clicks'], 0, ',', '.') }}</b> klik</span>
-                                                    <span><b>{{ number_format($marketplaceCategoryRow['orders'], 0, ',', '.') }}</b> order</span>
-                                                    <span><b>Rp {{ number_format($marketplaceCategoryRow['spend'], 0, ',', '.') }}</b> biaya</span>
-                                                    <span><b>Rp {{ number_format($marketplaceCategoryRow['gmv'], 0, ',', '.') }}</b> GMV</span>
+                                                    </div>
+                                                    <div class="traffic-marketplace-category-group-meta"><span><b>{{ number_format($marketplaceCategoryRow['campaigns'], 0, ',', '.') }}</b> iklan</span></div>
                                                 </div>
                                             </div>
                                         </td>
+                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($marketplaceCategoryRow['impressions'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($marketplaceCategoryRow['impressions'], $marketplaceCategoryRow['prev_impressions'], true) !!}</div><div class="perf-previous">↔ {!! $trafficFmtPrevious($marketplaceCategoryRow['prev_impressions']) !!}</div></td>
+                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">Rp {{ number_format($marketplaceCategoryRow['cpm'], 0, ',', '.') }}</span>{!! $trafficFmtDelta($marketplaceCategoryRow['cpm'], $marketplaceCategoryRow['prev_cpm'], false) !!}</div><div class="perf-previous">↔ {!! $trafficFmtPrevious($marketplaceCategoryRow['prev_cpm'], 'Rp ') !!}</div></td>
+                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($marketplaceCategoryRow['ctr'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($marketplaceCategoryRow['ctr'], $marketplaceCategoryRow['prev_ctr'], true) !!}</div><div class="perf-previous">↔ {!! $trafficFmtPrevious($marketplaceCategoryRow['prev_ctr'], '', '%') !!}</div></td>
+                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($marketplaceCategoryRow['cvr'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($marketplaceCategoryRow['cvr'], $marketplaceCategoryRow['prev_cvr'], true) !!}</div><div class="perf-previous">↔ {!! $trafficFmtPrevious($marketplaceCategoryRow['prev_cvr'], '', '%') !!}</div></td>
+                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ $marketplaceCategoryRow['aov'] > 0 ? 'Rp ' . number_format($marketplaceCategoryRow['aov'], 0, ',', '.') : '—' }}</span>{!! $trafficFmtDelta($marketplaceCategoryRow['aov'], $marketplaceCategoryRow['prev_aov'], true) !!}</div><div class="perf-previous">↔ {!! $trafficFmtPrevious($marketplaceCategoryRow['prev_aov'], 'Rp ') !!}</div></td>
+                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ $marketplaceCategoryRow['margin'] === null ? '—' : number_format($marketplaceCategoryRow['margin'], 2, ',', '.') . '%' }}</span>{!! $trafficFmtDelta($marketplaceCategoryRow['margin'], $marketplaceCategoryRow['prev_margin'], true) !!}</div><div class="perf-previous">↔ {!! $trafficFmtPrevious($marketplaceCategoryRow['prev_margin'], '', '%') !!}</div></td>
+                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ $marketplaceCategoryRow['gmv'] > 0 ? number_format($marketplaceCategoryRow['acos'], 2, ',', '.') . '%' : '—' }}</span>{!! $trafficFmtDelta($marketplaceCategoryRow['acos'], $marketplaceCategoryRow['prev_acos'], false) !!}</div><div class="perf-previous">↔ {!! $trafficFmtPrevious($marketplaceCategoryRow['prev_acos'], '', '%') !!}</div></td>
+                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ $marketplaceCategoryRow['bep_acos'] === null ? '—' : number_format($marketplaceCategoryRow['bep_acos'], 2, ',', '.') . '%' }}</span>{!! $trafficFmtDelta($marketplaceCategoryRow['bep_acos'], $marketplaceCategoryRow['prev_bep_acos'], true) !!}</div><div class="perf-previous">↔ {!! $trafficFmtPrevious($marketplaceCategoryRow['prev_bep_acos'], '', '%') !!}</div></td>
+                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($marketplaceCategoryRow['impression_share'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($marketplaceCategoryRow['impression_share'], $marketplaceCategoryRow['prev_impression_share'], true) !!}</div><div class="perf-previous">↔ {!! $trafficFmtPrevious($marketplaceCategoryRow['prev_impression_share'], '', '%') !!}</div></td>
+                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($marketplaceCategoryRow['spend_share'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($marketplaceCategoryRow['spend_share'], $marketplaceCategoryRow['prev_spend_share'], true) !!}</div><div class="perf-previous">↔ {!! $trafficFmtPrevious($marketplaceCategoryRow['prev_spend_share'], '', '%') !!}</div></td>
+                                        <td class="text-end traffic-metric-cell"><div class="perf-main"><span class="perf-val">{{ number_format($marketplaceCategoryRow['click_share'], 2, ',', '.') }}%</span>{!! $trafficFmtDelta($marketplaceCategoryRow['click_share'], $marketplaceCategoryRow['prev_click_share'], true) !!}</div><div class="perf-previous">↔ {!! $trafficFmtPrevious($marketplaceCategoryRow['prev_click_share'], '', '%') !!}</div></td>
                                     </tr>
                                 @endforeach
                                 @foreach($trafficRows as $trafficRow)
