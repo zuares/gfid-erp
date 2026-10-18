@@ -3918,7 +3918,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-product-cell { min-width:0; }
                 .traffic-product-copy { min-width:0; flex:1 1 auto; }
                 .traffic-product-title { min-width:0; }
-                .traffic-product-name { display:block; max-width:100%; overflow:visible !important; text-overflow:clip; white-space:normal !important; overflow-wrap:anywhere; font-size:.76rem !important; line-height:1.15; letter-spacing:-.01em; }
+                .traffic-product-name { display:block; max-width:100%; overflow:hidden !important; text-overflow:ellipsis; white-space:nowrap !important; overflow-wrap:normal; font-size:.76rem !important; line-height:1.15; letter-spacing:-.01em; }
                 .traffic-marketplace-category { display:flex; align-items:flex-start; gap:.18rem; max-width:100%; margin-top:.13rem; color:#64748b; font-size:.56rem; line-height:1.1; white-space:normal; overflow-wrap:anywhere; }
                 .traffic-marketplace-category i { flex:none; color:#2563eb; font-size:.56rem; }
                 .traffic-marketplace-category span { min-width:0; overflow-wrap:anywhere; }
@@ -3983,6 +3983,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 .traffic-product-meta-summary .traffic-product-meta-profit {
                     margin-top:0;
                 }
+                .traffic-product-tooltip .tooltip-inner {
+                    max-width:300px;
+                    padding:.45rem .55rem;
+                    border:1px solid rgba(148,163,184,.35);
+                    border-radius:7px;
+                    background:#0f172a;
+                    box-shadow:0 8px 24px rgba(15,23,42,.22);
+                    text-align:left;
+                    font-size:.6rem;
+                    line-height:1.3;
+                }
+                .traffic-product-tooltip-list {
+                    display:grid;
+                    gap:.18rem;
+                    min-width:190px;
+                }
+                .traffic-product-tooltip-row {
+                    display:flex;
+                    align-items:baseline;
+                    justify-content:space-between;
+                    gap:.7rem;
+                    padding-bottom:.16rem;
+                    border-bottom:1px solid rgba(226,232,240,.14);
+                    white-space:nowrap;
+                }
+                .traffic-product-tooltip-row:last-child {
+                    padding-bottom:0;
+                    border-bottom:0;
+                }
+                .traffic-product-tooltip-row span { color:#cbd5e1; }
+                .traffic-product-tooltip-row strong { color:#fff; font-weight:800; }
                 .traffic-marketplace-category-row { display:none; }
                 .traffic-marketplace-category-row td {
                     padding:.48rem .7rem !important;
@@ -4984,12 +5015,39 @@ document.addEventListener('DOMContentLoaded', function() {
         <script>
         document.addEventListener('DOMContentLoaded', function () {
             if (!window.bootstrap?.Tooltip) return;
+            const escapeHtml = function (value) {
+                return String(value).replace(/[&<>"']/g, function (character) {
+                    return {
+                        '&': '&amp;',
+                        '<': '&lt;',
+                        '>': '&gt;',
+                        '"': '&quot;',
+                        "'": '&#039;',
+                    }[character];
+                });
+            };
             document.querySelectorAll('#trafficTable [data-bs-toggle="tooltip"]').forEach(function (element) {
-                window.bootstrap.Tooltip.getOrCreateInstance(element, {
+                const options = {
                     container: 'body',
                     boundary: 'viewport',
                     placement: 'top',
-                });
+                };
+                if (element.classList.contains('traffic-product-meta-summary')) {
+                    const lines = (element.getAttribute('title') || '')
+                        .split(' · ')
+                        .filter(Boolean)
+                        .map(function (line) {
+                            const match = line.match(/^(AOV|GMV|COGS total|COGS\/unit|Admin fee|Iklan)\s+(.*)$/);
+                            const label = match ? match[1] : line;
+                            const value = match ? match[2] : '';
+                            return '<div class="traffic-product-tooltip-row"><span>' + escapeHtml(label) + '</span><strong>' + escapeHtml(value) + '</strong></div>';
+                        })
+                        .join('');
+                    options.html = true;
+                    options.customClass = 'traffic-product-tooltip';
+                    options.title = '<div class="traffic-product-tooltip-list">' + lines + '</div>';
+                }
+                window.bootstrap.Tooltip.getOrCreateInstance(element, options);
             });
         });
 
