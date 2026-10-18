@@ -352,12 +352,59 @@ class MarketplaceSalesDashboardController extends Controller
             ->sortByDesc('day')
             ->values();
 
+        // Dashboard COGS mengikuti harga biaya terakhir yang tersedia sampai
+        // akhir periode filter. Harga setelah date_to tidak boleh mengubah
+        // laporan periode yang sudah lewat.
+        $periodEndDate = $to->toDateString();
+        $latestPeriodPurchasePrice = DB::table('purchase_receipt_lines as period_prl')
+            ->join('purchase_receipts as period_pr', 'period_pr.id', '=', 'period_prl.purchase_receipt_id')
+            ->selectRaw('period_prl.item_id, CAST(period_prl.unit_price AS REAL) / COALESCE(NULLIF(period_prl.conversion_factor, 0), 1) as period_unit_cost')
+            ->where('period_pr.status', 'posted')
+            ->where('period_prl.unit_price', '>', 0)
+            ->whereRaw('COALESCE(period_prl.stock_qty_received, period_prl.qty_received * COALESCE(period_prl.conversion_factor, 1)) > 0')
+            ->whereDate('period_pr.date', '<=', $periodEndDate)
+            ->whereRaw(
+                'period_prl.id = (
+                    SELECT latest_period_prl.id
+                    FROM purchase_receipt_lines as latest_period_prl
+                    INNER JOIN purchase_receipts as latest_period_pr
+                        ON latest_period_pr.id = latest_period_prl.purchase_receipt_id
+                    WHERE latest_period_prl.item_id = period_prl.item_id
+                      AND latest_period_pr.status = ?
+                      AND latest_period_prl.unit_price > 0
+                      AND COALESCE(latest_period_prl.stock_qty_received, latest_period_prl.qty_received * COALESCE(latest_period_prl.conversion_factor, 1)) > 0
+                      AND DATE(latest_period_pr.date) <= ?
+                    ORDER BY latest_period_pr.date DESC, latest_period_pr.id DESC, latest_period_prl.id DESC
+                    LIMIT 1
+                )',
+                ['posted', $periodEndDate],
+            );
+        $latestPeriodHpp = DB::table('item_cost_snapshots as period_ics')
+            ->select('period_ics.item_id')
+            ->selectRaw('period_ics.unit_cost as period_unit_cost')
+            ->whereNull('period_ics.warehouse_id')
+            ->where('period_ics.unit_cost', '>', 0)
+            ->whereDate('period_ics.snapshot_date', '<=', $periodEndDate)
+            ->whereRaw(
+                'period_ics.id = (
+                    SELECT latest_period_ics.id
+                    FROM item_cost_snapshots as latest_period_ics
+                    WHERE latest_period_ics.item_id = period_ics.item_id
+                      AND latest_period_ics.warehouse_id IS NULL
+                      AND latest_period_ics.unit_cost > 0
+                      AND DATE(latest_period_ics.snapshot_date) <= ?
+                    ORDER BY latest_period_ics.snapshot_date DESC, latest_period_ics.id DESC
+                    LIMIT 1
+                )',
+                [$periodEndDate],
+            );
         $cogsExpression = 'COALESCE('
+            .'NULLIF(period_purchase.period_unit_cost, 0) * COALESCE(cogs_oi.qty, 0), '
+            .'NULLIF(period_hpp.period_unit_cost, 0) * COALESCE(cogs_oi.qty, 0), '
+            // Fallback untuk order lama yang belum punya histori harga item.
             .'NULLIF(cogs_oi.hpp_total_snapshot, 0), '
             .'NULLIF(cogs_oi.hpp_snapshot, 0) * COALESCE(cogs_oi.qty, 0), '
             .'NULLIF(cogs_oi.hpp_unit_snapshot, 0) * COALESCE(cogs_oi.qty, 0), '
-            .'NULLIF(cogs_item.base_unit_cost, 0) * COALESCE(cogs_oi.qty, 0), '
-            .'NULLIF(cogs_item.hpp, 0) * COALESCE(cogs_oi.qty, 0), '
             .'0)';
         $cogsByStoreDay = (clone $base)
             ->leftJoin('marketplace_order_items as cogs_oi', function ($join) {
@@ -370,7 +417,8 @@ class MarketplaceSalesDashboardController extends Controller
                             ->on('cogs_oi.order_id', '=', 'o.id');
                     });
             })
-            ->leftJoin('items as cogs_item', 'cogs_item.id', '=', 'cogs_oi.internal_item_id')
+            ->leftJoinSub($latestPeriodPurchasePrice, 'period_purchase', 'period_purchase.item_id', '=', 'cogs_oi.internal_item_id')
+            ->leftJoinSub($latestPeriodHpp, 'period_hpp', 'period_hpp.item_id', '=', 'cogs_oi.internal_item_id')
             ->selectRaw("DATE({$dateExpression}) as day")
             ->addSelect('o.store_id', 'st.name as store_name')
             ->selectRaw("COALESCE(SUM({$cogsExpression}), 0) as cogs")
@@ -388,6 +436,23 @@ class MarketplaceSalesDashboardController extends Controller
         $cogsByDay = $cogsByStoreDay
             ->groupBy('day')
             ->map(fn ($rows) => (float) $rows->sum('cogs'));
+        $settledCogsByDay = (clone $base)
+            ->join('marketplace_order_settlements as settled_cogs_ms', 'settled_cogs_ms.order_id', '=', 'o.id')
+            ->whereNotNull('settled_cogs_ms.settlement_time')
+            ->leftJoin('marketplace_order_items as cogs_oi', function ($join) {
+                $join->on('cogs_oi.marketplace_order_id', '=', 'o.id')
+                    ->orOn(function ($fallback) {
+                        $fallback->whereNull('cogs_oi.marketplace_order_id')
+                            ->on('cogs_oi.order_id', '=', 'o.id');
+                    });
+            })
+            ->leftJoinSub($latestPeriodPurchasePrice, 'period_purchase', 'period_purchase.item_id', '=', 'cogs_oi.internal_item_id')
+            ->leftJoinSub($latestPeriodHpp, 'period_hpp', 'period_hpp.item_id', '=', 'cogs_oi.internal_item_id')
+            ->selectRaw("DATE({$dateExpression}) as day")
+            ->selectRaw("COALESCE(SUM({$cogsExpression}), 0) as cogs")
+            ->groupByRaw("DATE({$dateExpression})")
+            ->get()
+            ->mapWithKeys(fn ($row) => [(string) $row->day => (float) $row->cogs]);
 
         // Selaraskan dengan estimasi penghasilan pada data order. Nilai legacy
         // ini adalah sumber utama yang dipakai halaman detail order; settlement
@@ -990,7 +1055,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->groupByRaw("DATE({$dateExpression})")
             ->orderByDesc('day')
             ->get()
-            ->map(function ($row) use ($cogsByDay, $estimatedPayoutByDay) {
+            ->map(function ($row) use ($settledCogsByDay) {
                 $row->orders = (int) $row->orders;
                 $row->settled_orders = (int) $row->settled_orders;
                 $row->pending_orders = (int) $row->pending_orders;
@@ -998,9 +1063,8 @@ class MarketplaceSalesDashboardController extends Controller
                 $row->settled_buyer_paid = (float) $row->settled_buyer_paid;
                 $row->pending_buyer_paid = (float) $row->pending_buyer_paid;
                 $row->final_income = (float) $row->final_income;
-                $row->cogs = (float) $cogsByDay->get((string) $row->day, 0);
-                $row->estimated_payout = (float) $estimatedPayoutByDay->get((string) $row->day, 0);
-                $row->gross_profit = $row->estimated_payout - $row->cogs;
+                $row->cogs = (float) $settledCogsByDay->get((string) $row->day, 0);
+                $row->gross_profit = $row->final_income - $row->cogs;
 
                 return $row;
             });

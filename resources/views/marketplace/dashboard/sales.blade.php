@@ -3140,8 +3140,8 @@
                 ['label' => 'Pembayaran Pembeli', 'value' => $fmt($incomeSummary['buyer_paid']), 'note' => number_format($incomeSummary['orders']).' orders', 'icon' => 'bi-wallet2', 'comparisons' => $kpiComparisons($incomeSummary['buyer_paid'], $previousMonthIncomeSummary['buyer_paid'] ?? null, $previousPeriodIncomeSummary['buyer_paid'] ?? null, $currencyDisplay)],
                 ['label' => 'Dana Cair', 'value' => $fmt($incomeSummary['final_income']), 'note' => number_format($incomeSummary['settled_orders']).' order settled', 'icon' => 'bi-cash-coin', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($incomeSummary['final_income'], $previousMonthIncomeSummary['final_income'] ?? null, $previousPeriodIncomeSummary['final_income'] ?? null, $currencyDisplay)],
                 ['label' => 'Belum Cair', 'value' => $fmt($incomeSummary['pending_buyer_paid']), 'note' => number_format($incomeSummary['pending_orders']).' order pending', 'icon' => 'bi-hourglass-split', 'comparisons' => $kpiComparisons($incomeSummary['pending_buyer_paid'], $previousMonthIncomeSummary['pending_buyer_paid'] ?? null, $previousPeriodIncomeSummary['pending_buyer_paid'] ?? null, $currencyDisplay, 'relative', false)],
-                ['label' => 'COGS / HPP', 'value' => $fmt($incomeSummary['cogs']), 'note' => 'biaya produk terjual', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($incomeSummary['cogs'], $previousMonthIncomeSummary['cogs'] ?? null, $previousPeriodIncomeSummary['cogs'] ?? null, $currencyDisplay, 'relative', false)],
-                ['label' => 'Gross Profit', 'value' => $fmt($incomeSummary['gross_profit']), 'note' => 'estimasi payout − COGS', 'icon' => 'bi-graph-up-arrow', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($incomeSummary['gross_profit'], $previousMonthIncomeSummary['gross_profit'] ?? null, $previousPeriodIncomeSummary['gross_profit'] ?? null, $currencyDisplay)],
+                ['label' => 'COGS / HPP', 'value' => $fmt($incomeSummary['cogs']), 'note' => 'order yang sudah cair', 'icon' => 'bi-box-seam', 'comparisons' => $kpiComparisons($incomeSummary['cogs'], $previousMonthIncomeSummary['cogs'] ?? null, $previousPeriodIncomeSummary['cogs'] ?? null, $currencyDisplay, 'relative', false)],
+                ['label' => 'Gross Profit', 'value' => $fmt($incomeSummary['gross_profit']), 'note' => 'Dana Cair − COGS', 'icon' => 'bi-graph-up-arrow', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($incomeSummary['gross_profit'], $previousMonthIncomeSummary['gross_profit'] ?? null, $previousPeriodIncomeSummary['gross_profit'] ?? null, $currencyDisplay)],
                 ['label' => 'Settlement Rate', 'value' => number_format($incomeSettlementRate, 1).'%','note' => 'berdasarkan jumlah order', 'icon' => 'bi-check2-circle', 'comparisons' => $kpiComparisons($incomeSettlementRate, $previousMonthIncomeSettlementRate, $previousPeriodIncomeSettlementRate, $percentDisplay, 'points')],
             ],
         ])
@@ -3166,7 +3166,7 @@
                                 <th class="text-end income-group-start" colspan="3">Sudah Cair</th>
                                 <th class="text-end income-group-start" colspan="3">Belum Cair</th>
                                 <th class="text-end income-group-start pe-3" colspan="2">Dana Cair</th>
-                                <th class="text-end income-group-start" colspan="2">Profitabilitas</th>
+                                <th class="text-end income-group-start" colspan="2">Profitabilitas · Sudah Cair</th>
                             </tr>
                             <tr>
                                 <th class="text-end">Qty</th>
