@@ -2979,8 +2979,11 @@ window.__trafficPerformanceView = function(view) {
             visible = !!groupRow?.classList.contains('open');
         }
         row.style.display = visible ? '' : 'none';
-        row.classList.remove('open');
-        if (isMarketplaceGroup) row.setAttribute('aria-expanded', 'false');
+        if (isMarketplaceGroup) {
+            row.setAttribute('aria-expanded', row.classList.contains('open') ? 'true' : 'false');
+        } else {
+            row.classList.remove('open');
+        }
         if (visible) visibleCount++;
     });
 
@@ -5125,7 +5128,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </tr>
                                 @endforeach
                                 @foreach($trafficMarketplaceCategoryRows as $marketplaceCategoryRow)
-                                    <tr class="traffic-marketplace-category-row" data-traffic-views="marketplace_category" data-marketplace-category-id="{{ $marketplaceCategoryRow['marketplace_category_id'] }}" data-marketplace-category-key="{{ $marketplaceCategoryRow['marketplace_category_id'] }}" role="button" tabindex="0" aria-expanded="false" onclick="trafficToggleMarketplaceCategory(this)" onkeydown="trafficHandleMarketplaceCategoryKeydown(event, this)">
+                                    <tr class="traffic-marketplace-category-row open" data-traffic-views="marketplace_category" data-marketplace-category-id="{{ $marketplaceCategoryRow['marketplace_category_id'] }}" data-marketplace-category-key="{{ $marketplaceCategoryRow['marketplace_category_id'] }}" role="button" tabindex="0" aria-expanded="true" onclick="trafficToggleMarketplaceCategory(this)" onkeydown="trafficHandleMarketplaceCategoryKeydown(event, this)">
                                         <td colspan="12">
                                             <div class="traffic-marketplace-category-group">
                                                 <div class="traffic-marketplace-category-group-title">
