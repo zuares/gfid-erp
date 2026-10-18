@@ -1168,6 +1168,93 @@
         .sales-dashboard .sales-product-analysis-matrix tr.sales-product-analysis-detail[hidden] { display: none !important; }
         .sales-dashboard .sales-product-analysis-matrix tr.sales-product-analysis-detail > td { display: block; width: 100%; }
     }
+    /* Enterprise visual pass: flatter surfaces, stronger hierarchy, and
+       denser information scanning without changing dashboard behavior. */
+    .sales-dashboard {
+        max-width: 1480px;
+        padding-inline: clamp(.75rem, 1.6vw, 1.5rem);
+    }
+    .sales-dashboard .sales-title {
+        color: #0f172a;
+        font-size: clamp(1.35rem, 1.8vw, 1.7rem);
+        font-weight: 800;
+        letter-spacing: -.035em;
+    }
+    body[data-theme="dark"] .sales-dashboard .sales-title { color: #f8fafc; }
+    .sales-dashboard .sales-card {
+        border-radius: 10px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 8px 24px rgba(15, 23, 42, .045);
+    }
+    .sales-dashboard .sales-filter-card {
+        border-top: 3px solid color-mix(in srgb, var(--sales-accent) 76%, var(--sales-line) 24%);
+        background: var(--sales-card);
+    }
+    .sales-dashboard .sales-nav-shell {
+        padding: .28rem;
+        border: 1px solid var(--sales-line);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--sales-card) 94%, var(--sales-bg) 6%);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+    .sales-dashboard .sales-nav { gap: .18rem !important; }
+    .sales-dashboard .sales-nav .nav-link {
+        border-radius: 7px;
+        color: var(--sales-muted);
+        font-size: .72rem;
+        font-weight: 750;
+        letter-spacing: .01em;
+        padding: .58rem .72rem;
+    }
+    .sales-dashboard .sales-nav .nav-link.active {
+        color: #fff;
+        background: var(--sales-accent);
+        box-shadow: 0 2px 5px color-mix(in srgb, var(--sales-accent) 22%, transparent);
+    }
+    .sales-dashboard .sales-nav .nav-link.active i { color: inherit; }
+    .sales-dashboard .sales-kpi {
+        min-height: 132px;
+        border-left: 3px solid color-mix(in srgb, var(--sales-accent) 58%, var(--sales-line) 42%);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 5px 16px rgba(15, 23, 42, .035);
+    }
+    .sales-dashboard .sales-kpi::after { opacity: .025; }
+    .sales-dashboard .sales-kpi-label {
+        font-size: .65rem;
+        letter-spacing: .045em;
+        text-transform: uppercase;
+    }
+    .sales-dashboard .sales-kpi-value {
+        font-size: clamp(1.05rem, 1.4vw, 1.32rem);
+        font-variant-numeric: tabular-nums;
+    }
+    .sales-dashboard .sales-kpi--success { border-left-color: var(--success, #16a34a); }
+    .sales-dashboard .sales-kpi--warning { border-left-color: var(--danger, #dc2626); }
+    .sales-dashboard .sales-section-header {
+        border-bottom: 1px solid color-mix(in srgb, var(--sales-line) 76%, transparent);
+    }
+    .sales-dashboard .sales-section-title {
+        font-size: .95rem;
+        font-weight: 800;
+        letter-spacing: -.01em;
+    }
+    .sales-dashboard .sales-table th {
+        background: color-mix(in srgb, var(--sales-bg) 72%, var(--sales-card) 28%);
+        font-size: .62rem;
+        letter-spacing: .075em;
+    }
+    .sales-dashboard .sales-table td,
+    .sales-dashboard .sales-income-table {
+        font-variant-numeric: tabular-nums;
+    }
+    .sales-dashboard .sales-table tbody tr:hover td {
+        background: color-mix(in srgb, var(--sales-accent-soft) 22%, var(--sales-card) 78%);
+    }
+    .sales-dashboard .sales-badge {
+        border: 1px solid color-mix(in srgb, var(--sales-accent) 16%, var(--sales-line) 84%);
+        background: color-mix(in srgb, var(--sales-accent-soft) 62%, var(--sales-card) 38%);
+        color: var(--sales-accent);
+        font-size: .65rem;
+        font-weight: 750;
+    }
 </style>
 @endpush
 
@@ -2453,19 +2540,19 @@
 <div class="container-fluid py-4 sales-dashboard">
     <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
         <div>
-            <div class="text-muted small mb-1">Toko Online / Dashboard Operasional</div>
-            <h1 class="h3 sales-title mb-1">Dashboard Penjualan</h1>
+            <div class="text-muted small mb-1">Marketplace / Operasional &amp; Keuangan</div>
+            <h1 class="h3 sales-title mb-1">Performance Dashboard</h1>
         </div>
         <div class="d-flex flex-wrap align-items-center gap-2">
             <a class="btn btn-outline-primary btn-sm" href="{{ $exportUrl }}" title="Unduh semua tab dalam format CSV dan JSONL">
-                <i class="bi bi-download me-1"></i>Export data
+                <i class="bi bi-download me-1"></i>Ekspor data
             </a>
             @if ($canImportMarketplace)
                 <a class="btn btn-primary btn-sm" href="{{ route('imports.marketplace.create', $importOrderQuery) }}">
                     <i class="bi bi-upload me-1"></i>Import Pesanan
                 </a>
             @endif
-            <span class="badge sales-badge rounded-pill px-3 py-2"><i class="bi bi-database-check me-1"></i>Data marketplace</span>
+            <span class="badge sales-badge rounded-pill px-3 py-2"><i class="bi bi-database-check me-1"></i>Data tersinkronisasi</span>
         </div>
     </div>
 
