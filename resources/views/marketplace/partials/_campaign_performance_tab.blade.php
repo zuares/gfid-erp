@@ -20,6 +20,14 @@
     // ROAS per campaign yang menyesuaikan HPP tiap item.
     $perfTargetProfitPct = $targetProfitPct ?? null;
     $perfStoreNames = collect($stores ?? [])->keyBy('id')->map(fn ($store) => $store->name);
+    // Traffic sudah memiliki mapping marketplace category yang dipakai pada
+    // tab Iklan. Gunakan sebagai fallback agar tab Kampanye tetap konsisten
+    // bila enrichment property pada object campaign belum terbawa.
+    $perfTrafficCategoryByCampaign = collect($trafficRows ?? [])
+        ->filter(fn ($row) => filled(data_get($row, 'marketplace_category_id')))
+        ->mapWithKeys(fn ($row) => [
+            (string) data_get($row, 'row.store_id') . '|' . (string) data_get($row, 'id') => $row,
+        ]);
 
     // Label periode pembanding (mengikuti compare_mode halaman).
     $perfCompareMode = $compareMode ?? 'prev_period';
@@ -148,6 +156,11 @@
 
         $campaignId = (string) $camp->channel_campaign_id;
         $campaignName = (string) ($camp->campaign_name ?? '');
+        $perfTrafficCategory = $perfTrafficCategoryByCampaign->get((string) $camp->store_id . '|' . $campaignId);
+        $marketplaceCategoryId = $camp->marketplace_category_id
+            ?? data_get($perfTrafficCategory, 'marketplace_category_id');
+        $marketplaceProductId = $camp->marketplace_product_id
+            ?? data_get($perfTrafficCategory, 'marketplace_product_id');
         $isGmvMax = str_starts_with(strtoupper($campaignId), 'GMS-')
             || str_contains(strtolower($campaignName), 'gmv max');
         // Produk dianggap bermasalah bila HPP efektif belum tersedia. HPP bisa
@@ -157,7 +170,7 @@
         $performanceViews = $isGmvMax
             ? ['all', 'category', 'gms']
             : array_values(array_unique(array_merge(['all', 'category', 'roas'], $isUnmapped ? ['unmapped'] : [])));
-        if (filled($camp->marketplace_category_id)) {
+        if (filled($marketplaceCategoryId)) {
             $performanceViews[] = 'marketplace_category';
         }
         $performanceViews = array_values(array_unique($performanceViews));
@@ -171,8 +184,8 @@
             'name' => $camp->campaign_name,
             'type' => $camp->ad_type,
             'performance_views' => $performanceViews,
-            'marketplace_category_id' => $camp->marketplace_category_id ?? null,
-            'marketplace_product_id' => $camp->marketplace_product_id ?? null,
+            'marketplace_category_id' => $marketplaceCategoryId,
+            'marketplace_product_id' => $marketplaceProductId,
             'category' => $isGmvMax ? 'GMV Max Auto' : ($camp->item_category ?? $camp->internalItem?->category?->name ?? 'Belum termapping'),
             'status' => $camp->campaign_status,
             'spend' => $spend,
