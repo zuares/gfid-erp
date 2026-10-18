@@ -172,6 +172,7 @@
             'type' => $camp->ad_type,
             'performance_views' => $performanceViews,
             'marketplace_category_id' => $camp->marketplace_category_id ?? null,
+            'marketplace_product_id' => $camp->marketplace_product_id ?? null,
             'category' => $isGmvMax ? 'GMV Max Auto' : ($camp->item_category ?? $camp->internalItem?->category?->name ?? 'Belum termapping'),
             'status' => $camp->campaign_status,
             'spend' => $spend,
@@ -679,6 +680,17 @@
     .perf-product-economics { display:flex; flex-wrap:wrap; gap:.25rem .45rem; margin-top:.18rem; color:var(--dsh-muted, #6b7280); font-size:.58rem; line-height:1.25; }
     .perf-product-economics span { white-space:nowrap; }
     .perf-product-economics b { color:var(--text); font-weight:750; }
+    .perf-marketplace-category { display:inline-flex; align-items:center; gap:.2rem; max-width:100%; margin-top:.16rem; color:#475569; font-size:.57rem; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .perf-marketplace-category i { color:#2563eb; font-size:.6rem; flex:0 0 auto; }
+    .perf-marketplace-category span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+    .perf-marketplace-category-group-row { cursor:pointer; background:rgba(239,246,255,.72); }
+    .perf-marketplace-category-group-row:hover { background:rgba(219,234,254,.78); }
+    .perf-marketplace-category-group-row td { padding:.55rem .75rem !important; border-top:1px solid var(--dsh-border); border-bottom:1px solid var(--dsh-border); }
+    .perf-marketplace-category-group-copy { display:flex; align-items:center; gap:.45rem; min-width:0; }
+    .perf-marketplace-category-group-copy i { color:#2563eb; font-size:.72rem; transition:transform .16s ease; }
+    .perf-marketplace-category-group-row.is-open .perf-marketplace-category-group-copy i { transform:rotate(90deg); }
+    .perf-marketplace-category-group-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text, #0f172a); font-size:.68rem; font-weight:800; }
+    .perf-marketplace-category-group-count { color:var(--dsh-muted, #64748b); font-size:.58rem; font-weight:700; }
     .perf-decision-filters { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; padding:.45rem; border:1px solid var(--dsh-border); border-radius:10px; background:var(--bg, #f8fafc); }
     .perf-decision-filters select, .perf-decision-filters input { min-height:30px; border-radius:7px; font-size:.65rem; }
     .perf-decision-filters .perf-filter-search { flex:1 1 190px; min-width:170px; }
@@ -1309,6 +1321,9 @@
                                                         <div style="min-width:0;">
                                                             <div class="fw-bold text-truncate" style="max-width:260px;" title="{{ $campaignRow['name'] }}">{{ $campaignRow['name'] }}</div>
                                                             <div class="text-muted text-truncate" style="font-size:.62rem; max-width:260px;">{{ $campaignRow['item_name'] }} @if($campaignRow['type']) · {{ strtoupper($campaignRow['type']) }}@endif</div>
+                                                            @if(filled($campaignRow['marketplace_product_id'] ?? null) && filled($campaignRow['marketplace_category_id'] ?? null))
+                                                                <div class="perf-marketplace-category" data-perf-marketplace-category data-product-id="{{ $campaignRow['marketplace_product_id'] }}" data-category-id="{{ $campaignRow['marketplace_category_id'] }}" title="Kategori marketplace #{{ $campaignRow['marketplace_category_id'] }}"><i class="bi bi-tags" aria-hidden="true"></i><span data-perf-marketplace-category-label>Kategori marketplace #{{ $campaignRow['marketplace_category_id'] }}</span></div>
+                                                            @endif
                                                             <div class="text-muted" style="font-size:.58rem;">
                                                                 <span class="badge bg-light text-dark border" style="font-size:.5rem;">{{ $campaignRow['status'] === 'ongoing' ? 'AKTIF' : strtoupper($campaignRow['status'] ?: 'N/A') }}</span>
                                                                 @if(($storeId ?? null) === 'all')<span class="badge bg-light text-dark border" style="font-size:.5rem;"><i class="bi bi-shop"></i> {{ $campaignRow['store_name'] }}</span>@endif
@@ -1372,7 +1387,7 @@
                     @php
                         $meetsTarget = $row['target_roas'] !== null && $row['roas'] >= $row['target_roas'];
                     @endphp
-                    <tr class="perf-row" data-perf-views="{{ implode(' ', $row['performance_views'] ?? []) }}" data-perf-name="{{ strtolower(($row['name'] ?? '') . ' ' . ($row['item_name'] ?? '')) }}" data-perf-status="{{ strtolower((string) ($row['status'] ?? '')) }}" data-perf-reco="{{ strtolower($row['reco']) }}" data-perf-profit="{{ $row['profit'] ?? 0 }}" data-perf-profit-available="{{ $row['profit_available'] ? '1' : '0' }}" data-perf-roas="{{ $row['roas'] }}" data-perf-gmv="{{ $row['gmv'] }}" data-perf-spend="{{ $row['spend'] }}" data-perf-orders="{{ $row['orders'] }}" data-perf-ctr="{{ $row['ctr'] }}" data-perf-cvr="{{ $row['cvr'] }}" data-perf-hourly-store-id="{{ e((string) $row['store_id']) }}" data-perf-hourly-campaign-id="{{ e((string) $row['campaign_id']) }}" data-perf-hourly-name="{{ e((string) ($row['name'] ?? 'Campaign')) }}" onclick="perfToggle(this)">
+                    <tr class="perf-row" data-perf-views="{{ implode(' ', $row['performance_views'] ?? []) }}" data-perf-name="{{ strtolower(($row['name'] ?? '') . ' ' . ($row['item_name'] ?? '')) }}" data-perf-status="{{ strtolower((string) ($row['status'] ?? '')) }}" data-perf-reco="{{ strtolower($row['reco']) }}" data-perf-profit="{{ $row['profit'] ?? 0 }}" data-perf-profit-available="{{ $row['profit_available'] ? '1' : '0' }}" data-perf-roas="{{ $row['roas'] }}" data-perf-gmv="{{ $row['gmv'] }}" data-perf-spend="{{ $row['spend'] }}" data-perf-orders="{{ $row['orders'] }}" data-perf-ctr="{{ $row['ctr'] }}" data-perf-cvr="{{ $row['cvr'] }}" data-perf-marketplace-category-id="{{ $row['marketplace_category_id'] ?? '' }}" data-perf-marketplace-category-label="Kategori marketplace #{{ $row['marketplace_category_id'] ?? '' }}" data-perf-hourly-store-id="{{ e((string) $row['store_id']) }}" data-perf-hourly-campaign-id="{{ e((string) $row['campaign_id']) }}" data-perf-hourly-name="{{ e((string) ($row['name'] ?? 'Campaign')) }}" onclick="perfToggle(this)">
                         {{-- Campaign / Item --}}
                         <td>
                             <div class="d-flex align-items-start gap-1">
@@ -1397,6 +1412,9 @@
                                         <span class="badge bg-light text-dark border ms-1" style="font-size:.52rem;">{{ $row['status'] === 'ongoing' ? 'AKTIF' : strtoupper($row['status'] ?: 'N/A') }}</span>
                                         @if(($storeId ?? null) === 'all')<span class="badge bg-light text-dark border ms-1" style="font-size:.52rem;"><i class="bi bi-shop"></i> {{ $row['store_name'] }}</span>@endif
                                     </div>
+                                    @if(filled($row['marketplace_product_id'] ?? null) && filled($row['marketplace_category_id'] ?? null))
+                                        <div class="perf-marketplace-category" data-perf-marketplace-category data-product-id="{{ $row['marketplace_product_id'] }}" data-category-id="{{ $row['marketplace_category_id'] }}" title="Kategori marketplace #{{ $row['marketplace_category_id'] }}"><i class="bi bi-tags" aria-hidden="true"></i><span data-perf-marketplace-category-label>Kategori marketplace #{{ $row['marketplace_category_id'] }}</span></div>
+                                    @endif
                                     <div class="perf-product-economics" title="{{ $row['item_name'] === 'N/A' ? 'Produk belum dipetakan ke HPP' : 'Ekonomi produk' }}">
                                         <span>COGS/unit <b>{{ $row['unit_cogs'] > 0 ? 'Rp ' . number_format($row['unit_cogs'], 0, ',', '.') : '—' }}</b></span>
                                         <span>BEP <b>{{ $row['bep_roas'] === null ? '—' : number_format($row['bep_roas'], 2) . 'x' }}</b></span>
@@ -2195,6 +2213,123 @@ function perfToggleCategory(row) {
     }
 }
 
+function perfLoadMarketplaceCategoryLabels() {
+    const targets = Array.from(document.querySelectorAll('.campaign-performance-panel [data-perf-marketplace-category]'));
+    if (!targets.length) return;
+    const cache = new Map();
+    const loadCategory = function(target) {
+        const productId = target.dataset.productId;
+        const categoryId = target.dataset.categoryId;
+        if (!productId || !categoryId) return Promise.resolve();
+        const cacheKey = `${productId}:${categoryId}`;
+        if (!cache.has(cacheKey)) {
+            cache.set(cacheKey, fetch(`/api/marketplace/products/${encodeURIComponent(productId)}/category-info?category_id=${encodeURIComponent(categoryId)}`, {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            }).then(function(response) {
+                if (!response.ok) throw new Error('category request failed');
+                return response.json();
+            }));
+        }
+        return cache.get(cacheKey).then(function(result) {
+            const path = Array.isArray(result.category_path) ? result.category_path.filter(Boolean) : [];
+            const label = path.length ? path.join(' › ') : (result.category_name || `Kategori marketplace #${categoryId}`);
+            document.querySelectorAll('.campaign-performance-panel [data-perf-marketplace-category]').forEach(function(item) {
+                if (item.dataset.productId !== String(productId) || item.dataset.categoryId !== String(categoryId)) return;
+                const labelTarget = item.querySelector('[data-perf-marketplace-category-label]');
+                if (labelTarget) labelTarget.textContent = label;
+                item.title = `Kategori marketplace: ${label}`;
+                const campaignRow = item.closest('tr.perf-row');
+                if (campaignRow) campaignRow.dataset.perfMarketplaceCategoryLabel = label;
+            });
+            perfUpdateMarketplaceGroupLabels();
+        }).catch(function() {
+            target.title = `Kategori marketplace #${categoryId}`;
+        });
+    };
+    Promise.all(targets.map(loadCategory));
+}
+
+document.addEventListener('DOMContentLoaded', perfLoadMarketplaceCategoryLabels);
+
+function perfMarketplaceGroupMembers(groupRow) {
+    const categoryId = groupRow?.dataset?.marketplaceCategoryId || '';
+    if (!categoryId) return [];
+    return Array.from(document.querySelectorAll('.campaign-performance-panel tr.perf-row')).filter(function(row) {
+        return row.dataset.perfMarketplaceCategoryId === categoryId;
+    });
+}
+
+function perfUpdateMarketplaceGroupLabels() {
+    document.querySelectorAll('.campaign-performance-panel tr.perf-marketplace-category-group-row').forEach(function(groupRow) {
+        const member = perfMarketplaceGroupMembers(groupRow)[0];
+        const label = member?.dataset?.perfMarketplaceCategoryLabel || `Kategori marketplace #${groupRow.dataset.marketplaceCategoryId || '—'}`;
+        const labelTarget = groupRow.querySelector('[data-perf-marketplace-category-group-label]');
+        if (labelTarget) labelTarget.textContent = label;
+    });
+}
+
+function perfUpdateMarketplaceGroups() {
+    const active = perfActiveSegment === 'marketplace_category';
+    document.querySelectorAll('.campaign-performance-panel tr.perf-marketplace-category-group-row').forEach(function(groupRow) {
+        const members = perfMarketplaceGroupMembers(groupRow);
+        const hasMatches = members.some(row => row.dataset.perfMatch !== '0');
+        const isOpen = groupRow.dataset.perfOpen === '1';
+        groupRow.style.display = active && hasMatches ? '' : 'none';
+        groupRow.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        groupRow.classList.toggle('is-open', isOpen);
+        members.forEach(function(row) {
+            const visible = active && isOpen && row.dataset.perfMatch !== '0';
+            row.style.display = visible ? '' : 'none';
+            const detail = row.nextElementSibling;
+            if (detail?.classList.contains('perf-detail')) {
+                detail.style.display = 'none';
+                detail.style.visibility = visible ? '' : 'hidden';
+            }
+        });
+        const countTarget = groupRow.querySelector('[data-perf-marketplace-category-group-count]');
+        if (countTarget) countTarget.textContent = `${members.filter(row => row.dataset.perfMatch !== '0').length} campaign`;
+    });
+}
+
+function perfArrangeMarketplaceGroups() {
+    const tbody = document.querySelector('.campaign-performance-panel .perf-table > tbody');
+    if (!tbody) return;
+    const openState = new Map();
+    tbody.querySelectorAll('tr.perf-marketplace-category-group-row').forEach(function(groupRow) {
+        openState.set(groupRow.dataset.marketplaceCategoryId || '', groupRow.dataset.perfOpen === '1');
+        groupRow.remove();
+    });
+    const groups = new Map();
+    Array.from(tbody.querySelectorAll('tr.perf-row[data-perf-marketplace-category-id]')).forEach(function(row) {
+        const categoryId = row.dataset.perfMarketplaceCategoryId || '';
+        if (!categoryId) return;
+        if (!groups.has(categoryId)) groups.set(categoryId, []);
+        groups.get(categoryId).push(row);
+    });
+    groups.forEach(function(members, categoryId) {
+        const groupRow = document.createElement('tr');
+        groupRow.className = 'perf-marketplace-category-group-row';
+        groupRow.dataset.marketplaceCategoryId = categoryId;
+        groupRow.dataset.perfOpen = openState.get(categoryId) ? '1' : '0';
+        groupRow.setAttribute('role', 'button');
+        groupRow.setAttribute('tabindex', '0');
+        groupRow.innerHTML = '<td colspan="7"><div class="perf-marketplace-category-group-copy"><i class="bi bi-chevron-right" aria-hidden="true"></i><span class="perf-marketplace-category-group-label" data-perf-marketplace-category-group-label></span><span class="perf-marketplace-category-group-count" data-perf-marketplace-category-group-count></span></div></td>';
+        groupRow.addEventListener('click', function() {
+            groupRow.dataset.perfOpen = groupRow.dataset.perfOpen === '1' ? '0' : '1';
+            perfUpdateMarketplaceGroups();
+        });
+        groupRow.addEventListener('keydown', function(event) {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            groupRow.click();
+        });
+        members[0].before(groupRow);
+    });
+    perfUpdateMarketplaceGroupLabels();
+    perfUpdateMarketplaceGroups();
+}
+
 const perfKpiData = {!! json_encode($perfSegmentKpis) !!};
 const perfFilterData = {!! json_encode($perfRows->map(function ($row) {
     return [
@@ -2416,6 +2551,32 @@ function perfKpiFromRows(rows) {
 function perfSortRows() {
     const tbody = document.querySelector('.campaign-performance-panel .perf-table tbody');
     if (!tbody) return;
+    if (perfActiveSegment === 'marketplace_category') {
+        const sortKey = {
+            spend: 'spend',
+            profit: 'profit',
+            roas: 'roas',
+            orders: 'orders',
+            gmv: 'gmv',
+        }[perfDecisionFilters.sort] || 'spend';
+        const direction = perfDecisionFilters.sortDirection === 'asc' ? 1 : -1;
+        const groups = Array.from(tbody.querySelectorAll('tr.perf-marketplace-category-group-row')).map(function(groupRow) {
+            const members = perfMarketplaceGroupMembers(groupRow);
+            const value = members.reduce((total, row) => total + Number(row.dataset['perf' + sortKey.charAt(0).toUpperCase() + sortKey.slice(1)] || 0), 0);
+            return { groupRow, members, value };
+        });
+        groups.sort((a, b) => (a.value - b.value) * direction);
+        groups.forEach(function(group) {
+            tbody.appendChild(group.groupRow);
+            group.members.forEach(function(row) {
+                const detail = row.nextElementSibling;
+                tbody.appendChild(row);
+                if (detail?.classList.contains('perf-detail')) tbody.appendChild(detail);
+            });
+        });
+        perfUpdateMarketplaceGroups();
+        return;
+    }
     const sortKey = {
         spend: 'spend',
         profit: 'profit',
@@ -2457,6 +2618,7 @@ function perfApplyDecisionFilters() {
     const activeFilter = perfFilterIsActive();
     const filteredData = perfFilterData.filter(row => (row.views || []).includes(segment) && perfMatchesDecisionFilter(row));
     const categoryView = segment === 'category';
+    const marketplaceCategoryView = segment === 'marketplace_category';
     const statusFilter = document.getElementById('perfStatusFilter');
     if (statusFilter) {
         statusFilter.disabled = categoryView;
@@ -2479,16 +2641,20 @@ function perfApplyDecisionFilters() {
                 profit: row.dataset.perfProfit, impressions: row.dataset.perfImpressions, clicks: row.dataset.perfClicks,
                 ctr: row.dataset.perfCtr, cvr: row.dataset.perfCvr, profit_available: row.dataset.perfProfitAvailable !== '0',
             });
-        row.style.display = matches ? '' : 'none';
+        row.dataset.perfMatch = matches ? '1' : '0';
+        row.style.display = marketplaceCategoryView ? 'none' : (matches ? '' : 'none');
         row.classList.remove('open');
         const detail = row.nextElementSibling;
         if (detail?.classList.contains('perf-detail')) { detail.style.display = 'none'; detail.style.visibility = matches ? '' : 'hidden'; }
     });
     perfSortRows();
+    perfUpdateMarketplaceGroups();
     if (activeFilter && !categoryView) perfUpdateKpis(segment, perfKpiFromRows(filteredData));
     else perfUpdateKpis(segment);
     const visible = categoryView
         ? Array.from(document.querySelectorAll('.perf-category-row')).some(row => row.style.display !== 'none')
+        : marketplaceCategoryView
+            ? Array.from(document.querySelectorAll('.perf-marketplace-category-group-row')).some(row => row.style.display !== 'none')
         : Array.from(document.querySelectorAll('.perf-row')).some(row => row.style.display !== 'none');
     const empty = document.querySelector('.perf-segment-empty');
     if (empty) empty.style.display = visible ? 'none' : 'table-row';
@@ -2519,12 +2685,14 @@ function perfApplySegment(segment) {
         // detail tetap tersedia melalui accordion kategori, agar detail CPC dan
         // metrik campaign tidak ikut muncul di tampilan utama kategori.
         const isCategoryView = segment === 'category';
+        const isMarketplaceCategoryView = segment === 'marketplace_category';
         const isVisible = isCategoryView
             ? row.classList.contains('perf-category-row')
             : row.classList.contains('perf-row')
                 && (row.dataset.perfViews || '').split(/\s+/).includes(segment);
+        if (row.classList.contains('perf-row')) row.dataset.perfMatch = isVisible ? '1' : '0';
         const detail = row.classList.contains('perf-row') ? row.nextElementSibling : null;
-        row.style.display = isVisible ? '' : 'none';
+        row.style.display = isMarketplaceCategoryView ? 'none' : (isVisible ? '' : 'none');
         row.classList.remove('open');
 
         if (detail && detail.classList.contains('perf-detail')) {
@@ -2535,6 +2703,7 @@ function perfApplySegment(segment) {
         if (isVisible) visibleCount++;
     });
 
+    perfArrangeMarketplaceGroups();
     if (emptyState) emptyState.style.display = visibleCount ? 'none' : 'table-row';
     perfApplyDecisionFilters();
 }
