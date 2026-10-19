@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Item;
+use App\Models\ItemBom;
 use App\Models\ItemBomLine;
 use App\Models\ItemCategory;
 use App\Models\User;
@@ -217,5 +218,130 @@ class MasterItemBomTest extends TestCase
         $response->assertRedirect(route('master.item_boms.create'));
         $response->assertSessionHasErrors('lines');
         $this->assertDatabaseCount('item_boms', 0);
+    }
+
+    public function test_bom_search_matches_item_sku_and_bom_name(): void
+    {
+        $finishedGood = Item::create([
+            'code' => 'FG-BOM-SEARCH-001',
+            'sku' => 'SHOP-SKU-SEARCH-001',
+            'name' => 'Produk Pencarian BOM',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_role' => 'finished_good',
+            'is_stocked' => true,
+            'hpp_behavior' => 'hpp',
+            'default_allocation' => 'hpp',
+            'can_make' => true,
+            'default_supply_source' => 'make',
+            'active' => true,
+        ]);
+
+        $bom = ItemBom::create([
+            'item_id' => $finishedGood->id,
+            'name' => 'Resep khusus pencarian',
+            'active' => true,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->get(route('master.item_boms.index', ['q' => 'SHOP-SKU-SEARCH-001']))
+            ->assertOk()
+            ->assertSee($finishedGood->code)
+            ->assertSee($finishedGood->name);
+
+        $this->actingAs($this->owner)
+            ->get(route('master.item_boms.index', ['q' => 'khusus pencarian']))
+            ->assertOk()
+            ->assertSee($finishedGood->code);
+
+        $this->actingAs($this->owner)
+            ->get(route('master.item_boms.ajax_items', [
+                'type' => 'finished_good',
+                'q' => 'SHOP-SKU-SEARCH-001',
+            ]))
+            ->assertOk()
+            ->assertJsonFragment(['id' => $finishedGood->id]);
+    }
+
+    public function test_existing_bom_can_be_edited_with_a_small_quantity(): void
+    {
+        $finishedGood = Item::create([
+            'code' => 'FG-BOM-EDIT-001',
+            'name' => 'Produk Edit BOM',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_role' => 'finished_good',
+            'is_stocked' => true,
+            'hpp_behavior' => 'hpp',
+            'default_allocation' => 'hpp',
+            'can_make' => true,
+            'default_supply_source' => 'make',
+            'active' => true,
+        ]);
+        $material = Item::create([
+            'code' => 'FAB-BOM-EDIT-001',
+            'name' => 'Bahan Edit BOM',
+            'unit' => 'kg',
+            'type' => 'material',
+            'item_role' => 'raw_material',
+            'is_stocked' => true,
+            'hpp_behavior' => 'hpp',
+            'default_allocation' => 'hpp',
+            'active' => true,
+        ]);
+
+        $bom = ItemBom::create([
+            'item_id' => $finishedGood->id,
+            'name' => 'BOM sebelum edit',
+            'active' => true,
+        ]);
+        ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $material->id,
+            'usage_stage' => ItemBomLine::STAGE_MAIN_MATERIAL,
+            'qty' => '0.0005',
+            'uom' => 'kg',
+            'scrap_pct' => '0',
+            'is_optional' => false,
+            'sort_order' => 10,
+        ]);
+
+        $response = $this->actingAs($this->owner)
+            ->put(route('master.item_boms.update', $bom), [
+                'name' => 'BOM setelah edit',
+                'active' => 1,
+                'lines' => [[
+                    'material_item_id' => $material->id,
+                    'usage_stage' => ItemBomLine::STAGE_MAIN_MATERIAL,
+                    'qty' => '0.0005',
+                    'uom' => 'kg',
+                    'scrap_pct' => '15',
+                    'is_optional' => 0,
+                    'sort_order' => 10,
+                ]],
+            ]);
+
+        $response->assertRedirect(route('master.item_boms.edit', $bom));
+        $this->assertSame('BOM setelah edit', $bom->fresh()->name);
+        $this->assertDatabaseHas('item_bom_lines', [
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $material->id,
+            'qty' => '0.0005',
+            'scrap_pct' => '15.000',
+        ]);
+    }
+
+    public function test_new_bom_line_uses_fifteen_percent_waste_by_default(): void
+    {
+        $this->actingAs($this->owner)
+            ->get(route('master.item_boms.create'))
+            ->assertOk()
+            ->assertSee('Waste (%)')
+            ->assertSee('Waste default 15%')
+            ->assertSee('name="lines[0][scrap_pct]"', false)
+            ->assertSee('value="15"', false)
+            ->assertSee('data-max-decimals="3"', false)
+            ->assertSee('placeholder="0,000"', false)
+            ->assertSee('toFixed(3)', false);
     }
 }

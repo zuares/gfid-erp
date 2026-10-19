@@ -11,61 +11,42 @@
         --bom-border-strong:rgba(148,163,184,.30);
         --bom-muted:#64748b;
     }
-    .page-wrap{ max-width:1040px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
+    .page-wrap{ max-width:1280px; width:100%; margin-inline:auto; padding:1rem 1.1rem 4rem; background:transparent!important; color:#0f172a; }
 
     .card-main{
         background: var(--card);
-        border-radius: 8px;
+        border-radius: 18px;
         border: 1px solid var(--bom-border);
-        box-shadow: none;
+        box-shadow: 0 10px 28px rgba(15,23,42,.045);
         overflow:hidden;
     }
     body[data-theme="dark"] .card-main{
-        border-color: rgba(51,65,85,.85);
+        border-color: #334155;
         box-shadow: none;
     }
 
     .bom-topbar{
-        position:sticky;
-        top:0;
-        z-index:300;
         display:flex;
         justify-content:space-between;
         align-items:center;
         gap:.6rem;
         flex-wrap:wrap;
-        padding:.45rem .75rem;
-        margin-inline:-.75rem;
-        margin-bottom:.65rem;
-        background:var(--card,#fff);
-        border-bottom:1px solid var(--bom-border);
+        padding:.2rem 0 1rem;
+        margin:0 0 1rem;
+        border-bottom:1px solid rgba(148,163,184,.22);
     }
-    body[data-theme="dark"] .bom-topbar{ background:var(--card,#0f172a); }
-    .title{ font-weight: 750; font-size:1rem; letter-spacing: 0; margin:0; }
+    body[data-theme="dark"] .page-wrap{ color:#e5e7eb; }
+    body[data-theme="dark"] .bom-topbar{ border-color:#334155; }
+    .title{ font-weight: 750; font-size:1.45rem; letter-spacing:-.03em; margin:0; }
     .sub{ color:var(--bom-muted); font-size:.78rem; }
     body[data-theme="dark"] .sub{ color:#9ca3af; }
 
-    .kpis{ display:flex; flex-wrap:wrap; gap:.32rem; margin-top:.35rem; }
-    .kpi{
-        display:inline-flex; align-items:baseline; gap:.45rem;
-        border-radius:7px; padding:.2rem .48rem;
-        border:1px solid rgba(148,163,184,.28);
-        background: transparent;
-        font-size:.72rem;
-    }
-    body[data-theme="dark"] .kpi{
-        background: rgba(15, 23, 42, 0.96);
-        border-color: rgba(51, 65, 85, 0.85);
-    }
-    .kpi .lbl{ text-transform:none; letter-spacing:0; font-size:.66rem; color:#94a3b8; }
-    body[data-theme="dark"] .kpi .lbl{ color:#6b7280; }
-    .kpi .val{ font-weight:650; color:var(--bom-accent); }
-
     .controls{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+    .bom-filter{ padding:0; background:transparent; border:0; border-radius:0; }
     .filter-label{ font-size:.8rem; color:#6b7280; }
     body[data-theme="dark"] .filter-label{ color:#9ca3af; }
-    .filter-input{ border-radius:7px; padding-left:.75rem; font-size:.82rem; min-height:30px; }
-    .btn-pill{ border-radius:7px; padding-inline:.78rem; box-shadow:none!important; font-weight:600; }
+    .filter-input{ border-radius:10px; padding-left:.75rem; font-size:.84rem; min-height:40px; border:1.5px solid #111827; box-shadow:0 0 0 2px rgba(15,23,42,.04); }
+    .btn-pill{ border-radius:10px; padding-inline:.85rem; min-height:40px; box-shadow:none!important; font-weight:600; }
     .btn-bom-primary{ background:var(--bom-accent)!important; border-color:var(--bom-accent)!important; color:#fff!important; }
     .btn-bom-primary:hover{ background:var(--bom-accent-2)!important; border-color:var(--bom-accent-2)!important; color:#fff!important; }
     .btn-bom-outline{ color:#475569!important; background:transparent!important; border:1px solid rgba(148,163,184,.35)!important; }
@@ -73,7 +54,7 @@
     body[data-theme="dark"] .btn-bom-outline { color: #cbd5e1!important; }
     body[data-theme="dark"] .btn-bom-outline:hover { color: #f8fafc!important; background: rgba(148,163,184,.15)!important; }
 
-    .table-list{ margin-bottom:0; }
+    .table-list{ margin-bottom:0; font-size:.76rem; }
     .table-list thead th{
         border-bottom-width:1px;
         font-size:.68rem;
@@ -81,7 +62,7 @@
         letter-spacing:0;
         color:#64748b;
         background: var(--card,#fff);
-        padding:.52rem .62rem;
+        padding:.7rem .7rem;
         white-space:nowrap;
         position: sticky;
         top: 0;
@@ -95,7 +76,7 @@
     .table-list tbody td{
         vertical-align:middle;
         border-top-color: rgba(148, 163, 184, 0.16);
-        padding:.52rem .62rem;
+        padding:.72rem .7rem;
     }
     body[data-theme="dark"] .table-list tbody td{ border-top-color: rgba(51, 65, 85, 0.85); }
 
@@ -104,6 +85,19 @@
     .muted{ font-size:.82rem; color:#6b7280; }
     body[data-theme="dark"] .muted{ color:#9ca3af; }
     .bom-name{ font-weight:600; }
+    .bom-item-code{ font-family:monospace; font-weight:750; letter-spacing:.01em; }
+    .bom-item-name{ color:#64748b; font-size:.76rem; margin-top:.12rem; }
+    body[data-theme="dark"] .bom-item-name{ color:#9ca3af; }
+    .bom-structure{ color:#475569; font-size:.74rem; line-height:1.5; }
+    .bom-structure strong{ color:#1e293b; font-weight:700; }
+    body[data-theme="dark"] .bom-structure{ color:#cbd5e1; }
+    body[data-theme="dark"] .bom-structure strong{ color:#f8fafc; }
+    .bom-actual{ color:#64748b; font-size:.7rem; margin-top:.18rem; }
+    body[data-theme="dark"] .bom-actual{ color:#9ca3af; }
+    .usage-status{ font-size:.67rem; font-weight:650; margin-left:.35rem; }
+    .usage-over{ color:#b91c1c; }
+    .usage-under{ color:#15803d; }
+    .usage-ok{ color:#64748b; }
 
     .badge-status{
         border-radius:7px; padding:.16rem .48rem;
@@ -146,15 +140,19 @@
     .gf-live-filter-indicator.is-show { display: inline-flex !important; }
 
     @media (max-width: 768px) {
-        .page-wrap{ padding:.5rem .5rem 4rem; }
-        .bom-topbar{ margin-inline:-.5rem; padding:.5rem .65rem; }
-        .title{ font-size:1.05rem; }
+        .page-wrap{ padding:.65rem .55rem 4rem; }
+        .bom-topbar{ padding:.2rem 0 .85rem; }
+        .title{ font-size:1.12rem; }
         .sub{ display:none; }
         .controls{ width:100%; align-items:stretch; }
         .controls form{ flex:1 1 100%; }
         .controls .btn,
         .controls form button{ min-height:40px; }
-        .kpis{ display:none; }
+        .bom-filter{ padding:11px; }
+        .bom-filter > div:first-child,
+        .bom-filter > div:last-child{ flex-basis:100% !important; width:100%; }
+        .bom-filter > div:last-child{ justify-content:stretch; }
+        .bom-filter > div:last-child .btn{ flex:1 1 auto; }
         .table-responsive{ overflow:visible; }
         .table-list thead{ display:none; }
         .table-list,
@@ -203,43 +201,38 @@
     <div class="bom-topbar">
         <div>
             <div class="title">BOM per SKU</div>
-            <div class="sub">1 SKU = 1 BOM (paling cepat jalan). Material ambil dari <span style="font-family: monospace;">items</span>.</div>
-
-            <div class="kpis">
-                <span class="kpi"><span class="lbl">Total BOM</span><span class="val">{{ number_format($boms->total(), 0, ',', '.') }}</span></span>
-            </div>
+            <div class="sub">Kelola komponen produksi per SKU.</div>
         </div>
 
         <div class="controls">
             <a href="{{ route('master.item_boms.import_form') }}" class="btn btn-sm btn-bom-outline btn-pill">
-                <i class="bi bi-upload"></i> Import CSV
+                <i class="bi bi-upload"></i> Import
             </a>
             <a href="{{ route('master.item_boms.duplicate_form') }}" class="btn btn-sm btn-bom-outline btn-pill">
-                <i class="bi bi-files"></i> Duplicate BOM
+                <i class="bi bi-files"></i> Duplikat
             </a>
             <a href="{{ route('master.item_boms.create') }}" class="btn btn-sm btn-bom-primary btn-pill">
-                BOM Baru
+                <i class="bi bi-plus-lg"></i> BOM Baru
             </a>
         </div>
     </div>
 
-    <form method="get" class="d-flex gap-2 flex-wrap mb-3 align-items-start" style="background: var(--card); padding: 12px 14px; border-radius: 8px; border: 1px solid var(--bom-border);">
+    <form method="get" class="bom-filter d-flex gap-2 flex-wrap mb-3 align-items-end">
         <div style="flex: 1 1 240px;">
             <div class="position-relative gf-live-filter-wrap">
                 <i class="bi bi-search position-absolute" style="left: 10px; top: 50%; transform: translateY(-50%); color: var(--bom-muted); font-size: 0.8rem;"></i>
                 <input type="search" name="q" class="form-control form-control-sm filter-input w-100"
-                    value="{{ request('q') }}" placeholder="Ketik SKU atau Nama Item..." autocomplete="off" autofocus
+                    value="{{ request('q') }}" placeholder="Cari SKU, nama item, atau nama BOM..." autocomplete="off" autofocus
                     style="padding-left: 32px; font-family: monospace; font-size: 0.88rem;">
             </div>
-            <div class="text-muted mt-2" style="font-size: 0.72rem;">Contoh: <span style="font-family: monospace; background: rgba(148,163,184,.1); padding: 2px 4px; border-radius: 4px;">C5BLK</span>, <span style="font-family: monospace; background: rgba(148,163,184,.1); padding: 2px 4px; border-radius: 4px;">J3MST</span>, <span style="font-family: monospace; background: rgba(148,163,184,.1); padding: 2px 4px; border-radius: 4px;">K1NVY</span></div>
         </div>
 
         <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-sm btn-bom-primary btn-pill" style="min-height: 32px; display: inline-flex; align-items: center; gap: 6px;">
+            <button type="submit" class="btn btn-sm btn-bom-primary btn-pill" style="display: inline-flex; align-items: center; gap: 6px;">
                 <i class="bi bi-funnel"></i> Cari
             </button>
             @if(request('q'))
-                <a href="{{ route('master.item_boms.index') }}" class="btn btn-sm btn-bom-outline btn-pill" style="min-height: 32px; display: inline-flex; align-items: center;">Reset</a>
+                <a href="{{ route('master.item_boms.index') }}" class="btn btn-sm btn-bom-outline btn-pill" style="display: inline-flex; align-items: center;">Reset</a>
             @endif
         </div>
     </form>
@@ -248,8 +241,13 @@
         <div class="card-body p-0">
             @if ($boms->count() === 0)
                 <div class="empty">
-                    Belum ada BOM.
-                    <div class="mt-1">Klik <b>BOM Baru</b> untuk membuat BOM.</div>
+                    @if($q !== '')
+                        BOM dengan kata kunci <b>{{ $q }}</b> tidak ditemukan.
+                        <div class="mt-1"><a href="{{ route('master.item_boms.index') }}">Hapus pencarian</a> atau buat BOM baru.</div>
+                    @else
+                        Belum ada BOM.
+                        <div class="mt-1">Klik <b>BOM Baru</b> untuk membuat BOM.</div>
+                    @endif
                 </div>
             @else
                 <div class="table-responsive" style="max-height: 65vh; overflow-y: auto;">
@@ -257,8 +255,7 @@
                         <thead>
                             <tr>
                                 <th style="width: 44px;" class="text-center">#</th>
-                                <th style="width: 130px;">SKU</th>
-                                <th style="min-width: 200px;">Nama</th>
+                                <th style="min-width: 240px;">SKU / Item</th>
                                 <th style="width: 220px;">Struktur BOM</th>
                                 <th class="text-center" style="width: 100px;">Status</th>
                                 <th class="text-end" style="width: 140px;"></th>
@@ -270,32 +267,32 @@
                                     <td class="text-center text-muted mobile-hide">{{ ($boms->currentPage()-1)*$boms->perPage() + $i + 1 }}</td>
                                     <td>
                                         <div class="bom-row-main">
-                                            <div class="bom-name" style="font-family: monospace;">{{ $b->item->code }}</div>
+                                            <div>
+                                                <div class="bom-item-code">{{ $b->item->code }}</div>
+                                                <div class="bom-item-name">{{ $b->item->name }}</div>
+                                            </div>
                                             <span class="badge-status {{ $b->active ? 'st-active' : 'st-inactive' }} d-md-none">{{ $b->active ? 'Active' : 'Off' }}</span>
                                         </div>
                                     </td>
                                     <td>
-                                        <div class="bom-name">{{ $b->item->name }}</div>
-                                    </td>
-                                    <td>
-                                        <div class="d-flex flex-wrap gap-1 mb-1">
-                                            <span class="badge-status" style="border: 1px solid rgba(148,163,184,.3); color: #475569; background: #f8fafc;">Utama {{ (int) $b->main_material_lines_count }}</span>
-                                            <span class="badge-status" style="border: 1px solid rgba(59,130,246,.3); color: #1d4ed8; background: rgba(59,130,246,.1);">Jahit {{ (int) $b->sewing_supply_lines_count }}</span>
-                                            <span class="badge-status" style="border: 1px solid rgba(6,182,212,.3); color: #0e7490; background: rgba(6,182,212,.1);">Packing {{ (int) $b->packing_supply_lines_count }}</span>
+                                        <div class="bom-structure">
+                                            <strong>{{ (int) $b->main_material_lines_count }}</strong> utama
+                                            <span>·</span>
+                                            <strong>{{ (int) $b->sewing_supply_lines_count }}</strong> jahit
+                                            <span>·</span>
+                                            <strong>{{ (int) $b->packing_supply_lines_count }}</strong> packing
+                                            <span class="muted">({{ (int) $b->lines_count }} total)</span>
                                         </div>
-                                        <div class="muted">Total {{ (int) $b->lines_count }} material</div>
                                         @php $ub = $bomUsageBadges[$b->id] ?? null; @endphp
                                         @if($ub)
-                                            <div class="muted mt-1">
-                                                Aktual terakhir:
-                                                <span style="font-family: monospace;" class="fw-semibold">{{ number_format($ub['kg_per_pcs'], 4) }}</span>/pcs
-                                                <span>· {{ $ub['job_code'] }}</span>
+                                            <div class="bom-actual">
+                                                Aktual <span style="font-family: monospace;" class="fw-semibold">{{ number_format($ub['kg_per_pcs'], 3, ',', '') }}</span>/pcs · {{ $ub['job_code'] }}
                                                 @if($ub['status'] === 'over')
-                                                    <span class="badge-status" style="background: rgba(239, 68, 68, 0.1); color: #991b1b; border-color: rgba(239, 68, 68, 0.3);" title="Standar BOM (maks): {{ number_format($ub['std_max'], 4) }} kg/pcs">⚠ melebihi standar</span>
+                                                    <span class="usage-status usage-over" title="Standar BOM (maks): {{ number_format($ub['std_max'], 3, ',', '') }} kg/pcs">· melebihi standar</span>
                                                 @elseif($ub['status'] === 'under')
-                                                    <span class="badge-status" style="background: rgba(34, 197, 94, 0.1); color: #166534; border-color: rgba(34, 197, 94, 0.3);" title="Standar BOM (maks): {{ number_format($ub['std_max'], 4) }} kg/pcs">lebih hemat</span>
+                                                    <span class="usage-status usage-under">· lebih hemat</span>
                                                 @elseif($ub['status'] === 'ok')
-                                                    <span class="badge-status" style="background: rgba(148, 163, 184, 0.1); color: #475569; border-color: rgba(148, 163, 184, 0.3);">sesuai standar</span>
+                                                    <span class="usage-status usage-ok">· sesuai standar</span>
                                                 @endif
                                             </div>
                                         @endif

@@ -8,16 +8,17 @@
     /* GF BOM UI FINAL - selaras Master Items */
     .gf-category-page,
     .page-wrap {
-        max-width: 1180px !important;
+        max-width: 1280px !important;
+        width: 100% !important;
         margin: 0 auto !important;
-        padding: 16px 12px 28px !important;
+        padding: 1rem 1.1rem 4rem !important;
         color: #0f172a !important;
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
     }
 
     .cardx {
         border: 1px solid #e2e8f0 !important;
-        border-radius: 24px !important;
+        border-radius: 18px !important;
         background: #ffffff !important;
         box-shadow: 0 16px 42px rgba(15, 23, 42, .07) !important;
         padding: 16px !important;
@@ -29,7 +30,7 @@
         margin-bottom: 14px !important;
         padding: 18px !important;
         border: 1px solid #e2e8f0 !important;
-        border-radius: 24px !important;
+        border-radius: 18px !important;
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 58%, #f1f5f9 100%) !important;
         box-shadow: 0 16px 42px rgba(15, 23, 42, .07) !important;
     }
@@ -38,7 +39,7 @@
         margin-top: 14px !important;
         background: #ffffff !important;
         border: 1px solid #e2e8f0 !important;
-        border-radius: 24px !important;
+        border-radius: 18px !important;
         box-shadow: 0 16px 42px rgba(15, 23, 42, .07) !important;
     }
 
@@ -434,7 +435,7 @@
           <div class="h1">Import BOM CSV</div>
           <div class="subt">
           Kolom wajib: <span class="mono">sku_code, material_code, qty</span>.
-          Opsional: <span class="mono">usage_stage, uom, scrap_pct, is_optional, sort_order</span>.
+          Opsional: <span class="mono">usage_stage, uom, scrap_pct, is_optional</span>.
         </div>
 
         <div class="rowx" style="margin-top:10px">
@@ -453,7 +454,7 @@
     <div class="cardx sub" style="padding:12px">
       <div class="small">Contoh baris:</div>
       <div class="mono" style="font-weight:950;margin-top:6px">
-        C5BLK,FLC280BLK,main_material,1.20,kg,2,0,10
+        C5BLK,FLC280BLK,main_material,1.20,kg,2,0
       </div>
       <div class="small" style="margin-top:6px">
         <span class="mono">usage_stage</span>: <span class="mono">main_material</span>,

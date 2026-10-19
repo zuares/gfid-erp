@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Builder;
 
 class ItemBomLine extends Model
 {
@@ -35,6 +36,19 @@ class ItemBomLine extends Model
             self::STAGE_SEWING_SUPPLY => 'Kelengkapan jahit',
             self::STAGE_PACKING_SUPPLY => 'Kelengkapan packing',
         ];
+    }
+
+    public function scopeOrdered(Builder $query): Builder
+    {
+        return $query
+            ->orderByRaw("CASE usage_stage
+                WHEN 'main_material' THEN 0
+                WHEN 'sewing_supply' THEN 1
+                WHEN 'packing_supply' THEN 2
+                ELSE 3
+            END")
+            ->orderBy('sort_order')
+            ->orderBy('id');
     }
 
     public function bom(): BelongsTo

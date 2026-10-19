@@ -26,21 +26,21 @@ class ItemBom extends Model
 
     public function lines(): HasMany
     {
-        return $this->hasMany(ItemBomLine::class)->orderBy('sort_order');
+        return $this->hasMany(ItemBomLine::class)->ordered();
     }
 
     public function requiredLines(): HasMany
     {
         return $this->hasMany(ItemBomLine::class)
             ->where('is_optional', false)
-            ->orderBy('sort_order');
+            ->ordered();
     }
 
     public function optionalLines(): HasMany
     {
         return $this->hasMany(ItemBomLine::class)
             ->where('is_optional', true)
-            ->orderBy('sort_order');
+            ->ordered();
     }
 
     public function hasComponents(): bool

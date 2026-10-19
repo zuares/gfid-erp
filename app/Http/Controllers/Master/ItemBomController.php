@@ -14,6 +14,7 @@ use Illuminate\Validation\ValidationException;
 class ItemBomController extends Controller
 {
     private const QTY_MIN = 0.0001; // biar bisa 0,0095
+    private const DEFAULT_WASTE_PCT = '15';
     private const PAGINATE = 20;
 
     public function index(Request $request)
@@ -29,9 +30,14 @@ class ItemBomController extends Controller
                 'packingSupplyLines',
             ])
             ->when($q !== '', function ($qq) use ($q) {
-                $qq->whereHas('item', function ($i) use ($q) {
-                    $i->where('code', 'like', "%{$q}%")
-                        ->orWhere('name', 'like', "%{$q}%");
+                $qq->where(function ($w) use ($q) {
+                    $w->whereHas('item', function ($i) use ($q) {
+                        $i->where(function ($item) use ($q) {
+                            $item->where('code', 'like', "%{$q}%")
+                                ->orWhere('sku', 'like', "%{$q}%")
+                                ->orWhere('name', 'like', "%{$q}%");
+                        });
+                    })->orWhere('item_boms.name', 'like', "%{$q}%");
                 });
             })
             ->orderByDesc('id')
@@ -102,7 +108,7 @@ class ItemBomController extends Controller
 
     public function create(Request $request)
     {
-        $rows = old('lines') ?: [$this->defaultRow(10)];
+        $rows = old('lines') ?: [$this->defaultRow()];
         $prefilledItem = null;
 
         if ($request->filled('item_id')) {
@@ -123,7 +129,7 @@ class ItemBomController extends Controller
     {
         $bom->load([
             'item:id,code,name',
-            'lines' => fn($q) => $q->orderBy('sort_order')
+            'lines' => fn($q) => $q->ordered()
                 ->with('material:id,code,name,unit,hpp,base_unit_cost'),
         ]);
 
@@ -189,12 +195,11 @@ class ItemBomController extends Controller
                     'uom' => $l->uom ?: ($l->material?->unit ?? 'pcs'),
                     'scrap_pct' => (string) ($l->scrap_pct ?? 0),
                     'is_optional' => (int) ($l->is_optional ? 1 : 0),
-                    'sort_order' => (int) ($l->sort_order ?? 0),
                 ];
             })->values()->all();
 
             if (empty($rows)) {
-                $rows = [$this->defaultRow(10)];
+                $rows = [$this->defaultRow()];
             }
         }
 
@@ -301,14 +306,12 @@ class ItemBomController extends Controller
             'lines.*.material_item_id' => ['required', 'integer', 'exists:items,id'],
             'lines.*.usage_stage' => ['nullable', 'in:' . implode(',', array_keys(ItemBomLine::usageStageLabels()))],
 
-            // ✅ min kecil biar 0.0095 valid
-            // sebelumnya 0.0001
-            'lines.*.qty' => ['required', 'numeric', 'min:0.001'],
+            // ✅ konsisten dengan import dan konstanta QTY_MIN
+            'lines.*.qty' => ['required', 'numeric', 'min:' . self::QTY_MIN],
 
             'lines.*.uom' => ['nullable', 'string', 'max:20'],
             'lines.*.scrap_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'lines.*.is_optional' => ['nullable', 'in:0,1'],
-            'lines.*.sort_order' => ['nullable', 'integer', 'min:0', 'max:999999'],
         ];
 
         $data = $request->validate($rules);
@@ -320,10 +323,9 @@ class ItemBomController extends Controller
 
             // keep as string normalized (avoid float)
             $data['lines'][$idx]['qty'] = $this->normalizeDecimal($l['qty']) ?? '0';
-            $data['lines'][$idx]['scrap_pct'] = $this->normalizeDecimal($l['scrap_pct'] ?? 0) ?? '0';
+            $data['lines'][$idx]['scrap_pct'] = $this->normalizeDecimal($l['scrap_pct'] ?? self::DEFAULT_WASTE_PCT) ?? self::DEFAULT_WASTE_PCT;
 
             $data['lines'][$idx]['is_optional'] = $request->boolean("lines.$idx.is_optional");
-            $data['lines'][$idx]['sort_order'] = $l['sort_order'] ?? ($idx * 10);
         }
 
         // material tidak boleh duplikat
@@ -359,7 +361,7 @@ class ItemBomController extends Controller
         return $v;
     }
 
-    private function defaultRow(int $sortOrder = 10): array
+    private function defaultRow(): array
     {
         return [
             'material_item_id' => null,
@@ -367,18 +369,18 @@ class ItemBomController extends Controller
             'usage_stage' => ItemBomLine::STAGE_MAIN_MATERIAL,
             'qty' => '',
             'uom' => 'pcs',
-            'scrap_pct' => 0,
+            'scrap_pct' => self::DEFAULT_WASTE_PCT,
             'is_optional' => 0,
-            'sort_order' => $sortOrder,
         ];
     }
 
     private function syncLines(ItemBom $bom, array $lines, int $parentItemId): void
     {
         $this->validateBomComponents($lines, $parentItemId);
+        $lines = $this->normalizeLineOrder($lines);
         ItemBomLine::where('item_bom_id', $bom->id)->delete();
 
-        foreach ($lines as $l) {
+        foreach (array_values($lines) as $idx => $l) {
             ItemBomLine::create([
                 'item_bom_id' => $bom->id,
                 'material_item_id' => (int) $l['material_item_id'],
@@ -387,12 +389,30 @@ class ItemBomController extends Controller
                 // ✅ simpan string, biar decimal DB yang handle presisi
                 'qty' => (string) ($this->normalizeDecimal($l['qty']) ?? '0'),
                 'uom' => (string) ($l['uom'] ?? 'pcs'),
-                'scrap_pct' => (string) ($this->normalizeDecimal($l['scrap_pct'] ?? 0) ?? '0'),
+                'scrap_pct' => (string) ($this->normalizeDecimal($l['scrap_pct'] ?? self::DEFAULT_WASTE_PCT) ?? self::DEFAULT_WASTE_PCT),
 
                 'is_optional' => (bool) ($l['is_optional'] ?? false),
-                'sort_order' => (int) ($l['sort_order'] ?? 0),
+                'sort_order' => ($idx + 1) * 10,
             ]);
         }
+    }
+
+    private function normalizeLineOrder(array $lines): array
+    {
+        $stageOrder = [
+            ItemBomLine::STAGE_MAIN_MATERIAL => 0,
+            ItemBomLine::STAGE_SEWING_SUPPLY => 1,
+            ItemBomLine::STAGE_PACKING_SUPPLY => 2,
+        ];
+
+        return collect($lines)
+            ->values()
+            ->sortBy(fn ($line, $index) => [
+                $stageOrder[$line['usage_stage'] ?? ItemBomLine::STAGE_MAIN_MATERIAL] ?? 99,
+                $index,
+            ])
+            ->values()
+            ->all();
     }
 
     private function validateBomComponents(array $lines, int $parentItemId): void
@@ -525,6 +545,7 @@ class ItemBomController extends Controller
             ->when($q !== '', function ($qq) use ($q) {
                 $qq->where(function ($w) use ($q) {
                     $w->where('code', 'like', "%{$q}%")
+                        ->orWhere('sku', 'like', "%{$q}%")
                         ->orWhere('name', 'like', "%{$q}%");
                 });
             })
@@ -601,11 +622,10 @@ class ItemBomController extends Controller
             $usageStage = isset($idx['usage_stage'])
                 ? $this->normalizeUsageStage((string) $row[$idx['usage_stage']])
                 : null;
-            $scrapRaw = isset($idx['scrap_pct']) ? (string) $row[$idx['scrap_pct']] : '0';
-            $scrapNorm = $this->normalizeDecimal($scrapRaw) ?? '0';
+            $scrapRaw = isset($idx['scrap_pct']) ? (string) $row[$idx['scrap_pct']] : self::DEFAULT_WASTE_PCT;
+            $scrapNorm = $this->normalizeDecimal($scrapRaw) ?? self::DEFAULT_WASTE_PCT;
 
             $opt = isset($idx['is_optional']) ? (int) $row[$idx['is_optional']] : 0;
-            $sort = isset($idx['sort_order']) ? (int) $row[$idx['sort_order']] : 0;
 
             $rowsBySku[$skuCode][] = [
                 'material_code' => $matCode,
@@ -614,7 +634,6 @@ class ItemBomController extends Controller
                 'uom' => $uom ?: 'pcs',
                 'scrap_pct' => $scrapNorm, // ✅ string
                 'is_optional' => $opt ? 1 : 0,
-                'sort_order' => $sort,
             ];
         }
         fclose($fh);
@@ -662,13 +681,18 @@ class ItemBomController extends Controller
                         'usage_stage' => $l['usage_stage'] ?: $this->inferUsageStageFromCode($code),
                         'qty' => (string) $l['qty'],
                         'uom' => (string) ($l['uom'] ?? 'pcs'),
-                        'scrap_pct' => (string) ($l['scrap_pct'] ?? '0'),
+                        'scrap_pct' => (string) ($l['scrap_pct'] ?? self::DEFAULT_WASTE_PCT),
                         'is_optional' => (bool) ($l['is_optional'] ?? 0),
-                        'sort_order' => (int) ($l['sort_order'] ?? 0),
                     ];
                 }
 
                 if (!$normalized) {$skipped[] = "No valid lines: {$skuCode}";continue;}
+
+                $normalized = $this->normalizeLineOrder($normalized);
+                foreach ($normalized as $idx => &$line) {
+                    $line['sort_order'] = ($idx + 1) * 10;
+                }
+                unset($line);
 
                 if ($mode === 'replace') {
                     ItemBomLine::where('item_bom_id', $bom->id)->delete();
@@ -697,13 +721,13 @@ class ItemBomController extends Controller
 
     public function downloadTemplate()
     {
-        $header = "sku_code,material_code,usage_stage,qty,uom,scrap_pct,is_optional,sort_order\n";
+        $header = "sku_code,material_code,usage_stage,qty,uom,scrap_pct,is_optional\n";
         $sample = [
-            "C5BLK,FLC280BLK,main_material,1.2000,kg,2,0,10",
-            "C5BLK,RIB280BLK,sewing_supply,0.2500,kg,2,0,20",
-            "C5BLK,KRT4CM,sewing_supply,1.0000,pcs,0,0,30",
-            "C5BLK,TLKADDS,packing_supply,0.0095,kg,0,0,40",
-            "C5BLK,OPP001,packing_supply,1.0000,pcs,0,0,50",
+            "C5BLK,FLC280BLK,main_material,1.2000,kg,2,0",
+            "C5BLK,RIB280BLK,sewing_supply,0.2500,kg,2,0",
+            "C5BLK,KRT4CM,sewing_supply,1.0000,pcs,0,0",
+            "C5BLK,TLKADDS,packing_supply,0.0095,kg,0,0",
+            "C5BLK,OPP001,packing_supply,1.0000,pcs,0,0",
         ];
 
         $csv = $header . implode("\n", $sample) . "\n";
@@ -775,15 +799,18 @@ class ItemBomController extends Controller
 
             $toBom->save();
 
-            $sourceLines = $fromBom->lines->map(fn($l) => [
+            $sourceLines = $this->normalizeLineOrder($fromBom->lines->map(fn($l) => [
                 'material_item_id' => (int) $l->material_item_id,
                 'usage_stage' => (string) ($l->usage_stage ?: ItemBomLine::STAGE_MAIN_MATERIAL),
                 'qty' => (string) $l->qty, // ✅ string
                 'uom' => (string) $l->uom,
                 'scrap_pct' => (string) $l->scrap_pct, // ✅ string
                 'is_optional' => (bool) $l->is_optional,
-                'sort_order' => (int) $l->sort_order,
-            ])->values()->all();
+            ])->values()->all());
+            foreach ($sourceLines as $idx => &$line) {
+                $line['sort_order'] = ($idx + 1) * 10;
+            }
+            unset($line);
 
             if ($mode === 'replace') {
                 ItemBomLine::where('item_bom_id', $toBom->id)->delete();
