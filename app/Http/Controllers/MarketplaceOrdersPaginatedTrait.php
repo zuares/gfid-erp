@@ -722,14 +722,27 @@ trait MarketplaceOrdersPaginatedTrait
             ->get()
             ->filter(fn (Store $store): bool => $store->connection_status === 'CONNECTED')
             ->modelKeys();
+        $importSources = [
+            'marketplace_import',
+            'marketplace_crm_import',
+            'marketplace_shipment_import',
+        ];
 
-        $query->where(function ($scope) use ($storeIds) {
+        $query->where(function ($scope) use ($storeIds, $importSources) {
             $scope->whereIn('store_id', $storeIds);
 
             // Data dummy tetap bisa diuji dari halaman Orders di local/testing,
             // meskipun store dummy tidak memiliki token marketplace.
             if (app()->environment(['local', 'testing'])) {
                 $scope->orWhereJsonContains('meta->is_dummy', true);
+            }
+
+            // Order hasil impor tetap harus terlihat sebagai histori operasional
+            // walaupun kredensial toko sudah tidak aktif atau sudah kedaluwarsa.
+            foreach ($importSources as $source) {
+                $scope->orWhereJsonContains('meta->source_type', $source)
+                    ->orWhereJsonContains('meta->crm_source', $source)
+                    ->orWhereJsonContains('raw_json->source', $source);
             }
         });
     }

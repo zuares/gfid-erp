@@ -347,6 +347,19 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
             ->assertSee('Pengiriman Gagal');
     }
 
+    public function test_order_hasil_impor_tetap_muncul_di_tab_dikirim_tanpa_kredensial_aktif(): void
+    {
+        $this->store->update(['credentials' => null]);
+        $importedOrder = $this->createOrder('IMPORTED-SHIPPED-ORDER', 'SHIPPED', 'buyer-imported');
+        $importedOrder->update([
+            'meta' => ['source_type' => 'marketplace_shipment_import'],
+        ]);
+
+        $response = $this->getJson('/api/marketplace/local-orders-paginated?tab=shipped&sub_tab=shipped&limit=50');
+
+        $response->assertOk()->assertJsonFragment(['id' => $importedOrder->id]);
+    }
+
     public function test_order_cancelled_dengan_status_paket_gagal_masuk_subtab_pengiriman_gagal(): void
     {
         $failedOrder = $this->createOrder('CANCELLED-DELIVERY-FAILED', 'CANCELLED', 'buyer-cancelled-delivery');
