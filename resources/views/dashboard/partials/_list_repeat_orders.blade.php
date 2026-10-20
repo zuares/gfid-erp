@@ -25,6 +25,8 @@
                             <th>No pesanan terakhir beli</th>
                             <th>SKU marketplace</th>
                             <th class="numeric">Qty</th>
+                            <th>Item scan shipment</th>
+                            <th class="numeric">Qty scan</th>
                             <th>Terakhir beli</th>
                             <th class="numeric">Order sebelumnya</th>
                             <th>Status</th>
@@ -36,8 +38,20 @@
                             <tr>
                                 <td class="numeric ditem-number">{{ $loop->iteration }}</td>
                                 <td class="drepeat-buyer">{{ $row['buyer_label'] ?: 'Tanpa username' }}</td>
-                                <td class="drepeat-order">{{ $row['order_number'] ?: '—' }}</td>
-                                <td class="drepeat-order">{{ $row['last_order_number'] ?: '—' }}</td>
+                                <td class="drepeat-order">
+                                    @if(!empty($row['id']))
+                                        <a class="drepeat-order-link" href="{{ route('marketplace.orders.show', ['order' => $row['id']]) }}">{{ $row['order_number'] ?: '—' }}</a>
+                                    @else
+                                        {{ $row['order_number'] ?: '—' }}
+                                    @endif
+                                </td>
+                                <td class="drepeat-order">
+                                    @if(!empty($row['last_order_id']))
+                                        <a class="drepeat-order-link" href="{{ route('marketplace.orders.show', ['order' => $row['last_order_id']]) }}">{{ $row['last_order_number'] ?: '—' }}</a>
+                                    @else
+                                        {{ $row['last_order_number'] ?: '—' }}
+                                    @endif
+                                </td>
                                 <td class="drepeat-items">
                                     @forelse($row['items'] ?? [] as $item)
                                         <div class="drepeat-item-line"><code>{{ $item['sku'] ?: '—' }}</code></div>
@@ -47,6 +61,20 @@
                                 </td>
                                 <td class="numeric drepeat-items">
                                     @forelse($row['items'] ?? [] as $item)
+                                        <div class="drepeat-item-line">{{ number_format((float) ($item['qty'] ?? 0), 0, ',', '.') }}</div>
+                                    @empty
+                                        —
+                                    @endforelse
+                                </td>
+                                <td class="drepeat-items">
+                                    @forelse($row['scanned_items'] ?? [] as $item)
+                                        <div class="drepeat-item-line"><code>{{ $item['code'] ?: '—' }}</code></div>
+                                    @empty
+                                        —
+                                    @endforelse
+                                </td>
+                                <td class="numeric drepeat-items">
+                                    @forelse($row['scanned_items'] ?? [] as $item)
                                         <div class="drepeat-item-line">{{ number_format((float) ($item['qty'] ?? 0), 0, ',', '.') }}</div>
                                     @empty
                                         —

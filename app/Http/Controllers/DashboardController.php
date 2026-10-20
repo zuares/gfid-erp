@@ -76,7 +76,7 @@ class DashboardController extends Controller
 
     private function ownerData(): array
     {
-        $cacheKey = 'dashboard.owner.v7.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.owner.v8.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->ownerDataUncached());
     }
@@ -246,7 +246,7 @@ class DashboardController extends Controller
 
     private function adminData(): array
     {
-        $cacheKey = 'dashboard.admin.v8.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.admin.v9.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->adminDataUncached());
     }
@@ -671,28 +671,32 @@ class DashboardController extends Controller
                 ->orderByDesc('current.' . $dateColumn)
                 ->limit($limit);
 
-            $lastOrderNumber = DB::table('marketplace_orders as previous')
+            $lastOrderBase = DB::table('marketplace_orders as previous')
                 ->where('previous.order_status', 'COMPLETED')
                 ->whereNull('previous.cancelled_at')
                 ->whereRaw("UPPER(COALESCE(previous.status, '')) NOT IN ('CANCELLED', 'CANCELED')")
                 ->whereRaw("UPPER(COALESCE(previous.order_status, '')) NOT IN ('CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING')")
                 ->whereColumn('previous.store_id', 'current.store_id')
                 ->whereRaw("{$previousBuyerKey} = {$currentBuyerKey}")
-                ->selectRaw("COALESCE(NULLIF(previous.external_invoice_no, ''), NULLIF(previous.external_order_id, ''), previous.channel_order_id, CONCAT('ORDER-', previous.id))")
                 ->orderByRaw('COALESCE(previous.ordered_at, previous.order_date, previous.created_at) DESC')
                 ->limit(1);
+            $lastOrderNumber = (clone $lastOrderBase)
+                ->selectRaw("COALESCE(NULLIF(previous.external_invoice_no, ''), NULLIF(previous.external_order_id, ''), previous.channel_order_id, CONCAT('ORDER-', previous.id))");
+            $lastOrderId = (clone $lastOrderBase)->select('previous.id');
 
             $orders = $orders
                 ->select([
                     'current.id',
                     DB::raw("COALESCE(NULLIF(current.buyer_username, ''), 'Tanpa username') as buyer_label"),
                     DB::raw("COALESCE(NULLIF(current.external_invoice_no, ''), NULLIF(current.external_order_id, ''), current.channel_order_id, CONCAT('ORDER-', current.id)) as order_number"),
+                    'current.external_invoice_no', 'current.external_order_id', 'current.channel_order_id',
                     'current.order_status',
                     DB::raw('COALESCE(current.ordered_at, current.order_date, current.created_at) as ordered_at'),
                     DB::raw("CASE WHEN current.order_status = 'COMPLETED' THEN repeat_history.previous_order_count - 1 ELSE repeat_history.previous_order_count END as previous_order_count"),
                     'repeat_history.last_purchased_at',
                 ])
                 ->selectSub($lastOrderNumber, 'last_order_number')
+                ->selectSub($lastOrderId, 'last_order_id')
                 ->get();
 
             $itemsByOrder = [];
@@ -722,9 +726,60 @@ class DashboardController extends Controller
                 }
             }
 
-            return $orders->map(function ($row) use ($itemsByOrder) {
+            $scannedItemsByOrder = [];
+            if (
+                $orders->isNotEmpty()
+                && Schema::hasTable('shipment_order_scans')
+                && Schema::hasTable('shipment_lines')
+                && Schema::hasTable('order_fulfillments')
+                && Schema::hasTable('items')
+            ) {
+                $orderIds = $orders->pluck('id')->all();
+                $orderReferenceMap = [];
+                foreach ($orders as $order) {
+                    foreach ([$order->external_invoice_no, $order->external_order_id, $order->channel_order_id] as $reference) {
+                        $reference = trim((string) $reference);
+                        if ($reference !== '') {
+                            $orderReferenceMap[$reference] = (int) $order->id;
+                        }
+                    }
+                }
+
+                $scannedLines = DB::table('shipment_lines as sl')
+                    ->join('shipment_order_scans as sos', 'sos.id', '=', 'sl.shipment_order_scan_id')
+                    ->leftJoin('order_fulfillments as fulfillment', 'fulfillment.id', '=', 'sos.fulfillment_id')
+                    ->leftJoin('items as i', 'i.id', '=', 'sl.item_id')
+                    ->where('sl.qty_scanned', '>', 0)
+                    ->where(function ($query) use ($orderIds, $orderReferenceMap) {
+                        $query->whereIn('fulfillment.marketplace_order_id', $orderIds);
+                        if ($orderReferenceMap !== []) {
+                            $query->orWhereIn('sos.order_no', array_keys($orderReferenceMap));
+                        }
+                    })
+                    ->get([
+                        'fulfillment.marketplace_order_id', 'sos.order_no',
+                        'i.code as item_code', 'sl.item_id', 'sl.qty_scanned',
+                    ]);
+
+                foreach ($scannedLines as $line) {
+                    $orderId = (int) ($line->marketplace_order_id ?: ($orderReferenceMap[(string) $line->order_no] ?? 0));
+                    if ($orderId < 1) {
+                        continue;
+                    }
+
+                    $itemCode = trim((string) ($line->item_code ?: ($line->item_id ? 'ITEM-' . $line->item_id : 'Item tidak ditemukan')));
+                    $scannedItemsByOrder[$orderId][$itemCode] = ($scannedItemsByOrder[$orderId][$itemCode] ?? 0) + (float) ($line->qty_scanned ?? 0);
+                }
+
+                $scannedItemsByOrder = collect($scannedItemsByOrder)
+                    ->map(fn ($items) => collect($items)->map(fn ($qty, $code) => ['code' => $code, 'qty' => $qty])->values()->all())
+                    ->all();
+            }
+
+            return $orders->map(function ($row) use ($itemsByOrder, $scannedItemsByOrder) {
                 $data = (array) $row;
                 $data['items'] = $itemsByOrder[(int) $row->id] ?? [];
+                $data['scanned_items'] = $scannedItemsByOrder[(int) $row->id] ?? [];
 
                 return $data;
             })->all();
