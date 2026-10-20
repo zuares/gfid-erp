@@ -1093,6 +1093,7 @@ class ShipmentController extends Controller
             'notes'            => ['nullable', 'string'],
             'sales_invoice_id' => ['nullable', 'exists:sales_invoices,id'],
             'scan_mode'        => ['nullable', 'in:item_first,order_first'],
+            'dispatch_mode'    => ['nullable', 'in:single,daily'],
         ]);
 
         // Store boleh null — diisi nanti saat rekonsiliasi dengan no pesanan
@@ -1126,7 +1127,10 @@ class ShipmentController extends Controller
             'code'             => $code,
             'shipment_type'    => $data['shipment_type'],
             'scan_mode'        => $scanMode,
-            'dispatch_mode'    => $data['dispatch_mode'] ?? ($data['shipment_type'] === Shipment::TYPE_MARKETPLACE ? Shipment::DISPATCH_DAILY : Shipment::DISPATCH_SINGLE),
+            // Gelombang belum menjadi pilihan operator di form shipment.
+            // Default marketplace harus tetap sekali posting sampai mode
+            // gelombang diaktifkan secara eksplisit.
+            'dispatch_mode'    => $data['dispatch_mode'] ?? Shipment::DISPATCH_SINGLE,
             'store_id'         => $data['store_id'] ?? null,
             'sales_invoice_id' => $data['sales_invoice_id'] ?? null,
             'date'             => $data['date'],

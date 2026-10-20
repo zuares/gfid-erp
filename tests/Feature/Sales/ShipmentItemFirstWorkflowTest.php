@@ -570,6 +570,25 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertDontSee('Dinonaktifkan sementara untuk Admin', false);
     }
 
+    public function test_new_marketplace_shipment_uses_single_dispatch_until_waves_are_enabled(): void
+    {
+        [$user, $store] = $this->shipmentContext();
+
+        $this->actingAs($user)
+            ->post(route('sales.shipments.store'), [
+                'shipment_type' => Shipment::TYPE_MARKETPLACE,
+                'store_id' => $store->id,
+                'date' => now()->toDateString(),
+                'scan_mode' => 'item_first',
+            ])
+            ->assertRedirect();
+
+        $shipment = Shipment::query()->latest('id')->firstOrFail();
+
+        $this->assertSame(Shipment::DISPATCH_SINGLE, $shipment->dispatch_mode);
+        $this->assertDatabaseCount('shipment_waves', 0);
+    }
+
     public function test_unknown_item_is_rejected_before_creating_daily_wave(): void
     {
         [$user, $store] = $this->shipmentContext();
