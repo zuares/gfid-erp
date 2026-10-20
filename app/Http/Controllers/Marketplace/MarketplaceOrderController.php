@@ -8,6 +8,7 @@ use App\Models\Item;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
+use App\Models\MarketplaceAdsDaily;
 use App\Models\Store;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -173,6 +174,14 @@ class MarketplaceOrderController extends Controller
 
         $estimatedFeePct = round($estimatedFeeRatio * 100, 1);
         $promotionBreakdown = $this->promotionBreakdownForOrder($order, $liveData ?? []);
+        $hppSummary = $this->hppSummaryForOrder($order);
+        $adsDate = ($order->ordered_at ?: $order->order_date)?->toDateString();
+        $adsDaily = $adsDate && $order->store_id
+            ? MarketplaceAdsDaily::query()
+                ->where('store_id', $order->store_id)
+                ->where('date', $adsDate)
+                ->first(['store_id', 'date', 'spend', 'gmv', 'roas'])
+            : null;
 
         return view('marketplace.orders.show', compact(
             'order',
@@ -180,8 +189,45 @@ class MarketplaceOrderController extends Controller
             'estimatedFeePct',
             'awbSource',
             'internalPackageNo',
-            'promotionBreakdown'
+            'promotionBreakdown',
+            'hppSummary',
+            'adsDate',
+            'adsDaily'
         ));
+    }
+
+    /**
+     * HPP order memakai snapshot immutable di setiap line. HPP yang belum
+     * tersnapshot tidak diganti diam-diam dengan biaya master saat ini.
+     */
+    private function hppSummaryForOrder(MarketplaceOrder $order): array
+    {
+        $total = 0.0;
+        $missingLines = 0;
+        $lines = $order->items ?? collect();
+
+        foreach ($lines as $line) {
+            $qty = max((float) ($line->qty ?? 0), 0);
+            $lineTotalSnapshot = (float) ($line->hpp_total_snapshot ?? 0);
+            $unitSnapshot = max(
+                (float) ($line->hpp_snapshot ?? 0),
+                (float) ($line->hpp_unit_snapshot ?? 0)
+            );
+
+            if ($lineTotalSnapshot > 0) {
+                $total += $lineTotalSnapshot;
+            } elseif ($unitSnapshot > 0 && $qty > 0) {
+                $total += $unitSnapshot * $qty;
+            } else {
+                $missingLines++;
+            }
+        }
+
+        return [
+            'total' => round($total, 2),
+            'complete' => $lines->isNotEmpty() && $missingLines === 0,
+            'missing_lines' => $missingLines,
+        ];
     }
 
     /**

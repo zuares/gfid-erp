@@ -679,7 +679,68 @@
 
         $buildFeeRows($buyerFeeBreakdown, 'Ongkos Kirim Dibayar Pembeli', $ongkirDibayarPembeli);
         $buildFeeRows($buyerFeeBreakdown, 'Biaya Pembayaran Pembeli', $biayaLayananPembeli);
+
+        $hppSummary = $hppSummary ?? ['total' => 0, 'complete' => false, 'missing_lines' => 0];
+        $adsDaily = $adsDaily ?? null;
+        $adsDate = $adsDate ?? null;
+        $hppTotal = (float) ($hppSummary['total'] ?? 0);
+        $hppComplete = (bool) ($hppSummary['complete'] ?? false);
+        $dailyAdsSpend = $adsDaily ? (float) ($adsDaily->spend ?? 0) : null;
+        $dailyAdsGmv = $adsDaily ? (float) ($adsDaily->gmv ?? 0) : null;
+        $dailyAcos = $dailyAdsGmv > 0
+            ? $dailyAdsSpend / $dailyAdsGmv
+            : (($adsDaily && (float) ($adsDaily->roas ?? 0) > 0) ? 1 / (float) $adsDaily->roas : null);
+        // ACOS adalah rasio biaya iklan terhadap GMV harian. Beban order
+        // dialokasikan memakai subtotal produk order pada tanggal tersebut.
+        $orderAdCost = $dailyAcos !== null ? round(max($subtotal, 0) * $dailyAcos, 2) : null;
+        $grossProfit = $hppComplete ? round($penghasilan - $hppTotal, 2) : null;
+        $profitAfterAds = $grossProfit !== null && $orderAdCost !== null
+            ? round($grossProfit - $orderAdCost, 2)
+            : null;
     @endphp
+
+    <div class="od-card">
+        <div class="od-head">
+            <div>
+                <div class="od-title">Profitabilitas Pesanan</div>
+                <div class="od-muted" style="margin-top:.15rem">Gross profit = penghasilan akhir − HPP, sebelum biaya iklan.</div>
+            </div>
+        </div>
+        <div class="od-body">
+            <div class="od-grid" style="grid-template-columns:repeat(4,minmax(0,1fr)); margin-bottom:.35rem">
+                <div>
+                    <div class="od-label">HPP</div>
+                    <div class="od-value" style="color:{{ $hppComplete ? '#111827' : '#b45309' }}">
+                        {{ $hppComplete ? 'Rp'.number_format($hppTotal, 0, ',', '.') : 'Belum lengkap' }}
+                    </div>
+                </div>
+                <div>
+                    <div class="od-label">ACOS {{ $adsDate ? $adsDate : 'hari order' }}</div>
+                    <div class="od-value">{{ $dailyAcos !== null ? number_format($dailyAcos * 100, 2, ',', '.').'%' : '—' }}</div>
+                </div>
+                <div>
+                    <div class="od-label">Biaya Iklan Order</div>
+                    <div class="od-value">{{ $orderAdCost !== null ? 'Rp'.number_format($orderAdCost, 0, ',', '.') : '—' }}</div>
+                </div>
+                <div>
+                    <div class="od-label">Gross Profit</div>
+                    <div class="od-value" style="color:{{ $grossProfit !== null && $grossProfit < 0 ? '#b91c1c' : '#166534' }}">
+                        {{ $grossProfit !== null ? 'Rp'.number_format($grossProfit, 0, ',', '.') : 'Belum tersedia' }}
+                    </div>
+                </div>
+            </div>
+            <div class="od-muted" style="font-size:.72rem">
+                @if($adsDaily && $dailyAcos !== null)
+                    Iklan dihitung dari subtotal produk × ACOS harian toko ({{ $adsDate }}): Rp{{ number_format($subtotal, 0, ',', '.') }} × {{ number_format($dailyAcos * 100, 2, ',', '.') }}%.
+                @else
+                    Data ACOS harian toko untuk tanggal order belum tersedia, sehingga biaya iklan order belum dihitung.
+                @endif
+                @if($hppComplete && $orderAdCost !== null)
+                    <span style="display:block; margin-top:.15rem">Profit setelah iklan: <strong style="color:{{ $profitAfterAds < 0 ? '#b91c1c' : '#166534' }}">Rp{{ number_format($profitAfterAds, 0, ',', '.') }}</strong>.</span>
+                @endif
+            </div>
+        </div>
+    </div>
 
     <div class="od-grid-2">
         <div class="od-card">
