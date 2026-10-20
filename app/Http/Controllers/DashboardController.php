@@ -75,9 +75,9 @@ class DashboardController extends Controller
 
     private function ownerData(): array
     {
-        $cacheKey = 'dashboard.owner.v3.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.owner.v4.' . Carbon::today()->toDateString();
 
-        return (array) Cache::remember($cacheKey, now()->addSeconds(30), fn () => $this->ownerDataUncached());
+        return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->ownerDataUncached());
     }
 
     private function ownerDataUncached(): array
@@ -245,9 +245,9 @@ class DashboardController extends Controller
 
     private function adminData(): array
     {
-        $cacheKey = 'dashboard.admin.v3.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.admin.v4.' . Carbon::today()->toDateString();
 
-        return (array) Cache::remember($cacheKey, now()->addSeconds(30), fn () => $this->adminDataUncached());
+        return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->adminDataUncached());
     }
 
     private function adminDataUncached(): array
@@ -415,17 +415,21 @@ class DashboardController extends Controller
                 return [];
             }
 
+            $orderColumns = $limit > 0
+                ? [
+                    'id',
+                    'external_invoice_no', 'external_order_id', 'buyer_name',
+                    'shipping_city', 'shipping_courier_code', 'order_status',
+                    DB::raw('COALESCE(total_amount, total_paid_customer, 0) as amount'),
+                ]
+                : ['id'];
+
             $orders = DB::table('marketplace_orders')
                 ->whereIn('order_status', self::DASHBOARD_PENDING_ORDER_STATUSES)
                 ->when($limit > 0, function ($query) {
                     $query->orderByDesc($this->mpDateCol())->limit($limit);
                 })
-                ->get([
-                    'id',
-                    'external_invoice_no', 'external_order_id', 'buyer_name',
-                    'shipping_city', 'shipping_courier_code', 'order_status',
-                    DB::raw('COALESCE(total_amount, total_paid_customer, 0) as amount'),
-                ]);
+                ->get($orderColumns);
 
             if ($orders->isEmpty() || ! Schema::hasTable('marketplace_order_items')) {
                 return $orders
@@ -601,7 +605,8 @@ class DashboardController extends Controller
                 return [];
             }
 
-            $today = Carbon::today()->toDateString();
+            $today = Carbon::today();
+            $dateColumn = $this->mpDateCol();
             $buyerKey = "COALESCE(NULLIF(buyer_username, ''), NULLIF(buyer_name, ''))";
             $currentBuyerKey = "COALESCE(NULLIF(current.buyer_username, ''), NULLIF(current.buyer_name, ''))";
             $completedHistory = DB::table('marketplace_orders')
@@ -620,8 +625,8 @@ class DashboardController extends Controller
                         ->on('repeat_history.buyer_key', '=', DB::raw($currentBuyerKey));
                 })
                 ->whereIn('current.order_status', self::DASHBOARD_PENDING_ORDER_STATUSES)
-                ->whereRaw('DATE(COALESCE(current.ordered_at, current.order_date, current.created_at)) = ?', [$today])
-                ->orderByDesc(DB::raw('COALESCE(current.ordered_at, current.order_date, current.created_at)'))
+                ->whereBetween('current.' . $dateColumn, [$today->copy()->startOfDay(), $today->copy()->endOfDay()])
+                ->orderByDesc('current.' . $dateColumn)
                 ->limit($limit)
                 ->get([
                     'current.id',
