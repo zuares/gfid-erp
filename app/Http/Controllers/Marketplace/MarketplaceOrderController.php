@@ -175,6 +175,18 @@ class MarketplaceOrderController extends Controller
         $estimatedFeePct = round($estimatedFeeRatio * 100, 1);
         $promotionBreakdown = $this->promotionBreakdownForOrder($order, $liveData ?? []);
         $hppSummary = $this->hppSummaryForOrder($order);
+        $buyerUsername = trim((string) ($order->buyer_username
+            ?: data_get($liveData ?? [], 'buyer_username')
+            ?: data_get($liveData ?? [], 'buyer_user_name')
+            ?: data_get($liveData ?? [], 'username')
+            ?: ''));
+        $buyerName = trim((string) ($order->buyer_name
+            ?: data_get($liveData ?? [], 'recipient_address.name')
+            ?: ''));
+        $buyerPhone = trim((string) ($order->buyer_phone
+            ?: data_get($liveData ?? [], 'recipient_address.phone')
+            ?: ''));
+        $buyerPurchaseCount = $this->buyerPurchaseCountForOrder($order, $buyerUsername, $buyerPhone, $buyerName);
         $adsDate = ($order->ordered_at ?: $order->order_date)?->toDateString();
         $adsDaily = $adsDate && $order->store_id
             ? MarketplaceAdsDaily::query()
@@ -191,9 +203,31 @@ class MarketplaceOrderController extends Controller
             'internalPackageNo',
             'promotionBreakdown',
             'hppSummary',
+            'buyerUsername',
+            'buyerPurchaseCount',
             'adsDate',
             'adsDaily'
         ));
+    }
+
+    private function buyerPurchaseCountForOrder(MarketplaceOrder $order, string $username, string $phone, string $name): int
+    {
+        $query = MarketplaceOrder::query()
+            ->where('store_id', $order->store_id)
+            ->whereNotIn('order_status', ['CANCELLED', 'CANCELED'])
+            ->whereNotIn('status', ['cancelled', 'canceled']);
+
+        if ($username !== '') {
+            $query->where('buyer_username', $username);
+        } elseif ($phone !== '') {
+            $query->where('buyer_phone', $phone);
+        } elseif ($name !== '') {
+            $query->where('buyer_name', $name);
+        } else {
+            return 1;
+        }
+
+        return max(1, (int) $query->count());
     }
 
     /**

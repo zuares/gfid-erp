@@ -4,56 +4,117 @@
 
 @push('head')
 <style>
-.od-wrap{max-width:1040px;margin-inline:auto;padding:.7rem .75rem 3rem}
-.od-topbar{position:sticky;top:0;z-index:250;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.55rem .75rem;background:var(--card,#fff);border-bottom:1px solid rgba(148,163,184,.18)}
-.od-code{font-weight:900;font-size:1rem;color:#111827}
+.od-wrap{max-width:1240px;margin-inline:auto;padding:1rem 1rem 4rem;color:var(--text,#172033)}
+.od-topbar{position:sticky;top:var(--app-navbar-offset,58px);z-index:250;width:min(100%,1240px);margin-inline:auto;display:flex;align-items:center;gap:.85rem;padding:.7rem 1rem;background:color-mix(in srgb,var(--card,#fff) 92%,transparent);border:1px solid var(--line,#e7ebf0);border-top:0;box-shadow:0 8px 24px rgba(15,23,42,.06);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.od-topbar-inner{width:100%;display:flex;align-items:center;gap:.75rem;min-width:0}
+.od-identity{min-width:0;display:grid;gap:.08rem}
+.od-kicker{font-size:.65rem;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:var(--muted,#64748b)}
+.od-code{font-size:1rem;font-weight:800;letter-spacing:-.015em;color:var(--text,#172033);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .od-spacer{flex:1}
-.od-btn,.od-pill{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;border-radius:7px;border:1px solid rgba(148,163,184,.3);background:transparent;color:#475569;text-decoration:none;font-size:.76rem;padding:.28rem .6rem;min-height:34px}
-.od-btn{font-weight:800}
-.od-btn:hover{background:rgba(148,163,184,.09);color:#111827;text-decoration:none}
-.od-primary{background:#334155!important;border-color:#334155!important;color:#fff!important}
-.od-status{font-weight:850;color:#334155;background:rgba(148,163,184,.08)}
-.od-status.completed,.od-status.shipped,.od-status.processed{color:#166534;background:rgba(22,101,52,.08);border-color:rgba(22,101,52,.2)}
-.od-status.cancelled{color:#991b1b;background:rgba(153,27,27,.08);border-color:rgba(153,27,27,.2)}
-.od-flow{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin:.6rem 0;padding:.45rem .55rem;border:1px solid rgba(148,163,184,.18);border-radius:8px;background:var(--card,#fff)}
-.od-step{border:1px solid rgba(148,163,184,.25);border-radius:7px;padding:.18rem .5rem;font-size:.72rem;font-weight:800;color:#64748b}
-.od-step.done{background:rgba(148,163,184,.08);color:#334155}
-.od-step.active{background:#334155;border-color:#334155;color:#fff}
-.od-step.cancel{background:#991b1b;border-color:#991b1b;color:#fff}
+.od-topbar-store{display:grid;gap:.08rem;min-width:0;padding-left:.75rem;border-left:1px solid var(--line,#e7ebf0)}
+.od-topbar-store b{font-size:.78rem;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+.od-btn,.od-pill{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;border-radius:9px;border:1px solid var(--line,#dce2e9);background:var(--card,#fff);color:#475569;text-decoration:none;font-size:.76rem;padding:.38rem .7rem;min-height:36px;white-space:nowrap}
+.od-btn{font-weight:700;transition:background .15s ease,border-color .15s ease,transform .15s ease}
+.od-btn:hover{background:var(--card-soft,#f8fafc);border-color:#cbd5e1;color:var(--text,#172033);text-decoration:none;transform:translateY(-1px)}
+.od-btn-ghost{background:transparent}
+.od-primary{background:#2563eb!important;border-color:#2563eb!important;color:#fff!important;box-shadow:0 5px 12px rgba(37,99,235,.16)}
+.od-primary:hover{background:#1d4ed8!important;border-color:#1d4ed8!important;color:#fff!important}
+.od-status{font-weight:750;letter-spacing:.02em;color:#475569;background:#f1f5f9;border-color:#e2e8f0}
+.od-status::before{content:"";width:7px;height:7px;border-radius:50%;background:#94a3b8;box-shadow:0 0 0 3px rgba(148,163,184,.16)}
+.od-status.completed::before,.od-status.shipped::before,.od-status.processed::before{background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.14)}
+.od-status.completed,.od-status.shipped,.od-status.processed{color:#166534;background:#f0fdf4;border-color:#bbf7d0}
+.od-status.cancelled{color:#991b1b;background:#fff1f2;border-color:#fecdd3}
+.od-status.cancelled::before{background:#dc2626;box-shadow:0 0 0 3px rgba(220,38,38,.14)}
+.od-flow{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;margin:0 0 1rem;padding:.7rem .8rem;border:1px solid var(--line,#e7ebf0);border-radius:14px;background:var(--card,#fff);box-shadow:0 1px 2px rgba(15,23,42,.035)}
+.od-flow::before{content:"Order lifecycle";margin-right:.25rem;color:var(--muted,#64748b);font-size:.68rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.od-step{border:1px solid var(--line,#dce2e9);border-radius:999px;padding:.34rem .7rem;font-size:.72rem;font-weight:700;color:var(--muted,#64748b);background:var(--card-soft,#f8fafc)}
+.od-step.done{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+.od-step.active{background:#2563eb;border-color:#2563eb;color:#fff;box-shadow:0 3px 8px rgba(37,99,235,.18)}
+.od-step.cancel{background:#fff1f2;border-color:#fecdd3;color:#be123c}
 .od-sep{color:#cbd5e1;font-size:.72rem}
-.od-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.55rem;margin-bottom:.65rem}
-.od-grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;margin-bottom:.65rem}
-.od-card{background:var(--card,#fff);border:1px solid rgba(148,163,184,.18);border-radius:8px;overflow:hidden;margin-bottom:.65rem}
-.od-kpi{padding:.65rem .75rem}
-.od-label{font-size:.72rem;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.02em}
-.od-value{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:1.05rem;font-weight:900;color:#111827;margin-top:.12rem}
-.od-value-text{font-size:1rem;font-weight:800;color:#111827;margin-top:.12rem}
-.od-muted{color:#64748b;font-size:.8rem}
-.od-head{display:flex;align-items:center;gap:.55rem;justify-content:space-between;padding:.7rem .85rem;border-bottom:1px solid rgba(148,163,184,.12)}
-.od-title{font-weight:900;color:#334155}
-.od-body{padding:.75rem .85rem}
-.od-list{display:grid;gap:.45rem}
-.od-table-wrap{overflow:auto;border-radius:8px}
+.od-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin-bottom:.75rem}
+.od-grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;margin-bottom:.75rem}
+.od-card{background:var(--card,#fff);border:1px solid var(--line,#e7ebf0);border-radius:14px;overflow:hidden;margin-bottom:.75rem;box-shadow:0 1px 2px rgba(15,23,42,.035)}
+.od-card:hover{box-shadow:0 8px 24px rgba(15,23,42,.055)}
+.od-kpi{position:relative;min-height:116px;padding:1rem 1.1rem;overflow:hidden}
+.od-kpi::after{content:"";position:absolute;width:96px;height:96px;right:-36px;bottom:-46px;border-radius:50%;background:#2563eb;opacity:.055}
+.od-kpi-head{display:flex;align-items:center;gap:.65rem;margin-bottom:.8rem}
+.od-kpi-icon{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border-radius:10px;background:#eff6ff;color:#2563eb;font-size:1rem}
+.od-label{font-size:.69rem;font-weight:750;color:var(--muted,#64748b);text-transform:uppercase;letter-spacing:.05em}
+.od-value{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:1.05rem;font-weight:800;color:var(--text,#172033);margin-top:.12rem;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.od-value-text{font-size:1rem;font-weight:750;color:var(--text,#172033);margin-top:.12rem}
+.od-muted{color:var(--muted,#64748b);font-size:.8rem}
+.od-head{display:flex;align-items:center;gap:.75rem;justify-content:space-between;padding:.9rem 1.1rem;border-bottom:1px solid var(--line,#eef1f4);background:var(--card,#fff)}
+.od-title{font-size:.9rem;font-weight:750;color:var(--text,#172033);letter-spacing:-.01em}
+.od-body{padding:1rem 1.1rem}
+.od-list{display:grid;gap:.55rem}
+.od-table-wrap{overflow:auto;border-radius:0 0 14px 14px}
 .od-table{width:100%;border-collapse:collapse}
-.od-table th,.od-table td{padding:.55rem .65rem;border-bottom:1px solid rgba(148,163,184,.12);vertical-align:middle}
-.od-table th{text-align:left;font-size:.72rem;color:#64748b;font-weight:900;text-transform:uppercase;letter-spacing:.02em;background:rgba(148,163,184,.04)}
-.od-table td{font-size:.86rem;color:#334155}
-.od-code-cell{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#111827}
-.od-name{color:#64748b;font-size:.8rem;margin-top:.08rem}
-.od-r{text-align:right}
-.od-c{text-align:center}
-.od-total td{font-weight:900;color:#111827;background:rgba(148,163,184,.04)}
-.od-fee-tab.active{background:#334155!important;border-color:#334155!important;color:#fff!important}
-.od-fee-panel{padding-top:.25rem}
+.od-table th,.od-table td{padding:.72rem 1.1rem;border-bottom:1px solid #eef1f4;vertical-align:middle}
+.od-table th{text-align:left;font-size:.68rem;color:var(--muted,#64748b);font-weight:750;text-transform:uppercase;letter-spacing:.05em;background:#f8fafc}
+.od-table td{font-size:.84rem;color:var(--text,#334155)}
+.od-table tbody tr:last-child td{border-bottom:0}
+.od-table tbody tr:hover td{background:#fbfdff}
+.od-code-cell{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:750;color:var(--text,#172033);font-variant-numeric:tabular-nums}
+.od-name{color:var(--muted,#64748b);font-size:.77rem;margin-top:.12rem}
+.od-r{text-align:right}.od-c{text-align:center}
+.od-total td{font-weight:800;color:var(--text,#172033);background:#f8fafc}
+.od-fee-tab.active{background:#2563eb!important;border-color:#2563eb!important;color:#fff!important;box-shadow:0 3px 8px rgba(37,99,235,.16)}
+.od-fee-panel{display:grid;gap:.45rem;margin-top:.6rem;padding:.75rem .8rem;background:var(--card-soft,#f8fafc);border:1px solid var(--line,#e7ebf0);border-radius:10px}
+.od-section-caption{font-size:.73rem;color:var(--muted,#64748b);margin-top:.16rem}
+.od-finance-card{height:100%;margin-bottom:0}
+.od-finance-head{min-height:88px;padding:1.05rem 1.15rem}
+.od-finance-head .od-title{font-size:1rem}
+.od-finance-total{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:1.25rem;font-weight:850;letter-spacing:-.035em;color:#15803d;white-space:nowrap;font-variant-numeric:tabular-nums}
+.od-finance-body{display:grid;gap:.8rem}
+.od-finance-group{display:grid;gap:.48rem}
+.od-finance-group-title{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding-bottom:.35rem;border-bottom:1px solid #eef1f4;color:var(--text,#172033);font-size:.76rem;font-weight:800}
+.od-finance-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;color:var(--muted,#64748b);font-size:.8rem}
+.od-finance-row > :last-child{color:var(--text,#172033);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:750;font-variant-numeric:tabular-nums;white-space:nowrap}
+.od-finance-row-total{padding-top:.65rem;margin-top:.1rem;border-top:1px solid var(--line,#e7ebf0);font-weight:800;color:var(--text,#172033)}
+.od-finance-row-total > :last-child{font-size:1.05rem;font-weight:850}
+.od-finance-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.25rem;width:100%;padding:.25rem;background:var(--card-soft,#f8fafc);border:1px solid var(--line,#e7ebf0);border-radius:10px}
+.od-finance-tabs .od-fee-tab{width:100%;min-width:0;border-color:transparent;background:transparent;min-height:36px;padding:.35rem .3rem;font-size:.7rem;line-height:1.2;text-align:center}
+.od-finance-tabs .od-fee-tab:not(.active):hover{background:var(--card,#fff);border-color:var(--line,#e7ebf0)}
+.od-settlement-address{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:.75rem;padding:.85rem 1.15rem;border-bottom:1px solid var(--line,#eef1f4);background:var(--card-soft,#f8fafc)}
+.od-settlement-address-label{font-size:.65rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#64748b);margin-bottom:.25rem}
+.od-settlement-address-name{font-size:.82rem;font-weight:800;color:var(--text,#172033)}
+.od-settlement-address-detail{font-size:.75rem;line-height:1.45;color:var(--muted,#64748b)}
+.od-payment-summary{display:grid;gap:.5rem;margin-top:.85rem;padding-top:.85rem;border-top:1px solid var(--line,#eef1f4)}
+.od-payment-summary-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+.od-payment-summary-total{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.95rem;font-weight:850;color:var(--text,#172033);font-variant-numeric:tabular-nums;white-space:nowrap}
+.od-finance-single{margin-bottom:.75rem}
+body[data-theme="dark"] .od-topbar{background:color-mix(in srgb,var(--card,#11263f) 92%,transparent);box-shadow:0 8px 24px rgba(0,0,0,.18)}
+body[data-theme="dark"] .od-kpi-icon{background:rgba(37,99,235,.2);color:#93c5fd}
+body[data-theme="dark"] .od-table th{background:var(--card-soft,#132a45)}
+body[data-theme="dark"] .od-table tbody tr:hover td{background:rgba(96,165,250,.06)}
+body[data-theme="dark"] .od-status{background:rgba(148,163,184,.12);border-color:rgba(148,163,184,.22)}
+body[data-theme="dark"] .od-finance-group-title,body[data-theme="dark"] .od-finance-row-total{border-color:var(--line,#1e3a5f)}
+body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{background:rgba(19,42,69,.7);border-color:var(--line,#1e3a5f)}
 @media(max-width:860px){
-  .od-wrap{padding:.5rem .5rem 3.5rem}
-  .od-topbar{padding:.5rem}
-  .od-code{flex:1;min-width:150px;font-size:1.02rem}
-  .od-grid,.od-grid-2{grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem}
-  .od-kpi{padding:.58rem .62rem}
-  .od-value,.od-value-text{font-size:1.08rem}
-  .od-head{padding:.65rem .7rem}
-  .od-body{padding:.65rem .7rem}
+  .od-wrap{padding:.7rem .65rem 4rem}
+  .od-topbar{padding:.65rem .7rem}
+  .od-topbar-inner{flex-wrap:wrap}
+  .od-identity{flex:1;min-width:150px}
+  .od-topbar-store{order:5;width:100%;padding:.55rem 0 0;border-left:0;border-top:1px solid var(--line,#e7ebf0)}
+  .od-topbar-store b{max-width:none}
+  .od-grid,.od-grid-2{grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}
+  .od-kpi{padding:.8rem .85rem;min-height:104px}
+  .od-kpi-head{margin-bottom:.6rem}
+  .od-value,.od-value-text{font-size:.95rem}
+  .od-head{padding:.8rem .85rem}
+  .od-body{padding:.85rem}
+  .od-table th,.od-table td{padding:.62rem .75rem}
+  .od-flow::before{width:100%;margin:0 0 .1rem}
+  .od-finance-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:520px){
+  .od-grid,.od-grid-2{grid-template-columns:1fr}
+  .od-settlement-address{grid-template-columns:1fr}
+  .od-finance-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .od-topbar .od-primary{flex:1}
+  .od-flow{gap:.35rem}
+  .od-sep{display:none}
 }
 </style>
 @endpush
@@ -79,6 +140,24 @@
     ];
     $settlementItems = (array) ($settlementRaw['items'] ?? []);
     $displayItems = $settlementItems ?: (array) ($liveData['item_list'] ?? []);
+    $hppBySku = [];
+    foreach (($order->items ?? collect()) as $costLine) {
+        $costQty = max((float) ($costLine->qty ?? 0), 0);
+        $costTotal = (float) ($costLine->hpp_total_snapshot ?? 0);
+        $costUnit = max((float) ($costLine->hpp_snapshot ?? 0), (float) ($costLine->hpp_unit_snapshot ?? 0));
+        if ($costTotal <= 0 && $costUnit > 0 && $costQty > 0) {
+            $costTotal = $costUnit * $costQty;
+        }
+        if ($costUnit <= 0 && $costTotal > 0 && $costQty > 0) {
+            $costUnit = $costTotal / $costQty;
+        }
+        foreach ([$costLine->model_sku, $costLine->item_sku, $costLine->external_sku] as $costSku) {
+            $costSku = strtolower(trim((string) $costSku));
+            if ($costSku !== '') {
+                $hppBySku[$costSku] = ['unit' => $costUnit, 'total' => $costTotal];
+            }
+        }
+    }
     $buyerShippingAmount = function (array $income, array $orderData, mixed $storedShipping): float {
         foreach ([$income, $orderData] as $source) {
             if (array_key_exists('buyer_paid_shipping_fee', $source)
@@ -144,6 +223,41 @@
         return null;
     };
 
+    $paymentSubtotal = (float) ($inc['order_discounted_price'] ?? $order->subtotal_items ?? 0);
+    if ($paymentSubtotal <= 0 && isset($liveData['item_list']) && is_array($liveData['item_list'])) {
+        foreach ($liveData['item_list'] as $paymentItem) {
+            $paymentPrice = (float) ($paymentItem['model_discounted_price'] ?? $paymentItem['discounted_price'] ?? $paymentItem['model_original_price'] ?? $paymentItem['selling_price'] ?? 0);
+            $paymentQty = (float) ($paymentItem['model_quantity_purchased'] ?? $paymentItem['quantity'] ?? 1);
+            $paymentSubtotal += $paymentPrice * $paymentQty;
+        }
+    }
+    if ($paymentSubtotal <= 0 && $order->items && $order->items->count() > 0) {
+        foreach ($order->items as $paymentLine) {
+            $paymentLineTotal = (float) ($paymentLine->line_gross_amount ?? 0);
+            if ($paymentLineTotal <= 0) {
+                $paymentLineTotal = (float) ($paymentLine->price ?? $paymentLine->price_original ?? 0) * (float) ($paymentLine->qty ?? 1);
+            }
+            $paymentSubtotal += $paymentLineTotal;
+        }
+    }
+    $paymentVoucherPlatform = (float) ($inc['voucher_from_shopee'] ?? $inc['voucher_from_platform'] ?? $inc['platform_voucher'] ?? 0);
+    $paymentVoucherStore = (float) ($inc['voucher_from_seller'] ?? $inc['seller_voucher_rebate'] ?? 0);
+    $paymentCoins = (float) ($inc['coin'] ?? 0);
+    $paymentShipping = $buyerShippingAmount($inc, $liveData, $order->shipping_fee_customer);
+    $paymentTotal = (float) ($inc['buyer_total_amount'] ?? $inc['buyer_paid_amount'] ?? ($order->total_paid_customer > 0
+        ? $order->total_paid_customer
+        : ($liveData['total_amount'] ?? $order->total_amount ?? 0)));
+    $paymentServiceFee = (float) ($inc['buyer_transaction_fee'] ?? 0);
+    if ($paymentTotal > 0) {
+        $paymentServiceFee = $paymentTotal - ($paymentSubtotal + $paymentShipping - $paymentVoucherPlatform - $paymentVoucherStore - $paymentCoins);
+        if ($paymentServiceFee < 0) {
+            $paymentServiceFee = (float) ($inc['buyer_transaction_fee'] ?? 0);
+        }
+    } else {
+        $paymentServiceFee = $paymentServiceFee > 0 ? $paymentServiceFee : 2000;
+        $paymentTotal = $paymentSubtotal + $paymentShipping - $paymentVoucherPlatform - $paymentVoucherStore - $paymentCoins + $paymentServiceFee;
+    }
+
     $cleanAwb = function ($value) {
         $awb = trim((string) $value);
         if ($awb === '') {
@@ -161,6 +275,8 @@
     // Fallbacks
     $buyerName = $liveData['recipient_address']['name'] ?? $order->buyer_name ?? '—';
     $buyerPhone = $liveData['recipient_address']['phone'] ?? $order->buyer_phone ?? '—';
+    $buyerUsername = $buyerUsername ?? ($order->buyer_username ?: $buyerName);
+    $buyerPurchaseCount = max(1, (int) ($buyerPurchaseCount ?? 1));
     $buyerAddress = $liveData['recipient_address']['full_address'] ?? $order->shipping_address ?? '—';
     $zipcode = $liveData['recipient_address']['zipcode'] ?? $order->shipping_postal_code ?? '';
     
@@ -209,49 +325,23 @@
 @section('content')
 
 <div class="od-topbar">
-    <a href="{{ route('marketplace.orders') }}" class="od-btn">Kembali</a>
-    <span class="od-code">{{ $order->channel_order_id ?: $order->external_order_id }}</span>
-    <span class="od-pill od-status {{ $statusText }}">{{ $statusLabel }}</span>
-    <span class="od-spacer"></span>
-    <span class="od-pill">Toko <b>{{ $order->store->name ?? '-' }}</b></span>
-    <a href="{{ route('sales.shipments.create', ['marketplace_order_id' => $order->id]) }}" class="od-btn od-primary">Buat Shipment Internal</a>
+    <div class="od-topbar-inner">
+        <a href="{{ route('marketplace.orders') }}" class="od-btn od-btn-ghost"><i class="bi bi-arrow-left"></i><span>Kembali</span></a>
+        <div class="od-identity">
+            <div class="od-kicker">Marketplace order</div>
+            <div class="od-code">{{ $order->channel_order_id ?: $order->external_order_id }}</div>
+        </div>
+        <span class="od-pill od-status {{ $statusText }}">{{ $statusLabel }}</span>
+        <span class="od-spacer"></span>
+        <div class="od-topbar-store">
+            <div class="od-kicker">Toko{{ $order->store?->channel?->code ? ' · '.$order->store->channel->code : '' }}</div>
+            <b>{{ $order->store?->name ?? '-' }}</b>
+        </div>
+        <a href="{{ route('sales.shipments.create', ['marketplace_order_id' => $order->id]) }}" class="od-btn od-primary"><i class="bi bi-box-seam"></i><span>Buat Shipment</span></a>
+    </div>
 </div>
 
-@php
-    $testingToolsEnabled = app()->environment(['local', 'testing']) || (auth()->user()?->role === 'owner');
-@endphp
-
 <div class="od-wrap">
-    @if($testingToolsEnabled)
-        <div class="od-card">
-                <div class="od-head">
-                    <div class="od-title">Testing Settlement</div>
-                    <div class="od-muted">Owner/dev only</div>
-                </div>
-                <form method="POST" action="{{ url('/marketplace/orders/' . $order->id . '/test-settlement-fields') }}" class="od-body">
-                    @csrf
-                    <div class="od-grid" style="grid-template-columns:repeat(3,minmax(0,1fr)); margin-bottom:.5rem;">
-                        <label style="display:grid; gap:.25rem;">
-                            <span class="od-muted" style="font-size:.72rem; font-weight:800; text-transform:uppercase;">order_ams_commission_fee</span>
-                        <input type="number" min="0" step="1" name="order_ams_commission_fee" value="{{ (int) round((float)($order->settlement?->activity_fee ?? data_get($liveData, 'income_details.order_ams_commission_fee') ?? data_get($liveData, 'income_details.ams_commission_fee') ?? 0)) }}" class="form-control form-control-sm">
-                        </label>
-                        <label style="display:grid; gap:.25rem;">
-                            <span class="od-muted" style="font-size:.72rem; font-weight:800; text-transform:uppercase;">voucher_from_shopee</span>
-                        <input type="number" min="0" step="1" name="voucher_from_shopee" value="{{ (int) round((float)(data_get($liveData, 'income_details.voucher_from_shopee') ?? data_get($liveData, 'income_details.voucher_from_platform') ?? data_get($liveData, 'income_details.platform_voucher') ?? 0)) }}" class="form-control form-control-sm">
-                        </label>
-                        <label style="display:grid; gap:.25rem;">
-                            <span class="od-muted" style="font-size:.72rem; font-weight:800; text-transform:uppercase;">voucher_from_seller</span>
-                        <input type="number" min="0" step="1" name="voucher_from_seller" value="{{ (int) round((float)($order->settlement?->seller_voucher ?? data_get($liveData, 'income_details.voucher_from_seller') ?? data_get($liveData, 'income_details.seller_voucher_rebate') ?? 0)) }}" class="form-control form-control-sm">
-                        </label>
-                    </div>
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <button type="submit" class="od-btn od-primary">Simpan Data Testing</button>
-                    <span class="od-muted" style="font-size:.78rem;">Nilai ini disimpan ke settlement raw_json supaya halaman penghasilan ikut kebaca.</span>
-                </div>
-            </form>
-        </div>
-    @endif
-
     <div class="od-flow">
         <span class="od-step {{ $step >= 1 || $isCancel ? 'done' : 'active' }} {{ $isCancel ? 'cancel' : '' }}">Dibuat</span><span class="od-sep">-&gt;</span>
         <span class="od-step {{ $step >= 2 || $isCancel ? 'done' : ($step == 1 && !$isCancel ? 'active' : '') }} {{ $isCancel ? 'cancel' : '' }}">Dibayar</span><span class="od-sep">-&gt;</span>
@@ -261,15 +351,15 @@
 
     <div class="od-grid">
         <div class="od-card od-kpi">
-            <div class="od-label">Metode Bayar</div>
+            <div class="od-kpi-head"><span class="od-kpi-icon"><i class="bi bi-credit-card-2-front"></i></span><div class="od-label">Metode Bayar</div></div>
             <div class="od-value-text">{{ $payMethod }}</div>
         </div>
         <div class="od-card od-kpi">
-            <div class="od-label">Kurir</div>
+            <div class="od-kpi-head"><span class="od-kpi-icon"><i class="bi bi-truck"></i></span><div class="od-label">Kurir</div></div>
             <div class="od-value-text">{{ $carrier }}</div>
         </div>
         <div class="od-card od-kpi">
-            <div class="od-label">No. Resi</div>
+            <div class="od-kpi-head"><span class="od-kpi-icon"><i class="bi bi-upc-scan"></i></span><div class="od-label">Nomor Resi</div></div>
             <div class="od-value" style="font-size:1rem">{{ $awb ?: ($canTrackOrder ? 'Sedang disinkronkan' : 'Belum ada') }}</div>
             @if(!$awb && !empty($internalPackageNo))
                 <div class="od-muted" style="margin-top:.28rem; font-size:.68rem;">
@@ -283,32 +373,12 @@
             @endif
         </div>
         <div class="od-card od-kpi">
-            <div class="od-label">Total Pembayaran</div>
+            <div class="od-kpi-head"><span class="od-kpi-icon"><i class="bi bi-wallet2"></i></span><div class="od-label">Total Pembayaran</div></div>
             <div class="od-value">Rp{{ number_format($liveData['total_amount'] ?? $order->total_paid_customer ?? $order->total_amount ?? 0, 0, ',', '.') }}</div>
         </div>
     </div>
 
     <div class="od-grid-2">
-        <div class="od-card">
-            <div class="od-head">
-                <div class="od-title">Alamat Pengiriman</div>
-            </div>
-            <div class="od-body">
-                <div style="font-weight:900; color:#111827">{{ $buyerName }}</div>
-                <div class="od-muted" style="margin-top:.2rem">{{ $buyerPhone }}</div>
-                <div class="od-muted" style="margin-top:.4rem; line-height:1.4">
-                    {{ $buyerAddress }}
-                    @if($zipcode) <br>{{ $zipcode }} @endif
-                </div>
-                @if($order->remarks)
-                    <div style="margin-top:.8rem; padding:.5rem; background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.25); border-radius:6px; font-size:.8rem; color:#92400e">
-                        <strong>Catatan:</strong> {{ $order->remarks }}
-                    </div>
-                @endif
-            </div>
-        </div>
-        
-        <div style="display:grid; gap:.65rem;">
             <div class="od-card">
                 <div class="od-head">
                     <div class="od-title">Waktu Transaksi</div>
@@ -357,6 +427,40 @@
                     <div style="display:flex; justify-content:space-between">
                         <span class="od-muted">Selesai / Batal</span>
                         <span class="od-code-cell" style="font-size:.85rem">{{ $completeTime ? id_datetime($completeTime) : '—' }}</span>
+                    </div>
+                    <div class="od-payment-summary">
+                        <div class="od-payment-summary-head">
+                            <span class="od-kicker">Customer payment</span>
+                            <span class="od-payment-summary-total">Rp{{ number_format($paymentTotal, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="od-finance-row">
+                            <span class="od-muted">Subtotal Pesanan</span>
+                            <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($paymentSubtotal, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="od-finance-row">
+                            <span class="od-muted">Ongkos Kirim</span>
+                            <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($paymentShipping, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="od-finance-row">
+                            <span class="od-muted">Voucher Platform</span>
+                            <span class="od-code-cell" style="font-size:.85rem">{{ $paymentVoucherPlatform > 0 ? '-' : '' }}Rp{{ number_format($paymentVoucherPlatform, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="od-finance-row">
+                            <span class="od-muted">Voucher Toko</span>
+                            <span class="od-code-cell" style="font-size:.85rem">{{ $paymentVoucherStore > 0 ? '-' : '' }}Rp{{ number_format($paymentVoucherStore, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="od-finance-row">
+                            <span class="od-muted">Koin Shopee Ditukarkan</span>
+                            <span class="od-code-cell" style="font-size:.85rem">{{ $paymentCoins > 0 ? '-' : '' }}Rp{{ number_format($paymentCoins, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="od-finance-row">
+                            <span class="od-muted">Biaya Layanan & Penanganan</span>
+                            <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($paymentServiceFee, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="od-finance-row od-finance-row-total">
+                            <span>Total Pembayaran Pembeli</span>
+                            <span>Rp{{ number_format($paymentTotal, 0, ',', '.') }}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -441,6 +545,32 @@
                     </div>
                 </div>
             </div>
+    </div>
+
+    <div class="od-card od-shipping-card">
+        <div class="od-head">
+            <div>
+                <div class="od-kicker">Customer profile</div>
+                <div class="od-title">Alamat Pengiriman</div>
+            </div>
+            <span class="od-pill"><i class="bi bi-bag-check"></i> {{ $buyerPurchaseCount }}x pembelian</span>
+        </div>
+        <div class="od-settlement-address">
+            <div>
+                <div class="od-settlement-address-label">User</div>
+                <div class="od-settlement-address-name">{{ $buyerUsername }}</div>
+                <div class="od-settlement-address-detail">{{ $buyerName }} · {{ $buyerPhone }}</div>
+                <div class="od-settlement-address-label" style="margin-top:.7rem">Riwayat Pembelian</div>
+                <div class="od-settlement-address-name">Pernah beli {{ $buyerPurchaseCount }} kali</div>
+            </div>
+            <div class="od-settlement-address-detail">
+                <div class="od-settlement-address-label">Alamat</div>
+                {{ $buyerAddress }}
+                @if($zipcode) <br>{{ $zipcode }} @endif
+                @if($order->remarks)
+                    <br><strong style="color:#92400e">Catatan:</strong> {{ $order->remarks }}
+                @endif
+            </div>
         </div>
     </div>
 
@@ -453,10 +583,13 @@
             <table class="od-table">
                 <thead>
                     <tr>
+                        <th class="od-c" style="width:3.5rem">No.</th>
                         <th>SKU</th>
                         <th>Produk</th>
                         <th class="od-c">Harga Satuan</th>
                         <th class="od-c">Qty</th>
+                        <th class="od-r">HPP / Unit</th>
+                        <th class="od-r">Total HPP</th>
                         <th class="od-r">Subtotal</th>
                     </tr>
                 </thead>
@@ -465,6 +598,7 @@
                         $items = $displayItems;
                         $fallbackItems = $order->items;
                         $subtotalItems = 0;
+                        $itemNumber = 0;
                     @endphp
                     
                     @if(!empty($items))
@@ -487,15 +621,21 @@
                                 $lineTotal = $price * $qty;
                             }
                             $subtotalItems += $lineTotal;
+                            $itemSku = trim((string) ($item['model_sku'] ?? $item['item_sku'] ?? ''));
+                            $itemHpp = $hppBySku[strtolower($itemSku)] ?? null;
+                            $itemNumber++;
                         @endphp
                         <tr>
-                            <td class="od-code-cell">{{ $item['model_sku'] ?? $item['item_sku'] ?? '-' }}</td>
+                            <td class="od-c od-muted">{{ $itemNumber }}</td>
+                            <td class="od-code-cell">{{ $itemSku ?: '-' }}</td>
                             <td>
                                 <div style="font-weight:700; color:#111827">{{ $item['item_name'] ?? 'Unknown Item' }}</div>
                                 <div class="od-name">Var: {{ $item['model_name'] ?? '-' }}</div>
                             </td>
                             <td class="od-c">{{ number_format($price, 0, ',', '.') }}</td>
                             <td class="od-c od-code-cell">{{ $qty }}</td>
+                            <td class="od-r od-code-cell">{{ $itemHpp && $itemHpp['unit'] > 0 ? 'Rp'.number_format($itemHpp['unit'], 0, ',', '.') : '—' }}</td>
+                            <td class="od-r od-code-cell">{{ $itemHpp && $itemHpp['total'] > 0 ? 'Rp'.number_format($itemHpp['total'], 0, ',', '.') : '—' }}</td>
                             <td class="od-r od-code-cell">{{ number_format($lineTotal, 0, ',', '.') }}</td>
                         </tr>
                         @endforeach
@@ -506,8 +646,15 @@
                             $qty = (int) $line->qty;
                             $subtotal = $price * $qty;
                             $subtotalItems += $line->line_gross_amount > 0 ? $line->line_gross_amount : $subtotal;
+                            $lineHppUnit = max((float) ($line->hpp_snapshot ?? 0), (float) ($line->hpp_unit_snapshot ?? 0));
+                            $lineHppTotal = (float) ($line->hpp_total_snapshot ?? 0);
+                            if ($lineHppTotal <= 0 && $lineHppUnit > 0) {
+                                $lineHppTotal = $lineHppUnit * max($qty, 0);
+                            }
+                            $itemNumber++;
                         @endphp
                         <tr>
+                            <td class="od-c od-muted">{{ $itemNumber }}</td>
                             <td class="od-code-cell">{{ $line->model_sku ?? $line->item_sku ?? $line->external_sku ?? '-' }}</td>
                             <td>
                                 <div style="font-weight:700; color:#111827">{{ $line->item_name ?? $line->item_name_snapshot ?? '-' }}</div>
@@ -517,12 +664,14 @@
                             </td>
                             <td class="od-c">{{ number_format($price, 0, ',', '.') }}</td>
                             <td class="od-c od-code-cell">{{ $qty }}</td>
+                            <td class="od-r od-code-cell">{{ $lineHppUnit > 0 ? 'Rp'.number_format($lineHppUnit, 0, ',', '.') : '—' }}</td>
+                            <td class="od-r od-code-cell">{{ $lineHppTotal > 0 ? 'Rp'.number_format($lineHppTotal, 0, ',', '.') : '—' }}</td>
                             <td class="od-r od-code-cell">{{ number_format($line->line_gross_amount > 0 ? $line->line_gross_amount : $subtotal, 0, ',', '.') }}</td>
                         </tr>
                         @endforeach
                     @else
                         <tr>
-                            <td colspan="5" class="od-c" style="padding:2rem; color:#94a3b8">Tidak ada data produk</td>
+                            <td colspan="8" class="od-c" style="padding:2rem; color:#94a3b8">Tidak ada data produk</td>
                         </tr>
                     @endif
                 </tbody>
@@ -637,7 +786,8 @@
         $platformFeeBreakdown = [];
         $adjustmentFeeBreakdown = [];
 
-        $buildFeeRows($sellerFeeBreakdown, 'Biaya Administrasi', $feeValue('commission_fee', $biayaAdmin));
+        $estimatedAdminFee = $isEstimasi;
+        $buildFeeRows($sellerFeeBreakdown, $estimatedAdminFee ? 'Estimasi Fee Marketplace' : 'Biaya Administrasi', $feeValue('commission_fee', $biayaAdmin));
         $buildFeeRows($sellerFeeBreakdown, 'Biaya Layanan', $feeValue('service_fee', $biayaLayananSeller));
         $buildFeeRows($sellerFeeBreakdown, 'Biaya Transaksi', $feeValue('seller_transaction_fee'));
         $buildFeeRows($sellerFeeBreakdown, 'Biaya Proses Pesanan', $feeValue('seller_order_processing_fee'));
@@ -742,51 +892,57 @@
         </div>
     </div>
 
-    <div class="od-grid-2">
-        <div class="od-card">
-            <div class="od-head">
+    <div class="od-finance-single">
+        <div class="od-card od-finance-card">
+            <div class="od-head od-finance-head">
                 <div>
-                    <div style="font-weight:500; color:#64748b; font-size:.85rem; margin-bottom:2px">{{ $isEstimasi ? 'Estimasi ' : '' }}Penghasilan Akhir</div>
+                    <div class="od-kicker">Seller settlement</div>
+                    <div class="od-title">{{ $isEstimasi ? 'Estimasi ' : '' }}Penghasilan Akhir</div>
                     @if($isEstimasi)
-                        <div style="font-size:.68rem; color:#64748b; font-weight:600;">
+                        <div class="od-section-caption">
                             Berdasarkan rata-rata fee historis toko ini ({{ number_format($estimatedFeePct, 1, ',', '.') }}%).
                         </div>
                     @endif
                 </div>
-                <div style="font-weight:900; color:#166534; font-size:1.1rem">Rp{{ number_format($penghasilan, 0, ',', '.') }}</div>
+                <div class="od-finance-total">Rp{{ number_format($penghasilan, 0, ',', '.') }}</div>
             </div>
-            <div class="od-body od-list" style="border-top:1px solid rgba(148,163,184,.12)">
-                <div style="font-weight:700; color:#334155; margin-bottom:.1rem">Subtotal Pesanan <span style="float:right">Rp{{ number_format($subtotal, 0, ',', '.') }}</span></div>
-                <div style="display:flex; justify-content:space-between; margin-left:.5rem">
-                    <span class="od-muted">Harga Produk</span>
-                    <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($subtotal, 0, ',', '.') }}</span>
+            <div class="od-body od-finance-body">
+                <div class="od-finance-group">
+                    <div class="od-finance-group-title"><span>Pendapatan produk</span><span>Rp{{ number_format($subtotal, 0, ',', '.') }}</span></div>
+                    <div class="od-finance-row">
+                        <span class="od-muted">Harga Produk</span>
+                        <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($subtotal, 0, ',', '.') }}</span>
+                    </div>
                 </div>
-                <div style="font-weight:700; color:#334155; margin-top:.5rem; margin-bottom:.1rem">Subtotal Ongkos Kirim <span style="float:right">Rp{{ number_format($subtotalOngkir, 0, ',', '.') }}</span></div>
-                <div style="display:flex; justify-content:space-between; margin-left:.5rem">
-                    <span class="od-muted">Ongkir Dibayar Pembeli</span>
-                    <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($ongkirDibayarPembeli, 0, ',', '.') }}</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; margin-left:.5rem">
-                    <span class="od-muted">Ongkos Kirim yang Dibayarkan ke Jasa Kirim</span>
-                    <span class="od-code-cell" style="font-size:.85rem; color:#b91c1c">-Rp{{ number_format($ongkosJasaKirim, 0, ',', '.') }}</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; margin-left:.5rem">
-                    <span class="od-muted">Potongan Ongkos Kirim dari Shopee</span>
-                    <span class="od-code-cell" style="font-size:.85rem; color:#15803d">Rp{{ number_format($potonganOngkir, 0, ',', '.') }}</span>
+                <div class="od-finance-group">
+                    <div class="od-finance-group-title"><span>Dampak ongkos kirim</span><span>{{ $subtotalOngkir < 0 ? '-Rp' : 'Rp' }}{{ number_format(abs($subtotalOngkir), 0, ',', '.') }}</span></div>
+                    <div class="od-finance-row">
+                        <span class="od-muted">Ongkir dibayar pembeli</span>
+                        <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($ongkirDibayarPembeli, 0, ',', '.') }}</span>
+                    </div>
+                    <div class="od-finance-row">
+                        <span class="od-muted">Ongkos Kirim yang Dibayarkan ke Jasa Kirim</span>
+                        <span class="od-code-cell" style="font-size:.85rem; color:#b91c1c">-Rp{{ number_format($ongkosJasaKirim, 0, ',', '.') }}</span>
+                    </div>
+                    <div class="od-finance-row">
+                        <span class="od-muted">Potongan Ongkos Kirim dari Shopee</span>
+                        <span class="od-code-cell" style="font-size:.85rem; color:#15803d">Rp{{ number_format($potonganOngkir, 0, ',', '.') }}</span>
+                    </div>
                 </div>
 
-                <div style="font-weight:700; color:#334155; margin-top:.6rem; margin-bottom:.35rem">
-                    Rincian Biaya Marketplace
-                    <span style="float:right; color:#b91c1c">-Rp{{ number_format($sellerFeeBreakdownTotal + $voucherFeeBreakdownTotal + $buyerFeeBreakdownTotal + $platformFeeBreakdownTotal + $adjustmentFeeBreakdownTotal, 0, ',', '.') }}</span>
-                </div>
+                <div class="od-finance-group">
+                    <div class="od-finance-group-title">
+                        <span>Rincian Biaya Marketplace</span>
+                        <span style="color:#b91c1c">-Rp{{ number_format($sellerFeeBreakdownTotal + $voucherFeeBreakdownTotal + $buyerFeeBreakdownTotal + $platformFeeBreakdownTotal + $adjustmentFeeBreakdownTotal, 0, ',', '.') }}</span>
+                    </div>
 
-                <div class="od-fee-tabs" style="display:flex; gap:.35rem; flex-wrap:wrap; margin: .25rem 0 .65rem;">
-                    <button type="button" class="od-btn od-fee-tab active" data-fee-tab="seller">Beban Seller</button>
-                    <button type="button" class="od-btn od-fee-tab" data-fee-tab="voucher">Voucher</button>
-                    <button type="button" class="od-btn od-fee-tab" data-fee-tab="buyer">Beban Pembeli</button>
-                    <button type="button" class="od-btn od-fee-tab" data-fee-tab="platform">Beban Platform</button>
-                    <button type="button" class="od-btn od-fee-tab" data-fee-tab="adjustment">Penyesuaian</button>
-                </div>
+                    <div class="od-finance-tabs">
+                        <button type="button" class="od-btn od-fee-tab active" data-fee-tab="seller">Beban Seller</button>
+                        <button type="button" class="od-btn od-fee-tab" data-fee-tab="voucher">Voucher</button>
+                        <button type="button" class="od-btn od-fee-tab" data-fee-tab="buyer">Beban Pembeli</button>
+                        <button type="button" class="od-btn od-fee-tab" data-fee-tab="platform">Beban Platform</button>
+                        <button type="button" class="od-btn od-fee-tab" data-fee-tab="adjustment">Penyesuaian</button>
+                    </div>
 
                 <div class="od-fee-panel" data-fee-panel="seller">
                     <div style="font-weight:700; color:#334155; margin-bottom:.1rem">
@@ -803,8 +959,8 @@
                         <span class="od-code-cell" style="font-size:.85rem; color:#94a3b8">—</span>
                     </div>
                     @endforelse
-                    @if($isEstimasi)
-                    <div style="display:flex; justify-content:space-between; margin-left:.5rem; margin-top:.25rem">
+                    @if($isEstimasi && $sellerFeeBreakdownTotal <= 0)
+                    <div style="display:flex; justify-content:space-between; margin-left:.5rem">
                         <span class="od-muted">Estimasi Fee Marketplace</span>
                         <span class="od-code-cell" style="font-size:.85rem; color:#b91c1c">-Rp{{ number_format($estimatedMarketplaceFee, 0, ',', '.') }}</span>
                     </div>
@@ -884,50 +1040,15 @@
                     </div>
                     @endforelse
                 </div>
+                </div>
 
-                <div style="display:flex; justify-content:space-between; margin-top:1.5rem; padding-top:.5rem; border-top:1px solid rgba(148,163,184,.3)">
-                    <span style="font-weight:800; color:#111827; font-size:1.1rem">{{ $isEstimasi ? 'Estimasi ' : '' }}Penghasilan Akhir</span>
-                    <span class="od-code-cell" style="font-size:1.1rem; font-weight:900; color:#166534">Rp{{ number_format($penghasilan, 0, ',', '.') }}</span>
+                <div class="od-finance-row od-finance-row-total">
+                    <span>{{ $isEstimasi ? 'Estimasi ' : '' }}Dana bersih seller</span>
+                    <span style="color:#15803d">Rp{{ number_format($penghasilan, 0, ',', '.') }}</span>
                 </div>
             </div>
         </div>
 
-        <div class="od-card">
-            <div class="od-head">
-                <div class="od-title">Pembayaran Pembeli</div>
-            </div>
-            <div class="od-body od-list" style="border-top:1px solid rgba(148,163,184,.12)">
-                <div style="display:flex; justify-content:space-between">
-                    <span class="od-muted">Subtotal Pesanan</span>
-                    <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($subtotal, 0, ',', '.') }}</span>
-                </div>
-                <div style="display:flex; justify-content:space-between">
-                    <span class="od-muted">Ongkos Kirim</span>
-                    <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($ongkirDibayarPembeli, 0, ',', '.') }}</span>
-                </div>
-                <div style="display:flex; justify-content:space-between">
-                    <span class="od-muted">Voucher Platform</span>
-                    <span class="od-code-cell" style="font-size:.85rem; color:{{ $voucherPlatform > 0 ? '#991b1b' : 'inherit' }}">{{ $voucherPlatform > 0 ? '-' : '' }}Rp{{ number_format($voucherPlatform, 0, ',', '.') }}</span>
-                </div>
-                <div style="display:flex; justify-content:space-between">
-                    <span class="od-muted">Voucher Toko</span>
-                    <span class="od-code-cell" style="font-size:.85rem; color:{{ $voucherToko > 0 ? '#991b1b' : 'inherit' }}">{{ $voucherToko > 0 ? '-' : '' }}Rp{{ number_format($voucherToko, 0, ',', '.') }}</span>
-                </div>
-                <div style="display:flex; justify-content:space-between">
-                    <span class="od-muted">Koin Shopee Ditukarkan</span>
-                    <span class="od-code-cell" style="font-size:.85rem; color:{{ $koinShopee > 0 ? '#991b1b' : 'inherit' }}">{{ $koinShopee > 0 ? '-' : '' }}Rp{{ number_format($koinShopee, 0, ',', '.') }}</span>
-                </div>
-                <div style="display:flex; justify-content:space-between">
-                    <span class="od-muted">Biaya Layanan & Penanganan</span>
-                    <span class="od-code-cell" style="font-size:.85rem">Rp{{ number_format($biayaLayananPembeli, 0, ',', '.') }}</span>
-                </div>
-                
-                <div style="display:flex; justify-content:space-between; margin-top:.8rem; padding-top:.5rem; border-top:1px dashed rgba(148,163,184,.3)">
-                    <span style="font-weight:800; color:#111827">Total Pembayaran Pembeli</span>
-                    <span class="od-code-cell" style="font-size:1.1rem; color:#111827">Rp{{ number_format($totalPembeli, 0, ',', '.') }}</span>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 @endsection
