@@ -33,6 +33,8 @@
 .sd-list{display:grid;gap:.45rem}
 .sd-order{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.65rem;border:1px solid rgba(148,163,184,.18);border-radius:8px;padding:.58rem .65rem}
 .sd-order-no{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#111827;word-break:break-word}
+.sd-order-pesanan{margin-top:.16rem;font-size:.72rem;overflow-wrap:anywhere}
+.sd-order-pesanan strong{color:#475569;font-weight:800}
 .sd-badge{display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid rgba(148,163,184,.25);padding:.16rem .48rem;font-size:.69rem;font-weight:900;color:#64748b;white-space:nowrap}
 .sd-badge.pending{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:#92400e}
 .sd-badge.skip{background:rgba(148,163,184,.08)}
@@ -644,11 +646,25 @@ body[data-theme="dark"] .sd-grid .sd-kpi { background: #1e293b; border-color: rg
                             $orderLines = $scan->lines
                                 ->merge($singleOrderFallbackLines)
                                 ->values();
+                            $linkedOrder = $scan->fulfillment?->marketplaceOrder;
+                            $scanOrderNo = trim((string) (
+                                $scan->order_no
+                                ?: data_get($scan->raw_payload, 'no')
+                                ?: ''
+                            ));
+                            $marketplaceOrderNumber = trim((string) (
+                                $linkedOrder?->channel_order_id
+                                ?: $linkedOrder?->external_order_id
+                                ?: data_get($scan->raw_payload, 'order.order_no')
+                                ?: data_get($scan->raw_payload, 'order_no')
+                                ?: ''
+                            ));
+                            $displayOrderNo = $scanOrderNo !== '' ? $scanOrderNo : $marketplaceOrderNumber;
                             $orderQty = (int) $orderLines->sum('qty_scanned');
-                            $orderMarketplace = $marketplaceGroup($scan->order_no);
+                            $orderMarketplace = $marketplaceGroup($scanOrderNo);
                             $orderNeedsReview = $orderLines->isEmpty();
                             $orderLinked = (bool) (
-                                $scan->fulfillment?->marketplaceOrder
+                                $linkedOrder
                                 || $scan->source === 'marketplace'
                                 || data_get($scan->raw_payload, 'linked_source') === 'marketplace_order'
                             );
@@ -657,16 +673,23 @@ body[data-theme="dark"] .sd-grid .sd-kpi { background: #1e293b; border-color: rg
                              data-marketplace="{{ $orderMarketplace }}"
                              data-link-status="{{ $orderLinked ? 'linked' : 'unlinked' }}"
                              data-needs-review="{{ $orderNeedsReview ? '1' : '0' }}"
-                             data-order-search="{{ strtolower(trim((string) $scan->order_no . ' ' . (string) $scan->source)) }}">
+                             data-order-search="{{ strtolower(trim($scanOrderNo . ' ' . $marketplaceOrderNumber . ' ' . (string) $scan->source)) }}">
                             <div class="sd-order-lead">
                                 <span class="sd-order-num">{{ $loop->iteration }}</span>
                                 <div>
                                     <div class="sd-order-no">
-                                        {{ $scan->order_no }}
+                                        @if($displayOrderNo !== '')
+                                            {{ $displayOrderNo }}
+                                        @else
+                                            <span class="sd-muted">Nomor pesanan belum tersedia</span>
+                                        @endif
                                         @if($scan->fulfillment && $scan->fulfillment->marketplaceOrder && $scan->fulfillment->marketplaceOrder->store)
                                             <span style="font-size:0.6rem; background:#f1f5f9; padding:2px 6px; border-radius:4px; margin-left:6px; color:#475569; border:1px solid #e2e8f0; vertical-align:middle;">{{ $scan->fulfillment->marketplaceOrder->store->name }}</span>
                                         @endif
                                     </div>
+                                    @if($marketplaceOrderNumber !== '' && $marketplaceOrderNumber !== $displayOrderNo)
+                                        <div class="sd-muted sd-order-pesanan"><strong>No. pesanan:</strong> {{ $marketplaceOrderNumber }}</div>
+                                    @endif
                                     <div class="sd-muted">
                                         {{ $scan->source === 'manual_scan' ? 'Belum tertaut' : $scan->source }}
                                         @if($scan->confirmed_at)
