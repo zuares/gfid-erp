@@ -1155,8 +1155,8 @@ class MarketplaceAnalyticsSummaryService
             ->where('oi.data_status', 'valid')
             ->where('oi.hpp_snapshot', '>', 0)
             ->where('fmo.financial_data_status', MarketplaceFinancialDataQualityService::ORDER_READY)
-            ->whereNotNull('fmo.ordered_at')
-            ->whereBetween('fmo.ordered_at', [
+            ->whereRaw('COALESCE(fmo.ordered_at, fmo.order_date) IS NOT NULL')
+            ->whereBetween(DB::raw('COALESCE(fmo.ordered_at, fmo.order_date)'), [
                 $filters['date_from'] . ' 00:00:00',
                 $filters['date_to'] . ' 23:59:59',
             ])
@@ -1170,7 +1170,7 @@ class MarketplaceAnalyticsSummaryService
             ->where('mo.financial_data_status', MarketplaceFinancialDataQualityService::ORDER_READY)
             ->where('ms.data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
             ->whereRaw($this->isRevenueStatus())
-            ->whereNotNull('mo.ordered_at');
+            ->whereRaw('COALESCE(mo.ordered_at, mo.order_date) IS NOT NULL');
 
         return $this->applyDateAndStoreFilters($query, $filters, 'mo');
     }
@@ -1187,10 +1187,10 @@ class MarketplaceAnalyticsSummaryService
     private function financialDaily(array $filters): array
     {
         return $this->financialBase($filters)
-            ->selectRaw('DATE(mo.ordered_at) AS date')
+            ->selectRaw('DATE(COALESCE(mo.ordered_at, mo.order_date)) AS date')
             ->selectRaw($this->aggregateSelect(false))
-            ->groupByRaw('DATE(mo.ordered_at)')
-            ->orderByRaw('DATE(mo.ordered_at)')
+            ->groupByRaw('DATE(COALESCE(mo.ordered_at, mo.order_date))')
+            ->orderByRaw('DATE(COALESCE(mo.ordered_at, mo.order_date))')
             ->get()
             ->map(fn ($row) => array_merge(['date' => $row->date], $this->normalizeAggregate($row)))
             ->values()
@@ -1521,32 +1521,35 @@ class MarketplaceAnalyticsSummaryService
         $gross = $this->orderValueExpression();
         $salesGross = 'CASE WHEN COALESCE(od_items.gross_sales, 0) > 0 THEN od_items.gross_sales ELSE CASE WHEN COALESCE(mo.subtotal_items, 0) > 0 THEN mo.subtotal_items ELSE COALESCE(mo.total_amount, 0) END END';
         $buyerPaid = 'COALESCE(NULLIF(od_ms.buyer_payment_amount, 0), NULLIF(mo.total_paid_customer, 0), NULLIF(mo.total_amount, 0), NULLIF(mo.subtotal_items, 0), 0)';
-        $sellerDiscount = 'COALESCE(od_ms.seller_voucher, 0)';
-        $salesNet = "CASE WHEN ({$salesGross} - {$sellerDiscount}) > 0 THEN ({$salesGross} - {$sellerDiscount}) ELSE 0 END";
         $estimatedPayout = "COALESCE(NULLIF(mo.net_payout_estimated, 0), NULLIF(od_ms.final_income, 0), od_ie.estimated_escrow_amount, ({$gross} * ".(1 - self::ESTIMATED_MARKETPLACE_FEE_RATE).'))';
 
-        return $this->operationalBase($filters)
+        $rows = $this->operationalBase($filters)
             ->leftJoinSub($itemTotals, 'od_items', fn ($join) => $join->on('od_items.order_key', '=', 'mo.id'))
             ->leftJoin('marketplace_order_settlements as od_ms', 'od_ms.order_id', '=', 'mo.id')
             ->leftJoin('marketplace_order_income_estimates as od_ie', 'od_ie.marketplace_order_id', '=', 'mo.id')
-            ->selectRaw('DATE(mo.ordered_at) AS date')
+            ->selectRaw('DATE(COALESCE(mo.ordered_at, mo.order_date)) AS date')
             ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN 1 ELSE 0 END) AS orders')
             ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $this->orderValueExpression() . ' ELSE 0 END) AS gmv')
             ->selectRaw("SUM(CASE WHEN {$this->isRevenueStatus()} THEN {$salesGross} ELSE 0 END) AS gross_sales")
-            ->selectRaw("SUM(CASE WHEN {$this->isRevenueStatus()} THEN {$salesNet} ELSE 0 END) AS net_sales")
             ->selectRaw("SUM(CASE WHEN {$this->isRevenueStatus()} THEN {$buyerPaid} ELSE 0 END) AS paid")
             ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN COALESCE(od_items.qty, 0) ELSE 0 END) AS qty')
             ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $estimatedPayout . ' ELSE 0 END) AS payout')
             ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN COALESCE(od_items.hpp, 0) ELSE 0 END) AS hpp')
-            ->groupByRaw('DATE(mo.ordered_at)')
-            ->orderByRaw('DATE(mo.ordered_at)')
-            ->get()
+            ->groupByRaw('DATE(COALESCE(mo.ordered_at, mo.order_date))')
+            ->orderByRaw('DATE(COALESCE(mo.ordered_at, mo.order_date))')
+            ->get();
+        $sellerDiscounts = $this->dailySellerDiscounts($filters);
+
+        return $rows
             ->map(fn ($row) => [
                 'date' => $row->date,
                 'orders' => (int) ($row->orders ?? 0),
                 'gmv' => round((float) ($row->gmv ?? 0), 2),
                 'gross_sales' => round((float) ($row->gross_sales ?? 0), 2),
-                'net_sales' => round((float) ($row->net_sales ?? 0), 2),
+                'net_sales' => round(max(
+                    (float) ($row->gross_sales ?? 0) - (float) ($sellerDiscounts[(string) $row->date] ?? 0),
+                    0,
+                ), 2),
                 'paid' => round((float) ($row->paid ?? 0), 2),
                 'qty' => (int) ($row->qty ?? 0),
                 'payout' => round((float) ($row->payout ?? 0), 2),
@@ -1554,6 +1557,124 @@ class MarketplaceAnalyticsSummaryService
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * Keep daily Net Sales aligned with the sales dashboard. Seller-funded
+     * vouchers, bundle deals, and combo hemat discounts are the only
+     * promotion amounts that reduce seller revenue; platform vouchers do not.
+     */
+    private function dailySellerDiscounts(array $filters): array
+    {
+        $rows = $this->applyDateAndStoreFilters(
+            DB::table('marketplace_orders as mo')
+                ->leftJoin('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
+                ->whereRaw($this->isRevenueStatus())
+                ->select([
+                    'mo.voucher_discount',
+                    'mo.raw_json as order_raw_json',
+                    'mo.raw_payload_json',
+                    'ms.id as settlement_id',
+                    'ms.seller_voucher',
+                    'ms.raw_json as settlement_raw_json',
+                ])
+                ->selectRaw('DATE(COALESCE(mo.ordered_at, mo.order_date)) AS date'),
+            $filters,
+            'mo',
+        )->get();
+
+        $totals = [];
+        foreach ($rows as $row) {
+            $settlement = $this->decodeAnalyticsPayload($row->settlement_raw_json ?? null);
+            $order = $this->decodeAnalyticsPayload($row->order_raw_json ?? $row->raw_payload_json ?? null);
+            $sellerVoucher = 0.0;
+            $bundleDiscount = 0.0;
+            $comboHemat = 0.0;
+
+            if ($row->settlement_id !== null) {
+                $sellerVoucher = array_key_exists('voucher_from_seller', $settlement)
+                    ? max((float) $settlement['voucher_from_seller'], 0)
+                    : max((float) ($row->seller_voucher ?? 0), 0);
+                $items = (array) ($settlement['items'] ?? ($order['item_list'] ?? []));
+                foreach ($items as $item) {
+                    if (! is_array($item)) {
+                        continue;
+                    }
+
+                    $split = $this->analyticsPromotionDiscountSplit($item);
+                    $bundleDiscount += $split['bundle_discount'];
+                    $comboHemat += $split['combo_hemat'];
+                }
+            } else {
+                $sellerVoucher = max((float) ($row->voucher_discount ?? 0), 0);
+            }
+
+            $date = (string) $row->date;
+            $totals[$date] = ($totals[$date] ?? 0) + $sellerVoucher + $bundleDiscount + $comboHemat;
+        }
+
+        return collect($totals)->map(fn ($value) => round((float) $value, 2))->all();
+    }
+
+    private function analyticsPromotionDiscountSplit(array $item): array
+    {
+        $reportedDiscount = max((float) ($item['seller_discount'] ?? 0), 0);
+        $originalPrice = max((float) ($item['original_price'] ?? $item['model_original_price'] ?? 0), 0);
+        $discountedPrice = max((float) ($item['discounted_price'] ?? $item['model_discounted_price'] ?? 0), 0);
+        $quantity = max((int) ($item['quantity_purchased'] ?? $item['model_quantity_purchased'] ?? $item['quantity'] ?? 1), 1);
+        $priceDifference = max($originalPrice - $discountedPrice, 0);
+
+        if ($reportedDiscount <= 0 && $priceDifference > 0) {
+            $reportedDiscount = $priceDifference * $quantity;
+        }
+        if ($reportedDiscount > 0 && $priceDifference > 0) {
+            $reportedDiscount = min($reportedDiscount, $priceDifference * $quantity);
+        }
+        if ($reportedDiscount <= 0) {
+            return ['bundle_discount' => 0.0, 'combo_hemat' => 0.0];
+        }
+
+        $promotionTypes = collect((array) ($item['promotion_list'] ?? []))
+            ->map(fn ($promotion) => strtolower((string) ($promotion['promotion_type'] ?? '')));
+        $activityType = strtolower((string) ($item['activity_type'] ?? ''));
+        $promotionType = strtolower((string) ($item['promotion_type'] ?? ''));
+        $isBundle = in_array($activityType, ['bundle_deal', 'bundle_deal_discount'], true)
+            || $promotionType === 'bundle_deal'
+            || (collect([$item['bundle_discount'] ?? null, $item['bundle_deal_discount'] ?? null, $item['bundle_discount_amount'] ?? null])
+                ->contains(fn ($amount) => is_numeric($amount) && (float) $amount > 0)
+                && $promotionTypes->contains('bundle_deal'));
+        $comboTypes = ['add_on_deal', 'add_on_deal_main', 'add_on_deal_sub'];
+        $isCombo = ! $isBundle && (in_array($activityType, $comboTypes, true)
+            || in_array($promotionType, $comboTypes, true)
+            || $promotionTypes->intersect($comboTypes)->isNotEmpty());
+
+        if (! $isBundle && ! $isCombo) {
+            return ['bundle_discount' => 0.0, 'combo_hemat' => 0.0];
+        }
+
+        $sellingPrice = max((float) ($item['selling_price'] ?? 0), 0);
+        $productGap = max($originalPrice - $sellingPrice, 0);
+        $promotionGap = max($sellingPrice - $discountedPrice, 0);
+        $promotionDiscount = $reportedDiscount;
+        if ($productGap > 0 && $promotionGap > 0) {
+            $promotionDiscount = min(max($reportedDiscount - min($reportedDiscount, $productGap), 0), $promotionGap);
+        }
+
+        return [
+            'bundle_discount' => $isBundle ? $promotionDiscount : 0.0,
+            'combo_hemat' => $isCombo ? $promotionDiscount : 0.0,
+        ];
+    }
+
+    private function decodeAnalyticsPayload(mixed $payload): array
+    {
+        if (is_array($payload)) {
+            return $payload;
+        }
+
+        $decoded = json_decode((string) $payload, true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 
     private function mergeDaily(array $financial, array $operational, array $ads = []): array
@@ -1751,8 +1872,10 @@ class MarketplaceAnalyticsSummaryService
 
     private function applyDateAndStoreFilters($query, array $filters, string $alias)
     {
+        $dateExpression = "COALESCE({$alias}.ordered_at, {$alias}.order_date)";
+
         return $query
-            ->whereBetween("{$alias}.ordered_at", [
+            ->whereBetween(DB::raw($dateExpression), [
                 $filters['date_from'] . ' 00:00:00',
                 $filters['date_to'] . ' 23:59:59',
             ])
