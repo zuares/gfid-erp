@@ -686,6 +686,7 @@
     /* Align analytics with the Marketplace Sales dashboard visual system. */
     @media (min-width: 768px) {
         .app-main .page-wrap:has(.an-page) { max-width: none; }
+        .app-main .dash:has(.an-page) { width: 100%; max-width: none; }
     }
 
     .an-page {
