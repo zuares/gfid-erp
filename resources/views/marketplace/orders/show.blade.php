@@ -869,7 +869,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         $orderAdTax = $orderAdCostBeforeTax !== null ? round($orderAdCostBeforeTax * $adTaxRate, 2) : null;
         $grossProfitBeforeAds = $hppComplete ? round($penghasilan - $hppTotal, 2) : null;
         $grossProfit = $grossProfitBeforeAds !== null && $orderAdCostBeforeTax !== null
-            ? round($grossProfitBeforeAds - $orderAdCostBeforeTax - $orderAdTax - $sellerFeeBreakdownTotal, 2)
+            ? round($grossProfitBeforeAds - $orderAdCostBeforeTax - $orderAdTax, 2)
             : null;
         $marginBase = max($subtotal, 0);
         $cogsPct = $hppComplete && $marginBase > 0 ? round(($hppTotal / $marginBase) * 100, 2) : null;
@@ -884,7 +884,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         <div class="od-head">
             <div>
                 <div class="od-title">Profitabilitas Pesanan</div>
-                <div class="od-muted" style="margin-top:.15rem">Laba kotor setelah iklan &amp; beban seller = penghasilan akhir − COGS − biaya iklan − PPN iklan − total beban seller.</div>
+                <div class="od-muted" style="margin-top:.15rem">Laba kotor setelah iklan = penghasilan akhir − COGS − biaya iklan − PPN iklan.</div>
             </div>
         </div>
         <div class="od-body">
@@ -907,7 +907,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                     @endif
                 </div>
                 <div>
-                    <div class="od-label">Laba Kotor Setelah Iklan &amp; Beban Seller</div>
+                    <div class="od-label">Laba Kotor Setelah Iklan</div>
                     <div class="od-value" style="color:{{ $grossProfit !== null && $grossProfit < 0 ? '#b91c1c' : '#166534' }}">
                         {{ $grossProfit !== null ? 'Rp'.number_format($grossProfit, 0, ',', '.') : 'Belum tersedia' }}
                     </div>
@@ -915,9 +915,9 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
             </div>
             <div class="od-muted" style="font-size:.72rem">
                 @if($adsDaily && $dailyAcos !== null)
-                    Persentase biaya iklan menggunakan ACOS harian toko pada tanggal order ({{ $adsDate }}): {{ number_format($dailyAcos * 100, 2, ',', '.') }}%. Biaya iklan Rp{{ number_format($orderAdCostBeforeTax, 0, ',', '.') }}, PPN iklan 11% Rp{{ number_format($orderAdTax, 0, ',', '.') }}, dan total beban seller Rp{{ number_format($sellerFeeBreakdownTotal, 0, ',', '.') }} mengurangi laba kotor.
+                    Persentase biaya iklan menggunakan ACOS harian toko pada tanggal order ({{ $adsDate }}): {{ number_format($dailyAcos * 100, 2, ',', '.') }}%. Biaya iklan Rp{{ number_format($orderAdCostBeforeTax, 0, ',', '.') }} dan PPN iklan 11% Rp{{ number_format($orderAdTax, 0, ',', '.') }} mengurangi laba kotor.
                 @else
-                    Data ACOS harian toko pada tanggal order belum tersedia, sehingga biaya iklan, PPN iklan, dan laba kotor setelah iklan &amp; beban seller belum dapat dihitung.
+                    Data ACOS harian toko pada tanggal order belum tersedia, sehingga biaya iklan, PPN iklan, dan laba kotor setelah iklan belum dapat dihitung.
                 @endif
             </div>
         </div>
@@ -1110,7 +1110,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                 </div>
 
                 <div class="od-finance-row od-finance-row-total">
-                    <span>{{ $isEstimasi ? 'Estimasi Laba Kotor Setelah Iklan & Beban Seller' : 'Laba Kotor Setelah Iklan & Beban Seller' }}</span>
+                    <span>{{ $isEstimasi ? 'Estimasi Laba Kotor Setelah Iklan' : 'Laba Kotor Setelah Iklan' }}</span>
                     <span style="color:{{ $grossProfit === null ? '#b45309' : ($grossProfit < 0 ? '#b91c1c' : '#15803d') }}">
                         {{ $grossProfit !== null ? 'Rp'.number_format($grossProfit, 0, ',', '.') : 'Belum lengkap' }}
                         @if($grossProfitPct !== null)<small class="od-finance-percent">({{ number_format($grossProfitPct, 2, ',', '.') }}%)</small>@endif
