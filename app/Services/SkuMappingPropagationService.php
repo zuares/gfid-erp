@@ -65,7 +65,8 @@ class SkuMappingPropagationService
                 ->where(function ($query) use ($skuValues) {
                     $query->whereIn('model_sku', $skuValues)
                         ->orWhereIn('item_sku', $skuValues)
-                        ->orWhereIn('marketplace_sku', $skuValues);
+                        ->orWhereIn('marketplace_sku', $skuValues)
+                        ->orWhereIn('external_sku', $skuValues);
                 })
                 ->chunkById(300, function ($items) use ($keys, $resolved) {
                     foreach ($items as $item) {
@@ -77,10 +78,12 @@ class SkuMappingPropagationService
                             continue;
                         }
 
+                        // Gunakan SKU yang membuat item cocok dengan mapping.
+                        // Ini penting ketika marketplace_sku berbeda dari model_sku/item_sku.
                         $item->update($this->issueService->buildMappingAttributes(
-                            modelSku: $item->model_sku,
-                            itemSku: $item->item_sku,
-                            externalSku: $item->external_sku,
+                            modelSku: $sku,
+                            itemSku: null,
+                            externalSku: null,
                             channelCode: $channelCode,
                             itemName: $item->item_name,
                             variantName: $item->variant_name,
@@ -177,7 +180,11 @@ class SkuMappingPropagationService
 
     private function sourceSku(MarketplaceOrderItem $item): ?string
     {
-        return $item->model_sku ?: ($item->item_sku ?: ($item->marketplace_sku ?: $item->external_sku));
+        $marketplaceSku = trim((string) $item->getRawOriginal('marketplace_sku'));
+
+        return $marketplaceSku !== ''
+            ? $marketplaceSku
+            : ($item->model_sku ?: ($item->item_sku ?: $item->external_sku));
     }
 
     private function keyApplies(Collection $keys, ?string $sku, ?string $channelCode): bool

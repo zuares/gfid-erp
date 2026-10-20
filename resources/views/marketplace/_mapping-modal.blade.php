@@ -202,7 +202,7 @@ window.mpMapping = (function () {
             api('/api/fulfillments/remap-all', { method: 'POST' }).catch(() => {});
 
             bootstrap.Modal.getInstance(modal)?.hide();
-            if (_onSaved) _onSaved();
+            if (_onSaved) await Promise.resolve(_onSaved());
         } catch (e) { alertEl.className = 'alert alert-danger'; alertEl.textContent = e.message; }
     }
 

@@ -175,21 +175,63 @@ class SkuMappingController extends Controller
     }
 
     /** SKU dari marketplace_order_items yang belum punya mapping. */
-    public function unmappedSkus(): JsonResponse
+    public function unmappedSkus(Request $request): JsonResponse
     {
+        $filters = $request->validate([
+            'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'channel_code' => ['nullable', 'string', 'max:30'],
+            'search' => ['nullable', 'string', 'max:100'],
+            'order_date_from' => ['nullable', 'date'],
+            'order_date_to' => ['nullable', 'date', 'after_or_equal:order_date_from'],
+            'sort' => ['nullable', Rule::in(['orders_desc', 'sku_asc', 'latest'])],
+        ]);
+
+        $skuExpression = "COALESCE(NULLIF(moi.marketplace_sku, ''), NULLIF(moi.model_sku, ''), NULLIF(moi.item_sku, ''))";
+        $itemNameExpression = "COALESCE(NULLIF(moi.item_name, ''), NULLIF(moi.item_name_snapshot, ''))";
+        $variantNameExpression = "COALESCE(NULLIF(moi.variant_name, ''), NULLIF(moi.variant_snapshot, ''))";
+        $channelCode = strtolower(trim((string) ($filters['channel_code'] ?? '')));
+        $search = trim((string) ($filters['search'] ?? ''));
+
         $unmapped = DB::table('marketplace_order_items as moi')
             ->join('marketplace_orders as mo', 'mo.id', '=', 'moi.marketplace_order_id')
             ->join('stores as s', 's.id', '=', 'mo.store_id')
             ->join('channels as c', 'c.id', '=', 's.channel_id')
             ->leftJoin('sku_mappings as sm', function ($join) {
-                $join->on('sm.marketplace_sku', '=', DB::raw('COALESCE(moi.model_sku, moi.item_sku)'))
-                     ->whereRaw('(sm.channel_code = c.code OR sm.channel_code IS NULL)');
+                $join->whereRaw("(
+                    sm.marketplace_sku = NULLIF(moi.marketplace_sku, '')
+                    OR sm.marketplace_sku = NULLIF(moi.model_sku, '')
+                    OR sm.marketplace_sku = NULLIF(moi.item_sku, '')
+                )")
+                ->whereRaw('(sm.channel_code IS NULL OR LOWER(sm.channel_code) = LOWER(c.code))');
             })
-            ->selectRaw('COALESCE(moi.model_sku, moi.item_sku) as sku, MAX(moi.item_name) as item_name, c.code as channel_code, COUNT(moi.id) as order_count')
-            ->whereRaw('COALESCE(moi.model_sku, moi.item_sku) IS NOT NULL')
+            ->selectRaw("{$skuExpression} as sku,
+                MAX({$itemNameExpression}) as item_name,
+                MAX({$variantNameExpression}) as variant_name,
+                c.code as channel_code,
+                COUNT(moi.id) as order_count,
+                COUNT(DISTINCT s.id) as store_count,
+                GROUP_CONCAT(DISTINCT s.name) as store_names,
+                MAX(mo.ordered_at) as last_order_at")
+            ->whereRaw("{$skuExpression} IS NOT NULL AND {$skuExpression} != ''")
             ->whereNull('sm.id')
-            ->groupByRaw('COALESCE(moi.model_sku, moi.item_sku), c.code')
-            ->orderByDesc('order_count')
+            ->when(! empty($filters['store_id']), fn ($query) => $query->where('s.id', (int) $filters['store_id'])
+            )
+            ->when($channelCode !== '', fn ($query) => $query->whereRaw('LOWER(c.code) = ?', [$channelCode]))
+            ->when($search !== '', function ($query) use ($search, $skuExpression, $itemNameExpression, $variantNameExpression) {
+                $needle = '%' . mb_strtolower($search) . '%';
+                $query->where(function ($searchQuery) use ($needle, $skuExpression, $itemNameExpression, $variantNameExpression) {
+                    $searchQuery->whereRaw("LOWER({$skuExpression}) LIKE ?", [$needle])
+                        ->orWhereRaw("LOWER({$itemNameExpression}) LIKE ?", [$needle])
+                        ->orWhereRaw("LOWER({$variantNameExpression}) LIKE ?", [$needle]);
+                });
+            })
+            ->when(! empty($filters['order_date_from']), fn ($query) => $query->whereDate('mo.ordered_at', '>=', $filters['order_date_from']))
+            ->when(! empty($filters['order_date_to']), fn ($query) => $query->whereDate('mo.ordered_at', '<=', $filters['order_date_to']))
+            ->groupByRaw("{$skuExpression}, c.code")
+            ->when(($filters['sort'] ?? 'orders_desc') === 'sku_asc', fn ($query) => $query->orderBy('sku'))
+            ->when(($filters['sort'] ?? 'orders_desc') === 'latest', fn ($query) => $query->orderByDesc('last_order_at'))
+            ->when(($filters['sort'] ?? 'orders_desc') === 'orders_desc', fn ($query) => $query->orderByDesc('order_count'))
+            ->orderBy('sku')
             ->get();
 
         return response()->json($unmapped);

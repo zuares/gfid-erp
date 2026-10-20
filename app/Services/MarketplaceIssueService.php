@@ -437,9 +437,28 @@ class MarketplaceIssueService
      */
     public function autoMapByCode(?int $storeId = null): array
     {
-        // Kumpulkan distinct SKU yang belum mapped
+        // Ambil semua item yang punya SKU tetapi belum benar-benar mapped.
+        // Sebagian data lama berstatus marketplace_sku_empty walaupun kolom
+        // marketplace_sku sudah terisi, jadi jangan hanya mengandalkan
+        // mapping_not_found.
         $query = MarketplaceOrderItem::query()
-            ->where('mapping_status', self::MAPPING_NOT_FOUND)
+            ->where(function ($q) {
+                $q->where('mapping_status', '!=', self::MAPPING_MAPPED)
+                    ->orWhereNull('mapping_status')
+                    ->orWhereNull('internal_item_id');
+            })
+            ->where(function ($q) {
+                $q->whereNotNull('marketplace_sku')->where('marketplace_sku', '!=', '')
+                    ->orWhere(function ($q2) {
+                        $q2->whereNotNull('model_sku')->where('model_sku', '!=', '');
+                    })
+                    ->orWhere(function ($q2) {
+                        $q2->whereNotNull('item_sku')->where('item_sku', '!=', '');
+                    })
+                    ->orWhere(function ($q2) {
+                        $q2->whereNotNull('external_sku')->where('external_sku', '!=', '');
+                    });
+            })
             ->when($storeId, fn ($q) => $q->whereHas(
                 'order', fn ($q2) => $q2->where('store_id', $storeId)
             ))
@@ -453,36 +472,34 @@ class MarketplaceIssueService
 
         $query->chunkById(200, function ($items) use (&$pairs, &$mapped, &$skipped, &$errors) {
             foreach ($items as $item) {
-                $sku = $item->marketplace_sku
-                    ?? $item->model_sku
-                    ?? $item->item_sku
-                    ?? null;
+                $sku = trim((string) ($item->getRawOriginal('marketplace_sku')
+                    ?: $item->model_sku
+                    ?: $item->item_sku
+                    ?: $item->external_sku
+                    ?: ''));
 
                 if (! $sku) { $skipped++; continue; }
 
-                $channelCode = $item->order?->store?->channel?->code;
-                $pairKey     = $sku . '|' . ($channelCode ?? '');
+                $channelCode = strtolower(trim((string) ($item->order?->store?->channel?->code ?? '')));
+                $pairKey     = strtolower($sku) . '|' . $channelCode;
 
                 // Skip if already created mapping for this SKU in this run
                 if (isset($pairs[$pairKey])) {
-                    // Still need to resolve this item against the newly created mapping
-                    try {
-                        $this->resolveItem($item, $channelCode);
-                        $mapped++;
-                    } catch (\Throwable) { $errors++; }
+                    // Setelah mapping dibuat, semua item dengan SKU/channel
+                    // yang sama sudah diproses oleh chunk di bawah.
                     continue;
                 }
 
                 $pairs[$pairKey] = true;
 
                 // ── Strategy 1: exact code match ──────────────────────────────
-                $internalItem = Item::where('code', $sku)->first();
+                $internalItem = Item::whereRaw('LOWER(code) = ?', [mb_strtolower($sku)])->first();
 
                 // ── Strategy 2: strip trailing -\d+ suffix ────────────────────
                 if (! $internalItem) {
                     $prefix = preg_replace('/-\d+$/', '', $sku);
                     if ($prefix !== $sku) {
-                        $internalItem = Item::where('code', $prefix)->first();
+                        $internalItem = Item::whereRaw('LOWER(code) = ?', [mb_strtolower($prefix)])->first();
                     }
                 }
 
@@ -500,18 +517,27 @@ class MarketplaceIssueService
                     $mapped++;
 
                     // Resolve all other items with same SKU (same channel)
-                    MarketplaceOrderItem::where('mapping_status', self::MAPPING_NOT_FOUND)
+                    MarketplaceOrderItem::where(function ($q) {
+                        $q->where('mapping_status', '!=', self::MAPPING_MAPPED)
+                            ->orWhereNull('mapping_status')
+                            ->orWhereNull('internal_item_id');
+                    })
                         ->where(function ($q) use ($sku) {
                             $q->where('marketplace_sku', $sku)
                               ->orWhere('model_sku', $sku)
-                              ->orWhere('item_sku', $sku);
+                              ->orWhere('item_sku', $sku)
+                              ->orWhere('external_sku', $sku);
                         })
                         ->where('id', '!=', $item->id)
                         ->with(['order.store.channel'])
-                        ->chunkById(100, function ($chunk) use (&$mapped, &$errors) {
+                        ->chunkById(100, function ($chunk) use (&$mapped, &$errors, $channelCode) {
                             foreach ($chunk as $s) {
                                 try {
-                                    $this->resolveItem($s->fresh(), $s->order?->store?->channel?->code);
+                                    $otherChannel = strtolower(trim((string) ($s->order?->store?->channel?->code ?? '')));
+                                    if ($otherChannel !== $channelCode) {
+                                        continue;
+                                    }
+                                    $this->resolveItem($s->fresh(), $otherChannel);
                                     $mapped++;
                                 } catch (\Throwable) { $errors++; }
                             }

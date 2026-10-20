@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Carbon\Carbon;
 use App\Models\Channel;
 use App\Models\InventoryStock;
 use App\Models\Item;
@@ -32,6 +33,11 @@ class MarketplaceSkuMappingUiTest extends TestCase
             ->assertOk()
             ->assertSee("const FMT = new Intl.NumberFormat('id-ID');", false)
             ->assertSee('mappingChannelFilter', false)
+            ->assertSee('unmappedDateRange', false)
+            ->assertSee("mode: 'range'", false)
+            ->assertSee('Nama Variant', false)
+            ->assertSee('unmappedAutoMapBtn', false)
+            ->assertSee('runUnmappedAutoMap', false)
             ->assertSee('Edit SKU Mapping', false)
             ->assertSee('mapSaveButton', false);
     }
@@ -92,6 +98,85 @@ class MarketplaceSkuMappingUiTest extends TestCase
             ->assertJsonPath('data.0.marketplace_sku', 'SKU-AVAILABLE');
     }
 
+    public function test_unmapped_skus_can_filter_by_store_channel_search_and_order_date(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-UNMAPPED-FILTER-'.uniqid(),
+        ]);
+        $shopee = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok']);
+        $storeA = Store::create([
+            'code' => 'STORE-UNMAPPED-A-'.uniqid(),
+            'name' => 'Toko A',
+            'channel_id' => $shopee->id,
+            'is_active' => true,
+        ]);
+        $storeB = Store::create([
+            'code' => 'STORE-UNMAPPED-B-'.uniqid(),
+            'name' => 'Toko B',
+            'channel_id' => $tiktok->id,
+            'is_active' => true,
+        ]);
+
+        $makeOrderWithItem = function (Store $store, string $orderId, string $sku, string $name, Carbon $orderedAt): void {
+            $order = MarketplaceOrder::create([
+                'store_id' => $store->id,
+                'external_order_id' => $orderId,
+                'order_date' => $orderedAt,
+                'ordered_at' => $orderedAt,
+                'status' => 'new',
+                'order_status' => 'READY_TO_SHIP',
+            ]);
+
+            MarketplaceOrderItem::create([
+                'order_id' => $order->id,
+                'marketplace_order_id' => $order->id,
+                'line_no' => 1,
+                'external_item_id' => 'ITEM-'.$sku,
+                'item_name' => $name,
+                'variant_name' => $sku === 'SKU-A' ? 'Merah / L' : null,
+                'item_sku' => $sku,
+                'qty' => 1,
+                'price' => 100,
+                'mapping_status' => 'mapping_not_found',
+            ]);
+        };
+
+        $makeOrderWithItem($storeA, 'ORDER-UNMAPPED-A', 'SKU-A', 'Produk A', now()->subDay());
+        $makeOrderWithItem($storeB, 'ORDER-UNMAPPED-B', 'SKU-B', 'Produk B', now()->subDays(10));
+
+        $this->actingAs($owner)
+            ->getJson('/api/sku-mappings/unmapped-skus?store_id='.$storeA->id.'&channel_code=SHOPEE&search=produk%20a&order_date_from='.now()->subDays(2)->toDateString())
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.sku', 'SKU-A')
+            ->assertJsonPath('0.variant_name', 'Merah / L')
+            ->assertJsonPath('0.channel_code', 'shopee')
+            ->assertJsonPath('0.store_names', 'Toko A');
+
+        $internalItem = Item::create([
+            'code' => 'ITEM-UNMAPPED-A',
+            'name' => 'Item Internal A',
+            'unit' => 'pcs',
+            'type' => 'finished',
+            'active' => true,
+        ]);
+
+        $this->actingAs($owner)
+            ->postJson('/api/sku-mappings', [
+                'marketplace_sku' => 'SKU-A',
+                'channel_code' => 'shopee',
+                'item_id' => $internalItem->id,
+            ])
+            ->assertCreated();
+
+        $this->actingAs($owner)
+            ->getJson('/api/sku-mappings/unmapped-skus?store_id='.$storeA->id.'&channel_code=shopee')
+            ->assertOk()
+            ->assertJsonCount(0);
+    }
+
     public function test_mapping_can_be_updated_without_creating_a_second_row(): void
     {
         $owner = User::factory()->create([
@@ -138,6 +223,137 @@ class MarketplaceSkuMappingUiTest extends TestCase
             'channel_code' => 'tiktok',
             'item_id' => $newItem->id,
             'notes' => 'sudah diperbarui',
+        ]);
+    }
+
+    public function test_mapping_resolves_all_order_items_with_the_same_marketplace_sku_and_channel(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-SKU-BULK-MAP-'.uniqid(),
+        ]);
+        $channel = Channel::firstOrCreate(['code' => 'TTK'], ['name' => 'TikTok']);
+        $store = Store::create([
+            'code' => 'STORE-SKU-BULK-'.uniqid(),
+            'name' => 'Dummy TikTok External',
+            'channel_id' => $channel->id,
+            'is_active' => true,
+        ]);
+        $internalItem = Item::create([
+            'code' => 'ITEM-TTK-BULK',
+            'name' => 'Item TikTok Bulk',
+            'unit' => 'pcs',
+            'type' => 'finished',
+            'active' => true,
+        ]);
+
+        foreach (['MODEL-TTK-1', 'MODEL-TTK-2'] as $modelSku) {
+            $order = MarketplaceOrder::create([
+                'store_id' => $store->id,
+                'external_order_id' => 'ORDER-TTK-BULK-'.uniqid(),
+                'order_date' => now(),
+                'ordered_at' => now(),
+                'status' => 'new',
+                'order_status' => 'READY_TO_SHIP',
+            ]);
+
+            MarketplaceOrderItem::create([
+                'order_id' => $order->id,
+                'marketplace_order_id' => $order->id,
+                'line_no' => 1,
+                'external_item_id' => 'ITEM-TTK-BULK-'.$modelSku,
+                'item_name' => 'Celana Pendek Short Boxer Big Size Premium Jumbo Size 40 Casual',
+                'variant_name' => 'Hitam, 6L',
+                'marketplace_sku' => 'TTK',
+                'model_sku' => $modelSku,
+                'item_sku' => 'TTK',
+                'qty' => 1,
+                'price' => 100,
+                'mapping_status' => 'mapping_not_found',
+            ]);
+        }
+
+        $this->actingAs($owner)
+            ->postJson('/api/sku-mappings', [
+                'marketplace_sku' => 'TTK',
+                'channel_code' => 'ttk',
+                'item_id' => $internalItem->id,
+            ])
+            ->assertCreated();
+
+        $this->assertDatabaseCount('sku_mappings', 1);
+        $this->assertDatabaseMissing('marketplace_order_items', [
+            'marketplace_sku' => 'TTK',
+            'mapping_status' => 'mapping_not_found',
+        ]);
+        $this->assertDatabaseCount('marketplace_order_items', 2);
+        $this->assertDatabaseHas('marketplace_order_items', [
+            'marketplace_sku' => 'TTK',
+            'mapping_status' => 'mapped',
+            'internal_item_id' => $internalItem->id,
+        ]);
+    }
+
+    public function test_auto_mapping_matches_case_insensitive_code_and_resolves_all_related_items(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-AUTO-MAP-'.uniqid(),
+        ]);
+        $channel = Channel::firstOrCreate(['code' => 'TTK'], ['name' => 'TikTok']);
+        $store = Store::create([
+            'code' => 'STORE-AUTO-MAP-'.uniqid(),
+            'name' => 'Dummy TikTok Auto Map',
+            'channel_id' => $channel->id,
+            'is_active' => true,
+        ]);
+        $internalItem = Item::create([
+            'code' => 'AUTO-TTK',
+            'name' => 'Item Auto TikTok',
+            'unit' => 'pcs',
+            'type' => 'finished',
+            'active' => true,
+        ]);
+
+        foreach (['MODEL-AUTO-1', 'MODEL-AUTO-2'] as $index => $modelSku) {
+            $order = MarketplaceOrder::create([
+                'store_id' => $store->id,
+                'external_order_id' => 'ORDER-AUTO-MAP-'.uniqid(),
+                'order_date' => now(),
+                'ordered_at' => now(),
+                'status' => 'new',
+                'order_status' => 'READY_TO_SHIP',
+            ]);
+
+            MarketplaceOrderItem::create([
+                'order_id' => $order->id,
+                'marketplace_order_id' => $order->id,
+                'line_no' => 1,
+                'external_item_id' => 'ITEM-AUTO-MAP-'.$index,
+                'item_name' => 'Produk Auto Map',
+                'marketplace_sku' => 'auto-ttk',
+                'model_sku' => $modelSku,
+                'qty' => 1,
+                'price' => 100,
+                'mapping_status' => $index === 0 ? 'marketplace_sku_empty' : 'mapping_not_found',
+            ]);
+        }
+
+        $this->actingAs($owner)
+            ->postJson('/api/marketplace/auto-map-by-code')
+            ->assertOk()
+            ->assertJsonPath('mapped', 2)
+            ->assertJsonPath('errors', 0);
+
+        $this->assertDatabaseCount('sku_mappings', 1);
+        $this->assertDatabaseHas('sku_mappings', [
+            'marketplace_sku' => 'auto-ttk',
+            'channel_code' => 'ttk',
+            'item_id' => $internalItem->id,
+        ]);
+        $this->assertDatabaseMissing('marketplace_order_items', [
+            'marketplace_sku' => 'auto-ttk',
+            'mapping_status' => 'mapping_not_found',
         ]);
     }
 

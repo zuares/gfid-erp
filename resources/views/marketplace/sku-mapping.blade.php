@@ -24,6 +24,47 @@
 
     {{-- Unmapped SKUs --}}
     <x-gf.panel title="SKU Belum Dipetakan" subtitle="SKU dari order marketplace yang belum ada item internalnya.">
+        <x-slot:actions>
+            <div class="d-flex flex-wrap gap-2 justify-content-end">
+                <button type="button" id="unmappedAutoMapBtn" class="btn btn-warning btn-sm fw-bold"
+                    style="border-radius:999px;font-size:.75rem"
+                    title="Cocokkan SKU marketplace dengan kode item internal yang sama"
+                    onclick="runUnmappedAutoMap()">⚡ Mapping Otomatis</button>
+                <input type="text" id="unmappedSearch" placeholder="Cari SKU atau nama item…"
+                    style="border-radius:999px;font-size:.75rem;padding:.3rem .85rem;border:1px solid rgba(15,23,42,.1);background:#fff;min-width:210px"
+                    oninput="filterUnmapped(this.value)">
+                <select id="unmappedStoreFilter" class="form-select form-select-sm"
+                    style="border-radius:999px;font-size:.75rem;width:auto;min-width:170px"
+                    onchange="applyUnmappedFilters()">
+                    <option value="">Semua Toko</option>
+                </select>
+                <select id="unmappedChannelFilter" class="form-select form-select-sm"
+                    style="border-radius:999px;font-size:.75rem;width:auto;min-width:135px"
+                    onchange="applyUnmappedFilters()">
+                    <option value="">Semua Channel</option>
+                    <option value="shopee">Shopee</option>
+                    <option value="tiktok">TikTok</option>
+                    <option value="tokopedia">Tokopedia</option>
+                    <option value="lazada">Lazada</option>
+                </select>
+                <input type="text" id="unmappedDateRange" class="form-control form-control-sm"
+                    placeholder="Rentang tanggal" autocomplete="off"
+                    aria-label="Rentang tanggal order" title="Rentang tanggal order"
+                    style="border-radius:999px;font-size:.75rem;width:190px;cursor:pointer;background:#fff">
+                <input type="hidden" id="unmappedDateFrom">
+                <input type="hidden" id="unmappedDateTo">
+                <select id="unmappedSort" class="form-select form-select-sm"
+                    style="border-radius:999px;font-size:.75rem;width:auto;min-width:145px"
+                    onchange="applyUnmappedFilters()">
+                    <option value="orders_desc">Order terbanyak</option>
+                    <option value="latest">Order terbaru</option>
+                    <option value="sku_asc">SKU A-Z</option>
+                </select>
+                <button type="button" class="btn btn-light border btn-sm"
+                    style="border-radius:999px;font-size:.75rem;font-weight:700"
+                    onclick="resetUnmappedFilters()">Reset</button>
+            </div>
+        </x-slot:actions>
         <div id="unmappedBody"><div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div></div>
     </x-gf.panel>
 
@@ -72,6 +113,8 @@
     let currentChannel = '';
     let currentStockStatus = '';
     let visibleMappings = [];
+    let unmappedSearchTimeout;
+    let unmappedFilterOptionsLoaded = false;
 
     const $ = id => document.getElementById(id);
 
@@ -79,10 +122,11 @@
         $('unmappedBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
         $('mappingsBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
 
+        const unmappedParams = unmappedRequestParams();
         const params = mappingParams();
 
         const [um, mp] = await Promise.allSettled([
-            api('/api/sku-mappings/unmapped-skus'),
+            api('/api/sku-mappings/unmapped-skus?' + unmappedParams.toString()),
             api('/api/sku-mappings?' + params.toString()),
         ]);
 
@@ -103,6 +147,105 @@
         }
 
         renderKpi();
+    }
+
+    async function loadUnmappedFilterOptions() {
+        if (unmappedFilterOptionsLoaded) return;
+        unmappedFilterOptionsLoaded = true;
+
+        const [storesResult, channelsResult] = await Promise.allSettled([
+            api('/api/marketplace/stores'),
+            api('/api/marketplace/channels'),
+        ]);
+
+        if (storesResult.status === 'fulfilled') {
+            const stores = Array.isArray(storesResult.value) ? storesResult.value : [];
+            const select = $('unmappedStoreFilter');
+            select.innerHTML = '<option value="">Semua Toko</option>' + stores.map(store => {
+                const channel = store.channel?.name ? ` · ${store.channel.name}` : '';
+                return `<option value="${esc(store.id)}">${esc(store.name)}${esc(channel)}</option>`;
+            }).join('');
+        }
+
+        if (channelsResult.status === 'fulfilled') {
+            const channels = Array.isArray(channelsResult.value) ? channelsResult.value : [];
+            const select = $('unmappedChannelFilter');
+            const current = select.value;
+            select.innerHTML = '<option value="">Semua Channel</option>' + channels.map(channel =>
+                `<option value="${esc(String(channel.code || '').toLowerCase())}">${esc(channel.name || channel.code)}</option>`
+            ).join('');
+            if (current) select.value = current;
+        }
+    }
+
+    function initUnmappedDateRange() {
+        const input = $('unmappedDateRange');
+        if (!input || !window.flatpickr) return;
+
+        window.flatpickr(input, {
+            mode: 'range',
+            dateFormat: 'd/m/Y',
+            allowInput: false,
+            locale: (window.flatpickr.l10ns && window.flatpickr.l10ns.id)
+                ? window.flatpickr.l10ns.id
+                : { firstDayOfWeek: 1 },
+            onChange(selectedDates, dateString, instance) {
+                const from = selectedDates[0]
+                    ? window.flatpickr.formatDate(selectedDates[0], 'Y-m-d')
+                    : '';
+                const to = selectedDates[1]
+                    ? window.flatpickr.formatDate(selectedDates[1], 'Y-m-d')
+                    : '';
+
+                $('unmappedDateFrom').value = from;
+                $('unmappedDateTo').value = to;
+                instance.input.value = selectedDates.length === 2
+                    ? `${window.flatpickr.formatDate(selectedDates[0], 'd/m/Y')} — ${window.flatpickr.formatDate(selectedDates[1], 'd/m/Y')}`
+                    : selectedDates.length === 1
+                        ? window.flatpickr.formatDate(selectedDates[0], 'd/m/Y')
+                        : '';
+
+                reloadUnmappedOnly();
+            },
+        });
+    }
+
+    function unmappedRequestParams() {
+        const params = new URLSearchParams();
+        const search = $('unmappedSearch').value.trim();
+        const storeId = $('unmappedStoreFilter').value;
+        const channel = $('unmappedChannelFilter').value;
+        const dateFrom = $('unmappedDateFrom').value;
+        const dateTo = $('unmappedDateTo').value;
+        const sort = $('unmappedSort').value;
+
+        if (search) params.append('search', search);
+        if (storeId) params.append('store_id', storeId);
+        if (channel) params.append('channel_code', channel);
+        if (dateFrom) params.append('order_date_from', dateFrom);
+        if (dateTo) params.append('order_date_to', dateTo);
+        if (sort) params.append('sort', sort);
+        return params;
+    }
+
+    function unmappedHasFilters() {
+        return Boolean($('unmappedSearch').value.trim()
+            || $('unmappedStoreFilter').value
+            || $('unmappedChannelFilter').value
+            || $('unmappedDateFrom').value
+            || $('unmappedDateTo').value);
+    }
+
+    async function reloadUnmappedOnly() {
+        $('unmappedBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
+        try {
+            unmappedList = await api('/api/sku-mappings/unmapped-skus?' + unmappedRequestParams().toString());
+            renderUnmapped();
+            renderKpi();
+        } catch (e) {
+            console.error(e);
+            $('unmappedBody').innerHTML = '<div class="oc-empty text-danger">Gagal memuat SKU belum dipetakan.</div>';
+        }
     }
     
     async function reloadMappingsOnly() {
@@ -142,14 +285,17 @@
     function renderUnmapped() {
         const body = $('unmappedBody');
         if (!unmappedList.length) {
-            body.innerHTML = '<div class="oc-empty">🎉 Semua SKU sudah dipetakan.</div>';
+            body.innerHTML = unmappedHasFilters()
+                ? '<div class="oc-empty">Tidak ada SKU belum dipetakan yang cocok dengan filter.</div>'
+                : '<div class="oc-empty">🎉 Semua SKU sudah dipetakan.</div>';
             return;
         }
         body.innerHTML = `
         <div class="gf-table-scroll">
         <table class="gf-clean-table w-100">
             <thead><tr>
-                <th>Marketplace SKU</th><th>Nama Item (di Marketplace)</th>
+                <th>SKU Marketplace</th><th>Nama Item (di Marketplace)</th><th>Nama Variant</th>
+                <th>Toko</th>
                 <th class="text-end">Jumlah Order</th><th class="text-end">Aksi</th>
             </tr></thead>
             <tbody>
@@ -159,10 +305,12 @@
                     ${u.channel_code ? `<br><span class="oc-badge oc-badge-muted" style="font-size:.65rem">${channelPill({code: u.channel_code, name: u.channel_code})}</span>` : ''}
                 </td>
                 <td style="font-size:.82rem;color:#475569">${esc(u.item_name || '—')}</td>
+                <td style="font-size:.78rem;color:#475569">${esc(u.variant_name || '—')}</td>
+                <td style="font-size:.78rem;color:#475569">${esc(u.store_names || '—')}</td>
                 <td class="text-end" style="font-size:.8rem;font-weight:700">${u.order_count}</td>
                 <td class="text-end">
                     <button class="btn btn-dark btn-sm fw-bold" style="border-radius:999px;font-size:.72rem"
-                        onclick="mpMapping.open('${esc(u.sku)}', window.loadData)">+ Map</button>
+                        onclick="openUnmappedMapping('${encodeURIComponent(String(u.sku || ''))}','${encodeURIComponent(String(u.channel_code || ''))}')">+ Map</button>
                 </td>
             </tr>`).join('')}
             </tbody>
@@ -263,7 +411,13 @@
 
     window.editMapping = function (id) {
         const mapping = visibleMappings.find(row => Number(row.id) === Number(id));
-        if (mapping) mpMapping.open(mapping.marketplace_sku, window.loadData, mapping);
+        if (mapping) mpMapping.open(mapping.marketplace_sku, loadData, mapping);
+    };
+
+    window.openUnmappedMapping = function (encodedSku, encodedChannel) {
+        const sku = decodeURIComponent(encodedSku);
+        const channel = decodeURIComponent(encodedChannel);
+        mpMapping.open(sku, loadData, { marketplace_sku: sku, channel_code: channel });
     };
 
     window.deleteMapping = async function (id) {
@@ -284,6 +438,68 @@
         }, 400);
     };
 
+    window.filterUnmapped = function () {
+        clearTimeout(unmappedSearchTimeout);
+        unmappedSearchTimeout = setTimeout(reloadUnmappedOnly, 350);
+    };
+
+    window.applyUnmappedFilters = function () {
+        reloadUnmappedOnly();
+    };
+
+    window.runUnmappedAutoMap = async function () {
+        const btn = $('unmappedAutoMapBtn');
+        const storeId = $('unmappedStoreFilter').value || '';
+        const scope = storeId
+            ? 'untuk toko yang dipilih'
+            : 'untuk semua toko';
+
+        if (!confirm(`Jalankan mapping otomatis ${scope}? Sistem akan mencocokkan SKU marketplace dengan kode item internal yang sama persis atau SKU dengan suffix variasi seperti -1.`)) {
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = '⏳ Mapping…';
+
+        try {
+            const query = storeId ? '?store_id=' + encodeURIComponent(storeId) : '';
+            const res = await api('/api/marketplace/auto-map-by-code' + query, { method: 'POST' });
+            const mapped = Number(res.mapped || 0);
+            const message = mapped > 0
+                ? `Mapping otomatis selesai — ${mapped} item berhasil dipetakan${res.skipped ? ', ' + res.skipped + ' tidak cocok' : ''}.`
+                : 'Tidak ada SKU yang cocok dengan kode item internal.';
+
+            if (window.GFID?.toast) {
+                window.GFID.toast(message, { icon: mapped > 0 ? 'success' : 'info' });
+            } else {
+                alert(message);
+            }
+
+            await loadData();
+        } catch (e) {
+            if (window.GFID?.errorAlert) {
+                window.GFID.errorAlert(e.message);
+            } else {
+                alert(e.message);
+            }
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '⚡ Mapping Otomatis';
+        }
+    };
+
+    window.resetUnmappedFilters = function () {
+        $('unmappedSearch').value = '';
+        $('unmappedStoreFilter').value = '';
+        $('unmappedChannelFilter').value = '';
+        $('unmappedDateFrom').value = '';
+        $('unmappedDateTo').value = '';
+        $('unmappedDateRange').value = '';
+        $('unmappedDateRange')._flatpickr?.clear();
+        $('unmappedSort').value = 'orders_desc';
+        reloadUnmappedOnly();
+    };
+
     window.applyMappingFilters = function () {
         currentChannel = $('mappingChannelFilter').value;
         currentStockStatus = $('mappingStockFilter').value;
@@ -295,6 +511,8 @@
     window.loadMappings = loadData; // Alias for backward compatibility if used in modals
     window.loadData = loadData;
     
+    initUnmappedDateRange();
+    loadUnmappedFilterOptions();
     loadData();
 })();
 </script>
