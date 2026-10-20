@@ -76,5 +76,6 @@
                 <tbody id="anSalesDailyBody"><tr><td colspan="12"><div class="an-empty">Memuat rincian harian…</div></td></tr></tbody>
             </table>
         </div>
+        <div class="an-sales-table-note" id="anSalesDailyNote"></div>
     </section>
 </section>

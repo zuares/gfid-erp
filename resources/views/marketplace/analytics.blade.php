@@ -684,6 +684,10 @@
     @media (max-width:420px) { .an-cohort-summary-grid, .an-cohort-help-grid { grid-template-columns:1fr; } .an-cohort-help-card summary { align-items:flex-start; flex-direction:column; gap:.2rem; } .an-cohort-help-card summary small { margin:0; } }
 
     /* Align analytics with the Marketplace Sales dashboard visual system. */
+    @media (min-width: 768px) {
+        .app-main .page-wrap:has(.an-page) { max-width: none; }
+    }
+
     .an-page {
         max-width: 1280px;
         padding-inline: clamp(.75rem, 1.6vw, 1.5rem);
@@ -958,8 +962,9 @@
     .an-sales-trend-insight--alert { border: 1px solid color-mix(in srgb, var(--danger, #dc2626) 18%, var(--dsh-border, #d4d7e3) 82%); background: color-mix(in srgb, var(--danger-soft, #fee2e2) 30%, var(--card, #fff) 70%); }
     .an-sales-trend-insight--alert .an-sales-trend-insight-label,
     .an-sales-trend-insight--alert .an-sales-trend-insight-value { color: #b91c1c; }
-    .an-sales-table-section .an-table-wrap { max-height: 430px; }
+    .an-sales-table-section .an-table-wrap { max-height: none; }
     .an-sales-table { min-width: 1260px; }
+    .an-sales-table-note { padding: .58rem .9rem .72rem; color: var(--dsh-muted, #6b7280); font-size: .61rem; font-weight: 700; }
     .an-sales-table th:not(:first-child), .an-sales-table td:not(:first-child) { text-align: right; }
     .an-sales-table td:first-child { font-weight: 800; }
     .an-sales-table th, .an-sales-table td { white-space: nowrap; }
@@ -1309,11 +1314,22 @@
             const delta = salesDelta(value, baseline, lowerIsBetter);
             return `<span class="an-sales-table-value ${valueClass}">${formatter(value)}</span><span class="an-sales-table-delta ${delta.tone}">${delta.label}</span>`;
         };
-        $('anSalesDailyBody').innerHTML = currentRows.length ? currentRows.slice().reverse().map((row, reverseIndex) => {
+        const orderedRows = currentRows.slice().reverse();
+        const maxSalesDailyRows = 31;
+        const displayedRows = orderedRows.slice(0, maxSalesDailyRows);
+        const omittedRows = Math.max(0, orderedRows.length - displayedRows.length);
+        $('anSalesDailyBody').innerHTML = currentRows.length ? displayedRows.map((row, displayIndex) => {
+            const reverseIndex = displayIndex;
             const index = currentRows.length - reverseIndex - 1;
             const previousRow = previousRows[index] || {};
             return `<tr><td>${esc(salesPeriodLabel(row.date))}</td><td>${tableCell(row.orders, previousRow.orders, number)}</td><td>${tableCell(row.qty, previousRow.qty, number)}</td><td>${tableCell(row.avgOrder, previousRow.avgOrder, money)}</td><td>${tableCell(row.grossSales, previousRow.grossSales)}</td><td>${tableCell(row.netSales, previousRow.netSales)}</td><td>${tableCell(row.paid, previousRow.paid)}</td><td>${tableCell(row.payout, previousRow.payout)}</td><td>${tableCell(row.cogs, previousRow.cogs, money, true)}</td><td>${tableCell(row.grossProfit, previousRow.grossProfit, money, false, row.grossProfit < 0 ? 'is-negative' : 'is-positive')}</td><td>${tableCell(row.adCost, previousRow.adCost, money, true)}</td><td>${tableCell(row.profit, previousRow.profit, money, false, row.profit < 0 ? 'is-negative' : 'is-positive')}</td></tr>`;
         }).join('') : '<tr><td colspan="12"><div class="an-empty">Belum ada rincian harian pada periode ini.</div></td></tr>';
+        const dailyNote = $('anSalesDailyNote');
+        if (dailyNote) {
+            dailyNote.textContent = currentRows.length
+                ? (omittedRows ? `Menampilkan ${displayedRows.length} hari terbaru dari ${orderedRows.length} hari pada periode.` : `Menampilkan ${displayedRows.length} hari pada periode aktif.`)
+                : '';
+        }
     }
 
     function render() {
