@@ -115,6 +115,7 @@ trait MarketplaceOrdersPaginatedTrait
         $store = request()->query('store');
         $dateFrom = request()->query('date_from');
         $dateTo = request()->query('date_to');
+        $canViewMarketplaceFinancials = request()->user()?->isOwner() ?? false;
 
         $hasScanLog = in_array('scan_log', \Illuminate\Support\Facades\Schema::getColumnListing('order_fulfillments'));
         $fulfillmentSelect = $hasScanLog ? 'id,marketplace_order_id,status,scan_log' : 'id,marketplace_order_id,status';
@@ -238,7 +239,7 @@ trait MarketplaceOrdersPaginatedTrait
         $adsDailyLookup = $this->adsDailyLookupForOrders($paginator->getCollection());
 
         // Map items exactly like in localOrders
-        $paginator->getCollection()->transform(function ($o) use ($hasScanLog, $buyerPurchaseCounts, $baseStockReferences, $incomeLookup, $adsDailyLookup) {
+        $paginator->getCollection()->transform(function ($o) use ($hasScanLog, $buyerPurchaseCounts, $baseStockReferences, $incomeLookup, $adsDailyLookup, $canViewMarketplaceFinancials) {
             $arr = $o->toArray();
 
             $buyerKey = $this->buyerIdentityKey($o);
@@ -253,16 +254,26 @@ trait MarketplaceOrdersPaginatedTrait
             $arr['tracking_checked_at'] = $o->tracking_checked_at?->toIso8601String();
             $paymentBreakdown = $this->paymentBreakdownForIndex($o);
             $arr['payment_breakdown'] = $paymentBreakdown;
-            $incomeSummary = $this->orderIncomeSummary($o, $incomeLookup);
+            $incomeSummary = $canViewMarketplaceFinancials
+                ? $this->orderIncomeSummary($o, $incomeLookup)
+                : [
+                    'amount' => null,
+                    'is_estimated' => false,
+                    'source' => 'hidden',
+                    'available' => false,
+                    'total_item_value' => 0.0,
+                ];
             $totalItemValue = $incomeSummary['total_item_value'];
             unset($incomeSummary['total_item_value']);
             $arr['income_summary'] = $incomeSummary;
-            $arr['profit_after_ads_summary'] = $this->profitAfterAdsSummaryForIndex(
-                $o,
-                $paymentBreakdown,
-                $incomeSummary,
-                $adsDailyLookup[$this->adsDailyKeyForOrder($o)] ?? null
-            );
+            $arr['profit_after_ads_summary'] = $canViewMarketplaceFinancials
+                ? $this->profitAfterAdsSummaryForIndex(
+                    $o,
+                    $paymentBreakdown,
+                    $incomeSummary,
+                    $adsDailyLookup[$this->adsDailyKeyForOrder($o)] ?? null
+                )
+                : null;
 
             if (isset($arr['items']) && is_array($arr['items'])) {
                 foreach ($arr['items'] as &$orderItem) {
@@ -286,13 +297,26 @@ trait MarketplaceOrdersPaginatedTrait
                         unset($orderItem['internal_item']['stock_on_hand'], $orderItem['internal_item']['stock_allocated']);
                     }
 
-                    $itemModel = $o->items->firstWhere('id', $orderItem['id'] ?? null);
-                    $itemValue = $itemModel ? $this->orderItemIncomeValue($itemModel) : 0.0;
-                    $orderItem['income_amount'] = $incomeSummary['available'] && $totalItemValue > 0
-                        ? round($incomeSummary['amount'] * $itemValue / $totalItemValue, 2)
-                        : null;
-                    $orderItem['income_source'] = $incomeSummary['source'];
-                    $orderItem['income_is_estimated'] = $incomeSummary['is_estimated'];
+                    if ($canViewMarketplaceFinancials) {
+                        $itemModel = $o->items->firstWhere('id', $orderItem['id'] ?? null);
+                        $itemValue = $itemModel ? $this->orderItemIncomeValue($itemModel) : 0.0;
+                        $orderItem['income_amount'] = $incomeSummary['available'] && $totalItemValue > 0
+                            ? round($incomeSummary['amount'] * $itemValue / $totalItemValue, 2)
+                            : null;
+                        $orderItem['income_source'] = $incomeSummary['source'];
+                        $orderItem['income_is_estimated'] = $incomeSummary['is_estimated'];
+                    } else {
+                        unset(
+                            $orderItem['income_amount'],
+                            $orderItem['income_source'],
+                            $orderItem['income_is_estimated'],
+                            $orderItem['hpp_snapshot'],
+                            $orderItem['hpp_unit_snapshot'],
+                            $orderItem['hpp_total_snapshot'],
+                            $orderItem['profit_status'],
+                            $orderItem['raw_json'],
+                        );
+                    }
                 }
                 unset($orderItem);
             }
@@ -311,6 +335,38 @@ trait MarketplaceOrdersPaginatedTrait
                     ? (float) $o->incomeEstimate->estimated_escrow_amount
                     : null;
                 $arr['settlement']['ams_total'] = $this->settlementAmsAmount($o->settlement);
+            }
+
+            if (! $canViewMarketplaceFinancials) {
+                // Keep buyer-facing payment/voucher context for the operations
+                // table, but do not expose seller payout, settlement details,
+                // HPP, or raw income payloads to non-owner roles.
+                $settlement = (array) ($arr['settlement'] ?? []);
+                $arr['settlement'] = array_filter([
+                    'buyer_payment_amount' => $settlement['buyer_payment_amount'] ?? null,
+                    'voucher_toko_total' => $settlement['voucher_toko_total'] ?? null,
+                    'voucher_platform_total' => $settlement['voucher_platform_total'] ?? null,
+                    'voucher_external_total' => $settlement['voucher_external_total'] ?? null,
+                    'bundle_discount_total' => $settlement['bundle_discount_total'] ?? null,
+                    'ams_total' => $settlement['ams_total'] ?? null,
+                ], static fn ($value) => $value !== null);
+                unset(
+                    $arr['income_estimate'],
+                    $arr['incomeEstimate'],
+                    $arr['net_payout_estimated'],
+                    $arr['platform_fee_total'],
+                    $arr['financial_data_status'],
+                    $arr['financial_issue_reason'],
+                    $arr['financial_checked_at'],
+                    $arr['escrow_sync'],
+                );
+
+                $rawOrder = is_array($arr['raw_json'] ?? null) ? $arr['raw_json'] : [];
+                $arr['raw_json'] = array_intersect_key($rawOrder, array_flip([
+                    'order_status',
+                    'shipped_by_advance_fulfilment',
+                    'shipped_by_advance_fulfillment',
+                ]));
             }
 
             // Bedakan "voucher nol" (data valid dari Shopee) dengan "escrow

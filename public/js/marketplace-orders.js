@@ -1,5 +1,6 @@
 
 const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
+const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS === true;
 
 (function () {
     // Force header actions ke satu baris (display:block → flex)
@@ -292,6 +293,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     }
 
     function escrowHtml(o) {
+        if (!CAN_VIEW_MARKETPLACE_FINANCIALS) return '';
+
         const incomeSummary = o.income_summary;
         const incomeAmount = incomeSummary?.amount !== null && incomeSummary?.amount !== undefined
             ? Number(incomeSummary.amount)
@@ -336,6 +339,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     }
 
     function profitAfterAdsSectionHtml(o) {
+        if (!CAN_VIEW_MARKETPLACE_FINANCIALS) return '';
+
         const summary = o.profit_after_ads_summary;
         if (!summary) return '';
 
@@ -432,6 +437,8 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
     }
 
     function itemIncomeHtml(i) {
+        if (!CAN_VIEW_MARKETPLACE_FINANCIALS) return '';
+
         const amount = i?.income_amount === null || i?.income_amount === undefined
             ? null
             : Number(i.income_amount);
@@ -3046,10 +3053,10 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <div class="ord-payment-summary">
                     ${buyerPaymentMethodHtml(o)}
                     ${paymentBreakdownHtml(o)}
-                    <div class="ord-payment-income">
+                    ${CAN_VIEW_MARKETPLACE_FINANCIALS ? `<div class="ord-payment-income">
                         <span class="ord-payment-income-label">Penghasilan</span>
                         ${escrowHtml(o)}
-                    </div>
+                    </div>` : ''}
                 </div>
             </td>`;
             const voucherCell = `<td class="ord-voucher-cell">
@@ -3115,7 +3122,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 <th>Item Produk</th>
                 ${hasResolveCol ? '<th>✅ Item Pengganti</th>' : ''}
                 ${hasScanCol    ? '<th>📦 Item Scan</th>'    : ''}
-                <th>Pembayaran Pembeli &amp; Penghasilan</th>
+                <th>${CAN_VIEW_MARKETPLACE_FINANCIALS ? 'Pembayaran Pembeli &amp; Penghasilan' : 'Pembayaran Pembeli'}</th>
                 <th>Voucher &amp; Diskon</th>
                 <th>AMS</th>
                 <th>Pengiriman / Lacak / Cetak</th>

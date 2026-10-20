@@ -72,6 +72,7 @@
 @push('scripts')
 <script>
     window.IS_DUMMY_MODE = @json($isDummy ?? false);
+    window.CAN_VIEW_MARKETPLACE_FINANCIALS = @json($canViewMarketplaceFinancials ?? false);
 </script>
 <script src="{{ asset('js/marketplace-orders.js?v=' . time()) }}"></script>
 @endpush

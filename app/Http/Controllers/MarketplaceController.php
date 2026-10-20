@@ -57,13 +57,14 @@ class MarketplaceController extends Controller
     {
         $today = now()->toDateString();
         $weekAgo = now()->subDays(6)->toDateString();
+        $canViewMarketplaceFinancials = $request->user()?->isOwner() ?? false;
         $filters = [
             'date_from' => $request->query('date_from', $weekAgo),
             'date_to' => $request->query('date_to', $today),
         ];
         $isDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
 
-        return view('marketplace.orders', compact('filters', 'isDummy'));
+        return view('marketplace.orders', compact('filters', 'isDummy', 'canViewMarketplaceFinancials'));
     }
 
     public function webhookTests(Request $request): \Illuminate\View\View

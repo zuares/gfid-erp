@@ -12,6 +12,7 @@ use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MpIncome;
 use App\Models\Store;
+use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Marketplace\MarketplaceTrackingStatusService;
 use Illuminate\Auth\Middleware\Authenticate;
@@ -74,6 +75,14 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
         ]);
     }
 
+    private function actAsOwner(): void
+    {
+        $this->actingAs(User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-REPEAT-'.uniqid(),
+        ]));
+    }
+
     public function test_order_ditandai_repeat_bila_pembeli_punya_histori_pembelian(): void
     {
         $this->createOrder('REPEAT-PREVIOUS', 'COMPLETED', 'buyer-repeat');
@@ -122,6 +131,7 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
 
     public function test_payout_order_dialokasikan_ke_item_produk_terkait(): void
     {
+        $this->actAsOwner();
         $order = $this->createOrder('PAYOUT-ORDER-001', 'COMPLETED', 'buyer-payout');
         $firstItem = MarketplaceOrderItem::create([
             'marketplace_order_id' => $order->id,
@@ -159,6 +169,7 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
 
     public function test_income_estimate_dipakai_bila_payout_belum_tersedia(): void
     {
+        $this->actAsOwner();
         $order = $this->createOrder('ESTIMATE-ORDER-001', 'COMPLETED', 'buyer-estimate');
         $item = MarketplaceOrderItem::create([
             'marketplace_order_id' => $order->id,
@@ -188,6 +199,7 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
 
     public function test_laba_kotor_setelah_iklan_mengurangi_cogs_dan_ppn_iklan(): void
     {
+        $this->actAsOwner();
         $order = $this->createOrder('GROSS-PROFIT-ORDER', 'COMPLETED', 'buyer-gross-profit');
         $order->update([
             'raw_json' => [
