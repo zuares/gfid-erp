@@ -1506,10 +1506,24 @@ class MarketplaceAnalyticsSummaryService
 
     private function operationalDaily(array $filters): array
     {
+        $itemTotals = DB::table('marketplace_order_items as oi')
+            ->selectRaw('COALESCE(oi.marketplace_order_id, oi.order_id) AS order_key')
+            ->selectRaw('SUM(CASE WHEN oi.qty > 0 THEN oi.qty ELSE 0 END) AS qty')
+            ->selectRaw('SUM(CASE WHEN oi.hpp_total_snapshot > 0 THEN oi.hpp_total_snapshot WHEN oi.hpp_snapshot > 0 THEN oi.hpp_snapshot * CASE WHEN oi.qty > 0 THEN oi.qty ELSE 0 END ELSE 0 END) AS hpp')
+            ->groupByRaw('COALESCE(oi.marketplace_order_id, oi.order_id)');
+        $gross = $this->orderValueExpression();
+        $estimatedPayout = "COALESCE(NULLIF(mo.net_payout_estimated, 0), NULLIF(od_ms.final_income, 0), od_ie.estimated_escrow_amount, ({$gross} * ".(1 - self::ESTIMATED_MARKETPLACE_FEE_RATE).'))';
+
         return $this->operationalBase($filters)
+            ->leftJoinSub($itemTotals, 'od_items', fn ($join) => $join->on('od_items.order_key', '=', 'mo.id'))
+            ->leftJoin('marketplace_order_settlements as od_ms', 'od_ms.order_id', '=', 'mo.id')
+            ->leftJoin('marketplace_order_income_estimates as od_ie', 'od_ie.marketplace_order_id', '=', 'mo.id')
             ->selectRaw('DATE(mo.ordered_at) AS date')
             ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN 1 ELSE 0 END) AS orders')
             ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $this->orderValueExpression() . ' ELSE 0 END) AS gmv')
+            ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN COALESCE(od_items.qty, 0) ELSE 0 END) AS qty')
+            ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $estimatedPayout . ' ELSE 0 END) AS payout')
+            ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN COALESCE(od_items.hpp, 0) ELSE 0 END) AS hpp')
             ->groupByRaw('DATE(mo.ordered_at)')
             ->orderByRaw('DATE(mo.ordered_at)')
             ->get()
@@ -1517,6 +1531,9 @@ class MarketplaceAnalyticsSummaryService
                 'date' => $row->date,
                 'orders' => (int) ($row->orders ?? 0),
                 'gmv' => round((float) ($row->gmv ?? 0), 2),
+                'qty' => (int) ($row->qty ?? 0),
+                'payout' => round((float) ($row->payout ?? 0), 2),
+                'hpp' => round((float) ($row->hpp ?? 0), 2),
             ])
             ->values()
             ->all();
@@ -1548,6 +1565,9 @@ class MarketplaceAnalyticsSummaryService
             ], [
                 'orders' => (int) ($row['orders'] ?? 0),
                 'gmv' => (float) ($row['gmv'] ?? 0),
+                'qty' => (int) ($row['qty'] ?? 0),
+                'payout' => (float) ($row['payout'] ?? 0),
+                'hpp' => (float) ($row['hpp'] ?? 0),
             ]);
         }
 
@@ -1579,21 +1599,24 @@ class MarketplaceAnalyticsSummaryService
                 ]);
             }
 
-            $rows = $rows->map(function (array $row) use ($ads) {
-                $adCostByDate = collect($ads)->firstWhere('date', $row['date']);
+        }
+
+        $rows = $rows->map(function (array $row) use ($ads) {
+            $adCostByDate = collect($ads)->firstWhere('date', $row['date']);
+            if ($ads !== []) {
                 $row['ad_cost_settlement'] = round((float) ($row['ad_cost_settlement'] ?? $row['ad_cost'] ?? 0), 2);
                 $row['ad_cost_before_tax'] = round((float) ($adCostByDate['ad_cost_before_tax'] ?? 0), 2);
                 $row['ad_cost_vat'] = round((float) ($adCostByDate['ad_cost_vat'] ?? 0), 2);
                 $row['ad_cost'] = round((float) ($adCostByDate['ad_cost'] ?? 0), 2);
-                $row['gross_profit'] = round((float) ($row['payout'] ?? 0) - (float) ($row['hpp'] ?? 0), 2);
-                $row['operating_profit'] = round($row['gross_profit'] - $row['ad_cost'], 2);
-                $row['margin_pct'] = (float) ($row['gross_sales'] ?? 0) > 0
-                    ? round(($row['operating_profit'] / $row['gross_sales']) * 100, 2)
-                    : 0.0;
+            }
+            $row['gross_profit'] = round((float) ($row['payout'] ?? 0) - (float) ($row['hpp'] ?? 0), 2);
+            $row['operating_profit'] = round($row['gross_profit'] - (float) ($row['ad_cost'] ?? 0), 2);
+            $row['margin_pct'] = (float) ($row['gross_sales'] ?? 0) > 0
+                ? round(($row['operating_profit'] / $row['gross_sales']) * 100, 2)
+                : 0.0;
 
-                return $row;
-            });
-        }
+            return $row;
+        });
 
         return $rows->sortKeys()->values()->all();
     }
