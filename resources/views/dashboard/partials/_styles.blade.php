@@ -160,14 +160,26 @@
     .ditem-demand { color: var(--text, #0f172a); font-size: .78rem; font-weight: 650; }
     .ditem-stock { color: #166534; font-size: .78rem; font-weight: 700; }
     .ditem-stock.short { color: #dc2626; }
-    .ditem-gap { color: #166534; font-size: .76rem; font-weight: 700; }
-    .ditem-gap.short { color: #dc2626; }
-    .ditem-gap.surplus { color: #2563eb; }
+    .ditem-gap { width: 112px; }
+    .ditem-gap-indicator { display: inline-flex; align-items: center; justify-content: flex-end; gap: .32rem; min-width: 72px; padding: .22rem .45rem; border-radius: 999px; font-size: .78rem; font-weight: 800; line-height: 1; }
+    .ditem-gap-indicator.safe { color: #166534; background: #dcfce7; }
+    .ditem-gap-indicator.short { color: #b91c1c; background: #fee2e2; }
+    .ditem-gap-indicator.unknown { color: #64748b; background: #f1f5f9; }
+    .ditem-gap-icon { font-size: .82rem; }
     body[data-theme="dark"] .ditem-stock { color: #bbf7d0; }
     body[data-theme="dark"] .ditem-stock.short { color: #fca5a5; }
-    body[data-theme="dark"] .ditem-gap { color: #bbf7d0; }
-    body[data-theme="dark"] .ditem-gap.short { color: #fca5a5; }
-    body[data-theme="dark"] .ditem-gap.surplus { color: #bfdbfe; }
+    body[data-theme="dark"] .ditem-gap-indicator.safe { color: #bbf7d0; background: rgba(22, 101, 52, .35); }
+    body[data-theme="dark"] .ditem-gap-indicator.short { color: #fca5a5; background: rgba(185, 28, 28, .35); }
+    body[data-theme="dark"] .ditem-gap-indicator.unknown { color: #cbd5e1; background: rgba(100, 116, 139, .3); }
+    .drepeat-table-wrap { overflow-x: auto; }
+    .drepeat-table { width: 100%; border-collapse: collapse; min-width: 620px; }
+    .drepeat-table th { padding: .45rem .55rem; color: var(--dsh-muted); font-size: .65rem; font-weight: 700; text-align: left; border-bottom: 1px solid var(--dsh-border); white-space: nowrap; }
+    .drepeat-table td { padding: .52rem .55rem; border-bottom: 1px solid var(--dsh-border); vertical-align: middle; font-size: .75rem; }
+    .drepeat-table tr:last-child td { border-bottom: 0; }
+    .drepeat-table .numeric { text-align: right; white-space: nowrap; }
+    .drepeat-buyer { color: var(--text, #0f172a); font-weight: 650; }
+    .drepeat-order { color: var(--dsh-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .69rem !important; }
+    .drepeat-date { color: var(--dsh-muted); white-space: nowrap; font-size: .72rem !important; }
 
     /* ---------- Badge (mirip badge-status + dot) ---------- */
     .pill { display: inline-flex; align-items: center; gap: .32rem; border-radius: 7px; padding: .14rem .45rem;

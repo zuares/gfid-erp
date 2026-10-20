@@ -26,7 +26,7 @@
                                 $demand = (float) ($row['demand_qty'] ?? 0);
                                 $stock = $row['stock_qty'] ?? null;
                                 $short = $stock !== null && $stock < $demand;
-                                $gap = $stock === null ? null : $demand - $stock;
+                                $gap = $stock === null ? null : $stock - $demand;
                             @endphp
                             <tr>
                                 <td class="numeric ditem-number">{{ $loop->iteration }}</td>
@@ -37,8 +37,13 @@
                                 <td class="numeric ditem-stock {{ $short ? 'short' : '' }}">
                                     {{ $stock === null ? '—' : $qty($stock) . ' pcs' }}
                                 </td>
-                                <td class="numeric ditem-gap {{ $gap !== null && $gap > 0 ? 'short' : ($gap !== null && $gap < 0 ? 'surplus' : '') }}">
-                                    {{ $gap === null ? '—' : (($gap > 0 ? '+' : '') . $qty($gap)) }}
+                                <td class="numeric ditem-gap">
+                                    @php($gapState = $gap === null ? 'unknown' : ($gap < 0 ? 'short' : 'safe'))
+                                    <span class="ditem-gap-indicator {{ $gapState }}"
+                                          title="{{ $gapState === 'safe' ? 'Stok mencukupi' : ($gapState === 'short' ? 'Stok kurang' : 'Stok belum diketahui') }}">
+                                        <i class="bi {{ $gapState === 'safe' ? 'bi-check-circle-fill' : ($gapState === 'short' ? 'bi-exclamation-circle-fill' : 'bi-question-circle') }} ditem-gap-icon" aria-hidden="true"></i>
+                                        <span>{{ $gap === null ? '—' : (($gap > 0 ? '+' : '') . $qty($gap)) }}</span>
+                                    </span>
                                 </td>
                             </tr>
                         @endforeach

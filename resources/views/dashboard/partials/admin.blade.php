@@ -4,6 +4,10 @@
     $qty = fn ($n) => number_format((float) $n, 0, ',', '.');
 @endphp
 
+<div class="dash-panels">
+    @include('dashboard.partials._list_repeat_orders', ['title' => 'Repeat order pesanan hari ini', 'rows' => $d['repeat_orders'] ?? [], 'link' => $r('marketplace.orders')])
+</div>
+
 {{-- ================= PESANAN HARI INI ================= --}}
 <div class="dash-sec"><i class="bi bi-bag-check"></i> Pesanan & Penjualan</div>
 <div class="dash-grid">

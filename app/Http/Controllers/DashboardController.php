@@ -225,6 +225,7 @@ class DashboardController extends Controller
             'po_unpaid'           => $this->poCount(['unpaid', 'partial'], 'payment_status'),
             'reject_total'        => $this->whQty(['REJ-CUT', 'REJ-SEW', 'REJ-FIN', 'REJECT']),
             'list_todo_items'    => $this->mpUnshippedItemList(12),
+            'repeat_orders'     => $this->mpRepeatOrderList(8),
             'list_stock'          => $this->stockCriticalList(6),
             'ads_hourly'          => $adsHourly,
             'ads_campaigns'       => $adsCampaigns,
@@ -249,6 +250,7 @@ class DashboardController extends Controller
             'stock_out_fg'      => $this->stockOutCount('finished_good'),
             'fg_ready'          => $this->whQty([self::WH['FG'], self::WH['RTS']]),
             'list_todo'         => $this->mpUnshippedList(10),
+            'repeat_orders'     => $this->mpRepeatOrderList(8),
             'list_stock'        => $this->stockCriticalList(6, 'finished_good'),
         ];
     }
@@ -569,6 +571,58 @@ class DashboardController extends Controller
             usort($rows, fn ($a, $b) => $b['demand_qty'] <=> $a['demand_qty']);
 
             return array_slice($rows, 0, $limit);
+        }, []);
+    }
+
+    /** Order terbaru dari pembeli yang sudah pernah menyelesaikan order. */
+    private function mpRepeatOrderList(int $limit): array
+    {
+        return (array) $this->safe(function () use ($limit) {
+            if (! Schema::hasTable('marketplace_orders')) {
+                return [];
+            }
+
+            $today = Carbon::today()->toDateString();
+            $buyerKey = "COALESCE(NULLIF(buyer_username, ''), NULLIF(buyer_name, ''))";
+            $currentBuyerKey = "COALESCE(NULLIF(current.buyer_username, ''), NULLIF(current.buyer_name, ''))";
+            $completedHistory = DB::table('marketplace_orders')
+                ->where('order_status', 'COMPLETED')
+                ->whereRaw("{$buyerKey} IS NOT NULL")
+                ->select('store_id')
+                ->selectRaw("{$buyerKey} as buyer_key")
+                ->selectRaw('COUNT(*) as previous_order_count')
+                ->selectRaw("MAX(COALESCE(ordered_at, order_date, created_at)) as last_purchased_at")
+                ->groupBy('store_id')
+                ->groupByRaw($buyerKey);
+
+            return DB::table('marketplace_orders as current')
+                ->joinSub($completedHistory, 'repeat_history', function ($join) use ($currentBuyerKey) {
+                    $join->on('repeat_history.store_id', '=', 'current.store_id')
+                        ->on('repeat_history.buyer_key', '=', DB::raw($currentBuyerKey));
+                })
+                ->whereNotIn('current.order_status', ['CANCELLED', 'CANCELED'])
+                ->whereRaw('DATE(COALESCE(current.ordered_at, current.order_date, current.created_at)) = ?', [$today])
+                ->where(function ($query) {
+                    $query->whereNull('current.order_status')
+                        ->orWhere('current.order_status', '!=', 'COMPLETED')
+                        ->orWhere(function ($completed) {
+                            $completed->where('current.order_status', 'COMPLETED')
+                                ->where('repeat_history.previous_order_count', '>', 1);
+                        });
+                })
+                ->orderByDesc(DB::raw('COALESCE(current.ordered_at, current.order_date, current.created_at)'))
+                ->limit($limit)
+                ->get([
+                    'current.id',
+                    DB::raw("COALESCE(NULLIF(current.buyer_name, ''), NULLIF(current.buyer_username, ''), 'Tanpa nama') as buyer_label"),
+                    DB::raw("COALESCE(NULLIF(current.external_invoice_no, ''), NULLIF(current.external_order_id, ''), current.channel_order_id, CONCAT('ORDER-', current.id)) as order_number"),
+                    'current.order_status',
+                    DB::raw('COALESCE(current.ordered_at, current.order_date, current.created_at) as ordered_at'),
+                    DB::raw("CASE WHEN current.order_status = 'COMPLETED' THEN repeat_history.previous_order_count - 1 ELSE repeat_history.previous_order_count END as previous_order_count"),
+                    'repeat_history.last_purchased_at',
+                ])
+                ->map(fn ($row) => (array) $row)
+                ->all();
         }, []);
     }
 
