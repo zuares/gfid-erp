@@ -101,6 +101,9 @@
 @php
   $lines = $shipment->lines ?? collect();
     $orders = ($shipment->orderScans ?? collect())->sortBy('id')->values();
+    $isItemOnlyAllowed = $shipment->shipment_type === \App\Models\Shipment::TYPE_MARKETPLACE
+        && ($shipment->dispatch_mode ?? \App\Models\Shipment::DISPATCH_SINGLE) !== \App\Models\Shipment::DISPATCH_DAILY
+        && $lines->isNotEmpty();
     $totalQty = (int) $lines->sum('qty_scanned');
     $totalLines = (int) $lines->count();
     $orderGroup = static function ($orderNo): string {
@@ -124,7 +127,7 @@
         <a href="{{ route('sales.shipments.confirm_orders', $shipment) }}"
            id="sifConfirmBtn"
            class="sif-btn sif-btn-primary"
-           aria-disabled="{{ $orders->isNotEmpty() ? 'false' : 'true' }}">Cek Shipment</a>
+           aria-disabled="{{ $orders->isNotEmpty() || $isItemOnlyAllowed ? 'false' : 'true' }}">Cek Shipment</a>
     </div>
 
     <div class="sif-shell">
@@ -132,7 +135,7 @@
             <div class="sif-card-head">
                 <div>
                     <div class="sif-title">Scan No Order</div>
-                    <div class="sif-sub">Item sudah discan. Scan nomor order sekarang untuk menghubungkan order dengan item shipment.</div>
+                    <div class="sif-sub">Item sudah discan. Nomor order opsional untuk shipment marketplace mode item-only.</div>
                 </div>
             </div>
             <div class="sif-body">
@@ -152,7 +155,7 @@
                         <div id="sifCameraReader" class="sif-camera-reader"></div>
                         <div id="sifCameraStatus" class="sif-camera-status">Meminta izin kamera...</div>
                     </div>
-                    <div class="sif-hint">Setelah order dicatat, pilih Cek Shipment untuk meninjau item dan melanjutkan post.</div>
+                    <div class="sif-hint">{{ $isItemOnlyAllowed ? 'Nomor order bisa dicatat sekarang, atau langsung pilih Cek Shipment untuk melanjutkan item-only.' : 'Setelah order dicatat, pilih Cek Shipment untuk meninjau item dan melanjutkan post.' }}</div>
                 </div>
             </div>
         </div>
@@ -198,7 +201,7 @@
                             @endforeach
                         </div>
                     @empty
-                        <div class="sif-empty">Belum ada nomor order yang discan.</div>
+                        <div class="sif-empty">{{ $isItemOnlyAllowed ? 'Belum ada nomor order. Shipment tetap dapat dilanjutkan sebagai item-only.' : 'Belum ada nomor order yang discan.' }}</div>
                     @endforelse
                 </div>
             </div>
@@ -216,6 +219,7 @@
     const count = document.getElementById('sifOrderTotal');
     const filterButtons = Array.from(document.querySelectorAll('#sifOrderFilters [data-group]'));
     const confirmBtn = document.getElementById('sifConfirmBtn');
+    const allowItemOnly = @json($isItemOnlyAllowed);
     const toast = document.getElementById('sifToast');
     const cameraBtn = document.getElementById('sifCameraBtn');
     const cameraPanel = document.getElementById('sifCameraPanel');
@@ -368,8 +372,9 @@
         if (count) count.textContent = orders.length;
         renderOrderFilters();
         if (confirmBtn) {
-            confirmBtn.setAttribute('aria-disabled', orders.length ? 'false' : 'true');
-            confirmBtn.classList.toggle('is-disabled', !orders.length);
+            const canConfirm = orders.length > 0 || allowItemOnly;
+            confirmBtn.setAttribute('aria-disabled', canConfirm ? 'false' : 'true');
+            confirmBtn.classList.toggle('is-disabled', !canConfirm);
         }
     }
 

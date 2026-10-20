@@ -609,6 +609,12 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         ]);
 
         $this->actingAs($user)
+            ->get(route('sales.shipments.scan_order', $shipment))
+            ->assertOk()
+            ->assertSee('aria-disabled="false"', false)
+            ->assertSee('Shipment tetap dapat dilanjutkan sebagai item-only.');
+
+        $this->actingAs($user)
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
             ->assertDontSee('Shipment belum siap dikirim')
