@@ -689,7 +689,7 @@
     }
 
     .an-page {
-        max-width: 1280px;
+        max-width: 1480px;
         padding-inline: clamp(.75rem, 1.6vw, 1.5rem);
     }
 
