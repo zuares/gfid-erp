@@ -959,9 +959,15 @@
     .an-sales-trend-insight--alert .an-sales-trend-insight-label,
     .an-sales-trend-insight--alert .an-sales-trend-insight-value { color: #b91c1c; }
     .an-sales-table-section .an-table-wrap { max-height: 430px; }
-    .an-sales-table { min-width: 690px; }
+    .an-sales-table { min-width: 1260px; }
     .an-sales-table th:not(:first-child), .an-sales-table td:not(:first-child) { text-align: right; }
     .an-sales-table td:first-child { font-weight: 800; }
+    .an-sales-table th, .an-sales-table td { white-space: nowrap; }
+    .an-sales-table-value { display: block; color: var(--text, #0f172a); font-weight: 800; }
+    .an-sales-table-delta { display: block; margin-top: .13rem; color: var(--dsh-muted, #6b7280); font-size: .59rem; font-weight: 750; }
+    .an-sales-table-delta.good { color: #15803d; }
+    .an-sales-table-delta.bad { color: #b91c1c; }
+    .an-sales-table-delta.neutral { color: var(--dsh-muted, #6b7280); }
     .an-sales-table .is-negative { color: #b91c1c; }
     .an-sales-table .is-positive { color: #15803d; }
 
@@ -1175,14 +1181,30 @@
             refund: n(row.return_refund_amount ?? row.cash_refund ?? row.refund),
         };
     };
-    const salesDailyRow = row => ({
-        date: String(row?.date || ''),
-        sales: n(row?.gmv ?? row?.gross_sales),
-        payout: n(row?.payout),
-        profit: n(row?.operating_profit),
-        adCost: n(row?.ad_cost),
-        orders: n(row?.order_count),
-    });
+    const salesDailyRow = row => {
+        const grossSales = n(row?.gross_sales || row?.gmv);
+        const cogs = n(row?.hpp);
+        const payout = n(row?.payout);
+        const grossProfit = n(row?.gross_profit || (payout - cogs));
+        const adCost = n(row?.ad_cost);
+        const orders = n(row?.orders || row?.order_count);
+
+        return {
+            date: String(row?.date || ''),
+            sales: grossSales,
+            grossSales,
+            netSales: n(row?.net_sales || grossSales),
+            paid: n(row?.cash_order_revenue || row?.paid || grossSales),
+            payout,
+            cogs,
+            grossProfit,
+            profit: n(row?.operating_profit || (grossProfit - adCost)),
+            adCost,
+            orders,
+            qty: n(row?.qty),
+            avgOrder: orders > 0 ? grossSales / orders : 0,
+        };
+    };
     const salesDelta = (value, baseline, lowerIsBetter = false) => {
         const currentValue = n(value), previousValue = n(baseline);
         if (previousValue === 0) return { label: currentValue === 0 ? '0,0%' : 'Baru', tone: currentValue === 0 ? 'neutral' : (lowerIsBetter && currentValue > 0 ? 'bad' : 'good') };
@@ -1282,7 +1304,16 @@
         const trend = renderSalesTrendSummary(currentRows, previousRows);
         renderSalesChart(currentRows, previousRows);
         renderSalesInsights(currentRows, trend.currentTotals);
-        $('anSalesDailyBody').innerHTML = currentRows.length ? currentRows.slice().reverse().map(row => `<tr><td>${esc(salesPeriodLabel(row.date))}</td><td>${money(row.sales)}</td><td>${money(row.payout)}</td><td class="${row.profit < 0 ? 'is-negative' : 'is-positive'}">${money(row.profit)}</td><td>${money(row.adCost)}</td><td>${row.orders.toLocaleString('id-ID')}</td></tr>`).join('') : '<tr><td colspan="6"><div class="an-empty">Belum ada rincian harian pada periode ini.</div></td></tr>';
+        const number = value => Number(value || 0).toLocaleString('id-ID');
+        const tableCell = (value, baseline, formatter = money, lowerIsBetter = false, valueClass = '') => {
+            const delta = salesDelta(value, baseline, lowerIsBetter);
+            return `<span class="an-sales-table-value ${valueClass}">${formatter(value)}</span><span class="an-sales-table-delta ${delta.tone}">${delta.label}</span>`;
+        };
+        $('anSalesDailyBody').innerHTML = currentRows.length ? currentRows.slice().reverse().map((row, reverseIndex) => {
+            const index = currentRows.length - reverseIndex - 1;
+            const previousRow = previousRows[index] || {};
+            return `<tr><td>${esc(salesPeriodLabel(row.date))}</td><td>${tableCell(row.orders, previousRow.orders, number)}</td><td>${tableCell(row.qty, previousRow.qty, number)}</td><td>${tableCell(row.avgOrder, previousRow.avgOrder, money)}</td><td>${tableCell(row.grossSales, previousRow.grossSales)}</td><td>${tableCell(row.netSales, previousRow.netSales)}</td><td>${tableCell(row.paid, previousRow.paid)}</td><td>${tableCell(row.payout, previousRow.payout)}</td><td>${tableCell(row.cogs, previousRow.cogs, money, true)}</td><td>${tableCell(row.grossProfit, previousRow.grossProfit, money, false, row.grossProfit < 0 ? 'is-negative' : 'is-positive')}</td><td>${tableCell(row.adCost, previousRow.adCost, money, true)}</td><td>${tableCell(row.profit, previousRow.profit, money, false, row.profit < 0 ? 'is-negative' : 'is-positive')}</td></tr>`;
+        }).join('') : '<tr><td colspan="12"><div class="an-empty">Belum ada rincian harian pada periode ini.</div></td></tr>';
     }
 
     function render() {

@@ -67,13 +67,13 @@
         <div class="an-sales-section-head">
             <div>
                 <div class="an-sales-section-title">Rincian harian</div>
-                <div class="an-sales-section-sub">Sumber data: <code>analytics-summary.daily</code>. Tidak mengubah perhitungan atau mengambil data dari dashboard sales.</div>
+                <div class="an-sales-section-sub">Sumber data: <code>analytics-summary.daily</code>. Format mengikuti tabel penjualan acuan; tidak mengambil data dari dashboard sales.</div>
             </div>
         </div>
         <div class="an-table-wrap">
             <table class="an-table an-sales-table">
-                <thead><tr><th>Tanggal</th><th>Omzet / GMV</th><th>Payout</th><th>Profit operasional</th><th>Iklan</th><th>Order siap profit</th></tr></thead>
-                <tbody id="anSalesDailyBody"><tr><td colspan="6"><div class="an-empty">Memuat rincian harian…</div></td></tr></tbody>
+                <thead><tr><th>Tanggal</th><th>Pesanan</th><th>Terjual</th><th>Avg Order</th><th>Gross Sales</th><th>Net Sales</th><th>Di Bayar</th><th>Est Revenue</th><th>COGS (HPP)</th><th>Gross Profit</th><th>Iklan</th><th>Net Profit</th></tr></thead>
+                <tbody id="anSalesDailyBody"><tr><td colspan="12"><div class="an-empty">Memuat rincian harian…</div></td></tr></tbody>
             </table>
         </div>
     </section>

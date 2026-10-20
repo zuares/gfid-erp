@@ -1508,11 +1508,16 @@ class MarketplaceAnalyticsSummaryService
     {
         return $this->operationalBase($filters)
             ->selectRaw('DATE(mo.ordered_at) AS date')
+            ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN 1 ELSE 0 END) AS orders')
             ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $this->orderValueExpression() . ' ELSE 0 END) AS gmv')
             ->groupByRaw('DATE(mo.ordered_at)')
             ->orderByRaw('DATE(mo.ordered_at)')
             ->get()
-            ->map(fn ($row) => ['date' => $row->date, 'gmv' => round((float) ($row->gmv ?? 0), 2)])
+            ->map(fn ($row) => [
+                'date' => $row->date,
+                'orders' => (int) ($row->orders ?? 0),
+                'gmv' => round((float) ($row->gmv ?? 0), 2),
+            ])
             ->values()
             ->all();
     }
@@ -1524,6 +1529,7 @@ class MarketplaceAnalyticsSummaryService
             $date = (string) $row['date'];
             $rows[$date] = array_merge($rows[$date] ?? [
                 'date' => $date,
+                'orders' => 0,
                 'order_count' => 0,
                 'qty' => 0,
                 'gross_sales' => 0,
@@ -1539,7 +1545,10 @@ class MarketplaceAnalyticsSummaryService
                 'operating_profit' => 0,
                 'margin_pct' => 0,
                 'aov' => 0,
-            ], ['gmv' => (float) ($row['gmv'] ?? 0)]);
+            ], [
+                'orders' => (int) ($row['orders'] ?? 0),
+                'gmv' => (float) ($row['gmv'] ?? 0),
+            ]);
         }
 
         if ($ads !== []) {
@@ -1547,6 +1556,7 @@ class MarketplaceAnalyticsSummaryService
                 $date = (string) $row['date'];
                 $rows[$date] = array_merge($rows[$date] ?? [
                     'date' => $date,
+                    'orders' => 0,
                     'order_count' => 0,
                     'qty' => 0,
                     'gross_sales' => 0,
