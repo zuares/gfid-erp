@@ -5,7 +5,7 @@
 @push('head')
 <style>
 .od-wrap{max-width:1240px;margin-inline:auto;padding:1rem 1rem 4rem;color:var(--text,#172033);display:flex;flex-direction:column}
-.od-topbar{position:sticky;top:var(--app-navbar-offset,58px);z-index:250;width:min(100%,1240px);margin-inline:auto;display:flex;align-items:center;gap:.85rem;padding:.7rem 1rem;background:color-mix(in srgb,var(--card,#fff) 92%,transparent);border:1px solid var(--line,#e7ebf0);border-top:0;box-shadow:0 8px 24px rgba(15,23,42,.06);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.od-topbar{position:relative;width:min(100%,1240px);margin-inline:auto;display:flex;align-items:center;gap:.85rem;padding:.7rem 1rem;background:var(--card,#fff);border:1px solid var(--line,#e7ebf0);border-top:0;box-shadow:0 1px 2px rgba(15,23,42,.035)}
 .od-topbar-inner{width:100%;display:flex;align-items:center;gap:.75rem;min-width:0}
 .od-identity{min-width:0;display:grid;gap:.08rem}
 .od-kicker{font-size:.65rem;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:var(--muted,#64748b)}
@@ -864,7 +864,10 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
             : (($adsDaily && (float) ($adsDaily->roas ?? 0) > 0) ? 1 / (float) $adsDaily->roas : null);
         // ACOS adalah rasio biaya iklan terhadap GMV harian. Beban order
         // dialokasikan memakai subtotal produk order pada tanggal tersebut.
-        $orderAdCost = $dailyAcos !== null ? round(max($subtotal, 0) * $dailyAcos, 2) : null;
+        $adTaxRate = 0.11;
+        $orderAdCostBeforeTax = $dailyAcos !== null ? round(max($subtotal, 0) * $dailyAcos, 2) : null;
+        $orderAdTax = $orderAdCostBeforeTax !== null ? round($orderAdCostBeforeTax * $adTaxRate, 2) : null;
+        $orderAdCost = $orderAdCostBeforeTax !== null ? round($orderAdCostBeforeTax + $orderAdTax, 2) : null;
         $grossProfit = $hppComplete ? round($penghasilan - $hppTotal, 2) : null;
         $profitAfterAds = $grossProfit !== null && $orderAdCost !== null
             ? round($grossProfit - $orderAdCost, 2)
@@ -873,7 +876,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         $cogsPct = $hppComplete && $marginBase > 0 ? round(($hppTotal / $marginBase) * 100, 2) : null;
         $adPct = $orderAdCost !== null && $marginBase > 0 ? round(($orderAdCost / $marginBase) * 100, 2) : null;
         $marketplaceFeeTotal = (float) $grandFeeBreakdownTotal;
-        $marketplaceFeePct = $marginBase > 0 ? round(($marketplaceFeeTotal / $marginBase) * 100, 2) : null;
+        $sellerFeePct = $marginBase > 0 ? round(($sellerFeeBreakdownTotal / $marginBase) * 100, 2) : null;
         $grossProfitPct = $grossProfit !== null && $marginBase > 0 ? round(($grossProfit / $marginBase) * 100, 2) : null;
     @endphp
 
@@ -897,7 +900,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                     <div class="od-value">{{ $dailyAcos !== null ? number_format($dailyAcos * 100, 2, ',', '.').'%' : '—' }}</div>
                 </div>
                 <div>
-                    <div class="od-label">Biaya Iklan Order</div>
+                    <div class="od-label">Biaya Iklan Order + PPN 11%</div>
                     <div class="od-value">{{ $orderAdCost !== null ? 'Rp'.number_format($orderAdCost, 0, ',', '.') : '—' }}</div>
                 </div>
                 <div>
@@ -909,7 +912,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
             </div>
             <div class="od-muted" style="font-size:.72rem">
                 @if($adsDaily && $dailyAcos !== null)
-                    Iklan dihitung dari subtotal produk × ACOS harian toko ({{ $adsDate }}): Rp{{ number_format($subtotal, 0, ',', '.') }} × {{ number_format($dailyAcos * 100, 2, ',', '.') }}%.
+                    Iklan dihitung dari subtotal produk × ACOS harian toko ({{ $adsDate }}): Rp{{ number_format($subtotal, 0, ',', '.') }} × {{ number_format($dailyAcos * 100, 2, ',', '.') }}% = Rp{{ number_format($orderAdCostBeforeTax, 0, ',', '.') }}, lalu ditambah PPN 11% Rp{{ number_format($orderAdTax, 0, ',', '.') }}.
                 @else
                     Data ACOS harian toko untuk tanggal order belum tersedia, sehingga biaya iklan order belum dihitung.
                 @endif
@@ -942,7 +945,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                         </strong>
                     </div>
                     <div class="od-finance-cogs">
-                        <span>Biaya iklan / order</span>
+                        <span>Biaya iklan / order + PPN 11%</span>
                         <strong style="color:{{ $orderAdCost !== null ? 'var(--text,#172033)' : '#b45309' }}">
                             {{ $orderAdCost !== null ? 'Rp'.number_format($orderAdCost, 0, ',', '.') : 'Belum tersedia' }}
                             @if($adPct !== null)<span class="od-finance-percent">({{ number_format($adPct, 2, ',', '.') }}%)</span>@endif
@@ -979,7 +982,6 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                         <span>Rincian Biaya Marketplace</span>
                         <span style="color:#b91c1c">
                             -Rp{{ number_format($marketplaceFeeTotal, 0, ',', '.') }}
-                            @if($marketplaceFeePct !== null)<small class="od-finance-percent">({{ number_format($marketplaceFeePct, 2, ',', '.') }}%)</small>@endif
                         </span>
                     </div>
 
@@ -993,12 +995,20 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
 
                 <div class="od-fee-panel" data-fee-panel="seller">
                     <div style="font-weight:700; color:#334155; margin-bottom:.1rem">
-                        Total Beban Seller <span style="float:right; color:#b91c1c">-Rp{{ number_format($sellerFeeBreakdownTotal, 0, ',', '.') }}</span>
+                        Total Beban Seller
+                        <span style="float:right; color:#b91c1c">
+                            -Rp{{ number_format($sellerFeeBreakdownTotal, 0, ',', '.') }}
+                            @if($sellerFeePct !== null)<small class="od-finance-percent">({{ number_format($sellerFeePct, 2, ',', '.') }}%)</small>@endif
+                        </span>
                     </div>
                     @forelse($sellerFeeBreakdown as $feeRow)
+                    @php $feeRowPct = $marginBase > 0 ? round(($feeRow['amount'] / $marginBase) * 100, 2) : null; @endphp
                     <div style="display:flex; justify-content:space-between; margin-left:.5rem">
                         <span class="od-muted">{{ $feeRow['label'] }}</span>
-                        <span class="od-code-cell" style="font-size:.85rem; color:#b91c1c">-Rp{{ number_format($feeRow['amount'], 0, ',', '.') }}</span>
+                        <span class="od-code-cell" style="font-size:.85rem; color:#b91c1c">
+                            -Rp{{ number_format($feeRow['amount'], 0, ',', '.') }}
+                            @if($feeRowPct !== null)<small class="od-finance-percent">({{ number_format($feeRowPct, 2, ',', '.') }}%)</small>@endif
+                        </span>
                     </div>
                     @empty
                     <div style="display:flex; justify-content:space-between; margin-left:.5rem">
@@ -1009,7 +1019,10 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                     @if($isEstimasi && $sellerFeeBreakdownTotal <= 0)
                     <div style="display:flex; justify-content:space-between; margin-left:.5rem">
                         <span class="od-muted">Estimasi Fee Marketplace</span>
-                        <span class="od-code-cell" style="font-size:.85rem; color:#b91c1c">-Rp{{ number_format($estimatedMarketplaceFee, 0, ',', '.') }}</span>
+                        <span class="od-code-cell" style="font-size:.85rem; color:#b91c1c">
+                            -Rp{{ number_format($estimatedMarketplaceFee, 0, ',', '.') }}
+                            @if($marginBase > 0)<small class="od-finance-percent">({{ number_format(($estimatedMarketplaceFee / $marginBase) * 100, 2, ',', '.') }}%)</small>@endif
+                        </span>
                     </div>
                     @endif
                 </div>
