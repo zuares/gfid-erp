@@ -611,6 +611,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $this->actingAs($user)
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
+            ->assertDontSee('Shipment belum siap dikirim')
             ->assertDontSee('Shipment marketplace wajib memiliki minimal satu nomor order.');
     }
 

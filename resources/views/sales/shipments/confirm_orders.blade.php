@@ -89,6 +89,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-duplicate-badge{display:inline-flex;align-items:center;justify-content:center;margin-left:.35rem;border:1px solid #fcd34d;border-radius:999px;padding:.12rem .4rem;background:#fffbeb;color:#a16207;font-size:.62rem;font-weight:850;line-height:1;vertical-align:middle}
 .sd-missing-item-badge{display:inline-flex;align-items:center;justify-content:center;margin-left:.35rem;border:1px solid #cbd5e1;border-radius:999px;padding:.12rem .4rem;background:#f8fafc;color:#64748b;font-size:.62rem;font-weight:750;line-height:1;vertical-align:middle}
 .sd-empty{padding:1.6rem 1rem;text-align:center;color:#64748b;font-size:.84rem}
+.sd-info-banner{display:flex;align-items:center;gap:.45rem;margin-bottom:.65rem;padding:.62rem .75rem;border:1px solid rgba(37,99,235,.2);border-radius:8px;background:rgba(239,246,255,.8);color:#1e40af;font-size:.78rem;font-weight:700}
 .sd-stock-warning{margin-bottom:.65rem;border:1px solid rgba(220,38,38,.24);border-radius:8px;background:rgba(254,242,242,.72);overflow:hidden}
 .sd-stock-head{padding:.65rem .75rem;border-bottom:1px solid rgba(220,38,38,.16);color:#991b1b;font-size:.8rem;font-weight:900}
 .sd-stock-table-wrap{overflow:auto}.sd-stock-table{width:100%;border-collapse:collapse}.sd-stock-table th,.sd-stock-table td{padding:.5rem .65rem;border-bottom:1px solid rgba(220,38,38,.12);font-size:.78rem}.sd-stock-table th{text-align:left;color:#991b1b;font-size:.68rem;text-transform:uppercase;letter-spacing:.02em;background:rgba(254,226,226,.45)}.sd-stock-table td{color:#475569}.sd-stock-table tr:last-child td{border-bottom:0}.sd-stock-table .sd-stock-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#111827}.sd-stock-table .sd-stock-number{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.sd-stock-table .sd-stock-short{color:#dc2626;font-weight:900}
@@ -723,6 +724,18 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     $unmappedQty = (int) $unmappedLines->sum('qty_scanned');
     $unlinkedOrderScans = $orderScans->filter(fn ($scan) => !$scan->fulfillment?->marketplaceOrder && $scan->source !== 'marketplace' && data_get($scan->raw_payload, 'linked_source') !== 'marketplace_order' && $scan->source !== 'sales_invoice')->values();
     $mappingErrors = $mappingErrors ?? [];
+    $isItemOnlyMarketplace = !$isDaily
+        && $shipment->shipment_type === \App\Models\Shipment::TYPE_MARKETPLACE
+        && $orderScans->isEmpty()
+        && $lines->isNotEmpty();
+    if ($isItemOnlyMarketplace) {
+        // Mode single/item-only tidak menunggu nomor order. Buang pesan lama
+        // dari session/controller agar banner dan tombol submit konsisten.
+        $mappingErrors = collect($mappingErrors)
+            ->reject(fn ($error) => str_contains((string) $error, 'minimal satu nomor order'))
+            ->values()
+            ->all();
+    }
     $editShipmentUrl = route('sales.shipments.scan_order', $shipment);
     $canDeleteShipmentRows = auth()->user()?->role === 'owner';
     $canSeeCogs = auth()->user()?->role === 'owner';
@@ -879,6 +892,13 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                     @endforeach
                 </ul>
             </div>
+        </div>
+    @endif
+
+    @if($isItemOnlyMarketplace)
+        <div class="sd-info-banner" role="status">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            <span>Mode item-only aktif. Nomor order belum dicatat; shipment tetap dapat disubmit tanpa gelombang.</span>
         </div>
     @endif
 
