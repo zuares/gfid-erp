@@ -867,14 +867,14 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         $adTaxRate = 0.11;
         $orderAdCostBeforeTax = $dailyAcos !== null ? round(max($subtotal, 0) * $dailyAcos, 2) : null;
         $orderAdTax = $orderAdCostBeforeTax !== null ? round($orderAdCostBeforeTax * $adTaxRate, 2) : null;
-        $orderAdCost = $orderAdCostBeforeTax !== null ? round($orderAdCostBeforeTax + $orderAdTax, 2) : null;
-        $grossProfit = $hppComplete ? round($penghasilan - $hppTotal, 2) : null;
-        $profitAfterAds = $grossProfit !== null && $orderAdCost !== null
-            ? round($grossProfit - $orderAdCost, 2)
+        $grossProfitBeforeAds = $hppComplete ? round($penghasilan - $hppTotal, 2) : null;
+        $grossProfit = $grossProfitBeforeAds !== null && $orderAdCostBeforeTax !== null
+            ? round($grossProfitBeforeAds - $orderAdCostBeforeTax - $orderAdTax, 2)
             : null;
         $marginBase = max($subtotal, 0);
         $cogsPct = $hppComplete && $marginBase > 0 ? round(($hppTotal / $marginBase) * 100, 2) : null;
-        $adPct = $orderAdCost !== null && $marginBase > 0 ? round(($orderAdCost / $marginBase) * 100, 2) : null;
+        $adPct = $dailyAcos !== null ? round($dailyAcos * 100, 2) : null;
+        $adTaxPct = $orderAdTax !== null && $marginBase > 0 ? round(($orderAdTax / $marginBase) * 100, 2) : null;
         $marketplaceFeeTotal = (float) $grandFeeBreakdownTotal;
         $sellerFeePct = $marginBase > 0 ? round(($sellerFeeBreakdownTotal / $marginBase) * 100, 2) : null;
         $grossProfitPct = $grossProfit !== null && $marginBase > 0 ? round(($grossProfit / $marginBase) * 100, 2) : null;
@@ -884,7 +884,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         <div class="od-head">
             <div>
                 <div class="od-title">Profitabilitas Pesanan</div>
-                <div class="od-muted" style="margin-top:.15rem">Gross profit = penghasilan akhir − HPP, sebelum biaya iklan.</div>
+                <div class="od-muted" style="margin-top:.15rem">Laba kotor setelah iklan = penghasilan akhir − COGS − biaya iklan − PPN iklan.</div>
             </div>
         </div>
         <div class="od-body">
@@ -900,11 +900,14 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                     <div class="od-value">{{ $dailyAcos !== null ? number_format($dailyAcos * 100, 2, ',', '.').'%' : '—' }}</div>
                 </div>
                 <div>
-                    <div class="od-label">Biaya Iklan Order + PPN 11%</div>
-                    <div class="od-value">{{ $orderAdCost !== null ? 'Rp'.number_format($orderAdCost, 0, ',', '.') : '—' }}</div>
+                    <div class="od-label">Biaya Iklan Order</div>
+                    <div class="od-value">{{ $orderAdCostBeforeTax !== null ? 'Rp'.number_format($orderAdCostBeforeTax, 0, ',', '.') : '—' }}</div>
+                    @if($orderAdTax !== null)
+                        <div class="od-muted" style="font-size:.68rem; margin-top:.15rem">PPN 11%: Rp{{ number_format($orderAdTax, 0, ',', '.') }}</div>
+                    @endif
                 </div>
                 <div>
-                    <div class="od-label">Gross Profit</div>
+                    <div class="od-label">Laba Kotor Setelah Iklan</div>
                     <div class="od-value" style="color:{{ $grossProfit !== null && $grossProfit < 0 ? '#b91c1c' : '#166534' }}">
                         {{ $grossProfit !== null ? 'Rp'.number_format($grossProfit, 0, ',', '.') : 'Belum tersedia' }}
                     </div>
@@ -912,12 +915,9 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
             </div>
             <div class="od-muted" style="font-size:.72rem">
                 @if($adsDaily && $dailyAcos !== null)
-                    Iklan dihitung dari subtotal produk × ACOS harian toko ({{ $adsDate }}): Rp{{ number_format($subtotal, 0, ',', '.') }} × {{ number_format($dailyAcos * 100, 2, ',', '.') }}% = Rp{{ number_format($orderAdCostBeforeTax, 0, ',', '.') }}, lalu ditambah PPN 11% Rp{{ number_format($orderAdTax, 0, ',', '.') }}.
+                    Persentase biaya iklan menggunakan ACOS harian toko pada tanggal order ({{ $adsDate }}): {{ number_format($dailyAcos * 100, 2, ',', '.') }}%. Biaya iklan Rp{{ number_format($orderAdCostBeforeTax, 0, ',', '.') }} dan PPN iklan 11% Rp{{ number_format($orderAdTax, 0, ',', '.') }} dihitung terpisah, lalu keduanya mengurangi laba kotor.
                 @else
-                    Data ACOS harian toko untuk tanggal order belum tersedia, sehingga biaya iklan order belum dihitung.
-                @endif
-                @if($hppComplete && $orderAdCost !== null)
-                    <span style="display:block; margin-top:.15rem">Profit setelah iklan: <strong style="color:{{ $profitAfterAds < 0 ? '#b91c1c' : '#166534' }}">Rp{{ number_format($profitAfterAds, 0, ',', '.') }}</strong>.</span>
+                    Data ACOS harian toko pada tanggal order belum tersedia, sehingga biaya iklan, PPN iklan, dan laba kotor setelah iklan belum dapat dihitung.
                 @endif
             </div>
         </div>
@@ -945,10 +945,17 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                         </strong>
                     </div>
                     <div class="od-finance-cogs">
-                        <span>Biaya iklan / order + PPN 11%</span>
-                        <strong style="color:{{ $orderAdCost !== null ? 'var(--text,#172033)' : '#b45309' }}">
-                            {{ $orderAdCost !== null ? 'Rp'.number_format($orderAdCost, 0, ',', '.') : 'Belum tersedia' }}
-                            @if($adPct !== null)<span class="od-finance-percent">({{ number_format($adPct, 2, ',', '.') }}%)</span>@endif
+                        <span>Biaya iklan / order</span>
+                        <strong style="color:{{ $orderAdCostBeforeTax !== null ? 'var(--text,#172033)' : '#b45309' }}">
+                            {{ $orderAdCostBeforeTax !== null ? 'Rp'.number_format($orderAdCostBeforeTax, 0, ',', '.') : 'Belum tersedia' }}
+                            @if($adPct !== null)<span class="od-finance-percent">(ACOS {{ $adsDate ?? 'hari order' }}: {{ number_format($adPct, 2, ',', '.') }}%)</span>@endif
+                        </strong>
+                    </div>
+                    <div class="od-finance-cogs">
+                        <span>PPN iklan (11%)</span>
+                        <strong style="color:{{ $orderAdTax !== null ? 'var(--text,#172033)' : '#b45309' }}">
+                            {{ $orderAdTax !== null ? 'Rp'.number_format($orderAdTax, 0, ',', '.') : 'Belum tersedia' }}
+                            @if($adTaxPct !== null)<span class="od-finance-percent">({{ number_format($adTaxPct, 2, ',', '.') }}%)</span>@endif
                         </strong>
                     </div>
                 </div>
@@ -1103,7 +1110,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                 </div>
 
                 <div class="od-finance-row od-finance-row-total">
-                    <span>{{ $isEstimasi ? 'Estimasi Laba Kotor' : 'Laba Kotor' }}</span>
+                    <span>{{ $isEstimasi ? 'Estimasi Laba Kotor Setelah Iklan' : 'Laba Kotor Setelah Iklan' }}</span>
                     <span style="color:{{ $grossProfit === null ? '#b45309' : ($grossProfit < 0 ? '#b91c1c' : '#15803d') }}">
                         {{ $grossProfit !== null ? 'Rp'.number_format($grossProfit, 0, ',', '.') : 'Belum lengkap' }}
                         @if($grossProfitPct !== null)<small class="od-finance-percent">({{ number_format($grossProfitPct, 2, ',', '.') }}%)</small>@endif
