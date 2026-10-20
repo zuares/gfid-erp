@@ -682,6 +682,216 @@
     @media (max-width:1100px) { .an-cohort-primary-controls { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-cohort-apply { width:auto; } .an-cohort-help-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     @media (max-width:760px) { .an-cohort-pagebar { align-items:flex-start; flex-direction:column; } .an-cohort-pagebar-meta { width:100%; padding:0; border-left:0; border-top:1px solid #e2e8f0; padding-top:.55rem; } .an-cohort-toolbar-head { align-items:flex-start; flex-direction:column; gap:.25rem; } .an-cohort-toolbar-note { white-space:normal; } .an-cohort-primary-controls, .an-cohort-advanced-grid { grid-template-columns:1fr; } .an-cohort-apply { width:100%; } .an-cohort-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .an-cohort-insights { grid-template-columns:1fr; } .an-cohort-legend { display:none; } .an-cohort-help-grid { grid-template-columns:1fr 1fr; } }
     @media (max-width:420px) { .an-cohort-summary-grid, .an-cohort-help-grid { grid-template-columns:1fr; } .an-cohort-help-card summary { align-items:flex-start; flex-direction:column; gap:.2rem; } .an-cohort-help-card summary small { margin:0; } }
+
+    /* Align analytics with the Marketplace Sales dashboard visual system. */
+    .an-page {
+        max-width: 1480px;
+        padding-inline: clamp(.75rem, 1.6vw, 1.5rem);
+    }
+
+    .an-shell { gap: .9rem; }
+
+    .an-hero {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        min-height: 0;
+        margin: 0 0 1rem;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .an-hero::after { display: none; }
+    .an-hero-copy { position: static; }
+    .an-hero-eyebrow {
+        display: block;
+        color: var(--dsh-muted, #6b7280);
+        font-size: .72rem;
+        font-weight: 600;
+        letter-spacing: 0;
+        text-transform: none;
+    }
+    .an-hero-eyebrow::before { display: none; }
+    .an-hero-title {
+        margin-top: 0;
+        color: var(--text, #0f172a);
+        font-size: clamp(1.35rem, 1.8vw, 1.7rem);
+        font-weight: 800;
+        letter-spacing: -.035em;
+    }
+    .an-hero-title i { color: var(--accent, #2563eb); }
+
+    .an-hero-controls {
+        position: static;
+        display: flex;
+        align-items: flex-end;
+        justify-content: flex-end;
+        flex: 0 1 auto;
+        gap: .55rem;
+        width: 100%;
+        margin-top: .15rem;
+        padding: .85rem;
+        border: 1px solid var(--dsh-border, #d4d7e3);
+        border-top: 3px solid color-mix(in srgb, var(--accent, #2563eb) 76%, var(--dsh-border, #d4d7e3) 24%);
+        border-radius: 10px;
+        background: var(--card, #fff);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(15, 23, 42, .045);
+        backdrop-filter: none;
+    }
+    .an-hero-controls .an-field { display: block; min-width: 0; }
+    .an-hero-controls .an-field label {
+        display: flex;
+        align-items: center;
+        gap: .3rem;
+        margin: 0 0 .28rem .1rem;
+        color: var(--dsh-muted, #6b7280);
+        font-size: .61rem;
+        font-weight: 800;
+        letter-spacing: .055em;
+        line-height: 1;
+        text-transform: uppercase;
+    }
+    .an-hero-controls .an-field input,
+    .an-hero-controls .an-field select {
+        min-height: 34px;
+        min-width: 0;
+        border-color: var(--dsh-border, #d4d7e3);
+        border-radius: 8px;
+        background: var(--card, #fff);
+        color: var(--text, #0f172a);
+        font-size: .72rem;
+        font-weight: 650;
+        box-shadow: none;
+    }
+    .an-hero-controls .an-field:first-child { width: 210px; }
+    .an-hero-controls .an-field:nth-child(2) { width: 230px; }
+    .an-hero-controls .an-field:nth-child(3) { width: 220px; }
+    .an-hero-controls .an-field input:focus,
+    .an-hero-controls .an-field select:focus {
+        border-color: var(--accent, #2563eb);
+        box-shadow: 0 0 0 .18rem color-mix(in srgb, var(--accent, #2563eb) 14%, transparent);
+    }
+    .an-btn {
+        min-height: 34px;
+        border-radius: 8px;
+        font-size: .72rem;
+        font-weight: 750;
+    }
+    .an-hero .an-btn-dark,
+    .an-btn-dark {
+        background: var(--accent, #2563eb);
+        border-color: var(--accent, #2563eb);
+        color: #fff;
+    }
+    .an-hero .an-btn-dark:hover,
+    .an-btn-dark:hover {
+        background: #1d4ed8;
+        border-color: #1d4ed8;
+        color: #fff;
+    }
+
+    .an-tabs-wrap {
+        padding: .28rem;
+        border: 1px solid var(--dsh-border, #d4d7e3);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--card, #fff) 94%, var(--bg, #f4f5fb) 6%);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+    .an-tabs {
+        display: flex;
+        gap: .18rem;
+        width: 100%;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+    .an-tab {
+        border-radius: 7px;
+        padding: .58rem .72rem;
+        color: var(--dsh-muted, #6b7280);
+        font-size: .72rem;
+        font-weight: 750;
+        letter-spacing: .01em;
+    }
+    .an-tab:hover { color: var(--accent, #2563eb); background: var(--accent-soft, #dbeafe); }
+    .an-tab.active {
+        color: #fff;
+        background: var(--accent, #2563eb);
+        box-shadow: 0 2px 5px color-mix(in srgb, var(--accent, #2563eb) 22%, transparent);
+    }
+
+    .an-enterprise-card,
+    .an-card,
+    .an-control-tower {
+        border-radius: 10px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 8px 24px rgba(15, 23, 42, .045);
+    }
+    .an-enterprise-head,
+    .an-card-head,
+    .an-control-head { border-bottom-color: color-mix(in srgb, var(--dsh-border, #d4d7e3) 76%, transparent); }
+    .an-enterprise-title,
+    .an-card-title,
+    .an-control-title { font-size: .95rem; font-weight: 800; letter-spacing: -.01em; }
+    .an-enterprise-sub,
+    .an-card-sub,
+    .an-control-sub { color: var(--dsh-muted, #6b7280); }
+
+    .an-kpi {
+        min-height: 132px;
+        border-radius: 10px;
+        border-left: 3px solid color-mix(in srgb, var(--accent, #2563eb) 58%, var(--dsh-border, #d4d7e3) 42%);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 5px 16px rgba(15, 23, 42, .035);
+    }
+    .an-kpi.primary {
+        background: var(--card, #fff);
+        border-color: var(--dsh-border, #d4d7e3);
+        border-left-color: var(--accent, #2563eb);
+    }
+    .an-kpi.kpi-cancelled,
+    .an-kpi.kpi-refund { border-left-color: var(--danger, #dc2626); }
+    .an-kpi-value { font-size: clamp(1.05rem, 1.4vw, 1.32rem); font-variant-numeric: tabular-nums; }
+    .an-kpi-note { color: var(--dsh-muted, #6b7280); }
+
+    .an-table th {
+        background: color-mix(in srgb, var(--bg, #f4f5fb) 72%, var(--card, #fff) 28%);
+        color: var(--dsh-muted, #6b7280);
+        font-size: .62rem;
+        letter-spacing: .075em;
+    }
+    .an-table td { font-variant-numeric: tabular-nums; }
+    .an-table tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft, #dbeafe) 22%, var(--card, #fff) 78%); }
+
+    @media (max-width: 900px) {
+        .an-hero { flex-direction: column; }
+        .an-hero-controls { align-items: stretch; flex-wrap: wrap; }
+        .an-hero-controls .an-field:first-child,
+        .an-hero-controls .an-field:nth-child(2),
+        .an-hero-controls .an-field:nth-child(3) { flex: 1 1 180px; width: auto; }
+    }
+    @media (max-width: 760px) {
+        .an-page { padding-inline: .5rem; }
+        .an-hero { margin-bottom: .75rem; }
+        .an-hero-controls { align-items: stretch; padding: .75rem; }
+        .an-hero-controls .an-field,
+        .an-hero-controls .an-field:first-child,
+        .an-hero-controls .an-field:nth-child(2),
+        .an-hero-controls .an-field:nth-child(3),
+        .an-hero-controls .an-field input,
+        .an-hero-controls .an-field select,
+        .an-hero-controls .an-btn { width: 100%; }
+        .an-tabs { overflow-x: auto; }
+        .an-tab { flex: 0 0 auto; }
+    }
+
+    body[data-theme="dark"] .an-hero-title { color: #f8fafc; }
+    body[data-theme="dark"] .an-hero-controls,
+    body[data-theme="dark"] .an-tabs-wrap { background: var(--card, #1e293b); }
 </style>
 @endpush
 
@@ -690,16 +900,16 @@
     <div class="page-wrap ads-shell an-page">
         <div class="an-hero">
             <div class="an-hero-copy">
-                <div class="an-hero-eyebrow">Marketplace · Analytics</div>
-                <div class="an-hero-title"><i class="bi bi-bar-chart-line me-1"></i>Analytics Marketplace</div>
+                <div class="an-hero-eyebrow">Marketplace / Operasional &amp; Keuangan</div>
+                <div class="an-hero-title"><i class="bi bi-bar-chart-line me-1"></i>Performance Analytics</div>
             </div>
-            <div class="an-hero-controls">
-                <div class="an-field"><label for="anStore">Filter toko</label><select id="anStore" aria-label="Filter toko"><option value="">Semua toko</option></select></div>
-                <div class="an-field"><label for="anDateRange">Periode</label><input type="text" id="anDateRange" autocomplete="off" value="{{ $filters['date_from'] }} — {{ $filters['date_to'] }}"></div>
-                <div class="an-field"><label for="anCompare">Bandingkan</label><select id="anCompare"><option value="prev_period" @selected(($filters['compare_mode'] ?? '') === 'prev_period')>Periode lalu</option><option value="prev_month" @selected(($filters['compare_mode'] ?? 'prev_month') === 'prev_month')>Tanggal sama bulan lalu</option><option value="prev_quarter" @selected(($filters['compare_mode'] ?? '') === 'prev_quarter')>Tanggal sama 3 bulan lalu</option><option value="prev_year" @selected(($filters['compare_mode'] ?? '') === 'prev_year')>Tanggal sama tahun lalu</option></select></div>
-                <input type="hidden" id="anDateFrom" value="{{ $filters['date_from'] }}"><input type="hidden" id="anDateTo" value="{{ $filters['date_to'] }}">
-                <button class="an-btn an-btn-dark" id="anRefresh" type="button">↻ Refresh</button>
-            </div>
+        </div>
+        <div class="an-hero-controls">
+            <div class="an-field"><label for="anStore">Filter toko</label><select id="anStore" aria-label="Filter toko"><option value="">Semua toko</option></select></div>
+            <div class="an-field"><label for="anDateRange">Periode</label><input type="text" id="anDateRange" autocomplete="off" value="{{ $filters['date_from'] }} — {{ $filters['date_to'] }}"></div>
+            <div class="an-field"><label for="anCompare">Bandingkan</label><select id="anCompare"><option value="prev_period" @selected(($filters['compare_mode'] ?? '') === 'prev_period')>Periode lalu</option><option value="prev_month" @selected(($filters['compare_mode'] ?? 'prev_month') === 'prev_month')>Tanggal sama bulan lalu</option><option value="prev_quarter" @selected(($filters['compare_mode'] ?? '') === 'prev_quarter')>Tanggal sama 3 bulan lalu</option><option value="prev_year" @selected(($filters['compare_mode'] ?? '') === 'prev_year')>Tanggal sama tahun lalu</option></select></div>
+            <input type="hidden" id="anDateFrom" value="{{ $filters['date_from'] }}"><input type="hidden" id="anDateTo" value="{{ $filters['date_to'] }}">
+            <button class="an-btn an-btn-dark" id="anRefresh" type="button"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
         </div>
 
         <div class="an-shell">
