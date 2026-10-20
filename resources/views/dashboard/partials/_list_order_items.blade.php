@@ -13,6 +13,7 @@
                 <table class="ditem-table">
                     <thead>
                         <tr>
+                            <th class="numeric">No</th>
                             <th>Kode item internal</th>
                             <th class="numeric">Permintaan</th>
                             <th class="numeric">Stok FG/RTS</th>
@@ -28,6 +29,7 @@
                                 $gap = $stock === null ? null : $demand - $stock;
                             @endphp
                             <tr>
+                                <td class="numeric ditem-number">{{ $loop->iteration }}</td>
                                 <td>
                                     <div class="ditem-code">{{ $row['code'] ?: 'Belum mapping' }}</div>
                                 </td>

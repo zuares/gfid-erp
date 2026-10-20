@@ -154,6 +154,7 @@
     .ditem-table td { padding: .52rem .55rem; border-bottom: 1px solid var(--dsh-border); vertical-align: middle; }
     .ditem-table tr:last-child td { border-bottom: 0; }
     .ditem-table .numeric { text-align: right; white-space: nowrap; }
+    .ditem-number { color: var(--dsh-muted); font-size: .74rem; font-weight: 650; width: 32px; }
     .ditem-code { color: var(--text, #0f172a); font-size: .8rem; font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .ditem-table .meta { font-size: .65rem; }
     .ditem-demand { color: var(--text, #0f172a); font-size: .78rem; font-weight: 650; }
