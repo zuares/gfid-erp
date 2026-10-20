@@ -35,4 +35,19 @@ class MarketplaceSalesDashboardAccessTest extends TestCase
             ->assertDontSee('Dashboard Penjualan')
             ->assertDontSee(route('marketplace.dashboard.sales'), false);
     }
+
+    public function test_admin_sidebar_hides_marketplace_finance_and_reports_group(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'employee_code' => 'ADMIN-FINANCE-SIDEBAR-'.uniqid(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('marketplace.orders'))
+            ->assertOk()
+            ->assertDontSee('Keuangan & Laporan')
+            ->assertDontSee('Marketplace Finance')
+            ->assertDontSee('AMS Performance &amp; Report', false);
+    }
 }

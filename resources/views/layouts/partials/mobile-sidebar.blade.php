@@ -357,20 +357,20 @@
     $hasMarketplaceAds = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics = $router->has('marketplace.analytics');
     $hasMarketplaceSalesDashboard = $isOwner && $router->has('marketplace.dashboard.sales');
-    $hasMarketplaceShopeePerformance = $router->has('marketplace.shopee-performance');
+    $hasMarketplaceShopeePerformance = !$isAdmin && $router->has('marketplace.shopee-performance');
     $hasMarketplaceIssues = $router->has('marketplace.issues');
     $hasMarketplaceShopeeApiLogs = $router->has('marketplace.shopee-api-logs');
     $hasSocialMediaInstagram = $router->has('social-media.instagram');
     $hasMarketplaceIndex = $router->has('marketplace.orders');
-    $hasMarketplaceSalesReport = $router->has('marketplace.reports.sales');
-    $hasMarketplaceAmsPerformance = $router->has('marketplace.reports.ams-performance');
+    $hasMarketplaceSalesReport = !$isAdmin && $router->has('marketplace.reports.sales');
+    $hasMarketplaceAmsPerformance = !$isAdmin && $router->has('marketplace.reports.ams-performance');
     $hasMarketplaceProfitReport = $isOwner && $router->has('marketplace.reports.profit');
     $hasMarketplaceFinancialStatement = $isOwner && $router->has('marketplace.reports.financial-statement');
     $hasMarketplaceFinancialClosing = $isOwner && $router->has('marketplace.reports.financial-closing');
     $hasMarketplaceFinancialQuality = $isOwner && $router->has('marketplace.reports.financial-quality');
-    $hasMarketplaceFinance = $router->has('marketplace.finance.index');
-    $hasMarketplaceReconcileQueue = $router->has('marketplace.reconcile.queue');
-    $hasMarketplaceReconcileItemsIndex = $router->has('marketplace.reconcile.items');
+    $hasMarketplaceFinance = !$isAdmin && $router->has('marketplace.finance.index');
+    $hasMarketplaceReconcileQueue = !$isAdmin && $router->has('marketplace.reconcile.queue');
+    $hasMarketplaceReconcileItemsIndex = !$isAdmin && $router->has('marketplace.reconcile.items');
 
     // Impor Toko Online
     $hasImportMarketplaceIndex = $router->has('imports.marketplace.index');

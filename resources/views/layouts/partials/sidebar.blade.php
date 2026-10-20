@@ -113,7 +113,7 @@
     $hasMarketplaceAds         = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics   = $router->has('marketplace.analytics');
     $hasMarketplaceSalesDashboard = $isOwner && $router->has('marketplace.dashboard.sales');
-    $hasMarketplaceShopeePerformance = $router->has('marketplace.shopee-performance');
+    $hasMarketplaceShopeePerformance = !$isAdmin && $router->has('marketplace.shopee-performance');
     $hasMarketplaceIssues      = $router->has('marketplace.issues');
     $hasMarketplaceShopeeApiLogs = $router->has('marketplace.shopee-api-logs');
     $hasSocialMediaInstagram = $router->has('social-media.instagram');
@@ -127,13 +127,13 @@
 
     // Toko Online Laporan
     $hasMarketplaceSalesReport = !$isAdmin && $router->has('marketplace.reports.sales');
-    $hasMarketplaceAmsPerformance = $router->has('marketplace.reports.ams-performance');
+    $hasMarketplaceAmsPerformance = !$isAdmin && $router->has('marketplace.reports.ams-performance');
     $hasMarketplaceSalesExport = $router->has('marketplace.reports.sales.export');
     $hasMarketplaceProfitReport = $isOwner && $router->has('marketplace.reports.profit');
     $hasMarketplaceFinancialStatement = $isOwner && $router->has('marketplace.reports.financial-statement');
     $hasMarketplaceFinancialClosing = $isOwner && $router->has('marketplace.reports.financial-closing');
     $hasMarketplaceFinancialQuality = $isOwner && $router->has('marketplace.reports.financial-quality');
-    $hasMarketplaceFinance = $router->has('marketplace.finance.index');
+    $hasMarketplaceFinance = !$isAdmin && $router->has('marketplace.finance.index');
 
     // Toko Online Reconcile
     $hasMarketplaceReconcileQueue = !$isAdmin && $router->has('marketplace.reconcile.queue');
@@ -1235,7 +1235,7 @@
                             </div>
                         @endif
 
-                        @if ($hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceShopeePerformance || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex)
+                        @if (!$isAdmin && ($hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceShopeePerformance || $hasMarketplaceFinance || $hasMarketplaceReconcileQueue || $hasMarketplaceReconcileItemsIndex))
                             <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceFinanceGroup ? 'is-open' : '' }}" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminFinance"
                                 aria-expanded="{{ $openMarketplaceFinanceGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminFinance">
