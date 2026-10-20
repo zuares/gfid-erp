@@ -76,7 +76,7 @@ class DashboardController extends Controller
 
     private function ownerData(): array
     {
-        $cacheKey = 'dashboard.owner.v10.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.owner.v11.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->ownerDataUncached());
     }
@@ -246,7 +246,7 @@ class DashboardController extends Controller
 
     private function adminData(): array
     {
-        $cacheKey = 'dashboard.admin.v11.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.admin.v12.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->adminDataUncached());
     }
@@ -683,6 +683,7 @@ class DashboardController extends Controller
             $lastOrderNumber = (clone $lastOrderBase)
                 ->selectRaw("COALESCE(NULLIF(previous.external_invoice_no, ''), NULLIF(previous.external_order_id, ''), previous.channel_order_id, CONCAT('ORDER-', previous.id))");
             $lastOrderId = (clone $lastOrderBase)->select('previous.id');
+            $lastOrderAwb = (clone $lastOrderBase)->select('previous.shipping_awb_no');
 
             $orders = $orders
                 ->select([
@@ -697,6 +698,7 @@ class DashboardController extends Controller
                 ])
                 ->selectSub($lastOrderNumber, 'last_order_number')
                 ->selectSub($lastOrderId, 'last_order_id')
+                ->selectSub($lastOrderAwb, 'last_order_awb')
                 ->get();
 
             $itemsByOrder = [];
@@ -758,7 +760,7 @@ class DashboardController extends Controller
                 }
 
                 $scannedLines = DB::table('shipment_lines as sl')
-                    ->join('shipment_order_scans as sos', 'sos.id', '=', 'sl.shipment_order_scan_id')
+                    ->leftJoin('shipment_order_scans as sos', 'sos.id', '=', 'sl.shipment_order_scan_id')
                     ->join('shipments as shipment', 'shipment.id', '=', 'sl.shipment_id')
                     ->leftJoin('order_fulfillments as fulfillment', 'fulfillment.id', '=', 'sos.fulfillment_id')
                     ->leftJoin('items as i', 'i.id', '=', 'sl.item_id')

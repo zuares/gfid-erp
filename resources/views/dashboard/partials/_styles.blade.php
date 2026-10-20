@@ -210,6 +210,8 @@
     .drepeat-order { color: var(--dsh-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .69rem !important; }
     .drepeat-order-link { color: var(--dsh-accent); text-decoration: none; }
     .drepeat-order-link:hover { text-decoration: underline; }
+    .drepeat-order-meta { margin-top: .18rem; color: var(--dsh-muted); font-family: inherit; font-size: .62rem; white-space: nowrap; }
+    .drepeat-order-meta code { color: var(--text, #0f172a); font-family: inherit; font-size: inherit; }
     .drepeat-items { color: var(--dsh-muted); font-size: .7rem !important; }
     .drepeat-items code { color: var(--text, #0f172a); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .69rem; }
     .drepeat-item-line { line-height: 1.35; white-space: nowrap; }

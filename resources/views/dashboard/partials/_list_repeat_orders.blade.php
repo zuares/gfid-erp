@@ -67,6 +67,9 @@
                                     @else
                                         {{ $row['last_order_number'] ?: '—' }}
                                     @endif
+                                    @if(!empty($row['last_order_awb']))
+                                        <div class="drepeat-order-meta">Resi: <code>{{ $row['last_order_awb'] }}</code></div>
+                                    @endif
                                 </td>
                                 <td class="drepeat-items">
                                     @forelse($row['last_items'] ?? [] as $item)
