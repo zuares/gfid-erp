@@ -547,33 +547,6 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
             </div>
     </div>
 
-    <div class="od-card od-shipping-card">
-        <div class="od-head">
-            <div>
-                <div class="od-kicker">Customer profile</div>
-                <div class="od-title">Alamat Pengiriman</div>
-            </div>
-            <span class="od-pill"><i class="bi bi-bag-check"></i> {{ $buyerPurchaseCount }}x pembelian</span>
-        </div>
-        <div class="od-settlement-address">
-            <div>
-                <div class="od-settlement-address-label">User</div>
-                <div class="od-settlement-address-name">{{ $buyerUsername }}</div>
-                <div class="od-settlement-address-detail">{{ $buyerName }} · {{ $buyerPhone }}</div>
-                <div class="od-settlement-address-label" style="margin-top:.7rem">Riwayat Pembelian</div>
-                <div class="od-settlement-address-name">Pernah beli {{ $buyerPurchaseCount }} kali</div>
-            </div>
-            <div class="od-settlement-address-detail">
-                <div class="od-settlement-address-label">Alamat</div>
-                {{ $buyerAddress }}
-                @if($zipcode) <br>{{ $zipcode }} @endif
-                @if($order->remarks)
-                    <br><strong style="color:#92400e">Catatan:</strong> {{ $order->remarks }}
-                @endif
-            </div>
-        </div>
-    </div>
-
     <div class="od-card">
         <div class="od-head">
             <div class="od-title">Rincian Produk</div>
@@ -676,6 +649,33 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                     @endif
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <div class="od-card od-shipping-card">
+        <div class="od-head">
+            <div>
+                <div class="od-kicker">Customer profile</div>
+                <div class="od-title">Alamat Pengiriman</div>
+            </div>
+            <span class="od-pill"><i class="bi bi-bag-check"></i> {{ $buyerPurchaseCount }}x pembelian</span>
+        </div>
+        <div class="od-settlement-address">
+            <div>
+                <div class="od-settlement-address-label">User</div>
+                <div class="od-settlement-address-name">{{ $buyerUsername }}</div>
+                <div class="od-settlement-address-detail">{{ $buyerName }} · {{ $buyerPhone }}</div>
+                <div class="od-settlement-address-label" style="margin-top:.7rem">Riwayat Pembelian</div>
+                <div class="od-settlement-address-name">Pernah beli {{ $buyerPurchaseCount }} kali</div>
+            </div>
+            <div class="od-settlement-address-detail">
+                <div class="od-settlement-address-label">Alamat</div>
+                {{ $buyerAddress }}
+                @if($zipcode) <br>{{ $zipcode }} @endif
+                @if($order->remarks)
+                    <br><strong style="color:#92400e">Catatan:</strong> {{ $order->remarks }}
+                @endif
+            </div>
         </div>
     </div>
 
