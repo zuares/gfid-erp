@@ -335,6 +335,31 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         </div>`;
     }
 
+    function profitAfterAdsHtml(o) {
+        const summary = o.profit_after_ads_summary;
+        if (!summary) return '';
+
+        const status = String(summary.status || 'ads_missing');
+        const isReady = status === 'ready' && Number.isFinite(Number(summary.amount));
+        const value = isReady
+            ? fmtRp(Number(summary.amount))
+            : status === 'cogs_missing'
+                ? 'Belum lengkap'
+                : 'Belum tersedia';
+        const title = status === 'cogs_missing'
+            ? 'Laba kotor belum dihitung karena COGS/HPP order belum lengkap'
+            : status === 'ads_missing'
+                ? 'Laba kotor belum dihitung karena biaya iklan pada tanggal order belum tersedia'
+                : status === 'income_missing'
+                    ? 'Laba kotor belum dihitung karena payout/penghasilan order belum tersedia'
+                    : 'Penghasilan dikurangi COGS, biaya iklan berdasarkan ACOS tanggal order, dan PPN iklan 11%';
+
+        return `<div class="ord-profit-after-ads ${isReady ? 'ready' : 'is-unavailable'}" title="${esc(title)}">
+            <span>Laba Kotor Setelah Iklan</span>
+            <strong>${esc(value)}</strong>
+        </div>`;
+    }
+
     function itemPaymentSummaryHtml(o) {
         return `<div class="ord-item-payment-summary">${buyerPaidHtml(o)}${voucherSummaryHtml(o)}</div>`;
     }
@@ -3009,6 +3034,7 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                         <span class="ord-payment-income-label">Penghasilan</span>
                         ${escrowHtml(o)}
                     </div>
+                    ${profitAfterAdsHtml(o)}
                 </div>
             </td>`;
             const voucherCell = `<td class="ord-voucher-cell">${voucherSummaryHtml(o) || '<span class="ord-payment-empty">—</span>'}</td>`;

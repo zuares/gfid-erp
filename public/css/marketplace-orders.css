@@ -1307,6 +1307,26 @@ body[data-theme="dark"] .ord-payment-breakdown-line.emphasis strong { color: #a7
 .ord-payment-income .ord-income-value {
     justify-content: space-between;
 }
+.ord-profit-after-ads {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding-top: .3rem;
+    border-top: 1px solid rgba(148,163,184,.22);
+    color: #166534;
+    font-size: .58rem;
+    font-weight: 800;
+    line-height: 1.25;
+}
+.ord-profit-after-ads strong {
+    flex-shrink: 0;
+    font-size: .67rem;
+    white-space: nowrap;
+}
+.ord-profit-after-ads.is-unavailable {
+    color: #a16207;
+}
 .ord-track-print-stack .ord-shipping-action {
     width: 100%;
 }
@@ -1326,4 +1346,11 @@ body[data-theme="dark"] .ord-shipping-status.fallback {
 }
 body[data-theme="dark"] .ord-payment-income-label {
     color: #94a3b8;
+}
+body[data-theme="dark"] .ord-profit-after-ads {
+    color: #a7f3d0;
+    border-color: rgba(148,163,184,.28);
+}
+body[data-theme="dark"] .ord-profit-after-ads.is-unavailable {
+    color: #fde68a;
 }

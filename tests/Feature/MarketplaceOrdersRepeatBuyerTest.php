@@ -7,6 +7,7 @@ use App\Models\Channel;
 use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\MarketplaceOrderIncomeEstimate;
+use App\Models\MarketplaceAdsDaily;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MpIncome;
@@ -183,6 +184,52 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
         $this->assertTrue($row['income_summary']['is_estimated']);
         $this->assertSame(42000.0, (float) $row['items'][0]['income_amount']);
         $this->assertSame($item->id, $row['items'][0]['id']);
+    }
+
+    public function test_laba_kotor_setelah_iklan_mengurangi_cogs_dan_ppn_iklan(): void
+    {
+        $order = $this->createOrder('GROSS-PROFIT-ORDER', 'COMPLETED', 'buyer-gross-profit');
+        $order->update([
+            'raw_json' => [
+                'order_list' => [[
+                    'income_details' => [
+                        'order_discounted_price' => 50000,
+                    ],
+                ]],
+            ],
+        ]);
+        MarketplaceOrderItem::create([
+            'marketplace_order_id' => $order->id,
+            'order_id' => $order->id,
+            'external_item_id' => 'PRODUCT-GROSS-PROFIT',
+            'item_name' => 'Produk Gross Profit',
+            'qty' => 1,
+            'hpp_total_snapshot' => 10000,
+            'price_after_discount' => 50000,
+        ]);
+        MpIncome::create([
+            'store_id' => $this->store->id,
+            'channel' => 'shopee',
+            'platform_order_id' => $order->channel_order_id,
+            'net_payout_actual' => 40000,
+        ]);
+        MarketplaceAdsDaily::create([
+            'store_id' => $this->store->id,
+            'date' => now()->toDateString(),
+            'spend' => 10000,
+            'gmv' => 100000,
+            'roas' => 10,
+        ]);
+
+        $response = $this->getJson('/api/marketplace/local-orders-paginated?tab=completed&limit=50');
+        $row = collect($response->json('data'))->firstWhere('id', $order->id);
+
+        $response->assertOk();
+        $this->assertSame('ready', $row['profit_after_ads_summary']['status']);
+        $this->assertSame(10000.0, (float) $row['profit_after_ads_summary']['cogs']);
+        $this->assertSame(5000.0, (float) $row['profit_after_ads_summary']['ad_cost']);
+        $this->assertSame(550.0, (float) $row['profit_after_ads_summary']['ad_tax']);
+        $this->assertSame(24450.0, (float) $row['profit_after_ads_summary']['amount']);
     }
 
     public function test_order_eligible_tanpa_escrow_lama_ditandai_tertunda(): void

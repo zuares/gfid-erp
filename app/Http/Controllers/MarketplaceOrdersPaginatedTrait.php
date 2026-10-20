@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Item;
 use App\Models\MpIncome;
+use App\Models\MarketplaceAdsDaily;
 use App\Models\MarketplaceOrder;
 use App\Models\Store;
 use Illuminate\Http\JsonResponse;
@@ -234,9 +235,10 @@ trait MarketplaceOrdersPaginatedTrait
         $buyerPurchaseCounts = $this->buyerPurchaseCounts($paginator->getCollection());
         $baseStockReferences = $this->baseStockReferences($paginator->getCollection());
         $incomeLookup = $this->mpIncomeLookup($paginator->getCollection());
+        $adsDailyLookup = $this->adsDailyLookupForOrders($paginator->getCollection());
 
         // Map items exactly like in localOrders
-        $paginator->getCollection()->transform(function ($o) use ($hasScanLog, $buyerPurchaseCounts, $baseStockReferences, $incomeLookup) {
+        $paginator->getCollection()->transform(function ($o) use ($hasScanLog, $buyerPurchaseCounts, $baseStockReferences, $incomeLookup, $adsDailyLookup) {
             $arr = $o->toArray();
 
             $buyerKey = $this->buyerIdentityKey($o);
@@ -249,11 +251,18 @@ trait MarketplaceOrdersPaginatedTrait
             $arr['tracking_status'] = $o->tracking_status;
             $arr['tracking_description'] = $o->tracking_description;
             $arr['tracking_checked_at'] = $o->tracking_checked_at?->toIso8601String();
-            $arr['payment_breakdown'] = $this->paymentBreakdownForIndex($o);
+            $paymentBreakdown = $this->paymentBreakdownForIndex($o);
+            $arr['payment_breakdown'] = $paymentBreakdown;
             $incomeSummary = $this->orderIncomeSummary($o, $incomeLookup);
             $totalItemValue = $incomeSummary['total_item_value'];
             unset($incomeSummary['total_item_value']);
             $arr['income_summary'] = $incomeSummary;
+            $arr['profit_after_ads_summary'] = $this->profitAfterAdsSummaryForIndex(
+                $o,
+                $paymentBreakdown,
+                $incomeSummary,
+                $adsDailyLookup[$this->adsDailyKeyForOrder($o)] ?? null
+            );
 
             if (isset($arr['items']) && is_array($arr['items'])) {
                 foreach ($arr['items'] as &$orderItem) {
@@ -728,6 +737,138 @@ trait MarketplaceOrdersPaginatedTrait
     private function isDummyOrdersRequest(): bool
     {
         return request()->boolean('dummy') && app()->environment(['local', 'testing']);
+    }
+
+    /**
+     * Ambil biaya iklan harian untuk seluruh order di halaman ini sekaligus.
+     * Biaya iklan dialokasikan berdasarkan ACOS pada tanggal order dan toko
+     * yang sama, sehingga daftar order konsisten dengan halaman detail.
+     *
+     * @param \Illuminate\Support\Collection<int,MarketplaceOrder> $orders
+     * @return array<string,MarketplaceAdsDaily>
+     */
+    private function adsDailyLookupForOrders($orders): array
+    {
+        $keys = $orders
+            ->map(fn (MarketplaceOrder $order): ?array => $this->adsDailyKeyPartsForOrder($order))
+            ->filter()
+            ->unique(fn (array $parts): string => $parts['store_id'].'|'.$parts['date'])
+            ->values();
+
+        if ($keys->isEmpty()) {
+            return [];
+        }
+
+        $rows = MarketplaceAdsDaily::query()
+            ->whereIn('store_id', $keys->pluck('store_id')->unique()->all())
+            ->whereIn('date', $keys->pluck('date')->unique()->all())
+            ->get(['store_id', 'date', 'spend', 'gmv', 'roas']);
+
+        $lookup = [];
+        foreach ($rows as $row) {
+            $date = substr((string) $row->date, 0, 10);
+            $lookup[(int) $row->store_id.'|'.$date] = $row;
+        }
+
+        return $lookup;
+    }
+
+    private function adsDailyKeyForOrder(MarketplaceOrder $order): ?string
+    {
+        $parts = $this->adsDailyKeyPartsForOrder($order);
+
+        return $parts ? $parts['store_id'].'|'.$parts['date'] : null;
+    }
+
+    private function adsDailyKeyPartsForOrder(MarketplaceOrder $order): ?array
+    {
+        $date = ($order->ordered_at ?: $order->order_date)?->toDateString();
+        if (! $date || ! $order->store_id) {
+            return null;
+        }
+
+        return [
+            'store_id' => (int) $order->store_id,
+            'date' => $date,
+        ];
+    }
+
+    /**
+     * COGS memakai snapshot HPP immutable pada line order. Order dengan HPP
+     * yang belum lengkap tidak diberi angka laba yang terlihat pasti.
+     */
+    private function cogsSummaryForIndex(MarketplaceOrder $order): array
+    {
+        $total = 0.0;
+        $missingLines = 0;
+        $lines = $order->items ?? collect();
+
+        foreach ($lines as $line) {
+            $qty = max((float) ($line->qty ?? 0), 0);
+            $lineTotalSnapshot = (float) ($line->hpp_total_snapshot ?? 0);
+            $unitSnapshot = max(
+                (float) ($line->hpp_snapshot ?? 0),
+                (float) ($line->hpp_unit_snapshot ?? 0)
+            );
+
+            if ($lineTotalSnapshot > 0) {
+                $total += $lineTotalSnapshot;
+            } elseif ($unitSnapshot > 0 && $qty > 0) {
+                $total += $unitSnapshot * $qty;
+            } else {
+                $missingLines++;
+            }
+        }
+
+        return [
+            'total' => round($total, 2),
+            'complete' => $lines->isNotEmpty() && $missingLines === 0,
+            'missing_lines' => $missingLines,
+        ];
+    }
+
+    private function profitAfterAdsSummaryForIndex(
+        MarketplaceOrder $order,
+        array $paymentBreakdown,
+        array $incomeSummary,
+        ?MarketplaceAdsDaily $adsDaily
+    ): array {
+        $cogs = $this->cogsSummaryForIndex($order);
+        $acos = null;
+        $adCost = null;
+        $adTax = null;
+
+        if ($adsDaily) {
+            $spend = max((float) ($adsDaily->spend ?? 0), 0);
+            $gmv = max((float) ($adsDaily->gmv ?? 0), 0);
+            $roas = (float) ($adsDaily->roas ?? 0);
+            $acos = $gmv > 0 ? $spend / $gmv : ($roas > 0 ? 1 / $roas : null);
+
+            if ($acos !== null) {
+                $adCost = round(max((float) ($paymentBreakdown['subtotal'] ?? 0), 0) * $acos, 2);
+                $adTax = round($adCost * 0.11, 2);
+            }
+        }
+
+        $status = ! $incomeSummary['available']
+            ? 'income_missing'
+            : (! $cogs['complete']
+                ? 'cogs_missing'
+                : ($adCost === null ? 'ads_missing' : 'ready'));
+        $amount = $status === 'ready'
+            ? round((float) $incomeSummary['amount'] - $cogs['total'] - $adCost - $adTax, 2)
+            : null;
+
+        return [
+            'amount' => $amount,
+            'status' => $status,
+            'cogs' => $cogs['total'],
+            'cogs_complete' => $cogs['complete'],
+            'ad_cost' => $adCost,
+            'ad_tax' => $adTax,
+            'acos' => $acos,
+            'income_source' => $incomeSummary['source'],
+        ];
     }
 
     /**
