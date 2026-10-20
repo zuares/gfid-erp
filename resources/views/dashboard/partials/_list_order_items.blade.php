@@ -114,12 +114,8 @@
                                     <td></td>
                                     <td><span class="ditem-category-name"><i class="bi bi-tag"></i> {{ $category }}</span></td>
                                     <td class="numeric ditem-category-total" title="Total permintaan kategori">{{ $qty($categorySummary['demand']) }} pcs</td>
-                                    <td class="numeric ditem-category-total ditem-stock">
-                                        {{ $categorySummary['stock_known'] ? $qty($categorySummary['stock']) . ' pcs' : '—' }}
-                                    </td>
-                                    <td class="numeric ditem-category-total ditem-production-stock {{ $categorySummary['production_known'] && $categorySummary['production_stock'] > 0 ? 'has-stock' : '' }}">
-                                        {{ $categorySummary['production_known'] ? $qty($categorySummary['production_stock']) . ' pcs' : '—' }}
-                                    </td>
+                                    <td class="ditem-category-empty" aria-hidden="true"></td>
+                                    <td class="ditem-category-empty" aria-hidden="true"></td>
                                     <td class="numeric ditem-gap ditem-category-total">
                                         <span class="ditem-category-gap-value {{ $categoryGapState }}" title="Selisih stok FG/RTS dikurangi permintaan kategori">
                                             {{ $categoryGap === null ? '—' : $qty($categoryGap) }}
