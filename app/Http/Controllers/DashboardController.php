@@ -463,8 +463,11 @@ class DashboardController extends Controller
                     ->join('warehouses as w', 'w.id', '=', 's.warehouse_id')
                     ->whereIn('w.code', [self::WH['FG'], self::WH['RTS']])
                     ->whereIn('s.item_id', $itemIds->all())
+                    ->select('s.item_id')
+                    ->selectRaw('COALESCE(SUM(s.qty), 0) as stock_qty')
                     ->groupBy('s.item_id')
-                    ->pluck(DB::raw('COALESCE(SUM(s.qty), 0)'), 's.item_id');
+                    ->get()
+                    ->pluck('stock_qty', 'item_id');
             }
 
             $itemsByOrder = [];
