@@ -933,6 +933,12 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                             {{ $hppComplete ? 'Rp'.number_format($hppTotal, 0, ',', '.') : 'Belum lengkap' }}
                         </strong>
                     </div>
+                    <div class="od-finance-cogs">
+                        <span>Biaya iklan / order</span>
+                        <strong style="color:{{ $orderAdCost !== null ? 'var(--text,#172033)' : '#b45309' }}">
+                            {{ $orderAdCost !== null ? 'Rp'.number_format($orderAdCost, 0, ',', '.') : 'Belum tersedia' }}
+                        </strong>
+                    </div>
                 </div>
             </div>
             <div class="od-body od-finance-body">
