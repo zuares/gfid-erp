@@ -224,7 +224,7 @@ class DashboardController extends Controller
             'po_unreceived'       => $this->poCount(['not_received', 'partially_received'], 'received_status'),
             'po_unpaid'           => $this->poCount(['unpaid', 'partial'], 'payment_status'),
             'reject_total'        => $this->whQty(['REJ-CUT', 'REJ-SEW', 'REJ-FIN', 'REJECT']),
-            'list_todo'           => $this->mpUnshippedList(6),
+            'list_todo_items'    => $this->mpUnshippedItemList(12),
             'list_stock'          => $this->stockCriticalList(6),
             'ads_hourly'          => $adsHourly,
             'ads_campaigns'       => $adsCampaigns,
@@ -398,7 +398,7 @@ class DashboardController extends Controller
             $orders = DB::table('marketplace_orders')
                 ->whereIn('order_status', ['PROCESSED', 'READY_TO_SHIP', 'TO_CONFIRM_RECEIVE'])
                 ->orderByDesc($this->mpDateCol())
-                ->limit($limit)
+                ->when($limit > 0, fn ($query) => $query->limit($limit))
                 ->get([
                     'id',
                     'external_invoice_no', 'external_order_id', 'buyer_name',
@@ -470,6 +470,14 @@ class DashboardController extends Controller
                     ->pluck('stock_qty', 'item_id');
             }
 
+            $internalItemsById = collect();
+            if ($itemIds->isNotEmpty() && Schema::hasTable('items')) {
+                $internalItemsById = DB::table('items')
+                    ->whereIn('id', $itemIds->all())
+                    ->get(['id', 'code', 'name'])
+                    ->keyBy('id');
+            }
+
             $itemsByOrder = [];
             foreach ($orderItems as $item) {
                 $itemData = (array) $item;
@@ -491,6 +499,7 @@ class DashboardController extends Controller
                         break;
                     }
                 }
+                $internalItem = $internalItemId ? $internalItemsById->get($internalItemId) : null;
 
                 $name = $itemData['item_name']
                     ?? $itemData['item_name_snapshot']
@@ -512,6 +521,9 @@ class DashboardController extends Controller
                     'qty' => (float) ($itemData['qty'] ?? 0),
                     'stock_qty' => $internalItemId ? (float) ($stockByItemId[$internalItemId] ?? 0) : null,
                     'mapped' => (bool) $internalItemId,
+                    'internal_item_id' => $internalItemId,
+                    'internal_code' => $internalItem?->code,
+                    'internal_name' => $internalItem?->name,
                 ];
             }
 
@@ -522,6 +534,41 @@ class DashboardController extends Controller
                     ]);
                 })
                 ->all();
+        }, []);
+    }
+
+    /** Ringkasan permintaan pesanan belum dikirim per item internal. */
+    private function mpUnshippedItemList(int $limit): array
+    {
+        return (array) $this->safe(function () use ($limit) {
+            $orders = $this->mpUnshippedList(0);
+            $grouped = [];
+
+            foreach ($orders as $order) {
+                foreach ($order['items'] ?? [] as $item) {
+                    $internalItemId = (int) ($item['internal_item_id'] ?? 0);
+                    $key = $internalItemId > 0
+                        ? 'internal:' . $internalItemId
+                        : 'unmapped:' . md5(strtolower(($item['sku'] ?? '') . '|' . ($item['name'] ?? '')));
+
+                    if (! isset($grouped[$key])) {
+                        $grouped[$key] = [
+                            'name' => $item['internal_name'] ?: ($item['name'] ?? 'Produk belum dipetakan'),
+                            'code' => $item['internal_code'] ?: ($item['sku'] ?? ''),
+                            'demand_qty' => 0,
+                            'stock_qty' => $item['stock_qty'] ?? null,
+                            'mapped' => $internalItemId > 0,
+                        ];
+                    }
+
+                    $grouped[$key]['demand_qty'] += (float) ($item['qty'] ?? 0);
+                }
+            }
+
+            $rows = array_values($grouped);
+            usort($rows, fn ($a, $b) => $b['demand_qty'] <=> $a['demand_qty']);
+
+            return array_slice($rows, 0, $limit);
         }, []);
     }
 

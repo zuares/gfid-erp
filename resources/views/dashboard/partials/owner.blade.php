@@ -58,6 +58,10 @@
     $marketplaceExceptions = (int) ($marketplaceMonthKpi['exception_total'] ?? 0);
     $marketplaceRoas = $marketplaceMonthKpi['roas_net'] ?? null;
 @endphp
+<div class="dash-panels">
+    @include('dashboard.partials._list_order_items', ['title' => 'Permintaan belum dikirim per item internal', 'rows' => $d['list_todo_items'] ?? [], 'link' => $r('marketplace.orders')])
+</div>
+
 <div class="dash-sec"><i class="bi bi-graph-up-arrow"></i> Penjualan (bulan berjalan)</div>
 <div class="dash-grid">
     @include('dashboard.partials._kpi', [
@@ -297,7 +301,6 @@
 
 {{-- ================= DAFTAR ================= --}}
 <div class="dash-panels">
-    @include('dashboard.partials._list_orders', ['title' => 'Pesanan belum dikirim', 'rows' => $d['list_todo'], 'link' => $r('marketplace.orders')])
     @include('dashboard.partials._list_stock', ['title' => 'Stok kritis (perlu segera)', 'rows' => $d['list_stock'], 'link' => $r('inventory.stocks.items')])
 </div>
 
