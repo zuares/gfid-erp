@@ -356,7 +356,7 @@
     $hasMarketplaceProfit = $router->has('marketplace.profit');
     $hasMarketplaceAds = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics = $router->has('marketplace.analytics');
-    $hasMarketplaceSalesDashboard = $router->has('marketplace.dashboard.sales');
+    $hasMarketplaceSalesDashboard = $isOwner && $router->has('marketplace.dashboard.sales');
     $hasMarketplaceShopeePerformance = $router->has('marketplace.shopee-performance');
     $hasMarketplaceIssues = $router->has('marketplace.issues');
     $hasMarketplaceShopeeApiLogs = $router->has('marketplace.shopee-api-logs');

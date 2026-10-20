@@ -120,14 +120,16 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::post('/marketplace/settings/preview-pdf', [MarketplaceSettingsController::class, 'previewSettingsPdf'])->name('marketplace.settings.previewPdf');
     Route::post('/marketplace/settings/delete-template', [MarketplaceSettingsController::class, 'deleteTemplate'])->name('marketplace.settings.delete_template');
     Route::get('/marketplace/analytics',  [MarketplaceAnalyticsController::class, 'index'])->name('marketplace.analytics');
-    Route::get('/marketplace/dashboard/sales', [MarketplaceSalesDashboardController::class, 'index'])->name('marketplace.dashboard.sales');
-    Route::get('/marketplace/dashboard/sales/export', [MarketplaceSalesDashboardController::class, 'export'])->name('marketplace.dashboard.sales.export');
+    Route::middleware('role:owner')->group(function () {
+        Route::get('/marketplace/dashboard/sales', [MarketplaceSalesDashboardController::class, 'index'])->name('marketplace.dashboard.sales');
+        Route::get('/marketplace/dashboard/sales/export', [MarketplaceSalesDashboardController::class, 'export'])->name('marketplace.dashboard.sales.export');
+        Route::get('/marketplace/dashboard/products/orders', [MarketplaceSalesDashboardController::class, 'productOrders'])->name('marketplace.dashboard.products.orders');
+        Route::get('/marketplace/dashboard/payments/{date}', [MarketplaceSalesDashboardController::class, 'paymentDetail'])->name('marketplace.dashboard.payments.detail');
+        Route::get('/marketplace/dashboard/promotions/{date}', [MarketplaceSalesDashboardController::class, 'promotionDetail'])->name('marketplace.dashboard.promotions.detail');
+        Route::get('/marketplace/dashboard/shipping/{date}', [MarketplaceSalesDashboardController::class, 'shippingDetail'])->name('marketplace.dashboard.shipping.detail');
+    });
     Route::get('/marketplace/shopee-performance', [ShopeeShopPerformanceController::class, 'index'])->name('marketplace.shopee-performance');
     Route::post('/marketplace/shopee-performance/sync', [ShopeeShopPerformanceController::class, 'sync'])->name('marketplace.shopee-performance.sync');
-    Route::get('/marketplace/dashboard/products/orders', [MarketplaceSalesDashboardController::class, 'productOrders'])->name('marketplace.dashboard.products.orders');
-    Route::get('/marketplace/dashboard/payments/{date}', [MarketplaceSalesDashboardController::class, 'paymentDetail'])->name('marketplace.dashboard.payments.detail');
-    Route::get('/marketplace/dashboard/promotions/{date}', [MarketplaceSalesDashboardController::class, 'promotionDetail'])->name('marketplace.dashboard.promotions.detail');
-    Route::get('/marketplace/dashboard/shipping/{date}', [MarketplaceSalesDashboardController::class, 'shippingDetail'])->name('marketplace.dashboard.shipping.detail');
     Route::get('/marketplace/issues',      [MarketplaceSystemController::class, 'issueCenter'])->name('marketplace.issues');
     Route::get('/marketplace/returns',     [\App\Http\Controllers\MarketplaceReturnController::class, 'index'])->name('marketplace.returns');
     Route::get('/marketplace/kilat',       [\App\Http\Controllers\MarketplaceBookingController::class, 'index'])->name('marketplace.kilat');
