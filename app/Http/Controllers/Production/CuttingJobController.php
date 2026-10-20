@@ -391,7 +391,7 @@ class CuttingJobController extends Controller
         // 7️⃣ Riwayat pemakaian kain AKTUAL per (finished_item × fabric_item)
         //    dari cutting job sebelumnya (exclude voided).
         //    Dipakai frontend untuk autofill "pemakaian terakhir" + info riwayat.
-        //    Format: { finishedItemId => { fabricItemId => { kg_per_pcs, job_code, date, history: [..max 3] } } }
+        //    Format: { finishedItemId => { fabricItemId => { qty_per_pcs, job_code, date, history: [..max 3] } } }
         $usageRows = \DB::table('cutting_job_bundles as b')
             ->join('cutting_jobs as j', 'j.id', '=', 'b.cutting_job_id')
             ->join('lots as l', 'l.id', '=', 'b.lot_id')
@@ -414,12 +414,12 @@ class CuttingJobController extends Controller
         foreach ($usageRows as $row) {
             $fid = (int) $row->finished_item_id;
             $mid = (int) $row->fabric_item_id;
-            $kgPerPcs = round((float) $row->qty_used_fabric / max((float) $row->qty_pcs, 0.0001), 4);
+            $qtyPerPcs = round((float) $row->qty_used_fabric / max((float) $row->qty_pcs, 0.0001), 4);
             $dateStr = \Illuminate\Support\Carbon::parse($row->date)->format('d/m/y');
 
             if (!isset($lastUsage[$fid][$mid])) {
                 $lastUsage[$fid][$mid] = [
-                    'kg_per_pcs' => $kgPerPcs,
+                    'qty_per_pcs' => $qtyPerPcs,
                     'job_code'   => $row->job_code,
                     'date'       => $dateStr,
                     'history'    => [],
@@ -429,7 +429,7 @@ class CuttingJobController extends Controller
             $hist = &$lastUsage[$fid][$mid]['history'];
             $lastJob = end($hist);
             if (count($hist) < 3 && (!$lastJob || $lastJob['job_code'] !== $row->job_code)) {
-                $hist[] = ['kg_per_pcs' => $kgPerPcs, 'job_code' => $row->job_code, 'date' => $dateStr];
+                $hist[] = ['qty_per_pcs' => $qtyPerPcs, 'job_code' => $row->job_code, 'date' => $dateStr];
             }
             unset($hist);
         }
@@ -471,6 +471,7 @@ class CuttingJobController extends Controller
                     'item_id' => (int) $itemId,
                     'item_code' => (string) $item->code,
                     'item_name' => (string) $item->name,
+                    'unit' => $item->stockUnit(),
                     'total_balance' => (float) $rows->sum('qty_balance'),
                     'lot_count' => $rows->count(),
                     'warehouses' => $warehouses,
@@ -486,6 +487,7 @@ class CuttingJobController extends Controller
                             'lot_code' => (string) ($lot?->code ?? ('LOT#' . $row->lot_id)),
                             'item_id' => (int) $item->id,
                             'item_code' => (string) $item->code,
+                            'unit' => $item->stockUnit(),
                             'balance' => (float) $row->qty_balance,
                             'warehouse_code' => (string) ($row->warehouse?->code ?? ''),
                             'supplier_name' => $supplierMap[$row->lot_id] ?? null,
@@ -597,12 +599,12 @@ class CuttingJobController extends Controller
         foreach ($usageRows as $row) {
             $fid = (int) $row->finished_item_id;
             $mid = (int) $row->fabric_item_id;
-            $kgPerPcs = round((float) $row->qty_used_fabric / max((float) $row->qty_pcs, 0.0001), 4);
+            $qtyPerPcs = round((float) $row->qty_used_fabric / max((float) $row->qty_pcs, 0.0001), 4);
             $dateStr = \Illuminate\Support\Carbon::parse($row->date)->format('d/m/y');
 
             if (!isset($lastUsage[$fid][$mid])) {
                 $lastUsage[$fid][$mid] = [
-                    'kg_per_pcs' => $kgPerPcs,
+                    'qty_per_pcs' => $qtyPerPcs,
                     'job_code'   => $row->job_code,
                     'date'       => $dateStr,
                     'history'    => [],
@@ -612,7 +614,7 @@ class CuttingJobController extends Controller
             $hist = &$lastUsage[$fid][$mid]['history'];
             $lastJob = end($hist);
             if (count($hist) < 3 && (!$lastJob || $lastJob['job_code'] !== $row->job_code)) {
-                $hist[] = ['kg_per_pcs' => $kgPerPcs, 'job_code' => $row->job_code, 'date' => $dateStr];
+                $hist[] = ['qty_per_pcs' => $qtyPerPcs, 'job_code' => $row->job_code, 'date' => $dateStr];
             }
             unset($hist);
         }
@@ -956,6 +958,13 @@ class CuttingJobController extends Controller
                 ->withInput();
         }
 
+        // Semua qty bahan cutting disimpan dalam stock unit item masing-masing.
+        // UOM ini juga dipakai untuk pesan validasi agar tidak selalu menyebut kg.
+        $fabricUnits = Item::query()
+            ->whereIn('id', $lotItems->values()->unique()->all())
+            ->get(['id', 'unit', 'stock_unit'])
+            ->mapWithKeys(fn (Item $item) => [$item->id => $item->stockUnit()]);
+
         // ==========================================
         // 2) HITUNG SALDO PER LOT (info saja, tidak memblok jika 0)
         // ==========================================
@@ -1065,11 +1074,13 @@ class CuttingJobController extends Controller
                             $itemCode = Item::whereKey($finishedItemId)->value('code') ?? ('#' . $finishedItemId);
                             throw ValidationException::withMessages([
                                 'bundles' => sprintf(
-                                    'Pemakaian kain %s = %s kg melebihi standar BOM (maks %s kg untuk %s pcs). '
+                                    'Pemakaian bahan %s = %s %s melebihi standar BOM (maks %s %s untuk %s pcs). '
                                     . 'Jika realita memang segitu, update BOM dulu lewat tombol "Update BOM" di form, lalu simpan ulang.',
                                     $itemCode,
                                     rtrim(rtrim(number_format($userFabric, 4, '.', ''), '0'), '.'),
+                                    $fabricUnits[$bundleMaterialId] ?? 'pcs',
                                     rtrim(rtrim(number_format($maxByBom, 4, '.', ''), '0'), '.'),
+                                    $fabricUnits[$bundleMaterialId] ?? 'pcs',
                                     rtrim(rtrim(number_format($qtyPcs, 2, '.', ''), '0'), '.')
                                 ),
                             ]);

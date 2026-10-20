@@ -999,19 +999,19 @@
             <div style="display: flex; flex-direction: column; gap: 2px;">
                 <span style="font-size: .65rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em;">Kebutuhan vs Terpilih</span>
                 <span id="lot-target-text" style="font-size: .82rem; font-weight: 600; color: var(--text);">
-                    Target: <span class="mono text-primary" id="lot-target-needed">0.00</span> kg
+                    Target: <span class="mono text-primary" id="lot-target-needed">0.00</span> <span id="lot-target-needed-unit">pcs</span>
                 </span>
             </div>
             <div style="text-align: right;">
                 <span style="font-size: .65rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em;">Terpilih</span>
-                <div id="lot-target-picked" class="mono" style="font-size: 1.1rem; font-weight: 800; color: #2563eb; line-height: 1;">0.00 <span style="font-size: .7rem;">kg</span></div>
+                <div id="lot-target-picked" class="mono" style="font-size: 1.1rem; font-weight: 800; color: #2563eb; line-height: 1;">0.00 <span id="lot-target-picked-unit" style="font-size: .7rem;">pcs</span></div>
             </div>
         </div>
         <div style="height: 6px; background: rgba(148, 163, 184, 0.15); border-radius: 999px; overflow: hidden; position: relative;">
             <div id="lot-target-bar" style="height: 100%; width: 0%; background: #2563eb; border-radius: 999px; transition: width 0.3s ease, background-color 0.3s ease;"></div>
         </div>
         <div id="lot-target-warning" style="display:none; font-size: .68rem; color: #dc2626; margin-top: .35rem; font-weight: 600;">
-            ⚠️ Stok yang dipilih masih kurang <span id="lot-target-shortage" class="mono">0.00</span> kg!
+            ⚠️ Stok yang dipilih masih kurang <span id="lot-target-shortage" class="mono">0.00</span> <span id="lot-target-warning-unit">pcs</span>!
         </div>
     </div>
 
@@ -1055,7 +1055,7 @@
                         </div>
                         <div class="lipb-qty">
                             <span class="lipb-qty-num">{{ number_format($totalBalance, 2, ',', '.') }}</span>
-                            <span class="lipb-qty-unit">kg stok</span>
+                            <span class="lipb-qty-unit">{{ $item->stockUnit() }} stok</span>
                         </div>
                         <div class="lipb-right">
                             <span class="lipb-selected" id="lipb-sel-{{ $itemId }}">✓</span>
@@ -1098,7 +1098,7 @@
                                     </div>
                                     <div class="lot-item-meta">
                                         <span>{{ $lotCount }} LOT</span>
-                                        <span class="mono">{{ number_format($totalBalance, 2, ',', '.') }} kg</span>
+                                        <span class="mono">{{ number_format($totalBalance, 2, ',', '.') }} {{ $item->stockUnit() }}</span>
                                         @if ($whCodes->isNotEmpty())
                                             <span>{{ $whCodes->implode(', ') }}</span>
                                         @endif
@@ -1123,7 +1123,8 @@
                                         data-lot-id="{{ $row->lot_id }}"
                                         data-balance="{{ $row->qty_balance }}"
                                         data-item-id="{{ $item->id }}"
-                                        data-item-code="{{ $item->code }}">
+                                        data-item-code="{{ $item->code }}"
+                                        data-item-unit="{{ $item->stockUnit() }}">
 
                                         <input type="checkbox" class="lot-checkbox lot-checkbox-hidden"
                                             name="selected_lots[]" value="{{ $row->lot_id }}"
@@ -1134,7 +1135,7 @@
 
                                         <div class="lot-qty-main">
                                             <span class="mono lot-balance">{{ number_format($row->qty_balance, 2, ',', '.') }}</span>
-                                            <span class="lot-qty-unit">kg</span>
+                                            <span class="lot-qty-unit">{{ $item->stockUnit() }}</span>
                                         </div>
 
                                         @if ($supplierName)
@@ -1426,7 +1427,7 @@
                             </div>
                             <div class="lipb-qty">
                                 <span class="lipb-qty-num">${formatNumber(group.total_balance)}</span>
-                                <span class="lipb-qty-unit">kg stok</span>
+                                <span class="lipb-qty-unit">${escapeHtml(group.unit || 'pcs')} stok</span>
                             </div>
                             <div class="lipb-right">
                                 <span class="lipb-selected ${selectedCount > 0 ? 'visible' : ''}" id="lipb-sel-${escapeHtml(itemId)}">${selectedCount > 0 ? selectedCount + ' dipilih' : ''}</span>
@@ -1447,7 +1448,8 @@
                                 data-lot-id="${escapeHtml(lot.lot_id)}"
                                 data-balance="${escapeHtml(lot.balance)}"
                                 data-item-id="${escapeHtml(lot.item_id)}"
-                                data-item-code="${escapeHtml(lot.item_code)}">
+                                data-item-code="${escapeHtml(lot.item_code)}"
+                                data-item-unit="${escapeHtml(lot.unit || group.unit || 'pcs')}">
                                 <input type="checkbox" class="lot-checkbox lot-checkbox-hidden"
                                     name="selected_lots[]" value="${escapeHtml(lot.lot_id)}"
                                     data-item-id="${escapeHtml(lot.item_id)}"
@@ -1456,7 +1458,7 @@
                                     ${checked ? 'checked' : ''}>
                                 <div class="lot-qty-main">
                                     <span class="mono lot-balance">${formatNumber(lot.balance)}</span>
-                                    <span class="lot-qty-unit">kg</span>
+                                    <span class="lot-qty-unit">${escapeHtml(lot.unit || group.unit || 'pcs')}</span>
                                 </div>
                                 ${supplier}
                                 <div class="lot-pills-row">
@@ -1484,7 +1486,7 @@
                                         </div>
                                         <div class="lot-item-meta">
                                             <span>${formatNumber(group.lot_count)} LOT</span>
-                                            <span class="mono">${formatNumber(group.total_balance)} kg</span>
+                                            <span class="mono">${formatNumber(group.total_balance)} ${escapeHtml(group.unit || 'pcs')}</span>
                                             <span class="lot-selected-badge ${selectedCount > 0 ? 'visible' : ''}" id="badge-item-${escapeHtml(itemId)}">${selectedCount > 0 ? selectedCount + ' dipilih' : ''}</span>
                                         </div>
                                     </div>

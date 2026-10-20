@@ -867,7 +867,7 @@
                 {{-- SHORTAGE WARNING --}}
                 <div id="lot-shortage-warning" class="lot-shortage-bar" style="display:none;">
                     <div class="lot-shortage-text">
-                        ⚠️ Stok LOT kurang <span class="lot-shortage-num" id="lot-shortage-amount">0</span> kg dari kebutuhan.
+                        ⚠️ Stok LOT kurang <span class="lot-shortage-num" id="lot-shortage-amount">0</span> <span id="lot-shortage-unit">pcs</span> dari kebutuhan.
                         Tambah LOT kain untuk melanjutkan.
                         <span id="lot-shortage-bom-status" style="display:block;margin-top:3px;font-size:.7rem;font-weight:700;"></span>
                     </div>
@@ -887,7 +887,7 @@
                                 <th style="min-width: 120px;" class="bundle-lot-col">LOT</th>
                                 <th style="min-width: 160px;">Item Jadi</th>
                                 <th style="min-width: 90px;" class="text-end">Qty (pcs)</th>
-                                <th style="min-width: 90px;" class="text-end">Kain (kg)<div style="font-size:.6rem;font-weight:500;color:#94a3b8;line-height:1.2;">auto: terakhir/BOM</div></th>
+                                <th style="min-width: 90px;" class="text-end">Bahan (<span id="fabric-unit-header">pcs</span>)<div style="font-size:.6rem;font-weight:500;color:#94a3b8;line-height:1.2;">auto: terakhir/BOM</div></th>
                                 <th style="min-width: 140px;" class="bundle-notes-header">Catatan</th>
                                 <th style="width: 36px;"></th>
                             </tr>
@@ -1035,7 +1035,7 @@
             // URL quick-update BOM line: { finishedItemId: quickUrl }
             const bomQuickUrls = @json($bomQuickUrls ?? []);
             // Riwayat pemakaian kain aktual terakhir:
-            // { finishedItemId: { fabricItemId: { kg_per_pcs, job_code, date, history: [...] } } }
+            // { finishedItemId: { fabricItemId: { qty_per_pcs, job_code, date, history: [...] } } }
             const lastUsage = @json($lastUsage ?? []);
             // CSRF token untuk PATCH request
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
@@ -1060,17 +1060,20 @@
                         || tr.querySelector('.lot-code')?.textContent?.trim()
                         || String(lotId);
                     const itemCode = (tr.dataset.itemCode || '').trim();
+                    const unit = (tr.dataset.itemUnit || '').trim() || 'pcs';
                     lotInfoMap[lotId] = {
                         lotId,
                         itemId,
                         code,
                         balance,
                         itemCode,
+                        unit,
                     };
                 });
             }
 
             rebuildLotRuntimeFromDom();
+            updateFabricUnitLabels();
 
             let bundleIndexCounter = 0;
             let lotsLocked = false;
@@ -1109,6 +1112,30 @@
                 return lotId ? (lotInfoMap[lotId]?.itemCode || '') : '';
             }
 
+            function getRowFabricUnit(tr) {
+                const lotId = parseInt(tr?.querySelector('.bundle-lot-select')?.value || '0', 10);
+                return lotId ? (lotInfoMap[lotId]?.unit || 'pcs') : getSelectedFabricUnit();
+            }
+
+            function getSelectedFabricUnit() {
+                const selected = getCheckedLotsWithInfo();
+                return selected[0]?.unit || 'pcs';
+            }
+
+            function updateFabricUnitLabels() {
+                const unit = getSelectedFabricUnit();
+                const header = document.getElementById('fabric-unit-header');
+                const shortage = document.getElementById('lot-shortage-unit');
+                const targetNeeded = document.getElementById('lot-target-needed-unit');
+                const targetPicked = document.getElementById('lot-target-picked-unit');
+                const targetWarning = document.getElementById('lot-target-warning-unit');
+                if (header) header.textContent = unit;
+                if (shortage) shortage.textContent = unit;
+                if (targetNeeded) targetNeeded.textContent = unit;
+                if (targetPicked) targetPicked.textContent = unit;
+                if (targetWarning) targetWarning.textContent = unit;
+            }
+
             // Ekstrak warna dari kode item kain (e.g. "K7BLK" → "BLK", "FLC280-BLK" → "BLK")
             function extractColorFromItemCode(code) {
                 if (!code) return '';
@@ -1139,7 +1166,8 @@
                 const lotCount = infos.length;
                 const balance = parseFloat(lotBalanceInput?.value || '0');
                 const itemCode = infos[0]?.itemCode || '';
-                return `<strong>${lotCount} LOT</strong> · ${balance.toFixed(2)} kg` + (itemCode ? ` · <span style="font-family:monospace">${itemCode}</span>` : '');
+                const unit = infos[0]?.unit || 'pcs';
+                return `<strong>${lotCount} LOT</strong> · ${balance.toFixed(2)} ${unit}` + (itemCode ? ` · <span style="font-family:monospace">${itemCode}</span>` : '');
             }
 
             function showMainContent() {
@@ -1229,6 +1257,7 @@
                     }
                 });
                 lotBalanceInput.value = total.toFixed(2);
+                updateFabricUnitLabels();
             }
 
             // helper: item jadi tidak difilter by lot_id karena LOT adalah bahan baku.
@@ -1409,21 +1438,22 @@
 
                 const sisaColor = isShort ? '#dc2626' : '#16a34a';
                 const sisaBg    = isShort ? '#fef2f2' : '#f0fdf4';
+                const fabricUnit = getSelectedFabricUnit();
 
                 const liStats = document.createElement('li');
                 liStats.style.cssText = 'display:block;padding:0;border:none;background:none;';
                 liStats.innerHTML =
                     `<div style="display:flex;gap:8px;flex-wrap:wrap;">`
-                    + tile('Stok Kain', `${totalBalance.toFixed(2)} kg`, '#334155', '#f1f5f9')
-                    + tile('Pakai', plannedFabric > 0 ? `${plannedFabric.toFixed(2)} kg` : '—', '#1d4ed8', '#eff6ff')
-                    + tile('Sisa', plannedFabric > 0 ? `${sisa.toFixed(2)} kg` : '—', sisaColor, sisaBg)
+                    + tile('Stok Bahan', `${totalBalance.toFixed(2)} ${fabricUnit}`, '#334155', '#f1f5f9')
+                    + tile('Pakai', plannedFabric > 0 ? `${plannedFabric.toFixed(2)} ${fabricUnit}` : '—', '#1d4ed8', '#eff6ff')
+                    + tile('Sisa', plannedFabric > 0 ? `${sisa.toFixed(2)} ${fabricUnit}` : '—', sisaColor, sisaBg)
                     + `</div>`;
                 lotSummaryList.appendChild(liStats);
 
                 // Satu baris kecil: pcs (+ standar BOM hanya jika beda dari rencana)
                 let metaTxt = `${totalPcs.toFixed(0)} pcs`;
                 if (bomRowCount > 0 && Math.abs(totalBomFabric - plannedFabric) > 0.0005) {
-                    metaTxt += ` · BOM maks ${totalBomFabric.toFixed(2)} kg`;
+                    metaTxt += ` · BOM maks ${totalBomFabric.toFixed(2)} ${fabricUnit}`;
                 }
                 const liMeta = document.createElement('li');
                 liMeta.style.cssText = 'border:none;padding:5px 2px 0;';
@@ -1435,7 +1465,7 @@
                     const liShort = document.createElement('li');
                     liShort.style.cssText = 'background:#fef2f2;border:none;border-radius:8px;padding:5px 8px;margin-top:4px;';
                     liShort.innerHTML =
-                        `<span style="color:#dc2626;font-weight:700;">⚠️ Kurang ${(plannedFabric - totalBalance).toFixed(2)} kg</span>`
+                        `<span style="color:#dc2626;font-weight:700;">⚠️ Kurang ${(plannedFabric - totalBalance).toFixed(2)} ${fabricUnit}</span>`
                       + `<span style="color:#dc2626;font-size:.72rem;">Tambah LOT / kurangi qty</span>`;
                     lotSummaryList.appendChild(liShort);
                 }
@@ -1797,7 +1827,7 @@
                 recalcLotSummary();
             }
 
-            // ── Helper: standar BOM maksimal (kg) untuk qty tertentu ──
+            // ── Helper: standar BOM maksimal dalam stock unit bahan ──
             function bomMaxKg(finishedItemId, fabricItemId, qtyPcs) {
                 const bom = bomData[finishedItemId];
                 if (!bom || !bom[fabricItemId] || qtyPcs <= 0) return null;
@@ -1816,9 +1846,9 @@
 
                 if (finishedItemId && fabricItemId && qtyPcs > 0) {
                     const usage = lastUsage[finishedItemId]?.[fabricItemId];
-                    if (usage && usage.kg_per_pcs > 0) {
+                    if (usage && usage.qty_per_pcs > 0) {
                         // Pemakaian aktual cutting terakhir
-                        qtyFabricInput.value = (qtyPcs * usage.kg_per_pcs).toFixed(4);
+                        qtyFabricInput.value = (qtyPcs * usage.qty_per_pcs).toFixed(4);
                         qtyFabricInput.dataset.auto = '1';
                     } else {
                         const maxKg = bomMaxKg(finishedItemId, fabricItemId, qtyPcs);
@@ -1843,16 +1873,17 @@
 
                 const bom   = bomData[finishedItemId]?.[fabricItemId];
                 const usage = lastUsage[finishedItemId]?.[fabricItemId];
+                const fabricUnit = getRowFabricUnit(tr);
                 const parts = [];
                 if (bom) {
                     const bomMax = bom.qty * (1 + bom.scrap_pct / 100);
-                    parts.push(`<span title="Standar BOM${bom.scrap_pct > 0 ? ` (${bom.qty.toFixed(4)} + scrap ${bom.scrap_pct}%)` : ''} per pcs" style="cursor:help;">Std <b>${bomMax.toFixed(4)}</b></span>`);
+                    parts.push(`<span title="Standar BOM${bom.scrap_pct > 0 ? ` (${bom.qty.toFixed(4)} + scrap ${bom.scrap_pct}%)` : ''} per pcs" style="cursor:help;">Std <b>${bomMax.toFixed(4)} ${fabricUnit}/pcs</b></span>`);
                 }
                 if (usage) {
                     const histTitle = 'Pemakaian aktual terakhir per pcs:\n' + (usage.history || [])
-                        .map(h => `${h.job_code} (${h.date}): ${h.kg_per_pcs} kg/pcs`)
+                        .map(h => `${h.job_code} (${h.date}): ${h.qty_per_pcs} ${fabricUnit}/pcs`)
                         .join('\n');
-                    parts.push(`<span title="${histTitle.replace(/"/g, '&quot;')}" style="color:#0d9488;cursor:help;">Akt <b>${usage.kg_per_pcs.toFixed(4)}</b></span>`);
+                    parts.push(`<span title="${histTitle.replace(/"/g, '&quot;')}" style="color:#0d9488;cursor:help;">Akt <b>${usage.qty_per_pcs.toFixed(4)} ${fabricUnit}/pcs</b></span>`);
                 }
                 const infoEditUrl = bomEditUrls[finishedItemId] ?? null;
                 if (infoEditUrl && (bom || usage)) {
@@ -1872,6 +1903,7 @@
                 const qtyPcs         = parseFloat(tr.querySelector('.bundle-qty-pcs')?.value || '0');
                 const usedKg         = parseFloat(qtyFabricInput.value || '0');
                 const maxKg          = bomMaxKg(finishedItemId, fabricItemId, qtyPcs);
+                const fabricUnit     = getRowFabricUnit(tr);
 
                 const exceed = maxKg !== null && usedKg > maxKg + 0.0005;
 
@@ -1896,8 +1928,8 @@
 
                 warnEl.innerHTML =
                     `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">`
-                    + `<span style="color:#dc2626;font-weight:700;" title="Standar BOM maksimal untuk ${qtyPcs} pcs">⚠ Maks ${maxKg.toFixed(2)} kg</span>`
-                    + (quickUrl ? `<button type="button" class="btn-bom-quick-update" title="Ubah standar BOM jadi ${suggestedBomQty.toFixed(4)} kg/pcs sesuai angka ini" style="padding:1px 10px;border-radius:4px;border:1px solid #d97706;background:#fef3c7;color:#92400e;font-weight:700;font-size:.7rem;cursor:pointer;">Update BOM</button>` : '')
+                    + `<span style="color:#dc2626;font-weight:700;" title="Standar BOM maksimal untuk ${qtyPcs} pcs">⚠ Maks ${maxKg.toFixed(2)} ${fabricUnit}</span>`
+                    + (quickUrl ? `<button type="button" class="btn-bom-quick-update" title="Ubah standar BOM jadi ${suggestedBomQty.toFixed(4)} ${fabricUnit}/pcs sesuai angka ini" style="padding:1px 10px;border-radius:4px;border:1px solid #d97706;background:#fef3c7;color:#92400e;font-weight:700;font-size:.7rem;cursor:pointer;">Update BOM</button>` : '')
                     + (editUrl ? `<a href="${editUrl}" target="_blank" title="Buka BOM" style="color:#b45309;font-size:.72rem;text-decoration:none;">✎</a>` : '')
                     + `</div>`;
                 warnEl.style.display = '';
@@ -2337,6 +2369,7 @@
                 bindLotCheckboxEvents();
                 enforceSingleFabricForCheckedLots();
                 recalcLotBalanceFromCheckedLots();
+                updateFabricUnitLabels();
                 rebuildLotOptionsForAllRows();
                 recalcLotSummary();
             };
