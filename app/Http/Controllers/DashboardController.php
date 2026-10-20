@@ -32,6 +32,9 @@ class DashboardController extends Controller
         'RTS'      => 'WH-RTS',
     ];
 
+    /** Status order yang masih perlu diproses/dikemas oleh tim. */
+    private const DASHBOARD_PENDING_ORDER_STATUSES = ['READY_TO_SHIP', 'PROCESSED'];
+
     public function __construct(
         private InventoryIntelligenceService $inventoryIntelligence,
         private MarketplaceAnalyticsSummaryService $marketplaceAnalytics,
@@ -72,7 +75,7 @@ class DashboardController extends Controller
 
     private function ownerData(): array
     {
-        $cacheKey = 'dashboard.owner.v2.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.owner.v3.' . Carbon::today()->toDateString();
 
         return (array) Cache::remember($cacheKey, now()->addSeconds(30), fn () => $this->ownerDataUncached());
     }
@@ -242,7 +245,7 @@ class DashboardController extends Controller
 
     private function adminData(): array
     {
-        $cacheKey = 'dashboard.admin.v2.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.admin.v3.' . Carbon::today()->toDateString();
 
         return (array) Cache::remember($cacheKey, now()->addSeconds(30), fn () => $this->adminDataUncached());
     }
@@ -369,7 +372,7 @@ class DashboardController extends Controller
     /** Pesanan belum dikirim (perlu diproses + siap kirim). */
     private function mpUnshippedCount(): int
     {
-        return $this->mpStatusCount(['PROCESSED', 'READY_TO_SHIP', 'TO_CONFIRM_RECEIVE']);
+        return $this->mpStatusCount(self::DASHBOARD_PENDING_ORDER_STATUSES);
     }
 
     private function mpStatusCount(array $statuses, ?int $daysBack = null): int
@@ -413,9 +416,10 @@ class DashboardController extends Controller
             }
 
             $orders = DB::table('marketplace_orders')
-                ->whereIn('order_status', ['PROCESSED', 'READY_TO_SHIP', 'TO_CONFIRM_RECEIVE'])
-                ->orderByDesc($this->mpDateCol())
-                ->when($limit > 0, fn ($query) => $query->limit($limit))
+                ->whereIn('order_status', self::DASHBOARD_PENDING_ORDER_STATUSES)
+                ->when($limit > 0, function ($query) {
+                    $query->orderByDesc($this->mpDateCol())->limit($limit);
+                })
                 ->get([
                     'id',
                     'external_invoice_no', 'external_order_id', 'buyer_name',
@@ -615,16 +619,8 @@ class DashboardController extends Controller
                     $join->on('repeat_history.store_id', '=', 'current.store_id')
                         ->on('repeat_history.buyer_key', '=', DB::raw($currentBuyerKey));
                 })
-                ->whereNotIn('current.order_status', ['CANCELLED', 'CANCELED'])
+                ->whereIn('current.order_status', self::DASHBOARD_PENDING_ORDER_STATUSES)
                 ->whereRaw('DATE(COALESCE(current.ordered_at, current.order_date, current.created_at)) = ?', [$today])
-                ->where(function ($query) {
-                    $query->whereNull('current.order_status')
-                        ->orWhere('current.order_status', '!=', 'COMPLETED')
-                        ->orWhere(function ($completed) {
-                            $completed->where('current.order_status', 'COMPLETED')
-                                ->where('repeat_history.previous_order_count', '>', 1);
-                        });
-                })
                 ->orderByDesc(DB::raw('COALESCE(current.ordered_at, current.order_date, current.created_at)'))
                 ->limit($limit)
                 ->get([
