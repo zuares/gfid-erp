@@ -1078,8 +1078,10 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                 </div>
 
                 <div class="od-finance-row od-finance-row-total">
-                    <span>{{ $isEstimasi ? 'Estimasi ' : '' }}Dana bersih seller</span>
-                    <span style="color:#15803d">Rp{{ number_format($penghasilan, 0, ',', '.') }}</span>
+                    <span>{{ $isEstimasi ? 'Estimasi Laba Kotor' : 'Laba Kotor' }}</span>
+                    <span style="color:{{ $grossProfit === null ? '#b45309' : ($grossProfit < 0 ? '#b91c1c' : '#15803d') }}">
+                        {{ $grossProfit !== null ? 'Rp'.number_format($grossProfit, 0, ',', '.') : 'Belum lengkap' }}
+                    </span>
                 </div>
             </div>
         </div>
