@@ -140,6 +140,10 @@ Route::middleware(['auth'])->group(function () {
         return app(DashboardController::class)->index($request);
     })->name('dashboard');
 
+    Route::middleware(['role:admin,owner'])
+        ->get('/dashboard/repeat-orders/{order}/awb', [DashboardController::class, 'resolveRepeatOrderAwb'])
+        ->name('dashboard.repeat_orders.awb');
+
     // ======================
     // ADMIN / OWNER ZONE
     // ======================

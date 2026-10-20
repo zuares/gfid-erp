@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Services\Inventory\InventoryIntelligenceService;
 use App\Services\Marketplace\MarketplaceAnalyticsSummaryService;
+use App\Services\Marketplace\MarketplaceLogisticsService;
+use App\Models\MarketplaceOrder;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -39,8 +42,24 @@ class DashboardController extends Controller
     public function __construct(
         private InventoryIntelligenceService $inventoryIntelligence,
         private MarketplaceAnalyticsSummaryService $marketplaceAnalytics,
+        private MarketplaceLogisticsService $marketplaceLogistics,
     )
     {
+    }
+
+    /** Cari resi pesanan terakhir tanpa menambah beban saat dashboard dirender. */
+    public function resolveRepeatOrderAwb(MarketplaceOrder $order): JsonResponse
+    {
+        $awb = $this->extractMarketplaceAwb($order->raw_json);
+
+        if (!$awb && $order->store) {
+            $orderSn = trim((string) ($order->channel_order_id ?: $order->external_order_id ?: $order->booking_sn));
+            if ($orderSn !== '') {
+                $awb = $this->marketplaceLogistics->syncAwb($order->store, $orderSn);
+            }
+        }
+
+        return response()->json(['awb' => $awb ?: null]);
     }
 
     public function devRunAudit(): \Illuminate\Http\JsonResponse
@@ -684,6 +703,7 @@ class DashboardController extends Controller
                 ->selectRaw("COALESCE(NULLIF(previous.external_invoice_no, ''), NULLIF(previous.external_order_id, ''), previous.channel_order_id, CONCAT('ORDER-', previous.id))");
             $lastOrderId = (clone $lastOrderBase)->select('previous.id');
             $lastOrderAwb = (clone $lastOrderBase)->select('previous.shipping_awb_no');
+            $lastOrderRawJson = (clone $lastOrderBase)->select('previous.raw_json');
 
             $orders = $orders
                 ->select([
@@ -699,6 +719,7 @@ class DashboardController extends Controller
                 ->selectSub($lastOrderNumber, 'last_order_number')
                 ->selectSub($lastOrderId, 'last_order_id')
                 ->selectSub($lastOrderAwb, 'last_order_awb')
+                ->selectSub($lastOrderRawJson, 'last_order_raw_json')
                 ->get();
 
             $itemsByOrder = [];
@@ -804,10 +825,39 @@ class DashboardController extends Controller
                 $data['items'] = $itemsByOrder[(int) $row->id] ?? [];
                 $data['last_items'] = $itemsByOrder[(int) ($row->last_order_id ?? 0)] ?? [];
                 $data['scanned_items'] = $scannedItemsByOrder[(int) $row->id] ?? [];
+                $data['last_order_awb'] = trim((string) ($data['last_order_awb'] ?? ''))
+                    ?: ($this->extractMarketplaceAwb($data['last_order_raw_json'] ?? null) ?: null);
 
                 return $data;
             })->all();
         }, []);
+    }
+
+    /** Ambil hanya nomor resi kurir dari payload Marketplace Order. */
+    private function extractMarketplaceAwb(mixed $raw): ?string
+    {
+        if (is_string($raw)) {
+            $raw = json_decode($raw, true);
+        }
+
+        if (!is_array($raw)) {
+            return null;
+        }
+
+        foreach ([
+            data_get($raw, 'tracking_no'),
+            data_get($raw, 'tracking_number'),
+            data_get($raw, 'shipping_document_info.tracking_number'),
+            data_get($raw, 'package_list.0.tracking_number'),
+            data_get($raw, 'package_list.0.tracking_no'),
+        ] as $candidate) {
+            $candidate = trim((string) $candidate);
+            if ($candidate !== '' && !preg_match('/^OFG/i', $candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     /** Total qty di gudang tertentu (berdasarkan kode gudang). */

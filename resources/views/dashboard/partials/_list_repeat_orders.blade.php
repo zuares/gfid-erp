@@ -67,8 +67,11 @@
                                     @else
                                         {{ $row['last_order_number'] ?: '—' }}
                                     @endif
-                                    @if(!empty($row['last_order_awb']))
-                                        <div class="drepeat-order-meta">Resi: <code>{{ $row['last_order_awb'] }}</code></div>
+                                    @if(!empty($row['last_order_id']))
+                                        <div
+                                            class="drepeat-order-meta"
+                                            data-repeat-order-awb="{{ route('dashboard.repeat_orders.awb', ['order' => $row['last_order_id']]) }}"
+                                        >Resi: <code>{{ $row['last_order_awb'] ?: '—' }}</code></div>
                                     @endif
                                 </td>
                                 <td class="drepeat-items">
@@ -114,3 +117,35 @@
         @endif
     </div>
 </div>
+
+@push('scripts')
+<script>
+    (() => {
+        const lookupCells = document.querySelectorAll('[data-repeat-order-awb]');
+        if (!lookupCells.length) return;
+
+        const lookup = async (cell) => {
+            try {
+                const response = await fetch(cell.dataset.repeatOrderAwb, {
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                });
+                if (!response.ok) return;
+
+                const data = await response.json();
+                const code = cell.querySelector('code');
+                if (code && data.awb) code.textContent = data.awb;
+            } catch (error) {
+                // Resi tidak boleh menghambat dashboard bila API marketplace gagal.
+            }
+        };
+
+        const start = () => Array.from(lookupCells).map(lookup);
+        if ('requestIdleCallback' in window) {
+            window.requestIdleCallback(start, { timeout: 1500 });
+        } else {
+            window.setTimeout(start, 250);
+        }
+    })();
+</script>
+@endpush
