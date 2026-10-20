@@ -1506,12 +1506,23 @@ class MarketplaceAnalyticsSummaryService
 
     private function operationalDaily(array $filters): array
     {
+        $itemGross = 'CASE'
+            .' WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount'
+            .' WHEN COALESCE(oi.price_after_discount, 0) > 0 THEN oi.price_after_discount * COALESCE(oi.qty, 0)'
+            .' WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount'
+            .' WHEN COALESCE(oi.price, 0) > 0 THEN oi.price * COALESCE(oi.qty, 0)'
+            .' ELSE 0 END';
         $itemTotals = DB::table('marketplace_order_items as oi')
             ->selectRaw('COALESCE(oi.marketplace_order_id, oi.order_id) AS order_key')
             ->selectRaw('SUM(CASE WHEN oi.qty > 0 THEN oi.qty ELSE 0 END) AS qty')
+            ->selectRaw("SUM({$itemGross}) AS gross_sales")
             ->selectRaw('SUM(CASE WHEN oi.hpp_total_snapshot > 0 THEN oi.hpp_total_snapshot WHEN oi.hpp_snapshot > 0 THEN oi.hpp_snapshot * CASE WHEN oi.qty > 0 THEN oi.qty ELSE 0 END ELSE 0 END) AS hpp')
             ->groupByRaw('COALESCE(oi.marketplace_order_id, oi.order_id)');
         $gross = $this->orderValueExpression();
+        $salesGross = 'CASE WHEN COALESCE(od_items.gross_sales, 0) > 0 THEN od_items.gross_sales ELSE CASE WHEN COALESCE(mo.subtotal_items, 0) > 0 THEN mo.subtotal_items ELSE COALESCE(mo.total_amount, 0) END END';
+        $buyerPaid = 'COALESCE(NULLIF(od_ms.buyer_payment_amount, 0), NULLIF(mo.total_paid_customer, 0), NULLIF(mo.total_amount, 0), NULLIF(mo.subtotal_items, 0), 0)';
+        $sellerDiscount = 'COALESCE(od_ms.seller_voucher, 0)';
+        $salesNet = "CASE WHEN ({$salesGross} - {$sellerDiscount}) > 0 THEN ({$salesGross} - {$sellerDiscount}) ELSE 0 END";
         $estimatedPayout = "COALESCE(NULLIF(mo.net_payout_estimated, 0), NULLIF(od_ms.final_income, 0), od_ie.estimated_escrow_amount, ({$gross} * ".(1 - self::ESTIMATED_MARKETPLACE_FEE_RATE).'))';
 
         return $this->operationalBase($filters)
@@ -1521,6 +1532,9 @@ class MarketplaceAnalyticsSummaryService
             ->selectRaw('DATE(mo.ordered_at) AS date')
             ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN 1 ELSE 0 END) AS orders')
             ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $this->orderValueExpression() . ' ELSE 0 END) AS gmv')
+            ->selectRaw("SUM(CASE WHEN {$this->isRevenueStatus()} THEN {$salesGross} ELSE 0 END) AS gross_sales")
+            ->selectRaw("SUM(CASE WHEN {$this->isRevenueStatus()} THEN {$salesNet} ELSE 0 END) AS net_sales")
+            ->selectRaw("SUM(CASE WHEN {$this->isRevenueStatus()} THEN {$buyerPaid} ELSE 0 END) AS paid")
             ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN COALESCE(od_items.qty, 0) ELSE 0 END) AS qty')
             ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $estimatedPayout . ' ELSE 0 END) AS payout')
             ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN COALESCE(od_items.hpp, 0) ELSE 0 END) AS hpp')
@@ -1531,6 +1545,9 @@ class MarketplaceAnalyticsSummaryService
                 'date' => $row->date,
                 'orders' => (int) ($row->orders ?? 0),
                 'gmv' => round((float) ($row->gmv ?? 0), 2),
+                'gross_sales' => round((float) ($row->gross_sales ?? 0), 2),
+                'net_sales' => round((float) ($row->net_sales ?? 0), 2),
+                'paid' => round((float) ($row->paid ?? 0), 2),
                 'qty' => (int) ($row->qty ?? 0),
                 'payout' => round((float) ($row->payout ?? 0), 2),
                 'hpp' => round((float) ($row->hpp ?? 0), 2),
@@ -1550,6 +1567,8 @@ class MarketplaceAnalyticsSummaryService
                 'order_count' => 0,
                 'qty' => 0,
                 'gross_sales' => 0,
+                'net_sales' => 0,
+                'paid' => 0,
                 'marketplace_fees' => 0,
                 'refund' => 0,
                 'payout' => 0,
@@ -1565,6 +1584,9 @@ class MarketplaceAnalyticsSummaryService
             ], [
                 'orders' => (int) ($row['orders'] ?? 0),
                 'gmv' => (float) ($row['gmv'] ?? 0),
+                'gross_sales' => (float) ($row['gross_sales'] ?? 0),
+                'net_sales' => (float) ($row['net_sales'] ?? 0),
+                'paid' => (float) ($row['paid'] ?? 0),
                 'qty' => (int) ($row['qty'] ?? 0),
                 'payout' => (float) ($row['payout'] ?? 0),
                 'hpp' => (float) ($row['hpp'] ?? 0),

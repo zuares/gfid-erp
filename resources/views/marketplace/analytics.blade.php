@@ -1188,19 +1188,23 @@
         };
     };
     const salesDailyRow = row => {
-        const grossSales = n(row?.gross_sales || row?.gmv);
+        const grossSales = n(row?.gross_sales ?? row?.gmv);
         const cogs = n(row?.hpp);
         const payout = n(row?.payout);
-        const grossProfit = n(row?.gross_profit || (payout - cogs));
+        const grossProfit = n(row?.gross_profit ?? (payout - cogs));
         const adCost = n(row?.ad_cost);
-        const orders = n(row?.orders || row?.order_count);
+        const orders = n(row?.orders ?? row?.order_count);
+        const netSales = row?.net_sales == null ? grossSales : n(row.net_sales);
+        const paid = row?.paid == null
+            ? n(row?.cash_order_revenue ?? row?.cash_gross_sales ?? row?.gross_sales ?? 0)
+            : n(row.paid);
 
         return {
             date: String(row?.date || ''),
             sales: grossSales,
             grossSales,
-            netSales: n(row?.net_sales || grossSales),
-            paid: n(row?.cash_order_revenue || row?.paid || grossSales),
+            netSales,
+            paid,
             payout,
             cogs,
             grossProfit,
