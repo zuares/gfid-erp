@@ -691,6 +691,12 @@
 
     .an-shell { gap: .9rem; }
 
+    .an-summary-top-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .9rem;
+    }
+
     .an-hero {
         display: flex;
         align-items: flex-start;
@@ -795,12 +801,30 @@
     }
 
     .an-tabs-wrap {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
         padding: .28rem;
         border: 1px solid var(--dsh-border, #d4d7e3);
         border-radius: 10px;
         background: color-mix(in srgb, var(--card, #fff) 94%, var(--bg, #f4f5fb) 6%);
         box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
     }
+    .an-tabs-meta {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        flex: 0 0 auto;
+        padding: .45rem .6rem .45rem .65rem;
+        color: var(--dsh-muted, #6b7280);
+        font-size: .61rem;
+        font-weight: 800;
+        letter-spacing: .055em;
+        line-height: 1;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+    .an-tabs-meta i { color: var(--accent, #2563eb); font-size: .7rem; }
     .an-tabs {
         display: flex;
         gap: .18rem;
@@ -867,6 +891,84 @@
     .an-table td { font-variant-numeric: tabular-nums; }
     .an-table tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft, #dbeafe) 22%, var(--card, #fff) 78%); }
 
+    .an-sales-pane { display: grid; gap: .8rem; }
+    .an-sales-head,
+    .an-sales-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+    .an-sales-head { padding: .2rem .1rem .15rem; }
+    .an-sales-title,
+    .an-sales-section-title { color: var(--text, #0f172a); font-size: 1.02rem; font-weight: 850; letter-spacing: -.025em; }
+    .an-sales-sub,
+    .an-sales-section-sub { margin-top: .2rem; color: var(--dsh-muted, #6b7280); font-size: .69rem; font-weight: 650; line-height: 1.45; }
+    .an-sales-section-title { font-size: .92rem; }
+    .an-sales-period { display: inline-flex; align-items: center; gap: .35rem; color: var(--dsh-muted, #6b7280); font-size: .65rem; font-weight: 750; white-space: nowrap; }
+    .an-sales-period i { color: var(--accent, #2563eb); }
+    .an-sales-kpi-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .6rem; }
+    .an-sales-kpi { position: relative; min-width: 0; min-height: 122px; overflow: hidden; padding: .72rem .76rem .66rem; border: 1px solid var(--dsh-border, #d4d7e3); border-left: 3px solid color-mix(in srgb, var(--accent, #2563eb) 56%, var(--dsh-border, #d4d7e3) 44%); border-radius: 10px; background: var(--card, #fff); box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 5px 16px rgba(15, 23, 42, .035); }
+    .an-sales-kpi::after { position: absolute; right: -1rem; bottom: -1.3rem; width: 4.4rem; height: 4.4rem; border-radius: 50%; background: var(--accent, #2563eb); content: ''; opacity: .045; }
+    .an-sales-kpi--primary { border-left-color: var(--accent, #2563eb); }
+    .an-sales-kpi--success { border-left-color: var(--success, #16a34a); }
+    .an-sales-kpi--warning { border-left-color: var(--danger, #dc2626); }
+    .an-sales-kpi-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .45rem; }
+    .an-sales-kpi-label { max-width: calc(100% - 2rem); color: var(--dsh-muted, #6b7280); font-size: .62rem; font-weight: 800; line-height: 1.25; }
+    .an-sales-kpi-icon { display: inline-flex; flex: 0 0 1.65rem; width: 1.65rem; height: 1.65rem; align-items: center; justify-content: center; border: 1px solid color-mix(in srgb, var(--accent, #2563eb) 14%, var(--dsh-border, #d4d7e3) 86%); border-radius: .5rem; background: var(--accent-soft, #dbeafe); color: var(--accent, #2563eb); font-size: .72rem; }
+    .an-sales-kpi--success .an-sales-kpi-icon { background: var(--success-soft, #dcfce7); color: var(--success, #16a34a); }
+    .an-sales-kpi--warning .an-sales-kpi-icon { background: var(--danger-soft, #fee2e2); color: var(--danger, #dc2626); }
+    .an-sales-kpi-value { position: relative; z-index: 1; overflow: hidden; margin-top: .85rem; color: var(--text, #0f172a); font-size: clamp(.95rem, 1.25vw, 1.18rem); font-weight: 850; letter-spacing: -.025em; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+    .an-sales-kpi-note { position: relative; z-index: 1; overflow: hidden; margin-top: .27rem; color: var(--dsh-muted, #6b7280); font-size: .58rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+    .an-sales-trend-section,
+    .an-sales-table-section { overflow: hidden; border: 1px solid var(--dsh-border, #d4d7e3); border-radius: 10px; background: var(--card, #fff); box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(15, 23, 42, .035); }
+    .an-sales-section-head { padding: .82rem .9rem .7rem; border-bottom: 1px solid color-mix(in srgb, var(--dsh-border, #d4d7e3) 76%, transparent); }
+    .an-sales-trend-body { padding: .75rem .85rem .85rem; }
+    .an-sales-trend-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; margin-bottom: .75rem; }
+    .an-sales-trend-summary-card { display: flex; min-width: 0; align-items: center; gap: .52rem; padding: .58rem .64rem; border: 1px solid color-mix(in srgb, var(--dsh-border, #d4d7e3) 72%, transparent); border-radius: .65rem; background: color-mix(in srgb, var(--accent-soft, #dbeafe) 28%, var(--card, #fff) 72%); }
+    .an-sales-trend-summary-icon { display: inline-flex; flex: 0 0 1.75rem; width: 1.75rem; height: 1.75rem; align-items: center; justify-content: center; border-radius: .5rem; background: var(--accent-soft, #dbeafe); color: var(--accent, #2563eb); font-size: .76rem; }
+    .an-sales-trend-summary-content { min-width: 0; }
+    .an-sales-trend-summary-label { overflow: hidden; color: var(--dsh-muted, #6b7280); font-size: .56rem; font-weight: 800; letter-spacing: .035em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+    .an-sales-trend-summary-value { overflow: hidden; margin-top: .08rem; color: var(--text, #0f172a); font-size: .74rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
+    .an-sales-trend-summary-delta { display: inline-flex; margin-top: .07rem; font-size: .56rem; font-weight: 800; }
+    .an-sales-trend-summary-delta.good { color: #15803d; }
+    .an-sales-trend-summary-delta.bad { color: #b91c1c; }
+    .an-sales-trend-summary-delta.neutral { color: var(--dsh-muted, #6b7280); }
+    .an-sales-trend-layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(230px, .75fr); gap: .75rem; }
+    .an-sales-trend-panel,
+    .an-sales-trend-insight { min-width: 0; border-radius: .75rem; background: color-mix(in srgb, var(--bg, #f4f5fb) 42%, var(--card, #fff) 58%); }
+    .an-sales-trend-panel { padding: .7rem .75rem .55rem; }
+    .an-sales-trend-toolbar { display: flex; align-items: center; justify-content: space-between; gap: .65rem; margin-bottom: .45rem; }
+    .an-sales-trend-label { color: var(--dsh-muted, #6b7280); font-size: .59rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+    .an-sales-trend-total { color: var(--text, #0f172a); font-size: .82rem; font-weight: 850; white-space: nowrap; }
+    .an-sales-trend-chart { min-height: 215px; border-radius: .65rem; background: linear-gradient(180deg, color-mix(in srgb, var(--card, #fff) 92%, var(--bg, #f4f5fb) 8%), var(--card, #fff)); }
+    .an-sales-trend-chart svg { display: block; width: 100%; height: 215px; overflow: visible; }
+    .an-sales-trend-chart .sales-grid { stroke: color-mix(in srgb, var(--dsh-border, #d4d7e3) 75%, transparent); stroke-width: 1; vector-effect: non-scaling-stroke; }
+    .an-sales-trend-chart .sales-axis-label { fill: var(--dsh-muted, #6b7280); font-size: 10px; font-weight: 700; }
+    .an-sales-trend-chart .sales-area { fill: color-mix(in srgb, var(--accent-soft, #dbeafe) 55%, transparent); }
+    .an-sales-trend-chart .sales-line { fill: none; stroke: var(--accent, #2563eb); stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; vector-effect: non-scaling-stroke; }
+    .an-sales-trend-chart .sales-line.previous { stroke: var(--dsh-muted, #6b7280); stroke-dasharray: 5 5; stroke-width: 1.8; opacity: .72; }
+    .an-sales-trend-chart .sales-point { fill: var(--accent, #2563eb); stroke: var(--card, #fff); stroke-width: 2; vector-effect: non-scaling-stroke; }
+    .an-sales-trend-chart .sales-point.previous { fill: var(--dsh-muted, #6b7280); }
+    .an-sales-trend-legend { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: .35rem; color: var(--dsh-muted, #6b7280); font-size: .59rem; font-weight: 750; }
+    .an-sales-trend-legend span { display: inline-flex; align-items: center; gap: .25rem; }
+    .an-sales-trend-legend i { width: .45rem; height: .45rem; border-radius: 50%; background: var(--accent, #2563eb); }
+    .an-sales-trend-legend i.previous { background: var(--dsh-muted, #6b7280); }
+    .an-sales-trend-insights { display: grid; align-content: start; gap: .45rem; }
+    .an-sales-trend-insight { padding: .68rem .72rem; }
+    .an-sales-trend-insight-label { color: var(--dsh-muted, #6b7280); font-size: .57rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+    .an-sales-trend-insight-value { margin-top: .18rem; color: var(--text, #0f172a); font-size: .79rem; font-weight: 850; }
+    .an-sales-trend-insight-meta { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .12rem; color: var(--dsh-muted, #6b7280); font-size: .59rem; font-weight: 700; }
+    .an-sales-trend-insight-meta strong { color: var(--text, #0f172a); font-weight: 850; }
+    .an-sales-trend-insight--alert { border: 1px solid color-mix(in srgb, var(--danger, #dc2626) 18%, var(--dsh-border, #d4d7e3) 82%); background: color-mix(in srgb, var(--danger-soft, #fee2e2) 30%, var(--card, #fff) 70%); }
+    .an-sales-trend-insight--alert .an-sales-trend-insight-label,
+    .an-sales-trend-insight--alert .an-sales-trend-insight-value { color: #b91c1c; }
+    .an-sales-table-section .an-table-wrap { max-height: 430px; }
+    .an-sales-table { min-width: 690px; }
+    .an-sales-table th:not(:first-child), .an-sales-table td:not(:first-child) { text-align: right; }
+    .an-sales-table td:first-child { font-weight: 800; }
+    .an-sales-table .is-negative { color: #b91c1c; }
+    .an-sales-table .is-positive { color: #15803d; }
+
+    @media (max-width: 1120px) {
+        .an-sales-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
     @media (max-width: 900px) {
         .an-hero { flex-direction: column; }
         .an-hero-controls { align-items: stretch; flex-wrap: wrap; }
@@ -877,6 +979,7 @@
     @media (max-width: 760px) {
         .an-page { padding-inline: .5rem; }
         .an-hero { margin-bottom: .75rem; }
+        .an-summary-top-grid { grid-template-columns: 1fr; }
         .an-hero-controls { align-items: stretch; padding: .75rem; }
         .an-hero-controls .an-field,
         .an-hero-controls .an-field:first-child,
@@ -885,8 +988,17 @@
         .an-hero-controls .an-field input,
         .an-hero-controls .an-field select,
         .an-hero-controls .an-btn { width: 100%; }
+        .an-tabs-wrap { align-items: stretch; flex-direction: column; gap: .1rem; }
+        .an-tabs-meta { padding: .35rem .45rem .2rem; }
         .an-tabs { overflow-x: auto; }
         .an-tab { flex: 0 0 auto; }
+        .an-sales-head,
+        .an-sales-section-head { flex-direction: column; gap: .35rem; }
+        .an-sales-period { white-space: normal; }
+        .an-sales-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .an-sales-trend-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .an-sales-trend-layout { grid-template-columns: 1fr; }
+        .an-sales-trend-toolbar { align-items: flex-start; flex-direction: column; gap: .2rem; }
     }
 
     body[data-theme="dark"] .an-hero-title { color: #f8fafc; }
@@ -914,14 +1026,18 @@
 
         <div class="an-shell">
           <div class="an-tabs-wrap">
-            <div class="an-tabs" id="analyticsTabs" role="tablist" aria-label="Navigasi analytics">
-                <button class="an-tab active" type="button" data-an-tab="summary" role="tab" aria-selected="true"><i class="bi bi-grid-1x2 me-1"></i>Ringkasan</button>
-                <button class="an-tab" type="button" data-an-tab="stores" role="tab" aria-selected="false"><i class="bi bi-shop me-1"></i>Akun &amp; Biaya</button>
+            <div class="an-tabs-meta"><i class="bi bi-sliders2" aria-hidden="true"></i>Analytics workspace</div>
+            <nav class="an-tabs" id="analyticsTabs" role="tablist" aria-label="Navigasi analytics">
+                <button class="an-tab active" type="button" data-an-tab="overview" role="tab" aria-selected="true"><i class="bi bi-grid-1x2 me-1"></i>Ikhtisar</button>
+                <button class="an-tab" type="button" data-an-tab="sales" role="tab" aria-selected="false"><i class="bi bi-graph-up-arrow me-1"></i>Penjualan</button>
+                <button class="an-tab" type="button" data-an-tab="operations" role="tab" aria-selected="false"><i class="bi bi-activity me-1"></i>Operasional</button>
+                <button class="an-tab" type="button" data-an-tab="stores" role="tab" aria-selected="false"><i class="bi bi-shop me-1"></i>Toko &amp; Biaya</button>
                 <button class="an-tab" type="button" data-an-tab="products" role="tab" aria-selected="false"><i class="bi bi-box-seam me-1"></i>Produk</button>
-                <button class="an-tab" type="button" data-an-tab="cohort" role="tab" aria-selected="false"><i class="bi bi-grid-3x3-gap me-1"></i>Cohort pelanggan &amp; produk</button>
-            </div>
+                <button class="an-tab" type="button" data-an-tab="cohort" role="tab" aria-selected="false"><i class="bi bi-grid-3x3-gap me-1"></i>Cohort</button>
+            </nav>
           </div>
         @include('marketplace.partials._analytics_summary')
+        @include('marketplace.partials._analytics_sales')
         @include('marketplace.partials._analytics_stores')
         @include('marketplace.partials._analytics_products')
         @include('marketplace.partials._analytics_cohort')
@@ -1043,12 +1159,139 @@
     @include('marketplace.partials._analytics_products_script')
     @include('marketplace.partials._analytics_cohort_script')
 
+    const salesSnapshot = snapshot => {
+        const row = snapshot || {};
+        const netSales = n(row.net_order_revenue ?? row.gross_order_revenue ?? row.gmv ?? row.gross_sales);
+        const payout = n(row.estimated_payout ?? row.payout ?? row.cash_payout);
+        const hpp = n(row.hpp_total ?? row.hpp);
+        const adCost = n(row.ad_cost);
+        return {
+            netSales,
+            orders: n(row.order_total ?? row.order_count),
+            qty: n(row.product_qty ?? row.qty),
+            payout,
+            profit: n(row.estimated_profit ?? row.operating_profit ?? (payout - hpp - adCost)),
+            adCost,
+            refund: n(row.return_refund_amount ?? row.cash_refund ?? row.refund),
+        };
+    };
+    const salesDailyRow = row => ({
+        date: String(row?.date || ''),
+        sales: n(row?.gmv ?? row?.gross_sales),
+        payout: n(row?.payout),
+        profit: n(row?.operating_profit),
+        adCost: n(row?.ad_cost),
+        orders: n(row?.order_count),
+    });
+    const salesDelta = (value, baseline, lowerIsBetter = false) => {
+        const currentValue = n(value), previousValue = n(baseline);
+        if (previousValue === 0) return { label: currentValue === 0 ? '0,0%' : 'Baru', tone: currentValue === 0 ? 'neutral' : (lowerIsBetter && currentValue > 0 ? 'bad' : 'good') };
+        const change = (currentValue - previousValue) / Math.abs(previousValue) * 100;
+        return { label: `${change >= 0 ? '↑' : '↓'} ${Math.abs(change).toFixed(1).replace('.', ',')}%`, tone: change === 0 ? 'neutral' : ((lowerIsBetter ? change < 0 : change > 0) ? 'good' : 'bad') };
+    };
+    const salesPeriodLabel = value => {
+        const date = String(value || '');
+        if (!date) return '—';
+        return new Date(`${date}T00:00:00`).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+    const renderSalesTrendSummary = (currentRows, previousRows) => {
+        const currentTotals = {
+            sales: currentRows.reduce((sum, row) => sum + row.sales, 0),
+            payout: currentRows.reduce((sum, row) => sum + row.payout, 0),
+            profit: currentRows.reduce((sum, row) => sum + row.profit, 0),
+            adCost: currentRows.reduce((sum, row) => sum + row.adCost, 0),
+        };
+        const previousTotals = {
+            sales: previousRows.reduce((sum, row) => sum + row.sales, 0),
+            payout: previousRows.reduce((sum, row) => sum + row.payout, 0),
+            profit: previousRows.reduce((sum, row) => sum + row.profit, 0),
+            adCost: previousRows.reduce((sum, row) => sum + row.adCost, 0),
+        };
+        const items = [
+            ['Penjualan harian', 'sales', 'bi-graph-up-arrow', false],
+            ['Estimasi payout', 'payout', 'bi-wallet2', false],
+            ['Profit operasional', 'profit', 'bi-bar-chart-line', false],
+            ['Biaya iklan', 'adCost', 'bi-megaphone', true],
+        ];
+        $('anSalesTrendSummary').innerHTML = items.map(([label, key, icon, lowerIsBetter]) => {
+            const delta = salesDelta(currentTotals[key], previousTotals[key], lowerIsBetter);
+            return `<div class="an-sales-trend-summary-card"><span class="an-sales-trend-summary-icon"><i class="bi ${icon}" aria-hidden="true"></i></span><div class="an-sales-trend-summary-content"><div class="an-sales-trend-summary-label">${label}</div><div class="an-sales-trend-summary-value">${money(currentTotals[key])}</div><span class="an-sales-trend-summary-delta ${delta.tone}">${delta.label} vs pembanding</span></div></div>`;
+        }).join('');
+        $('anSalesTrendTotal').textContent = money(currentTotals.sales);
+        return { currentTotals, previousTotals };
+    };
+    const renderSalesChart = (currentRows, previousRows) => {
+        const container = $('anSalesTrendChart');
+        const current = currentRows.slice(-31);
+        const previous = previousRows.slice(-31);
+        if (!current.length && !previous.length) {
+            container.innerHTML = '<div class="an-empty">Belum ada data penjualan harian pada periode ini.</div>';
+            return;
+        }
+        const active = current.length ? current : previous;
+        const width = 760, height = 215, pad = { top: 18, right: 16, bottom: 30, left: 58 };
+        const values = [...current, ...previous].map(row => row.sales);
+        const max = Math.max(...values, 1);
+        const x = index => pad.left + (active.length <= 1 ? 0 : index / (active.length - 1)) * (width - pad.left - pad.right);
+        const y = value => pad.top + (1 - (value / max)) * (height - pad.top - pad.bottom);
+        const points = rows => rows.map((row, index) => `${x(index).toFixed(1)},${y(row.sales).toFixed(1)}`).join(' ');
+        const area = current.length > 1 ? `${pad.left},${height - pad.bottom} ${points(current)} ${x(current.length - 1).toFixed(1)},${height - pad.bottom}` : '';
+        const grid = [0, .25, .5, .75, 1].map(level => {
+            const lineY = y(max * level);
+            const label = money(max * level).replace('Rp ', '');
+            return `<line class="sales-grid" x1="${pad.left}" x2="${width - pad.right}" y1="${lineY}" y2="${lineY}"></line><text class="sales-axis-label" x="${pad.left - 8}" y="${lineY + 3}" text-anchor="end">${esc(label)}</text>`;
+        }).join('');
+        const labels = active.map((row, index) => index === 0 || index === active.length - 1 || index === Math.floor(active.length / 2) ? `<text class="sales-axis-label" x="${x(index)}" y="${height - 8}" text-anchor="middle">${esc(salesPeriodLabel(row.date).replace(/\s+\d{4}$/, ''))}</text>` : '').join('');
+        const circles = current.length <= 14 ? current.map((row, index) => `<circle class="sales-point" cx="${x(index)}" cy="${y(row.sales)}" r="3"><title>${esc(salesPeriodLabel(row.date))}: ${esc(money(row.sales))}</title></circle>`).join('') : '';
+        const previousCircles = previous.length <= 14 ? previous.map((row, index) => `<circle class="sales-point previous" cx="${x(index)}" cy="${y(row.sales)}" r="2.5"><title>${esc(salesPeriodLabel(row.date))}: ${esc(money(row.sales))}</title></circle>`).join('') : '';
+        container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Grafik penjualan harian"><g>${grid}${labels}</g>${area ? `<polygon class="sales-area" points="${area}"></polygon>` : ''}${previous.length > 1 ? `<polyline class="sales-line previous" points="${points(previous)}"></polyline>` : ''}${current.length > 1 ? `<polyline class="sales-line" points="${points(current)}"></polyline>` : ''}${previousCircles}${circles}</svg>`;
+    };
+    const renderSalesInsights = (currentRows, totals) => {
+        const peak = currentRows.reduce((best, row) => !best || row.sales > best.sales ? row : best, null);
+        const low = currentRows.reduce((best, row) => !best || row.sales < best.sales ? row : best, null);
+        const negativeDays = currentRows.filter(row => row.profit < 0).length;
+        $('anSalesTrendInsights').innerHTML = [
+            `<div class="an-sales-trend-insight"><div class="an-sales-trend-insight-label">Hari penjualan tertinggi</div><div class="an-sales-trend-insight-value">${peak ? money(peak.sales) : '—'}</div><div class="an-sales-trend-insight-meta"><span>${peak ? esc(salesPeriodLabel(peak.date)) : 'Belum ada data'}</span><strong>${peak ? `${peak.orders.toLocaleString('id-ID')} order` : '—'}</strong></div></div>`,
+            `<div class="an-sales-trend-insight"><div class="an-sales-trend-insight-label">Rata-rata per hari</div><div class="an-sales-trend-insight-value">${currentRows.length ? money(totals.sales / currentRows.length) : '—'}</div><div class="an-sales-trend-insight-meta"><span>${currentRows.length.toLocaleString('id-ID')} hari berdata</span><strong>${currentRows.length ? money(totals.profit / currentRows.length) : '—'} profit</strong></div></div>`,
+            `<div class="an-sales-trend-insight ${negativeDays ? 'an-sales-trend-insight--alert' : ''}"><div class="an-sales-trend-insight-label">${negativeDays ? 'Perlu perhatian' : 'Profitabilitas'}</div><div class="an-sales-trend-insight-value">${negativeDays ? `${negativeDays} hari profit negatif` : 'Tidak ada hari negatif'}</div><div class="an-sales-trend-insight-meta"><span>Hari terendah</span><strong>${low ? money(low.sales) : '—'}</strong></div></div>`,
+        ].join('');
+    };
+    function renderSalesPane() {
+        const current = salesSnapshot(summary?.current);
+        const previous = salesSnapshot(summary?.previous);
+        const currentRows = (summary?.daily || []).map(salesDailyRow).sort((a, b) => a.date.localeCompare(b.date));
+        const previousRows = (summary?.previous_daily || []).map(salesDailyRow).sort((a, b) => a.date.localeCompare(b.date));
+        const labels = [
+            ['anSalesNetSales', current.netSales, previous.netSales, false, money],
+            ['anSalesOrders', current.orders, previous.orders, false, value => value.toLocaleString('id-ID')],
+            ['anSalesPayout', current.payout, previous.payout, false, money],
+            ['anSalesQty', current.qty, previous.qty, false, value => value.toLocaleString('id-ID')],
+            ['anSalesProfit', current.profit, previous.profit, false, money],
+            ['anSalesRefund', current.refund, previous.refund, true, money],
+        ];
+        labels.forEach(([id, value, baseline, lowerIsBetter, formatter]) => {
+            const element = $(id);
+            const note = $(`${id}Note`);
+            if (!element) return;
+            element.textContent = formatter(value);
+            const delta = salesDelta(value, baseline, lowerIsBetter);
+            if (note) { note.textContent = `${delta.label} vs pembanding`; note.className = `an-sales-kpi-note ${delta.tone}`; }
+        });
+        $('anSalesPeriod').textContent = `${from()} — ${to()}`;
+        $('anSalesCompareLabel').textContent = `vs ${$('anCompare')?.selectedOptions?.[0]?.textContent || 'periode pembanding'}`;
+        const trend = renderSalesTrendSummary(currentRows, previousRows);
+        renderSalesChart(currentRows, previousRows);
+        renderSalesInsights(currentRows, trend.currentTotals);
+        $('anSalesDailyBody').innerHTML = currentRows.length ? currentRows.slice().reverse().map(row => `<tr><td>${esc(salesPeriodLabel(row.date))}</td><td>${money(row.sales)}</td><td>${money(row.payout)}</td><td class="${row.profit < 0 ? 'is-negative' : 'is-positive'}">${money(row.profit)}</td><td>${money(row.adCost)}</td><td>${row.orders.toLocaleString('id-ID')}</td></tr>`).join('') : '<tr><td colspan="6"><div class="an-empty">Belum ada rincian harian pada periode ini.</div></td></tr>';
+    }
+
     function render() {
         const current = summary?.current || {};
         renderKpis();
         renderFinancePulse();
         renderEnterprise();
         renderChart(summary?.daily || [], summary?.previous_daily || []);
+        renderSalesPane();
         renderFunnel();
         renderStores();
         renderCosts();
@@ -1250,10 +1493,12 @@
         },
     });
     $('anStore').value = initialStore || '';
-    const initialView = new URLSearchParams(location.search).get('view');
-    if (['summary', 'stores', 'products', 'cohort'].includes(initialView)) activateTab(initialView);
+    const initialParams = new URLSearchParams(location.search);
+    const initialView = initialParams.get('view') || initialParams.get('tab');
+    const normalizedInitialView = initialView === 'summary' ? 'overview' : initialView;
+    if (['overview', 'sales', 'operations', 'stores', 'products', 'cohort'].includes(normalizedInitialView)) activateTab(normalizedInitialView);
     load();
-    if (initialView === 'products') loadProducts();
+    if (normalizedInitialView === 'products') loadProducts();
 })();
 </script>
 @endpush

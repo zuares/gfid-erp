@@ -1,14 +1,16 @@
-<section class="an-enterprise-card an-executive-top an-tab-pane" data-an-pane="summary">
-    <div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Executive overview</div><div class="an-enterprise-title">Executive pulse</div><div class="an-enterprise-sub">Volume, basket, dan exception operasional</div></div></div>
-    <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-executive" id="anPulseGrid"><div class="an-empty">Memuat insight…</div></div></div>
-</section>
+<div class="an-summary-top-grid an-tab-pane" data-an-pane="overview">
+    <section class="an-enterprise-card an-executive-top">
+        <div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Executive overview</div><div class="an-enterprise-title">Executive pulse</div><div class="an-enterprise-sub">Volume, basket, dan exception operasional</div></div></div>
+        <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-executive" id="anPulseGrid"><div class="an-empty">Memuat insight…</div></div></div>
+    </section>
 
-<section class="an-enterprise-card an-tab-pane" data-an-pane="summary">
-    <div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Decision cockpit</div><div class="an-enterprise-title">KPI keputusan</div><div class="an-enterprise-sub">GMV → dana → biaya → estimasi net profit</div></div></div>
-    <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-finance an-decision-pulse-grid" id="anDecisionPulse"><div class="an-empty">Memuat KPI…</div></div></div>
-</section>
+    <section class="an-enterprise-card">
+        <div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Decision cockpit</div><div class="an-enterprise-title">KPI keputusan</div><div class="an-enterprise-sub">GMV → dana → biaya → estimasi net profit</div></div></div>
+        <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-finance an-decision-pulse-grid" id="anDecisionPulse"><div class="an-empty">Memuat KPI…</div></div></div>
+    </section>
+</div>
 
-<section class="an-control-tower an-tab-pane" data-an-pane="summary">
+<section class="an-control-tower an-tab-pane is-hidden" data-an-pane="operations">
     <div class="an-control-head">
         <div>
             <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Executive control</div>
@@ -35,7 +37,7 @@
     </div>
 </section>
 
-<div class="an-grid-main an-grid-main-chart an-tab-pane" data-an-pane="summary">
+<div class="an-grid-main an-grid-main-chart an-tab-pane is-hidden" data-an-pane="operations">
     <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Performance trend</div><div class="an-card-title"><i class="bi bi-graph-up-arrow me-1" style="color:#16a34a"></i>Grafik harian</div><div class="an-card-sub">Omzet &amp; estimasi profit</div></div></div><div class="an-card-body"><div class="an-chart-panel-head"><div class="an-chart-panel-title">Performa harian</div><div class="an-chart-summary" id="chartCompareNote">Memuat…</div></div><div class="an-chart" id="revenueChart"><div class="an-empty">Memuat grafik…</div></div></div></section>
 </div>
 
@@ -87,7 +89,7 @@
     </section>
 </div>
 
-<div class="an-contribution-grid an-tab-pane" data-an-pane="summary">
+<div class="an-contribution-grid an-tab-pane is-hidden" data-an-pane="operations">
     <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-enterprise-title">Kontribusi toko</div><div class="an-enterprise-sub">Toko dengan kontribusi omzet terbesar</div></div></div><div class="an-enterprise-body"><div class="an-contribution-list" id="anTopStores"><div class="an-empty">Memuat…</div></div></div></section>
     <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-enterprise-title">Unit economics</div><div class="an-enterprise-sub">Omzet total, pencairan, dan biaya aktual</div></div><div class="an-economics-legend" aria-label="Legenda status omzet"><span><i></i>Cair</span><span><i class="pending"></i>Belum cair</span></div></div><div class="an-enterprise-body"><div class="an-contribution-list" id="anEconomics"><div class="an-empty">Memuat…</div></div></div></section>
 </div>
