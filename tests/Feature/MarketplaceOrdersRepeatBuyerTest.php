@@ -129,6 +129,25 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
         $this->assertFalse($row['is_repeat_buyer']);
     }
 
+    public function test_order_batal_tidak_masuk_repeat_atau_riwayat_pembelian(): void
+    {
+        $this->createOrder('CANCELLED-PREVIOUS', 'COMPLETED', 'buyer-cancelled');
+        $cancelled = $this->createOrder('CANCELLED-CURRENT', 'CANCELLED', 'buyer-cancelled');
+
+        $response = $this->getJson('/api/marketplace/local-orders-paginated?tab=ready&sub_tab=cancel&limit=50');
+        $row = collect($response->json('data'))->firstWhere('id', $cancelled->id);
+
+        $response->assertOk();
+        $this->assertSame(0, $row['buyer_previous_order_count']);
+        $this->assertFalse($row['is_repeat_buyer']);
+
+        $history = $this->getJson("/api/marketplace/local-orders/{$cancelled->id}/buyer-completed-orders");
+
+        $history->assertOk()
+            ->assertJsonPath('buyer_label', null)
+            ->assertJsonCount(0, 'data');
+    }
+
     public function test_payout_order_dialokasikan_ke_item_produk_terkait(): void
     {
         $this->actAsOwner();

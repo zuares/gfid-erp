@@ -248,6 +248,10 @@ trait MarketplaceOrdersPaginatedTrait
             $previousPurchaseCount = max(0, $purchaseCount - $currentOrderCounts);
             $arr['buyer_previous_order_count'] = $previousPurchaseCount;
             $arr['is_repeat_buyer'] = $previousPurchaseCount > 0;
+            if ($o->isCancelledOrder()) {
+                $arr['buyer_previous_order_count'] = 0;
+                $arr['is_repeat_buyer'] = false;
+            }
             $arr['delivery_failed'] = $this->isDeliveryFailed($o);
             $arr['tracking_status'] = $o->tracking_status;
             $arr['tracking_description'] = $o->tracking_description;
@@ -552,6 +556,13 @@ trait MarketplaceOrdersPaginatedTrait
      */
     public function buyerCompletedOrders(MarketplaceOrder $order): JsonResponse
     {
+        if ($order->isCancelledOrder()) {
+            return response()->json([
+                'data' => [],
+                'buyer_label' => null,
+            ]);
+        }
+
         $username = trim((string) ($order->buyer_username ?? ''));
         $name = trim((string) ($order->buyer_name ?? ''));
 

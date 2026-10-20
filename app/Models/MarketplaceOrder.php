@@ -183,6 +183,28 @@ class MarketplaceOrder extends Model
         return in_array($logisticsStatus, ['LOGISTICS_NOT_START', 'LOGISTICS_NOT_READY'], true);
     }
 
+    /**
+     * Status yang berarti order batal dan tidak boleh dihitung sebagai
+     * pembelian pelanggan atau repeat order.
+     */
+    public function isCancelledOrder(): bool
+    {
+        $orderStatus = strtoupper(trim((string) $this->order_status));
+        $legacyStatus = strtolower(trim((string) $this->status));
+
+        return in_array($orderStatus, [
+            'CANCELLED',
+            'CANCELED',
+            'IN_CANCEL',
+            'CANCELLED_BEFORE_SHIPPING',
+        ], true) || in_array($legacyStatus, [
+            'cancelled',
+            'canceled',
+            'in_cancel',
+            'cancelled_before_shipping',
+        ], true);
+    }
+
     /** Filter sebelum pagination; COALESCE menjaga order tanpa payload tetap bisa diproses. */
     public function scopeShippingPending(Builder $query, bool $pending = true): Builder
     {

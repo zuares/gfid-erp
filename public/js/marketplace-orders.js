@@ -396,6 +396,15 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
     }
 
     function repeatOrderBadgeHtml(o) {
+        const orderStatus = String(o.order_status || '').toUpperCase();
+        const legacyStatus = String(o.status || '').toLowerCase();
+        const isCancelled = [
+            'CANCELLED', 'CANCELED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING',
+        ].includes(orderStatus) || [
+            'cancelled', 'canceled', 'in_cancel', 'cancelled_before_shipping',
+        ].includes(legacyStatus);
+        if (isCancelled) return '';
+
         const repeatOrder = Number(o.buyer_previous_order_count || 0);
         const repeatBuyer = o.is_repeat_buyer === true || repeatOrder > 0;
         return repeatBuyer

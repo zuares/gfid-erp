@@ -293,7 +293,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         'count' => 1,
         'last_order_at' => $order->ordered_at ?: $order->order_date,
     ];
-    $buyerPurchaseCount = max(1, (int) ($buyerPurchaseHistory['count'] ?? 1));
+    $buyerPurchaseCount = max(0, (int) ($buyerPurchaseHistory['count'] ?? 0));
     $buyerLastPurchaseAt = $buyerPurchaseHistory['last_order_at'] ?? null;
     $buyerAddress = $liveData['recipient_address']['full_address'] ?? $order->shipping_address ?? '—';
     $zipcode = $liveData['recipient_address']['zipcode'] ?? $order->shipping_postal_code ?? '';

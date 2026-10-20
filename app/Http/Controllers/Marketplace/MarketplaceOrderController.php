@@ -225,12 +225,17 @@ class MarketplaceOrderController extends Controller
             $query->where('buyer_name', $name);
         } else {
             return [
-                'count' => 1,
-                'last_order_at' => $order->ordered_at ?: $order->order_date,
+                'count' => $order->isCancelledOrder() ? 0 : 1,
+                'last_order_at' => $order->isCancelledOrder()
+                    ? null
+                    : ($order->ordered_at ?: $order->order_date),
             ];
         }
 
-        $count = max(1, (int) (clone $query)->count());
+        $count = (int) (clone $query)->count();
+        if (! $order->isCancelledOrder()) {
+            $count = max(1, $count);
+        }
         $lastOrderAt = (clone $query)
             ->selectRaw('COALESCE(ordered_at, order_date) as last_order_at')
             ->orderByRaw('COALESCE(ordered_at, order_date) DESC')
@@ -238,7 +243,7 @@ class MarketplaceOrderController extends Controller
 
         return [
             'count' => $count,
-            'last_order_at' => $lastOrderAt ?: ($order->ordered_at ?: $order->order_date),
+            'last_order_at' => $lastOrderAt ?: ($order->isCancelledOrder() ? null : ($order->ordered_at ?: $order->order_date)),
         ];
     }
 
