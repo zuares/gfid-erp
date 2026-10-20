@@ -201,7 +201,7 @@
         .ditem-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     .drepeat-table-wrap { overflow-x: auto; }
-    .drepeat-table { width: 100%; border-collapse: collapse; min-width: 1160px; }
+    .drepeat-table { width: 100%; border-collapse: collapse; min-width: 1400px; }
     .drepeat-table th { padding: .45rem .55rem; color: var(--dsh-muted); font-size: .65rem; font-weight: 700; text-align: left; border-bottom: 1px solid var(--dsh-border); white-space: nowrap; }
     .drepeat-table td { padding: .52rem .55rem; border-bottom: 1px solid var(--dsh-border); vertical-align: middle; font-size: .75rem; }
     .drepeat-table tr:last-child td { border-bottom: 0; }

@@ -76,7 +76,7 @@ class DashboardController extends Controller
 
     private function ownerData(): array
     {
-        $cacheKey = 'dashboard.owner.v8.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.owner.v9.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->ownerDataUncached());
     }
@@ -246,7 +246,7 @@ class DashboardController extends Controller
 
     private function adminData(): array
     {
-        $cacheKey = 'dashboard.admin.v9.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.admin.v10.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->adminDataUncached());
     }
@@ -701,7 +701,13 @@ class DashboardController extends Controller
 
             $itemsByOrder = [];
             if ($orders->isNotEmpty() && Schema::hasTable('marketplace_order_items')) {
-                $orderIds = $orders->pluck('id')->all();
+                $orderIds = $orders
+                    ->pluck('id')
+                    ->merge($orders->pluck('last_order_id'))
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
                 $items = DB::table('marketplace_order_items')
                     ->where(function ($query) use ($orderIds) {
                         $query->whereIn('marketplace_order_id', $orderIds)
@@ -747,6 +753,7 @@ class DashboardController extends Controller
 
                 $scannedLines = DB::table('shipment_lines as sl')
                     ->join('shipment_order_scans as sos', 'sos.id', '=', 'sl.shipment_order_scan_id')
+                    ->join('shipments as shipment', 'shipment.id', '=', 'sl.shipment_id')
                     ->leftJoin('order_fulfillments as fulfillment', 'fulfillment.id', '=', 'sos.fulfillment_id')
                     ->leftJoin('items as i', 'i.id', '=', 'sl.item_id')
                     ->where('sl.qty_scanned', '>', 0)
@@ -757,6 +764,7 @@ class DashboardController extends Controller
                         }
                     })
                     ->get([
+                        'sl.shipment_id',
                         'fulfillment.marketplace_order_id', 'sos.order_no',
                         'i.code as item_code', 'sl.item_id', 'sl.qty_scanned',
                     ]);
@@ -779,6 +787,7 @@ class DashboardController extends Controller
             return $orders->map(function ($row) use ($itemsByOrder, $scannedItemsByOrder) {
                 $data = (array) $row;
                 $data['items'] = $itemsByOrder[(int) $row->id] ?? [];
+                $data['last_items'] = $itemsByOrder[(int) ($row->last_order_id ?? 0)] ?? [];
                 $data['scanned_items'] = $scannedItemsByOrder[(int) $row->id] ?? [];
 
                 return $data;

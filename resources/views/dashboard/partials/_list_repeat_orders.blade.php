@@ -23,8 +23,10 @@
                             <th>Username</th>
                             <th>Order hari ini</th>
                             <th>No pesanan terakhir beli</th>
-                            <th>SKU marketplace</th>
-                            <th class="numeric">Qty</th>
+                            <th>SKU marketplace (hari ini)</th>
+                            <th class="numeric">Qty hari ini</th>
+                            <th>SKU marketplace (terakhir beli)</th>
+                            <th class="numeric">Qty terakhir</th>
                             <th>Item scan shipment</th>
                             <th class="numeric">Qty scan</th>
                             <th>Terakhir beli</th>
@@ -61,6 +63,20 @@
                                 </td>
                                 <td class="numeric drepeat-items">
                                     @forelse($row['items'] ?? [] as $item)
+                                        <div class="drepeat-item-line">{{ number_format((float) ($item['qty'] ?? 0), 0, ',', '.') }}</div>
+                                    @empty
+                                        —
+                                    @endforelse
+                                </td>
+                                <td class="drepeat-items">
+                                    @forelse($row['last_items'] ?? [] as $item)
+                                        <div class="drepeat-item-line"><code>{{ $item['sku'] ?: '—' }}</code></div>
+                                    @empty
+                                        —
+                                    @endforelse
+                                </td>
+                                <td class="numeric drepeat-items">
+                                    @forelse($row['last_items'] ?? [] as $item)
                                         <div class="drepeat-item-line">{{ number_format((float) ($item['qty'] ?? 0), 0, ',', '.') }}</div>
                                     @empty
                                         —
