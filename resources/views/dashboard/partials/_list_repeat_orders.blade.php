@@ -20,8 +20,11 @@
                     <thead>
                         <tr>
                             <th class="numeric">No</th>
-                            <th>Pembeli</th>
-                            <th>Order terbaru</th>
+                            <th>Username</th>
+                            <th>Order hari ini</th>
+                            <th>No pesanan terakhir beli</th>
+                            <th>SKU marketplace</th>
+                            <th class="numeric">Qty</th>
                             <th>Terakhir beli</th>
                             <th class="numeric">Order sebelumnya</th>
                             <th>Status</th>
@@ -32,8 +35,23 @@
                             @php($status = $statusMap[$row['order_status'] ?? ''] ?? [$row['order_status'] ?? '—', 'slate'])
                             <tr>
                                 <td class="numeric ditem-number">{{ $loop->iteration }}</td>
-                                <td class="drepeat-buyer">{{ $row['buyer_label'] ?: 'Tanpa nama' }}</td>
+                                <td class="drepeat-buyer">{{ $row['buyer_label'] ?: 'Tanpa username' }}</td>
                                 <td class="drepeat-order">{{ $row['order_number'] ?: '—' }}</td>
+                                <td class="drepeat-order">{{ $row['last_order_number'] ?: '—' }}</td>
+                                <td class="drepeat-items">
+                                    @forelse($row['items'] ?? [] as $item)
+                                        <div class="drepeat-item-line"><code>{{ $item['sku'] ?: '—' }}</code></div>
+                                    @empty
+                                        —
+                                    @endforelse
+                                </td>
+                                <td class="numeric drepeat-items">
+                                    @forelse($row['items'] ?? [] as $item)
+                                        <div class="drepeat-item-line">{{ number_format((float) ($item['qty'] ?? 0), 0, ',', '.') }}</div>
+                                    @empty
+                                        —
+                                    @endforelse
+                                </td>
                                 <td class="drepeat-date">
                                     {{ !empty($row['last_purchased_at']) ? \Carbon\Carbon::parse($row['last_purchased_at'])->translatedFormat('d M Y') : '—' }}
                                 </td>

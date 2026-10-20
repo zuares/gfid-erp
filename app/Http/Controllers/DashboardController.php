@@ -76,7 +76,7 @@ class DashboardController extends Controller
 
     private function ownerData(): array
     {
-        $cacheKey = 'dashboard.owner.v5.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.owner.v7.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->ownerDataUncached());
     }
@@ -246,7 +246,7 @@ class DashboardController extends Controller
 
     private function adminData(): array
     {
-        $cacheKey = 'dashboard.admin.v6.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.admin.v8.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->adminDataUncached());
     }
@@ -644,8 +644,12 @@ class DashboardController extends Controller
             $dateColumn = $this->mpDateCol();
             $buyerKey = "COALESCE(NULLIF(buyer_username, ''), NULLIF(buyer_name, ''))";
             $currentBuyerKey = "COALESCE(NULLIF(current.buyer_username, ''), NULLIF(current.buyer_name, ''))";
+            $previousBuyerKey = "COALESCE(NULLIF(previous.buyer_username, ''), NULLIF(previous.buyer_name, ''))";
             $completedHistory = DB::table('marketplace_orders')
                 ->where('order_status', 'COMPLETED')
+                ->whereNull('cancelled_at')
+                ->whereRaw("UPPER(COALESCE(status, '')) NOT IN ('CANCELLED', 'CANCELED')")
+                ->whereRaw("UPPER(COALESCE(order_status, '')) NOT IN ('CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING')")
                 ->whereRaw("{$buyerKey} IS NOT NULL")
                 ->select('store_id')
                 ->selectRaw("{$buyerKey} as buyer_key")
@@ -654,26 +658,76 @@ class DashboardController extends Controller
                 ->groupBy('store_id')
                 ->groupByRaw($buyerKey);
 
-            return DB::table('marketplace_orders as current')
+            $orders = DB::table('marketplace_orders as current')
                 ->joinSub($completedHistory, 'repeat_history', function ($join) use ($currentBuyerKey) {
                     $join->on('repeat_history.store_id', '=', 'current.store_id')
                         ->on('repeat_history.buyer_key', '=', DB::raw($currentBuyerKey));
                 })
                 ->whereIn('current.order_status', self::DASHBOARD_PENDING_ORDER_STATUSES)
+                ->whereNull('current.cancelled_at')
+                ->whereRaw("UPPER(COALESCE(current.status, '')) NOT IN ('CANCELLED', 'CANCELED')")
+                ->whereRaw("UPPER(COALESCE(current.order_status, '')) NOT IN ('CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING')")
                 ->whereBetween('current.' . $dateColumn, [$today->copy()->startOfDay(), $today->copy()->endOfDay()])
                 ->orderByDesc('current.' . $dateColumn)
-                ->limit($limit)
-                ->get([
+                ->limit($limit);
+
+            $lastOrderNumber = DB::table('marketplace_orders as previous')
+                ->where('previous.order_status', 'COMPLETED')
+                ->whereNull('previous.cancelled_at')
+                ->whereRaw("UPPER(COALESCE(previous.status, '')) NOT IN ('CANCELLED', 'CANCELED')")
+                ->whereRaw("UPPER(COALESCE(previous.order_status, '')) NOT IN ('CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING')")
+                ->whereColumn('previous.store_id', 'current.store_id')
+                ->whereRaw("{$previousBuyerKey} = {$currentBuyerKey}")
+                ->selectRaw("COALESCE(NULLIF(previous.external_invoice_no, ''), NULLIF(previous.external_order_id, ''), previous.channel_order_id, CONCAT('ORDER-', previous.id))")
+                ->orderByRaw('COALESCE(previous.ordered_at, previous.order_date, previous.created_at) DESC')
+                ->limit(1);
+
+            $orders = $orders
+                ->select([
                     'current.id',
-                    DB::raw("COALESCE(NULLIF(current.buyer_name, ''), NULLIF(current.buyer_username, ''), 'Tanpa nama') as buyer_label"),
+                    DB::raw("COALESCE(NULLIF(current.buyer_username, ''), 'Tanpa username') as buyer_label"),
                     DB::raw("COALESCE(NULLIF(current.external_invoice_no, ''), NULLIF(current.external_order_id, ''), current.channel_order_id, CONCAT('ORDER-', current.id)) as order_number"),
                     'current.order_status',
                     DB::raw('COALESCE(current.ordered_at, current.order_date, current.created_at) as ordered_at'),
                     DB::raw("CASE WHEN current.order_status = 'COMPLETED' THEN repeat_history.previous_order_count - 1 ELSE repeat_history.previous_order_count END as previous_order_count"),
                     'repeat_history.last_purchased_at',
                 ])
-                ->map(fn ($row) => (array) $row)
-                ->all();
+                ->selectSub($lastOrderNumber, 'last_order_number')
+                ->get();
+
+            $itemsByOrder = [];
+            if ($orders->isNotEmpty() && Schema::hasTable('marketplace_order_items')) {
+                $orderIds = $orders->pluck('id')->all();
+                $items = DB::table('marketplace_order_items')
+                    ->where(function ($query) use ($orderIds) {
+                        $query->whereIn('marketplace_order_id', $orderIds)
+                            ->orWhereIn('order_id', $orderIds);
+                    })
+                    ->get([
+                        'marketplace_order_id', 'order_id', 'marketplace_sku',
+                        'model_sku', 'item_sku', 'external_sku', 'qty',
+                    ]);
+
+                foreach ($items as $item) {
+                    $orderId = (int) ($item->marketplace_order_id ?: $item->order_id);
+                    if ($orderId < 1) {
+                        continue;
+                    }
+
+                    $sku = trim((string) ($item->marketplace_sku ?: ($item->model_sku ?: ($item->item_sku ?: $item->external_sku))));
+                    $itemsByOrder[$orderId][] = [
+                        'sku' => $sku !== '' ? $sku : 'SKU belum ada',
+                        'qty' => (float) ($item->qty ?? 0),
+                    ];
+                }
+            }
+
+            return $orders->map(function ($row) use ($itemsByOrder) {
+                $data = (array) $row;
+                $data['items'] = $itemsByOrder[(int) $row->id] ?? [];
+
+                return $data;
+            })->all();
         }, []);
     }
 
