@@ -9,7 +9,7 @@ final class PurchaseChannel
         $channel = strtolower(trim((string) ($value ?? '')));
 
         return match ($channel) {
-            'tiktok', 'tiktok shop' => 'tiktok',
+            'tiktok', 'tiktok shop', 'aplikasi tiktok', 'aplikasi tiktok shop' => 'tiktok',
             'tokopedia', 'tokopedia shop' => 'tokopedia',
             default => null,
         };
