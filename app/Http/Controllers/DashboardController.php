@@ -76,7 +76,7 @@ class DashboardController extends Controller
 
     private function ownerData(): array
     {
-        $cacheKey = 'dashboard.owner.v9.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.owner.v10.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->ownerDataUncached());
     }
@@ -246,7 +246,7 @@ class DashboardController extends Controller
 
     private function adminData(): array
     {
-        $cacheKey = 'dashboard.admin.v10.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.admin.v11.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->adminDataUncached());
     }
@@ -689,7 +689,7 @@ class DashboardController extends Controller
                     'current.id',
                     DB::raw("COALESCE(NULLIF(current.buyer_username, ''), 'Tanpa username') as buyer_label"),
                     DB::raw("COALESCE(NULLIF(current.external_invoice_no, ''), NULLIF(current.external_order_id, ''), current.channel_order_id, CONCAT('ORDER-', current.id)) as order_number"),
-                    'current.external_invoice_no', 'current.external_order_id', 'current.channel_order_id',
+                    'current.external_invoice_no', 'current.external_order_id', 'current.channel_order_id', 'current.shipping_awb_no',
                     'current.order_status',
                     DB::raw('COALESCE(current.ordered_at, current.order_date, current.created_at) as ordered_at'),
                     DB::raw("CASE WHEN current.order_status = 'COMPLETED' THEN repeat_history.previous_order_count - 1 ELSE repeat_history.previous_order_count END as previous_order_count"),
@@ -742,12 +742,18 @@ class DashboardController extends Controller
             ) {
                 $orderIds = $orders->pluck('id')->all();
                 $orderReferenceMap = [];
+                $orderAwbMap = [];
                 foreach ($orders as $order) {
                     foreach ([$order->external_invoice_no, $order->external_order_id, $order->channel_order_id] as $reference) {
                         $reference = trim((string) $reference);
                         if ($reference !== '') {
                             $orderReferenceMap[$reference] = (int) $order->id;
                         }
+                    }
+
+                    $awb = trim((string) $order->shipping_awb_no);
+                    if ($awb !== '') {
+                        $orderAwbMap[$awb] = (int) $order->id;
                     }
                 }
 
@@ -757,20 +763,27 @@ class DashboardController extends Controller
                     ->leftJoin('order_fulfillments as fulfillment', 'fulfillment.id', '=', 'sos.fulfillment_id')
                     ->leftJoin('items as i', 'i.id', '=', 'sl.item_id')
                     ->where('sl.qty_scanned', '>', 0)
-                    ->where(function ($query) use ($orderIds, $orderReferenceMap) {
+                    ->where(function ($query) use ($orderIds, $orderReferenceMap, $orderAwbMap) {
                         $query->whereIn('fulfillment.marketplace_order_id', $orderIds);
                         if ($orderReferenceMap !== []) {
                             $query->orWhereIn('sos.order_no', array_keys($orderReferenceMap));
+                        }
+                        if ($orderAwbMap !== []) {
+                            $query->orWhereIn('shipment.awb', array_keys($orderAwbMap));
                         }
                     })
                     ->get([
                         'sl.shipment_id',
                         'fulfillment.marketplace_order_id', 'sos.order_no',
+                        'shipment.awb as shipment_awb',
                         'i.code as item_code', 'sl.item_id', 'sl.qty_scanned',
                     ]);
 
                 foreach ($scannedLines as $line) {
-                    $orderId = (int) ($line->marketplace_order_id ?: ($orderReferenceMap[(string) $line->order_no] ?? 0));
+                    $orderId = (int) (
+                        $line->marketplace_order_id
+                        ?: ($orderReferenceMap[(string) $line->order_no] ?? ($orderAwbMap[(string) $line->shipment_awb] ?? 0))
+                    );
                     if ($orderId < 1) {
                         continue;
                     }

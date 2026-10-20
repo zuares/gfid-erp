@@ -22,10 +22,10 @@
                             <th class="numeric">No</th>
                             <th>Username</th>
                             <th>Order hari ini</th>
-                            <th>No pesanan terakhir beli</th>
-                            <th>SKU marketplace (hari ini)</th>
+                            <th>SKU hari ini</th>
                             <th class="numeric">Qty hari ini</th>
-                            <th>SKU marketplace (terakhir beli)</th>
+                            <th>Pesanan terakhir</th>
+                            <th>SKU terakhir</th>
                             <th class="numeric">Qty terakhir</th>
                             <th>Item scan shipment</th>
                             <th class="numeric">Qty scan</th>
@@ -48,13 +48,6 @@
                                     @endif
                                 </td>
                                 <td class="drepeat-order">
-                                    @if(!empty($row['last_order_id']))
-                                        <a class="drepeat-order-link" href="{{ route('marketplace.orders.show', ['order' => $row['last_order_id']]) }}">{{ $row['last_order_number'] ?: '—' }}</a>
-                                    @else
-                                        {{ $row['last_order_number'] ?: '—' }}
-                                    @endif
-                                </td>
-                                <td class="drepeat-items">
                                     @forelse($row['items'] ?? [] as $item)
                                         <div class="drepeat-item-line"><code>{{ $item['sku'] ?: '—' }}</code></div>
                                     @empty
@@ -67,6 +60,13 @@
                                     @empty
                                         —
                                     @endforelse
+                                </td>
+                                <td class="drepeat-order">
+                                    @if(!empty($row['last_order_id']))
+                                        <a class="drepeat-order-link" href="{{ route('marketplace.orders.show', ['order' => $row['last_order_id']]) }}">{{ $row['last_order_number'] ?: '—' }}</a>
+                                    @else
+                                        {{ $row['last_order_number'] ?: '—' }}
+                                    @endif
                                 </td>
                                 <td class="drepeat-items">
                                     @forelse($row['last_items'] ?? [] as $item)
