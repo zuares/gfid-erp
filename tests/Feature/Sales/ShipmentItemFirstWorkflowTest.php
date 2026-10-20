@@ -589,6 +589,31 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $this->assertDatabaseCount('shipment_waves', 0);
     }
 
+    public function test_single_marketplace_shipment_without_order_scan_is_not_blocked_on_confirmation(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-ITEM-ONLY-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'dispatch_mode' => Shipment::DISPATCH_SINGLE,
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertDontSee('Shipment marketplace wajib memiliki minimal satu nomor order.');
+    }
+
     public function test_unknown_item_is_rejected_before_creating_daily_wave(): void
     {
         [$user, $store] = $this->shipmentContext();

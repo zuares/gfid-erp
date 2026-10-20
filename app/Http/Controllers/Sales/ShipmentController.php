@@ -2541,9 +2541,12 @@ class ShipmentController extends Controller
                 return ($payload['mode'] ?? null) === 'record_only';
             });
             $hasLinkedScan = $scans->contains(fn ($scan) => !empty($scan->fulfillment_id));
-            $recordOnlyBatch = $hasRecordOnlyScan && !$hasLinkedScan;
+            // Tanpa scan order sama sekali, shipment single diperlakukan
+            // sebagai batch item-only sementara. Mode gelombang tetap wajib
+            // melewati validasi order di bawah.
+            $recordOnlyBatch = $scans->isEmpty() || ($hasRecordOnlyScan && !$hasLinkedScan);
 
-            if ($recordOnlyBatch && !$this->salesOperationalSetting('allow_unlinked_submit', false)) {
+            if ($hasRecordOnlyScan && $recordOnlyBatch && !$this->salesOperationalSetting('allow_unlinked_submit', false)) {
                 abort(422, 'Shipment record-only belum diizinkan untuk disubmit. Aktifkan Boleh submit record-only di Pengaturan Operasional Penjualan.');
             }
 
@@ -3582,6 +3585,10 @@ class ShipmentController extends Controller
         $errors = [];
 
         if ($activeScans->isEmpty()) {
+            if (!$wave && !$this->usesDailyWaves($shipment)) {
+                return [];
+            }
+
             $errors[] = 'Shipment marketplace wajib memiliki minimal satu nomor order.';
             return $errors;
         }
