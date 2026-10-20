@@ -394,16 +394,130 @@ class DashboardController extends Controller
             if (!Schema::hasTable('marketplace_orders')) {
                 return [];
             }
-            return DB::table('marketplace_orders')
+
+            $orders = DB::table('marketplace_orders')
                 ->whereIn('order_status', ['PROCESSED', 'READY_TO_SHIP', 'TO_CONFIRM_RECEIVE'])
                 ->orderByDesc($this->mpDateCol())
                 ->limit($limit)
                 ->get([
+                    'id',
                     'external_invoice_no', 'external_order_id', 'buyer_name',
                     'shipping_city', 'shipping_courier_code', 'order_status',
                     DB::raw('COALESCE(total_amount, total_paid_customer, 0) as amount'),
-                ])
-                ->map(fn ($r) => (array) $r)
+                ]);
+
+            if ($orders->isEmpty() || ! Schema::hasTable('marketplace_order_items')) {
+                return $orders
+                    ->map(fn ($r) => array_merge((array) $r, ['items' => []]))
+                    ->all();
+            }
+
+            // Data marketplace lama memakai order_id, sedangkan data omnichannel
+            // baru memakai marketplace_order_id. Ambil keduanya agar daftar
+            // dashboard tetap lengkap saat data berasal dari dua alur sync.
+            $orderItemOrderColumns = collect(['marketplace_order_id', 'order_id'])
+                ->filter(fn ($column) => Schema::hasColumn('marketplace_order_items', $column))
+                ->values()
+                ->all();
+
+            if ($orderItemOrderColumns === []) {
+                return $orders
+                    ->map(fn ($r) => array_merge((array) $r, ['items' => []]))
+                    ->all();
+            }
+
+            $orderIds = $orders->pluck('id')->all();
+            $orderItems = DB::table('marketplace_order_items')
+                ->where(function ($query) use ($orderItemOrderColumns, $orderIds) {
+                    foreach ($orderItemOrderColumns as $index => $column) {
+                        $method = $index === 0 ? 'whereIn' : 'orWhereIn';
+                        $query->{$method}($column, $orderIds);
+                    }
+                })
+                ->get();
+
+            $itemIdColumns = collect(['internal_item_id', 'item_id'])
+                ->filter(fn ($column) => Schema::hasColumn('marketplace_order_items', $column))
+                ->values()
+                ->all();
+            $itemIds = collect($orderItems)
+                ->map(function ($item) use ($itemIdColumns) {
+                    foreach ($itemIdColumns as $column) {
+                        if (! empty($item->{$column})) {
+                            return (int) $item->{$column};
+                        }
+                    }
+                    return null;
+                })
+                ->filter()
+                ->unique()
+                ->values();
+
+            // Untuk kebutuhan fulfillment, stok yang ditampilkan adalah stok
+            // siap jual di gudang barang jadi (FG) dan ready-to-ship (RTS).
+            $stockByItemId = collect();
+            if ($itemIds->isNotEmpty()
+                && Schema::hasTable('inventory_stocks')
+                && Schema::hasTable('warehouses')) {
+                $stockByItemId = DB::table('inventory_stocks as s')
+                    ->join('warehouses as w', 'w.id', '=', 's.warehouse_id')
+                    ->whereIn('w.code', [self::WH['FG'], self::WH['RTS']])
+                    ->whereIn('s.item_id', $itemIds->all())
+                    ->groupBy('s.item_id')
+                    ->pluck(DB::raw('COALESCE(SUM(s.qty), 0)'), 's.item_id');
+            }
+
+            $itemsByOrder = [];
+            foreach ($orderItems as $item) {
+                $itemData = (array) $item;
+                $orderId = null;
+                foreach ($orderItemOrderColumns as $column) {
+                    if (! empty($itemData[$column])) {
+                        $orderId = (int) $itemData[$column];
+                        break;
+                    }
+                }
+                if (! $orderId) {
+                    continue;
+                }
+
+                $internalItemId = null;
+                foreach ($itemIdColumns as $column) {
+                    if (! empty($itemData[$column])) {
+                        $internalItemId = (int) $itemData[$column];
+                        break;
+                    }
+                }
+
+                $name = $itemData['item_name']
+                    ?? $itemData['item_name_snapshot']
+                    ?? 'Produk belum dipetakan';
+                $variant = $itemData['variant_name']
+                    ?? $itemData['variant_snapshot']
+                    ?? null;
+                $sku = $itemData['model_sku']
+                    ?? $itemData['item_sku']
+                    ?? $itemData['marketplace_sku']
+                    ?? $itemData['external_sku']
+                    ?? $itemData['item_code_snapshot']
+                    ?? null;
+
+                $itemsByOrder[$orderId][] = [
+                    'name' => trim((string) $name) ?: 'Produk belum dipetakan',
+                    'variant' => trim((string) $variant),
+                    'sku' => trim((string) $sku),
+                    'qty' => (float) ($itemData['qty'] ?? 0),
+                    'stock_qty' => $internalItemId ? (float) ($stockByItemId[$internalItemId] ?? 0) : null,
+                    'mapped' => (bool) $internalItemId,
+                ];
+            }
+
+            return $orders
+                ->map(function ($order) use ($itemsByOrder) {
+                    return array_merge((array) $order, [
+                        'items' => $itemsByOrder[(int) $order->id] ?? [],
+                    ]);
+                })
                 ->all();
         }, []);
     }

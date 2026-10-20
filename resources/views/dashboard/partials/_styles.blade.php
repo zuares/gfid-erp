@@ -137,6 +137,17 @@
     .drow .val { font-weight: 650; font-size: .82rem; white-space: nowrap; color: var(--text, #0f172a); }
     .drow .val.red { color: #dc2626; }
     body[data-theme="dark"] .drow .val.red { color: #fca5a5; }
+    .order-products { display: grid; gap: .35rem; margin-top: .45rem; }
+    .order-product { display: flex; align-items: center; gap: .55rem; padding: .35rem .45rem; border: 1px solid var(--dsh-border); border-radius: 6px; background: rgba(148,163,184,.04); }
+    .order-product-main { min-width: 0; flex: 1; }
+    .order-product-name { color: var(--text, #0f172a); font-size: .76rem; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .order-product .meta { font-size: .66rem; }
+    .order-stock { display: grid; gap: .05rem; min-width: 70px; text-align: right; color: var(--dsh-muted); font-size: .61rem; line-height: 1.1; }
+    .order-stock strong { color: #166534; font-size: .77rem; }
+    .order-stock.short strong { color: #dc2626; }
+    body[data-theme="dark"] .order-stock strong { color: #bbf7d0; }
+    body[data-theme="dark"] .order-stock.short strong { color: #fca5a5; }
+    .order-items-empty { margin-top: .35rem; font-style: italic; }
 
     /* ---------- Badge (mirip badge-status + dot) ---------- */
     .pill { display: inline-flex; align-items: center; gap: .32rem; border-radius: 7px; padding: .14rem .45rem;

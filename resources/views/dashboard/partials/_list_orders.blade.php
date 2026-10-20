@@ -27,6 +27,35 @@
                         @if(!empty($row['shipping_city'])) · {{ $row['shipping_city'] }}@endif
                         @if(!empty($row['shipping_courier_code'])) · {{ $row['shipping_courier_code'] }}@endif
                     </div>
+                    @if(!empty($row['items']))
+                        <div class="order-products">
+                            @foreach($row['items'] as $item)
+                                @php
+                                    $orderedQty = (float) ($item['qty'] ?? 0);
+                                    $stockQty = $item['stock_qty'] ?? null;
+                                    $stockShort = $stockQty !== null && $stockQty < $orderedQty;
+                                @endphp
+                                <div class="order-product">
+                                    <div class="order-product-main">
+                                        <div class="order-product-name">
+                                            {{ $item['name'] ?: 'Produk belum dipetakan' }}
+                                            @if(!empty($item['variant'])) · {{ $item['variant'] }} @endif
+                                        </div>
+                                        <div class="meta">
+                                            @if(!empty($item['sku'])){{ $item['sku'] }} · @endif
+                                            Pesan {{ number_format($orderedQty, 0, ',', '.') }} pcs
+                                        </div>
+                                    </div>
+                                    <div class="order-stock {{ $stockShort ? 'short' : '' }}">
+                                        <span>Stok FG/RTS</span>
+                                        <strong>{{ $stockQty === null ? '—' : number_format($stockQty, 0, ',', '.') }}</strong>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="meta order-items-empty">Detail produk belum tersedia</div>
+                    @endif
                 </div>
                 <div style="text-align:right;">
                     @if($showAmount)
