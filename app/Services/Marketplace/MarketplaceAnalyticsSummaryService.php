@@ -4,6 +4,7 @@ namespace App\Services\Marketplace;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Small, server-side summary for the Marketplace Analytics page.
@@ -1776,10 +1777,8 @@ class MarketplaceAnalyticsSummaryService
 
     private function adsAggregate(array $filters): array
     {
-        $row = $this->adsBase($filters)
-            ->selectRaw('COALESCE(SUM(spend), 0) AS ad_cost_before_tax')
-            ->first();
-        $beforeTax = (float) ($row->ad_cost_before_tax ?? 0);
+        $beforeTax = (float) collect($this->adsFacts($filters))
+            ->sum(fn (array $row): float => (float) ($row['spend'] ?? 0));
 
         return [
             'ad_cost_before_tax' => round($beforeTax, 2),
@@ -1790,16 +1789,14 @@ class MarketplaceAnalyticsSummaryService
 
     private function adsDaily(array $filters): array
     {
-        return $this->adsBase($filters)
-            ->selectRaw('date, COALESCE(SUM(spend), 0) AS ad_cost_before_tax')
+        return collect($this->adsFacts($filters))
             ->groupBy('date')
-            ->orderBy('date')
-            ->get()
-            ->map(function ($row) {
-                $beforeTax = (float) ($row->ad_cost_before_tax ?? 0);
+            ->sortKeys()
+            ->map(function ($rows, string $date): array {
+                $beforeTax = (float) $rows->sum(fn (array $row): float => (float) ($row['spend'] ?? 0));
 
                 return [
-                    'date' => (string) $row->date,
+                    'date' => $date,
                     'ad_cost_before_tax' => round($beforeTax, 2),
                     'ad_cost_vat' => round($beforeTax * self::ADS_VAT_RATE, 2),
                     'ad_cost' => round($beforeTax * (1 + self::ADS_VAT_RATE), 2),
@@ -1811,13 +1808,19 @@ class MarketplaceAnalyticsSummaryService
 
     private function adsStoreSummary(array $filters)
     {
-        return $this->adsBase($filters)
-            ->join('stores as st', 'st.id', '=', 'marketplace_ads_dailies.store_id')
-            ->selectRaw('marketplace_ads_dailies.store_id, st.name as store_name, COALESCE(SUM(marketplace_ads_dailies.spend), 0) AS ad_cost_before_tax')
-            ->groupBy('marketplace_ads_dailies.store_id', 'st.name')
-            ->get()
-            ->map(function ($row) {
-                $beforeTax = (float) ($row->ad_cost_before_tax ?? 0);
+        $spendByStore = collect($this->adsFacts($filters))
+            ->groupBy('store_id')
+            ->map(fn ($rows): float => (float) $rows->sum(fn (array $row): float => (float) ($row['spend'] ?? 0)));
+
+        if ($spendByStore->isEmpty()) {
+            return collect();
+        }
+
+        return DB::table('stores as st')
+            ->whereIn('st.id', $spendByStore->keys()->all())
+            ->get(['st.id as store_id', 'st.name as store_name'])
+            ->map(function ($row) use ($spendByStore) {
+                $beforeTax = (float) ($spendByStore->get((int) $row->store_id) ?? 0);
                 $row->ad_cost_before_tax = round($beforeTax, 2);
                 $row->ad_cost_vat = round($beforeTax * self::ADS_VAT_RATE, 2);
                 $row->ad_cost = round($beforeTax * (1 + self::ADS_VAT_RATE), 2);
@@ -1826,11 +1829,58 @@ class MarketplaceAnalyticsSummaryService
             });
     }
 
-    private function adsBase(array $filters)
+    /**
+     * Return one authoritative ad-spend fact per store/day.
+     *
+     * Ads API facts take precedence. Imported income reports (including
+     * TikTok advertising deductions) fill the gap when a store/day has no
+     * positive API spend, matching AdsDashboardService's source policy.
+     *
+     * @return array<int, array{store_id: int, date: string, spend: float}>
+     */
+    private function adsFacts(array $filters): array
     {
-        return DB::table('marketplace_ads_dailies')
+        $apiRows = DB::table('marketplace_ads_dailies')
             ->whereBetween('date', [$filters['date_from'], $filters['date_to']])
-            ->when($filters['store_id'], fn ($q, $storeId) => $q->where('store_id', $storeId));
+            ->when($filters['store_id'], fn ($q, $storeId) => $q->where('store_id', $storeId))
+            ->selectRaw('store_id, date, COALESCE(SUM(spend), 0) AS spend')
+            ->groupBy('store_id', 'date')
+            ->get();
+
+        $importedRows = collect();
+        if (Schema::hasTable('marketplace_imported_ad_spends')) {
+            $importedRows = DB::table('marketplace_imported_ad_spends')
+                ->whereBetween('date', [$filters['date_from'], $filters['date_to']])
+                ->when($filters['store_id'], fn ($q, $storeId) => $q->where('store_id', $storeId))
+                ->selectRaw('store_id, date, COALESCE(SUM(spend), 0) AS spend')
+                ->groupBy('store_id', 'date')
+                ->get();
+        }
+
+        $apiByKey = $apiRows->keyBy(fn ($row): string => ((int) $row->store_id).'|'.substr((string) $row->date, 0, 10));
+        $importedByKey = $importedRows->keyBy(fn ($row): string => ((int) $row->store_id).'|'.substr((string) $row->date, 0, 10));
+        $facts = [];
+
+        foreach ($apiByKey->keys()->merge($importedByKey->keys())->unique() as $key) {
+            $api = $apiByKey->get($key);
+            $imported = $importedByKey->get($key);
+            $spend = $api && (float) ($api->spend ?? 0) > 0
+                ? (float) $api->spend
+                : (float) ($imported->spend ?? 0);
+
+            if ($spend <= 0) {
+                continue;
+            }
+
+            [$storeId, $date] = explode('|', $key, 2);
+            $facts[] = [
+                'store_id' => (int) $storeId,
+                'date' => $date,
+                'spend' => $spend,
+            ];
+        }
+
+        return $facts;
     }
 
     private function operationalBase(array $filters)

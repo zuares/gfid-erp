@@ -18,6 +18,7 @@ use App\Services\Marketplace\Import\MpImportService;
 use App\Services\Marketplace\Income\ImportedMarketplaceIncomeSyncService;
 use App\Services\Marketplace\Income\MpIncomeImportService;
 use App\Services\Marketplace\Ads\AdsDashboardService;
+use App\Services\Marketplace\MarketplaceAnalyticsSummaryService;
 use App\Services\Marketplace\Source\TiktokApiSourceAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -1170,5 +1171,15 @@ class MarketplaceTikTokImportTest extends TestCase
         );
 
         $this->assertSame(17000.0, (float) data_get($daily->get('2026-10-13'), 'spend'));
+
+        $summary = app(MarketplaceAnalyticsSummaryService::class)->summary([
+            'store_id' => $store->id,
+            'date_from' => '2026-10-13',
+            'date_to' => '2026-10-13',
+            'compare_mode' => 'prev_period',
+        ]);
+
+        $this->assertSame(18870.0, (float) $summary['current']['ad_cost']);
+        $this->assertSame(18870.0, (float) data_get($summary, 'daily.0.ad_cost'));
     }
 }
