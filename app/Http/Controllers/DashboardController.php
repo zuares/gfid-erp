@@ -34,6 +34,7 @@ class DashboardController extends Controller
 
     /** Status order yang masih perlu diproses/dikemas oleh tim. */
     private const DASHBOARD_PENDING_ORDER_STATUSES = ['READY_TO_SHIP', 'PROCESSED'];
+    private const PRODUCTION_WAREHOUSE_CODES = ['WIP-CUT', 'WIP-SEW', 'WIP-FIN', 'WIP-PACK'];
 
     public function __construct(
         private InventoryIntelligenceService $inventoryIntelligence,
@@ -75,7 +76,7 @@ class DashboardController extends Controller
 
     private function ownerData(): array
     {
-        $cacheKey = 'dashboard.owner.v4.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.owner.v5.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->ownerDataUncached());
     }
@@ -245,7 +246,7 @@ class DashboardController extends Controller
 
     private function adminData(): array
     {
-        $cacheKey = 'dashboard.admin.v4.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.admin.v5.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->adminDataUncached());
     }
@@ -478,28 +479,48 @@ class DashboardController extends Controller
                 ->unique()
                 ->values();
 
-            // Untuk kebutuhan fulfillment, stok yang ditampilkan adalah stok
-            // siap jual di gudang barang jadi (FG) dan ready-to-ship (RTS).
+            // Stok siap jual tetap dipisahkan dari stok yang masih berada di
+            // proses produksi agar selisih fulfillment tidak tertutup.
             $stockByItemId = collect();
             if ($itemIds->isNotEmpty()
                 && Schema::hasTable('inventory_stocks')
                 && Schema::hasTable('warehouses')) {
+                $sellableWarehouseCodes = [self::WH['FG'], self::WH['RTS']];
+                $stockWarehouseCodes = array_merge($sellableWarehouseCodes, self::PRODUCTION_WAREHOUSE_CODES);
                 $stockByItemId = DB::table('inventory_stocks as s')
                     ->join('warehouses as w', 'w.id', '=', 's.warehouse_id')
-                    ->whereIn('w.code', [self::WH['FG'], self::WH['RTS']])
+                    ->whereIn('w.code', $stockWarehouseCodes)
                     ->whereIn('s.item_id', $itemIds->all())
                     ->select('s.item_id')
-                    ->selectRaw('COALESCE(SUM(s.qty), 0) as stock_qty')
+                    ->selectRaw(
+                        'COALESCE(SUM(CASE WHEN w.code IN (?, ?) THEN s.qty ELSE 0 END), 0) as stock_qty',
+                        $sellableWarehouseCodes,
+                    )
+                    ->selectRaw(
+                        'COALESCE(SUM(CASE WHEN w.code IN (?, ?, ?, ?) THEN s.qty ELSE 0 END), 0) as production_stock_qty',
+                        self::PRODUCTION_WAREHOUSE_CODES,
+                    )
                     ->groupBy('s.item_id')
                     ->get()
-                    ->pluck('stock_qty', 'item_id');
+                    ->keyBy('item_id');
             }
 
             $internalItemsById = collect();
             if ($itemIds->isNotEmpty() && Schema::hasTable('items')) {
-                $internalItemsById = DB::table('items')
-                    ->whereIn('id', $itemIds->all())
-                    ->get(['id', 'code', 'name'])
+                $itemsQuery = DB::table('items as i');
+                $itemSelect = ['i.id', 'i.code', 'i.name'];
+                if (
+                    Schema::hasTable('item_categories')
+                    && Schema::hasColumn('items', 'item_category_id')
+                ) {
+                    $itemsQuery->leftJoin('item_categories as c', 'c.id', '=', 'i.item_category_id');
+                    $itemSelect[] = 'c.code as category_code';
+                    $itemSelect[] = 'c.name as category_name';
+                }
+
+                $internalItemsById = $itemsQuery
+                    ->whereIn('i.id', $itemIds->all())
+                    ->get($itemSelect)
                     ->keyBy('id');
             }
 
@@ -538,17 +559,20 @@ class DashboardController extends Controller
                     ?? $itemData['external_sku']
                     ?? $itemData['item_code_snapshot']
                     ?? null;
+                $stockData = $internalItemId ? $stockByItemId->get($internalItemId) : null;
 
                 $itemsByOrder[$orderId][] = [
                     'name' => trim((string) $name) ?: 'Produk belum dipetakan',
                     'variant' => trim((string) $variant),
                     'sku' => trim((string) $sku),
                     'qty' => (float) ($itemData['qty'] ?? 0),
-                    'stock_qty' => $internalItemId ? (float) ($stockByItemId[$internalItemId] ?? 0) : null,
+                    'stock_qty' => $internalItemId ? (float) ($stockData->stock_qty ?? 0) : null,
+                    'production_stock_qty' => $internalItemId ? (float) ($stockData->production_stock_qty ?? 0) : null,
                     'mapped' => (bool) $internalItemId,
                     'internal_item_id' => $internalItemId,
                     'internal_code' => $internalItem?->code,
                     'internal_name' => $internalItem?->name,
+                    'internal_category' => $internalItem?->category_name ?: ($internalItem?->category_code ?? null),
                 ];
             }
 
@@ -580,8 +604,10 @@ class DashboardController extends Controller
                         $grouped[$key] = [
                             'name' => $item['internal_name'] ?: ($item['name'] ?? 'Produk belum dipetakan'),
                             'code' => $item['internal_code'] ?: ($item['sku'] ?? ''),
+                            'category' => $item['internal_category'] ?: 'Tanpa kategori',
                             'demand_qty' => 0,
                             'stock_qty' => $item['stock_qty'] ?? null,
+                            'production_stock_qty' => $item['production_stock_qty'] ?? null,
                             'mapped' => $internalItemId > 0,
                         ];
                     }
@@ -592,8 +618,16 @@ class DashboardController extends Controller
 
             $rows = array_values($grouped);
             usort($rows, fn ($a, $b) => $b['demand_qty'] <=> $a['demand_qty']);
+            $rows = array_slice($rows, 0, $limit);
+            usort($rows, function ($a, $b) {
+                $categoryOrder = strcasecmp((string) ($a['category'] ?? ''), (string) ($b['category'] ?? ''));
 
-            return array_slice($rows, 0, $limit);
+                return $categoryOrder !== 0
+                    ? $categoryOrder
+                    : ($b['demand_qty'] <=> $a['demand_qty']);
+            });
+
+            return $rows;
         }, []);
     }
 
