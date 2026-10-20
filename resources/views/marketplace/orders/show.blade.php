@@ -71,6 +71,7 @@
 .od-finance-head-values{display:grid;justify-items:end;gap:.18rem;text-align:right}
 .od-finance-cogs{display:flex;align-items:center;gap:.35rem;color:var(--muted,#64748b);font-size:.7rem;white-space:nowrap}
 .od-finance-cogs strong{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:800;color:var(--text,#172033);font-variant-numeric:tabular-nums}
+.od-finance-percent{font-size:.68em;font-weight:750;color:var(--muted,#64748b);white-space:nowrap}
 .od-finance-body{display:grid;gap:.8rem}
 .od-finance-group{display:grid;gap:.48rem}
 .od-finance-group-title{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding-bottom:.35rem;border-bottom:1px solid #eef1f4;color:var(--text,#172033);font-size:.76rem;font-weight:800}
@@ -868,6 +869,12 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         $profitAfterAds = $grossProfit !== null && $orderAdCost !== null
             ? round($grossProfit - $orderAdCost, 2)
             : null;
+        $marginBase = max($subtotal, 0);
+        $cogsPct = $hppComplete && $marginBase > 0 ? round(($hppTotal / $marginBase) * 100, 2) : null;
+        $adPct = $orderAdCost !== null && $marginBase > 0 ? round(($orderAdCost / $marginBase) * 100, 2) : null;
+        $marketplaceFeeTotal = (float) $grandFeeBreakdownTotal;
+        $marketplaceFeePct = $marginBase > 0 ? round(($marketplaceFeeTotal / $marginBase) * 100, 2) : null;
+        $grossProfitPct = $grossProfit !== null && $marginBase > 0 ? round(($grossProfit / $marginBase) * 100, 2) : null;
     @endphp
 
     <div class="od-card od-order-profitability">
@@ -931,12 +938,14 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                         <span>Total COGS</span>
                         <strong style="color:{{ $hppComplete ? 'var(--text,#172033)' : '#b45309' }}">
                             {{ $hppComplete ? 'Rp'.number_format($hppTotal, 0, ',', '.') : 'Belum lengkap' }}
+                            @if($cogsPct !== null)<span class="od-finance-percent">({{ number_format($cogsPct, 2, ',', '.') }}%)</span>@endif
                         </strong>
                     </div>
                     <div class="od-finance-cogs">
                         <span>Biaya iklan / order</span>
                         <strong style="color:{{ $orderAdCost !== null ? 'var(--text,#172033)' : '#b45309' }}">
                             {{ $orderAdCost !== null ? 'Rp'.number_format($orderAdCost, 0, ',', '.') : 'Belum tersedia' }}
+                            @if($adPct !== null)<span class="od-finance-percent">({{ number_format($adPct, 2, ',', '.') }}%)</span>@endif
                         </strong>
                     </div>
                 </div>
@@ -968,7 +977,10 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                 <div class="od-finance-group">
                     <div class="od-finance-group-title">
                         <span>Rincian Biaya Marketplace</span>
-                        <span style="color:#b91c1c">-Rp{{ number_format($sellerFeeBreakdownTotal + $voucherFeeBreakdownTotal + $buyerFeeBreakdownTotal + $platformFeeBreakdownTotal + $adjustmentFeeBreakdownTotal, 0, ',', '.') }}</span>
+                        <span style="color:#b91c1c">
+                            -Rp{{ number_format($marketplaceFeeTotal, 0, ',', '.') }}
+                            @if($marketplaceFeePct !== null)<small class="od-finance-percent">({{ number_format($marketplaceFeePct, 2, ',', '.') }}%)</small>@endif
+                        </span>
                     </div>
 
                     <div class="od-finance-tabs">
@@ -1081,6 +1093,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                     <span>{{ $isEstimasi ? 'Estimasi Laba Kotor' : 'Laba Kotor' }}</span>
                     <span style="color:{{ $grossProfit === null ? '#b45309' : ($grossProfit < 0 ? '#b91c1c' : '#15803d') }}">
                         {{ $grossProfit !== null ? 'Rp'.number_format($grossProfit, 0, ',', '.') : 'Belum lengkap' }}
+                        @if($grossProfitPct !== null)<small class="od-finance-percent">({{ number_format($grossProfitPct, 2, ',', '.') }}%)</small>@endif
                     </span>
                 </div>
             </div>
