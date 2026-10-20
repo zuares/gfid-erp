@@ -5,6 +5,7 @@ namespace App\Services\Marketplace\Import;
 use App\Models\MpShipment;
 use App\Models\MpShipmentItem;
 use App\Models\MarketplaceOrder;
+use App\Services\Marketplace\Income\ImportedMarketplaceIncomeSyncService;
 use App\Services\Marketplace\Import\Adapters\MpImportAdapterInterface;
 use App\Services\Marketplace\MpPacketItemSyncService;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,9 @@ class MpImportService
     /** @var array<string, MpImportAdapterInterface> */
     protected array $adapters = [];
 
-    public function __construct()
+    public function __construct(
+        protected ImportedMarketplaceIncomeSyncService $storedIncomeSync,
+    )
     {
         $this->register(app(\App\Services\Marketplace\Import\Adapters\ShopeeImportAdapter::class));
         $this->register(app(\App\Services\Marketplace\Import\Adapters\TiktokImportAdapter::class));
@@ -59,6 +62,11 @@ class MpImportService
             'inserted_items' => 0,
             'new_shipments' => 0,
             'existing_shipments' => 0,
+            'settlements_created' => 0,
+            'settlements_updated' => 0,
+            'api_settlements_preserved' => 0,
+            'income_mismatches' => 0,
+            'profit_incomplete' => 0,
             'purchase_channels' => [],
             'warnings' => [],
             'dry_run' => $dryRun,
@@ -313,6 +321,21 @@ class MpImportService
                 );
                 if (! empty($salesOrder['order_id']) && (int) $mp->marketplace_order_id !== (int) $salesOrder['order_id']) {
                     $mp->forceFill(['marketplace_order_id' => (int) $salesOrder['order_id']])->save();
+                }
+
+                // Income bisa masuk lebih dulu daripada order. Setelah order
+                // tersedia, sambungkan income tersimpan tanpa upload ulang.
+                $incomeSync = $this->storedIncomeSync->syncStoredIncomeForOrder(
+                    (int) $storeId,
+                    (string) ($s['channel'] ?? $channel),
+                    (string) ($s['platform_order_id'] ?? ''),
+                );
+                if (! empty($incomeSync['found'])) {
+                    $stats['settlements_created'] += (int) ($incomeSync['settlements_created'] ?? 0);
+                    $stats['settlements_updated'] += (int) ($incomeSync['settlements_updated'] ?? 0);
+                    $stats['api_settlements_preserved'] += (int) ($incomeSync['api_settlements_preserved'] ?? 0);
+                    $stats['income_mismatches'] += (int) ($incomeSync['income_mismatches'] ?? 0);
+                    $stats['profit_incomplete'] += (int) ($incomeSync['profit_incomplete'] ?? 0);
                 }
 
                 $stats['warnings'] = array_values(array_unique(array_merge(

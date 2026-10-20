@@ -161,6 +161,34 @@ class AdsDashboardService
             ->get()
             ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
 
+        // Income CSV/XLSX reports can contain actual advertising deductions
+        // even when the ads API has not been connected. Use those imported
+        // daily facts only as a fallback; API metrics remain authoritative.
+        if (Schema::hasTable('marketplace_imported_ad_spends')) {
+            $importedAds = DB::table('marketplace_imported_ad_spends')
+                ->whereIn('store_id', $storeIds)
+                ->whereBetween('date', [$dateFrom, $dateTo])
+                ->selectRaw('date, SUM(spend) as spend')
+                ->groupBy('date')
+                ->get();
+
+            foreach ($importedAds as $row) {
+                $date = substr((string) $row->date, 0, 10);
+                $importedSpend = (float) ($row->spend ?? 0);
+                $apiRow = $shop->get($date);
+                if (! $apiRow || (float) ($apiRow->spend ?? 0) <= 0) {
+                    $shop->put($date, (object) [
+                        'date' => $date,
+                        'spend' => $importedSpend,
+                        'impressions' => (int) ($apiRow->impressions ?? 0),
+                        'clicks' => (int) ($apiRow->clicks ?? 0),
+                        'orders' => (int) ($apiRow->orders ?? 0),
+                        'gmv' => (float) ($apiRow->gmv ?? 0),
+                    ]);
+                }
+            }
+        }
+
         // Data daily dari Shopee dapat tertinggal untuk hari aktif. Sync hourly
         // sudah menyimpan snapshot toko yang lebih baru, jadi gunakan hourly
         // sebagai sumber terbaru untuk hari ini dan kemarin.

@@ -19,6 +19,7 @@ use App\Models\Store;
 use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use App\Services\Marketplace\PurchaseChannel;
+use App\Services\Marketplace\Income\ImportedMarketplaceIncomeSyncService;
 use App\Services\Channels\ChannelManager;
 use App\Services\Channels\Contracts\MarketplaceChannel;
 use Carbon\Carbon;
@@ -73,6 +74,7 @@ class MarketplaceSyncService
     public function __construct(
         protected MarketplaceApiGateway $gateway,
         protected OrderFulfillmentService $fulfillment,
+        protected ImportedMarketplaceIncomeSyncService $storedIncomeSync,
         protected MarketplaceIssueService $issueService = new MarketplaceIssueService(),
         protected MarketplaceFinancialDataQualityService $financialQuality = new MarketplaceFinancialDataQualityService(),
     ) {}
@@ -3303,6 +3305,18 @@ class MarketplaceSyncService
                 } elseif (in_array($orderStatus, ['READY_TO_SHIP', 'PROCESSED'])) {
                     $outerStats['ready']++;
                 }
+
+                // Income manual dapat tersimpan sebelum order hasil API masuk.
+                // Reconcile di sini membuat payout langsung tersambung tanpa
+                // upload ulang file income atau tindakan manual tambahan.
+                $incomeChannel = $this->incomeChannelForStore($store);
+                if ($incomeChannel !== null) {
+                    $this->storedIncomeSync->syncStoredIncomeForOrder(
+                        (int) $store->id,
+                        $incomeChannel,
+                        (string) $order->channel_order_id,
+                    );
+                }
             }
         });
         } // akhir per-batch (array_chunk)
@@ -3366,6 +3380,25 @@ class MarketplaceSyncService
                 Log::warning("Gagal buat fulfillment draft order #{$order->id}: " . $e->getMessage());
             }
         }
+    }
+
+    private function incomeChannelForStore(Store $store): ?string
+    {
+        $store->loadMissing('channel');
+        $value = strtoupper(trim(
+            (string) ($store->channel?->code ?? '').' '.
+            (string) ($store->channel?->name ?? '')
+        ));
+
+        if (str_contains($value, 'TIKTOK') || in_array(strtok($value, ' '), ['TTK', 'TKT'], true)) {
+            return 'tiktok';
+        }
+
+        if (str_contains($value, 'SHOPEE') || str_starts_with($value, 'SHP') || str_contains($value, ' SHP')) {
+            return 'shopee';
+        }
+
+        return null;
     }
 
     private function log(Store $store, string $action, string $status, string $message, array $payload = []): void

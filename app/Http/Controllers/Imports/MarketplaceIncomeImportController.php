@@ -235,15 +235,29 @@ class MarketplaceIncomeImportController extends Controller
 
         $file = $request->file('file');
         $sourceFile = $file->getClientOriginalName();
+        $path = null;
 
-        $path = $file->store("imports/marketplace_income/{$channel}", $this->disk);
-        $abs = Storage::disk($this->disk)->path($path);
+        try {
+            $path = $file->store("imports/marketplace_income/{$channel}", $this->disk);
+            $abs = Storage::disk($this->disk)->path($path);
 
-        if (!is_file($abs) || !is_readable($abs)) {
-            abort(500, "Upload tersimpan tapi file tidak ditemukan / tidak bisa dibaca. disk={$this->disk} rel={$path} abs={$abs}");
+            if (!is_file($abs) || !is_readable($abs)) {
+                throw new \RuntimeException("Upload tersimpan tapi file tidak ditemukan / tidak bisa dibaca. disk={$this->disk} rel={$path} abs={$abs}");
+            }
+
+            $res = $svc->import($channel, $abs, $sourceFile, $storeId, true);
+        } catch (\Throwable $e) {
+            if ($path !== null) {
+                Storage::disk($this->disk)->delete($path);
+            }
+
+            report($e);
+
+            return redirect()
+                ->route('imports.marketplace_income.create')
+                ->withInput()
+                ->with('error', 'Preview import income gagal: '.$this->userFacingImportError($e));
         }
-
-        $res = $svc->import($channel, $abs, $sourceFile, $storeId, true);
 
         $stats = $res['stats'] ?? [];
         $sample = $res['sample'] ?? [];
@@ -645,6 +659,15 @@ class MarketplaceIncomeImportController extends Controller
         }
 
         return null;
+    }
+
+    private function userFacingImportError(\Throwable $e): string
+    {
+        if (app()->environment(['local', 'testing'])) {
+            return $e->getMessage() ?: class_basename($e);
+        }
+
+        return 'File tidak sesuai template income atau tidak dapat dibaca. Periksa format XLSX/CSV dan coba lagi.';
     }
 
     private function baseIncomeQuery(): Builder

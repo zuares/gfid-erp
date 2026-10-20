@@ -34,6 +34,7 @@ class ShopeeIncomeAdapter implements MpIncomeAdapterInterface
 
         // Kita akan auto-detect semua kolom yang berawalan "Biaya"
         $feeCols = $this->detectFeeColumns($headerRow);
+        $advertisingCols = $this->detectAdvertisingColumns($headerRow);
 
         $out = [];
 
@@ -74,6 +75,10 @@ class ShopeeIncomeAdapter implements MpIncomeAdapterInterface
                 $feeSum += $this->moneyIdr($r[$col] ?? null);
             }
             $fee = abs($feeSum);
+            $adSpend = 0;
+            foreach ($advertisingCols as $col) {
+                $adSpend += abs($this->moneyIdr($r[$col] ?? null));
+            }
 
             $key = (string) $orderNo;
 
@@ -84,6 +89,7 @@ class ShopeeIncomeAdapter implements MpIncomeAdapterInterface
                     'platform_fee_total' => 0,
                     'refund_total' => 0,
                     'net_payout_actual' => 0,
+                    'ad_spend' => 0,
                     'raw' => [],
                 ];
             }
@@ -92,6 +98,7 @@ class ShopeeIncomeAdapter implements MpIncomeAdapterInterface
             $out[$key]['platform_fee_total'] += $fee;
             $out[$key]['refund_total'] += $refund;
             $out[$key]['net_payout_actual'] += $net;
+            $out[$key]['ad_spend'] += $adSpend;
 
             // Simpan released_at paling baru
             if ($releasedAt && (!$out[$key]['released_at'] || $releasedAt > $out[$key]['released_at'])) {
@@ -168,6 +175,23 @@ class ShopeeIncomeAdapter implements MpIncomeAdapterInterface
                 $cols[] = $col;
             }
         }
+        return $cols;
+    }
+
+    private function detectAdvertisingColumns(array $headerRow): array
+    {
+        $cols = [];
+        foreach ($headerRow as $col => $name) {
+            $header = $this->norm((string) $name);
+            if ($header === '') {
+                continue;
+            }
+
+            if (str_contains($header, 'iklan') || str_contains($header, 'ads') || str_contains($header, 'advert')) {
+                $cols[] = $col;
+            }
+        }
+
         return $cols;
     }
 

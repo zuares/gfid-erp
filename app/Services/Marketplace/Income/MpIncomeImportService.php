@@ -4,6 +4,7 @@ namespace App\Services\Marketplace\Income;
 
 use App\Models\MpIncome;
 use App\Models\MpShipment;
+use App\Models\MarketplaceImportedAdSpend;
 use App\Services\Marketplace\Income\Adapters\MpIncomeAdapterInterface;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -57,8 +58,35 @@ class MpIncomeImportService
         $rows = $adapter->parse($path, $sourceFile);
         $adapterStats = method_exists($adapter, 'lastStats') ? $adapter->lastStats() : [];
 
-        // 2) Dedupe by platform_order_id (last wins)
-        [$uniqueOrderIds, $rowByOrder, $skippedNoOrderId, $skippedDedupe] = $this->dedupeRowsByOrderId($rows);
+        // 2) Pisahkan biaya iklan dari baris order. TikTok dapat mengirim
+        // biaya iklan sebagai adjustment tanpa Order ID; baris seperti itu
+        // tidak boleh dibuat menjadi order palsu, tetapi tetap disimpan sebagai
+        // fakta biaya harian untuk dashboard sales.
+        $adSpendByDate = [];
+        $orderRows = [];
+        foreach ($rows as $row) {
+            $adSpend = (float) ($row['ad_spend'] ?? 0);
+            $adDate = trim((string) ($row['ad_spend_date'] ?? ''));
+            if ($adDate === '' && ! empty($row['released_at'])) {
+                try {
+                    $adDate = Carbon::parse($row['released_at'], $tz)->toDateString();
+                } catch (\Throwable) {
+                    $adDate = '';
+                }
+            }
+
+            if ($adSpend > 0 && $adDate !== '') {
+                $adSpendByDate[$adDate]['spend'] = (float) ($adSpendByDate[$adDate]['spend'] ?? 0) + $adSpend;
+                $adSpendByDate[$adDate]['raw'][] = $row['raw'] ?? null;
+            }
+
+            if (trim((string) ($row['platform_order_id'] ?? '')) !== '') {
+                $orderRows[] = $row;
+            }
+        }
+
+        // 3) Dedupe by platform_order_id (last wins)
+        [$uniqueOrderIds, $rowByOrder, $skippedNoOrderId, $skippedDedupe] = $this->dedupeRowsByOrderId($orderRows);
 
         $stats = [
             'channel' => $channel,
@@ -70,6 +98,8 @@ class MpIncomeImportService
             'orders_parsed' => count($uniqueOrderIds),
 
             'incomes_upserted' => 0,
+            'ad_spend_dates' => count($adSpendByDate),
+            'ad_spend_total' => (float) collect($adSpendByDate)->sum('spend'),
 
             'orders_matched_shipments' => 0,
             'orders_unmatched_shipments' => 0,
@@ -94,7 +124,7 @@ class MpIncomeImportService
             'dry_run' => $dryRun,
         ];
 
-        if (empty($uniqueOrderIds)) {
+        if (empty($uniqueOrderIds) && $adSpendByDate === []) {
             return ['stats' => $stats, 'sample' => []];
         }
 
@@ -143,8 +173,36 @@ class MpIncomeImportService
             $chunkSize,
             $now,
             $tz,
+            $adSpendByDate,
             &$stats
         ) {
+            if ($adSpendByDate !== []) {
+                $adSpendRows = [];
+                foreach ($adSpendByDate as $date => $adSpend) {
+                    $adSpendRows[] = [
+                        'store_id' => $storeId,
+                        'channel' => $channel,
+                        'date' => $date,
+                        'spend' => (float) ($adSpend['spend'] ?? 0),
+                        'source_file' => $sourceFile,
+                        'import_batch_id' => $batchId,
+                        'raw_json' => json_encode([
+                            'source' => 'marketplace_income_import',
+                            'source_file' => $sourceFile,
+                            'raw' => $adSpend['raw'] ?? [],
+                        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+
+                MarketplaceImportedAdSpend::query()->upsert(
+                    $adSpendRows,
+                    ['store_id', 'channel', 'date'],
+                    ['spend', 'source_file', 'import_batch_id', 'raw_json', 'updated_at'],
+                );
+            }
+
             foreach (array_chunk($uniqueOrderIds, $chunkSize) as $orderChunk) {
                 // ---------- UPSERT mp_incomes ----------
                 $incomeRows = [];

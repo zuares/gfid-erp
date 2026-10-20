@@ -8,13 +8,16 @@ use App\Models\MarketplaceImportBatch;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
+use App\Models\MarketplaceImportedAdSpend;
 use App\Models\MpShipment;
+use App\Models\MpIncome;
 use App\Models\SkuMapping;
 use App\Models\Store;
 use App\Models\User;
 use App\Services\Marketplace\Import\MpImportService;
 use App\Services\Marketplace\Income\ImportedMarketplaceIncomeSyncService;
 use App\Services\Marketplace\Income\MpIncomeImportService;
+use App\Services\Marketplace\Ads\AdsDashboardService;
 use App\Services\Marketplace\Source\TiktokApiSourceAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -1087,5 +1090,85 @@ class MarketplaceTikTokImportTest extends TestCase
         $this->assertSame(1, $result['stats']['profit_incomplete']);
         $this->assertSame(28000.0, (float) $order->settlement()->value('final_income'));
         $this->assertSame('settlement_data_incomplete', $order->fresh()->financial_issue_reason);
+    }
+
+    public function test_income_saved_before_tiktok_order_is_reconciled_when_order_is_imported(): void
+    {
+        $store = $this->makeTiktokStore('TTK-INCOME-FIRST');
+
+        MpIncome::create([
+            'store_id' => $store->id,
+            'channel' => 'tiktok',
+            'platform_order_id' => 'INCOME-FIRST-001',
+            'released_at' => '2026-10-13 09:00:00',
+            'released_date' => '2026-10-13',
+            'platform_fee_total' => 5000,
+            'refund_total' => 0,
+            'net_payout_actual' => 28000,
+            'currency' => 'IDR',
+            'source_file' => 'income-before-order.xlsx',
+            'import_batch_id' => 'income-before-order-batch',
+            'raw_payload' => ['income' => ['raw' => ['source' => 'test']]],
+        ]);
+
+        $orderPath = $this->makeTiktokCsv('INCOME-FIRST-001', 'PKG-INCOME-FIRST-001', 'JY-INCOME-FIRST-001', 'TikTok');
+        try {
+            app(MpImportService::class)->import('tiktok', $orderPath, $store->id, 'order-after-income.csv');
+        } finally {
+            unlink($orderPath);
+        }
+
+        $order = MarketplaceOrder::where('channel_order_id', 'INCOME-FIRST-001')->firstOrFail();
+        $settlement = $order->settlement()->firstOrFail();
+        $shipment = MpShipment::where('platform_order_id', 'INCOME-FIRST-001')->firstOrFail();
+
+        $this->assertSame(28000.0, (float) $settlement->final_income);
+        $this->assertSame('2026-10-13 09:00:00', $settlement->settlement_time?->format('Y-m-d H:i:s'));
+        $this->assertSame(28000.0, (float) $shipment->net_payout_actual);
+    }
+
+    public function test_income_import_saves_advertising_spend_for_sales_dashboard(): void
+    {
+        $store = $this->makeTiktokStore('TTK-IMPORT-ADS');
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Detail Pesanan');
+        $sheet->fromArray([
+            ['Order/Adjustment ID', 'Type', 'Order Settled Time', 'Total Settlement Amount', 'Total Fees', 'Advertising Fee', 'Jumlah penyesuaian'],
+            ['AD-ORDER-001', 'Order', '13/10/2026 09:00:00', 28000, -5000, -3000],
+            ['ADJUSTMENT-ADS-001', 'Advertising', '13/10/2026 10:00:00', -4500, -4500, null, null],
+            ['GMV-ADS-001', 'Pembayaran GMV untuk Iklan TikTok', '13/10/2026 11:00:00', null, null, null, -12500],
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'tiktok-income-ads-');
+        (new Xlsx($spreadsheet))->save($path);
+        $spreadsheet->disconnectWorksheets();
+
+        try {
+            $result = app(MpIncomeImportService::class)->import(
+                'tiktok',
+                $path,
+                'income-with-ads.xlsx',
+                $store->id,
+            );
+        } finally {
+            unlink($path);
+        }
+
+        $this->assertSame(17000.0, (float) $result['stats']['ad_spend_total']);
+        $this->assertDatabaseHas('marketplace_imported_ad_spends', [
+            'store_id' => $store->id,
+            'channel' => 'tiktok',
+            'date' => '2026-10-13',
+            'spend' => 17000,
+        ]);
+
+        $daily = app(AdsDashboardService::class)->getDailyMetrics(
+            [$store->id],
+            $store->id,
+            '2026-10-13',
+            '2026-10-13',
+        );
+
+        $this->assertSame(17000.0, (float) data_get($daily->get('2026-10-13'), 'spend'));
     }
 }

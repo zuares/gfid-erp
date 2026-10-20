@@ -70,6 +70,7 @@ class MarketplaceSalesDashboardController extends Controller
         $isPromotionDummy = $request->boolean('dummy') && app()->environment(['local', 'testing']);
         $isSalesComparison = $request->boolean('_sales_comparison');
         $isSalesExport = $request->boolean('_sales_export');
+        $dashboardTab = (string) $request->query('tab', 'sales');
         $today = now()->startOfDay();
         $defaultFrom = (clone $today)->startOfMonth();
 
@@ -124,7 +125,7 @@ class MarketplaceSalesDashboardController extends Controller
             $storeId = null;
         }
 
-        $adStoreIds = $stores
+        $adSyncStoreIds = $stores
             ->filter(function ($store) use ($platformCode) {
                 $channelCode = $this->normalizePlatformCode($store->channel->code ?? null);
 
@@ -135,8 +136,22 @@ class MarketplaceSalesDashboardController extends Controller
             ->map(fn ($id) => (int) $id)
             ->values()
             ->all();
+        // Read metrics for every selected marketplace channel so imported
+        // advertising deductions can appear even before the ads API exists
+        // for that channel (currently TikTok). Only Shopee stores are queued
+        // for the existing ads API sync below.
+        $adStoreIds = $stores
+            ->filter(function ($store) use ($platformCode) {
+                $channelCode = $this->normalizePlatformCode($store->channel->code ?? null);
+
+                return ! $platformCode || $channelCode === $platformCode;
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
         if (! $isSalesExport) {
-            $this->queueRecentAdsSync($adStoreIds, $storeId, $from, $to);
+            $this->queueRecentAdsSync($adSyncStoreIds, $storeId, $from, $to);
         }
         $adDailyMetrics = app(AdsDashboardService::class)->getDailyMetrics(
             $adStoreIds,
@@ -202,6 +217,44 @@ class MarketplaceSalesDashboardController extends Controller
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
             ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel));
+
+        // The item aggregate subqueries are joined back to the filtered order
+        // scope. Without this restriction SQLite has to group every historical
+        // marketplace item row on every dashboard request, even when the
+        // selected period contains only a few orders.
+        $scopedOrderIds = (clone $base)
+            ->select('o.id')
+            ->pluck('o.id')
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values()
+            ->all();
+        $scopeItemAggregate = static function ($query, string $alias) use ($scopedOrderIds): void {
+            // Keep SQLite well below its bind-parameter limit because some
+            // aggregate queries contain this scope more than once. Very wide
+            // periods retain the original query shape instead of failing with
+            // "too many SQL variables".
+            if ($scopedOrderIds === []) {
+                $query->whereRaw('1 = 0');
+
+                return;
+            }
+            if (count($scopedOrderIds) > 220) {
+                return;
+            }
+
+            $query->where(function ($scope) use ($alias, $scopedOrderIds) {
+                $scope
+                    ->whereIn($alias.'.marketplace_order_id', $scopedOrderIds)
+                    ->orWhere(function ($fallback) use ($alias, $scopedOrderIds) {
+                        $fallback
+                            ->whereNull($alias.'.marketplace_order_id')
+                            ->whereIn($alias.'.order_id', $scopedOrderIds);
+                    });
+            });
+        };
+        $scopeItemAggregate($itemTotals, 'oi');
+        $scopeItemAggregate($gmvItemTotals, 'gmv_oi');
 
         $orderBase = (clone $base)->leftJoinSub($itemTotals, 'itot', 'itot.order_key', '=', 'o.id');
 
@@ -485,6 +538,7 @@ class MarketplaceSalesDashboardController extends Controller
         $productOrderTotals = DB::table('marketplace_order_items as oi_total')
             ->selectRaw('COALESCE(oi_total.marketplace_order_id, oi_total.order_id) as order_key')
             ->selectRaw("COALESCE(SUM({$productLineValueExpression}), 0) as order_item_value")
+            ->tap(fn ($query) => $scopeItemAggregate($query, 'oi_total'))
             ->groupByRaw('COALESCE(oi_total.marketplace_order_id, oi_total.order_id)');
         $productBuyerPaymentExpression = 'COALESCE(NULLIF(s.buyer_payment_amount, 0), NULLIF(o.total_paid_customer, 0), NULLIF(o.total_amount, 0), NULLIF(o.subtotal_items, 0), 0)';
         $productLineValueForRow = 'CASE WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount WHEN COALESCE(oi.price, 0) > 0 THEN oi.price * COALESCE(oi.qty, 0) WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount ELSE 0 END';
@@ -592,7 +646,12 @@ class MarketplaceSalesDashboardController extends Controller
             ->unique()
             ->values();
         $unmappedProducts = $products->filter(fn ($product) => ! (int) ($product->internal_item_id ?? 0))->values();
-        if ($internalProductIds->isNotEmpty() || $unmappedProducts->isNotEmpty()) {
+        // The fallback allocation query groups settlement/order JSON for all
+        // matching products. On a large period SQLite can fall back to a full
+        // historical scan, which blocks dashboard tab navigation. For wide
+        // periods the main product aggregate is already available; keep the
+        // detailed allocation for smaller result sets where it is cheap.
+        if (($internalProductIds->isNotEmpty() || $unmappedProducts->isNotEmpty()) && count($scopedOrderIds) <= 220) {
             $promotionProductNameExpression = "COALESCE(NULLIF(promo_oi.item_name, ''), NULLIF(promo_oi.item_name_snapshot, ''), NULLIF(promo_oi.variant_name, ''), NULLIF(promo_oi.variant_snapshot, ''), 'Produk tanpa nama')";
             $promotionProductSkuExpression = "COALESCE(NULLIF(promo_oi.item_sku, ''), NULLIF(promo_oi.marketplace_sku, ''), NULLIF(promo_oi.model_sku, ''), NULLIF(promo_oi.external_sku, ''), NULLIF(promo_oi.item_code_snapshot, ''), '-')";
             $promotionRows = DB::table('marketplace_order_items as promo_oi')
@@ -623,6 +682,10 @@ class MarketplaceSalesDashboardController extends Controller
                         });
                     }
                 })
+                // A popular SKU may exist in many historical orders. Restrict
+                // the allocation rows to the already resolved dashboard
+                // orders before decoding their promotion payloads.
+                ->tap(fn ($query) => $scopeItemAggregate($query, 'promo_oi'))
                 ->select([
                     'promo_o.id as order_id',
                     'promo_o.voucher_discount',
@@ -729,6 +792,14 @@ class MarketplaceSalesDashboardController extends Controller
         );
         $adMetricsByInternalItem = $productAdMetrics['internal'];
         $adMetricsByChannelItem = $productAdMetrics['external'];
+        $importedAdSpendForProducts = 0.0;
+        if ($platformCode === 'TIKTOK' && Schema::hasTable('marketplace_imported_ad_spends')) {
+            $importedAdSpendForProducts = (float) DB::table('marketplace_imported_ad_spends')
+                ->whereIn('store_id', $adStoreIds)
+                ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+                ->sum('spend');
+        }
+        $productSalesForImportedAdAllocation = (float) $products->sum(fn ($product) => (float) ($product->sales ?? 0));
         $productExternalIdsByInternal = collect();
         $internalProductIds = $products
             ->pluck('internal_item_id')
@@ -776,7 +847,7 @@ class MarketplaceSalesDashboardController extends Controller
             }
         }
 
-        $products = $products->map(function ($product, $productIndex) use ($adMetricsByInternalItem, $adMetricsByChannelItem, $productExternalIds, $productsByExternalId, $products) {
+        $products = $products->map(function ($product, $productIndex) use ($adMetricsByInternalItem, $adMetricsByChannelItem, $productExternalIds, $productsByExternalId, $products, $importedAdSpendForProducts, $productSalesForImportedAdAllocation) {
             $internalItemId = (int) ($product->internal_item_id ?? 0);
             $externalIds = collect($productExternalIds->get($productIndex, collect()));
             $productAdMetrics = [
@@ -826,6 +897,15 @@ class MarketplaceSalesDashboardController extends Controller
                     'impressions' => (float) ($internalMetrics['impressions'] ?? 0) * $allocationShare,
                     'clicks' => (float) ($internalMetrics['clicks'] ?? 0) * $allocationShare,
                 ];
+            }
+
+            // Income files contain TikTok ad deductions at store/day level,
+            // not per SKU. Allocate that imported fact once by product sales
+            // so the product table is useful without overstating the total.
+            if (! $hasExternalMetrics && $importedAdSpendForProducts > 0 && $productSalesForImportedAdAllocation > 0) {
+                $productAdMetrics['spend'] = $importedAdSpendForProducts
+                    * ((float) ($product->sales ?? 0) / $productSalesForImportedAdAllocation);
+                $hasExternalMetrics = true;
             }
 
             $product->ad_spend_matched = $hasExternalMetrics || ($internalItemId > 0 && $adMetricsByInternalItem->has($internalItemId));
@@ -1103,6 +1183,7 @@ SQL;
         $promotionItemTotals = DB::table('marketplace_order_items as oi')
             ->selectRaw('COALESCE(oi.marketplace_order_id, oi.order_id) as order_key')
             ->selectRaw("COALESCE(SUM({$linePromotionExpression}), 0) as product_discount")
+            ->tap(fn ($query) => $scopeItemAggregate($query, 'oi'))
             ->whereNotExists(function ($query) {
                 $query->selectRaw('1')
                     ->from('marketplace_order_settlements as promo_settlement')
@@ -1151,28 +1232,43 @@ SQL;
             ->get()
             ->keyBy('day');
 
-        $settlementPromotionRows = DB::table('marketplace_order_settlements as ms')
-            ->join('marketplace_orders as o', 'o.id', '=', 'ms.order_id')
-            ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
-            ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
-            ->whereRaw("{$dateExpression} IS NOT NULL")
-            ->whereDate(DB::raw($dateExpression), '>=', $from->toDateString())
-            ->whereDate(DB::raw($dateExpression), '<=', $to->toDateString())
-            ->whereRaw("{$statusExpression} NOT IN (".implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')).')', self::NON_REVENUE_STATUSES)
-            ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
-            ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
-            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
-            ->select([
-                'ms.order_id',
-                'ms.seller_voucher',
-                'ms.shipping_fee_subsidy',
-                'ms.raw_json',
-                'o.raw_json as order_raw_json',
-            ])
-            ->selectRaw("DATE({$dateExpression}) as day")
-            ->selectRaw("{$subtotalExpression} as order_subtotal")
-            ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
-            ->get();
+        // Settlement raw payloads are only needed by the Promosi tab. Loading
+        // them for every tab (and for each comparison period) makes SQLite
+        // scan a large JSON column and can block tab navigation for 30s+.
+        $settlementPromotionRows = collect();
+        if ($dashboardTab === 'promotions' && ! $isSalesComparison && ! $isSalesExport && count($scopedOrderIds) <= 220) {
+            $settlementPromotionRows = DB::table('marketplace_order_settlements as ms')
+                ->join('marketplace_orders as o', 'o.id', '=', 'ms.order_id')
+                ->leftJoin('stores as st', 'st.id', '=', 'o.store_id')
+                ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
+                // Keep this query sargable. The previous whereDate(COALESCE(...))
+                // forced SQLite to scan the entire settlement table for every
+                // comparison period.
+                ->where(function ($query) use ($fromDateTime, $toDateTime) {
+                    $query
+                        ->whereBetween('o.ordered_at', [$fromDateTime, $toDateTime])
+                        ->orWhere(function ($fallback) use ($fromDateTime, $toDateTime) {
+                            $fallback
+                                ->whereNull('o.ordered_at')
+                                ->whereBetween('o.order_date', [$fromDateTime, $toDateTime]);
+                        });
+                })
+                ->whereRaw("{$statusExpression} NOT IN (".implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')).')', self::NON_REVENUE_STATUSES)
+                ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
+                ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
+                ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
+                ->select([
+                    'ms.order_id',
+                    'ms.seller_voucher',
+                    'ms.shipping_fee_subsidy',
+                    'ms.raw_json',
+                    'o.raw_json as order_raw_json',
+                ])
+                ->selectRaw("DATE({$dateExpression}) as day")
+                ->selectRaw("{$subtotalExpression} as order_subtotal")
+                ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
+                ->get();
+        }
 
         foreach ($settlementPromotionRows as $settlementRow) {
             $raw = is_array($settlementRow->raw_json)
@@ -1687,6 +1783,7 @@ SQL;
             'adSalesTotal' => $adSalesTotal,
             'adCtr' => $adCtr,
             'adCvr' => $adCvr,
+            'importedAdSpendForProducts' => $importedAdSpendForProducts,
             'shipping' => $shipping,
             'shippingDaily' => $shippingDaily,
             'shippingKpi' => $shippingKpi,
@@ -2080,6 +2177,22 @@ README;
                 ->selectRaw('date, store_id, SUM(spend) as spend')
                 ->groupBy('date', 'store_id')
         );
+        if (Schema::hasTable('marketplace_imported_ad_spends')) {
+            $imported = $aggregate(
+                DB::table('marketplace_imported_ad_spends')
+                    ->whereIn('store_id', $storeIds)
+                    ->whereBetween('date', [$dateFrom, $dateTo])
+                    ->selectRaw('date, store_id, SUM(spend) as spend')
+                    ->groupBy('date', 'store_id')
+            );
+
+            foreach ($imported as $key => $row) {
+                $apiRow = $shop->get($key);
+                if (! $apiRow || (float) $apiRow->spend <= 0) {
+                    $shop->put($key, $row);
+                }
+            }
+        }
         try {
             if (Schema::hasTable('marketplace_ads_hourly_performances')) {
                 $today = Carbon::today()->toDateString();

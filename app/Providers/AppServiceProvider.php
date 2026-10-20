@@ -14,6 +14,15 @@ class AppServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
+        // BladeCompiler writes compiled views through tempnam() in this
+        // directory. Keep it present after view:clear or cache rebuilds so
+        // PHP does not fall back to the system temp directory and turn the
+        // warning into an HTTP 500 response.
+        $compiledViewPath = (string) config('view.compiled', storage_path('framework/views'));
+        if (! File::isDirectory($compiledViewPath)) {
+            File::makeDirectory($compiledViewPath, 0755, true);
+        }
+
         \Illuminate\Support\Facades\Event::listen(\Illuminate\Http\Client\Events\ResponseReceived::class, function ($event) {
             $url = $event->request->url();
             if (str_contains($url, 'shopee')) {

@@ -4,6 +4,7 @@ namespace App\Services\Marketplace\Income;
 
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderSettlement;
+use App\Models\MpIncome;
 use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use Carbon\Carbon;
 
@@ -11,7 +12,79 @@ class ImportedMarketplaceIncomeSyncService
 {
     public function __construct(
         protected MarketplaceFinancialDataQualityService $financialQuality,
+        protected ApplyIncomeService $applyIncome,
     ) {}
+
+    /**
+     * Reconcile income yang sudah tersimpan sebelum order marketplace tersedia.
+     *
+     * Jalur ini sengaja idempoten dan dipakai oleh import order/API sync maupun
+     * safety-net scheduler. Jadi income tidak perlu di-upload ulang.
+     */
+    public function syncStoredIncomeForOrder(int $storeId, string $channel, string $orderId): array
+    {
+        $channel = strtolower(trim($channel));
+        $orderId = trim($orderId);
+
+        if ($storeId <= 0 || $channel === '' || $orderId === '') {
+            return ['found' => false];
+        }
+
+        $income = MpIncome::query()
+            ->where('store_id', $storeId)
+            ->where('channel', $channel)
+            ->where('platform_order_id', $orderId)
+            ->first();
+
+        if (! $income) {
+            return ['found' => false];
+        }
+
+        $rawPayload = is_array($income->raw_payload)
+            ? $income->raw_payload
+            : (json_decode((string) $income->raw_payload, true) ?: []);
+        $incomePayload = is_array($rawPayload['income'] ?? null) ? $rawPayload['income'] : [];
+        $row = [
+            'platform_order_id' => $orderId,
+            'platform_fee_total' => (float) $income->platform_fee_total,
+            'refund_total' => (float) $income->refund_total,
+            'net_payout_actual' => $income->net_payout_actual,
+            'released_at' => $income->released_at,
+            'raw' => $incomePayload['raw'] ?? null,
+        ];
+
+        $batchId = trim((string) ($income->import_batch_id ?: 'stored-income-reconcile-'.$income->id));
+        $sourceFile = (string) ($income->source_file ?: 'stored-income');
+        $stats = $this->syncFromParsedRows(
+            $storeId,
+            [$orderId],
+            [$orderId => $row],
+            $batchId,
+            $sourceFile,
+        );
+
+        $apply = $this->applyIncome->applyFromParsedRows(
+            $storeId,
+            $channel,
+            [$orderId],
+            [$orderId => $row],
+            $batchId,
+            $sourceFile,
+        );
+
+        return [
+            'found' => true,
+            'matched_order' => (int) ($stats['matched_orders'] ?? 0),
+            'unmatched_order' => (int) ($stats['unmatched_orders'] ?? 0),
+            'settlements_created' => (int) ($stats['settlements_created'] ?? 0),
+            'settlements_updated' => (int) ($stats['settlements_updated'] ?? 0),
+            'api_settlements_preserved' => (int) ($stats['api_settlements_preserved'] ?? 0),
+            'income_mismatches' => (int) ($stats['income_mismatches'] ?? 0),
+            'profit_incomplete' => (int) ($stats['profit_incomplete'] ?? 0),
+            'matched_shipment' => (int) ($apply['matched_orders'] ?? 0),
+            'shipments_updated' => (int) ($apply['updated_shipments'] ?? 0),
+        ];
+    }
 
     /**
      * Reconcile aggregate Income exports with marketplace order settlements.

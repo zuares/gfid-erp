@@ -77,6 +77,16 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-orders'))
     ->name('sync-orders')
     ->withoutOverlapping();
 
+// Sambungkan income yang sudah tersimpan sebelum order tersedia. Hook pada
+// proses import/API menangani kasus real-time; scheduler ini menjadi safety-net
+// tanpa perlu klik tombol atau menjalankan command secara manual.
+Schedule::call(fn () => Artisan::call('marketplace:reconcile-income', [
+        '--limit' => 500,
+    ]))
+    ->everyFiveMinutes()
+    ->name('reconcile-marketplace-income')
+    ->withoutOverlapping();
+
 Schedule::command('marketplace:run-voucher-automations')
     ->everyMinute()
     ->name('run-voucher-automations')

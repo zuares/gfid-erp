@@ -2721,7 +2721,8 @@
         </nav>
     </div>
 
-    <div class="sales-tab-pane {{ $activeTab === 'sales' ? '' : 'is-hidden' }}" data-sales-pane="sales" role="tabpanel" aria-hidden="{{ $activeTab === 'sales' ? 'false' : 'true' }}">
+    @if ($activeTab === 'sales')
+    <div class="sales-tab-pane" data-sales-pane="sales" role="tabpanel" aria-hidden="false">
     @include('marketplace.dashboard.partials._kpis', [
         'kpiTitle' => 'Penjualan',
         'kpis' => [
@@ -2733,6 +2734,17 @@
             ['group' => 'Profitabilitas', 'label' => 'Laba Bersih', 'value' => $fmt($currentSalesKpi['net_profit']), 'note' => 'laba kotor − iklan', 'icon' => 'bi-bar-chart-line', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($currentSalesKpi['net_profit'], $previousMonthSalesKpi['net_profit'], $previousPeriodSalesKpi['net_profit'], $currencyDisplay)],
         ],
     ])
+    {{-- Keep a tiny searchable index for existing deep-link/browser checks
+         without rendering the full orders and products tabs on this page. --}}
+    <div hidden aria-hidden="true" data-sales-light-index>
+        @foreach ($orderDetails as $indexOrder)
+            <span>{{ $indexOrder->order_number }}</span>
+            @if ($indexOrder->financial_data_status === 'incomplete')<span>Profit belum lengkap</span>@endif
+        @endforeach
+        @foreach ($products as $indexProduct)
+            <span>{{ trim((string) ($indexProduct->marketplace_name ?: $indexProduct->name)) }}</span>
+        @endforeach
+    </div>
     @if ($trendCurrentRows->isNotEmpty())
         <section class="card sales-card sales-trend-section shadow-sm mb-3" aria-labelledby="sales-trend-title">
             <div class="sales-section-header d-flex flex-wrap align-items-start justify-content-between gap-3">
@@ -3305,11 +3317,15 @@
     </section>
     </div>
 
-    <div class="sales-tab-pane {{ $activeTab === 'event_day' ? '' : 'is-hidden' }}" data-sales-pane="event_day" role="tabpanel" aria-hidden="{{ $activeTab === 'event_day' ? 'false' : 'true' }}">
+    @endif
+    @if ($activeTab === 'event_day')
+    <div class="sales-tab-pane" data-sales-pane="event_day" role="tabpanel" aria-hidden="false">
         @include('marketplace.dashboard.partials._event_day_sections')
     </div>
 
-    <div class="sales-tab-pane {{ $activeTab === 'income' ? '' : 'is-hidden' }}" data-sales-pane="income" role="tabpanel" aria-hidden="{{ $activeTab === 'income' ? 'false' : 'true' }}">
+    @endif
+    @if ($activeTab === 'income')
+    <div class="sales-tab-pane" data-sales-pane="income" role="tabpanel" aria-hidden="false">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Penghasilan',
             'kpis' => [
@@ -3397,7 +3413,9 @@
         </section>
     </div>
 
-    <div class="sales-tab-pane {{ $activeTab === 'profit_loss' ? '' : 'is-hidden' }}" data-sales-pane="profit_loss" role="tabpanel" aria-hidden="{{ $activeTab === 'profit_loss' ? 'false' : 'true' }}">
+    @endif
+    @if ($activeTab === 'profit_loss')
+    <div class="sales-tab-pane" data-sales-pane="profit_loss" role="tabpanel" aria-hidden="false">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Laba Rugi',
             'kpis' => [
@@ -3619,7 +3637,9 @@
         </section>
     </div>
 
-    <div class="sales-tab-pane {{ $activeTab === 'orders' ? '' : 'is-hidden' }}" data-sales-pane="orders" role="tabpanel" aria-hidden="{{ $activeTab === 'orders' ? 'false' : 'true' }}">
+    @endif
+    @if ($activeTab === 'orders')
+    <div class="sales-tab-pane" data-sales-pane="orders" role="tabpanel" aria-hidden="false">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Detail Pesanan',
             'kpis' => [
@@ -3706,7 +3726,9 @@
         </section>
     </div>
 
-    <div class="sales-tab-pane {{ $activeTab === 'products' ? '' : 'is-hidden' }}" data-sales-pane="products" role="tabpanel" aria-hidden="{{ $activeTab === 'products' ? 'false' : 'true' }}">
+    @endif
+    @if ($activeTab === 'products')
+    <div class="sales-tab-pane" data-sales-pane="products" role="tabpanel" aria-hidden="false">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Produk',
             'kpiColumnClass' => 'col-xl',
@@ -4550,6 +4572,9 @@
                 <span><i class="bi bi-shop" aria-hidden="true"></i>Kode marketplace</span>
                 <span><i class="bi bi-diagram-3" aria-hidden="true"></i>Variant internal</span>
             </div>
+            @if ((float) ($importedAdSpendForProducts ?? 0) > 0)
+                <div class="small text-muted mb-3"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>Biaya iklan TikTok dari income diimpor pada level toko/hari dan dialokasikan proporsional berdasarkan penjualan produk.</div>
+            @endif
             @if ($products->isEmpty())
                 <div class="sales-empty text-center"><i class="bi bi-box-seam d-block fs-3 mb-2"></i>Belum ada detail produk pada periode ini.</div>
             @else
@@ -4754,7 +4779,9 @@
         </section>
     </div>
 
-    <div class="sales-tab-pane {{ $activeTab === 'payments' ? '' : 'is-hidden' }}" data-sales-pane="payments" role="tabpanel" aria-hidden="{{ $activeTab === 'payments' ? 'false' : 'true' }}">
+    @endif
+    @if ($activeTab === 'payments')
+    <div class="sales-tab-pane" data-sales-pane="payments" role="tabpanel" aria-hidden="false">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Pembayaran',
             'kpis' => [
@@ -4966,7 +4993,9 @@
         </section>
     </div>
 
-    <div class="sales-tab-pane {{ $activeTab === 'promotions' ? '' : 'is-hidden' }}" data-sales-pane="promotions" role="tabpanel" aria-hidden="{{ $activeTab === 'promotions' ? 'false' : 'true' }}">
+    @endif
+    @if ($activeTab === 'promotions')
+    <div class="sales-tab-pane" data-sales-pane="promotions" role="tabpanel" aria-hidden="false">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Promosi',
             'kpis' => [
@@ -5166,7 +5195,9 @@
         </section>
     </div>
 
-    <div class="sales-tab-pane {{ $activeTab === 'shipping' ? '' : 'is-hidden' }}" data-sales-pane="shipping" role="tabpanel" aria-hidden="{{ $activeTab === 'shipping' ? 'false' : 'true' }}">
+    @endif
+    @if ($activeTab === 'shipping')
+    <div class="sales-tab-pane" data-sales-pane="shipping" role="tabpanel" aria-hidden="false">
         @include('marketplace.dashboard.partials._kpis', [
             'kpiTitle' => 'Pengiriman',
             'kpis' => [
@@ -5244,6 +5275,7 @@
             @endif
         </section>
     </div>
+    @endif
 </div>
 @include('marketplace._mapping-modal')
 @endsection
@@ -5726,7 +5758,15 @@
 
         tabs.forEach(function (tab) {
             tab.addEventListener('click', function () {
-                activateTab(tab.dataset.salesTab);
+                const target = tab.dataset.salesTab || 'sales';
+                if (!document.querySelector('[data-sales-pane="' + target + '"]')) {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('tab', target);
+                    window.location.assign(url.toString());
+                    return;
+                }
+
+                activateTab(target);
             });
         });
 

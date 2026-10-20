@@ -48,6 +48,8 @@ class TiktokIncomeAdapter implements MpIncomeAdapterInterface
         $this->lastStats['rows_seen'] = max(0, count($rows) - $headerRowIndex);
         $map = $this->buildHeaderMap($headerRow);
         $out = [];
+        $adSpendRows = [];
+        $advertisingCols = $this->detectAdvertisingColumns($headerRow);
 
         for ($i = $headerRowIndex + 1; $i <= count($rows); $i++) {
             $r = $rows[$i] ?? null;
@@ -72,22 +74,6 @@ class TiktokIncomeAdapter implements MpIncomeAdapterInterface
 
             $isOrder = $this->isOrderTransaction($type);
             $platformOrderId = $isOrder || $type === '' ? $orderId : $related;
-
-            // Fee iklan/platform tanpa ID order tidak boleh menjadi order palsu.
-            if (!$this->validId($platformOrderId)) {
-                if ($isOrder || $type === '') {
-                    $this->lastStats['rows_skipped_no_order_id']++;
-                } else {
-                    $this->lastStats['rows_skipped_unlinked_adjustment']++;
-                }
-                continue;
-            }
-
-            if ($isOrder) {
-                $this->lastStats['order_rows']++;
-            } else {
-                $this->lastStats['adjustment_rows']++;
-            }
 
             $releasedAt = $this->dt($this->v($r, $map, [
                 'order settled time',
@@ -123,6 +109,36 @@ class TiktokIncomeAdapter implements MpIncomeAdapterInterface
                 'total biaya',
             ])));
 
+            // TikTok menaruh nilai settlement untuk beberapa adjustment,
+            // termasuk "Pembayaran GMV untuk Iklan TikTok", di kolom
+            // "Jumlah penyesuaian". Kolom ini tidak boleh dianggap sebagai
+            // payout order biasa, tetapi perlu dipakai sebagai sumber biaya
+            // iklan ketika baris adjustment tidak memiliki fee/net terpisah.
+            $adjustmentAmount = abs($this->moneyIdr($this->v($r, $map, [
+                'jumlah penyesuaian',
+                'adjustment amount',
+                'adjustment fee',
+            ])));
+
+            $isAdvertising = $this->isAdvertisingTransaction($type);
+            $advertisingCost = 0;
+            // For TikTok order rows, columns such as "Komisi Iklan Toko
+            // afiliasi" are affiliate fees, not the GMV Max advertising
+            // spend requested for this dashboard. Only advertising
+            // adjustment rows may contribute to ad spend.
+            if ($isAdvertising) {
+                foreach ($advertisingCols as $col) {
+                    $advertisingCost += abs($this->moneyIdr($r[$col] ?? null));
+                }
+            }
+            if ($isAdvertising && $advertisingCost <= 0) {
+                // Some TikTok reports expose an advertising adjustment only as
+                // a negative Total Fees/settlement/adjustment row. Use the
+                // largest candidate because the same amount may be repeated
+                // in more than one export column.
+                $advertisingCost = max($fee, abs($net), $adjustmentAmount);
+            }
+
             $refund = abs($this->moneyIdr($this->v($r, $map, [
                 'customer refund',
                 'refund',
@@ -132,6 +148,31 @@ class TiktokIncomeAdapter implements MpIncomeAdapterInterface
                 'subtotal pengembalian dana sebelum diskon penjual',
             ])));
 
+            // Fee iklan tanpa ID order tidak boleh menjadi order palsu. Simpan
+            // sebagai fakta biaya harian agar tetap masuk dashboard sales.
+            if (!$this->validId($platformOrderId)) {
+                if ($advertisingCost > 0 && $releasedAt) {
+                    $adSpendRows[] = [
+                        'platform_order_id' => null,
+                        'ad_spend_date' => substr($releasedAt, 0, 10),
+                        'ad_spend' => $advertisingCost,
+                        'raw' => $this->rawRow($r, $headerRow),
+                    ];
+                }
+                if ($isOrder || $type === '') {
+                    $this->lastStats['rows_skipped_no_order_id']++;
+                } else {
+                    $this->lastStats['rows_skipped_unlinked_adjustment']++;
+                }
+                continue;
+            }
+
+            if ($isOrder) {
+                $this->lastStats['order_rows']++;
+            } else {
+                $this->lastStats['adjustment_rows']++;
+            }
+
             $key = (string) $platformOrderId;
             if (!isset($out[$key])) {
                 $out[$key] = [
@@ -140,6 +181,7 @@ class TiktokIncomeAdapter implements MpIncomeAdapterInterface
                     'platform_fee_total' => 0,
                     'refund_total' => 0,
                     'net_payout_actual' => 0,
+                    'ad_spend' => 0,
                     'hint' => [
                         'transaction_types' => [],
                         'currency' => $this->v($r, $map, ['currency', 'mata uang']),
@@ -156,6 +198,7 @@ class TiktokIncomeAdapter implements MpIncomeAdapterInterface
             $out[$key]['platform_fee_total'] += $fee;
             $out[$key]['refund_total'] += $refund;
             $out[$key]['net_payout_actual'] += $net;
+            $out[$key]['ad_spend'] += $advertisingCost;
 
             if ($releasedAt && (!$out[$key]['released_at'] || $releasedAt > $out[$key]['released_at'])) {
                 $out[$key]['released_at'] = $releasedAt;
@@ -168,7 +211,7 @@ class TiktokIncomeAdapter implements MpIncomeAdapterInterface
         $this->lastStats['rows_skipped'] = $this->lastStats['rows_skipped_no_order_id']
             + $this->lastStats['rows_skipped_unlinked_adjustment'];
 
-        return array_values($out);
+        return array_merge(array_values($out), $adSpendRows);
     }
 
     /**
@@ -301,6 +344,35 @@ class TiktokIncomeAdapter implements MpIncomeAdapterInterface
             || $type === 'order'
             || str_contains($type, 'order ')
             || str_contains($type, 'pesanan');
+    }
+
+    private function isAdvertisingTransaction(string $type): bool
+    {
+        $type = $this->norm($type);
+
+        return str_contains($type, 'advert')
+            || str_contains($type, 'paid ads')
+            || str_contains($type, 'ads charge')
+            || str_contains($type, 'biaya iklan')
+            || str_contains($type, 'pembayaran gmv')
+            || str_contains($type, 'iklan');
+    }
+
+    private function detectAdvertisingColumns(array $headerRow): array
+    {
+        $cols = [];
+        foreach ($headerRow as $col => $name) {
+            $header = $this->norm((string) $name);
+            if ($header === '') {
+                continue;
+            }
+
+            if (str_contains($header, 'advert') || str_contains($header, 'ads') || str_contains($header, 'iklan')) {
+                $cols[] = $col;
+            }
+        }
+
+        return $cols;
     }
 
     private function rowEmpty(array $r): bool
