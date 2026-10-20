@@ -186,7 +186,7 @@ class MarketplaceOrderController extends Controller
         $buyerPhone = trim((string) ($order->buyer_phone
             ?: data_get($liveData ?? [], 'recipient_address.phone')
             ?: ''));
-        $buyerPurchaseCount = $this->buyerPurchaseCountForOrder($order, $buyerUsername, $buyerPhone, $buyerName);
+        $buyerPurchaseHistory = $this->buyerPurchaseHistoryForOrder($order, $buyerUsername, $buyerPhone, $buyerName);
         $adsDate = ($order->ordered_at ?: $order->order_date)?->toDateString();
         $adsDaily = $adsDate && $order->store_id
             ? MarketplaceAdsDaily::query()
@@ -204,13 +204,13 @@ class MarketplaceOrderController extends Controller
             'promotionBreakdown',
             'hppSummary',
             'buyerUsername',
-            'buyerPurchaseCount',
+            'buyerPurchaseHistory',
             'adsDate',
             'adsDaily'
         ));
     }
 
-    private function buyerPurchaseCountForOrder(MarketplaceOrder $order, string $username, string $phone, string $name): int
+    private function buyerPurchaseHistoryForOrder(MarketplaceOrder $order, string $username, string $phone, string $name): array
     {
         $query = MarketplaceOrder::query()
             ->where('store_id', $order->store_id)
@@ -224,10 +224,22 @@ class MarketplaceOrderController extends Controller
         } elseif ($name !== '') {
             $query->where('buyer_name', $name);
         } else {
-            return 1;
+            return [
+                'count' => 1,
+                'last_order_at' => $order->ordered_at ?: $order->order_date,
+            ];
         }
 
-        return max(1, (int) $query->count());
+        $count = max(1, (int) (clone $query)->count());
+        $lastOrderAt = (clone $query)
+            ->selectRaw('COALESCE(ordered_at, order_date) as last_order_at')
+            ->orderByRaw('COALESCE(ordered_at, order_date) DESC')
+            ->value('last_order_at');
+
+        return [
+            'count' => $count,
+            'last_order_at' => $lastOrderAt ?: ($order->ordered_at ?: $order->order_date),
+        ];
     }
 
     /**

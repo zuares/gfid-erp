@@ -4,7 +4,7 @@
 
 @push('head')
 <style>
-.od-wrap{max-width:1240px;margin-inline:auto;padding:1rem 1rem 4rem;color:var(--text,#172033)}
+.od-wrap{max-width:1240px;margin-inline:auto;padding:1rem 1rem 4rem;color:var(--text,#172033);display:flex;flex-direction:column}
 .od-topbar{position:sticky;top:var(--app-navbar-offset,58px);z-index:250;width:min(100%,1240px);margin-inline:auto;display:flex;align-items:center;gap:.85rem;padding:.7rem 1rem;background:color-mix(in srgb,var(--card,#fff) 92%,transparent);border:1px solid var(--line,#e7ebf0);border-top:0;box-shadow:0 8px 24px rgba(15,23,42,.06);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 .od-topbar-inner{width:100%;display:flex;align-items:center;gap:.75rem;min-width:0}
 .od-identity{min-width:0;display:grid;gap:.08rem}
@@ -56,7 +56,9 @@
 .od-table tbody tr:last-child td{border-bottom:0}
 .od-table tbody tr:hover td{background:#fbfdff}
 .od-code-cell{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:750;color:var(--text,#172033);font-variant-numeric:tabular-nums}
+.od-sku-cell{display:block;max-width:8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .od-name{color:var(--muted,#64748b);font-size:.77rem;margin-top:.12rem}
+.od-product-name{max-width:32rem;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;color:var(--text,#334155);font-size:.78rem;font-weight:600;line-height:1.35;text-overflow:ellipsis}
 .od-r{text-align:right}.od-c{text-align:center}
 .od-total td{font-weight:800;color:var(--text,#172033);background:#f8fafc}
 .od-fee-tab.active{background:#2563eb!important;border-color:#2563eb!important;color:#fff!important;box-shadow:0 3px 8px rgba(37,99,235,.16)}
@@ -66,6 +68,9 @@
 .od-finance-head{min-height:88px;padding:1.05rem 1.15rem}
 .od-finance-head .od-title{font-size:1rem}
 .od-finance-total{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:1.25rem;font-weight:850;letter-spacing:-.035em;color:#15803d;white-space:nowrap;font-variant-numeric:tabular-nums}
+.od-finance-head-values{display:grid;justify-items:end;gap:.18rem;text-align:right}
+.od-finance-cogs{display:flex;align-items:center;gap:.35rem;color:var(--muted,#64748b);font-size:.7rem;white-space:nowrap}
+.od-finance-cogs strong{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:800;color:var(--text,#172033);font-variant-numeric:tabular-nums}
 .od-finance-body{display:grid;gap:.8rem}
 .od-finance-group{display:grid;gap:.48rem}
 .od-finance-group-title{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding-bottom:.35rem;border-bottom:1px solid #eef1f4;color:var(--text,#172033);font-size:.76rem;font-weight:800}
@@ -84,6 +89,13 @@
 .od-payment-summary-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
 .od-payment-summary-total{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.95rem;font-weight:850;color:var(--text,#172033);font-variant-numeric:tabular-nums;white-space:nowrap}
 .od-finance-single{margin-bottom:.75rem}
+.od-order-lifecycle{order:1}
+.od-order-kpis{order:2}
+.od-order-products{order:3}
+.od-order-settlement{order:4}
+.od-order-profitability{order:5}
+.od-order-customer{order:6}
+.od-order-meta{order:7}
 body[data-theme="dark"] .od-topbar{background:color-mix(in srgb,var(--card,#11263f) 92%,transparent);box-shadow:0 8px 24px rgba(0,0,0,.18)}
 body[data-theme="dark"] .od-kpi-icon{background:rgba(37,99,235,.2);color:#93c5fd}
 body[data-theme="dark"] .od-table th{background:var(--card-soft,#132a45)}
@@ -276,7 +288,12 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
     $buyerName = $liveData['recipient_address']['name'] ?? $order->buyer_name ?? '—';
     $buyerPhone = $liveData['recipient_address']['phone'] ?? $order->buyer_phone ?? '—';
     $buyerUsername = $buyerUsername ?? ($order->buyer_username ?: $buyerName);
-    $buyerPurchaseCount = max(1, (int) ($buyerPurchaseCount ?? 1));
+    $buyerPurchaseHistory = $buyerPurchaseHistory ?? [
+        'count' => 1,
+        'last_order_at' => $order->ordered_at ?: $order->order_date,
+    ];
+    $buyerPurchaseCount = max(1, (int) ($buyerPurchaseHistory['count'] ?? 1));
+    $buyerLastPurchaseAt = $buyerPurchaseHistory['last_order_at'] ?? null;
     $buyerAddress = $liveData['recipient_address']['full_address'] ?? $order->shipping_address ?? '—';
     $zipcode = $liveData['recipient_address']['zipcode'] ?? $order->shipping_postal_code ?? '';
     
@@ -342,14 +359,14 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
 </div>
 
 <div class="od-wrap">
-    <div class="od-flow">
+    <div class="od-flow od-order-lifecycle">
         <span class="od-step {{ $step >= 1 || $isCancel ? 'done' : 'active' }} {{ $isCancel ? 'cancel' : '' }}">Dibuat</span><span class="od-sep">-&gt;</span>
         <span class="od-step {{ $step >= 2 || $isCancel ? 'done' : ($step == 1 && !$isCancel ? 'active' : '') }} {{ $isCancel ? 'cancel' : '' }}">Dibayar</span><span class="od-sep">-&gt;</span>
         <span class="od-step {{ $step >= 3 || $isCancel ? 'done' : ($step == 2 && !$isCancel ? 'active' : '') }} {{ $isCancel ? 'cancel' : '' }}">Dikirim</span><span class="od-sep">-&gt;</span>
         <span class="od-step {{ $step >= 4 ? 'active' : ($isCancel ? 'cancel' : '') }}">{{ $isCancel ? 'Dibatalkan' : 'Selesai' }}</span>
     </div>
 
-    <div class="od-grid">
+    <div class="od-grid od-order-kpis">
         <div class="od-card od-kpi">
             <div class="od-kpi-head"><span class="od-kpi-icon"><i class="bi bi-credit-card-2-front"></i></span><div class="od-label">Metode Bayar</div></div>
             <div class="od-value-text">{{ $payMethod }}</div>
@@ -378,7 +395,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         </div>
     </div>
 
-    <div class="od-grid-2">
+    <div class="od-grid-2 od-order-meta">
             <div class="od-card">
                 <div class="od-head">
                     <div class="od-title">Waktu Transaksi</div>
@@ -547,7 +564,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
             </div>
     </div>
 
-    <div class="od-card">
+    <div class="od-card od-order-products">
         <div class="od-head">
             <div class="od-title">Rincian Produk</div>
             <span class="od-pill">{{ count($displayItems ?: ($order->items ?? [])) }} Item</span>
@@ -600,9 +617,9 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                         @endphp
                         <tr>
                             <td class="od-c od-muted">{{ $itemNumber }}</td>
-                            <td class="od-code-cell">{{ $itemSku ?: '-' }}</td>
+                            <td class="od-code-cell"><span class="od-sku-cell" title="{{ $itemSku ?: '-' }}">{{ $itemSku ?: '-' }}</span></td>
                             <td>
-                                <div style="font-weight:700; color:#111827">{{ $item['item_name'] ?? 'Unknown Item' }}</div>
+                                <div class="od-product-name" title="{{ $item['item_name'] ?? 'Unknown Item' }}">{{ $item['item_name'] ?? 'Unknown Item' }}</div>
                                 <div class="od-name">Var: {{ $item['model_name'] ?? '-' }}</div>
                             </td>
                             <td class="od-c">{{ number_format($price, 0, ',', '.') }}</td>
@@ -628,9 +645,10 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                         @endphp
                         <tr>
                             <td class="od-c od-muted">{{ $itemNumber }}</td>
-                            <td class="od-code-cell">{{ $line->model_sku ?? $line->item_sku ?? $line->external_sku ?? '-' }}</td>
+                            @php $lineSku = $line->model_sku ?? $line->item_sku ?? $line->external_sku ?? '-'; @endphp
+                            <td class="od-code-cell"><span class="od-sku-cell" title="{{ $lineSku }}">{{ $lineSku }}</span></td>
                             <td>
-                                <div style="font-weight:700; color:#111827">{{ $line->item_name ?? $line->item_name_snapshot ?? '-' }}</div>
+                                <div class="od-product-name" title="{{ $line->item_name ?? $line->item_name_snapshot ?? '-' }}">{{ $line->item_name ?? $line->item_name_snapshot ?? '-' }}</div>
                                 @if($line->variant_name || $line->variant_snapshot)
                                 <div class="od-name">Var: {{ $line->variant_name ?? $line->variant_snapshot }}</div>
                                 @endif
@@ -652,7 +670,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         </div>
     </div>
 
-    <div class="od-card od-shipping-card">
+    <div class="od-card od-shipping-card od-order-customer">
         <div class="od-head">
             <div>
                 <div class="od-kicker">Customer profile</div>
@@ -666,7 +684,10 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                 <div class="od-settlement-address-name">{{ $buyerUsername }}</div>
                 <div class="od-settlement-address-detail">{{ $buyerName }} · {{ $buyerPhone }}</div>
                 <div class="od-settlement-address-label" style="margin-top:.7rem">Riwayat Pembelian</div>
-                <div class="od-settlement-address-name">Pernah beli {{ $buyerPurchaseCount }} kali</div>
+                <div class="od-settlement-address-name">Pembelian ke-{{ $buyerPurchaseCount }}</div>
+                <div class="od-settlement-address-detail">
+                    Terakhir {{ $buyerLastPurchaseAt ? id_datetime($buyerLastPurchaseAt) : 'Belum ada data' }}
+                </div>
             </div>
             <div class="od-settlement-address-detail">
                 <div class="od-settlement-address-label">Alamat</div>
@@ -849,7 +870,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
             : null;
     @endphp
 
-    <div class="od-card">
+    <div class="od-card od-order-profitability">
         <div class="od-head">
             <div>
                 <div class="od-title">Profitabilitas Pesanan</div>
@@ -892,7 +913,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         </div>
     </div>
 
-    <div class="od-finance-single">
+    <div class="od-finance-single od-order-settlement">
         <div class="od-card od-finance-card">
             <div class="od-head od-finance-head">
                 <div>
@@ -904,7 +925,15 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                         </div>
                     @endif
                 </div>
-                <div class="od-finance-total">Rp{{ number_format($penghasilan, 0, ',', '.') }}</div>
+                <div class="od-finance-head-values">
+                    <div class="od-finance-total">Rp{{ number_format($penghasilan, 0, ',', '.') }}</div>
+                    <div class="od-finance-cogs">
+                        <span>Total COGS</span>
+                        <strong style="color:{{ $hppComplete ? 'var(--text,#172033)' : '#b45309' }}">
+                            {{ $hppComplete ? 'Rp'.number_format($hppTotal, 0, ',', '.') : 'Belum lengkap' }}
+                        </strong>
+                    </div>
+                </div>
             </div>
             <div class="od-body od-finance-body">
                 <div class="od-finance-group">
