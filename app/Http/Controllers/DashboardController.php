@@ -246,7 +246,7 @@ class DashboardController extends Controller
 
     private function adminData(): array
     {
-        $cacheKey = 'dashboard.admin.v5.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.admin.v6.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->adminDataUncached());
     }
@@ -269,6 +269,7 @@ class DashboardController extends Controller
             'stock_out_fg'      => $this->stockOutCount('finished_good'),
             'fg_ready'          => $this->whQty([self::WH['FG'], self::WH['RTS']]),
             'list_todo'         => $this->mpUnshippedList(10),
+            'list_todo_items'   => $this->mpUnshippedItemList(12),
             'repeat_orders'     => $this->mpRepeatOrderList(8),
             'list_stock'        => $this->stockCriticalList(6, 'finished_good'),
         ];
@@ -427,7 +428,7 @@ class DashboardController extends Controller
 
             $orders = DB::table('marketplace_orders')
                 ->whereIn('order_status', self::DASHBOARD_PENDING_ORDER_STATUSES)
-                ->when($limit > 0, function ($query) {
+                ->when($limit > 0, function ($query) use ($limit) {
                     $query->orderByDesc($this->mpDateCol())->limit($limit);
                 })
                 ->get($orderColumns);
