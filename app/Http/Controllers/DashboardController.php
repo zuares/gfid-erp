@@ -6,6 +6,7 @@ use App\Services\Inventory\InventoryIntelligenceService;
 use App\Services\Marketplace\MarketplaceAnalyticsSummaryService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
@@ -70,6 +71,13 @@ class DashboardController extends Controller
     // =====================================================================
 
     private function ownerData(): array
+    {
+        $cacheKey = 'dashboard.owner.v2.' . Carbon::today()->toDateString();
+
+        return (array) Cache::remember($cacheKey, now()->addSeconds(30), fn () => $this->ownerDataUncached());
+    }
+
+    private function ownerDataUncached(): array
     {
         $today = Carbon::today();
 
@@ -233,6 +241,13 @@ class DashboardController extends Controller
     }
 
     private function adminData(): array
+    {
+        $cacheKey = 'dashboard.admin.v2.' . Carbon::today()->toDateString();
+
+        return (array) Cache::remember($cacheKey, now()->addSeconds(30), fn () => $this->adminDataUncached());
+    }
+
+    private function adminDataUncached(): array
     {
         $salesTd = $this->mpSales(0);
         $sales7  = $this->mpSales(6);
