@@ -335,17 +335,24 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
         </div>`;
     }
 
-    function profitAfterAdsHtml(o) {
+    function profitAfterAdsSectionHtml(o) {
         const summary = o.profit_after_ads_summary;
         if (!summary) return '';
 
         const status = String(summary.status || 'ads_missing');
         const isReady = status === 'ready' && Number.isFinite(Number(summary.amount));
-        const value = isReady
+        const cogsValue = summary.cogs_complete && Number.isFinite(Number(summary.cogs))
+            ? fmtRp(Number(summary.cogs))
+            : 'Belum lengkap';
+        const adCostValue = summary.ad_cost !== null && summary.ad_cost !== undefined
+            ? fmtRp(Number(summary.ad_cost))
+            : 'Belum tersedia';
+        const adTaxValue = summary.ad_tax !== null && summary.ad_tax !== undefined
+            ? fmtRp(Number(summary.ad_tax))
+            : 'Belum tersedia';
+        const grossProfitValue = isReady
             ? fmtRp(Number(summary.amount))
-            : status === 'cogs_missing'
-                ? 'Belum lengkap'
-                : 'Belum tersedia';
+            : status === 'cogs_missing' ? 'Belum lengkap' : 'Belum tersedia';
         const title = status === 'cogs_missing'
             ? 'Laba kotor belum dihitung karena COGS/HPP order belum lengkap'
             : status === 'ads_missing'
@@ -353,10 +360,19 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                 : status === 'income_missing'
                     ? 'Laba kotor belum dihitung karena payout/penghasilan order belum tersedia'
                     : 'Penghasilan dikurangi COGS, biaya iklan berdasarkan ACOS tanggal order, dan PPN iklan 11%';
+        const line = (label, value) => `<div class="ord-profitability-line">
+            <span>${label}</span><strong>${esc(value)}</strong>
+        </div>`;
 
-        return `<div class="ord-profit-after-ads ${isReady ? 'ready' : 'is-unavailable'}" title="${esc(title)}">
-            <span>Laba Kotor Setelah Iklan</span>
-            <strong>${esc(value)}</strong>
+        return `<div class="ord-profitability-section" title="${esc(title)}">
+            <div class="ord-profitability-title">Profitabilitas</div>
+            ${line('Total COGS', cogsValue)}
+            ${line('Biaya iklan / pesanan', adCostValue)}
+            ${line('PPN iklan (11%)', adTaxValue)}
+            <div class="ord-profitability-profit ${isReady ? 'ready' : 'is-unavailable'}">
+                <span>Laba Kotor Setelah Iklan</span>
+                <strong>${esc(grossProfitValue)}</strong>
+            </div>
         </div>`;
     }
 
@@ -3034,10 +3050,12 @@ const IS_DUMMY_MODE = window.IS_DUMMY_MODE;
                         <span class="ord-payment-income-label">Penghasilan</span>
                         ${escrowHtml(o)}
                     </div>
-                    ${profitAfterAdsHtml(o)}
                 </div>
             </td>`;
-            const voucherCell = `<td class="ord-voucher-cell">${voucherSummaryHtml(o) || '<span class="ord-payment-empty">—</span>'}</td>`;
+            const voucherCell = `<td class="ord-voucher-cell">
+                ${voucherSummaryHtml(o) || '<span class="ord-payment-empty">—</span>'}
+                ${profitAfterAdsSectionHtml(o)}
+            </td>`;
             
             const firstColHtml = activeTab === 'processed' 
                 ? `<div style="display:flex; gap:0.6rem; align-items:flex-start;">
