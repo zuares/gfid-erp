@@ -156,7 +156,7 @@ class DashboardController extends Controller
 
     private function ownerData(): array
     {
-        $cacheKey = 'dashboard.owner.v11.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.owner.v12.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->ownerDataUncached());
     }
@@ -203,7 +203,7 @@ class DashboardController extends Controller
                 : 0;
         }
         unset($todaySnapshot);
-        foreach (['net_order_revenue', 'order_total', 'net_aov'] as $todayComparisonKey) {
+        foreach (['net_order_revenue', 'order_total', 'net_aov', 'estimated_profit'] as $todayComparisonKey) {
             $marketplaceTodayKpi['comparisons'][$todayComparisonKey] = [
                 'yesterday' => $this->percentageComparison(
                     (float) ($marketplaceTodayKpi[$todayComparisonKey] ?? 0),

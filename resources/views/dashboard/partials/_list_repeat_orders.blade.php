@@ -25,9 +25,9 @@
                             <th>SKU hari ini</th>
                             <th class="numeric">Qty hari ini</th>
                             <th>Pesanan terakhir</th>
-                            <th>SKU terakhir</th>
-                            <th class="numeric">Qty terakhir</th>
-                            <th>Terakhir beli</th>
+                            <th class="drepeat-mobile-secondary">SKU terakhir</th>
+                            <th class="numeric drepeat-mobile-secondary">Qty terakhir</th>
+                            <th class="drepeat-mobile-secondary">Terakhir beli</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -71,21 +71,21 @@
                                         ><code>{{ $row['last_order_awb'] ?: '—' }}</code></div>
                                     @endif
                                 </td>
-                                <td class="drepeat-items">
+                                <td class="drepeat-items drepeat-mobile-secondary">
                                     @forelse($row['last_items'] ?? [] as $item)
                                         <div class="drepeat-item-line"><code>{{ $item['sku'] ?: '—' }}</code></div>
                                     @empty
                                         —
                                     @endforelse
                                 </td>
-                                <td class="numeric drepeat-items">
+                                <td class="numeric drepeat-items drepeat-mobile-secondary">
                                     @forelse($row['last_items'] ?? [] as $item)
                                         <div class="drepeat-item-line">{{ number_format((float) ($item['qty'] ?? 0), 0, ',', '.') }}</div>
                                     @empty
                                         —
                                     @endforelse
                                 </td>
-                                <td class="drepeat-date">
+                                <td class="drepeat-date drepeat-mobile-secondary">
                                     {{ !empty($row['last_purchased_at']) ? \Carbon\Carbon::parse($row['last_purchased_at'])->translatedFormat('d M Y') : '—' }}
                                 </td>
                                 <td><span class="pill {{ $status[1] }}">{{ $status[0] }}</span></td>

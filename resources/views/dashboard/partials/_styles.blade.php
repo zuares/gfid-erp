@@ -207,6 +207,16 @@
     .drepeat-panel .dpanel-head .t .bi { color: #2563eb; }
     .drepeat-panel .dpanel-body { padding-left: .08rem; padding-right: .15rem; }
     .drepeat-table { display: table; width: 100%; min-width: 100%; max-width: 100%; box-sizing: border-box; border-collapse: collapse; table-layout: fixed; }
+    .drepeat-table th:nth-child(1), .drepeat-table td:nth-child(1) { width: 4%; }
+    .drepeat-table th:nth-child(2), .drepeat-table td:nth-child(2) { width: 10%; }
+    .drepeat-table th:nth-child(3), .drepeat-table td:nth-child(3) { width: 12%; }
+    .drepeat-table th:nth-child(4), .drepeat-table td:nth-child(4) { width: 13%; }
+    .drepeat-table th:nth-child(5), .drepeat-table td:nth-child(5) { width: 6%; }
+    .drepeat-table th:nth-child(6), .drepeat-table td:nth-child(6) { width: 17%; }
+    .drepeat-table th:nth-child(7), .drepeat-table td:nth-child(7) { width: 13%; }
+    .drepeat-table th:nth-child(8), .drepeat-table td:nth-child(8) { width: 6%; }
+    .drepeat-table th:nth-child(9), .drepeat-table td:nth-child(9) { width: 10%; }
+    .drepeat-table th:nth-child(10), .drepeat-table td:nth-child(10) { width: 9%; }
     .drepeat-table thead { background: rgba(239,246,255,.58); }
     .drepeat-table th { padding: .35rem .4rem; color: #475569; font-size: .62rem; font-weight: 750; text-align: left; border-bottom: 1px solid rgba(59,130,246,.18); white-space: normal; }
     .drepeat-table td { padding: .4rem .4rem; border-bottom: 1px solid var(--dsh-border); vertical-align: middle; font-size: .7rem; overflow-wrap: anywhere; }
@@ -255,5 +265,41 @@
         .hero-date { display: none; }
         .kpi { min-height: 164px; }
         .kpi-value { font-size: 1.25rem; }
+
+        .ditem-table-wrap, .drepeat-table-wrap { overflow-x: hidden; }
+        .ditem-table { min-width: 0; table-layout: fixed; }
+        .ditem-table th, .ditem-table td { padding: .34rem .3rem; font-size: .66rem; }
+        .ditem-table th:nth-child(1), .ditem-table td:nth-child(1) { width: 8%; }
+        .ditem-table th:nth-child(2), .ditem-table td:nth-child(2) { width: 47%; }
+        .ditem-table th:nth-child(3), .ditem-table td:nth-child(3) { width: 23%; }
+        .ditem-table th:nth-child(6), .ditem-table td:nth-child(6) { width: 22%; }
+        .ditem-table .ditem-number { width: 24px; }
+        .ditem-code { font-size: .68rem; overflow-wrap: anywhere; }
+        .ditem-gap { width: auto; }
+        .ditem-gap-indicator { min-width: 0; padding: .18rem .3rem; font-size: .68rem; }
+        .ditem-gap-icon { font-size: .72rem; }
+        .ditem-mobile-secondary { display: none !important; }
+        .ditem-category-row td:nth-child(2) { padding-left: .3rem; }
+        .ditem-summary { gap: .3rem; }
+        .ditem-summary-item { padding: .38rem .4rem; font-size: .62rem; }
+        .ditem-summary-item strong { font-size: .76rem; }
+
+        .drepeat-table th, .drepeat-table td { padding: .32rem .26rem; font-size: .64rem; }
+        .drepeat-table th:nth-child(1), .drepeat-table td:nth-child(1) { width: 6%; }
+        .drepeat-table th:nth-child(2), .drepeat-table td:nth-child(2) { width: 17%; }
+        .drepeat-table th:nth-child(3), .drepeat-table td:nth-child(3) { width: 18%; }
+        .drepeat-table th:nth-child(4), .drepeat-table td:nth-child(4) { width: 22%; }
+        .drepeat-table th:nth-child(5), .drepeat-table td:nth-child(5) { width: 9%; }
+        .drepeat-table th:nth-child(6), .drepeat-table td:nth-child(6) { width: 19%; }
+        .drepeat-table th:nth-child(10), .drepeat-table td:nth-child(10) { width: 9%; }
+        .drepeat-table .ditem-number { width: 22px; }
+        .drepeat-order { font-size: .6rem !important; }
+        .drepeat-items { font-size: .62rem !important; }
+        .drepeat-items code { font-size: .6rem; }
+        .drepeat-buyer { overflow-wrap: anywhere; }
+        .drepeat-order-meta { font-size: .5rem; }
+        .drepeat-mobile-secondary { display: none !important; }
+        .drepeat-panel .dpanel-head { padding: .55rem .65rem; }
+        .drepeat-panel .dpanel-head .t { font-size: .78rem; }
     }
 </style>

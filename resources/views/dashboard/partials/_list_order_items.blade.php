@@ -76,8 +76,8 @@
                             <th class="numeric">No</th>
                             <th>Kode item internal</th>
                             <th class="numeric">Permintaan</th>
-                            <th class="numeric">Stok FG/RTS</th>
-                            <th class="numeric">Stok produksi</th>
+                            <th class="numeric ditem-mobile-secondary">Stok FG/RTS</th>
+                            <th class="numeric ditem-mobile-secondary">Stok produksi</th>
                             <th class="numeric">Selisih kurang</th>
                         </tr>
                     </thead>
@@ -114,8 +114,8 @@
                                     <td></td>
                                     <td><span class="ditem-category-name"><i class="bi bi-tag"></i> {{ $category }}</span></td>
                                     <td class="numeric ditem-category-total" title="Total permintaan kategori">{{ $qty($categorySummary['demand']) }} pcs</td>
-                                    <td class="ditem-category-empty" aria-hidden="true"></td>
-                                    <td class="ditem-category-empty" aria-hidden="true"></td>
+                                    <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
+                                    <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
                                     <td class="numeric ditem-gap ditem-category-total">
                                         <span class="ditem-category-gap-value {{ $categoryGapState }}" title="Selisih stok FG/RTS dikurangi permintaan kategori">
                                             {{ $categoryGap === null ? '—' : $qty($categoryGap) }}
@@ -136,10 +136,10 @@
                                     <div class="ditem-code">{{ $row['code'] ?: 'Belum mapping' }}</div>
                                 </td>
                                 <td class="numeric ditem-demand">{{ $qty($demand) }} pcs</td>
-                                <td class="numeric ditem-stock {{ $short ? 'short' : '' }}">
+                                <td class="numeric ditem-stock ditem-mobile-secondary {{ $short ? 'short' : '' }}">
                                     {{ $stock === null ? '—' : $qty($stock) . ' pcs' }}
                                 </td>
-                                <td class="numeric ditem-production-stock {{ $productionStock !== null && $productionStock > 0 ? 'has-stock' : '' }}">
+                                <td class="numeric ditem-production-stock ditem-mobile-secondary {{ $productionStock !== null && $productionStock > 0 ? 'has-stock' : '' }}">
                                     @if($productionStock === null)
                                         —
                                     @elseif($productionStock > 0)
