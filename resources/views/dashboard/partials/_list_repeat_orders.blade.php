@@ -24,13 +24,12 @@
                             <th>Order hari ini</th>
                             <th>SKU hari ini</th>
                             <th class="numeric">Qty hari ini</th>
+                            <th>Sebelum pesanan terakhir</th>
                             <th>Pesanan terakhir</th>
                             <th>SKU terakhir</th>
                             <th class="numeric">Qty terakhir</th>
                             <th>Item scan shipment</th>
                             <th class="numeric">Qty scan</th>
-                            <th>Item scan terakhir</th>
-                            <th class="numeric">Qty scan terakhir</th>
                             <th>Terakhir beli</th>
                             <th class="numeric">Order sebelumnya</th>
                             <th>Status</th>
@@ -62,6 +61,18 @@
                                     @empty
                                         —
                                     @endforelse
+                                </td>
+                                <td class="drepeat-order">
+                                    @if(!empty($row['before_last_order_id']))
+                                        <a class="drepeat-order-link" href="{{ route('marketplace.orders.show', ['order' => $row['before_last_order_id']]) }}">{{ $row['before_last_order_number'] ?: '—' }}</a>
+                                    @else
+                                        {{ $row['before_last_order_number'] ?: '—' }}
+                                    @endif
+                                    @if(!empty($row['before_last_purchased_at']))
+                                        <div class="drepeat-order-meta">
+                                            Beli: {{ \Carbon\Carbon::parse($row['before_last_purchased_at'])->translatedFormat('d M Y') }}
+                                        </div>
+                                    @endif
                                 </td>
                                 <td class="drepeat-order">
                                     @if(!empty($row['last_order_id']))
@@ -99,20 +110,6 @@
                                 </td>
                                 <td class="numeric drepeat-items">
                                     @forelse($row['scanned_items'] ?? [] as $item)
-                                        <div class="drepeat-item-line">{{ number_format((float) ($item['qty'] ?? 0), 0, ',', '.') }}</div>
-                                    @empty
-                                        —
-                                    @endforelse
-                                </td>
-                                <td class="drepeat-items">
-                                    @forelse($row['last_scanned_items'] ?? [] as $item)
-                                        <div class="drepeat-item-line"><code>{{ $item['code'] ?: '—' }}</code></div>
-                                    @empty
-                                        —
-                                    @endforelse
-                                </td>
-                                <td class="numeric drepeat-items">
-                                    @forelse($row['last_scanned_items'] ?? [] as $item)
                                         <div class="drepeat-item-line">{{ number_format((float) ($item['qty'] ?? 0), 0, ',', '.') }}</div>
                                     @empty
                                         —

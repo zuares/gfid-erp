@@ -768,6 +768,12 @@ class DashboardController extends Controller
             $lastOrderExternalInvoice = (clone $lastOrderBase)->select('previous.external_invoice_no');
             $lastOrderExternalId = (clone $lastOrderBase)->select('previous.external_order_id');
             $lastOrderChannelId = (clone $lastOrderBase)->select('previous.channel_order_id');
+            $beforeLastOrderBase = (clone $lastOrderBase)->offset(1);
+            $beforeLastOrderNumber = (clone $beforeLastOrderBase)
+                ->selectRaw("COALESCE(NULLIF(previous.external_invoice_no, ''), NULLIF(previous.external_order_id, ''), previous.channel_order_id, CONCAT('ORDER-', previous.id))");
+            $beforeLastOrderId = (clone $beforeLastOrderBase)->select('previous.id');
+            $beforeLastPurchasedAt = (clone $beforeLastOrderBase)
+                ->selectRaw('COALESCE(previous.ordered_at, previous.order_date, previous.created_at)');
 
             $orders = $orders
                 ->select([
@@ -787,6 +793,9 @@ class DashboardController extends Controller
                 ->selectSub($lastOrderExternalInvoice, 'last_order_external_invoice_no')
                 ->selectSub($lastOrderExternalId, 'last_order_external_order_id')
                 ->selectSub($lastOrderChannelId, 'last_order_channel_order_id')
+                ->selectSub($beforeLastOrderNumber, 'before_last_order_number')
+                ->selectSub($beforeLastOrderId, 'before_last_order_id')
+                ->selectSub($beforeLastPurchasedAt, 'before_last_purchased_at')
                 ->get();
 
             $itemsByOrder = [];
