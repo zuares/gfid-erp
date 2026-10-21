@@ -205,10 +205,12 @@
     .drepeat-panel .dpanel-head { background: linear-gradient(90deg, rgba(239,246,255,.9), rgba(248,250,252,.55)); border-bottom-color: rgba(59,130,246,.16); }
     .drepeat-panel .dpanel-head .t { color: #1e3a8a; }
     .drepeat-panel .dpanel-head .t .bi { color: #2563eb; }
+    .drepeat-panel .dpanel-body { padding-left: .08rem; padding-right: .15rem; }
     .drepeat-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     .drepeat-table thead { background: rgba(239,246,255,.58); }
     .drepeat-table th { padding: .35rem .4rem; color: #475569; font-size: .62rem; font-weight: 750; text-align: left; border-bottom: 1px solid rgba(59,130,246,.18); white-space: normal; }
     .drepeat-table td { padding: .4rem .4rem; border-bottom: 1px solid var(--dsh-border); vertical-align: middle; font-size: .7rem; overflow-wrap: anywhere; }
+    .drepeat-table th:first-child, .drepeat-table td:first-child { padding-left: .2rem; }
     .drepeat-table tbody tr { transition: background-color .12s ease; }
     .drepeat-table tbody tr:hover { background: rgba(239,246,255,.62); }
     .drepeat-table tr:last-child td { border-bottom: 0; }
