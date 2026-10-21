@@ -116,6 +116,23 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
         $this->assertFalse($row['is_repeat_buyer']);
     }
 
+    public function test_detail_menampilkan_order_terakhir_di_modal_riwayat_pembelian(): void
+    {
+        $previous = $this->createOrder('HISTORY-PREVIOUS', 'COMPLETED', 'buyer-history');
+        $previous->update([
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+        ]);
+        $current = $this->createOrder('HISTORY-CURRENT', 'READY_TO_SHIP', 'buyer-history');
+
+        $response = $this->get(route('marketplace.orders.show', $current));
+
+        $response->assertOk()
+            ->assertSee('window.showBuyerLastPurchase', false)
+            ->assertSee('HISTORY-CURRENT')
+            ->assertSee('Pembelian Terakhir', false);
+    }
+
     public function test_order_yang_belum_completed_tidak_menjadikan_pembeli_repeat(): void
     {
         $this->createOrder('REPEAT-IN-PROGRESS', 'SHIPPED', 'buyer-belum-selesai');

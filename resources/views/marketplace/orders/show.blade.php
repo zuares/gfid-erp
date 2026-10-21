@@ -86,6 +86,12 @@
 .od-settlement-address-label{font-size:.65rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#64748b);margin-bottom:.25rem}
 .od-settlement-address-name{font-size:.82rem;font-weight:800;color:var(--text,#172033)}
 .od-settlement-address-detail{font-size:.75rem;line-height:1.45;color:var(--muted,#64748b)}
+.od-history-trigger{display:block;width:100%;margin:.7rem 0 0;padding:.65rem .7rem;border:1px solid var(--line,#e7ebf0);border-radius:10px;background:var(--card,#fff);color:inherit;text-align:left;cursor:pointer;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}
+.od-history-trigger:hover{border-color:#bfdbfe;background:#eff6ff;box-shadow:0 3px 10px rgba(37,99,235,.08)}
+.od-history-trigger:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
+.od-history-trigger .od-settlement-address-label{margin:0 0 .2rem}
+.od-history-trigger .od-settlement-address-name{color:#1d4ed8}
+.od-history-trigger-hint{display:inline-flex;align-items:center;gap:.25rem;margin-left:.35rem;font-size:.65rem;font-weight:700;color:#2563eb;text-transform:none;letter-spacing:0}
 .od-payment-summary{display:grid;gap:.5rem;margin-top:.85rem;padding-top:.85rem;border-top:1px solid var(--line,#eef1f4)}
 .od-payment-summary-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
 .od-payment-summary-total{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.95rem;font-weight:850;color:var(--text,#172033);font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -684,11 +690,13 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                 <div class="od-settlement-address-label">User</div>
                 <div class="od-settlement-address-name">{{ $buyerUsername }}</div>
                 <div class="od-settlement-address-detail">{{ $buyerName }} · {{ $buyerPhone }}</div>
-                <div class="od-settlement-address-label" style="margin-top:.7rem">Riwayat Pembelian</div>
-                <div class="od-settlement-address-name">Pembelian ke-{{ $buyerPurchaseCount }}</div>
-                <div class="od-settlement-address-detail">
-                    Terakhir {{ $buyerLastPurchaseAt ? id_datetime($buyerLastPurchaseAt) : 'Belum ada data' }}
-                </div>
+                <button type="button" class="od-history-trigger" onclick="window.showBuyerLastPurchase()" aria-label="Lihat pembelian terakhir">
+                    <div class="od-settlement-address-label">Riwayat Pembelian <span class="od-history-trigger-hint"><i class="bi bi-box-arrow-up-right"></i> Lihat order</span></div>
+                    <div class="od-settlement-address-name">Pembelian ke-{{ $buyerPurchaseCount }}</div>
+                    <div class="od-settlement-address-detail">
+                        Terakhir {{ $buyerLastPurchaseAt ? id_datetime($buyerLastPurchaseAt) : 'Belum ada data' }}
+                    </div>
+                </button>
             </div>
             <div class="od-settlement-address-detail">
                 <div class="od-settlement-address-label">Alamat</div>
@@ -1124,7 +1132,58 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
 @endsection
 
 @push('scripts')
+@php
+    $buyerPurchaseHistoryPayload = [
+        'count' => $buyerPurchaseCount,
+        'last_order_id' => $buyerPurchaseHistory['last_order_id'] ?? null,
+        'last_order_sn' => $buyerPurchaseHistory['last_order_sn'] ?? null,
+        'last_order_status' => $buyerPurchaseHistory['last_order_status'] ?? null,
+        'last_order_at_label' => $buyerLastPurchaseAt ? id_datetime($buyerLastPurchaseAt) : null,
+    ];
+@endphp
 <script>
+    window.BUYER_PURCHASE_HISTORY = @json($buyerPurchaseHistoryPayload);
+
+    window.showBuyerLastPurchase = function() {
+        const history = window.BUYER_PURCHASE_HISTORY || {};
+        const orderId = Number(history.last_order_id || 0);
+        const escapeHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+        }[char]));
+        const openOrder = () => {
+            if (orderId > 0) window.location.href = `/marketplace/orders/${encodeURIComponent(orderId)}`;
+        };
+
+        if (!window.Swal) {
+            openOrder();
+            return;
+        }
+
+        Swal.fire({
+            title: 'Pembelian Terakhir',
+            html: `<div style="text-align:left;display:grid;gap:.7rem">
+                <div style="padding:.8rem .9rem;border:1px solid #dbeafe;border-radius:10px;background:#eff6ff">
+                    <div style="font-size:.68rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#64748b">Order</div>
+                    <div style="margin-top:.2rem;font-size:1rem;font-weight:800;color:#1d4ed8">${escapeHtml(history.last_order_sn || '—')}</div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem">
+                    <div><div style="font-size:.68rem;color:#64748b">Waktu transaksi</div><strong style="font-size:.82rem;color:#1e293b">${escapeHtml(history.last_order_at_label || 'Belum ada data')}</strong></div>
+                    <div><div style="font-size:.68rem;color:#64748b">Status</div><strong style="font-size:.82rem;color:#1e293b">${escapeHtml(history.last_order_status || '—')}</strong></div>
+                </div>
+                <div style="font-size:.75rem;color:#64748b">Pembelian ke-${escapeHtml(history.count || 0)} dari customer ini.</div>
+            </div>`,
+            width: 460,
+            showCloseButton: true,
+            showCancelButton: orderId <= 0,
+            showConfirmButton: orderId > 0,
+            confirmButtonText: 'Buka order',
+            cancelButtonText: 'Tutup',
+            confirmButtonColor: '#2563eb',
+        }).then((result) => {
+            if (result.isConfirmed) openOrder();
+        });
+    };
+
     window.trackOrder = async function(storeId, orderSn, e) {
         if(e) e.preventDefault();
         

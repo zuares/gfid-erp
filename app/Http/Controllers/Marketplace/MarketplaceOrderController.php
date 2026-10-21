@@ -229,6 +229,9 @@ class MarketplaceOrderController extends Controller
                 'last_order_at' => $order->isCancelledOrder()
                     ? null
                     : ($order->ordered_at ?: $order->order_date),
+                'last_order_id' => $order->isCancelledOrder() ? null : $order->id,
+                'last_order_sn' => $order->isCancelledOrder() ? null : ($order->channel_order_id ?: $order->external_order_id),
+                'last_order_status' => $order->isCancelledOrder() ? null : ($order->order_status ?: $order->status),
             ];
         }
 
@@ -236,14 +239,28 @@ class MarketplaceOrderController extends Controller
         if (! $order->isCancelledOrder()) {
             $count = max(1, $count);
         }
-        $lastOrderAt = (clone $query)
-            ->selectRaw('COALESCE(ordered_at, order_date) as last_order_at')
+        $lastOrder = (clone $query)
             ->orderByRaw('COALESCE(ordered_at, order_date) DESC')
-            ->value('last_order_at');
+            ->orderByDesc('id')
+            ->first([
+                'id',
+                'channel_order_id',
+                'external_order_id',
+                'order_status',
+                'status',
+                'ordered_at',
+                'order_date',
+            ]);
+        $lastOrderAt = $lastOrder?->ordered_at ?: $lastOrder?->order_date;
 
         return [
             'count' => $count,
             'last_order_at' => $lastOrderAt ?: ($order->isCancelledOrder() ? null : ($order->ordered_at ?: $order->order_date)),
+            'last_order_id' => $lastOrder?->id ?: ($order->isCancelledOrder() ? null : $order->id),
+            'last_order_sn' => $lastOrder
+                ? ($lastOrder->channel_order_id ?: $lastOrder->external_order_id)
+                : ($order->isCancelledOrder() ? null : ($order->channel_order_id ?: $order->external_order_id)),
+            'last_order_status' => $lastOrder?->order_status ?: ($lastOrder?->status ?: ($order->isCancelledOrder() ? null : ($order->order_status ?: $order->status))),
         ];
     }
 
