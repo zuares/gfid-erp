@@ -8,7 +8,7 @@
         'COMPLETED' => ['Selesai', 'green'],
     ];
 @endphp
-<div class="dpanel">
+<div class="dpanel drepeat-panel">
     <div class="dpanel-head">
         <div class="t"><i class="bi bi-arrow-repeat"></i> {{ $title }}</div>
         @if(!empty($link))<a href="{{ $link }}">Lihat semua <i class="bi bi-arrow-right-short"></i></a>@endif
@@ -24,7 +24,6 @@
                             <th>Order hari ini</th>
                             <th>SKU hari ini</th>
                             <th class="numeric">Qty hari ini</th>
-                            <th>Sebelum pesanan terakhir</th>
                             <th>Pesanan terakhir</th>
                             <th>SKU terakhir</th>
                             <th class="numeric">Qty terakhir</th>
@@ -60,18 +59,6 @@
                                     @endforelse
                                 </td>
                                 <td class="drepeat-order">
-                                    @if(!empty($row['before_last_order_id']))
-                                        <a class="drepeat-order-link" href="{{ route('marketplace.orders.show', ['order' => $row['before_last_order_id']]) }}">{{ $row['before_last_order_number'] ?: '—' }}</a>
-                                    @else
-                                        {{ $row['before_last_order_number'] ?: '—' }}
-                                    @endif
-                                    @if(!empty($row['before_last_purchased_at']))
-                                        <div class="drepeat-order-meta">
-                                            Beli: {{ \Carbon\Carbon::parse($row['before_last_purchased_at'])->translatedFormat('d M Y') }}
-                                        </div>
-                                    @endif
-                                </td>
-                                <td class="drepeat-order">
                                     @if(!empty($row['last_order_id']))
                                         <a class="drepeat-order-link" href="{{ route('marketplace.orders.show', ['order' => $row['last_order_id']]) }}">{{ $row['last_order_number'] ?: '—' }}</a>
                                     @else
@@ -81,7 +68,7 @@
                                         <div
                                             class="drepeat-order-meta"
                                             data-repeat-order-awb="{{ route('dashboard.repeat_orders.awb', ['order' => $row['last_order_id']]) }}"
-                                        >Resi: <code>{{ $row['last_order_awb'] ?: '—' }}</code></div>
+                                        ><code>{{ $row['last_order_awb'] ?: '—' }}</code></div>
                                     @endif
                                 </td>
                                 <td class="drepeat-items">

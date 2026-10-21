@@ -201,9 +201,16 @@
         .ditem-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     .drepeat-table-wrap { overflow-x: auto; }
+    .drepeat-panel { border-color: rgba(59,130,246,.24); }
+    .drepeat-panel .dpanel-head { background: linear-gradient(90deg, rgba(239,246,255,.9), rgba(248,250,252,.55)); border-bottom-color: rgba(59,130,246,.16); }
+    .drepeat-panel .dpanel-head .t { color: #1e3a8a; }
+    .drepeat-panel .dpanel-head .t .bi { color: #2563eb; }
     .drepeat-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    .drepeat-table th { padding: .35rem .4rem; color: var(--dsh-muted); font-size: .62rem; font-weight: 700; text-align: left; border-bottom: 1px solid var(--dsh-border); white-space: normal; }
+    .drepeat-table thead { background: rgba(239,246,255,.58); }
+    .drepeat-table th { padding: .35rem .4rem; color: #475569; font-size: .62rem; font-weight: 750; text-align: left; border-bottom: 1px solid rgba(59,130,246,.18); white-space: normal; }
     .drepeat-table td { padding: .4rem .4rem; border-bottom: 1px solid var(--dsh-border); vertical-align: middle; font-size: .7rem; overflow-wrap: anywhere; }
+    .drepeat-table tbody tr { transition: background-color .12s ease; }
+    .drepeat-table tbody tr:hover { background: rgba(239,246,255,.62); }
     .drepeat-table tr:last-child td { border-bottom: 0; }
     .drepeat-table .numeric { text-align: right; white-space: nowrap; }
     .drepeat-buyer { color: var(--text, #0f172a); font-weight: 650; }
@@ -216,6 +223,13 @@
     .drepeat-items code { color: var(--text, #0f172a); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .69rem; }
     .drepeat-item-line { line-height: 1.3; white-space: normal; overflow-wrap: anywhere; }
     .drepeat-date { color: var(--dsh-muted); white-space: nowrap; font-size: .72rem !important; }
+    body[data-theme="dark"] .drepeat-panel { border-color: rgba(96,165,250,.4); }
+    body[data-theme="dark"] .drepeat-panel .dpanel-head { background: linear-gradient(90deg, rgba(30,58,138,.3), rgba(15,23,42,.2)); border-bottom-color: rgba(96,165,250,.28); }
+    body[data-theme="dark"] .drepeat-panel .dpanel-head .t { color: #bfdbfe; }
+    body[data-theme="dark"] .drepeat-panel .dpanel-head .t .bi { color: #93c5fd; }
+    body[data-theme="dark"] .drepeat-table thead { background: rgba(30,58,138,.2); }
+    body[data-theme="dark"] .drepeat-table th { color: #cbd5e1; border-bottom-color: rgba(96,165,250,.3); }
+    body[data-theme="dark"] .drepeat-table tbody tr:hover { background: rgba(30,58,138,.18); }
 
     /* ---------- Badge (mirip badge-status + dot) ---------- */
     .pill { display: inline-flex; align-items: center; gap: .32rem; border-radius: 7px; padding: .14rem .45rem;
