@@ -81,20 +81,46 @@ class DashboardController extends Controller
             $order->channel_order_id,
             $order->booking_sn,
         ])->map(fn ($value) => trim((string) $value))->filter()->unique()->values()->all();
+        $knownAwbs = collect([
+            $order->shipping_awb_no,
+            $this->extractMarketplaceAwb($order->raw_json),
+        ])->map(fn ($value) => trim((string) $value))->filter()->unique()->values()->all();
+        $scanReferences = array_values(array_unique([...$references, ...$knownAwbs]));
 
-        return DB::table('shipments as shipment')
+        $scan = DB::table('shipments as shipment')
             ->join('shipment_order_scans as sos', 'sos.shipment_id', '=', 'shipment.id')
             ->leftJoin('order_fulfillments as fulfillment', 'fulfillment.id', '=', 'sos.fulfillment_id')
-            ->whereNotNull('shipment.awb')
-            ->where('shipment.awb', '<>', '')
-            ->where(function ($query) use ($order, $references) {
+            ->where(function ($query) use ($order, $scanReferences) {
                 $query->where('fulfillment.marketplace_order_id', $order->id);
-                if ($references !== []) {
-                    $query->orWhereIn('sos.order_no', $references);
+                if ($scanReferences !== []) {
+                    $query->orWhereIn('sos.order_no', $scanReferences);
                 }
             })
+            ->where(function ($query) use ($knownAwbs) {
+                $query->whereNotNull('shipment.awb')
+                    ->where('shipment.awb', '<>', '');
+                if ($knownAwbs !== []) {
+                    $query->orWhereIn('sos.order_no', $knownAwbs);
+                }
+                $query->orWhereIn(DB::raw("LOWER(COALESCE(sos.match_method, ''))"), ['awb', 'awb_booking']);
+            })
             ->orderByDesc('shipment.id')
-            ->value('shipment.awb');
+            ->first(['shipment.awb as shipment_awb', 'sos.order_no', 'sos.match_method']);
+
+        if (!$scan) {
+            return null;
+        }
+
+        $shipmentAwb = trim((string) $scan->shipment_awb);
+        if ($shipmentAwb !== '') {
+            return $shipmentAwb;
+        }
+
+        $scannedCode = trim((string) $scan->order_no);
+        return in_array($scannedCode, $knownAwbs, true)
+            || in_array(strtolower((string) $scan->match_method), ['awb', 'awb_booking'], true)
+            ? $scannedCode
+            : null;
     }
 
     public function devRunAudit(): \Illuminate\Http\JsonResponse
@@ -817,7 +843,10 @@ class DashboardController extends Controller
                 foreach ($orders as $order) {
                     foreach ([
                         [$order->id, $order->external_invoice_no, $order->external_order_id, $order->channel_order_id],
+                        [$order->id, $order->shipping_awb_no],
                         [$order->last_order_id, $order->last_order_external_invoice_no, $order->last_order_external_order_id, $order->last_order_channel_order_id],
+                        [$order->last_order_id, $order->last_order_awb],
+                        [$order->last_order_id, $this->extractMarketplaceAwb($order->last_order_raw_json)],
                     ] as $orderReferences) {
                         $mappedOrderId = (int) array_shift($orderReferences);
                         if ($mappedOrderId < 1) {
@@ -863,7 +892,7 @@ class DashboardController extends Controller
                     ->orderByDesc('shipment.id')
                     ->get([
                         'sl.shipment_id',
-                        'fulfillment.marketplace_order_id', 'sos.order_no',
+                        'fulfillment.marketplace_order_id', 'sos.order_no', 'sos.match_method',
                         'shipment.awb as shipment_awb',
                         'i.code as item_code', 'sl.item_id', 'sl.qty_scanned',
                     ]);
@@ -878,6 +907,19 @@ class DashboardController extends Controller
                     }
 
                     $shipmentAwb = trim((string) $line->shipment_awb);
+                    if ($shipmentAwb === '') {
+                        $scannedCode = trim((string) $line->order_no);
+                        $shipmentAwb = trim((string) ($orderAwbMap[$scannedCode] ?? ''));
+                        if (
+                            $shipmentAwb === ''
+                            && in_array(strtolower((string) $line->match_method), ['awb', 'awb_booking'], true)
+                        ) {
+                            $shipmentAwb = $scannedCode;
+                        }
+                        if ($shipmentAwb !== '') {
+                            $shipmentAwb = $scannedCode;
+                        }
+                    }
                     if ($shipmentAwb !== '' && !isset($shipmentAwbByOrder[$orderId])) {
                         $shipmentAwbByOrder[$orderId] = $shipmentAwb;
                     }
