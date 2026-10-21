@@ -124,6 +124,13 @@
 <div class="dash-sec"><i class="bi bi-speedometer2"></i> KPI Marketplace (bulan berjalan)</div>
 <div class="dash-grid">
     @include('dashboard.partials._kpi', [
+        'label' => 'Estimasi profit hari ini', 'icon' => 'bi-piggy-bank', 'color' => (float) ($marketplaceTodayKpi['estimated_profit'] ?? 0) >= 0 ? 'green' : 'red',
+        'value' => rupiah($marketplaceTodayKpi['estimated_profit'] ?? 0),
+        'sub' => 'Setelah fee, HPP, refund, dan iklan hari ini',
+        'comparisons' => $todayComparison('estimated_profit', $money),
+        'url' => $marketplaceAnalyticsUrl, 'cta' => 'Lihat detail',
+    ])
+    @include('dashboard.partials._kpi', [
         'label' => 'Estimasi profit bulan ini', 'icon' => 'bi-piggy-bank', 'color' => (float) ($marketplaceMonthKpi['estimated_profit'] ?? 0) >= 0 ? 'green' : 'red',
         'value' => rupiah($marketplaceMonthKpi['estimated_profit'] ?? 0),
         'sub' => 'Setelah fee, HPP, refund, dan iklan',
@@ -131,13 +138,6 @@
             $monthComparison('estimated_profit', $money),
         ],
         'url' => $marketplaceAnalyticsUrl, 'cta' => 'Lihat profit',
-    ])
-    @include('dashboard.partials._kpi', [
-        'label' => 'Estimasi profit hari ini', 'icon' => 'bi-piggy-bank', 'color' => (float) ($marketplaceTodayKpi['estimated_profit'] ?? 0) >= 0 ? 'green' : 'red',
-        'value' => rupiah($marketplaceTodayKpi['estimated_profit'] ?? 0),
-        'sub' => 'Setelah fee, HPP, refund, dan iklan hari ini',
-        'comparisons' => $todayComparison('estimated_profit', $money),
-        'url' => $marketplaceAnalyticsUrl, 'cta' => 'Lihat detail',
     ])
     @include('dashboard.partials._kpi', [
         'label' => 'Margin estimasi', 'icon' => 'bi-percent', 'color' => (float) ($marketplaceMonthKpi['estimated_profit_margin'] ?? 0) >= 10 ? 'green' : 'amber',
