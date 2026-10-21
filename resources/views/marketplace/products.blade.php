@@ -423,6 +423,9 @@
     .filter-bar{ gap:.6rem; }
     .filter-search,.filter-select{ border-radius:9px; min-height:34px; }
     .card-main{ border-radius:16px; box-shadow:0 14px 34px rgba(15,23,42,.06); }
+    /* Action menus must be allowed to escape the product card at the bottom edge. */
+    #productTableWrap{ overflow:visible !important; }
+    #productTableWrap .dropdown-menu{ z-index:2000; }
     .table-list thead th{ padding:.7rem .65rem; font-size:.65rem; letter-spacing:.02em; text-transform:uppercase; }
     .table-list tbody td{ padding:.72rem .65rem; }
     .table-list tbody tr[data-pid]:hover td{ background:rgba(37,99,235,.055); }
@@ -453,7 +456,7 @@
     {{-- Topbar --}}
     <div class="prd-topbar">
         <div>
-            <div class="prd-eyebrow"><i class="bi bi-shop"></i> Marketplace / Shopee</div>
+            <div class="prd-eyebrow"><i class="bi bi-shop"></i> Marketplace / Produk</div>
             <h1 class="title"><i class="bi bi-box-seam me-1 text-primary"></i>Produk Marketplace</h1>
             <div class="sub">Kelola listing, harga normal, stok, mapping SKU, dan gambar dalam satu workspace <span id="rtLabel" class="muted"></span><span id="prdDemoBadge" class="prd-demo-badge"><i class="bi bi-flask"></i> Data demo lokal</span></div>
             <div class="kpis" id="kpiRow"></div>
@@ -461,7 +464,7 @@
         <div class="controls">
             <button class="btn btn-pill btn-prd-outline" id="btnAutoMap" onclick="autoMap()" title="Cocokkan SKU marketplace dengan item internal"><i class="bi bi-link-45deg me-1"></i>Auto-map</button>
             <button class="btn btn-pill btn-prd-primary" onclick="openProductCreate()" title="Buat listing produk baru"><i class="bi bi-plus-lg me-1"></i>Tambah Produk</button>
-            <button class="btn btn-pill btn-prd-outline" id="btnSync" onclick="syncProducts()" title="Ambil data terbaru dari Shopee"><i class="bi bi-arrow-repeat me-1"></i>Sync Shopee</button>
+            <button class="btn btn-pill btn-prd-outline" id="btnSync" onclick="syncProducts()" title="Ambil data terbaru dari semua marketplace"><i class="bi bi-arrow-repeat me-1"></i>Sync Produk</button>
         </div>
     </div>
 
@@ -520,7 +523,7 @@
     </div>
 
     {{-- Tabel --}}
-    <div class="card-main table-wrap" style="max-height: calc(100vh - 210px); overflow-y: auto;">
+    <div id="productTableWrap" class="card-main table-wrap" style="max-height: none; overflow: visible;">
         <table class="table-list table-hover">
             <thead><tr>
                 <th style="width:38px;text-align:center">#</th><th>Produk</th><th>Status</th><th title="Harga normal produk">Harga</th><th>Stok</th><th>Mapping</th><th style="width:230px">Aksi</th>
@@ -1203,19 +1206,23 @@
     function renderProductEditor(data) {
         const product = data.product || {};
         const models = data.models || [];
+        const isTikTok = data.source?.channel === 'tiktok';
+        const sourceWarning = data.source?.stale_snapshot
+            ? (data.source.warning || 'Detail live TikTok sedang tidak tersedia; data snapshot terakhir ditampilkan.')
+            : '';
         productEditorData = data;
         productEditorPid = product.local_id;
         productEditorImagesDirty = false;
         productEditorImages = (data.images || []).map(image => ({ ...image, file: null }));
         $('modalProductEditorLabel').textContent = product.item_name || 'Edit Produk';
-        $('productEditorSubtitle').textContent = `${product.store_name || 'Toko'} · Item ID ${product.item_id || '—'} · Fresh ${orderDate(data.source?.fetched_at)}`;
+        $('productEditorSubtitle').textContent = `${product.store_name || 'Toko'} · Item ID ${product.item_id || '—'} · ${sourceWarning ? 'Snapshot lokal' : `Fresh ${orderDate(data.source?.fetched_at)}`}`;
 
         const modelRows = models.length
             ? models.map(model => {
                 const price = model.original_price ?? model.current_price ?? '';
                 return `<tr data-model-id="${esc(model.model_id || '0')}" data-original-price="${esc(price)}" data-original-stock="${esc(model.stock ?? 0)}" data-original-sku="${esc(model.model_sku || '')}">
                     <td>${esc(model.model_name || 'Produk')}</td>
-                    <td><input class="form-control form-control-sm editor-model-sku" value="${esc(model.model_sku || '')}" maxlength="100" placeholder="SKU"></td>
+                    <td><input class="form-control form-control-sm editor-model-sku" value="${esc(model.model_sku || '')}" maxlength="100" placeholder="SKU" ${isTikTok ? 'disabled' : ''}></td>
                     <td class="text-muted">${esc(model.model_id || '0')}</td>
                     <td><input type="number" min="100" step="1" class="form-control form-control-sm text-end editor-model-price" value="${esc(price)}"></td>
                     <td><input type="number" min="0" step="1" class="form-control form-control-sm text-end editor-model-stock" value="${esc(model.stock ?? 0)}"></td>
@@ -1224,25 +1231,26 @@
             : '<tr><td colspan="5" class="text-center text-muted">Data varian tidak tersedia</td></tr>';
 
         $('productEditorBody').innerHTML = `
+            ${sourceWarning ? `<div class="alert alert-warning py-2 mb-3" style="font-size:.78rem"><i class="bi bi-cloud-slash me-1"></i>${esc(sourceWarning)}</div>` : ''}
             <div class="prd-edit-section">
                 <div class="prd-edit-section-title">Informasi Produk</div>
                 <div class="row">
-                    <div class="col-md-8 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">NAMA PRODUK</label><input class="form-control form-control-sm" id="editorItemName" maxlength="255" value="${esc(product.item_name || '')}"></div>
-                    <div class="col-md-4 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">SKU INDUK</label><input class="form-control form-control-sm" id="editorItemSku" maxlength="100" value="${esc(product.item_sku || '')}"></div>
+                    <div class="col-md-8 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">NAMA PRODUK</label><input class="form-control form-control-sm" id="editorItemName" maxlength="255" value="${esc(product.item_name || '')}" ${isTikTok ? 'disabled' : ''}></div>
+                    <div class="col-md-4 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">SKU INDUK</label><input class="form-control form-control-sm" id="editorItemSku" maxlength="100" value="${esc(product.item_sku || '')}" ${isTikTok ? 'disabled' : ''}></div>
                     <div class="col-md-4 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">STATUS LISTING</label><input class="form-control form-control-sm prd-edit-readonly" value="${esc(product.item_status || '—')}" readonly></div>
-                    <div class="col-md-8 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">KATEGORI MARKETPLACE</label><div class="prd-category-card"><span class="prd-category-icon"><i class="bi bi-diagram-3"></i></span><span class="prd-category-copy"><span class="prd-category-label">Shopee</span><span class="prd-category-name" id="productEditorCategoryName">Memuat nama kategori…</span><span class="prd-category-path" id="productEditorCategoryPath"><span>Menyiapkan breadcrumb kategori…</span></span><span class="prd-category-meta" id="productEditorCategoryMeta">ID kategori ${esc(product.category_id || '—')}</span></span><span class="prd-category-badge">READ ONLY</span></div></div>
+                    <div class="col-md-8 mb-2"><label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">KATEGORI MARKETPLACE</label><div class="prd-category-card"><span class="prd-category-icon"><i class="bi bi-diagram-3"></i></span><span class="prd-category-copy"><span class="prd-category-label">${isTikTok ? 'TikTok Shop' : 'Shopee'}</span><span class="prd-category-name" id="productEditorCategoryName">Memuat nama kategori…</span><span class="prd-category-path" id="productEditorCategoryPath"><span>Menyiapkan breadcrumb kategori…</span></span><span class="prd-category-meta" id="productEditorCategoryMeta">ID kategori ${esc(product.category_id || '—')}</span></span><span class="prd-category-badge">READ ONLY</span></div></div>
                 </div>
                 <div class="prd-detail-metrics" id="productEditorMetrics" aria-live="polite"></div>
                 <label class="form-label mb-1" style="font-size:.7rem;font-weight:700;color:#64748b">DESKRIPSI</label>
-                <textarea class="form-control form-control-sm" id="editorDescription" rows="5" maxlength="3000">${esc(product.description || '')}</textarea>
+                <textarea class="form-control form-control-sm" id="editorDescription" rows="5" maxlength="3000" ${isTikTok ? 'disabled' : ''}>${esc(product.description || '')}</textarea>
             </div>
 
             <div class="prd-edit-section">
                 <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
                     <div class="prd-edit-section-title mb-0">Gallery Produk <span class="prd-edit-meta" id="productEditorImageCount">(0/9 gambar)</span></div>
-                    <label class="btn btn-sm btn-outline-primary mb-0" style="border-radius:999px;cursor:pointer">+ Tambah gambar<input type="file" id="productEditorImageInput" accept="image/jpeg,image/png" multiple hidden onchange="addProductEditorImages(event)"></label>
+                    <label class="btn btn-sm btn-outline-primary mb-0" style="border-radius:999px;cursor:pointer;${isTikTok ? 'display:none;' : ''}">+ Tambah gambar<input type="file" id="productEditorImageInput" accept="image/jpeg,image/png" multiple hidden onchange="addProductEditorImages(event)"></label>
                 </div>
-                <div class="prd-edit-meta mb-2">Drag-and-drop atau gunakan ↑/↓ untuk mengatur urutan. Gambar pertama menjadi cover; tombol × menghapus dari listing saat disimpan.</div>
+                <div class="prd-edit-meta mb-2">${isTikTok ? 'Gallery TikTok ditampilkan dari snapshot terbaru dan belum dapat diubah dari modul ini.' : 'Drag-and-drop atau gunakan ↑/↓ untuk mengatur urutan. Gambar pertama menjadi cover; tombol × menghapus dari listing saat disimpan.'}</div>
                 <div class="prd-edit-gallery" id="productEditorGallery"></div>
             </div>
 
@@ -1261,7 +1269,7 @@
 
             <div class="prd-edit-section mb-0">
                 <div class="prd-edit-section-title">Catatan</div>
-                <div class="prd-edit-meta">Simpan akan mengirim hanya perubahan yang terdeteksi. Perubahan gallery meng-upload file baru ke Shopee lalu menyimpan daftar image ID final.</div>
+                <div class="prd-edit-meta">${isTikTok ? 'Modul ini dapat menyimpan perubahan harga dan stok SKU TikTok. Konten, SKU, dan gallery masih read-only.' : 'Simpan akan mengirim hanya perubahan yang terdeteksi. Perubahan gallery meng-upload file baru ke Shopee lalu menyimpan daftar image ID final.'}</div>
             </div>
 
             <div class="prd-edit-section mb-0">
@@ -1273,7 +1281,12 @@
             </div>`;
 
         renderProductEditorGallery();
-        loadProductCategoryLabel(product.local_id, product.category_id);
+        if (isTikTok) {
+            $('productEditorCategoryName').textContent = 'Kategori TikTok Shop';
+            $('productEditorCategoryPath').innerHTML = '<span>Metadata kategori tersedia di Seller Center</span>';
+        } else {
+            loadProductCategoryLabel(product.local_id, product.category_id);
+        }
         loadProductEditorMetrics(product.local_id);
         loadProductEditorLogs();
         $('productEditorSaveBtn').disabled = false;
@@ -1368,8 +1381,9 @@
         if (!productEditorPid || !productEditorData) return;
         const button = $('productEditorSaveBtn');
         const status = $('productEditorSaveStatus');
+        const isTikTok = productEditorData?.source?.channel === 'tiktok';
         button.disabled = true;
-        status.textContent = 'Menyimpan perubahan ke Shopee…';
+        status.textContent = `Menyimpan perubahan ke ${isTikTok ? 'TikTok Shop' : 'Shopee'}…`;
 
         try {
             const original = productEditorData.product || {};
@@ -1378,12 +1392,12 @@
             const itemSku = $('editorItemSku')?.value.trim() || '';
             const results = [];
 
-            if (itemName !== (original.item_name || '') || description !== (original.description || '')) {
+            if (!isTikTok && (itemName !== (original.item_name || '') || description !== (original.description || ''))) {
                 results.push(await api(`${API}/${productEditorPid}/base-info`, {
                     method: 'POST', body: JSON.stringify({ item_name: itemName, description })
                 }));
             }
-            if (itemSku !== (original.item_sku || '')) {
+            if (!isTikTok && itemSku !== (original.item_sku || '')) {
                 results.push(await api(`${API}/${productEditorPid}/sku`, {
                     method: 'POST', body: JSON.stringify({ new_sku: itemSku })
                 }));
@@ -1400,7 +1414,7 @@
                 const sku = row.querySelector('.editor-model-sku')?.value.trim() || '';
                 if (Number.isFinite(price) && price !== Number(row.dataset.originalPrice)) priceList.push({ model_id: modelId, original_price: price });
                 if (Number.isInteger(stock) && stock >= 0 && stock !== Number(row.dataset.originalStock)) stockList.push({ model_id: modelId, stock });
-                if (modelId !== '0' && sku !== (row.dataset.originalSku || '')) modelSkuUpdates.push({ model_id: modelId, new_sku: sku });
+                if (!isTikTok && modelId !== '0' && sku !== (row.dataset.originalSku || '')) modelSkuUpdates.push({ model_id: modelId, new_sku: sku });
             });
 
             if (priceList.length) results.push(await api(`${API}/${productEditorPid}/price`, { method: 'POST', body: JSON.stringify({ price_list: priceList }) }));
@@ -1408,7 +1422,7 @@
             for (const update of modelSkuUpdates) {
                 results.push(await api(`${API}/${productEditorPid}/model-sku`, { method: 'POST', body: JSON.stringify(update) }));
             }
-            if (productEditorImagesDirty) results.push(await saveProductEditorImages());
+            if (!isTikTok && productEditorImagesDirty) results.push(await saveProductEditorImages());
 
             status.textContent = results.length ? 'Perubahan berhasil disimpan. Memuat ulang data terbaru…' : 'Tidak ada perubahan yang terdeteksi.';
             if (results.length) {
@@ -1429,7 +1443,7 @@
     window.openProductEditor = async function (pid) {
         const modal = bootstrap.Modal.getOrCreateInstance($('modalProductEditor'));
         $('modalProductEditorLabel').textContent = 'Detail Produk';
-        $('productEditorSubtitle').textContent = 'Mengambil data terbaru dari Shopee…';
+        $('productEditorSubtitle').textContent = 'Mengambil data terbaru dari marketplace…';
         $('productEditorBody').innerHTML = '<div class="text-center text-muted py-5">⏳ Memuat detail produk…</div>';
         $('productEditorSaveBtn').disabled = true;
         $('productEditorSaveStatus').textContent = 'Memuat data terbaru…';
@@ -1467,7 +1481,7 @@
             // Do not call loadProducts immediately since it's backgrounded. 
             // Just let user know it's running.
         } catch (e) { alert('Sync gagal: ' + e.message); }
-        finally { $('btnSync').disabled = false; $('btnSync').textContent = '⟳ Sync Shopee'; }
+        finally { $('btnSync').disabled = false; $('btnSync').textContent = '⟳ Sync Produk'; }
     };
 
     function buildStoreOptions() {
@@ -1658,8 +1672,8 @@
             $('prdBody').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-state">
                 <div class="empty-state-icon"><i class="bi bi-${hasProducts ? 'search' : 'box-seam'}"></i></div>
                 <div class="empty-state-title">${hasProducts ? 'Produk tidak ditemukan' : 'Belum ada produk'}</div>
-                <div class="empty-state-copy">${hasProducts ? 'Coba ubah kata kunci atau filter yang dipilih.' : 'Klik Sync Shopee untuk mengambil listing, atau tambah produk baru untuk mulai menjual.'}</div>
-                ${hasProducts ? '<button type="button" class="btn btn-sm btn-prd-outline mt-2" onclick="resetFilters()">Reset filter</button>' : '<button type="button" class="btn btn-sm btn-prd-primary mt-2" onclick="syncProducts()">⟳ Sync Shopee</button>'}
+                <div class="empty-state-copy">${hasProducts ? 'Coba ubah kata kunci atau filter yang dipilih.' : 'Klik Sync Produk untuk mengambil listing, atau tambah produk baru untuk mulai menjual.'}</div>
+                ${hasProducts ? '<button type="button" class="btn btn-sm btn-prd-outline mt-2" onclick="resetFilters()">Reset filter</button>' : '<button type="button" class="btn btn-sm btn-prd-primary mt-2" onclick="syncProducts()">⟳ Sync Produk</button>'}
             </div></td></tr>`;
             return;
         }
@@ -2742,7 +2756,7 @@
         const grouped = $('stGroup') ? $('stGroup').checked : true;
         const rows = stFilteredRows();
         if (!rows.length) {
-            $('stBody').innerHTML = `<tr><td colspan="4" class="empty">${products.length ? 'Tidak ada produk yang cocok dengan filter.' : 'Belum ada produk. Klik "⟳ Sync Shopee".'}</td></tr>`;
+            $('stBody').innerHTML = `<tr><td colspan="4" class="empty">${products.length ? 'Tidak ada produk yang cocok dengan filter.' : 'Belum ada produk. Klik "⟳ Sync Produk".'}</td></tr>`;
             stUpdateDirtyCount();
             return;
         }

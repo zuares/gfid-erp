@@ -13,7 +13,7 @@ class TikTokShopChannel implements MarketplaceChannel
 
     protected function baseUrl(Store $store): string
     {
-        return rtrim(config('tiktok_shop.base_url', 'https://open-api.tiktok-shops.com'), '/');
+        return rtrim(config('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com'), '/');
     }
 
     protected function appKey(Store $store): string
@@ -41,14 +41,17 @@ class TikTokShopChannel implements MarketplaceChannel
         return trim((string) $store->credential('access_token'));
     }
 
-    // ─── Signature (TikTok Shop v2 style) ────────────────────────────────────
-    // Format: HMAC-SHA256( appSecret + path + sortedParamStr + timestamp + appSecret )
+    // ─── Signature (TikTok Shop v202309+) ───────────────────────────────────
+    // Format: HMAC-SHA256(
+    //   appSecret + path + sorted(query key/value pairs) + body + appSecret,
+    //   key=appSecret
+    // )
 
-    protected function sign(Store $store, string $path, array $params, string $timestamp): string
+    protected function sign(Store $store, string $path, array $params, string $body = ''): string
     {
         $appSecret = $this->appSecret($store);
 
-        unset($params['sign'], $params['timestamp'], $params['app_key']);
+        unset($params['sign'], $params['access_token']);
 
         ksort($params);
         $paramStr = '';
@@ -56,7 +59,7 @@ class TikTokShopChannel implements MarketplaceChannel
             $paramStr .= $k . $v;
         }
 
-        $toSign = $appSecret . $path . $paramStr . $timestamp . $appSecret;
+        $toSign = $appSecret . $path . $paramStr . $body . $appSecret;
 
         return hash_hmac('sha256', $toSign, $appSecret);
     }
@@ -65,7 +68,7 @@ class TikTokShopChannel implements MarketplaceChannel
 
     protected function get(Store $store, string $path, array $params = []): array
     {
-        $result = $this->doGet($store, $path, $params);
+        $result = $this->doRequest($store, 'GET', $path, $params);
 
         // Token expired → auto-refresh sekali lalu retry
         $code = $result['code'] ?? null;
@@ -73,27 +76,59 @@ class TikTokShopChannel implements MarketplaceChannel
             $refreshed = $this->refreshToken($store);
             if (empty($refreshed['error'])) {
                 $store->refresh();
-                $result = $this->doGet($store, $path, $params);
+                $result = $this->doRequest($store, 'GET', $path, $params);
             }
         }
 
         return $result;
     }
 
-    protected function doGet(Store $store, string $path, array $params = []): array
+    protected function post(Store $store, string $path, array $body = [], array $params = []): array
+    {
+        $result = $this->doRequest($store, 'POST', $path, $params, $body);
+
+        $code = $result['code'] ?? null;
+        if ($code === 105 || $code === 'invalid_access_token') {
+            $refreshed = $this->refreshToken($store);
+            if (empty($refreshed['error'])) {
+                $store->refresh();
+                $result = $this->doRequest($store, 'POST', $path, $params, $body);
+            }
+        }
+
+        return $result;
+    }
+
+    protected function doRequest(
+        Store $store,
+        string $method,
+        string $path,
+        array $params = [],
+        array $body = []
+    ): array
     {
         $timestamp = (string) time();
 
         $query = array_merge($params, [
-            'app_key'      => $this->appKey($store),
-            'shop_cipher'  => $this->shopCipher($store),
-            'timestamp'    => $timestamp,
-            'version'      => '202309',
+            'app_key'   => $this->appKey($store),
+            'timestamp' => $timestamp,
         ]);
 
-        $query['sign'] = $this->sign($store, $path, $query, $timestamp);
+        $shopCipher = $this->shopCipher($store);
+        if ($shopCipher !== '') {
+            $query['shop_cipher'] = $shopCipher;
+        }
 
-        $response = Http::connectTimeout(10)
+        $bodyJson = $method === 'POST'
+            ? json_encode($body, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+            : '';
+        if ($bodyJson === false) {
+            return ['error' => true, 'code' => -1, 'message' => 'Gagal membuat JSON request TikTok Shop.'];
+        }
+
+        $query['sign'] = $this->sign($store, $path, $query, $bodyJson);
+
+        $request = Http::connectTimeout(10)
             ->timeout(30)
             ->retry(2, function (int $attempt, \Throwable $exception) {
                 // Hanya retry pada error transien (5xx, connection timeout)
@@ -109,8 +144,20 @@ class TikTokShopChannel implements MarketplaceChannel
             ->withHeaders([
                 'x-tts-access-token' => $this->accessToken($store),
                 'content-type'       => 'application/json',
-            ])
-            ->get($this->baseUrl($store) . $path, $query);
+            ]);
+
+        $url = $this->baseUrl($store) . $path;
+
+        // TikTok expects app_key, timestamp, sign, shop_cipher, and endpoint
+        // parameters in the query string even when the request body is JSON.
+        // Passing $query as the second argument to post() would treat it as
+        // the request body. Set the raw JSON body explicitly in the Guzzle
+        // options so TikTok receives application/json (not form parameters).
+        $response = $method === 'POST'
+            ? $request
+                ->withOptions(['body' => $bodyJson])
+                ->send('POST', $url . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986))
+            : $request->get($url, $query);
 
         $json = $response->json();
         if ($json === null) {
@@ -123,7 +170,7 @@ class TikTokShopChannel implements MarketplaceChannel
         }
 
         // TikTok Shop API v202309 usually returns code != 0 for errors
-        if (isset($json['code']) && $json['code'] !== 0) {
+        if (isset($json['code']) && (int) $json['code'] !== 0) {
             $json['error'] = true;
         }
 
@@ -135,6 +182,117 @@ class TikTokShopChannel implements MarketplaceChannel
     public function getShopInfo(Store $store): array
     {
         return $this->get($store, '/seller/202309/shops');
+    }
+
+    // ─── Products (TikTok Shop Product API v202309) ─────────────────────────
+
+    /**
+     * Search products with opaque-token pagination.
+     *
+     * TikTok returns a compact product/SKU snapshot here. The product service
+     * uses it for the catalogue sync and can request getProduct() when it needs
+     * the full listing detail.
+     */
+    public function searchProducts(
+        Store $store,
+        string $status = 'ALL',
+        string $pageToken = '',
+        int $pageSize = 100
+    ): array {
+        $params = [
+            'page_size' => min(100, max(1, $pageSize)),
+        ];
+        if ($pageToken !== '') {
+            $params['page_token'] = $pageToken;
+        }
+
+        $response = $this->post($store, '/product/202309/products/search', [
+            'status' => $status ?: 'ALL',
+            'locale' => 'id-ID',
+        ], $params);
+
+        $products = data_get($response, 'data.products');
+        if (is_array($products)) {
+            $response['response']['products'] = $products;
+            $response['response']['next_page_token'] = data_get($response, 'data.next_page_token');
+            $response['response']['more'] = filled(data_get($response, 'data.next_page_token'));
+        }
+
+        return $response;
+    }
+
+    /**
+     * Retrieve a complete product listing, including images and SKU inventory.
+     */
+    public function getProduct(Store $store, string $productId): array
+    {
+        return $this->get($store, '/product/202309/products/' . rawurlencode($productId));
+    }
+
+    /**
+     * Update SKU inventory. Each row must contain model_id, stock and the
+     * warehouse_id captured from the latest product snapshot.
+     */
+    public function updateProductInventory(Store $store, string $productId, array $stockList): array
+    {
+        $skus = [];
+        foreach ($stockList as $stock) {
+            $skuId = trim((string) ($stock['model_id'] ?? ''));
+            $warehouseId = trim((string) ($stock['warehouse_id'] ?? ''));
+            if ($skuId === '' || $warehouseId === '') {
+                continue;
+            }
+
+            $skus[] = [
+                'id' => $skuId,
+                'inventory' => [[
+                    'warehouse_id' => $warehouseId,
+                    'quantity' => (int) ($stock['stock'] ?? 0),
+                ]],
+            ];
+        }
+
+        if ($skus === []) {
+            return [
+                'error' => 'warehouse_missing',
+                'message' => 'Warehouse TikTok tidak ditemukan pada snapshot SKU. Sinkronkan produk terlebih dahulu.',
+            ];
+        }
+
+        return $this->post($store, '/product/202309/products/' . rawurlencode($productId) . '/inventory/update', [
+            'skus' => $skus,
+        ]);
+    }
+
+    /**
+     * Update SKU prices. TikTok prices are SKU-level and use an amount object.
+     */
+    public function updateProductPrices(Store $store, string $productId, array $priceList): array
+    {
+        $skus = [];
+        foreach ($priceList as $price) {
+            $skuId = trim((string) ($price['model_id'] ?? ''));
+            if ($skuId === '') {
+                continue;
+            }
+
+            $currency = strtoupper(trim((string) ($price['currency'] ?? 'IDR')));
+            $skus[] = [
+                'id' => $skuId,
+                'price' => [
+                    'amount' => (string) ((int) round((float) ($price['original_price'] ?? 0))),
+                    'currency' => $currency,
+                ],
+            ];
+        }
+
+        if ($skus === []) {
+            return ['error' => 'sku_missing', 'message' => 'SKU TikTok tidak ditemukan.'];
+        }
+
+        return $this->post($store, '/product/202309/products/' . rawurlencode($productId) . '/prices/update', [
+            'skus' => $skus,
+        ]);
     }
 
     // ─── Logistics / Fulfillment ──────────────────────────────────────────────
@@ -161,23 +319,173 @@ class TikTokShopChannel implements MarketplaceChannel
 
     public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = '', string $orderStatus = '', string $timeRangeField = 'update_time'): array
     {
-        // TikTok Shop: pakai create_time_* saat backfill histori, selain itu update_time_*.
+        // TikTok Shop v202309 uses POST /orders/search and page_token
+        // pagination. The channel contract calls this value cursor.
         $prefix = $timeRangeField === 'create_time' ? 'create_time' : 'update_time';
-        $params = [
+        $body = [
             $prefix . '_ge' => $timeFrom,
             $prefix . '_lt' => $timeTo,
-            'page_size'      => $pageSize,
+        ];
+
+        if ($orderStatus !== '') {
+            $body['order_status'] = $orderStatus;
+        }
+
+        $params = [
+            'page_size'  => min(100, max(1, $pageSize)),
+            'sort_field' => $prefix,
+            'sort_order' => 'ASC',
         ];
         if ($cursor) {
-            $params['cursor'] = $cursor;
+            $params['page_token'] = $cursor;
         }
-        return $this->get($store, '/order/202309/orders', $params);
+
+        return $this->normalizeOrderResponse(
+            $this->post($store, '/order/202309/orders/search', $body, $params)
+        );
     }
 
     public function getOrderDetail(Store $store, array $orderSnList): array
     {
-        return $this->get($store, '/order/202309/orders', [
+        return $this->normalizeOrderResponse($this->get($store, '/order/202309/orders', [
             'ids' => implode(',', $orderSnList),
+        ]));
+    }
+
+    /**
+     * Keep the existing marketplace sync contract while accepting the
+     * current TikTok response shape (`data.orders`).
+     */
+    protected function normalizeOrderResponse(array $response): array
+    {
+        $orders = data_get($response, 'data.orders');
+        if (! is_array($orders)) {
+            return $response;
+        }
+
+        // MarketplaceSyncService memakai schema order yang sama untuk semua
+        // channel. TikTok mengembalikan `id`, `status`, `line_items`, dan
+        // `payment`, sedangkan schema internal memakai `order_sn`,
+        // `order_status`, `item_list`, dan field finansial di level order.
+        // Tanpa normalisasi ini detail TikTok akan dianggap kosong karena
+        // upsertOrders() hanya menerima detail yang memiliki order_sn.
+        $orders = array_map(fn (array $order): array => $this->normalizeOrder($order), $orders);
+
+        $response['response']['order_list'] = $orders;
+        $response['response']['next_cursor'] = data_get($response, 'data.next_page_token');
+        $response['response']['more'] = filled(data_get($response, 'data.next_page_token'));
+
+        return $response;
+    }
+
+    /**
+     * Adapt one TikTok Shop order to the shared marketplace order schema.
+     * Keep the original TikTok fields as well so raw_json remains useful for
+     * diagnostics and future fields can be consumed without another API call.
+     */
+    protected function normalizeOrder(array $order): array
+    {
+        $status = strtoupper((string) ($order['status'] ?? $order['order_status'] ?? ''));
+        $statusMap = [
+            'ON_HOLD'            => 'PENDING',
+            'AWAITING_SHIPMENT'  => 'READY_TO_SHIP',
+            'PARTIALLY_SHIPPING' => 'PROCESSED',
+            'AWAITING_COLLECTION' => 'PROCESSED',
+            'IN_TRANSIT'         => 'SHIPPED',
+            'DELIVERED'          => 'TO_CONFIRM_RECEIVE',
+        ];
+        $canonicalStatus = $statusMap[$status] ?? ($status !== '' ? $status : null);
+
+        $address = is_array($order['recipient_address'] ?? null)
+            ? $order['recipient_address']
+            : [];
+        $firstName = trim((string) ($address['first_name'] ?? ''));
+        $lastName = trim((string) ($address['last_name'] ?? ''));
+        $addressName = trim((string) ($address['name'] ?? ''));
+        $fullAddress = trim((string) ($address['full_address'] ?? ''));
+        if ($fullAddress === '') {
+            $fullAddress = trim(implode(', ', array_filter([
+                $address['address_line1'] ?? null,
+                $address['address_line2'] ?? null,
+                $address['address_line3'] ?? null,
+                $address['address_line4'] ?? null,
+                $address['address_detail'] ?? null,
+            ], static fn ($part): bool => trim((string) $part) !== '')));
+        }
+
+        $normalizedAddress = array_merge($address, [
+            'name' => $addressName !== '' ? $addressName : trim($firstName . ' ' . $lastName),
+            'phone_number' => $address['phone_number'] ?? $address['phone'] ?? null,
+            'full_address' => $fullAddress !== '' ? $fullAddress : null,
+            'zip_code' => $address['zip_code'] ?? $address['postal_code'] ?? null,
+            'city' => $address['city'] ?? $address['district'] ?? null,
+            'state' => $address['state'] ?? $address['province'] ?? null,
+        ]);
+
+        $payment = is_array($order['payment'] ?? null) ? $order['payment'] : [];
+        $trackingNumber = $order['tracking_number'] ?? null;
+        $shippingCarrier = $order['shipping_provider'] ?? $order['shipping_provider_name'] ?? null;
+        $packages = is_array($order['packages'] ?? null) ? $order['packages'] : [];
+        $packageList = array_map(static function (array $package) use ($trackingNumber, $shippingCarrier): array {
+            return array_merge($package, [
+                'package_number' => $package['id'] ?? $package['package_id'] ?? null,
+                'tracking_no' => $package['tracking_number'] ?? $trackingNumber,
+                'tracking_number' => $package['tracking_number'] ?? $trackingNumber,
+                'shipping_carrier' => $package['shipping_carrier'] ?? $shippingCarrier,
+            ]);
+        }, $packages);
+        if ($packageList === [] && ($trackingNumber || $shippingCarrier)) {
+            $packageList[] = [
+                'tracking_no' => $trackingNumber,
+                'tracking_number' => $trackingNumber,
+                'shipping_carrier' => $shippingCarrier,
+            ];
+        }
+
+        $lineItems = is_array($order['line_items'] ?? null) ? $order['line_items'] : [];
+        $itemList = array_map(static function (array $item): array {
+            $quantity = (int) ($item['quantity']
+                ?? $item['quantity_purchased']
+                ?? $item['model_quantity_purchased']
+                ?? 1);
+            $sellerSku = $item['seller_sku'] ?? $item['sku'] ?? null;
+            $originalPrice = $item['original_price'] ?? $item['model_original_price'] ?? 0;
+            $salePrice = $item['sale_price']
+                ?? $item['discounted_price']
+                ?? $item['model_discounted_price']
+                ?? $originalPrice;
+
+            return array_merge($item, [
+                'item_id' => $item['product_id'] ?? $item['item_id'] ?? null,
+                'model_id' => $item['sku_id'] ?? $item['model_id'] ?? null,
+                'item_name' => $item['product_name'] ?? $item['item_name'] ?? null,
+                'item_sku' => $sellerSku,
+                'model_sku' => $sellerSku,
+                'model_name' => $item['sku_name'] ?? $item['model_name'] ?? null,
+                'model_quantity_purchased' => max(1, $quantity),
+                'model_original_price' => $originalPrice,
+                'model_discounted_price' => $salePrice,
+                'image_info' => [
+                    'image_url' => $item['sku_image'] ?? data_get($item, 'image_info.image_url'),
+                ],
+            ]);
+        }, $lineItems);
+
+        return array_merge($order, [
+            'order_sn' => (string) ($order['id'] ?? $order['order_id'] ?? $order['order_sn'] ?? ''),
+            'order_status' => $canonicalStatus,
+            'platform_order_status' => $status,
+            'recipient_address' => $normalizedAddress,
+            'package_list' => $packageList,
+            'item_list' => $itemList,
+            'buyer_username' => $order['buyer_username'] ?? $order['user_id'] ?? null,
+            'shipping_carrier' => $shippingCarrier,
+            'tracking_number' => $trackingNumber,
+            'payment_method' => $order['payment_method_name'] ?? $order['payment_method'] ?? null,
+            'total_amount' => $payment['total_amount'] ?? $order['total_amount'] ?? 0,
+            'actual_shipping_fee' => $payment['shipping_fee'] ?? $order['shipping_fee'] ?? 0,
+            'buyer_paid_shipping_fee' => $payment['shipping_fee'] ?? $order['shipping_fee'] ?? 0,
+            'currency' => $payment['currency'] ?? data_get($itemList, '0.currency', 'IDR'),
         ]);
     }
 
@@ -365,7 +673,7 @@ class TikTokShopChannel implements MarketplaceChannel
 
         $response = Http::connectTimeout(10)->timeout(30)
             ->retry(2, 1000, throw: false)
-            ->post($authUrl . '/api/v2/token/refresh', [
+            ->get($authUrl . '/api/v2/token/refresh', [
             'app_key'       => $appKey,
             'app_secret'    => $appSecret,
             'refresh_token' => $store->credential('refresh_token'),
@@ -375,23 +683,72 @@ class TikTokShopChannel implements MarketplaceChannel
         $data = $response->json() ?? [];
         $body = $data['data'] ?? $data;
 
+        if (! $response->successful() || (isset($data['code']) && (int) $data['code'] !== 0)) {
+            Log::warning('TikTok token refresh failed', [
+                'store'       => $store->code,
+                'http_status' => $response->status(),
+                'code'        => $data['code'] ?? null,
+                'request_id'  => $data['request_id'] ?? null,
+                'message'     => $data['message'] ?? null,
+            ]);
+
+            return $data;
+        }
+
         if (! empty($body['access_token'])) {
             $credentials = $store->credentials ?? [];
             $credentials['access_token']  = $body['access_token'];
             $credentials['refresh_token'] = $body['refresh_token'] ?? $credentials['refresh_token'] ?? null;
-            $credentials['access_token_expire_in']  = $body['access_token_expire_in']  ?? null;
-            $credentials['refresh_token_expire_in'] = $body['refresh_token_expire_in'] ?? null;
+            $accessTokenExpiresIn = $body['access_token_expire_in'] ?? $body['expires_in'] ?? null;
+            $refreshTokenExpiresIn = $body['refresh_token_expire_in'] ?? $body['refresh_expires_in'] ?? null;
+            $credentials['access_token_expire_in'] = $accessTokenExpiresIn
+                ?? $credentials['access_token_expire_in']
+                ?? null;
+            $credentials['refresh_token_expire_in'] = $refreshTokenExpiresIn
+                ?? $credentials['refresh_token_expire_in']
+                ?? null;
+
+            foreach (['open_id', 'user_type'] as $field) {
+                if (array_key_exists($field, $body)) {
+                    $credentials[$field] = $body[$field];
+                }
+            }
+
+            $meta = $store->meta ?? [];
+            if (array_key_exists('open_id', $body)) {
+                $meta['open_id'] = $body['open_id'];
+            }
+            if (array_key_exists('user_type', $body)) {
+                $meta['user_type'] = $body['user_type'];
+            }
+            if (array_key_exists('granted_scopes', $body)) {
+                $meta['granted_scopes'] = array_values((array) $body['granted_scopes']);
+            } elseif (array_key_exists('scopes', $body)) {
+                $meta['granted_scopes'] = array_values((array) $body['scopes']);
+            }
 
             $store->update([
                 'credentials'      => $credentials,
-                'token_expires_at' => isset($body['access_token_expire_in'])
-                    ? now()->addSeconds((int) $body['access_token_expire_in'])
-                    : null,
+                'meta'             => $meta,
+                'token_expires_at' => $accessTokenExpiresIn !== null
+                    ? $this->tokenExpiresAt($accessTokenExpiresIn)
+                    : $store->token_expires_at,
             ]);
-        } else {
-            Log::warning('TikTok token refresh failed', ['store' => $store->code, 'response' => $data]);
         }
 
         return $data;
+    }
+
+    protected function tokenExpiresAt(mixed $value): ?\Illuminate\Support\Carbon
+    {
+        if ($value === null || $value === '' || (int) $value <= 0) {
+            return null;
+        }
+
+        $value = (int) $value;
+
+        return $value >= 1_000_000_000
+            ? now()->setTimestamp($value)
+            : now()->addSeconds($value);
     }
 }

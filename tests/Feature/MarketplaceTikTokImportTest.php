@@ -225,6 +225,25 @@ class MarketplaceTikTokImportTest extends TestCase
             ->assertSee(route('imports.marketplace.batches.destroy', $batchId), false);
 
         $this->actingAs($owner)
+            ->get(route('imports.marketplace.create', ['store_id' => $store->id]))
+            ->assertOk()
+            ->assertSee('Batch import terbaru')
+            ->assertSee('Hapus batch import')
+            ->assertSee(route('imports.marketplace.batches.destroy', $batchId), false);
+
+        $shipment = MpShipment::query()
+            ->where('platform_order_id', 'ORDER-DELETE-001')
+            ->firstOrFail();
+        $order = MarketplaceOrder::query()
+            ->where('channel_order_id', 'ORDER-DELETE-001')
+            ->where('store_id', $store->id)
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('mp_shipment_items', ['mp_shipment_id' => $shipment->id]);
+        $this->assertDatabaseHas('mp_packet_items', ['mp_shipment_id' => (string) $shipment->id]);
+        $this->assertDatabaseHas('marketplace_order_items', ['order_id' => $order->id]);
+
+        $this->actingAs($owner)
             ->delete(route('imports.marketplace.batches.destroy', $batchId))
             ->assertRedirect(route('imports.marketplace.index'))
             ->assertSessionHas('success', 'Import dihapus: 1 shipment dan 1 order dashboard.');
@@ -238,6 +257,9 @@ class MarketplaceTikTokImportTest extends TestCase
             'channel_order_id' => 'ORDER-DELETE-001',
             'store_id' => $store->id,
         ]);
+        $this->assertDatabaseMissing('mp_shipment_items', ['mp_shipment_id' => $shipment->id]);
+        $this->assertDatabaseMissing('mp_packet_items', ['mp_shipment_id' => (string) $shipment->id]);
+        $this->assertDatabaseMissing('marketplace_order_items', ['order_id' => $order->id]);
     }
 
     public function test_admin_can_add_edit_and_delete_empty_store(): void

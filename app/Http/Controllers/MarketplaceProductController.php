@@ -158,7 +158,7 @@ class MarketplaceProductController extends Controller
 
             if (! empty($data['error'])) {
                 return response()->json([
-                    'message' => $data['message'] ?? 'Detail produk tidak dapat diambil dari Shopee.',
+                    'message' => $data['message'] ?? 'Detail produk tidak dapat diambil dari marketplace.',
                 ], 422);
             }
 
@@ -167,7 +167,7 @@ class MarketplaceProductController extends Controller
             report($e);
 
             return response()->json([
-                'message' => $e->getMessage() ?: 'Gagal mengambil detail produk dari Shopee.',
+                'message' => $e->getMessage() ?: 'Gagal mengambil detail produk dari marketplace.',
             ], 422);
         }
     }
@@ -199,7 +199,7 @@ class MarketplaceProductController extends Controller
      */
     public function index(Request $request)
     {
-        $q = MarketplaceProduct::with(['store:id,name', 'models'])
+        $q = MarketplaceProduct::with(['store:id,name,channel_id', 'store.channel:id,code', 'models'])
             ->when($request->filled('store_id'), fn ($qq) => $qq->where('store_id', $request->integer('store_id')))
             ->when($request->filled('status'), fn ($qq) => $qq->where('item_status', $request->string('status')))
             ->when($request->filled('search'), function ($qq) use ($request) {
@@ -218,12 +218,32 @@ class MarketplaceProductController extends Controller
             ->filter()->map(fn ($sku) => trim((string) $sku))->unique()->values();
 
         $mappings = \App\Models\SkuMapping::whereIn('marketplace_sku', $skus)
-            ->where(fn ($w) => $w->whereNull('channel_code')->orWhereRaw('LOWER(channel_code) = ?', ['shopee']))
+            ->where(fn ($w) => $w->whereNull('channel_code')->orWhereRaw('LOWER(channel_code) IN (?, ?)', ['shopee', 'tiktok']))
             ->with(['item:id,code,name,item_category_id', 'item.category:id,code,name'])
             ->get()
-            // channel-spesifik menang atas global
+            // channel-spesifik menang atas global; key menyertakan channel
+            // supaya SKU yang sama dapat dipetakan berbeda di tiap marketplace.
             ->sortBy(fn ($m) => $m->channel_code === null ? 1 : 0)
-            ->keyBy(fn ($mapping) => mb_strtolower(trim((string) $mapping->marketplace_sku)));
+            ->mapWithKeys(function ($mapping): array {
+                $channel = $mapping->channel_code === null
+                    ? '*'
+                    : strtolower(trim((string) $mapping->channel_code));
+                $sku = mb_strtolower(trim((string) $mapping->marketplace_sku));
+
+                return [$channel . '|' . $sku => $mapping];
+            });
+
+        $mappingFor = static function (MarketplaceProduct $product, ?string $sku) use ($mappings) {
+            $sku = mb_strtolower(trim((string) $sku));
+            if ($sku === '') {
+                return null;
+            }
+
+            $channel = strtolower((string) $product->store?->channel?->code);
+            $channel = in_array($channel, ['tt', 'ttk'], true) ? 'tiktok' : $channel;
+
+            return $mappings->get($channel . '|' . $sku) ?? $mappings->get('*|' . $sku);
+        };
 
         // Stok gudang internal per item (fisik = SUM qty, tersedia = fisik - dialokasi).
         $mappedItemIds = $mappings->pluck('item_id')->filter()->unique()->values();
@@ -246,9 +266,7 @@ class MarketplaceProductController extends Controller
         };
 
         foreach ($products as $p) {
-            $parentMapping = $p->item_sku
-                ? ($mappings[mb_strtolower(trim((string) $p->item_sku))] ?? null)
-                : null;
+            $parentMapping = $mappingFor($p, $p->item_sku);
             $p->setAttribute('mapping', $parentMapping ? array_merge([
                 'id'            => $parentMapping->id,
                 'item_id'       => $parentMapping->item_id,
@@ -258,9 +276,7 @@ class MarketplaceProductController extends Controller
                 'category_name' => $parentMapping->item?->category?->name,
             ], $internalFor($parentMapping)) : null);
             foreach ($p->models as $m) {
-                $map = $m->model_sku
-                    ? ($mappings[mb_strtolower(trim((string) $m->model_sku))] ?? null)
-                    : null;
+                $map = $mappingFor($p, $m->model_sku);
                 $m->setAttribute('mapping', $map ? array_merge([
                     'id'            => $map->id,
                     'item_id'       => $map->item_id,
@@ -625,7 +641,7 @@ class MarketplaceProductController extends Controller
      */
     public function sync(Request $request)
     {
-        $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+        $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee', 'TIKTOK', 'TTK', 'tiktok', 'tt']))
             ->where('status', 'active')
             ->when($request->filled('store_id'), fn ($q) => $q->where('id', $request->integer('store_id')))
             ->get();

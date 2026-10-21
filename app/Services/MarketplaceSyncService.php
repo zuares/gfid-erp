@@ -2886,7 +2886,12 @@ class MarketplaceSyncService
             foreach ($chunk as $detail) {
                 if (empty($detail['order_sn'])) continue;
 
-                $purchaseChannel = PurchaseChannel::normalize($detail['purchase_channel'] ?? null);
+                // TikTok Shop's order detail response does not include a
+                // purchase_channel field. The store channel is authoritative
+                // for API-synced orders, so keep the dashboard filterable even
+                // when the provider omits that optional field.
+                $purchaseChannel = PurchaseChannel::normalize($detail['purchase_channel'] ?? null)
+                    ?? PurchaseChannel::normalize($store->channel?->code);
 
                 $orderedAt   = ! empty($detail['create_time']) ? now()->setTimestamp((int) $detail['create_time']) : null;
                 $orderDate   = $orderedAt ? $orderedAt->toDateTimeString() : now()->toDateTimeString();

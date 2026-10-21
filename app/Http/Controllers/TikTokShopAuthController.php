@@ -2,24 +2,24 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Channel;
-use App\Models\Store;
+use App\Jobs\ProcessTikTokShopOAuthJob;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class TikTokShopAuthController extends Controller
 {
-    // ─── Step 1: Redirect ke TikTok authorization page ───────────────────────
-
     public function redirect()
     {
-        $appKey = trim((string) config('tiktok_shop.app_key'));
-        $authUrl = rtrim(trim((string) config('tiktok_shop.auth_url', 'https://auth.tiktok-shops.com')), '/');
+        $serviceId = trim((string) config('tiktok_shop.service_id'));
+        $authUrl = rtrim(trim((string) config(
+            'tiktok_shop.seller_auth_url',
+            'https://services.tiktokshop.com/open/authorize'
+        )), '/');
 
-        if (! $appKey) {
-            return response('TIKTOK_SHOP_APP_KEY belum diisi di .env', 422);
+        if (! $serviceId) {
+            return response('TIKTOK_SHOP_SERVICE_ID belum diisi di .env', 422);
         }
 
         if (request()->has('store_id')) {
@@ -34,219 +34,98 @@ class TikTokShopAuthController extends Controller
 
         $state = Str::random(64);
         session(['tiktok_oauth_state' => $state]);
+        Cache::put('tiktok_oauth_state:' . $state, [
+            'store_id' => session('tiktok_connect_store_id'),
+            'integration' => session('marketplace_integration'),
+        ], now()->addMinutes(10));
 
-        $callbackUrl = rtrim(env('APP_URL', request()->getSchemeAndHttpHost()), '/')
-            . '/marketplace/tiktok/callback';
-
-        $url = $authUrl . '/oauth/authorize?' . http_build_query([
-            'app_key'      => $appKey,
-            'redirect_uri' => $callbackUrl,
-            'state'        => $state,
-        ]);
-
-        return redirect()->away($url);
+        return redirect()->away($authUrl . '?' . http_build_query([
+            'service_id' => $serviceId,
+            'state' => $state,
+        ]));
     }
-
-    // ─── Step 2: TikTok redirect kembali dengan auth_code ────────────────────
 
     public function callback(Request $request)
     {
-        $expectedState = session()->pull('tiktok_oauth_state');
-        if ($expectedState && $request->query('state') !== null
-            && ! hash_equals($expectedState, (string) $request->query('state'))) {
-            return redirect('/marketplace/toko')->with('error', 'TikTok callback ditolak karena state OAuth tidak valid.');
+        $expectedState = session('tiktok_oauth_state');
+        $providedState = (string) $request->query('state', '');
+        $cachedState = $providedState !== ''
+            ? Cache::pull('tiktok_oauth_state:' . $providedState)
+            : null;
+        $sessionStateMatches = filled($expectedState)
+            && filled($providedState)
+            && hash_equals((string) $expectedState, $providedState);
+        // TikTok Seller OAuth treats state as optional and some sandbox
+        // callbacks omit it even when we sent it in the authorization URL.
+        // In that case the intact browser session is still our binding to
+        // the authorization request. Never accept a stateless callback.
+        $sellerCallbackWithoutState = blank($providedState) && filled($expectedState);
+
+        if (! $sessionStateMatches && ! $sellerCallbackWithoutState && ! is_array($cachedState)) {
+            Log::warning('TikTok OAuth state mismatch', [
+                'has_expected_state' => filled($expectedState),
+                'expected_state_length' => strlen((string) $expectedState),
+                'provided_state_length' => strlen($providedState),
+                'session_id' => session()->getId(),
+                'callback_host' => $request->getHost(),
+            ]);
+            session()->forget('tiktok_oauth_state');
+
+            return redirect('/marketplace/toko')->with(
+                'error',
+                'TikTok callback ditolak karena state OAuth tidak valid.'
+            );
+        }
+
+        if (! $sessionStateMatches && ! $sellerCallbackWithoutState) {
+            // Bind the callback to the one-time server-side state when the
+            // browser returns with a different session cookie.
+            if (filled($cachedState['store_id'] ?? null)) {
+                session(['tiktok_connect_store_id' => (int) $cachedState['store_id']]);
+            }
+            if (filled($cachedState['integration'] ?? null)) {
+                session(['marketplace_integration' => $cachedState['integration']]);
+            }
+        }
+        session()->forget('tiktok_oauth_state');
+
+        if ($request->filled('error')) {
+            return redirect('/marketplace/toko')->with(
+                'error',
+                'Otorisasi TikTok Shop dibatalkan: ' . (string) $request->query(
+                    'error_description',
+                    $request->query('error')
+                )
+            );
         }
 
         $authCode = $request->query('code') ?? $request->query('auth_code');
-        $state    = $request->query('state');
-
         if (! $authCode) {
-            return response()->json([
-                'error' => 'TikTok Shop callback gagal. code tidak ditemukan.',
-                'raw'   => $request->query(),
-            ], 422);
+            return redirect('/marketplace/toko')->with(
+                'error',
+                'TikTok Shop callback gagal. Code tidak ditemukan.'
+            );
         }
 
-        $appKey    = trim((string) config('tiktok_shop.app_key'));
-        $appSecret = trim((string) config('tiktok_shop.app_secret'));
-        $authUrl   = rtrim(trim((string) config('tiktok_shop.auth_url', 'https://auth.tiktok-shops.com')), '/');
-
-        // ─── Tukar auth_code → access_token ──────────────────────────────────
-        $tokenResponse = Http::timeout(30)->post($authUrl . '/api/v2/token/get', [
-            'app_key'    => $appKey,
-            'app_secret' => $appSecret,
-            'auth_code'  => $authCode,
-            'grant_type' => 'authorized_code',
-        ]);
-
-        $tokenData = $tokenResponse->json() ?? [];
-
-        if (! empty($tokenData['code']) && $tokenData['code'] !== 0) {
-            return response()->json([
-                'error'          => 'Gagal tukar code ke token TikTok Shop.',
-                'token_response' => $tokenData,
-            ], 422);
-        }
-
-        $data         = $tokenData['data'] ?? $tokenData;
-        $accessToken  = $data['access_token']  ?? null;
-        $refreshToken = $data['refresh_token'] ?? null;
-
-        if (! $accessToken) {
-            return response()->json([
-                'error'          => 'access_token tidak ditemukan di response TikTok.',
-                'token_response' => $tokenData,
-            ], 422);
-        }
-
-        // ─── Ambil daftar shops yang diauthorize ──────────────────────────────
-        $shops = $this->fetchAuthorizedShops($appKey, $appSecret, $accessToken);
-
-        if (empty($shops)) {
-            // Fallback: simpan satu store tanpa shop detail (shop_id dari token data)
-            $shops = [[
-                'shop_id'     => $data['seller_base_region'] ?? null, // best-effort fallback
-                'shop_cipher' => $data['seller_base_region'] ?? null,
-                'shop_name'   => 'TikTok Shop',
-                'region'      => $data['seller_base_region'] ?? 'ID',
-            ]];
-        }
-
-        $channel = Channel::firstOrCreate(
-            ['code' => 'tiktok'],
-            ['name' => 'TikTok Shop', 'status' => 'active']
+        $job = new ProcessTikTokShopOAuthJob(
+            (string) $authCode,
+            session()->pull('tiktok_connect_store_id'),
+            session()->pull('marketplace_integration') === 'ads_read_only',
         );
 
-        $targetStoreId = session()->pull('tiktok_connect_store_id');
-        $targetStore = $targetStoreId ? Store::find((int) $targetStoreId) : null;
-        $readOnlyIntegration = session()->pull('marketplace_integration') === 'ads_read_only';
-
-        // ─── Simpan satu Store per shop ───────────────────────────────────────
-        foreach ($shops as $shop) {
-            $shopId     = (string) ($shop['shop_id']     ?? '');
-            $shopCipher = (string) ($shop['shop_cipher'] ?? '');
-            $shopName   = (string) ($shop['shop_name']   ?? 'TikTok Shop');
-            $region     = (string) ($shop['region']      ?? 'ID');
-
-            if (! $shopId) {
-                continue;
-            }
-
-            $credentials = [
-                'app_key'                  => $appKey,
-                'app_secret'               => $appSecret,
-                'shop_id'                  => $shopId,
-                'shop_cipher'              => $shopCipher,
-                'access_token'             => $accessToken,
-                'refresh_token'            => $refreshToken,
-                'access_token_expire_in'   => $data['access_token_expire_in']  ?? null,
-                'refresh_token_expire_in'  => $data['refresh_token_expire_in'] ?? null,
-            ];
-
-            $storePayload = [
-                'name'             => $shopName,
-                'channel_id'       => $channel->id,
-                'external_shop_id' => $shopId,
-                'region'           => $region,
-                'status'           => 'active',
-                'is_active'        => true,
-                'credentials'      => $credentials,
-                'token_expires_at' => isset($data['access_token_expire_in'])
-                    ? now()->addSeconds((int) $data['access_token_expire_in'])
-                    : null,
-                'meta' => [
-                    'auth_source'        => 'tiktok_oauth',
-                    'shop_cipher'        => $shopCipher,
-                ],
-            ];
-
-            if ($readOnlyIntegration) {
-                $storePayload['meta'] = array_merge($targetStore?->meta ?? [], $storePayload['meta'], [
-                    'api_access_mode' => 'read_only',
-                    'api_scopes' => config('marketplace.read_only_api_scopes', ['ads.read', 'shop.read']),
-                    'api_auth_source' => 'official_oauth',
-                    'api_connected_at' => now()->toISOString(),
-                    'api_revoked_at' => null,
-                    'api_revoked_by' => null,
-                ]);
-            }
-
-            if ($targetStore) {
-                $targetStore->update($storePayload);
-                $storeModel = $targetStore;
-                // Bila satu authorization mengembalikan beberapa shop, hanya
-                // shop pertama yang ditautkan ke toko yang dipilih user.
-                $targetStore = null;
-            } else {
-                $storeModel = Store::updateOrCreate(
-                    ['code' => 'tiktok_' . $shopCipher],
-                    $storePayload
-                );
-            }
-
-            // Jalankan sinkronisasi awal secara otomatis di background
-            if (isset($storeModel) && $storeModel) {
-                \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-orders', ['--store' => $storeModel->id]);
-                \App\Jobs\SyncMarketplaceReturns::dispatch($storeModel, null, null, true);
-            }
+        // Do not make outbound DNS/HTTPS calls from PHP-FPM. On macOS Herd,
+        // both cURL and PHP streams can abort inside getaddrinfo after FPM
+        // forks. The queue CLI process handles the TikTok calls safely.
+        if (app()->environment('testing')) {
+            app(\App\Services\TikTokShop\TikTokShopOAuthService::class)
+                ->process($job->authCode, $job->targetStoreId, $job->readOnlyIntegration);
+        } else {
+            dispatch($job);
         }
 
-        return redirect('/marketplace/toko?connected=1');
-    }
-
-    // ─── Helper: GET /authorization/202309/shops ──────────────────────────────
-
-    protected function fetchAuthorizedShops(string $appKey, string $appSecret, string $accessToken): array
-    {
-        try {
-            $baseUrl   = rtrim(trim((string) config('tiktok_shop.base_url', 'https://open-api.tiktok-shops.com')), '/');
-            $path      = '/authorization/202309/shops';
-            $timestamp = (string) time();
-            $sign      = $this->sign($appSecret, $path, [], $timestamp);
-
-            $response = Http::timeout(30)
-                ->withHeaders([
-                    'x-tts-access-token' => $accessToken,
-                    'content-type'       => 'application/json',
-                ])
-                ->get($baseUrl . $path, [
-                    'app_key'   => $appKey,
-                    'timestamp' => $timestamp,
-                    'sign'      => $sign,
-                    'version'   => '202309',
-                ]);
-
-            $json  = $response->json() ?? [];
-            $shops = $json['data']['shops'] ?? $json['shops'] ?? [];
-
-            return array_map(fn ($s) => [
-                'shop_id'     => (string) ($s['shop_id']     ?? ''),
-                'shop_cipher' => (string) ($s['cipher']      ?? $s['shop_cipher'] ?? ''),
-                'shop_name'   => (string) ($s['shop_name']   ?? 'TikTok Shop'),
-                'region'      => (string) ($s['region']      ?? 'ID'),
-            ], $shops);
-        } catch (\Throwable $e) {
-            Log::warning('TikTok fetchAuthorizedShops failed: ' . $e->getMessage());
-            return [];
-        }
-    }
-
-    // ─── TikTok Shop signature (sorted params, HMAC-SHA256) ──────────────────
-
-    protected function sign(string $appSecret, string $path, array $params, string $timestamp): string
-    {
-        // Remove sign, timestamp, app_key from params before signing
-        unset($params['sign'], $params['timestamp'], $params['app_key']);
-
-        ksort($params);
-
-        $paramStr = '';
-        foreach ($params as $k => $v) {
-            $paramStr .= $k . $v;
-        }
-
-        $toSign = $appSecret . $path . $paramStr . $timestamp . $appSecret;
-
-        return hash_hmac('sha256', $toSign, $appSecret);
+        return redirect('/marketplace/toko?connecting=1')->with(
+            'success',
+            'Permintaan koneksi TikTok Shop sedang diproses. Muat ulang halaman dalam beberapa detik.'
+        );
     }
 }

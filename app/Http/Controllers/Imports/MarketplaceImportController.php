@@ -117,6 +117,10 @@ class MarketplaceImportController extends Controller
             'draft' => session('mp_import_preview'),
             'selectedChannelId' => $selectedChannelId,
             'selectedStoreId' => $selectedStoreId,
+            'recentBatches' => MarketplaceImportBatch::with('store:id,name')
+                ->latest()
+                ->limit(8)
+                ->get(),
         ]);
     }
 
@@ -483,30 +487,61 @@ class MarketplaceImportController extends Controller
                 ->with('error', 'Batch ini memperbarui shipment lama sehingga tidak bisa dihapus otomatis.');
         }
 
-        $deleted = DB::transaction(function () use ($batch): array {
+        // Income/reconciliation dapat mengubah import_batch_id pada shipment
+        // primary, tetapi order snapshot tetap menyimpan batch pemiliknya.
+        // Ambil order tersebut lebih dulu agar penghapusan tidak menyisakan
+        // shipment, item, atau settlement yatim.
+        $ownedOrderIds = MarketplaceOrder::query()
+            ->where('store_id', $batch->store_id)
+            ->get(['id', 'meta'])
+            ->filter(fn (MarketplaceOrder $order): bool =>
+                data_get($order->meta, 'source_type') === 'marketplace_shipment_import'
+                && (string) data_get($order->meta, 'import_batch_id') === (string) $batch->id
+            )
+            ->pluck('id')
+            ->values();
+
+        // Jangan menghapus order yang sudah masuk workflow fulfillment atau
+        // finance. Penghapusan order seperti itu dapat memutus jejak stok/jurnal
+        // yang dibuat di luar batch import.
+        if ($ownedOrderIds->isNotEmpty()) {
+            $hasConfirmedFulfillment = DB::table('order_fulfillments')
+                ->whereIn('marketplace_order_id', $ownedOrderIds)
+                ->where('status', 'confirmed')
+                ->exists();
+            $hasFinancialTransaction = DB::table('marketplace_financial_transactions')
+                ->whereIn('marketplace_order_id', $ownedOrderIds)
+                ->exists();
+
+            if ($hasConfirmedFulfillment || $hasFinancialTransaction) {
+                return redirect()
+                    ->route('imports.marketplace.index')
+                    ->with('error', 'Batch tidak bisa dihapus karena order sudah memiliki fulfillment confirmed atau transaksi finance.');
+            }
+        }
+
+        $deleted = DB::transaction(function () use ($batch, $ownedOrderIds): array {
             $shipmentIds = MpShipment::query()
-                ->where('import_batch_id', $batch->id)
+                ->where(function ($query) use ($batch, $ownedOrderIds): void {
+                    $query->where(function ($shipmentQuery) use ($batch): void {
+                        $shipmentQuery
+                            ->where('import_batch_id', $batch->id)
+                            ->where('source_type', 'import');
+                    });
+
+                    if ($ownedOrderIds->isNotEmpty()) {
+                        $query->orWhere(function ($shipmentQuery) use ($ownedOrderIds): void {
+                            $shipmentQuery
+                                ->whereIn('marketplace_order_id', $ownedOrderIds)
+                                ->where('source_type', 'import');
+                        });
+                    }
+                })
                 ->pluck('id');
 
             $packetShipmentIds = $shipmentIds
                 ->map(static fn ($id): string => (string) $id)
                 ->all();
-
-            $bridgeOrderIds = MpShipment::query()
-                ->whereIn('id', $shipmentIds)
-                ->whereNotNull('marketplace_order_id')
-                ->pluck('marketplace_order_id')
-                ->unique()
-                ->values();
-            $ownedBridgeOrderIds = MarketplaceOrder::query()
-                ->whereIn('id', $bridgeOrderIds)
-                ->get(['id', 'meta'])
-                ->filter(fn (MarketplaceOrder $order): bool =>
-                    data_get($order->meta, 'source_type') === 'marketplace_shipment_import'
-                    && (string) data_get($order->meta, 'import_batch_id') === (string) $batch->id
-                )
-                ->pluck('id')
-                ->values();
 
             $shipmentItems = DB::table('mp_shipment_items')
                 ->whereIn('mp_shipment_id', $shipmentIds)
@@ -525,13 +560,19 @@ class MarketplaceImportController extends Controller
                 ->delete();
 
             $marketplaceOrderItems = DB::table('marketplace_order_items')
-                ->where(function ($query) use ($ownedBridgeOrderIds): void {
-                    $query->whereIn('order_id', $ownedBridgeOrderIds)
-                        ->orWhereIn('marketplace_order_id', $ownedBridgeOrderIds);
+                ->where(function ($query) use ($ownedOrderIds): void {
+                    $query->whereIn('order_id', $ownedOrderIds)
+                        ->orWhereIn('marketplace_order_id', $ownedOrderIds);
                 })
                 ->delete();
+            $settlements = DB::table('marketplace_order_settlements')
+                ->whereIn('order_id', $ownedOrderIds)
+                ->delete();
+            $fulfillments = DB::table('order_fulfillments')
+                ->whereIn('marketplace_order_id', $ownedOrderIds)
+                ->delete();
             $marketplaceOrders = MarketplaceOrder::query()
-                ->whereIn('id', $ownedBridgeOrderIds)
+                ->whereIn('id', $ownedOrderIds)
                 ->delete();
 
             $batches = MarketplaceImportBatch::query()
@@ -544,6 +585,8 @@ class MarketplaceImportController extends Controller
                 'packetItems',
                 'reconciliations',
                 'marketplaceOrderItems',
+                'settlements',
+                'fulfillments',
                 'marketplaceOrders',
                 'batches',
             );
@@ -556,7 +599,8 @@ class MarketplaceImportController extends Controller
             ->with(
                 'success',
                 'Import dihapus: ' . (int) $deleted['shipments'] . ' shipment'
-                    . ($deleted['marketplaceOrders'] ? ' dan ' . (int) $deleted['marketplaceOrders'] . ' order dashboard.' : '.'),
+                    . ($deleted['marketplaceOrders'] ? ' dan ' . (int) $deleted['marketplaceOrders'] . ' order dashboard.' : '.')
+                    . ($deleted['settlements'] ? ' Settlement: ' . (int) $deleted['settlements'] . '.' : ''),
             );
     }
 

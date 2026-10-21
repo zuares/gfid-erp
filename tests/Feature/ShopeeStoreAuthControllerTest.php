@@ -56,28 +56,8 @@ class ShopeeStoreAuthControllerTest extends TestCase
             ], 200),
         ]);
 
-        $shopee = \Mockery::mock(\App\Services\Channels\Shopee\ShopeeChannel::class);
-        $shopee->shouldReceive('getShopInfo')
-            ->once()
-            ->andReturn([
-                'response' => [
-                    'shop_name' => 'Shopee Toko Baru',
-                ],
-            ]);
-        app()->instance(\App\Services\Channels\Shopee\ShopeeChannel::class, $shopee);
-
         Queue::fake();
         Bus::fake();
-
-        $queuedAdsSync = \Mockery::mock();
-        $queuedAdsSync->shouldReceive('onQueue')
-            ->once()
-            ->with('ads')
-            ->andReturnSelf();
-
-        Artisan::shouldReceive('queue')
-            ->times(3)
-            ->andReturn(null, null, $queuedAdsSync);
 
         $response = $this->actingAs($user)
             ->withSession([
@@ -90,13 +70,14 @@ class ShopeeStoreAuthControllerTest extends TestCase
                 'state' => 'test-state',
             ]));
 
-        $response->assertRedirect('/marketplace/toko?connected=1');
-        $response->assertSessionHas('success', 'Shopee berhasil terhubung.');
+        $response->assertRedirect('/marketplace/toko?connecting=1');
+        $response->assertSessionHas('success', 'Permintaan koneksi Shopee sedang diproses. Muat ulang halaman dalam beberapa detik.');
 
-        $store->refresh();
-
-        $this->assertSame('987654321', $store->external_shop_id);
-        $this->assertSame('Shopee Toko Baru', $store->name);
-        $this->assertSame('CONNECTED', $store->connection_status);
+        Bus::assertDispatched(\App\Jobs\ProcessShopeeOAuthJob::class, function ($job) use ($store): bool {
+            return $job->code === 'dummy-code'
+                && $job->shopId === 987654321
+                && $job->targetStoreId === $store->id
+                && $job->readOnlyIntegration === false;
+        });
     }
 }

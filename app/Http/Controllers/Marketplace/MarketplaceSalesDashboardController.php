@@ -216,7 +216,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
-            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel));
+            ->when($purchaseChannel, fn ($query) => $this->applyPurchaseChannelFilter($query, $purchaseChannel));
 
         // The item aggregate subqueries are joined back to the filtered order
         // scope. Without this restriction SQLite has to group every historical
@@ -608,7 +608,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->whereRaw("{$statusExpression} NOT IN (".implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')).')', self::NON_REVENUE_STATUSES)
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
-            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
+            ->when($purchaseChannel, fn ($query) => $this->applyPurchaseChannelFilter($query, $purchaseChannel))
             ->selectRaw("COALESCE(MAX(NULLIF(internal_item.name, '')), MAX({$marketplaceProductNameExpression}), 'Produk tanpa nama') as name")
             ->selectRaw("MAX({$marketplaceProductNameExpression}) as marketplace_name")
             ->selectRaw("MAX(NULLIF(oi.image_url, '')) as image_url")
@@ -668,7 +668,7 @@ class MarketplaceSalesDashboardController extends Controller
                 ->whereRaw("UPPER(COALESCE(NULLIF(promo_o.order_status, ''), NULLIF(promo_o.status, ''), '')) NOT IN (".implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')).')', self::NON_REVENUE_STATUSES)
                 ->when($storeId, fn ($query) => $query->where('promo_o.store_id', $storeId))
                 ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(promo_ch.code)'), $platformCodes))
-                ->when($purchaseChannel, fn ($query) => $query->where('promo_o.purchase_channel', $purchaseChannel))
+                ->when($purchaseChannel, fn ($query) => $this->applyPurchaseChannelFilter($query, $purchaseChannel, 'promo_o', 'promo_ch'))
                 ->where(function ($query) use ($internalProductIds, $unmappedProducts, $promotionProductNameExpression, $promotionProductSkuExpression) {
                     if ($internalProductIds->isNotEmpty()) {
                         $query->whereIn('promo_oi.internal_item_id', $internalProductIds->all());
@@ -1256,7 +1256,7 @@ SQL;
                 ->whereRaw("{$statusExpression} NOT IN (".implode(',', array_fill(0, count(self::NON_REVENUE_STATUSES), '?')).')', self::NON_REVENUE_STATUSES)
                 ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
                 ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
-                ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
+                ->when($purchaseChannel, fn ($query) => $this->applyPurchaseChannelFilter($query, $purchaseChannel))
                 ->select([
                     'ms.order_id',
                     'ms.seller_voucher',
@@ -1505,7 +1505,7 @@ SQL;
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
-            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel));
+            ->when($purchaseChannel, fn ($query) => $this->applyPurchaseChannelFilter($query, $purchaseChannel));
         $shippingReturnStatusesSql = "'".implode("', '", self::SHIPPING_RETURN_STATUSES)."'";
 
         $shipping = (clone $shippingBase)
@@ -2367,7 +2367,7 @@ README;
                 ->where('st.is_active', true)
                 ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
                 ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
-                ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
+                ->when($purchaseChannel, fn ($query) => $this->applyPurchaseChannelFilter($query, $purchaseChannel))
                 ->select('o.store_id', 'oi.external_item_id', 'internal_category.name as category_name', 'oi.id')
                 ->orderByDesc('oi.id')
                 ->get();
@@ -2458,7 +2458,7 @@ README;
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
-            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
+            ->when($purchaseChannel, fn ($query) => $this->applyPurchaseChannelFilter($query, $purchaseChannel))
             ->when($internalItemId, fn ($query) => $query->where('oi.internal_item_id', $internalItemId))
             ->when(! $internalItemId, fn ($query) => $query->whereRaw("{$nameExpression} = ?", [$name]))
             ->when(! $internalItemId && $sku !== '' && $sku !== '-', fn ($query) => $query->whereRaw("{$skuExpression} = ?", [$sku]))
@@ -2685,7 +2685,7 @@ README;
             ->when($isDashboardDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
-            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
+            ->when($purchaseChannel, fn ($query) => $this->applyPurchaseChannelFilter($query, $purchaseChannel))
             ->select([
                 'o.id',
                 'o.channel_order_id',
@@ -2863,7 +2863,7 @@ README;
             ->when($isDashboardDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
-            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
+            ->when($purchaseChannel, fn ($query) => $this->applyPurchaseChannelFilter($query, $purchaseChannel))
             ->select([
                 'o.id',
                 'o.channel_order_id',
@@ -3015,7 +3015,7 @@ SQL;
             ->when($isPromotionDummy, fn ($query) => $query->whereJsonContains('o.meta->dummy_source', self::PROMOTION_DUMMY_SOURCE))
             ->when($storeId, fn ($query) => $query->where('o.store_id', $storeId))
             ->when($platformCode, fn ($query) => $query->whereIn(DB::raw('UPPER(ch.code)'), $platformCodes))
-            ->when($purchaseChannel, fn ($query) => $query->where('o.purchase_channel', $purchaseChannel))
+            ->when($purchaseChannel, fn ($query) => $this->applyPurchaseChannelFilter($query, $purchaseChannel))
             ->select([
                 'o.id',
                 'o.channel_order_id',
@@ -3114,6 +3114,29 @@ SQL;
         } catch (\Throwable) {
             return $default;
         }
+    }
+
+    /**
+     * Apply the purchase-channel scope while supporting older API rows that
+     * predate the channel fallback and still have a NULL value. In that case
+     * the configured store channel is the safe source of truth.
+     */
+    private function applyPurchaseChannelFilter($query, string $purchaseChannel, string $orderAlias = 'o', string $channelAlias = 'ch')
+    {
+        $platformCode = strtoupper($purchaseChannel);
+        $platformCodes = $this->platformCodes($platformCode);
+        $purchaseColumn = $orderAlias.'.purchase_channel';
+
+        return $query->where(function ($scope) use ($purchaseColumn, $channelAlias, $purchaseChannel, $platformCodes) {
+            $scope->where($purchaseColumn, $purchaseChannel)
+                ->orWhere(function ($fallback) use ($purchaseColumn, $channelAlias, $platformCodes) {
+                    $fallback
+                        ->where(function ($missing) use ($purchaseColumn) {
+                            $missing->whereNull($purchaseColumn)->orWhere($purchaseColumn, '');
+                        })
+                        ->whereIn(DB::raw('UPPER('.$channelAlias.'.code)'), $platformCodes);
+                });
+        });
     }
 
     private function normalizePlatformCode(?string $code): ?string

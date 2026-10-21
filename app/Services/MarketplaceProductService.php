@@ -25,6 +25,10 @@ class MarketplaceProductService
      */
     public function syncProducts(Store $store, array $statuses = ['NORMAL', 'UNLIST']): array
     {
+        if ($this->isTikTokStore($store)) {
+            return $this->syncTikTokProducts($store);
+        }
+
         $driver  = $this->gateway;
         $itemIds = [];
         $errors  = [];
@@ -232,6 +236,163 @@ class MarketplaceProductService
     }
 
     /**
+     * Sync TikTok Shop's product catalogue into the shared marketplace
+     * product tables. TikTok exposes product IDs and SKU snapshots through
+     * Search Products, so no Shopee-specific item/model endpoint is used here.
+     */
+    private function syncTikTokProducts(Store $store): array
+    {
+        $synced = 0;
+        $errors = [];
+        $pageToken = '';
+        $seenTokens = [];
+
+        do {
+            $response = $this->gateway->searchProducts($store, 'ALL', $pageToken, 100);
+            if (! empty($response['error'])) {
+                $errors[] = 'search_products: ' . ($response['message'] ?? $response['error']);
+                break;
+            }
+
+            $summaries = data_get($response, 'response.products')
+                ?? data_get($response, 'data.products')
+                ?? [];
+            if (! is_array($summaries)) {
+                $summaries = [];
+            }
+
+            foreach ($summaries as $summary) {
+                $productId = trim((string) ($summary['id'] ?? $summary['product_id'] ?? ''));
+                if ($productId === '') {
+                    continue;
+                }
+
+                $detailResponse = $this->gateway->getProduct($store, $productId);
+                $detail = data_get($detailResponse, 'data');
+                if (! is_array($detail) || empty($detail['id'])) {
+                    // The search snapshot is still useful when one detail call
+                    // fails; retain the sync error and continue other products.
+                    if (! empty($detailResponse['error'])) {
+                        $errors[] = "get_product {$productId}: " . ($detailResponse['message'] ?? $detailResponse['error']);
+                    }
+                    $detail = $summary;
+                }
+
+                $this->upsertTikTokProduct($store, $detail);
+                $synced++;
+            }
+
+            $nextToken = (string) (
+                data_get($response, 'response.next_page_token')
+                ?? data_get($response, 'data.next_page_token')
+                ?? ''
+            );
+            if ($nextToken === '' || isset($seenTokens[$nextToken])) {
+                break;
+            }
+            $seenTokens[$nextToken] = true;
+            $pageToken = $nextToken;
+        } while ($pageToken !== '');
+
+        return ['synced' => $synced, 'errors' => $errors];
+    }
+
+    /**
+     * Convert TikTok's product/SKU shape to the common local catalogue shape.
+     */
+    private function upsertTikTokProduct(Store $store, array $item): MarketplaceProduct
+    {
+        $itemId = trim((string) ($item['id'] ?? $item['product_id'] ?? ''));
+        $status = strtoupper((string) ($item['status'] ?? 'UNKNOWN'));
+        $localStatus = $status === 'ACTIVATE' ? 'NORMAL' : 'UNLIST';
+        $skus = array_values(array_filter((array) ($item['skus'] ?? []), 'is_array'));
+        $images = (array) ($item['main_images'] ?? []);
+        $firstImage = data_get($images, '0');
+        $imageUrl = data_get($firstImage, 'urls.0')
+            ?? data_get($firstImage, 'url')
+            ?? data_get($firstImage, 'uri');
+        $categories = (array) ($item['categories'] ?? []);
+        $categoryId = data_get($categories, '0.id')
+            ?? data_get($item, 'category_id')
+            ?? data_get($item, 'recommended_categories.0.id');
+
+        $product = MarketplaceProduct::updateOrCreate(
+            ['store_id' => $store->id, 'item_id' => $itemId],
+            [
+                'item_name' => $item['title'] ?? $item['product_name'] ?? null,
+                'item_sku' => count($skus) === 1 ? ($skus[0]['seller_sku'] ?? null) : null,
+                'item_status' => $localStatus,
+                'category_id' => $categoryId !== null ? (string) $categoryId : null,
+                'image_url' => $imageUrl,
+                'has_model' => count($skus) > 1 || collect($skus)->contains(fn (array $sku): bool => ! empty($sku['sales_attributes'])),
+                'raw_json' => $item,
+                'synced_at' => now(),
+            ]
+        );
+
+        $keptModelIds = [];
+        foreach ($skus as $sku) {
+            $modelId = trim((string) ($sku['id'] ?? $sku['sku_id'] ?? ''));
+            if ($modelId === '') {
+                continue;
+            }
+
+            $price = data_get($sku, 'price.sale_price')
+                ?? data_get($sku, 'price.tax_exclusive_price')
+                ?? data_get($sku, 'price.amount');
+            $stock = collect((array) ($sku['inventory'] ?? []))
+                ->sum(fn ($inventory): int => (int) ($inventory['quantity'] ?? 0));
+            $attributes = collect((array) ($sku['sales_attributes'] ?? []))
+                ->map(fn ($attribute): string => (string) ($attribute['value_name'] ?? $attribute['name'] ?? ''))
+                ->filter()
+                ->implode(' / ');
+
+            $model = MarketplaceProductModel::updateOrCreate(
+                ['marketplace_product_id' => $product->id, 'model_id' => $modelId],
+                [
+                    'model_name' => $attributes !== '' ? $attributes : null,
+                    'model_sku' => $sku['seller_sku'] ?? null,
+                    'price' => $price !== null ? (float) $price : null,
+                    'stock' => $stock,
+                    'raw_json' => $sku,
+                ]
+            );
+            $keptModelIds[] = $model->id;
+        }
+
+        // A product with no SKU is unusual, but keeping a model row preserves
+        // the same UI contract as the Shopee adapter.
+        if ($keptModelIds === []) {
+            $model = MarketplaceProductModel::updateOrCreate(
+                ['marketplace_product_id' => $product->id, 'model_id' => '0'],
+                [
+                    'model_name' => null,
+                    'model_sku' => null,
+                    'price' => null,
+                    'stock' => 0,
+                    'raw_json' => [],
+                ]
+            );
+            $keptModelIds[] = $model->id;
+        }
+
+        $product->models()->whereNotIn('id', $keptModelIds)->delete();
+        $prices = $product->models()->pluck('price')->filter();
+        $product->update([
+            'price_min' => $prices->min(),
+            'price_max' => $prices->max(),
+            'stock_total' => (int) $product->models()->sum('stock'),
+        ]);
+
+        return $product->fresh();
+    }
+
+    private function isTikTokStore(Store $store): bool
+    {
+        return in_array(strtolower((string) $store->channel?->code), ['tiktok', 'ttk', 'tt'], true);
+    }
+
+    /**
      * Sync satu item (dipakai webhook item_update).
      */
     public function syncSingleItem(Store $store, $itemId): ?MarketplaceProduct
@@ -258,6 +419,10 @@ class MarketplaceProductService
     {
         $store = $product->store;
         $channel = strtolower((string) ($store?->channel?->code ?? ''));
+
+        if (in_array($channel, ['tiktok', 'ttk', 'tt'], true)) {
+            return $this->getTikTokEditData($product);
+        }
 
         if (! in_array($channel, ['shopee', 'shp'], true)) {
             return [
@@ -395,13 +560,123 @@ class MarketplaceProductService
     }
 
     /**
+     * TikTok detail snapshot for the shared editor. TikTok supports SKU price
+     * and inventory mutations through this module; listing content, SKU names,
+     * and gallery remain read-only until their dedicated API flow is added.
+     */
+    private function getTikTokEditData(MarketplaceProduct $product): array
+    {
+        $store = $product->store;
+        $response = $this->gateway->getProduct($store, (string) $product->item_id);
+        $item = data_get($response, 'data');
+        $staleSnapshot = false;
+        $remoteMessage = null;
+
+        // Detail TikTok kadang gagal sementara (502/429 dari upstream). Produk
+        // sudah menyimpan raw snapshot saat sync, sehingga editor tetap bisa
+        // dibuka dan harga/stok lokal tidak ikut hilang.
+        if (! is_array($item) || empty($item['id'])) {
+            $remoteMessage = $response['message'] ?? null;
+            $item = is_array($product->raw_json) ? $product->raw_json : [];
+            if (! empty($item)) {
+                $item['id'] = $item['id'] ?? (string) $product->item_id;
+                $staleSnapshot = true;
+            }
+        }
+
+        if (! is_array($item) || empty($item['id'])) {
+            return [
+                'error' => 'item_not_found',
+                'message' => 'Produk tidak ditemukan di TikTok Shop. Coba lakukan sync terlebih dahulu.',
+            ];
+        }
+
+        $freshProduct = $staleSnapshot
+            ? $product->fresh('models')
+            : $this->upsertTikTokProduct($store, $item);
+        $models = $freshProduct->fresh('models')->models->map(function (MarketplaceProductModel $model): array {
+            $raw = is_array($model->raw_json) ? $model->raw_json : [];
+            $price = data_get($raw, 'price.sale_price')
+                ?? data_get($raw, 'price.tax_exclusive_price')
+                ?? data_get($raw, 'price.amount')
+                ?? $model->price;
+
+            return [
+                'model_id' => (string) $model->model_id,
+                'model_name' => $model->model_name,
+                'model_sku' => $model->model_sku,
+                'original_price' => $price,
+                'current_price' => $price,
+                'stock' => (int) $model->stock,
+                'tier_index' => [],
+            ];
+        })->values()->all();
+
+        $images = collect((array) ($item['main_images'] ?? []))
+            ->map(function (array $image, int $index): array {
+                return [
+                    'image_id' => data_get($image, 'uri') ?? data_get($image, 'urls.0'),
+                    'image_url' => data_get($image, 'urls.0') ?? data_get($image, 'url') ?? data_get($image, 'uri'),
+                    'sort_order' => $index,
+                    'is_cover' => $index === 0,
+                ];
+            })->values()->all();
+
+        return [
+            'product' => [
+                'local_id' => $freshProduct->id,
+                'store_id' => $store->id,
+                'store_name' => $store->name,
+                'item_id' => (string) ($item['id'] ?? $freshProduct->item_id),
+                'item_name' => $item['title'] ?? $freshProduct->item_name,
+                'description' => $item['description'] ?? data_get($freshProduct->raw_json, 'description'),
+                'item_sku' => $freshProduct->item_sku,
+                'item_status' => $freshProduct->item_status,
+                'category_id' => data_get($item, 'categories.0.id') ?? $freshProduct->category_id,
+                'has_model' => $freshProduct->has_model,
+            ],
+            'images' => $images,
+            'tiers' => [],
+            'models' => $models,
+            'source' => [
+                'channel' => 'tiktok',
+                'read_only_content' => true,
+                'stale_snapshot' => $staleSnapshot,
+                'warning' => $staleSnapshot
+                    ? ($remoteMessage ?: 'Detail live TikTok sedang tidak tersedia; data snapshot terakhir ditampilkan.')
+                    : null,
+                'fetched_at' => now()->toIso8601String(),
+                'product_endpoint' => '/product/202309/products/{product_id}',
+            ],
+        ];
+    }
+
+    /**
      * Update stok di Shopee + lokal.
      * $stockList: [['model_id' => '0', 'stock' => 10], ...]
      */
     public function updateStock(MarketplaceProduct $product, array $stockList): array
     {
         $driver = $this->channelDriver($product->store);
-        $res = $driver->updateProductStock($product->store, $product->item_id, $stockList);
+        if ($this->isTikTokStore($product->store)) {
+            $tiktokStockList = [];
+            foreach ($stockList as $stock) {
+                $model = $product->models()
+                    ->where('model_id', (string) ($stock['model_id'] ?? '0'))
+                    ->first();
+                $raw = is_array($model?->raw_json) ? $model->raw_json : [];
+                $warehouseId = data_get($raw, 'inventory.0.warehouse_id')
+                    ?? data_get($product->raw_json, 'skus.0.inventory.0.warehouse_id');
+                $tiktokStockList[] = [
+                    'model_id' => $stock['model_id'] ?? '0',
+                    'stock' => $stock['stock'],
+                    'warehouse_id' => $warehouseId,
+                ];
+            }
+            $res = $driver->updateProductInventory($product->store, (string) $product->item_id, $tiktokStockList);
+        } else {
+            $res = $driver->updateProductStock($product->store, $product->item_id, $stockList);
+        }
 
         if (! empty($res['error'])) {
             return $res;
@@ -433,14 +708,27 @@ class MarketplaceProductService
             ->get()
             ->keyBy(fn (MarketplaceProductModel $model) => (string) $model->model_id);
 
-        $originalPriceList = array_map(function ($p) {
-            return [
-                'model_id' => $p['model_id'],
-                'original_price' => $p['original_price'],
-            ];
-        }, $priceList);
-
-        $res = $driver->updateProductPrice($product->store, $product->item_id, $originalPriceList);
+        if ($this->isTikTokStore($product->store)) {
+            $tiktokPriceList = [];
+            foreach ($priceList as $price) {
+                $model = $oldModels->get((string) ($price['model_id'] ?? '0'));
+                $raw = is_array($model?->raw_json) ? $model->raw_json : [];
+                $tiktokPriceList[] = [
+                    'model_id' => $price['model_id'],
+                    'original_price' => $price['original_price'],
+                    'currency' => data_get($raw, 'price.currency', 'IDR'),
+                ];
+            }
+            $res = $driver->updateProductPrices($product->store, (string) $product->item_id, $tiktokPriceList);
+        } else {
+            $originalPriceList = array_map(function ($p) {
+                return [
+                    'model_id' => $p['model_id'],
+                    'original_price' => $p['original_price'],
+                ];
+            }, $priceList);
+            $res = $driver->updateProductPrice($product->store, $product->item_id, $originalPriceList);
+        }
 
         if (! empty($res['error'])) {
             return $res;
@@ -453,8 +741,12 @@ class MarketplaceProductService
                 
             if ($model) {
                 $raw = is_string($model->raw_json) ? json_decode($model->raw_json, true) : ($model->raw_json ?? []);
-                if (!isset($raw['price_info'])) $raw['price_info'] = [[]];
-                $raw['price_info'][0]['original_price'] = (float) $p['original_price'];
+                if ($this->isTikTokStore($product->store)) {
+                    $raw['price']['amount'] = (string) ((int) round((float) $p['original_price']));
+                } else {
+                    if (!isset($raw['price_info'])) $raw['price_info'] = [[]];
+                    $raw['price_info'][0]['original_price'] = (float) $p['original_price'];
+                }
                 $model->update([
                     'price' => (float) $p['original_price'],
                     'raw_json' => $raw

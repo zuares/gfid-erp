@@ -1483,6 +1483,36 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         $this->assertSame(['escrow_amount' => 80000], $settlement->raw_json);
     }
 
+    public function test_sync_order_mengisi_purchase_channel_tiktok_dari_channel_store(): void
+    {
+        $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $tiktok->id,
+            'code' => 'TTK' . rand(1000, 9999),
+            'name' => 'Toko TikTok Uji',
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => ['access_token' => 'dummy'],
+            'token_expires_at' => now()->addDay(),
+        ]);
+        $this->mirrorLegacyMarketplaceStore($store);
+
+        $method = new \ReflectionMethod(MarketplaceSyncService::class, 'upsertOrders');
+        $method->setAccessible(true);
+        $method->invoke(app(MarketplaceSyncService::class), $store, [[
+            'order_sn' => 'TTK-ORDER-CHANNEL-FALLBACK',
+            'order_status' => 'COMPLETED',
+            'total_amount' => 100000,
+            'item_list' => [],
+        ]]);
+
+        $this->assertDatabaseHas('marketplace_orders', [
+            'store_id' => $store->id,
+            'channel_order_id' => 'TTK-ORDER-CHANNEL-FALLBACK',
+            'purchase_channel' => 'tiktok',
+        ]);
+    }
+
     public function test_sync_order_tidak_mendowngrade_status_ready_to_handover()
     {
         $orderSn = 'ORDER-READY-HANDOVER';

@@ -36,7 +36,7 @@ class SyncOrdersCommand extends Command
         $query = Store::where('status', 'active')
             ->where('is_active', true) // toko nonaktif dilewati: jangan tarik/refresh token
             ->whereHas('channel', function ($q) {
-                $q->where('code', 'shopee');
+                $q->whereIn('code', ['shopee', 'tiktok']);
             });
 
         if ($this->option('store')) {
@@ -47,14 +47,14 @@ class SyncOrdersCommand extends Command
 
         if ($stores->isEmpty()) {
             if ($this->option('store')) {
-                $this->error('Toko tidak ditemukan, tidak aktif, atau bukan Shopee.');
+                $this->error('Toko tidak ditemukan, tidak aktif, atau channel marketplace belum didukung.');
                 return self::FAILURE;
             }
-            $this->info('Tidak ada toko Shopee aktif.');
+            $this->info('Tidak ada toko marketplace aktif.');
             return self::SUCCESS;
         }
 
-        $this->info('Ditemukan: ' . $stores->count() . ' toko Shopee aktif');
+        $this->info('Ditemukan: ' . $stores->count() . ' toko marketplace aktif');
         $this->line('');
 
         $successCount = 0;

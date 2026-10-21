@@ -113,7 +113,12 @@ class OmnichannelSyncService
             foreach ($details as $detail) {
                 if (empty($detail['order_sn'])) continue;
 
-                $purchaseChannel = PurchaseChannel::normalize($detail['purchase_channel'] ?? null);
+                // Some provider payloads (notably TikTok Shop) omit the
+                // purchase channel. Fall back to the configured store channel
+                // so API orders remain visible when the dashboard filters by
+                // purchase_channel.
+                $purchaseChannel = PurchaseChannel::normalize($detail['purchase_channel'] ?? null)
+                    ?? PurchaseChannel::normalize($store->channel?->code);
 
                 $order = MarketplaceOrder::updateOrCreate(
                     ['store_id' => $store->id, 'channel_order_id' => $detail['order_sn']],

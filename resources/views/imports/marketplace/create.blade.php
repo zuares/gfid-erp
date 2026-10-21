@@ -4,12 +4,14 @@
 
 @php
   use Illuminate\Support\Facades\Storage;
+  use Illuminate\Support\Str;
 
   $channels = $channels ?? [];
   $stores   = $stores ?? [];
   $draft    = $draft ?? session('mp_import_preview');
   $selectedChannelId = old('channel_id', $selectedChannelId ?? null);
   $selectedStoreId = old('store_id', $selectedStoreId ?? null);
+  $recentBatches = $recentBatches ?? collect();
   $channelNameCounts = collect($channels)->countBy(fn ($channel) => strtolower(trim((string) $channel->name)));
 
   $canResume = false;
@@ -154,6 +156,36 @@
   .shipment-guide-copy span{ display:block; margin-top:.12rem; color:var(--import-muted); font-size:.66rem; line-height:1.45; }
   .shipment-guide-footer{ display:flex; align-items:center; gap:.45rem; margin-top:1rem; padding:.68rem .72rem; border-radius:10px; background:var(--import-soft); color:var(--import-muted); font-size:.65rem; line-height:1.4; }
 
+  .import-history-card{ margin-top:.75rem; overflow:hidden; }
+  .import-history-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; padding:1rem 1.15rem .85rem; border-bottom:1px solid var(--import-line); }
+  .import-history-kicker{ color:var(--import-muted); font-size:.63rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+  .import-history-title{ margin:.22rem 0 0; color:var(--import-ink); font-size:.9rem; font-weight:800; }
+  .import-history-note{ margin-top:.2rem; color:var(--import-muted); font-size:.7rem; }
+  .import-history-link{ color:var(--import-ink); font-size:.7rem; font-weight:750; text-decoration:none; white-space:nowrap; }
+  .import-history-link:hover{ text-decoration:underline; }
+  .import-history-list{ display:grid; gap:.55rem; padding:.75rem; }
+  .import-history-row{ display:grid; grid-template-columns:minmax(0,1.7fr) minmax(150px,.9fr) minmax(170px,1fr) auto; align-items:center; gap:.8rem; padding:.72rem .8rem; border:1px solid var(--import-line); border-radius:11px; background:var(--import-soft); }
+  .import-history-main,.import-history-meta{ min-width:0; }
+  .import-history-file{ overflow:hidden; color:var(--import-ink); font-size:.73rem; font-weight:800; text-overflow:ellipsis; white-space:nowrap; }
+  .import-history-sub{ display:flex; flex-wrap:wrap; gap:.3rem .75rem; margin-top:.25rem; color:var(--import-muted); font-size:.65rem; }
+  .import-history-sub span{ display:inline-flex; align-items:center; gap:.25rem; }
+  .import-history-store{ overflow:hidden; color:var(--import-ink); font-size:.7rem; font-weight:750; text-overflow:ellipsis; white-space:nowrap; }
+  .import-history-date{ margin-top:.22rem; color:var(--import-muted); font-size:.64rem; }
+  .import-history-stat{ color:var(--import-ink); font-size:.68rem; line-height:1.55; }
+  .import-history-stat strong{ font-weight:800; }
+  .import-history-status{ display:inline-flex; align-items:center; justify-content:center; min-width:72px; padding:.25rem .45rem; border-radius:999px; font-size:.61rem; font-weight:800; text-transform:capitalize; }
+  .import-history-status.completed{ color:#166534; background:#dcfce7; }
+  .import-history-status.processing{ color:#92400e; background:#fef3c7; }
+  .import-history-status.preview{ color:#475569; background:#e2e8f0; }
+  .import-history-status.failed,.import-history-status.cancelled{ color:#991b1b; background:#fee2e2; }
+  body[data-theme="dark"] .import-history-status.completed{ color:#bbf7d0; background:rgba(34,197,94,.16); }
+  body[data-theme="dark"] .import-history-status.processing{ color:#fde68a; background:rgba(245,158,11,.16); }
+  body[data-theme="dark"] .import-history-status.preview{ color:#cbd5e1; background:rgba(148,163,184,.16); }
+  body[data-theme="dark"] .import-history-status.failed,body[data-theme="dark"] .import-history-status.cancelled{ color:#fecaca; background:rgba(239,68,68,.16); }
+  .import-history-actions{ display:flex; align-items:center; justify-content:flex-end; gap:.45rem; }
+  .import-history-actions form{ margin:0; }
+  .import-history-empty{ padding:1.1rem; color:var(--import-muted); font-size:.72rem; text-align:center; }
+
   @media(max-width:1024px){ .shipment-workspace{ grid-template-columns:1fr; } .shipment-guide{ position:static; } }
   @media(max-width:760px){
     .shipment-hero{ align-items:flex-start; flex-direction:column; }
@@ -175,6 +207,12 @@
     .shipment-browse{ display:none; }
     .shipment-form-actions{ align-items:stretch; flex-direction:column; }
     .shipment-submit{ width:100%; }
+  }
+  @media(max-width:760px){
+    .import-history-head{ align-items:flex-start; flex-direction:column; gap:.4rem; }
+    .import-history-row{ grid-template-columns:1fr 1fr; gap:.55rem .8rem; }
+    .import-history-main{ grid-column:1 / -1; }
+    .import-history-actions{ justify-content:flex-start; }
   }
 </style>
 @endpush
@@ -353,6 +391,71 @@
       <div class="shipment-guide-footer"><i class="bi bi-info-circle"></i><span>File TikTok <span class="mono">OrderSKUList</span> serta ekspor Shopee didukung.</span></div>
     </aside>
   </div>
+
+  <section class="shipment-card import-history-card" aria-label="Batch import terbaru">
+    <div class="import-history-head">
+      <div>
+        <div class="import-history-kicker">Audit import</div>
+        <h2 class="import-history-title">Batch import terbaru</h2>
+        <div class="import-history-note">Pantau file yang sudah preview, diproses, selesai, atau dibatalkan.</div>
+      </div>
+      <a class="import-history-link" href="{{ route('imports.marketplace.index') }}">Lihat riwayat lengkap <i class="bi bi-arrow-up-right"></i></a>
+    </div>
+
+    @if($recentBatches->isEmpty())
+      <div class="import-history-empty">Belum ada batch import.</div>
+    @else
+      <div class="import-history-list">
+        @foreach($recentBatches as $batch)
+          @php
+            $batchStatus = strtolower((string) ($batch->status ?? 'preview'));
+            $batchLabel = match ($batchStatus) {
+              'completed' => 'Selesai',
+              'processing' => 'Diproses',
+              'failed' => 'Gagal',
+              'cancelled' => 'Dibatalkan',
+              default => 'Preview',
+            };
+          @endphp
+          <div class="import-history-row">
+            <div class="import-history-main">
+              <div class="import-history-file" title="{{ $batch->source_file ?: '-' }}">{{ $batch->source_file ?: '-' }}</div>
+              <div class="import-history-sub">
+                <span><i class="bi bi-broadcast"></i>{{ strtoupper((string) $batch->channel) }}</span>
+                <span class="mono" title="{{ $batch->id }}">{{ Str::limit((string) $batch->id, 18, '…') }}</span>
+              </div>
+            </div>
+            <div class="import-history-meta">
+              <div class="import-history-store"><i class="bi bi-shop me-1"></i>{{ $batch->store?->name ?: 'Store #'.$batch->store_id }}</div>
+              <div class="import-history-date"><i class="bi bi-clock me-1"></i>{{ optional($batch->created_at)->timezone('Asia/Jakarta')->format('d M Y H:i') }}</div>
+            </div>
+            <div class="import-history-stat">
+              <strong>{{ number_format((int) $batch->shipments_parsed) }}</strong> shipment ·
+              <strong>{{ number_format((int) $batch->items_parsed) }}</strong> item<br>
+              {{ number_format((int) $batch->inserted_shipments) }} baru · {{ number_format((int) $batch->updated_shipments) }} update
+              @if((int) $batch->error_count > 0)
+                <span class="text-danger"> · {{ number_format((int) $batch->error_count) }} error</span>
+              @endif
+            </div>
+            <div class="import-history-actions">
+              <span class="import-history-status {{ $batchStatus }}">{{ $batchLabel }}</span>
+              @if(in_array($batchStatus, ['completed', 'failed'], true) && (int) $batch->updated_shipments === 0)
+                <form method="POST" action="{{ route('imports.marketplace.batches.destroy', $batch) }}" onsubmit="return confirm('Hapus batch ini beserta semua shipment, item, order, dan settlement yang dimiliki batch ini?')">
+                  @csrf
+                  @method('DELETE')
+                  <button type="submit" class="btn btn-outline-danger btn-sm" title="Hapus batch import" aria-label="Hapus batch import">
+                    <i class="bi bi-trash3"></i>
+                  </button>
+                </form>
+              @elseif((int) $batch->updated_shipments > 0)
+                <span class="text-muted small" title="Batch memperbarui shipment lama">Tidak aman</span>
+              @endif
+            </div>
+          </div>
+        @endforeach
+      </div>
+    @endif
+  </section>
 
 </div>
 @endsection

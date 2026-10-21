@@ -58,7 +58,7 @@ class MarketplaceSyncOrdersCommandTest extends TestCase
         });
 
         $this->artisan('marketplace:sync-orders')
-            ->expectsOutputToContain("Ditemukan: 2 toko Shopee aktif")
+            ->expectsOutputToContain("Ditemukan: 2 toko marketplace aktif")
             ->expectsOutputToContain("[1/2] {$storeA->name}")
             ->expectsOutputToContain("[2/2] {$storeB->name}")
             ->expectsOutputToContain("Hasil: 2 order baru")
@@ -159,6 +159,36 @@ class MarketplaceSyncOrdersCommandTest extends TestCase
 
         $this->artisan('marketplace:sync-orders', ['--dry-run' => true])
             ->expectsOutputToContain("Hasil: Dry-run OK (tidak ada API call)")
+            ->assertSuccessful();
+    }
+
+    public function test_toko_tiktok_juga_diproses(): void
+    {
+        $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $tiktok->id,
+            'code' => 'TTK-'.rand(100, 999),
+            'name' => 'TikTok Test Shop',
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'access_token' => 'dummy_token',
+                'shop_cipher' => 'dummy_cipher',
+            ],
+            'token_expires_at' => now()->addDays(1),
+        ]);
+
+        $this->mock(MarketplaceSyncService::class, function (MockInterface $mock) use ($store) {
+            $mock->shouldReceive('syncOrders')
+                ->withArgs(fn ($candidate) => $candidate->id === $store->id)
+                ->once()
+                ->andReturn(['new' => 1, 'updated' => 0]);
+        });
+
+        $this->artisan('marketplace:sync-orders', ['--store' => $store->id])
+            ->expectsOutputToContain('Ditemukan: 1 toko marketplace aktif')
+            ->expectsOutputToContain('TikTok Test Shop')
+            ->expectsOutputToContain('Hasil: 1 order baru')
             ->assertSuccessful();
     }
     

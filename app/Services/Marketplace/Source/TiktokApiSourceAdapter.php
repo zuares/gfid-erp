@@ -100,7 +100,10 @@ class TiktokApiSourceAdapter implements MarketplaceSourceAdapterInterface
                 $out[] = [
                     'store_id' => $storeId,
                     'channel' => $this->channel(),
-                    'purchase_channel' => PurchaseChannel::normalize($order['purchase_channel'] ?? null),
+                    // TikTok API payloads commonly identify the marketplace
+                    // only through the source adapter, not purchase_channel.
+                    'purchase_channel' => PurchaseChannel::normalize($order['purchase_channel'] ?? null)
+                        ?? PurchaseChannel::normalize($this->channel()),
                     'platform_order_id' => $orderId,
                     'platform_shipment_id' => $packageId ?: null,
                     'tracking_no' => $tracking ?: null,
