@@ -6,6 +6,8 @@
 
 <div class="dash-panels">
     @include('dashboard.partials._list_repeat_orders', ['title' => 'Repeat order pesanan hari ini', 'rows' => $d['repeat_orders'] ?? [], 'link' => $r('marketplace.orders')])
+</div>
+<div class="dash-panels">
     @include('dashboard.partials._list_order_items', ['title' => 'Permintaan belum dikirim per item internal', 'rows' => $d['list_todo_items'] ?? [], 'link' => $r('marketplace.orders')])
 </div>
 

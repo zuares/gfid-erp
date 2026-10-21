@@ -200,13 +200,13 @@
     @media (max-width: 720px) {
         .ditem-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
-    .drepeat-table-wrap { overflow-x: auto; }
-    .drepeat-panel { border-color: rgba(59,130,246,.24); }
+    .drepeat-table-wrap { width: 100%; max-width: 100%; overflow-x: hidden; }
+    .drepeat-panel { grid-column: 1 / -1; width: 100%; min-width: 0; border-color: rgba(59,130,246,.24); }
     .drepeat-panel .dpanel-head { background: linear-gradient(90deg, rgba(239,246,255,.9), rgba(248,250,252,.55)); border-bottom-color: rgba(59,130,246,.16); }
     .drepeat-panel .dpanel-head .t { color: #1e3a8a; }
     .drepeat-panel .dpanel-head .t .bi { color: #2563eb; }
     .drepeat-panel .dpanel-body { padding-left: .08rem; padding-right: .15rem; }
-    .drepeat-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .drepeat-table { display: table; width: 100%; min-width: 100%; max-width: 100%; box-sizing: border-box; border-collapse: collapse; table-layout: fixed; }
     .drepeat-table thead { background: rgba(239,246,255,.58); }
     .drepeat-table th { padding: .35rem .4rem; color: #475569; font-size: .62rem; font-weight: 750; text-align: left; border-bottom: 1px solid rgba(59,130,246,.18); white-space: normal; }
     .drepeat-table td { padding: .4rem .4rem; border-bottom: 1px solid var(--dsh-border); vertical-align: middle; font-size: .7rem; overflow-wrap: anywhere; }
