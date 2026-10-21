@@ -201,20 +201,20 @@
         .ditem-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     .drepeat-table-wrap { overflow-x: auto; }
-    .drepeat-table { width: 100%; border-collapse: collapse; min-width: 1600px; }
-    .drepeat-table th { padding: .45rem .55rem; color: var(--dsh-muted); font-size: .65rem; font-weight: 700; text-align: left; border-bottom: 1px solid var(--dsh-border); white-space: nowrap; }
-    .drepeat-table td { padding: .52rem .55rem; border-bottom: 1px solid var(--dsh-border); vertical-align: middle; font-size: .75rem; }
+    .drepeat-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .drepeat-table th { padding: .35rem .4rem; color: var(--dsh-muted); font-size: .62rem; font-weight: 700; text-align: left; border-bottom: 1px solid var(--dsh-border); white-space: normal; }
+    .drepeat-table td { padding: .4rem .4rem; border-bottom: 1px solid var(--dsh-border); vertical-align: middle; font-size: .7rem; overflow-wrap: anywhere; }
     .drepeat-table tr:last-child td { border-bottom: 0; }
     .drepeat-table .numeric { text-align: right; white-space: nowrap; }
     .drepeat-buyer { color: var(--text, #0f172a); font-weight: 650; }
     .drepeat-order { color: var(--dsh-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .69rem !important; }
     .drepeat-order-link { color: var(--dsh-accent); text-decoration: none; }
     .drepeat-order-link:hover { text-decoration: underline; }
-    .drepeat-order-meta { margin-top: .18rem; color: var(--dsh-muted); font-family: inherit; font-size: .62rem; white-space: nowrap; }
+    .drepeat-order-meta { margin-top: .18rem; color: var(--dsh-muted); font-family: inherit; font-size: .58rem; white-space: normal; }
     .drepeat-order-meta code { color: var(--text, #0f172a); font-family: inherit; font-size: inherit; }
     .drepeat-items { color: var(--dsh-muted); font-size: .7rem !important; }
     .drepeat-items code { color: var(--text, #0f172a); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .69rem; }
-    .drepeat-item-line { line-height: 1.35; white-space: nowrap; }
+    .drepeat-item-line { line-height: 1.3; white-space: normal; overflow-wrap: anywhere; }
     .drepeat-date { color: var(--dsh-muted); white-space: nowrap; font-size: .72rem !important; }
 
     /* ---------- Badge (mirip badge-status + dot) ---------- */

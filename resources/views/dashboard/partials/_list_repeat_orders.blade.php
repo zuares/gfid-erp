@@ -28,10 +28,7 @@
                             <th>Pesanan terakhir</th>
                             <th>SKU terakhir</th>
                             <th class="numeric">Qty terakhir</th>
-                            <th>Item scan shipment</th>
-                            <th class="numeric">Qty scan</th>
                             <th>Terakhir beli</th>
-                            <th class="numeric">Order sebelumnya</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -101,24 +98,9 @@
                                         —
                                     @endforelse
                                 </td>
-                                <td class="drepeat-items">
-                                    @forelse($row['scanned_items'] ?? [] as $item)
-                                        <div class="drepeat-item-line"><code>{{ $item['code'] ?: '—' }}</code></div>
-                                    @empty
-                                        —
-                                    @endforelse
-                                </td>
-                                <td class="numeric drepeat-items">
-                                    @forelse($row['scanned_items'] ?? [] as $item)
-                                        <div class="drepeat-item-line">{{ number_format((float) ($item['qty'] ?? 0), 0, ',', '.') }}</div>
-                                    @empty
-                                        —
-                                    @endforelse
-                                </td>
                                 <td class="drepeat-date">
                                     {{ !empty($row['last_purchased_at']) ? \Carbon\Carbon::parse($row['last_purchased_at'])->translatedFormat('d M Y') : '—' }}
                                 </td>
-                                <td class="numeric">{{ number_format((int) ($row['previous_order_count'] ?? 0), 0, ',', '.') }}</td>
                                 <td><span class="pill {{ $status[1] }}">{{ $status[0] }}</span></td>
                             </tr>
                         @endforeach
