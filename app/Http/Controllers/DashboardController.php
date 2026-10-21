@@ -50,7 +50,9 @@ class DashboardController extends Controller
     /** Cari resi pesanan terakhir tanpa menambah beban saat dashboard dirender. */
     public function resolveRepeatOrderAwb(MarketplaceOrder $order): JsonResponse
     {
-        $awb = $this->extractMarketplaceAwb($order->raw_json);
+        $awb = $this->findShipmentAwb($order)
+            ?: trim((string) $order->shipping_awb_no)
+            ?: $this->extractMarketplaceAwb($order->raw_json);
 
         if (!$awb && $order->store) {
             $orderSn = trim((string) ($order->channel_order_id ?: $order->external_order_id ?: $order->booking_sn));
@@ -60,6 +62,39 @@ class DashboardController extends Controller
         }
 
         return response()->json(['awb' => $awb ?: null]);
+    }
+
+    /** Resi yang sudah dipakai di modul Sales > Shipments untuk order ini. */
+    private function findShipmentAwb(MarketplaceOrder $order): ?string
+    {
+        if (
+            !Schema::hasTable('shipments')
+            || !Schema::hasTable('shipment_order_scans')
+            || !Schema::hasTable('order_fulfillments')
+        ) {
+            return null;
+        }
+
+        $references = collect([
+            $order->external_invoice_no,
+            $order->external_order_id,
+            $order->channel_order_id,
+            $order->booking_sn,
+        ])->map(fn ($value) => trim((string) $value))->filter()->unique()->values()->all();
+
+        return DB::table('shipments as shipment')
+            ->join('shipment_order_scans as sos', 'sos.shipment_id', '=', 'shipment.id')
+            ->leftJoin('order_fulfillments as fulfillment', 'fulfillment.id', '=', 'sos.fulfillment_id')
+            ->whereNotNull('shipment.awb')
+            ->where('shipment.awb', '<>', '')
+            ->where(function ($query) use ($order, $references) {
+                $query->where('fulfillment.marketplace_order_id', $order->id);
+                if ($references !== []) {
+                    $query->orWhereIn('sos.order_no', $references);
+                }
+            })
+            ->orderByDesc('shipment.id')
+            ->value('shipment.awb');
     }
 
     public function devRunAudit(): \Illuminate\Http\JsonResponse
@@ -704,6 +739,9 @@ class DashboardController extends Controller
             $lastOrderId = (clone $lastOrderBase)->select('previous.id');
             $lastOrderAwb = (clone $lastOrderBase)->select('previous.shipping_awb_no');
             $lastOrderRawJson = (clone $lastOrderBase)->select('previous.raw_json');
+            $lastOrderExternalInvoice = (clone $lastOrderBase)->select('previous.external_invoice_no');
+            $lastOrderExternalId = (clone $lastOrderBase)->select('previous.external_order_id');
+            $lastOrderChannelId = (clone $lastOrderBase)->select('previous.channel_order_id');
 
             $orders = $orders
                 ->select([
@@ -720,6 +758,9 @@ class DashboardController extends Controller
                 ->selectSub($lastOrderId, 'last_order_id')
                 ->selectSub($lastOrderAwb, 'last_order_awb')
                 ->selectSub($lastOrderRawJson, 'last_order_raw_json')
+                ->selectSub($lastOrderExternalInvoice, 'last_order_external_invoice_no')
+                ->selectSub($lastOrderExternalId, 'last_order_external_order_id')
+                ->selectSub($lastOrderChannelId, 'last_order_channel_order_id')
                 ->get();
 
             $itemsByOrder = [];
@@ -756,6 +797,7 @@ class DashboardController extends Controller
             }
 
             $scannedItemsByOrder = [];
+            $shipmentAwbByOrder = [];
             if (
                 $orders->isNotEmpty()
                 && Schema::hasTable('shipment_order_scans')
@@ -763,20 +805,43 @@ class DashboardController extends Controller
                 && Schema::hasTable('order_fulfillments')
                 && Schema::hasTable('items')
             ) {
-                $orderIds = $orders->pluck('id')->all();
+                $orderIds = $orders
+                    ->pluck('id')
+                    ->merge($orders->pluck('last_order_id'))
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
                 $orderReferenceMap = [];
                 $orderAwbMap = [];
                 foreach ($orders as $order) {
-                    foreach ([$order->external_invoice_no, $order->external_order_id, $order->channel_order_id] as $reference) {
-                        $reference = trim((string) $reference);
-                        if ($reference !== '') {
-                            $orderReferenceMap[$reference] = (int) $order->id;
+                    foreach ([
+                        [$order->id, $order->external_invoice_no, $order->external_order_id, $order->channel_order_id],
+                        [$order->last_order_id, $order->last_order_external_invoice_no, $order->last_order_external_order_id, $order->last_order_channel_order_id],
+                    ] as $orderReferences) {
+                        $mappedOrderId = (int) array_shift($orderReferences);
+                        if ($mappedOrderId < 1) {
+                            continue;
+                        }
+
+                        foreach ($orderReferences as $reference) {
+                            $reference = trim((string) $reference);
+                            if ($reference !== '') {
+                                $orderReferenceMap[$reference] = $mappedOrderId;
+                            }
                         }
                     }
 
-                    $awb = trim((string) $order->shipping_awb_no);
-                    if ($awb !== '') {
-                        $orderAwbMap[$awb] = (int) $order->id;
+                    foreach ([
+                        [$order->id, $order->shipping_awb_no],
+                        [$order->last_order_id, $order->last_order_awb],
+                        [$order->last_order_id, $this->extractMarketplaceAwb($order->last_order_raw_json)],
+                    ] as [$mappedOrderId, $awb]) {
+                        $mappedOrderId = (int) $mappedOrderId;
+                        $awb = trim((string) $awb);
+                        if ($mappedOrderId > 0 && $awb !== '') {
+                            $orderAwbMap[$awb] = $mappedOrderId;
+                        }
                     }
                 }
 
@@ -795,6 +860,7 @@ class DashboardController extends Controller
                             $query->orWhereIn('shipment.awb', array_keys($orderAwbMap));
                         }
                     })
+                    ->orderByDesc('shipment.id')
                     ->get([
                         'sl.shipment_id',
                         'fulfillment.marketplace_order_id', 'sos.order_no',
@@ -811,6 +877,11 @@ class DashboardController extends Controller
                         continue;
                     }
 
+                    $shipmentAwb = trim((string) $line->shipment_awb);
+                    if ($shipmentAwb !== '' && !isset($shipmentAwbByOrder[$orderId])) {
+                        $shipmentAwbByOrder[$orderId] = $shipmentAwb;
+                    }
+
                     $itemCode = trim((string) ($line->item_code ?: ($line->item_id ? 'ITEM-' . $line->item_id : 'Item tidak ditemukan')));
                     $scannedItemsByOrder[$orderId][$itemCode] = ($scannedItemsByOrder[$orderId][$itemCode] ?? 0) + (float) ($line->qty_scanned ?? 0);
                 }
@@ -820,13 +891,23 @@ class DashboardController extends Controller
                     ->all();
             }
 
-            return $orders->map(function ($row) use ($itemsByOrder, $scannedItemsByOrder) {
+            return $orders->map(function ($row) use ($itemsByOrder, $scannedItemsByOrder, $shipmentAwbByOrder) {
                 $data = (array) $row;
-                $data['items'] = $itemsByOrder[(int) $row->id] ?? [];
-                $data['last_items'] = $itemsByOrder[(int) ($row->last_order_id ?? 0)] ?? [];
-                $data['scanned_items'] = $scannedItemsByOrder[(int) $row->id] ?? [];
-                $data['last_order_awb'] = trim((string) ($data['last_order_awb'] ?? ''))
+                $currentOrderId = (int) $row->id;
+                $lastOrderId = (int) ($row->last_order_id ?? 0);
+                $data['items'] = $itemsByOrder[$currentOrderId] ?? [];
+                $data['last_items'] = $itemsByOrder[$lastOrderId] ?? [];
+                $data['scanned_items'] = $scannedItemsByOrder[$currentOrderId] ?? [];
+                $data['last_scanned_items'] = $scannedItemsByOrder[$lastOrderId] ?? [];
+                $data['last_order_awb'] = $shipmentAwbByOrder[$lastOrderId]
+                    ?? trim((string) ($data['last_order_awb'] ?? ''))
                     ?: ($this->extractMarketplaceAwb($data['last_order_raw_json'] ?? null) ?: null);
+                unset(
+                    $data['last_order_raw_json'],
+                    $data['last_order_external_invoice_no'],
+                    $data['last_order_external_order_id'],
+                    $data['last_order_channel_order_id'],
+                );
 
                 return $data;
             })->all();

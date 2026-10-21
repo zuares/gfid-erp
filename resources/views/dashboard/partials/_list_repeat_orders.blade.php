@@ -29,6 +29,8 @@
                             <th class="numeric">Qty terakhir</th>
                             <th>Item scan shipment</th>
                             <th class="numeric">Qty scan</th>
+                            <th>Item scan terakhir</th>
+                            <th class="numeric">Qty scan terakhir</th>
                             <th>Terakhir beli</th>
                             <th class="numeric">Order sebelumnya</th>
                             <th>Status</th>
@@ -97,6 +99,20 @@
                                 </td>
                                 <td class="numeric drepeat-items">
                                     @forelse($row['scanned_items'] ?? [] as $item)
+                                        <div class="drepeat-item-line">{{ number_format((float) ($item['qty'] ?? 0), 0, ',', '.') }}</div>
+                                    @empty
+                                        —
+                                    @endforelse
+                                </td>
+                                <td class="drepeat-items">
+                                    @forelse($row['last_scanned_items'] ?? [] as $item)
+                                        <div class="drepeat-item-line"><code>{{ $item['code'] ?: '—' }}</code></div>
+                                    @empty
+                                        —
+                                    @endforelse
+                                </td>
+                                <td class="numeric drepeat-items">
+                                    @forelse($row['last_scanned_items'] ?? [] as $item)
                                         <div class="drepeat-item-line">{{ number_format((float) ($item['qty'] ?? 0), 0, ',', '.') }}</div>
                                     @empty
                                         —
