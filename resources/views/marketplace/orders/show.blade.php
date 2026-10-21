@@ -1138,6 +1138,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         'last_order_id' => $buyerPurchaseHistory['last_order_id'] ?? null,
         'last_order_sn' => $buyerPurchaseHistory['last_order_sn'] ?? null,
         'last_order_status' => $buyerPurchaseHistory['last_order_status'] ?? null,
+        'last_order_items' => $buyerPurchaseHistory['last_order_items'] ?? [],
         'last_order_at_label' => $buyerLastPurchaseAt ? id_datetime($buyerLastPurchaseAt) : null,
     ];
 @endphp
@@ -1147,9 +1148,16 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
     window.showBuyerLastPurchase = function() {
         const history = window.BUYER_PURCHASE_HISTORY || {};
         const orderId = Number(history.last_order_id || 0);
+        const items = Array.isArray(history.last_order_items) ? history.last_order_items : [];
         const escapeHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (char) => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
         }[char]));
+        const formatPrice = (value) => Number(value) > 0
+            ? `Rp ${Number(value).toLocaleString('id-ID', { maximumFractionDigits: 0 })}`
+            : '—';
+        const itemsHtml = items.length
+            ? `<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden"><div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.75rem;padding:.45rem .65rem;background:#f8fafc;color:#64748b;font-size:.64rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase"><span>SKU Marketplace</span><span>Qty</span><span>Harga</span></div>${items.map((item) => `<div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:.75rem;padding:.6rem .65rem;border-top:1px solid #eef2f7;background:#fff;font-size:.76rem"><span style="min-width:0;color:#1e293b;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(item.sku || 'SKU tidak tersedia')}</span><strong style="color:#334155">${escapeHtml(item.qty || 1)}×</strong><strong style="color:#1e293b;white-space:nowrap">${formatPrice(item.price)}</strong></div>`).join('')}</div>`
+            : '<div style="font-size:.75rem;color:#94a3b8;padding:.55rem 0">Item produk tidak tersedia.</div>';
         const openOrder = () => {
             if (orderId > 0) window.location.href = `/marketplace/orders/${encodeURIComponent(orderId)}`;
         };
@@ -1170,6 +1178,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                     <div><div style="font-size:.68rem;color:#64748b">Waktu transaksi</div><strong style="font-size:.82rem;color:#1e293b">${escapeHtml(history.last_order_at_label || 'Belum ada data')}</strong></div>
                     <div><div style="font-size:.68rem;color:#64748b">Status</div><strong style="font-size:.82rem;color:#1e293b">${escapeHtml(history.last_order_status || '—')}</strong></div>
                 </div>
+                <div><div style="margin-bottom:.4rem;font-size:.68rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#64748b">Item yang dibeli</div>${itemsHtml}</div>
                 <div style="font-size:.75rem;color:#64748b">Pembelian ke-${escapeHtml(history.count || 0)} dari customer ini.</div>
             </div>`,
             width: 460,

@@ -212,6 +212,22 @@ class MarketplaceOrderController extends Controller
 
     private function buyerPurchaseHistoryForOrder(MarketplaceOrder $order, string $username, string $phone, string $name): array
     {
+        $formatItems = static function (?MarketplaceOrder $historyOrder): array {
+            if (! $historyOrder) {
+                return [];
+            }
+
+            return $historyOrder->items->map(fn (MarketplaceOrderItem $item): array => [
+                'qty' => (int) ($item->qty ?: 1),
+                'sku' => $item->model_sku ?: ($item->item_sku ?: $item->external_sku),
+                'price' => (float) collect([
+                    $item->price_after_discount,
+                    $item->price,
+                    $item->price_original,
+                ])->map(fn ($price): float => (float) $price)->first(fn (float $price): bool => $price > 0) ?: 0,
+            ])->values()->all();
+        };
+
         $query = MarketplaceOrder::query()
             ->where('store_id', $order->store_id)
             ->whereNotIn('order_status', ['CANCELLED', 'CANCELED'])
@@ -232,6 +248,7 @@ class MarketplaceOrderController extends Controller
                 'last_order_id' => $order->isCancelledOrder() ? null : $order->id,
                 'last_order_sn' => $order->isCancelledOrder() ? null : ($order->channel_order_id ?: $order->external_order_id),
                 'last_order_status' => $order->isCancelledOrder() ? null : ($order->order_status ?: $order->status),
+                'last_order_items' => $order->isCancelledOrder() ? [] : $formatItems($order),
             ];
         }
 
@@ -240,6 +257,7 @@ class MarketplaceOrderController extends Controller
             $count = max(1, $count);
         }
         $lastOrder = (clone $query)
+            ->with(['items.internalItem:id,code,name'])
             ->orderByRaw('COALESCE(ordered_at, order_date) DESC')
             ->orderByDesc('id')
             ->first([
@@ -261,6 +279,7 @@ class MarketplaceOrderController extends Controller
                 ? ($lastOrder->channel_order_id ?: $lastOrder->external_order_id)
                 : ($order->isCancelledOrder() ? null : ($order->channel_order_id ?: $order->external_order_id)),
             'last_order_status' => $lastOrder?->order_status ?: ($lastOrder?->status ?: ($order->isCancelledOrder() ? null : ($order->order_status ?: $order->status))),
+            'last_order_items' => $formatItems($lastOrder),
         ];
     }
 

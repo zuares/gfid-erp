@@ -124,12 +124,22 @@ class MarketplaceOrdersRepeatBuyerTest extends TestCase
             'order_date' => now()->subDay(),
         ]);
         $current = $this->createOrder('HISTORY-CURRENT', 'READY_TO_SHIP', 'buyer-history');
+        MarketplaceOrderItem::create([
+            'marketplace_order_id' => $current->id,
+            'order_id' => $current->id,
+            'model_sku' => 'HISTORY-SKU',
+            'item_name' => 'Produk History',
+            'qty' => 2,
+            'price_after_discount' => 12500,
+        ]);
 
         $response = $this->get(route('marketplace.orders.show', $current));
 
         $response->assertOk()
             ->assertSee('window.showBuyerLastPurchase', false)
             ->assertSee('HISTORY-CURRENT')
+            ->assertSee('HISTORY-SKU')
+            ->assertSee('"price":12500', false)
             ->assertSee('Pembelian Terakhir', false);
     }
 
