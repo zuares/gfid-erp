@@ -87,6 +87,8 @@
         .ic-list-panel .gf-panel-body { padding: 0; }
         .ic-panel .gf-panel-title { color: var(--ic-text); font-size: .88rem; }
         .ic-panel .gf-subtext { color: var(--ic-muted); margin-top: .16rem; }
+        .ic-panel-meta { display: inline-flex; align-items: center; gap: .38rem; min-height: 28px; padding: .3rem .55rem; border: 1px solid var(--ic-line); border-radius: 999px; color: var(--ic-muted); background: var(--ic-soft); font-size: .67rem; font-weight: 800; white-space: nowrap; }
+        .ic-panel-meta i { color: var(--ic-brand-strong); }
         .ic-filter { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(150px, .28fr) auto; align-items: end; gap: .7rem; }
         .ic-field { display: grid; gap: .3rem; min-width: 0; }
         .ic-label { color: var(--ic-muted); font-size: .68rem; font-weight: 850; letter-spacing: .035em; text-transform: uppercase; }
@@ -166,6 +168,7 @@
         @media (max-width: 1050px) { .ic-filter { grid-template-columns: minmax(180px, 1fr) minmax(130px, .4fr); } .ic-filter-actions { grid-column: 1 / -1; } }
         @media (max-width: 900px) { .ic-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 767px) { .ic-page .gf-master-header { padding: 1rem; } .ic-page .gf-master-header-layout, .ic-actions, .ic-actions .ic-btn { width: 100%; } .ic-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); } .ic-actions .ic-btn { min-height: 44px; } .ic-filter { grid-template-columns: 1fr; } .ic-filter-actions { display: grid; grid-template-columns: 1fr 1fr; width: 100%; } .ic-filter-actions .ic-btn { width: 100%; } .ic-footer { align-items: flex-start; flex-direction: column; } .ic-footer > :last-child { width: 100%; overflow-x: auto; } .ic-modal-grid { grid-template-columns: 1fr; } .ic-modal-field-full { grid-column: auto; } #itemFormModal .form-control, #itemFormModal .form-select, #categoryModal .form-control, #categoryModal .form-select { min-height: 44px; } .ic-modal .modal-dialog { margin: .5rem; } .ic-modal .modal-footer { align-items: stretch; flex-wrap: wrap; } .ic-modal .modal-footer .ic-modal-help { flex-basis: 100%; min-height: 32px; } .ic-modal .modal-footer .ic-btn { flex: 1 1 0; min-height: 44px; } }
+        @media (max-width: 767px) { .ic-table-scroll-hint { display: flex; padding: .65rem .85rem; border-bottom: 1px solid var(--ic-line); background: color-mix(in srgb, var(--ic-soft) 70%, var(--ic-surface) 30%); } .ic-table { min-width: 760px; } .ic-actions-cell .ic-btn, .ic-icon-btn { min-height: 44px; } .ic-icon-btn { width: 44px; height: 44px; } }
         @media (max-width: 430px) { .ic-summary { gap: .55rem; } .ic-stat { min-height: 98px; padding: .78rem; } .ic-stat-value { font-size: 1.08rem; } .ic-stat-label { font-size: .61rem; } .ic-actions { grid-template-columns: 1fr; } }
         /* Final component contract: shared controls and modal rhythm. */
         .ic-btn { appearance: none; cursor: pointer; min-height: 40px; padding: .58rem .9rem; border-color: var(--ic-line); border-radius: 10px; font-size: .73rem; font-weight: 780; letter-spacing: -.01em; box-shadow: 0 1px 2px rgba(16,24,40,.03); }
@@ -176,9 +179,22 @@
         .ic-btn-primary:hover, .ic-btn-primary:focus-visible { color: #fff; border-color: var(--ic-brand-strong); background: var(--ic-brand-strong); box-shadow: 0 9px 18px rgba(65,66,187,.24); }
         .ic-actions { align-items: center; gap: .55rem; }
         .ic-actions .ic-btn { white-space: nowrap; }
+        .ic-modal { --ic-text: var(--gf-color-content, #101828); --ic-muted: var(--gf-color-muted, #667085); --ic-surface: var(--gf-color-surface, #fff); --ic-soft: var(--gf-color-surface-muted, #f2f4f7); --ic-line: var(--gf-color-line, #e4e7ec); --ic-brand: var(--gf-color-brand, #5b5ce2); --ic-brand-strong: var(--gf-color-brand-strong, #4142bb); }
+        .ic-table-wrap { position: relative; isolation: isolate; overflow: auto; }
+        .ic-table { border-collapse: separate; border-spacing: 0; }
+        .ic-table thead th:last-child, .ic-table tbody td:last-child { position: sticky; right: 0; z-index: 4; background: var(--ic-surface); background-clip: padding-box; box-shadow: -10px 0 18px rgba(16,24,40,.07); }
+        .ic-table thead th:last-child { z-index: 6; background: color-mix(in srgb, var(--ic-soft) 72%, var(--ic-surface) 28%); }
+        .ic-table tbody tr:hover td:last-child, .ic-table tbody tr:focus-within td:last-child { background: color-mix(in srgb, var(--ic-brand) 4%, var(--ic-surface)); }
+        .ic-table-scroll-hint { display: none; align-items: center; gap: .35rem; color: var(--ic-muted); font-size: .67rem; font-weight: 700; }
+        .ic-table-scroll-hint i { color: var(--ic-brand-strong); }
+        .ic-actions-cell .ic-btn { min-width: 74px; }
+        .ic-icon-btn { width: 36px; height: 36px; }
+        body[data-theme="dark"] .ic-table thead th:last-child, body[data-theme="dark"] .ic-table tbody td:last-child { background: #111827; box-shadow: -10px 0 18px rgba(0,0,0,.24); }
+        body[data-theme="dark"] .ic-table thead th:last-child { background: #132a45; }
+        body[data-theme="dark"] .ic-table tbody tr:hover td:last-child, body[data-theme="dark"] .ic-table tbody tr:focus-within td:last-child { background: #172033; }
         .ic-modal .modal-dialog { max-width: 640px; margin-block: .75rem; }
         #itemFormModal .modal-dialog { max-width: 720px; }
-        .ic-modal .modal-content { border-radius: 18px; box-shadow: 0 24px 56px rgba(48,49,125,.16); }
+        .ic-modal .modal-content { overflow: hidden; border-radius: 18px; background: var(--ic-surface, #fff) !important; opacity: 1; box-shadow: 0 24px 56px rgba(48,49,125,.16); }
         .ic-modal .modal-header { display: grid; grid-template-columns: 36px minmax(0, 1fr) 40px; align-items: start; gap: .7rem; padding: 1rem 1.15rem; }
         .ic-modal-heading { display: contents; }
         .ic-modal-icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 11px; color: var(--ic-brand-strong); background: #eeefff; font-size: .88rem; }
@@ -186,8 +202,13 @@
         .ic-modal .modal-title { margin-top: .15rem; font-size: 1.02rem; letter-spacing: -.03em; }
         .ic-modal .modal-header .ic-modal-help { margin-top: .25rem; }
         .ic-modal .btn-close { grid-column: 3; width: 40px; height: 40px; margin-top: -.15rem; padding: .75rem; border-radius: 9px; }
-        .ic-modal .modal-body { padding: 1.1rem 1.15rem 1.2rem; background: color-mix(in srgb, var(--ic-soft) 28%, var(--ic-surface)); }
+        .ic-modal .modal-body { padding: 1.1rem 1.15rem 1.2rem; background: var(--ic-surface, #fff) !important; }
         .ic-modal-grid { gap: .9rem; }
+        .ic-modal-section { display: grid; gap: .9rem; padding: .85rem; border: 1px solid var(--ic-line); border-radius: 14px; background: color-mix(in srgb, var(--ic-soft) 42%, var(--ic-surface)); }
+        .ic-modal-section-head { display: flex; align-items: flex-start; gap: .55rem; }
+        .ic-modal-section-icon { display: grid; flex: 0 0 auto; width: 28px; height: 28px; place-items: center; border-radius: 8px; color: var(--ic-brand-strong); background: #eeefff; font-size: .75rem; }
+        .ic-modal-section-title { color: var(--ic-text); font-size: .75rem; font-weight: 850; }
+        .ic-modal-section-copy { margin: .12rem 0 0; color: var(--ic-muted); font-size: .67rem; line-height: 1.45; }
         .ic-modal-field { min-width: 0; }
         .ic-modal .ic-label { margin-bottom: .05rem; }
         .ic-modal .ic-control { min-height: 42px; border-color: #d0d5dd; border-radius: 10px; background: var(--ic-surface); font-size: .76rem; }
@@ -195,16 +216,18 @@
         .ic-modal .form-check { display: flex; align-items: center; gap: .45rem; min-height: 42px; padding: .65rem .75rem; border: 1px solid var(--ic-line); border-radius: 10px; background: var(--ic-surface); }
         .ic-modal .form-check-input { margin: 0; }
         .ic-modal .form-check-label { line-height: 1.35; }
-        .ic-modal .modal-footer { display: flex; align-items: center; gap: .55rem; padding: .8rem 1.15rem; background: var(--ic-surface); }
+        .ic-modal .modal-footer { display: flex; align-items: center; gap: .55rem; padding: .8rem 1.15rem; background: var(--ic-surface, #fff) !important; }
         .ic-modal .modal-footer .ic-btn { min-height: 40px; }
         .ic-modal .modal-footer .ic-modal-help { color: var(--ic-muted); font-weight: 650; text-decoration: none; }
         .ic-modal .modal-footer .ic-modal-help:hover { color: var(--ic-brand-strong); }
-        body[data-theme="dark"] .ic-modal .modal-body { background: #0f172a; }
-        body[data-theme="dark"] .ic-modal .modal-header, body[data-theme="dark"] .ic-modal .modal-footer { background: #111827; }
+        body[data-theme="dark"] .ic-modal .modal-content, body[data-theme="dark"] .ic-modal .modal-body { background: #0f172a !important; }
+        body[data-theme="dark"] .ic-modal .modal-header, body[data-theme="dark"] .ic-modal .modal-footer { background: #111827 !important; }
         body[data-theme="dark"] .ic-modal .modal-content, body[data-theme="dark"] .ic-modal .form-check { border-color: #334155; }
         body[data-theme="dark"] .ic-modal .ic-control { border-color: #475569; background: #0f172a; color: #f8fafc; }
         body[data-theme="dark"] .ic-modal .ic-control::placeholder { color: #94a3b8; }
         body[data-theme="dark"] .ic-modal .form-check { background: #111827; }
+        body[data-theme="dark"] .ic-modal-section { border-color: #334155; background: #111827; }
+        body[data-theme="dark"] .ic-modal-section-icon { color: #c4b5fd; background: rgba(91,92,226,.22); }
         @media (prefers-reduced-motion: reduce) { .ic-page *, .ic-page *::before, .ic-page *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; } }
     </style>
 @endpush
@@ -247,7 +270,10 @@
             </form>
         </x-gf.panel>
 
-        <x-gf.panel class="ic-panel ic-list-panel" :flush="true" title="{{ $isItemMode ? 'Item dalam kelompok' : 'Daftar kategori' }}" subtitle="{{ $isItemMode ? 'Review item yang masuk ke kelompok ' . $activeKindLabel . '.' : 'Kelola kategori dan pastikan referensinya tetap aman.' }}">
+        <x-gf.panel class="ic-panel ic-list-panel" :flush="true" title="{{ $isItemMode ? 'Item dalam kelompok' : 'Daftar kategori' }}" subtitle="{{ $isItemMode ? 'Review item yang masuk ke kelompok ' . $activeKindLabel . '.' : 'Kelola kategori, pantau pemakaian, dan jaga referensi master data tetap aman.' }}">
+            <x-slot:actions>
+                <span class="ic-panel-meta"><i class="bi {{ $isItemMode ? 'bi-box-seam' : 'bi-tags' }}" aria-hidden="true"></i><span>{{ $fmt($isItemMode ? $kindItems->total() : $categories->total()) }} {{ $isItemMode ? 'item' : 'kategori' }}</span></span>
+            </x-slot:actions>
             <nav class="ic-tabs" aria-label="Filter kelompok item">
                 <a class="ic-tab {{ $activeKind === '' ? 'is-active' : '' }}" href="{{ $tabUrl(null) }}" @if($activeKind === '') aria-current="page" @endif><i class="bi bi-grid" aria-hidden="true"></i><span>Semua kategori</span><span class="ic-tab-count">{{ $fmt($totalCategories) }}</span></a>
                 @foreach ($kindLabels as $key => $label)
@@ -259,7 +285,7 @@
                 @if ($kindItems->isEmpty())
                     <div class="ic-empty"><div class="ic-empty-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></div><div class="ic-empty-title">Belum ada item di kelompok ini</div><p class="ic-empty-text">Ubah kata kunci atau cek kembali klasifikasi item di Master item.</p><div class="d-flex flex-wrap justify-content-center gap-2">@if(! $isAdminRole)<button class="ic-btn ic-btn-primary ic-btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#itemFormModal" id="btnEmptyAddItem"><i class="bi bi-plus-lg" aria-hidden="true"></i><span>Tambah item</span></button>@endif<a class="ic-btn ic-btn-sm" href="{{ route('master.items.index') }}"><i class="bi bi-arrow-right" aria-hidden="true"></i><span>Buka Master item</span></a></div></div>
                 @else
-                    <div class="ic-table-wrap"><table class="table align-middle ic-table"><thead><tr><th class="text-center">No.</th><th>Kode item</th><th>Nama item</th><th>Kategori</th><th>Tipe</th><th>Produksi</th><th>Satuan</th><th class="text-center">Barcode</th><th class="text-end">HPP</th><th>Status</th><th class="text-end">Aksi</th></tr></thead><tbody>
+                    <div class="ic-table-wrap"><div class="ic-table-scroll-hint" role="note"><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span>Geser tabel untuk melihat aksi</span></div><table class="table align-middle ic-table"><thead><tr><th class="text-center">No.</th><th>Kode item</th><th>Nama item</th><th>Kategori</th><th>Tipe</th><th>Produksi</th><th>Satuan</th><th class="text-center">Barcode</th><th class="text-end">HPP</th><th>Status</th><th class="text-end">Aksi</th></tr></thead><tbody>
                         @foreach ($kindItems as $item)
                             @php $hpp = (float) ($item->active_unit_cost ?? 0); @endphp
                             <tr><td class="text-center ic-muted">{{ $kindItems->firstItem() + $loop->index }}</td><td><span class="ic-code">{{ $item->code }}</span></td><td><div class="ic-name">{{ $item->name }}</div><div class="ic-muted">{{ $item->active ? 'Aktif di master item' : 'Nonaktif di master item' }}</div></td><td>@if($item->category)<div class="ic-code">{{ $item->category->code }}</div><div class="ic-muted">{{ $item->category->name }}</div>@else<span class="ic-muted">-</span>@endif</td><td><span class="ic-muted">{{ $typeLabels[$item->type] ?? $item->type }}</span></td><td>@if(in_array($item->type, ['finished_good', 'wip'], true))<div class="ic-name">{{ $item->supply_mode_label }}</div><div class="ic-muted">Default: {{ $item->default_supply_source_label }}</div>@else<span class="ic-muted">-</span>@endif</td><td><span class="ic-muted">{{ $item->unit }}</span></td><td class="text-center">@if($item->barcodes_count > 0)<span class="ic-pill ic-pill-active">{{ $fmt($item->barcodes_count) }}</span>@else<span class="ic-pill ic-pill-warning">0</span>@endif</td><td class="text-end">@if($hpp > 0)<span class="fw-semibold">Rp {{ $fmt($hpp) }}</span>@else<span class="ic-muted">Kosong</span>@endif</td><td>@if($item->active)<span class="ic-pill ic-pill-active">Aktif</span>@else<span class="ic-pill ic-pill-inactive">Nonaktif</span>@endif</td><td class="text-end"><button class="ic-btn ic-btn-sm btn-edit-item" type="button" data-bs-toggle="modal" data-bs-target="#itemFormModal" data-item-edit-url="{{ route('master.items.update', $item) }}" data-item-edit-full-url="{{ route('master.items.edit', $item) }}" data-item-edit-code="{{ $item->code }}" data-item-edit-name="{{ $item->name }}" data-item-edit-sku="{{ $item->sku }}" data-item-edit-type="{{ $item->type }}" data-item-edit-category="{{ $item->item_category_id }}" data-item-edit-stock-unit="{{ $item->stock_unit ?: $item->unit }}" data-item-edit-purchase-unit="{{ $item->purchase_unit ?: $item->unit }}" data-item-edit-conversion="{{ $item->purchase_conversion_factor ?: 1 }}" data-item-edit-production-source="{{ $item->production_source }}" data-item-edit-can-buy="{{ $item->can_buy ? 1 : 0 }}" data-item-edit-can-make="{{ $item->can_make ? 1 : 0 }}" data-item-edit-default-source="{{ $item->default_supply_source }}" data-item-edit-active="{{ $item->active ? 1 : 0 }}" data-item-edit-type-option="{{ $item->item_type_option_id }}" data-item-edit-allocation="{{ $item->default_allocation ?: 'hpp' }}" data-item-edit-treatment="{{ $item->purchase_treatment_id }}" data-item-edit-expense-account="{{ $item->default_expense_account_id }}"><span>Edit</span><i class="bi bi-pencil-square" aria-hidden="true"></i></button></td></tr>
@@ -269,7 +295,7 @@
             @elseif ($categories->isEmpty())
                 <div class="ic-empty"><div class="ic-empty-icon"><i class="bi bi-collection" aria-hidden="true"></i></div><div class="ic-empty-title">Kategori tidak ditemukan</div><p class="ic-empty-text">Ubah filter atau buat kategori baru untuk melanjutkan pengelolaan master item.</p><button class="ic-btn ic-btn-primary ic-btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#categoryModal" id="btnEmptyAddCategory"><i class="bi bi-plus-lg" aria-hidden="true"></i><span>Tambah kategori</span></button></div>
             @else
-                <div class="ic-table-wrap"><table class="table align-middle ic-table"><thead><tr><th class="text-center">No.</th><th>Kode</th><th>Nama kategori</th><th>Kelompok</th><th class="text-center">Item</th><th>Referensi</th><th>Status</th><th class="text-end">Aksi</th></tr></thead><tbody>
+                <div class="ic-table-wrap"><div class="ic-table-scroll-hint" role="note"><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span>Geser tabel untuk melihat aksi</span></div><table class="table align-middle ic-table"><thead><tr><th class="text-center">No.</th><th>Kode</th><th>Nama kategori</th><th>Kelompok</th><th class="text-center">Item</th><th>Referensi</th><th>Status</th><th class="text-end">Aksi</th></tr></thead><tbody>
                     @foreach ($categories as $cat)
                         @php $tone = $kindTone[$cat->kind] ?? 'muted'; $referenceCount = (int) $cat->items_count + (int) $cat->piece_rates_count + (int) $cat->piecework_payroll_lines_count + (int) $cat->cutting_job_bundles_count + (int) $cat->supplier_category_mapping_count; @endphp
                         <tr><td class="text-center ic-muted">{{ $categories->firstItem() + $loop->index }}</td><td><span class="ic-code">{{ $cat->code }}</span></td><td><div class="ic-name">{{ $cat->name }}</div><div class="ic-muted">{{ $cat->items_count > 0 ? 'Dipakai di master item' : 'Belum dipakai item' }}</div></td><td><span class="ic-kind {{ $tone === 'blue' ? 'ic-kind-blue' : ($tone === 'amber' ? 'ic-kind-amber' : ($tone === 'green' ? 'ic-kind-green' : '')) }}">{{ $cat->kind_label }}</span></td><td class="text-center">@if($cat->items_count > 0)<span class="ic-pill ic-pill-active">{{ $fmt($cat->items_count) }} item</span>@else<span class="ic-pill ic-pill-warning">0 item</span>@endif</td><td><span class="ic-muted">{{ $referenceCount > 0 ? $fmt($referenceCount) . ' referensi' : 'Belum ada referensi' }}</span></td><td>@if($cat->active)<span class="ic-pill ic-pill-active">Aktif</span>@else<span class="ic-pill ic-pill-inactive">Nonaktif</span>@endif</td><td><div class="ic-actions-cell"><button class="ic-btn ic-btn-sm btn-edit-category" type="button" data-id="{{ $cat->id }}" data-code="{{ $cat->code }}" data-name="{{ $cat->name }}" data-kind="{{ $cat->kind }}" data-active="{{ $cat->active ? 1 : 0 }}" data-bs-toggle="modal" data-bs-target="#categoryModal"><i class="bi bi-pencil-square" aria-hidden="true"></i><span>Edit</span></button>@if($referenceCount === 0)<form method="POST" action="{{ route('master.item_categories.destroy', $cat) }}" data-confirm-delete data-category-name="{{ $cat->name }}">@csrf @method('DELETE')<button class="ic-icon-btn" type="submit" aria-label="Hapus kategori {{ $cat->name }}" title="Hapus kategori"><i class="bi bi-trash3" aria-hidden="true"></i></button></form>@else<button class="ic-icon-btn" type="button" disabled aria-label="Kategori {{ $cat->name }} tidak dapat dihapus" title="Masih memiliki {{ $referenceCount }} referensi"><i class="bi bi-trash3" aria-hidden="true"></i></button>@endif</div></td></tr>
@@ -299,8 +325,8 @@
         </form></div>
     </div>
 
-    <div class="modal fade ic-modal" id="categoryModal" tabindex="-1" aria-labelledby="categoryModalTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg"><form method="POST" id="categoryForm" class="modal-content">@csrf<input type="hidden" name="_method" id="categoryMethod" value="POST"><div class="modal-header"><span class="ic-modal-icon" aria-hidden="true"><i class="bi bi-tags"></i></span><div><div class="ic-modal-kicker">Master data</div><h2 class="modal-title" id="categoryModalTitle">Tambah kategori</h2><div class="ic-modal-help">Kode digunakan sebagai identitas singkat di laporan dan transaksi.</div></div><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Tutup"></button></div><div class="modal-body"><div class="ic-modal-grid"><div class="ic-modal-field"><label class="ic-label" for="categoryCode">Kode kategori <span aria-hidden="true">*</span></label><input class="form-control ic-control @error('code') is-invalid @enderror" type="text" name="code" id="categoryCode" maxlength="50" value="{{ old('code') }}" required>@error('code')<div class="invalid-feedback">{{ $message }}</div>@enderror</div><div class="ic-modal-field"><label class="ic-label" for="categoryName">Nama kategori <span aria-hidden="true">*</span></label><input class="form-control ic-control @error('name') is-invalid @enderror" type="text" name="name" id="categoryName" maxlength="190" value="{{ old('name') }}" required>@error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror</div><div class="ic-modal-field ic-modal-field-full"><label class="ic-label" for="categoryKind">Kelompok <span aria-hidden="true">*</span></label><select class="form-select ic-control @error('kind') is-invalid @enderror" name="kind" id="categoryKind" required>@foreach($kindLabels as $key => $label)<option value="{{ $key }}" @selected(old('kind', $activeKind ?: 'product') === $key)>{{ $label }}</option>@endforeach</select>@error('kind')<div class="invalid-feedback">{{ $message }}</div>@enderror</div><div class="form-check ic-modal-field-full"><input type="hidden" name="active" value="0"><input class="form-check-input" type="checkbox" name="active" value="1" id="categoryActive" @checked(old('active', '1') === '1')><label class="form-check-label" for="categoryActive">Kategori aktif dan tersedia untuk dipilih pada master item</label></div></div></div><div class="modal-footer"><button class="ic-btn" type="button" data-bs-dismiss="modal">Batal</button><button class="ic-btn ic-btn-primary" type="submit"><i class="bi bi-check2" aria-hidden="true"></i><span>Simpan kategori</span></button></div></form></div>
+    <div class="modal fade ic-modal" id="categoryModal" tabindex="-1" aria-labelledby="categoryModalTitle" aria-describedby="categoryModalDescription" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg"><form method="POST" id="categoryForm" class="modal-content">@csrf<input type="hidden" name="_method" id="categoryMethod" value="POST"><div class="modal-header"><span class="ic-modal-icon" aria-hidden="true"><i class="bi bi-tags"></i></span><div><div class="ic-modal-kicker">Master data</div><h2 class="modal-title" id="categoryModalTitle">Tambah kategori</h2><div class="ic-modal-help" id="categoryModalDescription">Kode digunakan sebagai identitas singkat di laporan dan transaksi.</div></div><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Tutup"></button></div><div class="modal-body"><div class="ic-modal-section"><div class="ic-modal-section-head"><span class="ic-modal-section-icon" aria-hidden="true"><i class="bi bi-card-checklist"></i></span><div><div class="ic-modal-section-title">Identitas kategori</div><p class="ic-modal-section-copy">Gunakan kode dan nama yang mudah dikenali di laporan, transaksi, dan master item.</p></div></div><div class="ic-modal-grid"><div class="ic-modal-field"><label class="ic-label" for="categoryCode">Kode kategori <span aria-hidden="true">*</span></label><input class="form-control ic-control @error('code') is-invalid @enderror" type="text" name="code" id="categoryCode" maxlength="50" value="{{ old('code') }}" required>@error('code')<div class="invalid-feedback">{{ $message }}</div>@enderror</div><div class="ic-modal-field"><label class="ic-label" for="categoryName">Nama kategori <span aria-hidden="true">*</span></label><input class="form-control ic-control @error('name') is-invalid @enderror" type="text" name="name" id="categoryName" maxlength="190" value="{{ old('name') }}" required>@error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror</div><div class="ic-modal-field ic-modal-field-full"><label class="ic-label" for="categoryKind">Kelompok <span aria-hidden="true">*</span></label><select class="form-select ic-control @error('kind') is-invalid @enderror" name="kind" id="categoryKind" required>@foreach($kindLabels as $key => $label)<option value="{{ $key }}" @selected(old('kind', $activeKind ?: 'product') === $key)>{{ $label }}</option>@endforeach</select>@error('kind')<div class="invalid-feedback">{{ $message }}</div>@enderror</div><div class="form-check ic-modal-field-full"><input type="hidden" name="active" value="0"><input class="form-check-input" type="checkbox" name="active" value="1" id="categoryActive" @checked(old('active', '1') === '1')><label class="form-check-label" for="categoryActive">Kategori aktif dan tersedia untuk dipilih pada master item</label></div></div></div></div><div class="modal-footer"><button class="ic-btn" type="button" data-bs-dismiss="modal">Batal</button><button class="ic-btn ic-btn-primary" type="submit" id="categoryFormSubmit"><i class="bi bi-check2" aria-hidden="true"></i><span>Simpan kategori</span></button></div></form></div>
     </div>
 @endsection
 
@@ -311,6 +337,8 @@
             const searchClear = document.querySelector('[data-category-search-clear]');
             const form = document.getElementById('categoryForm');
             const title = document.getElementById('categoryModalTitle');
+            const description = document.getElementById('categoryModalDescription');
+            const submit = document.getElementById('categoryFormSubmit');
             const methodInput = document.getElementById('categoryMethod');
             const codeInput = document.getElementById('categoryCode');
             const nameInput = document.getElementById('categoryName');
@@ -450,6 +478,9 @@
                 form.action = storeUrl;
                 methodInput.value = 'POST';
                 title.textContent = 'Tambah kategori';
+                description.textContent = 'Tambahkan kategori baru untuk mengelompokkan item secara konsisten.';
+                submit.disabled = false;
+                submit.querySelector('span').textContent = 'Tambah kategori';
                 codeInput.value = '';
                 nameInput.value = '';
                 kindInput.value = activeKind;
@@ -465,11 +496,20 @@
                     form.action = updateUrlBase + '/' + button.dataset.id;
                     methodInput.value = 'PUT';
                     title.textContent = 'Edit kategori';
+                    description.textContent = 'Perbarui identitas kategori tanpa mengubah referensi item yang sudah ada.';
+                    submit.disabled = false;
+                    submit.querySelector('span').textContent = 'Simpan perubahan';
                     codeInput.value = button.dataset.code || '';
                     nameInput.value = button.dataset.name || '';
                     kindInput.value = button.dataset.kind || 'product';
                     activeInput.checked = button.dataset.active === '1';
                 });
+            });
+
+            form?.addEventListener('submit', function () {
+                if (!submit) return;
+                submit.disabled = true;
+                submit.querySelector('span').textContent = 'Menyimpan…';
             });
 
             document.querySelectorAll('[data-confirm-delete]').forEach(function (deleteForm) {

@@ -792,28 +792,22 @@
     .item-page .item-row-actions .action-label { display: none !important; }
     .item-page .item-row-actions [data-item-edit],
     .item-page .item-mobile-card-actions [data-item-edit] {
-        --bs-btn-color: #fff;
-        --bs-btn-hover-color: #fff;
-        --bs-btn-active-color: #fff;
-        color: #fff !important;
-        border-color: var(--gf-color-brand) !important;
-        background: var(--gf-color-brand) !important;
-        box-shadow: 0 7px 14px rgba(91,92,226,.2) !important;
+        color: var(--gf-brand-strong) !important;
+        border-color: #dfe1ff !important;
+        background: #f8f8ff !important;
+        box-shadow: none !important;
     }
     .item-page .item-row-actions [data-item-edit] i,
     .item-page .item-row-actions [data-item-edit] .action-label,
-    .item-page .item-mobile-card-actions [data-item-edit] i {
-        color: #fff !important;
-        -webkit-text-fill-color: #fff !important;
-    }
+    .item-page .item-mobile-card-actions [data-item-edit] i { color: inherit !important; }
     .item-page .item-row-actions [data-item-edit]:hover,
     .item-page .item-row-actions [data-item-edit]:focus-visible,
     .item-page .item-mobile-card-actions [data-item-edit]:hover,
     .item-page .item-mobile-card-actions [data-item-edit]:focus-visible {
         color: #fff !important;
-        border-color: var(--gf-color-brand-strong) !important;
-        background: var(--gf-color-brand-strong) !important;
-        box-shadow: 0 9px 18px rgba(65,66,187,.24) !important;
+        border-color: var(--gf-brand) !important;
+        background: var(--gf-brand) !important;
+        box-shadow: 0 4px 10px rgba(91,92,226,.16) !important;
     }
     @media (max-width: 760px) {
         .item-page .item-mobile-card-actions .btn {
@@ -856,6 +850,12 @@
     body[data-theme="dark"] .item-page .item-table thead th:last-child { background-color: #0f172a !important; }
     body[data-theme="dark"] .item-page .item-table tbody tr:hover td:last-child,
     body[data-theme="dark"] .item-page .item-table tbody tr:focus-within td:last-child { background-color: #172033 !important; }
+    body[data-theme="dark"] .item-page .item-row-actions [data-item-edit],
+    body[data-theme="dark"] .item-page .item-mobile-card-actions [data-item-edit] { color: #c7d2fe !important; border-color: #4338ca !important; background: #1e1b4b !important; }
+    body[data-theme="dark"] .item-page .item-row-actions [data-item-edit]:hover,
+    body[data-theme="dark"] .item-page .item-row-actions [data-item-edit]:focus-visible,
+    body[data-theme="dark"] .item-page .item-mobile-card-actions [data-item-edit]:hover,
+    body[data-theme="dark"] .item-page .item-mobile-card-actions [data-item-edit]:focus-visible { color: #fff !important; border-color: #6366f1 !important; background: #4f46e5 !important; }
     /* Width contract: the desktop filter has two search tracks, four selects, and one action track. */
     @media (min-width: 1101px) {
         .item-page > .item-card { width: 100%; min-width: 0; }
