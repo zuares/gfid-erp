@@ -62,7 +62,7 @@
 .sd-order-item-code{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:500;color:#334155}
 .sd-order-item-name{color:#64748b;font-size:.76rem;margin-top:.06rem}
 .sd-order-item-qty{color:#334155;font-size:.8rem;font-weight:900}
-.sd-marketplace-detail{margin:.7rem 0 0 2.05rem;padding:.7rem .75rem;border:1px solid rgba(37,99,235,.16);border-radius:8px;background:rgba(239,246,255,.55)}
+.sd-marketplace-detail{margin:0;padding:.65rem .75rem .75rem;border:0;border-top:1px solid #e2e8f0;border-radius:0;background:transparent}
 .sd-marketplace-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.6rem;flex-wrap:wrap;margin-bottom:.55rem}
 .sd-marketplace-title{font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:#1e40af}
 .sd-marketplace-meta{display:flex;gap:.4rem .75rem;flex-wrap:wrap;margin-top:.15rem;color:#64748b;font-size:.72rem}
@@ -75,7 +75,7 @@
 .sd-marketplace-table .sd-marketplace-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#0f172a}
 .sd-marketplace-table .sd-marketplace-number{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .sd-marketplace-short{color:#b91c1c;font-weight:900}.sd-marketplace-ok{color:#15803d;font-weight:900}
-body[data-theme="dark"] .sd-marketplace-detail{background:rgba(30,64,175,.14);border-color:rgba(96,165,250,.35)}
+body[data-theme="dark"] .sd-marketplace-detail{background:transparent;border-top-color:rgba(148,163,184,.25)}
 body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dark"] .sd-marketplace-table td{color:#cbd5e1}body[data-theme="dark"] .sd-marketplace-table .sd-marketplace-code{color:#f1f5f9}
 .sd-badge{display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid rgba(148,163,184,.25);padding:.16rem .48rem;font-size:.69rem;font-weight:900;color:#64748b;white-space:nowrap}
 .sd-badge.pending{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:#92400e}
@@ -215,7 +215,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-order-search input{min-height:32px;padding:.28rem .5rem}
 .sd-order{padding:.5rem .6rem}
 .sd-order-items{margin-left:0}
-.sd-marketplace-detail{margin:.55rem 0 0 1.8rem;padding:.55rem .65rem}
+.sd-marketplace-detail{margin:0;padding:.6rem .75rem .75rem}
 .sd-marketplace-table th,.sd-marketplace-table td{padding:.32rem .35rem}
 @media(max-width:860px){
   .sd-topbar,
