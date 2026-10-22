@@ -17,21 +17,21 @@
                 <h3 class="h6 mb-0 mt-1">Riwayat penerimaan dana</h3>
             </div>
         </div>
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
+        <div class="finance-table-wrap table-responsive">
+            <table class="finance-table table table-hover mb-0">
                 <thead><tr><th>Settlement ID</th><th>Tanggal</th><th>Toko</th><th>Jumlah</th><th>Allocated</th><th>Unallocated</th><th>Bank</th><th>Journal</th></tr></thead>
                 <tbody>
                     @forelse ($rows as $row)
                         @php $settlement = $settlementModels[$row['settlement_id']] ?? null; @endphp
                         <tr>
-                            <td class="fw-semibold">{{ $row['external_settlement_id'] }}</td>
-                            <td>{{ $settlement?->settlement_date?->format('d M Y') ?? '-' }}</td>
-                            <td>{{ $settlement?->store?->name ?? 'Toko tidak diketahui' }}</td>
-                            <td>Rp {{ $money($row['settlement_amount']) }}</td>
-                            <td>Rp {{ $money($row['allocated_amount']) }}</td>
-                            <td>Rp {{ $money($row['unallocated_amount']) }}</td>
-                            <td>{{ $settlement?->bankAccount?->name ?? 'Belum ditentukan' }}</td>
-                            <td><span class="badge text-bg-{{ $row['journal_amount'] !== null ? 'success' : 'secondary' }}">{{ $row['journal_amount'] !== null ? 'Posted' : 'Belum posted' }}</span></td>
+                            <td data-label="Settlement ID" class="fw-semibold">{{ $row['external_settlement_id'] }}</td>
+                            <td data-label="Tanggal">{{ $settlement?->settlement_date?->format('d M Y') ?? '-' }}</td>
+                            <td data-label="Toko">{{ $settlement?->store?->name ?? 'Toko tidak diketahui' }}</td>
+                            <td data-label="Jumlah">Rp {{ $money($row['settlement_amount']) }}</td>
+                            <td data-label="Allocated">Rp {{ $money($row['allocated_amount']) }}</td>
+                            <td data-label="Unallocated">Rp {{ $money($row['unallocated_amount']) }}</td>
+                            <td data-label="Bank">{{ $settlement?->bankAccount?->name ?? 'Belum ditentukan' }}</td>
+                            <td data-label="Journal"><span class="badge text-bg-{{ $row['journal_amount'] !== null ? 'success' : 'secondary' }}">{{ $row['journal_amount'] !== null ? 'Posted' : 'Belum posted' }}</span></td>
                         </tr>
                     @empty
                         <tr><td colspan="8"><div class="finance-empty"><i class="bi bi-bank"></i>Belum ada settlement finance.</div></td></tr>

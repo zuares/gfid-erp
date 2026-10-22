@@ -2,7 +2,7 @@
 <html lang="id" class="{{ config('storefront.theme', '') }}">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>@yield('title', storefront_setting('branding.brand_name', 'Greatfit'))</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -91,6 +91,11 @@
         a    { color: inherit; text-decoration: none; }
         img  { display: block; max-width: 100%; }
 
+        :focus-visible {
+            outline: 3px solid color-mix(in srgb, var(--accent) 72%, #2563eb 28%);
+            outline-offset: 3px;
+        }
+
         /* ── Nav ──────────────────────────────────────────────────────── */
         .nav {
             position: sticky; top: 0; z-index: 100;
@@ -120,7 +125,7 @@
         /* Masuk button */
         .nav-btn-masuk {
             display: inline-flex; align-items: center; gap: 5px;
-            height: 32px; padding: 0 13px;
+            min-height: 44px; padding: 0 13px;
             border-radius: var(--radius-pill);
             border: 1.5px solid var(--line);
             background: var(--white); color: var(--ink);
@@ -133,7 +138,7 @@
         .nav-btn-masuk:hover { border-color: var(--ink); background: var(--soft); }
 
         /* Cart icon */
-        .cart-icon { position: relative; width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); transition: background .15s; }
+        .cart-icon { position: relative; width: 44px; height: 44px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); transition: background .15s; }
         .cart-icon:hover { background: var(--soft); }
         .cart-badge { position: absolute; top: -2px; right: -2px; min-width: 16px; height: 16px; border-radius: var(--radius-pill); padding: 0 3px; background: var(--ink); color: var(--white); font-size: 9px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--white); }
         .cart-pop { animation: cartPop .4s ease; }
@@ -141,7 +146,7 @@
 
         /* User chip */
         .user-menu-wrap { position: relative; }
-        .user-chip { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 10px 0 6px; border-radius: var(--radius-pill); border: 1.5px solid var(--line); background: var(--white); color: var(--ink); font-family: var(--font-body); font-size: 12px; font-weight: 800; cursor: pointer; transition: border-color .15s, background .15s; }
+        .user-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 10px 0 6px; border-radius: var(--radius-pill); border: 1.5px solid var(--line); background: var(--white); color: var(--ink); font-family: var(--font-body); font-size: 12px; font-weight: 800; cursor: pointer; transition: border-color .15s, background .15s; }
         .user-chip:hover, .user-chip[aria-expanded="true"] { border-color: var(--ink); background: var(--soft); }
         .user-avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--white); display: grid; place-items: center; font-size: 11px; font-weight: 900; flex-shrink: 0; }
         .user-chip-name { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -154,7 +159,7 @@
         .user-dropdown-head { padding: 12px 14px 10px; border-bottom: 1px solid var(--line); }
         .ud-name  { font-size: 13px; font-weight: 800; }
         .ud-phone { font-size: 11px; color: var(--mid); font-weight: 500; margin-top: 1px; }
-        .ud-item  { display: flex; align-items: center; gap: 9px; padding: 11px 14px; font-size: 13px; font-weight: 700; color: var(--ink); width: 100%; text-align: left; background: none; border: none; font-family: var(--font-body); cursor: pointer; text-decoration: none; transition: background .12s; }
+        .ud-item  { display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 11px 14px; font-size: 13px; font-weight: 700; color: var(--ink); width: 100%; text-align: left; background: none; border: none; font-family: var(--font-body); cursor: pointer; text-decoration: none; transition: background .12s; }
         .ud-item:hover { background: var(--soft); }
         .ud-item svg { color: var(--mid); flex-shrink: 0; }
         .ud-sep { height: 1px; background: var(--line); }
@@ -220,8 +225,6 @@
 @show
 
 @include('storefront._tracker')
-@include('storefront._mobile_zoom_lock')
-
 <script>
 /* ── User dropdown (shared across all pages) ─────────────────────────── */
 (function () {

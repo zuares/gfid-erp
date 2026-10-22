@@ -19,6 +19,7 @@
     .hm-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .btn-dk { height: 42px; padding: 0 20px; border-radius: var(--radius-pill); background: var(--ink); color: var(--white); font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; transition: opacity .15s; }
     .btn-dk:hover { opacity: .8; }
+    .btn-dk:focus-visible, .btn-sk:focus-visible, .ch:focus-visible, .cat-card:focus-visible, .pc:focus-visible, .hm-card:focus-visible, .hd-card:focus-visible, .sec-a:focus-visible { outline-offset: 4px; }
     .btn-sk { height: 42px; padding: 0 20px; border-radius: var(--radius-pill); background: transparent; color: var(--ink); font-size: 12px; font-weight: 700; border: 1.5px solid var(--line); display: inline-flex; align-items: center; transition: border-color .15s; }
     .btn-sk:hover { border-color: var(--ink); }
     .hm-visual { min-height: 360px; border-radius: 20px; background: var(--ink); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
@@ -58,6 +59,7 @@
     .sec { padding: 32px 0; scroll-margin-top: 82px; }
     .sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
     .sec-t { font-size: 16px; font-weight: 800; letter-spacing: 0; }
+    .sec-t, .cat-title, .shop-title, .cta-blk-t { margin-top: 0; }
     .sec-a { font-size: 12px; font-weight: 700; color: var(--mid); white-space: nowrap; }
     .sec-a:hover { color: var(--ink); }
     .sec-a.all-products { min-height: 34px; padding: 0 13px; border: 1px solid var(--ink); border-radius: var(--radius-pill); color: var(--ink); display: inline-flex; align-items: center; gap: 7px; font-size: 11px; }
@@ -102,6 +104,7 @@
     .pc { border-radius: 16px; overflow: hidden; background: var(--soft); border: 1px solid var(--line); display: block; }
     .pc-img { aspect-ratio: 1; position: relative; background: var(--soft); overflow: hidden; }
     .pc-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .pc-img img[hidden], .hero-bg[hidden], .hd-photo[hidden] { display: none; }
     .pc-tag { position: absolute; top: 9px; left: 9px; z-index: 3; background: var(--ink); color: var(--white); font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: var(--radius-pill); letter-spacing: .04em; }
     .pc-tag.badge-trending { background: #0f172a; }
     .pc-tag.badge-new      { background: #6366f1; }
@@ -180,6 +183,13 @@
         .cta-blk { padding: 56px 24px; border-radius: 24px; }
         .cta-blk-t { font-size: 72px; }
         .sec { padding: 44px 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        .strip-track { animation: none; }
+        .hero-bg, .hd-photo { transition: none; }
+        *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
     }
 </style>
 @endpush
@@ -488,6 +498,8 @@
         <div class="hm-visual">
             @foreach($sfHeroSlotsMobile as $i => $slot)
             <img class="hero-bg {{ $i === 0 ? 'active' : '' }}" src="{{ $slot['url'] }}"
+                 loading="{{ $i === 0 ? 'eager' : 'lazy' }}" decoding="async" @if($i === 0) fetchpriority="high" @endif
+                 onerror="this.hidden = true"
                  @if($slot['focus_mobile'] ?? $slot['focus'] ?? null) style="object-position: {{ $slot['focus_mobile'] ?? $slot['focus'] }};" @endif
                  alt="Foto {{ $i+1 }} {{ $sfBrandName }}">
             @endforeach
@@ -526,6 +538,8 @@
     <div class="hd-visual">
         @foreach($sfHeroSlots as $i => $slot)
         <img class="hd-photo {{ $i === 0 ? 'active' : '' }}" src="{{ $slot['url'] }}"
+             loading="{{ $i === 0 ? 'eager' : 'lazy' }}" decoding="async" @if($i === 0) fetchpriority="high" @endif
+             onerror="this.hidden = true"
              @if($slot['focus']) style="object-position: {{ $slot['focus'] }};" @endif
              alt="Foto {{ $i+1 }} {{ $sfBrandName }}">
         @endforeach
@@ -569,7 +583,7 @@
         <div class="sec-head cat-head">
             <div>
                 <div class="cat-eyebrow">{{ $sfCatEyebrow }}</div>
-                <div class="cat-title">{{ $sfCatTitle }}</div>
+                <h2 class="cat-title">{{ $sfCatTitle }}</h2>
                 <div class="cat-copy">{{ $sfCatCopy }}</div>
             </div>
             <a href="{{ route('storefront.products') }}" class="sec-a">{{ $sfCatAllLabel }}</a>
@@ -614,7 +628,7 @@
         <div class="shop-panel">
             <div class="shop-head">
                 <div class="shop-kicker">Channel Belanja</div>
-                <div class="shop-title">Mau belanja lewat mana?</div>
+                <h2 class="shop-title">Mau belanja lewat mana?</h2>
                 <div class="shop-copy">Website {{ $sfBrandName }} atau marketplace favorit, pilih yang paling nyaman.</div>
             </div>
             <div class="chs">
@@ -691,7 +705,7 @@
     @php $sfSecStyle = $sfSectionStyle('products', ['pt' => null, 'pb' => null]); @endphp
     <section class="sec" id="produk" data-sf-sec="products" style="{{ $sfSectionCss('products', $sfSecStyle) }}">
         <div class="sec-head">
-            <div class="sec-t">Produk pilihan</div>
+            <h2 class="sec-t">Produk pilihan</h2>
             <a href="{{ route('storefront.products') }}" class="sec-a all-products">
                 Lihat semua produk
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
@@ -726,7 +740,7 @@
                     @elseif($stockStatus === 'low')
                     <span class="pc-stock-badge">Stok Terbatas</span>
                     @endif
-                    <img src="{{ storefront_img($p['img']) }}" alt="{{ $p['name'] }}" loading="lazy">
+                    <img src="{{ storefront_img($p['img']) }}" alt="{{ $p['name'] }}" loading="lazy" decoding="async" onerror="this.hidden = true">
                 </div>
                 <div class="pc-b">
                     @if(!empty($p['category_name']) || !empty($p['audience_label']))
@@ -758,7 +772,7 @@
     @php $sfSecStyle = $sfSectionStyle('cta', ['pt' => 0, 'pb' => null]); @endphp
     <section class="sec" style="{{ $sfSectionCss('cta', $sfSecStyle) }}" data-sf-sec="cta">
         <div class="cta-blk">
-            <div class="cta-blk-t">Ready to<br>Wear Daily.</div>
+            <h2 class="cta-blk-t">Ready to<br>Wear Daily.</h2>
             <div class="cta-blk-row">
                 <a href="{{ route('storefront.products') }}" class="btn-cw">Shop Now</a>
                 <a href="#beli" class="btn-co">Marketplace</a>

@@ -956,6 +956,66 @@
         font-size: .65rem;
     }
 
+    .sidebar-menu-search {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: .45rem;
+        margin: .05rem .1rem .15rem;
+        min-height: 34px;
+        padding: 0 .58rem;
+        border: 1px solid color-mix(in srgb, var(--line) 82%, var(--sidebar-brand) 18%);
+        border-radius: 10px;
+        color: var(--muted);
+        background: color-mix(in srgb, var(--card) 86%, var(--bg) 14%);
+        transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+
+    .sidebar-menu-search:focus-within {
+        border-color: var(--sidebar-brand);
+        background: var(--card);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--sidebar-brand) 15%, transparent 85%);
+    }
+
+    .sidebar-menu-search > i { font-size: .72rem; }
+
+    .sidebar-menu-search input {
+        width: 100%;
+        min-width: 0;
+        border: 0;
+        outline: 0;
+        color: var(--text);
+        background: transparent;
+        font-size: .68rem;
+    }
+
+    .sidebar-menu-search input::placeholder { color: var(--muted); opacity: .85; }
+
+    .sidebar-menu-search kbd {
+        min-width: 18px;
+        padding: .13rem .28rem;
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 5px;
+        color: var(--muted);
+        background: color-mix(in srgb, var(--card) 78%, var(--bg) 22%);
+        font-family: inherit;
+        font-size: .56rem;
+        line-height: 1;
+        text-align: center;
+    }
+
+    .sidebar-modern .sidebar-link:focus-visible,
+    .sidebar-modern .sidebar-link-sub:focus-visible,
+    .sidebar-modern .sidebar-toggle:focus-visible,
+    .sidebar-modern .sidebar-menu-search input:focus-visible {
+        outline: 2px solid var(--sidebar-brand);
+        outline-offset: 2px;
+    }
+
+    .sidebar-modern.is-searching .collapse { display: block !important; }
+    .sidebar-modern .sidebar-nav > li[hidden] { display: none !important; }
+
     .sidebar-subhead {
         margin-top: .72rem;
         padding: .4rem .75rem .2rem;
@@ -1034,6 +1094,12 @@
         </span>
         <i class="bi bi-chevron-down" aria-hidden="true"></i>
     </div>
+
+    <label class="sidebar-menu-search" for="sidebar-menu-search">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input id="sidebar-menu-search" type="search" placeholder="Cari menu..." autocomplete="off" spellcheck="false" aria-label="Cari menu sidebar">
+        <kbd aria-hidden="true">/</kbd>
+    </label>
 
     <ul class="sidebar-nav">
 
@@ -3268,3 +3334,47 @@
                     @endif
     </ul>
 </aside>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const sidebar = document.querySelector('.sidebar-modern');
+    const search = document.getElementById('sidebar-menu-search');
+    if (!sidebar || !search) return;
+
+    const topItems = Array.from(sidebar.querySelectorAll(':scope > .sidebar-nav > li'));
+    const sectionLabels = topItems.filter((item) => item.classList.contains('menu-label'));
+
+    function applyMenuSearch() {
+        const query = search.value.trim().toLowerCase();
+        sidebar.classList.toggle('is-searching', Boolean(query));
+
+        topItems.forEach((item) => {
+            if (item.classList.contains('menu-label')) return;
+            item.hidden = Boolean(query) && !item.textContent.toLowerCase().includes(query);
+        });
+
+        sectionLabels.forEach((label) => {
+            const nextItem = label.nextElementSibling;
+            label.hidden = Boolean(query) && (!nextItem || nextItem.hidden);
+        });
+    }
+
+    search.addEventListener('input', applyMenuSearch);
+    search.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            search.value = '';
+            applyMenuSearch();
+            search.blur();
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === '/' && document.activeElement !== search && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+            event.preventDefault();
+            search.focus();
+        }
+    });
+});
+</script>
+@endpush

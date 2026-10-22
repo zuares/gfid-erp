@@ -49,6 +49,9 @@
         flex-direction: column;
         padding: .75rem .9rem 1.1rem;
         padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+        background:
+            radial-gradient(circle at 100% 0%, rgba(91, 92, 226, .12), transparent 30%),
+            var(--card);
     }
 
     .mobile-sidebar-panel.is-open {
@@ -60,13 +63,35 @@
         align-items: center;
         justify-content: space-between;
         gap: .5rem;
-        margin-bottom: .35rem;
+        margin-bottom: .6rem;
+        padding-bottom: .65rem;
+        border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, var(--accent) 20%);
     }
 
     .mobile-sidebar-title {
-        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+        min-width: 0;
         font-size: 1rem;
-        letter-spacing: -.01em;
+        font-weight: 800;
+        letter-spacing: -.03em;
+    }
+
+    .mobile-sidebar-title::before {
+        content: 'GF';
+        display: grid;
+        width: 32px;
+        height: 32px;
+        flex: 0 0 32px;
+        place-items: center;
+        border-radius: 11px;
+        color: #fff;
+        background: linear-gradient(145deg, #5b5ce2, #13b8c4);
+        box-shadow: 0 7px 14px rgba(91, 92, 226, .22);
+        font-size: .7rem;
+        font-weight: 900;
+        letter-spacing: -.08em;
     }
 
     .mobile-sidebar-close-btn {
@@ -79,8 +104,58 @@
         justify-content: center;
         background: color-mix(in srgb, var(--card) 90%, var(--bg) 10%);
         cursor: pointer;
-        font-size: 1.1rem;
+        color: var(--text);
+        font-size: .9rem;
+        transition: background .16s ease, border-color .16s ease, transform .16s ease;
     }
+
+    .mobile-sidebar-close-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+    .mobile-sidebar-close-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .mobile-sidebar-workspace {
+        display: flex;
+        align-items: center;
+        gap: .55rem;
+        margin-bottom: .6rem;
+        padding: .58rem .62rem;
+        border: 1px solid color-mix(in srgb, var(--line) 80%, var(--accent) 20%);
+        border-radius: 13px;
+        background: color-mix(in srgb, var(--card) 80%, var(--accent-soft) 20%);
+    }
+
+    .mobile-sidebar-workspace-icon {
+        display: grid;
+        width: 27px;
+        height: 27px;
+        flex: 0 0 27px;
+        place-items: center;
+        border-radius: 9px;
+        color: var(--accent);
+        background: color-mix(in srgb, var(--accent-soft) 75%, var(--card) 25%);
+    }
+
+    .mobile-sidebar-workspace-copy { display: grid; min-width: 0; line-height: 1.1; }
+    .mobile-sidebar-workspace-copy small { color: var(--muted); font-size: .57rem; font-weight: 750; text-transform: uppercase; }
+    .mobile-sidebar-workspace-copy strong { overflow: hidden; margin-top: .17rem; color: var(--text); font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
+
+    .mobile-sidebar-search {
+        display: flex;
+        align-items: center;
+        gap: .45rem;
+        min-height: 36px;
+        margin-bottom: .6rem;
+        padding: 0 .62rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        color: var(--muted);
+        background: color-mix(in srgb, var(--card) 86%, var(--bg) 14%);
+    }
+
+    .mobile-sidebar-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent 85%); }
+    .mobile-sidebar-search input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--text); background: transparent; font-size: .76rem; }
+    .mobile-sidebar-search input::placeholder { color: var(--muted); }
+    .mobile-sidebar-panel.is-searching .collapse { display: block !important; }
+    .mobile-sidebar-panel .mobile-sidebar-link[hidden] { display: none !important; }
 
     .mobile-sidebar-body {
         margin-top: .25rem;
@@ -747,11 +822,21 @@
 <div id="mobileSidebarOverlay" class="mobile-sidebar-overlay"></div>
 
 {{-- PANEL --}}
-<aside id="mobileSidebarPanel" class="mobile-sidebar-panel">
+<aside id="mobileSidebarPanel" class="mobile-sidebar-panel" aria-labelledby="mobileSidebarTitle">
     <div class="mobile-sidebar-header">
-        <div class="mobile-sidebar-title">{{ config('app.name', 'GFID') }}</div>
-        <button type="button" class="mobile-sidebar-close-btn" id="mobileSidebarCloseBtn">✕</button>
+        <div class="mobile-sidebar-title" id="mobileSidebarTitle">{{ config('app.name', 'GFID') }}</div>
+        <button type="button" class="mobile-sidebar-close-btn" id="mobileSidebarCloseBtn" aria-label="Tutup menu">✕</button>
     </div>
+
+    <div class="mobile-sidebar-workspace" aria-label="Workspace aktif">
+        <span class="mobile-sidebar-workspace-icon" aria-hidden="true"><i class="bi bi-buildings"></i></span>
+        <span class="mobile-sidebar-workspace-copy"><small>Workspace</small><strong>Greatfit HQ</strong></span>
+    </div>
+
+    <label class="mobile-sidebar-search" for="mobile-sidebar-menu-search">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input id="mobile-sidebar-menu-search" type="search" placeholder="Cari menu..." autocomplete="off" spellcheck="false" aria-label="Cari menu sidebar">
+    </label>
 
     <div class="mobile-sidebar-body">
         <ul class="mobile-sidebar-nav">
@@ -2814,6 +2899,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const sidebar = document.getElementById('mobileSidebarPanel');
     const overlay = document.getElementById('mobileSidebarOverlay');
     const links = sidebar ? sidebar.querySelectorAll('.mobile-sidebar-link[href]') : [];
+    const search = document.getElementById('mobile-sidebar-menu-search');
 
     if (!toggleBtn || !sidebar || !overlay) return;
 
@@ -2839,6 +2925,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Auto-close saat klik link menu
     links.forEach(link => link.addEventListener('click', closeSidebar));
+
+    search?.addEventListener('input', function () {
+        const query = search.value.trim().toLowerCase();
+        sidebar.classList.toggle('is-searching', Boolean(query));
+        sidebar.querySelectorAll('.mobile-sidebar-link').forEach(function (item) {
+            const nextPanel = item.nextElementSibling?.classList.contains('collapse') ? item.nextElementSibling : null;
+            const ownMatch = item.textContent.toLowerCase().includes(query);
+            const childMatch = nextPanel?.textContent.toLowerCase().includes(query) ?? false;
+            item.hidden = Boolean(query) && !ownMatch && !childMatch;
+        });
+    });
+
+    search?.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            search.value = '';
+            search.dispatchEvent(new Event('input'));
+            search.blur();
+        }
+    });
 
     document.addEventListener('keyup', function(e) {
         if (e.key === 'Escape') closeSidebar();

@@ -89,8 +89,8 @@
                 <span class="badge rounded-pill text-bg-light border">{{ number_format($report['transactions']->total()) }} order</span>
             </div>
         </div>
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
+        <div class="finance-table-wrap table-responsive">
+            <table class="finance-table table table-hover mb-0">
                 <thead>
                     <tr>
                         <th>Order SN</th>
@@ -109,17 +109,17 @@
                             $meta = $statusMeta[$row['status']] ?? $statusMeta['pending'];
                         @endphp
                         <tr>
-                            <td class="fw-semibold text-nowrap"><span class="font-monospace small">{{ $row['order_sn'] }}</span></td>
-                            <td>
+                            <td data-label="Order SN" class="fw-semibold text-nowrap"><span class="font-monospace small">{{ $row['order_sn'] }}</span></td>
+                            <td data-label="Status">
                                 <span class="badge rounded-pill text-bg-{{ $meta['tone'] === 'success' ? 'success' : ($meta['tone'] === 'danger' ? 'danger' : 'warning') }}">
                                     <i class="bi {{ $meta['icon'] }} me-1"></i>{{ $meta['label'] }}
                                 </span>
                             </td>
-                            <td class="text-nowrap">Rp {{ $money($row['escrow_gross']) }}</td>
-                            <td class="text-nowrap">{{ $row['expected_net_income'] === null ? '-' : 'Rp '.$money($row['expected_net_income']) }}</td>
-                            <td class="text-nowrap">Rp {{ $money($row['allocated_amount']) }}</td>
-                            <td><span class="finance-journal-count"><i class="bi bi-journal-text"></i>{{ $journalCount }}/3</span></td>
-                            <td style="min-width: 240px;">
+                            <td data-label="Gross escrow" class="text-nowrap">Rp {{ $money($row['escrow_gross']) }}</td>
+                            <td data-label="Expected net" class="text-nowrap">{{ $row['expected_net_income'] === null ? '-' : 'Rp '.$money($row['expected_net_income']) }}</td>
+                            <td data-label="Allocated" class="text-nowrap">Rp {{ $money($row['allocated_amount']) }}</td>
+                            <td data-label="Jurnal"><span class="finance-journal-count"><i class="bi bi-journal-text"></i>{{ $journalCount }}/3</span></td>
+                            <td data-label="Alasan" style="min-width: 240px;">
                                 @forelse ($row['reasons'] as $reason)
                                     <span class="finance-reason">{{ $reasonLabels[$reason] ?? str_replace('_', ' ', ucfirst($reason)) }}</span>
                                 @empty
@@ -152,20 +152,20 @@
             </div>
         </div>
         @if (count($report['settlements']) > 0)
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
+            <div class="finance-table-wrap table-responsive">
+                <table class="finance-table table table-hover mb-0">
                     <thead>
                         <tr><th>Settlement ID</th><th>Status</th><th>Amount</th><th>Allocated</th><th>Unallocated</th><th>Alasan</th></tr>
                     </thead>
                     <tbody>
                         @foreach ($report['settlements'] as $row)
                             <tr>
-                                <td class="fw-semibold text-nowrap font-monospace small">{{ $row['external_settlement_id'] }}</td>
-                                <td><span class="badge rounded-pill text-bg-{{ $row['status'] === 'matched' ? 'success' : ($row['status'] === 'mismatch' ? 'danger' : 'warning') }}">{{ ucfirst($row['status']) }}</span></td>
-                                <td class="text-nowrap">Rp {{ $money($row['settlement_amount']) }}</td>
-                                <td class="text-nowrap">Rp {{ $money($row['allocated_amount']) }}</td>
-                                <td class="text-nowrap">Rp {{ $money($row['unallocated_amount']) }}</td>
-                                <td class="small">{{ $row['reasons'] ? implode(', ', $row['reasons']) : 'Tidak ada' }}</td>
+                                <td data-label="Settlement ID" class="fw-semibold text-nowrap font-monospace small">{{ $row['external_settlement_id'] }}</td>
+                                <td data-label="Status"><span class="badge rounded-pill text-bg-{{ $row['status'] === 'matched' ? 'success' : ($row['status'] === 'mismatch' ? 'danger' : 'warning') }}">{{ ucfirst($row['status']) }}</span></td>
+                                <td data-label="Amount" class="text-nowrap">Rp {{ $money($row['settlement_amount']) }}</td>
+                                <td data-label="Allocated" class="text-nowrap">Rp {{ $money($row['allocated_amount']) }}</td>
+                                <td data-label="Unallocated" class="text-nowrap">Rp {{ $money($row['unallocated_amount']) }}</td>
+                                <td data-label="Alasan" class="small">{{ $row['reasons'] ? implode(', ', $row['reasons']) : 'Tidak ada' }}</td>
                             </tr>
                         @endforeach
                     </tbody>

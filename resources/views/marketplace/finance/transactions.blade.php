@@ -18,8 +18,8 @@
         <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
             <div><div class="finance-section-meta">Ledger terfilter</div><h3 class="h6 mb-0 mt-1">Detail transaksi</h3></div>
         </div>
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
+        <div class="finance-table-wrap table-responsive">
+            <table class="finance-table table table-hover mb-0">
                 <thead><tr><th>Order SN</th><th>Toko</th><th>Invoice / Shipment</th><th>Gross</th><th>Fees</th><th>Net</th><th>Income</th><th>Journal</th></tr></thead>
                 <tbody>
                     @forelse ($rows as $row)
@@ -28,14 +28,14 @@
                             $journalCount = collect($journal)->filter(fn ($value) => $value !== null)->count();
                         @endphp
                         <tr>
-                            <td class="fw-semibold">{{ $row['order_sn'] }}</td>
-                            <td>{{ $storeNames[$row['store_id']] ?? 'Toko tidak diketahui' }}</td>
-                            <td class="small">{{ $row['gross_sales_invoice'] !== null ? 'INV linked' : 'INV belum ada' }}<br>{{ $row['settlement_received_amount'] > 0 ? 'Settlement diterima' : 'Shipment/settlement pending' }}</td>
-                            <td>Rp {{ $money($row['gross_sales_invoice'] ?? $row['escrow_gross'] ?? 0) }}</td>
-                            <td>Rp {{ $money(abs($row['total_components'])) }}</td>
-                            <td>Rp {{ $money($row['actual_net_income']) }}</td>
-                            <td><span class="badge text-bg-{{ $row['income_status'] === 'released' ? 'success' : ($row['income_status'] === 'to_release' ? 'warning' : 'secondary') }}">{{ str_replace('_', ' ', ucfirst($row['income_status'] ?? 'unknown')) }}</span></td>
-                            <td><span class="badge text-bg-{{ $journalCount === 3 ? 'success' : ($journalCount > 0 ? 'warning' : 'secondary') }}">{{ $journalCount }}/3 posted</span></td>
+                            <td data-label="Order SN" class="fw-semibold">{{ $row['order_sn'] }}</td>
+                            <td data-label="Toko">{{ $storeNames[$row['store_id']] ?? 'Toko tidak diketahui' }}</td>
+                            <td data-label="Invoice / Shipment" class="small">{{ $row['gross_sales_invoice'] !== null ? 'INV linked' : 'INV belum ada' }}<br>{{ $row['settlement_received_amount'] > 0 ? 'Settlement diterima' : 'Shipment/settlement pending' }}</td>
+                            <td data-label="Gross">Rp {{ $money($row['gross_sales_invoice'] ?? $row['escrow_gross'] ?? 0) }}</td>
+                            <td data-label="Fees">Rp {{ $money(abs($row['total_components'])) }}</td>
+                            <td data-label="Net">Rp {{ $money($row['actual_net_income']) }}</td>
+                            <td data-label="Income"><span class="badge text-bg-{{ $row['income_status'] === 'released' ? 'success' : ($row['income_status'] === 'to_release' ? 'warning' : 'secondary') }}">{{ str_replace('_', ' ', ucfirst($row['income_status'] ?? 'unknown')) }}</span></td>
+                            <td data-label="Journal"><span class="badge text-bg-{{ $journalCount === 3 ? 'success' : ($journalCount > 0 ? 'warning' : 'secondary') }}">{{ $journalCount }}/3 posted</span></td>
                         </tr>
                     @empty
                         <tr><td colspan="8" class="text-center text-muted py-5">Belum ada transaksi finance.</td></tr>
