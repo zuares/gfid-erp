@@ -2053,10 +2053,10 @@ class ShipmentController extends Controller
      * Ambil posisi stok untuk tanggal shipment, bukan saldo berjalan hari ini.
      *
      * Saldo fisik memakai saldo berjalan dengan membalik mutasi setelah tanggal
-     * shipment; bila belum ada saldo berjalan, ledger sampai tanggal tersebut
-     * dipakai sebagai fallback. Reservasi hanya mengambil draft shipment dengan
-     * tanggal yang sama/lebih awal, sehingga shipment pada tanggal berikutnya
-     * tidak ikut membuat tanggal sebelumnya terlihat kekurangan stok.
+     * shipment. Koreksi stok positif setelah tanggal tersebut tetap dihitung
+     * sebagai koreksi historis; bila belum ada saldo berjalan, ledger sampai
+     * tanggal tersebut dipakai sebagai fallback. Reservasi hanya mengambil draft
+     * shipment dengan tanggal yang sama/lebih awal.
      *
      * @return array{physical:\Illuminate\Support\Collection, allocated:\Illuminate\Support\Collection}
      */
@@ -2096,15 +2096,39 @@ class ShipmentController extends Controller
             ->selectRaw('item_id, COALESCE(SUM(qty_change), 0) as qty')
             ->groupBy('item_id')
             ->pluck('qty', 'item_id');
+        $futureCorrections = InventoryMutation::query()
+            ->where('warehouse_id', $warehouse->id)
+            ->whereIn('item_id', $itemIds->all())
+            ->whereDate('date', '>', $asOfDate)
+            ->where('qty_change', '>', 0)
+            ->where(function ($query) {
+                $query
+                    ->whereIn('source_type', [
+                        \App\Models\InventoryAdjustment::class,
+                        'adjustment',
+                        'inventory_adjustment',
+                        'inventory_adjustment_manual',
+                        'stock_opname_adjustment',
+                        'stock_opname_opening',
+                        'stock_opname_periodic',
+                    ])
+                    ->orWhereRaw("LOWER(COALESCE(source_type, '')) LIKE '%adjust%'")
+                    ->orWhereRaw("LOWER(COALESCE(source_type, '')) LIKE '%opname%'");
+            })
+            ->selectRaw('item_id, COALESCE(SUM(qty_change), 0) as qty')
+            ->groupBy('item_id')
+            ->pluck('qty', 'item_id');
         $physical = $itemIds->mapWithKeys(function (int $itemId) use (
             $currentStocks,
             $historicalPhysical,
             $futureMutations,
+            $futureCorrections,
         ) {
             if ($currentStocks->has($itemId)) {
                 return [
                     $itemId => (float) $currentStocks->get($itemId)->qty
-                        - (float) $futureMutations->get($itemId, 0),
+                        - (float) $futureMutations->get($itemId, 0)
+                        + (float) $futureCorrections->get($itemId, 0),
                 ];
             }
 

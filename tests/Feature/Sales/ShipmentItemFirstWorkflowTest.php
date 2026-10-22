@@ -122,7 +122,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'date' => $shipmentDate,
             'warehouse_id' => $warehouse->id,
             'item_id' => $item->id,
-            'qty_change' => 10,
+            'qty_change' => 1,
             'direction' => 'in',
             'source_type' => 'test',
         ]);
@@ -130,14 +130,14 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'date' => now()->toDateString(),
             'warehouse_id' => $warehouse->id,
             'item_id' => $item->id,
-            'qty_change' => -9,
-            'direction' => 'out',
-            'source_type' => 'test',
+            'qty_change' => 1,
+            'direction' => 'in',
+            'source_type' => 'inventory_adjustment_manual',
         ]);
         InventoryStock::create([
             'warehouse_id' => $warehouse->id,
             'item_id' => $item->id,
-            'qty' => 1,
+            'qty' => 2,
             'allocated_qty' => 102,
         ]);
 
