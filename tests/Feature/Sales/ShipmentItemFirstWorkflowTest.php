@@ -1030,7 +1030,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Booking ditemukan')
             ->assertSee('<span>No</span><span>Kode Item</span><span>Order</span><span>Ship</span><span>Diff</span><span>SKU Marketplace</span><span>COGS</span><span>Subtotal COGS</span>', false)
             ->assertSee('>Periksa</div>', false)
-            ->assertSee('>K5BLK-1</div>', false)
+            ->assertSee('class="sd-marketplace-sku-value">K5BLK-1</span>', false)
             ->assertDontSee('SKU booking belum tersedia.');
 
         $order = MarketplaceOrder::create([
@@ -1083,7 +1083,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'booking_sn' => 'BOOKING-VERIFY-001',
             'tracking_number' => $awb,
             'booking_status' => 'SHIPPED',
-            'items' => [['model_sku' => 'K7BLK-1', 'quantity' => 1]],
+            'items' => [['model_sku' => 'K7BLK-1', 'model_name' => 'Hitam / Ukuran 1', 'quantity' => 1]],
         ]);
         $scan = ShipmentOrderScan::create([
             'shipment_id' => $shipment->id,
@@ -1106,6 +1106,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Booking ditemukan')
             ->assertSee('sd-order-item-diff sd-marketplace-ok', false)
             ->assertSee('>0</div>', false)
+            ->assertSee('K7BLK-1')
+            ->assertSee('Hitam / Ukuran 1')
             ->assertDontSee('>Periksa</div>', false);
 
         ShipmentLine::where('shipment_order_scan_id', $scan->id)->update(['qty_scanned' => 2]);
@@ -1223,8 +1225,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $response = $this->actingAs($user)
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
-            ->assertSee('>K7BLK-1</div>', false)
-            ->assertSee('>K5BLK-1</div>', false)
+            ->assertSee('class="sd-marketplace-sku-value">K7BLK-1</span>', false)
+            ->assertSee('class="sd-marketplace-sku-value">K5BLK-1</span>', false)
             ->assertDontSee('>Periksa</div>', false);
 
         $this->assertSame(2, substr_count($response->getContent(), 'sd-order-item-diff sd-marketplace-ok'));
@@ -1294,8 +1296,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $this->actingAs($user)
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
-            ->assertSee('>MODEL-SKU-22</div>', false)
-            ->assertDontSee('>BASE-SKU</div>', false)
+            ->assertSee('class="sd-marketplace-sku-value">MODEL-SKU-22</span>', false)
+            ->assertDontSee('class="sd-marketplace-sku-value">BASE-SKU</span>', false)
             ->assertDontSee('WRONG-STORE-MODEL');
     }
 
@@ -1379,7 +1381,9 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'internal_item_id' => $marketplaceItem->id,
             'item_name' => $marketplaceItem->name,
             'item_sku' => 'TTD-BLK',
-            'model_sku' => 'TTD-BLK-M',
+            'model_sku' => null,
+            'marketplace_sku' => 'TTD-BLK-M',
+            'variant_name' => 'Hitam / Ukuran M',
             'qty' => 1,
         ]);
         $scan = ShipmentOrderScan::create([
@@ -1401,6 +1405,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
             ->assertSee('TTD-BLK-M')
+            ->assertSee('Hitam / Ukuran M')
             ->assertSee('>BOOKING-SPX-SKU-MISMATCH</span>', false)
             ->assertSee('>ORDER-SPX-SKU-MISMATCH</span>', false)
             ->assertSee('Item berbeda')

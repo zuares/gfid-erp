@@ -4179,7 +4179,7 @@ class ShipmentController extends Controller
             ->keyBy(fn ($product) => $product->store_id . '|' . $product->item_id);
         $bookingProductModels = $bookingProducts->isEmpty() ? collect() : \App\Models\MarketplaceProductModel::query()
             ->whereIn('marketplace_product_id', $bookingProducts->pluck('id')->all())
-            ->get(['marketplace_product_id', 'model_id', 'model_sku'])
+            ->get(['marketplace_product_id', 'model_id', 'model_name', 'model_sku'])
             ->keyBy(fn ($model) => $model->marketplace_product_id . '|' . $model->model_id);
         $bookingSkusByScan = [];
         $bookingItemsByScan = [];
@@ -4212,11 +4212,13 @@ class ShipmentController extends Controller
                     continue;
                 }
                 $sku = trim((string) ($item['model_sku'] ?? ''));
+                $variantName = trim((string) ($item['model_name'] ?? $item['variant_name'] ?? $item['variation_name'] ?? ''));
                 if ($sku === '') {
                     $product = $bookingProducts->get($booking->store_id . '|' . trim((string) ($item['item_id'] ?? '')));
                     $modelId = trim((string) ($item['model_id'] ?? '0')) ?: '0';
                     $model = $product ? $bookingProductModels->get($product->id . '|' . $modelId) : null;
                     $sku = trim((string) ($model?->model_sku ?: ($item['item_sku'] ?? null) ?: $product?->item_sku ?: ''));
+                    $variantName = $variantName ?: trim((string) ($model?->model_name ?? ''));
                 }
                 if ($sku !== '') {
                     $skus[] = $sku;
@@ -4224,6 +4226,7 @@ class ShipmentController extends Controller
                 $rawQty = $item['quantity'] ?? $item['model_quantity_purchased'] ?? $item['qty'] ?? null;
                 $bookingItemsByScan[$scanId][] = [
                     'sku' => $sku,
+                    'variant_name' => $variantName,
                     'qty' => is_numeric($rawQty) && (int) $rawQty > 0 ? (int) $rawQty : null,
                     'item_id' => null,
                 ];

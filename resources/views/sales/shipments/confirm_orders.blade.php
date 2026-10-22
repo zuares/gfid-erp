@@ -601,13 +601,43 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-marketplace-item-name { margin-top: .08rem; font-size: .66rem; }
 .sd-order-item-marketplace-sku {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .18rem;
   overflow: hidden;
-  color: #64748b;
+}
+.sd-marketplace-sku-value {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  padding: .16rem .38rem;
+  border: 1px solid rgba(37,99,235,.24);
+  border-radius: 5px;
+  background: rgba(219,234,254,.72);
+  color: #1d4ed8;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: .7rem;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
+  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.sd-marketplace-variant {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: #64748b;
+  font-size: .65rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body[data-theme="dark"] .sd-marketplace-sku-value {
+  background: rgba(30,64,175,.24);
+  border-color: rgba(96,165,250,.38);
+  color: #bfdbfe;
 }
 .sd-order-items-breakdown { overflow-x: auto; }
 .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku,
@@ -1294,6 +1324,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                 $lineBookingSku = $bookingCanVerify
                                                     ? $bookingSkuByItem->get($line->item_id, '')
                                                     : ($showSingleBookingSku ? $bookingSkus[0] : ($hasBookingOnly && $bookingSkus !== [] ? 'Lihat daftar' : '—'));
+                                                $lineBookingVariant = $bookingItems->first(fn ($item) => (int) ($item['item_id'] ?? 0) === (int) $line->item_id)['variant_name']
+                                                    ?? ($hasSingleBookingItem ? ($bookingItems->first()['variant_name'] ?? '') : '');
                                             @endphp
                                             <div class="sd-order-item {{ $orderItemGridClass }} {{ $hasBookingOnly ? 'sd-qty-breakdown' : '' }}">
                                                 <span class="sd-order-item-num">{{ $loop->iteration }}</span>
@@ -1308,7 +1340,10 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                 @else
                                                     <div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div>
                                                 @endif
-                                                <div class="sd-order-item-marketplace-sku" @if($showSingleBookingSku && !$bookingCanVerify) title="SKU Shopee dari booking atau produk toko; item scan belum diverifikasi" @endif>{{ $lineBookingSku }}</div>
+                                                <div class="sd-order-item-marketplace-sku" @if($showSingleBookingSku && !$bookingCanVerify) title="SKU Shopee dari booking atau produk toko; item scan belum diverifikasi" @endif>
+                                                    <span class="sd-marketplace-sku-value">{{ $lineBookingSku }}</span>
+                                                    @if($lineBookingVariant !== '')<span class="sd-marketplace-variant" title="{{ $lineBookingVariant }}">{{ $lineBookingVariant }}</span>@endif
+                                                </div>
                                                 @if($canSeeCogs)
                                                     <div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div>
                                                     <div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>
@@ -1401,7 +1436,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                         $marketplaceLine = $matchedMarketplaceLine ?: ($singleLineMismatch ? $marketplaceLines->first() : null);
                                                         // Tampilkan SKU asli dari payload marketplace saja.
                                                         // Jangan gunakan marketplace_sku hasil mapping nama atau kode internal.
-                                                        $marketplaceSku = $marketplaceLine?->model_sku ?: $marketplaceLine?->item_sku ?: '—';
+                                                        $marketplaceSku = $marketplaceLine?->model_sku ?: $marketplaceLine?->item_sku ?: $marketplaceLine?->marketplace_sku ?: '—';
+                                                        $marketplaceVariant = trim((string) ($marketplaceLine?->variant_name ?: $marketplaceLine?->variant_snapshot ?: ''));
                                                         $qtyOrder = $itemMismatch && !$singleLineMismatch
                                                             ? null
                                                             : ($marketplaceLine ? $sourceQty($marketplaceLine, $orderLines) : (int) $line->qty_scanned);
@@ -1417,7 +1453,11 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                         <div class="sd-order-item-qty">{{ $qtyOrder === null ? '—' : number_format($qtyOrder, 0, ',', '.') }}</div>
                                                         <div class="sd-order-item-qty">{{ number_format($qtyShipment, 0, ',', '.') }}</div>
                                                         <div class="sd-order-item-diff {{ !$itemMismatch && $difference === 0 ? 'sd-marketplace-ok' : 'sd-marketplace-short' }}">{{ $itemMismatch ? 'Periksa' : (($difference > 0 ? '+' : '') . number_format($difference, 0, ',', '.')) }}</div>
-                                                        <div class="sd-order-item-marketplace-sku {{ $itemMismatch ? 'is-mismatch' : '' }}">{{ $marketplaceSku }}@if($itemMismatch)<span class="sd-sku-mismatch">{{ $singleLineMismatch ? 'Item berbeda' : 'Lihat SKU order' }}</span>@endif</div>
+                                                        <div class="sd-order-item-marketplace-sku {{ $itemMismatch ? 'is-mismatch' : '' }}">
+                                                            <span class="sd-marketplace-sku-value" title="SKU marketplace: {{ $marketplaceSku }}">{{ $marketplaceSku }}</span>
+                                                            @if($marketplaceVariant !== '')<span class="sd-marketplace-variant" title="{{ $marketplaceVariant }}">{{ $marketplaceVariant }}</span>@endif
+                                                            @if($itemMismatch)<span class="sd-sku-mismatch">{{ $singleLineMismatch ? 'Item berbeda' : 'Lihat SKU order' }}</span>@endif
+                                                        </div>
                                                         @if($canSeeCogs)
                                                             <div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div>
                                                             <div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>
