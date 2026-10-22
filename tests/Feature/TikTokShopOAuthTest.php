@@ -337,6 +337,6 @@ class TikTokShopOAuthTest extends TestCase
         $status->assertOk()
             ->assertJsonPath('status', 'failed')
             ->assertJsonPath('code', 105005);
-        $status->assertJsonFragment(['message' => 'Scope TikTok Shop belum aktif. Aktifkan seller.shop.info dan seller.authorization.info di Partner Center, lalu revoke dan hubungkan ulang toko.']);
+        $status->assertJsonFragment(['message' => 'Scope TikTok Shop belum aktif. Aktifkan seller.shop.info, seller.authorization.info, dan seller.finance.info di Partner Center, lalu revoke dan hubungkan ulang toko.']);
     }
 }

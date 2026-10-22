@@ -105,6 +105,59 @@ class TikTokShopChannelTest extends TestCase
         });
     }
 
+    public function test_get_unsettled_transactions_uses_the_v202507_finance_endpoint(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::firstOrCreate(['code' => 'tiktok'], ['name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-UNSETTLED-FINANCE',
+            'name' => 'TikTok Unsettled Finance Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202507/orders/unsettled*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'transactions' => [],
+                    'next_page_token' => '',
+                ],
+            ]),
+        ]);
+
+        $response = app(TikTokShopChannel::class)->getUnsettledTransactions(
+            $store,
+            1754006400,
+            1754438400,
+            '',
+            100,
+        );
+
+        $this->assertSame([], data_get($response, 'data.transactions'));
+        Http::assertSent(function ($request): bool {
+            $url = $request->url();
+
+            return $request->method() === 'GET'
+                && str_starts_with($url, 'https://open-api.tiktokglobalshop.com/finance/202507/orders/unsettled?')
+                && str_contains($url, 'search_time_ge=1754006400')
+                && str_contains($url, 'search_time_lt=1754438400')
+                && str_contains($url, 'page_size=100')
+                && str_contains($url, 'sort_field=order_create_time')
+                && str_contains($url, 'sort_order=DESC')
+                && str_contains($url, 'shop_cipher=shop-cipher-test')
+                && str_contains($url, 'sign=');
+        });
+    }
+
     public function test_order_responses_are_normalized_to_the_shared_marketplace_schema(): void
     {
         config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');

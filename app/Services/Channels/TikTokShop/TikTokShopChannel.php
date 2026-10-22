@@ -555,6 +555,32 @@ class TikTokShopChannel implements MarketplaceChannel
     }
 
     /**
+     * Ambil transaksi TikTok yang belum settle.
+     *
+     * Nilai dari endpoint ini adalah estimasi dan dapat berubah sampai
+     * transaksi masuk ke statement final. Endpoint ini hanya digunakan untuk
+     * mengisi kolom estimasi di halaman settlement, bukan sebagai payout final.
+     */
+    public function getUnsettledTransactions(
+        Store $store,
+        int $searchTimeFrom,
+        int $searchTimeTo,
+        string $pageToken = '',
+        int $pageSize = 100,
+    ): array {
+        $pageSize = max(1, min($pageSize, 100));
+
+        return $this->get($store, '/finance/202507/orders/unsettled', [
+            'search_time_ge' => $searchTimeFrom,
+            'search_time_lt' => $searchTimeTo,
+            'page_size' => $pageSize,
+            'page_token' => $pageToken,
+            'sort_field' => 'order_create_time',
+            'sort_order' => 'DESC',
+        ]);
+    }
+
+    /**
      * TikTok's tracking API is order-based, unlike Shopee's order detail
      * package shape. Keep a small compatibility response for the shared
      * logistics service/controller.

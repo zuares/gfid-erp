@@ -102,7 +102,7 @@ class TikTokShopOAuthService
                 if ((int) ($this->lastApiError['code'] ?? 0) === 105005) {
                     return [
                         'status' => 'failed',
-                        'message' => 'Scope TikTok Shop belum aktif. Aktifkan seller.shop.info dan seller.authorization.info di Partner Center, lalu revoke dan hubungkan ulang toko.',
+                        'message' => 'Scope TikTok Shop belum aktif. Aktifkan seller.shop.info, seller.authorization.info, dan seller.finance.info di Partner Center, lalu revoke dan hubungkan ulang toko.',
                         'code' => 105005,
                     ];
                 }

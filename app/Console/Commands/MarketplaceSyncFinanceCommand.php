@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\MarketplaceOrder;
 use App\Models\Store;
 use App\Services\MarketplaceSyncService;
 use Carbon\Carbon;
@@ -233,90 +232,42 @@ class MarketplaceSyncFinanceCommand extends Command
             $tiktokFinanceSupported = in_array($channelCode, ['tiktok', 'ttk', 'tkt'], true);
 
             if ($tiktokFinanceSupported && ! $dryRun) {
-                $ordersQuery = MarketplaceOrder::query()
-                    ->where('store_id', $store->id)
-                    ->whereBetween('ordered_at', [
-                        Carbon::createFromTimestamp($targetDate, config('app.timezone')),
-                        Carbon::createFromTimestamp($syncEndTimestamp, config('app.timezone')),
-                    ])
-                    ->orderBy('id');
-
-                if ($missingOnly) {
-                    $ordersQuery->where(function ($query): void {
-                        $query->whereDoesntHave('settlement')
-                            ->orWhereHas('settlement', function ($settlement): void {
-                                $settlement->where('data_status', '!=', 'complete')
-                                    ->orWhereNull('data_status');
-                            });
-                    });
-                }
-
-                $tiktokOrders = $ordersQuery->get();
                 $tiktokProgressKey = "marketplace:settlement_sync_progress:{$store->id}";
-                Cache::put($tiktokProgressKey, [
-                    'status' => 'running',
-                    'phase' => 'tiktok_finance',
-                    'percent' => $tiktokOrders->isEmpty() ? 100 : 5,
-                    'found' => $tiktokOrders->count(),
-                    'processed' => 0,
-                    'synced' => 0,
-                    'pending' => 0,
-                    'errors' => 0,
-                    'label' => $tiktokOrders->isEmpty()
-                        ? 'Tidak ada order TikTok yang perlu diproses.'
-                        : "Menarik Finance TikTok untuk {$tiktokOrders->count()} order…",
-                    'store_id' => $store->id,
-                    'store_name' => $store->name,
-                ], 1800);
-                $tiktokSynced = 0;
-                $tiktokPending = 0;
-                $tiktokErrors = 0;
-                foreach ($tiktokOrders as $index => $tiktokOrder) {
-                    try {
-                        $finance = $syncService->syncTikTokOrderFinance($store, $tiktokOrder);
-                        if (($finance['status'] ?? null) === 'synced') {
-                            $tiktokSynced++;
-                            $totalSyncedToFinance++;
-                        } elseif (($finance['status'] ?? null) === 'pending') {
-                            $tiktokPending++;
-                        } elseif (($finance['status'] ?? null) === 'error') {
-                            $tiktokErrors++;
-                            $failureCount++;
-                        }
-                    } catch (\Throwable $e) {
-                        $tiktokErrors++;
-                        $failureCount++;
-                        $this->warn("   TikTok finance {$tiktokOrder->channel_order_id} gagal: {$e->getMessage()}");
-                    }
+                $tiktokResult = $syncService->syncTikTokFinance(
+                    $store,
+                    $targetDate,
+                    $syncEndTimestamp,
+                    $missingOnly,
+                    function (array $progress) use ($tiktokProgressKey, $store): void {
+                        Cache::put($tiktokProgressKey, array_merge($progress, [
+                            'store_id' => $store->id,
+                            'store_name' => $store->name,
+                        ]), 1800);
+                    },
+                    self::SETTLEMENT_BATCH_LIMIT,
+                );
 
-                    Cache::put($tiktokProgressKey, [
-                        'status' => 'running',
-                        'phase' => 'tiktok_finance',
-                        'percent' => $tiktokOrders->count() > 0
-                            ? min(99, (int) round((($index + 1) / $tiktokOrders->count()) * 100))
-                            : 100,
-                        'found' => $tiktokOrders->count(),
-                        'processed' => $index + 1,
-                        'synced' => $tiktokSynced,
-                        'pending' => $tiktokPending,
-                        'errors' => $tiktokErrors,
-                        'label' => "Finance TikTok: ".($index + 1)."/{$tiktokOrders->count()} order diproses…",
-                        'store_id' => $store->id,
-                        'store_name' => $store->name,
-                    ], 1800);
-                }
+                $tiktokSynced = (int) ($tiktokResult['synced'] ?? 0);
+                $tiktokPending = (int) ($tiktokResult['pending'] ?? 0);
+                $tiktokErrors = (int) ($tiktokResult['errors'] ?? 0) + (int) ($tiktokResult['estimate_errors'] ?? 0);
+                $estimateUpdated = (int) ($tiktokResult['estimates_updated'] ?? 0);
+                $totalSyncedToFinance += $tiktokSynced;
+                $failureCount += $tiktokErrors;
 
-                $this->info("   TikTok Finance: {$tiktokSynced} settled, {$tiktokPending} belum settled, {$tiktokErrors} error.");
+                $this->info("   TikTok Finance: {$tiktokSynced} settled, {$tiktokPending} belum settled, "
+                    . "{$estimateUpdated} estimasi diperbarui, {$tiktokErrors} error.");
                 Cache::put($tiktokProgressKey, [
                     'status' => $tiktokErrors > 0 ? ($tiktokSynced > 0 ? 'warn' : 'error') : 'success',
                     'phase' => 'store_done',
                     'percent' => 100,
-                    'found' => $tiktokOrders->count(),
-                    'processed' => $tiktokOrders->count(),
+                    'found' => $tiktokResult['found'] ?? 0,
+                    'processed' => $tiktokResult['processed'] ?? 0,
                     'synced' => $tiktokSynced,
                     'pending' => $tiktokPending,
                     'errors' => $tiktokErrors,
-                    'label' => "Finance TikTok selesai: {$tiktokSynced} settled, {$tiktokPending} belum settled, {$tiktokErrors} error.",
+                    'estimates_updated' => $estimateUpdated,
+                    'label' => "Finance TikTok selesai: {$tiktokSynced} settled, {$tiktokPending} belum settled, "
+                        . "{$estimateUpdated} estimasi diperbarui, {$tiktokErrors} error.",
                     'store_id' => $store->id,
                     'store_name' => $store->name,
                 ], 1800);

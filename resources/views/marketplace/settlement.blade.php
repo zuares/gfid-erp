@@ -789,6 +789,14 @@
         }
 
         const connection = String(store.connection_status || '').toUpperCase();
+        if (isTikTokStore(store) && String(store.meta?.tiktok_finance_scope_status || '').toLowerCase() === 'missing') {
+            return {
+                key: 'attention',
+                label: 'Scope Finance belum aktif',
+                icon: 'bi-shield-exclamation',
+                note: 'Aktifkan seller.finance.info, lalu hubungkan ulang toko TikTok.',
+            };
+        }
         if (connection === 'CONNECTED') {
             return { key: 'ready', label: 'Siap sync', icon: 'bi-check-circle', note: isTikTokStore(store) ? 'Finance API TikTok v202501 siap.' : 'Credential aktif.' };
         }
@@ -806,6 +814,10 @@
 
     function getStoreAction(store, state) {
         if (state.key !== 'attention' || !isFinanceStore(store)) return null;
+        if (isTikTokStore(store)
+            && String(store.meta?.tiktok_finance_scope_status || '').toLowerCase() === 'missing') {
+            return { url: '/marketplace/tiktok/connect', label: 'Hubungkan ulang' };
+        }
         if (String(store.connection_status || '').toUpperCase() === 'NOT_CONNECTED') {
             return { url: isTikTokStore(store) ? '/marketplace/tiktok/connect' : '/marketplace/shopee/connect', label: 'Hubungkan' };
         }

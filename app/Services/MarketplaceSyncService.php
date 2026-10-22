@@ -987,9 +987,15 @@ class MarketplaceSyncService
 
         $response = $this->gateway->getOrderStatementTransactions($store, $orderId);
         if (! empty($response['error']) || (isset($response['code']) && (int) $response['code'] !== 0)) {
-            $message = (string) ($response['message'] ?? $response['error'] ?? 'Finance TikTok gagal diambil.');
+            $scopeMissing = $this->isTikTokFinanceScopeError($response);
+            $message = $scopeMissing
+                ? 'TikTok Finance membutuhkan scope seller.finance.info. Aktifkan scope tersebut di Partner Center, lalu revoke dan hubungkan ulang toko TikTok.'
+                : (string) ($response['message'] ?? $response['error'] ?? 'Finance TikTok gagal diambil.');
+            $this->setTikTokFinanceScopeStatus($store, $scopeMissing ? 'missing' : 'unknown');
             $order->update([
-                'settlement_sync_error_code' => 'tiktok_finance_api_error',
+                'settlement_sync_error_code' => $scopeMissing
+                    ? 'tiktok_finance_scope_missing'
+                    : 'tiktok_finance_api_error',
                 'settlement_sync_failed_at' => now(),
                 'settlement_sync_last_attempt_at' => now(),
             ]);
@@ -998,6 +1004,7 @@ class MarketplaceSyncService
         }
 
         $data = is_array($response['data'] ?? null) ? $response['data'] : [];
+        $this->setTikTokFinanceScopeStatus($store, 'granted');
         $skuTransactions = is_array($data['sku_transactions'] ?? null)
             ? array_values($data['sku_transactions'])
             : [];
@@ -1090,12 +1097,43 @@ class MarketplaceSyncService
         ];
     }
 
+    private function isTikTokFinanceScopeError(array $response): bool
+    {
+        $code = (string) ($response['code'] ?? '');
+        $message = strtolower((string) ($response['message'] ?? $response['error'] ?? ''));
+
+        return $code === '105005'
+            || str_contains($message, 'scope')
+            || str_contains($message, 'permission')
+            || str_contains($message, 'access denied');
+    }
+
+    private function setTikTokFinanceScopeStatus(Store $store, string $status): void
+    {
+        try {
+            $meta = is_array($store->meta) ? $store->meta : [];
+            if (($meta['tiktok_finance_scope_status'] ?? null) === $status) {
+                return;
+            }
+
+            $meta['tiktok_finance_scope_status'] = $status;
+            $meta['tiktok_finance_scope_checked_at'] = now()->toISOString();
+            $store->update(['meta' => $meta]);
+        } catch (\Throwable $e) {
+            Log::debug('[TikTok Finance] Gagal menyimpan status scope finance', [
+                'store_id' => $store->id,
+                'status' => $status,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     /**
      * Sinkronkan statement Finance TikTok untuk order lokal dalam satu toko.
      * Endpoint Finance TikTok bekerja per order, sehingga orkestrasi batch perlu
      * tetap berada di service agar tombol UI dan command memakai mapping yang sama.
      *
-     * @return array{found:int,processed:int,synced:int,pending:int,skipped:int,errors:int,last_processed_id:int|null,message:string}
+     * @return array{found:int,processed:int,synced:int,pending:int,skipped:int,errors:int,unsettled_found:int,estimates_updated:int,estimates_unmatched:int,estimate_errors:int,last_processed_id:int|null,message:string}
      */
     public function syncTikTokFinance(
         Store $store,
@@ -1139,6 +1177,12 @@ class MarketplaceSyncService
             ->limit($limit);
 
         $orders = $ordersQuery->get();
+        $estimateSummary = $this->syncTikTokUnsettledEstimates(
+            $store,
+            $timeFrom,
+            $timeTo,
+            $orders,
+        );
         $summary = [
             'found' => $orders->count(),
             'processed' => 0,
@@ -1146,6 +1190,10 @@ class MarketplaceSyncService
             'pending' => 0,
             'skipped' => 0,
             'errors' => 0,
+            'unsettled_found' => $estimateSummary['found'],
+            'estimates_updated' => $estimateSummary['updated'],
+            'estimates_unmatched' => $estimateSummary['unmatched'],
+            'estimate_errors' => $estimateSummary['errors'],
             'last_processed_id' => null,
         ];
 
@@ -1204,7 +1252,153 @@ class MarketplaceSyncService
             ]);
         }
 
-        $summary['message'] = "Finance TikTok selesai: {$summary['synced']} settled, {$summary['pending']} belum settled, {$summary['errors']} error.";
+        $summary['message'] = "Finance TikTok selesai: {$summary['synced']} settled, {$summary['pending']} belum settled, "
+            . "{$summary['estimates_updated']} estimasi diperbarui, {$summary['errors']} error.";
+
+        return $summary;
+    }
+
+    /**
+     * Sinkronkan estimasi transaksi TikTok yang belum cair.
+     *
+     * Get Unsettled Transactions adalah endpoint batch. Ia mengembalikan
+     * transaksi order/adjustment dengan nominal estimasi yang dapat berubah,
+     * sehingga hasilnya disimpan di MarketplaceOrderIncomeEstimate dan tidak
+     * pernah menimpa final_income atau settlement_time.
+     *
+     * @param  \Illuminate\Support\Collection<int,MarketplaceOrder>  $orders
+     * @return array{found:int,updated:int,unmatched:int,errors:int,pages:int}
+     */
+    private function syncTikTokUnsettledEstimates(
+        Store $store,
+        ?int $timeFrom,
+        ?int $timeTo,
+        $orders,
+    ): array {
+        $summary = [
+            'found' => 0,
+            'updated' => 0,
+            'unmatched' => 0,
+            'errors' => 0,
+            'pages' => 0,
+        ];
+
+        if ($timeFrom === null || $timeTo === null) {
+            return $summary;
+        }
+
+        $ordersByChannelId = $orders
+            ->filter(fn (MarketplaceOrder $order): bool => filled($order->channel_order_id))
+            ->keyBy(fn (MarketplaceOrder $order): string => (string) $order->channel_order_id);
+        $pageToken = '';
+        $maxPages = 100;
+
+        try {
+            do {
+                $summary['pages']++;
+                $response = $this->gateway->getUnsettledTransactions(
+                    $store,
+                    $timeFrom,
+                    $timeTo,
+                    $pageToken,
+                    100,
+                );
+
+                if (! empty($response['error'])
+                    || (($response['code'] ?? null) !== null && (string) $response['code'] !== '0')) {
+                    $summary['errors']++;
+                    Log::warning('[TikTok Finance] Get unsettled transactions gagal', [
+                        'store_id' => $store->id,
+                        'code' => $response['code'] ?? null,
+                        'message' => $response['message'] ?? $response['error'] ?? null,
+                    ]);
+                    break;
+                }
+
+                $transactions = data_get($response, 'data.transactions', []);
+                if (! is_array($transactions)) {
+                    $transactions = [];
+                }
+
+                foreach ($transactions as $transaction) {
+                    if (! is_array($transaction)) {
+                        continue;
+                    }
+
+                    $summary['found']++;
+                    $orderId = trim((string) ($transaction['order_id'] ?? ''));
+                    $estimatedSettlement = $this->decimalValue(
+                        $transaction['est_settlement_amount'] ?? null
+                    );
+
+                    // Adjustment-only rows do not map to an order settlement.
+                    if ($orderId === '' || $estimatedSettlement === null) {
+                        $summary['unmatched']++;
+                        continue;
+                    }
+
+                    $order = $ordersByChannelId->get($orderId);
+                    if (! $order) {
+                        $order = MarketplaceOrder::query()
+                            ->where('store_id', $store->id)
+                            ->where('channel_order_id', $orderId)
+                            ->first();
+                    }
+
+                    if (! $order) {
+                        $summary['unmatched']++;
+                        continue;
+                    }
+
+                    $settlement = $order->settlement;
+                    if ($settlement?->settlement_time
+                        || $settlement?->data_status === MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE) {
+                        continue;
+                    }
+
+                    MarketplaceOrderIncomeEstimate::updateOrCreate(
+                        [
+                            'store_id' => $store->id,
+                            'channel_order_id' => $orderId,
+                        ],
+                        [
+                            'marketplace_order_id' => $order->id,
+                            // Legacy table stores Shopee's pending value as 2.
+                            'income_status' => 2,
+                            'estimated_escrow_amount' => $estimatedSettlement,
+                            'estimated_payout_at' => $this->normalizeShopeeTimestamp(
+                                $transaction['estimated_settlement'] ?? null
+                            ),
+                            'payment_method' => null,
+                            'status_description' => $transaction['unsettled_reason'] ?? 'UNSETTLED',
+                            'currency' => $transaction['currency'] ?? null,
+                            'source_created_at' => $this->normalizeShopeeTimestamp(
+                                $transaction['order_create_time'] ?? null
+                            ),
+                            'synced_at' => now(),
+                            'raw_json' => [
+                                'source' => 'tiktok_finance_202507_orders_unsettled',
+                                'transaction' => $transaction,
+                            ],
+                        ],
+                    );
+                    $summary['updated']++;
+                }
+
+                $nextPageToken = trim((string) data_get($response, 'data.next_page_token', ''));
+                if ($nextPageToken === '' || $nextPageToken === $pageToken) {
+                    break;
+                }
+
+                $pageToken = $nextPageToken;
+            } while ($summary['pages'] < $maxPages);
+        } catch (\Throwable $e) {
+            $summary['errors']++;
+            Log::warning('[TikTok Finance] Exception saat mengambil unsettled transactions', [
+                'store_id' => $store->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return $summary;
     }

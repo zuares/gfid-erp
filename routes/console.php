@@ -163,6 +163,20 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-settlements', [
     ->name('sync-recent-settlements')
     ->withoutOverlapping();
 
+// TikTok tidak masuk ke sync-settlements karena tidak memiliki endpoint
+// escrow Shopee. Jalankan Finance v202501 + estimasi unsettled v202507 pada
+// jendela order terbaru agar halaman settlement ikut berubah seperti Orders.
+Schedule::call(fn () => Artisan::call('marketplace:sync-finance', [
+        '--from' => now()->subDays(3)->toDateString(),
+        '--to' => now()->toDateString(),
+        '--mode' => 'full',
+        '--channel' => 'tiktok',
+        '--store_id' => 'all',
+    ]))
+    ->everyFiveMinutes()
+    ->name('sync-recent-tiktok-finance')
+    ->withoutOverlapping();
+
 Schedule::call(fn () => Artisan::call('marketplace:sync-settlements', [
         '--all' => true,
     ]))
