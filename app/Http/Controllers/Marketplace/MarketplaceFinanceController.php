@@ -109,7 +109,9 @@ class MarketplaceFinanceController extends Controller
             ->paginate(10, ['*'], 'fee_type_page')
             ->withQueryString();
         $byType->setCollection($byType->getCollection()->map(fn ($row): array => [
-                'label' => $row->label ?: $row->code,
+                'label' => $row->code === 'unmapped_adjustment'
+                    ? 'Selisih settlement belum terpetakan'
+                    : ($row->label ?: $row->code),
                 'code' => $row->code,
                 'amount' => round((float) $row->amount, 2),
                 'count' => (int) $row->count,

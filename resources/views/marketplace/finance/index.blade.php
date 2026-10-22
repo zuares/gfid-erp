@@ -14,19 +14,11 @@
         ];
     @endphp
 
-    <div class="finance-view-header d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
-        <div>
-            <div class="finance-eyebrow mb-1">Financial overview</div>
-            <h2 class="finance-page-title h4 mb-1">Ringkasan performa finance</h2>
-            <div class="finance-page-subtitle finance-caption">KPI dihitung dari transaksi dan settlement yang sesuai filter analitik.</div>
-        </div>
-        <span class="badge rounded-pill text-bg-light border px-3 py-2">{{ number_format($report['summary']['transaction_count']) }} transaksi terfilter</span>
-    </div>
-
+    <section class="finance-tab-panel finance-overview" aria-label="Ringkasan performa finance">
     <div class="row g-3 mb-4">
         @foreach ($cards as $card)
             <div class="col-12 col-sm-6 col-xl-3">
-                <div class="finance-card finance-kpi card h-100">
+                <div class="finance-card finance-kpi finance-section-card card h-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <span class="text-muted small">{{ $card['label'] }}</span>
@@ -41,7 +33,7 @@
 
     <div class="row g-3">
         <div class="col-12 col-xl-5">
-            <div class="finance-card card h-100">
+            <div class="finance-card finance-section-card card h-100">
                 <div class="card-body">
                     <h2 class="h6">Status rekonsiliasi</h2>
                     <div class="row g-2 text-center mt-2">
@@ -58,7 +50,7 @@
             </div>
         </div>
         <div class="col-12 col-xl-7">
-            <div class="finance-card card h-100">
+            <div class="finance-card finance-section-card card h-100">
                 <div class="card-body">
                     <h2 class="h6">Akses cepat</h2>
                     <div class="d-flex flex-wrap gap-2 mt-3">
@@ -74,7 +66,7 @@
 
     <div class="row g-3 mt-1">
         <div class="col-12 col-xl-7">
-            <div class="finance-card card h-100">
+            <div class="finance-card finance-section-card card h-100">
                 <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
                     <div><div class="finance-section-meta">Aktivitas terbaru</div><h2 class="h6 mb-0 mt-1">Transactions</h2></div>
                     <a class="btn btn-sm btn-light border" href="{{ route('marketplace.finance.transactions', request()->query()) }}">Lihat semua</a>
@@ -102,7 +94,7 @@
             </div>
         </div>
         <div class="col-12 col-xl-5">
-            <div class="finance-card card h-100">
+            <div class="finance-card finance-section-card card h-100">
                 <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
                     <div><div class="finance-section-meta">Payout terbaru</div><h2 class="h6 mb-0 mt-1">Settlements</h2></div>
                     <a class="btn btn-sm btn-light border" href="{{ route('marketplace.finance.settlements', request()->query()) }}">Lihat semua</a>
@@ -130,4 +122,5 @@
             </div>
         </div>
     </div>
+    </section>
 @endsection

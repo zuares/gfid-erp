@@ -144,6 +144,49 @@ class MarketplaceFinanceUiTest extends TestCase
             ->assertSee('Menampilkan 1–50 dari 51 transaksi');
     }
 
+    public function test_settlements_render_a_settlement_sidebar(): void
+    {
+        $this->get('/marketplace/finance/settlements?date_from=2026-10-01&date_to=2026-10-22')
+            ->assertOk()
+            ->assertSee('Filter settlement')
+            ->assertSee('Periode settlement')
+            ->assertSee('1 aktif');
+    }
+
+    public function test_fee_analysis_explains_unmapped_settlement_adjustment(): void
+    {
+        $store = Store::create([
+            'code' => 'FEE-UNMAPPED-STORE',
+            'name' => 'Fee Unmapped Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $transaction = MarketplaceFinancialTransaction::create([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'order_sn' => 'FEE-UNMAPPED-ORDER-001',
+            'currency' => 'IDR',
+            'gross_amount' => 120000,
+            'net_amount' => 100000,
+            'escrow_status' => EscrowStatus::FINALIZED,
+            'income_status' => IncomeStatus::RELEASED,
+        ]);
+        MarketplaceFinancialComponent::create([
+            'financial_transaction_id' => $transaction->id,
+            'component_code' => 'unmapped_adjustment',
+            'component_name' => 'Unmapped Settlement Adjustment',
+            'amount' => 20000,
+            'direction' => ComponentDirection::DEBIT,
+            'dedupe_key' => str_repeat('m', 64),
+        ]);
+
+        $this->get('/marketplace/finance/fee-analysis?store_id='.$store->id)
+            ->assertOk()
+            ->assertSee('Selisih settlement belum terpetakan')
+            ->assertSee('Sisa dari gross − net setelah komponen yang dikenali.')
+            ->assertSee('Bukan otomatis biaya marketplace; perlu ditelusuri.');
+    }
+
     public function test_fee_analysis_aggregates_in_sql_and_paginates_orders(): void
     {
         $store = Store::create([

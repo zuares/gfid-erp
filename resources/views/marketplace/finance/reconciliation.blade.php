@@ -23,17 +23,7 @@
         ];
     @endphp
 
-    <div class="finance-view-header d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
-        <div>
-            <div class="finance-eyebrow mb-1">Audit finance</div>
-            <h2 class="finance-page-title h4 mb-1">Rekonsiliasi transaksi</h2>
-            <div class="finance-page-subtitle finance-caption">Periksa status order, escrow, fee, settlement, dan jurnal dalam satu tampilan.</div>
-        </div>
-        <div class="text-md-end">
-            <div class="finance-section-meta">Transaksi terfilter</div>
-            <div class="h5 mb-0">{{ number_format($summary['transaction_count']) }}</div>
-        </div>
-    </div>
+    <section class="finance-tab-panel finance-reconciliation" aria-label="Rekonsiliasi transaksi marketplace">
 
     <div class="finance-callout mb-4">
         <i class="bi bi-info-circle-fill"></i>
@@ -41,6 +31,7 @@
             <strong>Aturan rekonsiliasi saat ini</strong>
             <span>Invoice dan shipment bersifat opsional untuk finance. HPP tetap mengikuti jurnal shipment; halaman ini fokus pada transaksi marketplace dan settlement.</span>
         </div>
+        <span class="finance-section-count ms-auto">{{ number_format($summary['transaction_count']) }} transaksi</span>
     </div>
 
     <div class="row g-3 mb-3">
@@ -60,7 +51,7 @@
         @endforeach
     </div>
 
-    <div class="finance-card card mb-3">
+    <div class="finance-card finance-section-card card mb-3">
         <div class="card-body py-2">
             <div class="row g-3 align-items-center">
                 <div class="col-12 col-md-4">
@@ -79,7 +70,7 @@
         </div>
     </div>
 
-    <div class="finance-card card mb-3">
+    <div class="finance-card finance-section-card card mb-3">
         <div class="card-header bg-white border-0 px-0 pt-3">
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 px-md-4">
                 <div>
@@ -141,7 +132,7 @@
         @endif
     </div>
 
-    <div class="finance-card card">
+    <div class="finance-card finance-section-card card">
         <div class="card-header bg-white border-0 px-0 pt-3">
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 px-md-4">
                 <div>
@@ -184,4 +175,5 @@
             </div>
         @endif
     </div>
+    </section>
 @endsection

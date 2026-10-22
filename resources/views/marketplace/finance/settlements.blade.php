@@ -1,21 +1,19 @@
 @extends('marketplace.finance.layout')
 
+@section('finance-sidebar')
+    @include('marketplace.finance._settlement-sidebar')
+@endsection
+
 @section('finance-content')
     @php $money = fn ($value): string => number_format((float) $value, 2, ',', '.'); @endphp
-    <div class="finance-view-header d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
-        <div>
-            <div class="finance-eyebrow mb-1">Payout marketplace</div>
-            <h2 class="finance-page-title h4 mb-1">Settlements</h2>
-            <div class="finance-page-subtitle finance-caption">Daftar payout yang masuk dari marketplace dan status posting jurnalnya.</div>
-        </div>
-        <span class="badge rounded-pill text-bg-light border px-3 py-2">{{ number_format($rows->total()) }} settlement</span>
-    </div>
-    <div class="finance-card card">
-        <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+    <section class="finance-tab-panel finance-settlements" aria-label="Riwayat settlement marketplace">
+    <div class="finance-card finance-section-card card">
+        <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center gap-3">
             <div>
                 <div class="finance-section-meta">Settlement terfilter</div>
                 <h3 class="h6 mb-0 mt-1">Riwayat penerimaan dana</h3>
             </div>
+            <span class="finance-section-count">{{ number_format($rows->total()) }} settlement</span>
         </div>
         <div class="finance-table-wrap table-responsive">
             <table class="finance-table table table-hover mb-0">
@@ -46,4 +44,5 @@
             </div>
         @endif
     </div>
+    </section>
 @endsection
