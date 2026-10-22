@@ -157,7 +157,7 @@ class DashboardController extends Controller
 
     private function ownerData(): array
     {
-        $cacheKey = 'dashboard.owner.v13.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.owner.v14.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->ownerDataUncached());
     }
@@ -317,7 +317,7 @@ class DashboardController extends Controller
             'po_unreceived'       => $this->poCount(['not_received', 'partially_received'], 'received_status'),
             'po_unpaid'           => $this->poCount(['unpaid', 'partial'], 'payment_status'),
             'reject_total'        => $this->whQty(['REJ-CUT', 'REJ-SEW', 'REJ-FIN', 'REJECT']),
-            'list_todo_items'    => $this->mpUnshippedItemList(12),
+            'list_todo_items'    => $this->mpUnshippedItemList(50),
             'repeat_orders'     => $this->mpRepeatOrderList(8),
             'list_stock'          => $this->stockCriticalList(6),
             'ads_hourly'          => $adsHourly,
@@ -350,7 +350,7 @@ class DashboardController extends Controller
             'stock_out_fg'      => $this->stockOutCount('finished_good'),
             'fg_ready'          => $this->whQty([self::WH['FG'], self::WH['RTS']]),
             'list_todo'         => $this->mpUnshippedList(10),
-            'list_todo_items'   => $this->mpUnshippedItemList(12),
+            'list_todo_items'   => $this->mpUnshippedItemList(50),
             'repeat_orders'     => $this->mpRepeatOrderList(8),
             'list_stock'        => $this->stockCriticalList(6, 'finished_good'),
         ];
