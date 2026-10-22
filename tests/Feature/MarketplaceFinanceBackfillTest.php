@@ -87,6 +87,46 @@ class MarketplaceFinanceBackfillTest extends TestCase
         $this->assertSame(0, MarketplaceFinancialTransaction::count());
     }
 
+    public function test_payout_without_order_mapping_creates_unallocated_settlement_header(): void
+    {
+        $store = $this->store();
+        $bank = Account::create(['code' => 'BF-WALLET-1101', 'name' => 'Wallet Payout Bank', 'type' => 'asset', 'is_cash' => true, 'is_active' => true]);
+        MarketplacePayout::create([
+            'date' => '2026-10-01',
+            'transaction_created_at' => '2026-10-01 09:30:00',
+            'marketplace_name' => 'Shopee',
+            'store_id' => $store->id,
+            'source' => 'shopee_wallet',
+            'amount' => 250000,
+            'bank_account_id' => $bank->id,
+            'external_transaction_id' => 'BF-WALLET-PAYOUT-001',
+            'status' => 'draft',
+            'source_payload' => ['transaction_type' => 'withdrawal', 'amount' => 250000],
+        ]);
+
+        $dryRun = app(\App\Services\Marketplace\Finance\MarketplaceFinanceBackfillService::class)->run([
+            'dry_run' => true,
+            'sources' => ['payouts'],
+        ]);
+
+        $this->assertSame(1, $dryRun['summary']['settlements_created']);
+        $this->assertSame(0, $dryRun['summary']['allocations_created']);
+        $this->assertSame('settlement_without_order_mapping', $dryRun['unmatched_rows'][0]['reason']);
+        $this->assertSame(0, MarketplaceFinanceSettlement::count());
+
+        $this->artisan('marketplace:finance-backfill', [
+            '--apply' => true,
+            '--source' => ['payouts'],
+        ])->assertExitCode(0);
+
+        $settlement = MarketplaceFinanceSettlement::firstOrFail();
+        $this->assertSame('250000.00', (string) $settlement->amount);
+        $this->assertSame('2026-10-01', $settlement->settlement_date->toDateString());
+        $this->assertSame('pending', $settlement->status->value);
+        $this->assertNull($settlement->journal_id);
+        $this->assertSame(0, DB::table('marketplace_finance_settlement_allocations')->count());
+    }
+
     public function test_settlement_backfill_maps_existing_order_invoice_and_shipment_on_first_insert(): void
     {
         $store = $this->store();

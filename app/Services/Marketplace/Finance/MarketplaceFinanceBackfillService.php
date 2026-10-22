@@ -310,12 +310,6 @@ class MarketplaceFinanceBackfillService
         }
         $this->duplicateSource($stats, 'payouts', $store->id.'|'.$channel.'|'.$externalId);
         $items = $this->allocationRows($row->source_payload);
-        if ($items === []) {
-            $this->unmatched($stats, $result, 'payouts', $row->id, 'settlement_without_order_mapping');
-
-            return;
-        }
-
         $settlement = $this->settlement($store, $channel, $externalId, [
             'amount' => $this->nullableAmount($row->amount) ?? '0.00',
             'currency' => 'IDR',
@@ -324,6 +318,15 @@ class MarketplaceFinanceBackfillService
             'status' => $this->settlementStatus($row->status),
             'raw_payload' => $this->legacyPayload('marketplace_payouts', $row->id, $row->source_payload),
         ], $stats);
+
+        // Wallet withdrawals have no order-level mapping. Keep their payout
+        // visible as an unallocated settlement instead of dropping the header
+        // or assigning its amount to an arbitrary order.
+        if ($items === []) {
+            $this->unmatched($stats, $result, 'payouts', $row->id, 'settlement_without_order_mapping');
+
+            return;
+        }
 
         foreach ($items as $index => $item) {
             $orderSn = trim((string) ($item['order_sn'] ?? $item['order_id'] ?? $item['ordersn'] ?? ''));
