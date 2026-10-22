@@ -44,8 +44,8 @@ class MarketplacePayoutTest extends TestCase
         $this->get(route('marketplace.payout'))
             ->assertOk()
             ->assertSee('Payout Shopee')
-            ->assertSee('get_payout_info')
-            ->assertSee('get_payout_detail')
+            ->assertSee('get_wallet_transaction_list')
+            ->assertSee('seller lokal Shopee Indonesia')
             ->assertSee('tanpa cache database');
     }
 
@@ -54,43 +54,43 @@ class MarketplacePayoutTest extends TestCase
         $store = $this->store();
 
         $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($store): void {
-            $mock->shouldReceive('getPayoutInfo')
+            $mock->shouldReceive('getWalletTransactionList')
                 ->once()
-                ->withArgs(function (Store $actual, int $from, int $to, string $cursor, int $pageSize) use ($store): bool {
+                ->withArgs(function (Store $actual, int $pageNo, int $pageSize, int $from, int $to, string $moneyFlow, string $transactionType, ?string $walletType, string $transactionTabType) use ($store): bool {
                     return $actual->is($store)
+                        && $pageNo === 0
+                        && $pageSize === 100
                         && $from === Carbon::createFromFormat('Y-m-d', '2026-08-01', config('app.timezone'))->startOfDay()->timestamp
                         && $to === Carbon::createFromFormat('Y-m-d', '2026-08-10', config('app.timezone'))->endOfDay()->timestamp
-                        && $cursor === 'CURSOR-X'
-                        && $pageSize === 100;
+                        && $moneyFlow === 'MONEY_OUT'
+                        && $transactionType === '201'
+                        && $walletType === null
+                        && $transactionTabType === 'wallet_withdrawals';
                 })
                 ->andReturn([
                     'response' => [
-                        'payout_list' => [
-                            'from_currency' => 'USD',
-                            'payout_currency' => 'IDR',
-                            'from_amount' => 100,
-                            'payout_amount' => 1600000,
-                            'exchange_rate' => '16000',
-                            'payout_time' => 1754395200,
-                            'pay_service' => 'payoneer',
-                            'payee_id' => 'PAYEE-1',
-                            'encrypted_payout_id' => 'ENC-1',
-                        ],
+                        'transaction_list' => [[
+                            'transaction_id' => 'TX-1',
+                            'transaction_type' => 'withdrawal_created',
+                            'amount' => -1600000,
+                            'create_time' => 1754395200,
+                            'status' => 'COMPLETED',
+                            'reason' => 'Withdrawal to bank',
+                        ]],
                         'more' => true,
-                        'next_cursor' => 'CURSOR-Y',
                     ],
                 ]);
         });
 
-        $this->getJson("/api/marketplace/stores/{$store->id}/payout-info?date_from=2026-08-01&date_to=2026-08-10&cursor=CURSOR-X")
+        $this->getJson("/api/marketplace/stores/{$store->id}/payout-info?date_from=2026-08-01&date_to=2026-08-10")
             ->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.items.0.from_currency', 'USD')
+            ->assertJsonPath('data.items.0.from_currency', 'IDR')
             ->assertJsonPath('data.items.0.payout_currency', 'IDR')
             ->assertJsonPath('data.items.0.payout_amount', 1600000)
-            ->assertJsonPath('data.items.0.encrypted_payout_id', 'ENC-1')
+            ->assertJsonPath('data.items.0.transaction_id', 'TX-1')
             ->assertJsonPath('data.more', true)
-            ->assertJsonPath('data.next_cursor', 'CURSOR-Y');
+            ->assertJsonPath('data.next_cursor', '100');
     }
 
     public function test_detail_normalizes_escrow_and_adjustments(): void
@@ -98,23 +98,26 @@ class MarketplacePayoutTest extends TestCase
         $store = $this->store();
 
         $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($store): void {
-            $mock->shouldReceive('getPayoutDetail')
+            $mock->shouldReceive('getWalletTransactionList')
                 ->once()
-                ->withArgs(fn (Store $actual, int $from, int $to, int $pageNo, int $pageSize): bool => $actual->is($store)
+                ->withArgs(fn (Store $actual, int $pageNo, int $pageSize, int $from, int $to, string $moneyFlow, string $transactionType, ?string $walletType, string $transactionTabType): bool => $actual->is($store)
+                    && $pageNo === 100
+                    && $pageSize === 100
                     && $from === Carbon::createFromFormat('Y-m-d', '2026-08-01', config('app.timezone'))->startOfDay()->timestamp
                     && $to === Carbon::createFromFormat('Y-m-d', '2026-08-10', config('app.timezone'))->endOfDay()->timestamp
-                    && $pageNo === 2
-                    && $pageSize === 100)
+                    && $moneyFlow === 'MONEY_OUT'
+                    && $transactionType === '201'
+                    && $walletType === null
+                    && $transactionTabType === 'wallet_withdrawals')
                 ->andReturn([
                     'response' => [
-                        'payout_list' => [[
-                            'payout_info' => [
-                                'payout_currency' => 'IDR',
-                                'payout_amount' => 1600000,
-                                'payout_time' => 1754395200,
-                            ],
-                            'escrow_list' => [['order_sn' => 'ORDER-1', 'escrow_amount' => 1500000, 'currency' => 'USD']],
-                            'offline_adjustment_list' => [['adjustment_amount' => -100]],
+                        'transaction_list' => [[
+                            'transaction_id' => 'TX-1',
+                            'transaction_type' => 'withdrawal_created',
+                            'amount' => -1600000,
+                            'create_time' => 1754395200,
+                            'status' => 'COMPLETED',
+                            'reason' => 'Withdrawal to bank',
                         ]],
                         'more' => false,
                     ],
@@ -125,9 +128,9 @@ class MarketplacePayoutTest extends TestCase
         $this->getJson("/api/marketplace/stores/{$store->id}/payout-detail?date_from=2026-08-01&date_to=2026-08-10&page_no=2")
             ->assertOk()
             ->assertJsonPath('data.items.0.payout_info.payout_amount', 1600000)
-            ->assertJsonPath('data.items.0.escrow_list.0.order_sn', 'ORDER-1')
-            ->assertJsonPath('data.items.0.escrow_list.0.escrow_amount', 1500000)
-            ->assertJsonPath('data.items.0.offline_adjustment_list.0.adjustment_amount', -100)
+            ->assertJsonPath('data.items.0.payout_info.transaction_id', 'TX-1')
+            ->assertJsonPath('data.items.0.escrow_list', [])
+            ->assertJsonPath('data.items.0.offline_adjustment_list', [])
             ->assertJsonMissingPath('data.raw_response._meta');
     }
 
@@ -140,7 +143,7 @@ class MarketplacePayoutTest extends TestCase
         $this->getJson("/api/marketplace/stores/{$store->id}/payout-info?date_from=2026-08-01&date_to=2026-08-16")
             ->assertStatus(422)
             ->assertJsonPath('success', false)
-            ->assertJsonPath('message', 'Rentang tanggal maksimal 15 hari sesuai batas endpoint payout Shopee.');
+            ->assertJsonPath('message', 'Rentang tanggal maksimal 15 hari sesuai batas endpoint wallet payout Shopee.');
     }
 
     public function test_non_shopee_store_is_rejected(): void

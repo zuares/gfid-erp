@@ -36,7 +36,7 @@ class PayoutController extends Controller
             return response()->json(['success' => false, 'message' => 'Tanggal mulai tidak boleh melewati tanggal akhir.'], 422);
         }
         if ($from->diffInSeconds($to) >= 15 * 86400) {
-            return response()->json(['success' => false, 'message' => 'Rentang tanggal maksimal 15 hari sesuai batas endpoint payout Shopee.'], 422);
+            return response()->json(['success' => false, 'message' => 'Rentang tanggal maksimal 15 hari sesuai batas endpoint wallet payout Shopee.'], 422);
         }
 
         try {
@@ -67,7 +67,7 @@ class PayoutController extends Controller
             return response()->json(['success' => false, 'message' => 'Tanggal mulai tidak boleh melewati tanggal akhir.'], 422);
         }
         if ($from->diffInSeconds($to) >= 15 * 86400) {
-            return response()->json(['success' => false, 'message' => 'Rentang tanggal maksimal 15 hari sesuai batas endpoint payout Shopee.'], 422);
+            return response()->json(['success' => false, 'message' => 'Rentang tanggal maksimal 15 hari sesuai batas endpoint wallet payout Shopee.'], 422);
         }
 
         try {

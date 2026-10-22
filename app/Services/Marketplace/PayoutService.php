@@ -8,18 +8,25 @@ use Illuminate\Support\Arr;
 use RuntimeException;
 
 /**
- * Live reader untuk payout Shopee Cross-Border.
+ * Live reader untuk payout wallet Shopee local.
  * Tidak menyimpan atau mengubah data lokal; response Shopee tetap dibawa ke UI.
  */
 class PayoutService
 {
     private const SHOPEE_CODES = ['shopee', 'shp'];
+    private const KNOWN_NON_WITHDRAWAL_TYPES = [
+        '101', '102', '203', 'paid_ads_charge', 'paid-ads-charge',
+        'escrow_verified_add', 'escrow_verified_minus',
+    ];
 
     public function __construct(
         protected MarketplaceApiGateway $gateway,
     ) {}
 
     /**
+     * The wallet endpoint uses an offset in page_no. The UI keeps calling
+     * this field a cursor so the existing pagination contract stays intact.
+     *
      * @return array{items:array<int,array<string,mixed>>,more:bool,next_cursor:string,page_size:int,raw_response:array}
      */
     public function fetchInfo(
@@ -32,36 +39,33 @@ class PayoutService
         $this->assertShopee($store);
 
         $pageSize = min(100, max(1, $pageSize));
-        $response = $this->gateway->getPayoutInfo(
+        $offset = $this->walletOffset($cursor);
+        $response = $this->gateway->getWalletTransactionList(
             $store,
+            $offset,
+            $pageSize,
             $from->timestamp,
             $to->timestamp,
-            trim($cursor),
-            $pageSize,
+            'MONEY_OUT',
+            '201',
+            null,
+            'wallet_withdrawals',
         );
         $this->assertSuccessfulResponse($response);
 
-        $root = data_get($response, 'response');
-        if (! is_array($root)) {
-            $root = $response;
-        }
-
-        $rows = $root['payout_list'] ?? [];
-        if (is_array($rows) && ! array_is_list($rows)) {
-            $rows = [$rows];
-        }
-        if (! is_array($rows)) {
-            $rows = [];
-        }
+        $root = $this->responseRoot($response);
+        $rows = $this->withdrawalRows($root);
+        $more = (bool) ($root['more'] ?? false);
+        $nextOffset = $offset + $pageSize;
 
         return [
             'items' => collect($rows)
                 ->filter(static fn (mixed $row): bool => is_array($row))
-                ->map(fn (array $row): array => $this->normalizeInfo($row))
+                ->map(fn (array $row): array => $this->normalizeWalletInfo($row))
                 ->values()
                 ->all(),
-            'more' => (bool) ($root['more'] ?? false),
-            'next_cursor' => (string) ($root['next_cursor'] ?? ''),
+            'more' => $more,
+            'next_cursor' => $more ? (string) $nextOffset : '',
             'page_size' => $pageSize,
             'raw_response' => $this->withoutMeta($response),
         ];
@@ -81,29 +85,27 @@ class PayoutService
 
         $pageNo = max(1, $pageNo);
         $pageSize = min(100, max(1, $pageSize));
-        $response = $this->gateway->getPayoutDetail(
+        $offset = ($pageNo - 1) * $pageSize;
+        $response = $this->gateway->getWalletTransactionList(
             $store,
+            $offset,
+            $pageSize,
             $from->timestamp,
             $to->timestamp,
-            $pageNo,
-            $pageSize,
+            'MONEY_OUT',
+            '201',
+            null,
+            'wallet_withdrawals',
         );
         $this->assertSuccessfulResponse($response);
 
-        $root = data_get($response, 'response');
-        if (! is_array($root)) {
-            $root = $response;
-        }
-
-        $rows = $root['payout_list'] ?? [];
-        if (! is_array($rows)) {
-            $rows = [];
-        }
+        $root = $this->responseRoot($response);
+        $rows = $this->withdrawalRows($root);
 
         return [
             'items' => collect($rows)
                 ->filter(static fn (mixed $row): bool => is_array($row))
-                ->map(fn (array $row): array => $this->normalizeDetail($row))
+                ->map(fn (array $row): array => $this->normalizeWalletDetail($row))
                 ->values()
                 ->all(),
             'more' => (bool) ($root['more'] ?? false),
@@ -114,52 +116,97 @@ class PayoutService
     }
 
     /** @return array<string,mixed> */
-    private function normalizeInfo(array $row): array
+    private function responseRoot(array $response): array
     {
-        $info = $row['payout_info'] ?? $row;
-        if (! is_array($info)) {
-            $info = [];
+        $root = data_get($response, 'response');
+
+        return is_array($root) ? $root : $response;
+    }
+
+    /** @return array<int,array<string,mixed>> */
+    private function withdrawalRows(array $root): array
+    {
+        $rows = $root['transaction_list'] ?? [];
+        if (! is_array($rows)) {
+            return [];
+        }
+        if (! array_is_list($rows) && (
+            array_key_exists('transaction_id', $rows)
+            || array_key_exists('withdraw_id', $rows)
+            || array_key_exists('amount', $rows)
+        )) {
+            $rows = [$rows];
         }
 
-        $rawTime = $info['payout_time'] ?? null;
+        return collect($rows)
+            ->filter(fn (mixed $row): bool => is_array($row) && $this->isWithdrawal($row))
+            ->values()
+            ->all();
+    }
+
+    private function isWithdrawal(array $row): bool
+    {
+        $type = strtolower(str_replace('-', '_', trim((string) ($row['transaction_type'] ?? $row['type'] ?? ''))));
+        if ($type === '') {
+            return true;
+        }
+        if (in_array($type, array_map(
+            static fn (string $value): string => str_replace('-', '_', $value),
+            self::KNOWN_NON_WITHDRAWAL_TYPES
+        ), true)) {
+            return false;
+        }
+
+        // The request is already filtered by Shopee to withdrawal type 201.
+        // Keep unknown labels for forward compatibility with new withdrawal
+        // labels, while explicitly excluding known wallet outflows.
+        return true;
+    }
+
+    private function walletOffset(string $cursor): int
+    {
+        return max(0, is_numeric($cursor) ? (int) $cursor : 0);
+    }
+
+    /** @return array<string,mixed> */
+    private function normalizeWalletInfo(array $row): array
+    {
+        $amount = $this->numberOrNull(
+            $row['amount']
+                ?? $row['transaction_amount']
+                ?? $row['withdrawal_amount']
+                ?? $row['net_amount']
+        );
+        $amount = $amount === null ? null : abs($amount);
+        $rawTime = $row['create_time'] ?? $row['transaction_time'] ?? null;
+        $transactionId = $row['transaction_id'] ?? $row['withdraw_id'] ?? $row['withdrawal_id'] ?? null;
 
         return [
-            'from_currency' => $info['from_currency'] ?? null,
-            'payout_currency' => $info['payout_currency'] ?? null,
-            'from_amount' => $this->numberOrNull($info['from_amount'] ?? null),
-            'payout_amount' => $this->numberOrNull($info['payout_amount'] ?? null),
-            'exchange_rate' => $info['exchange_rate'] ?? null,
+            'from_currency' => $row['currency'] ?? 'IDR',
+            'payout_currency' => $row['currency'] ?? 'IDR',
+            'from_amount' => $amount,
+            'payout_amount' => $amount,
+            'exchange_rate' => null,
             'payout_time' => is_numeric($rawTime) ? (int) $rawTime : null,
             'payout_at' => $this->timestamp($rawTime)?->toIso8601String(),
-            'pay_service' => $info['pay_service'] ?? null,
-            'payee_id' => $info['payee_id'] ?? null,
-            'encrypted_payout_id' => $info['encrypted_payout_id'] ?? null,
+            'pay_service' => 'Shopee Wallet',
+            'payee_id' => $transactionId,
+            'encrypted_payout_id' => $transactionId,
+            'transaction_id' => $transactionId,
+            'transaction_type' => $row['transaction_type'] ?? $row['type'] ?? null,
+            'status' => $row['status'] ?? null,
+            'reason' => $row['reason'] ?? null,
             'raw' => $row,
         ];
     }
 
     /** @return array<string,mixed> */
-    private function normalizeDetail(array $row): array
+    private function normalizeWalletDetail(array $row): array
     {
-        $info = $this->normalizeInfo((array) ($row['payout_info'] ?? []));
-
-        $escrow = collect($row['escrow_list'] ?? [])
-            ->filter(static fn (mixed $item): bool => is_array($item))
-            ->map(fn (array $item): array => [
-                'order_sn' => (string) ($item['order_sn'] ?? ''),
-                'escrow_amount' => $this->numberOrNull($item['escrow_amount'] ?? null),
-                'currency' => $item['currency'] ?? null,
-                'raw' => $item,
-            ])
-            ->values()
-            ->all();
-
         return [
-            'payout_info' => Arr::except($info, ['raw']),
-            'escrow_list' => $escrow,
-            'offline_adjustment_list' => is_array($row['offline_adjustment_list'] ?? null)
-                ? array_values($row['offline_adjustment_list'])
-                : [],
+            'payout_info' => Arr::except($this->normalizeWalletInfo($row), ['raw']),
+            'escrow_list' => [],
+            'offline_adjustment_list' => [],
             'raw_response' => $row,
         ];
     }
