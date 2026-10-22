@@ -892,6 +892,11 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $response->assertOk()
             ->assertSee('Selisih item')
             ->assertSee('Selisih qty')
+            ->assertSee('<span class="sd-scan-kind" title="Jenis nomor yang dipindai">Order</span>', false)
+            ->assertSee('<dt>No. pesanan</dt>', false)
+            ->assertSee('Qty order')
+            ->assertSee('Qty dikirim')
+            ->assertSee('Selisih qty')
             ->assertSee('data-order-problem="true"', false)
             ->assertSee('data-order-problem="false"', false)
             ->assertSee('S3RDM-6')
@@ -1031,6 +1036,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('<span>No</span><span>SKU Marketplace</span><span>Order</span><span>Ship</span><span>Diff</span><span>Scan Item Gudang</span><span>COGS</span><span>Subtotal COGS</span>', false)
             ->assertSee('>Periksa</div>', false)
             ->assertSee('sd-order-item-review', false)
+            ->assertSee('<span class="sd-scan-kind" title="Jenis nomor yang dipindai">AWB</span>', false)
+            ->assertSee('<span class="sd-order-primary-label">No. resi</span>', false)
             ->assertSee('class="sd-marketplace-sku-value">K5BLK-1</span>', false)
             ->assertDontSee('SKU booking belum tersedia.');
 
@@ -1060,6 +1067,9 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('data-order-platform-highlight="shopee"', false)
             ->assertSee('sd-platform-highlight is-shopee', false)
             ->assertSee('>Shopee</span>', false)
+            ->assertSee('.sd-order-group[data-order-platform-highlight="shopee"] .sd-marketplace-footer', false)
+            ->assertSee('.sd-order-group[data-order-platform-highlight="tiktok"] .sd-marketplace-footer', false)
+            ->assertSee('<dt>No. pesanan</dt>', false)
             ->assertDontSee('Booking ditemukan')
             ->assertSee('sd-marketplace-detail', false);
     }
