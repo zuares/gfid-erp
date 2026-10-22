@@ -1028,7 +1028,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
             ->assertSee('Booking ditemukan')
-            ->assertSee('<span>No</span><span>SKU Marketplace</span><span>Order</span><span>Ship</span><span>Diff</span><span>Kode Item</span><span>COGS</span><span>Subtotal COGS</span>', false)
+            ->assertSee('<span>No</span><span>SKU Marketplace</span><span>Order</span><span>Ship</span><span>Diff</span><span>Scan Item Gudang</span><span>COGS</span><span>Subtotal COGS</span>', false)
             ->assertSee('>Periksa</div>', false)
             ->assertSee('class="sd-marketplace-sku-value">K5BLK-1</span>', false)
             ->assertDontSee('SKU booking belum tersedia.');
@@ -1404,7 +1404,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $response = $this->actingAs($user)
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
-            ->assertSee('<span>No</span><span>SKU Marketplace</span><span>Order</span><span>Ship</span><span>Diff</span><span>Kode Item</span>', false)
+            ->assertSee('<span>No</span><span>SKU Marketplace</span><span>Order</span><span>Ship</span><span>Diff</span><span>Scan Item Gudang</span>', false)
             ->assertSee('TTD-BLK-M')
             ->assertSee('Hitam / Ukuran M')
             ->assertSee('>BOOKING-SPX-SKU-MISMATCH</span>', false)
@@ -1414,7 +1414,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('sd-badge linked', false);
 
         $this->assertMatchesRegularExpression(
-            '/<div class="sd-order-item-diff[^\"]*">\s*<details class="sd-item-review">\s*<summary>Periksa<\/summary>\s*<span class="sd-sku-mismatch">Item berbeda<\/span>\s*<div class="sd-item-review-panel">\s*<strong>Item yang discan<\/strong>/',
+            '/<div class="sd-order-item-diff[^\"]*">\s*Periksa\s*<span class="sd-sku-mismatch">Item berbeda<\/span>\s*<\/div>/',
             $response->getContent(),
         );
     }
@@ -1445,8 +1445,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'ordered_at' => now(),
         ]);
         foreach ([
-            ['sku' => 'MARKETPLACE-SKU-A', 'variant' => 'Varian Hitam M'],
-            ['sku' => 'MARKETPLACE-SKU-B', 'variant' => 'Varian Navy L'],
+            ['sku' => 'MARKETPLACE-SKU-A', 'title' => 'Kaos Olahraga Premium Hitam', 'variant' => 'Varian Hitam M'],
+            ['sku' => 'MARKETPLACE-SKU-B', 'title' => 'Celana Jogger Training Navy', 'variant' => 'Varian Navy L'],
         ] as $marketplaceLine) {
             $sku = $marketplaceLine['sku'];
             $marketplaceItem = Item::create([
@@ -1458,7 +1458,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
                 'marketplace_order_id' => $order->id,
                 'item_id' => $marketplaceItem->id,
                 'internal_item_id' => $marketplaceItem->id,
-                'item_name' => $marketplaceItem->name,
+                'item_name' => $marketplaceLine['title'],
+                'item_name_snapshot' => $marketplaceLine['title'],
                 'model_sku' => $sku,
                 'variant_name' => $marketplaceLine['variant'],
                 'qty' => 1,
@@ -1487,18 +1488,19 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Item order belum cocok: MARKETPLACE-SKU-A, MARKETPLACE-SKU-B')
             ->assertSee('SKU order belum dipasangkan')
             ->assertSee('class="sd-marketplace-sku-value" title="SKU marketplace: MARKETPLACE-SKU-A">MARKETPLACE-SKU-A</span>', false)
+            ->assertSee('class="sd-marketplace-product-name" title="Kaos Olahraga Premium Hitam">Kaos Olahraga Premium Hitam</span>', false)
             ->assertSee('Varian Hitam M')
             ->assertSee('class="sd-marketplace-sku-value" title="SKU marketplace: MARKETPLACE-SKU-B">MARKETPLACE-SKU-B</span>', false)
+            ->assertSee('class="sd-marketplace-product-name" title="Celana Jogger Training Navy">Celana Jogger Training Navy</span>', false)
             ->assertSee('Varian Navy L')
             ->assertSee('Periksa');
 
         $html = $response->getContent();
         preg_match_all('/<div class="sd-order-item [^\"]*sd-qty-breakdown">/', $html, $rows);
-        $this->assertCount(2, $rows[0], 'Only the two scanned item rows should remain; unmatched order items must not create extra rows.');
-        $this->assertSame(2, substr_count($html, '<summary>Periksa</summary>'));
-        $this->assertSame(2, substr_count($html, '<strong>Item yang discan</strong>'));
+        $this->assertCount(4, $rows[0], 'Two unmatched marketplace item rows should be shown alongside the two scanned rows.');
+        $this->assertStringNotContainsString('<details class="sd-item-review">', $html);
+        $this->assertSame(2, preg_match_all('/class="sd-order-item-diff[^\"]*">\s*Periksa/', $html));
         $this->assertDoesNotMatchRegularExpression('/<div class="sd-order-item-code">[^<]*<\/div>\s*<div class="sd-order-item-name">/', $html);
-        $this->assertStringContainsString('<span class="sd-order-item-name">Second scanned item</span>', $html);
     }
 
     public function test_ready_to_ship_and_processed_kilat_orders_are_linked_when_scanned(): void

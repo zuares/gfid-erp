@@ -496,14 +496,14 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-order-item.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 30px; }
 .sd-order-item.sd-has-cogs { grid-template-columns: 30px minmax(0,1fr) 52px 86px 110px; }
 .sd-order-item.sd-has-cogs.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 86px 110px 30px; }
-.sd-items-head.sd-has-marketplace-sku { grid-template-columns: 30px 112px 52px minmax(0,1fr); }
-.sd-items-head.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 30px 112px 52px minmax(0,1fr) 30px; }
-.sd-items-head.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 30px 112px 52px minmax(0,1fr) 86px 110px; }
-.sd-items-head.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 30px 112px 52px minmax(0,1fr) 86px 110px 30px; }
-.sd-order-item.sd-has-marketplace-sku { grid-template-columns: 30px 112px 52px minmax(0,1fr); }
-.sd-order-item.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 30px 112px 52px minmax(0,1fr) 30px; }
-.sd-order-item.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 30px 112px 52px minmax(0,1fr) 86px 110px; }
-.sd-order-item.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 30px 112px 52px minmax(0,1fr) 86px 110px 30px; }
+.sd-items-head.sd-has-marketplace-sku { grid-template-columns: 30px 156px 52px minmax(0,1fr); }
+.sd-items-head.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 30px 156px 52px minmax(0,1fr) 30px; }
+.sd-items-head.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 30px 156px 52px minmax(0,1fr) 86px 110px; }
+.sd-items-head.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 30px 156px 52px minmax(0,1fr) 86px 110px 30px; }
+.sd-order-item.sd-has-marketplace-sku { grid-template-columns: 30px 156px 52px minmax(0,1fr); }
+.sd-order-item.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 30px 156px 52px minmax(0,1fr) 30px; }
+.sd-order-item.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 30px 156px 52px minmax(0,1fr) 86px 110px; }
+.sd-order-item.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 30px 156px 52px minmax(0,1fr) 86px 110px 30px; }
 .sd-item-row.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 30px; }
 .sd-item-row.sd-has-cogs { grid-template-columns: 30px minmax(0,1fr) 52px 86px 110px; }
 .sd-item-row.sd-has-cogs.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 86px 110px 30px; }
@@ -583,6 +583,10 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-action-delete:disabled { opacity: .55; cursor: wait; }
 .sd-order-item-code,
 .sd-item-code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   line-height: 1.2;
 }
 .sd-order-item-name,
@@ -634,6 +638,16 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sd-marketplace-product-name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: #475569;
+  font-size: .65rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .sd-marketplace-unpaired-list {
   display: flex;
   flex-direction: column;
@@ -655,23 +669,23 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
 .sd-order-items-breakdown { overflow-x: auto; }
 .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku,
 .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku {
-  grid-template-columns: 26px 90px 48px 48px minmax(76px,auto) minmax(180px,1fr);
-  min-width: 528px;
+  grid-template-columns: 26px 156px 48px 48px minmax(76px,auto) minmax(180px,1fr);
+  min-width: 594px;
 }
 .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs,
 .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs {
-  grid-template-columns: 26px 90px 48px 48px minmax(76px,auto) minmax(180px,1fr) 76px 84px;
-  min-width: 708px;
+  grid-template-columns: 26px 156px 48px 48px minmax(76px,auto) minmax(180px,1fr) 76px 84px;
+  min-width: 774px;
 }
 .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-actions,
 .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-actions {
-  grid-template-columns: 26px 90px 48px 48px minmax(76px,auto) minmax(180px,1fr) 28px;
-  min-width: 558px;
+  grid-template-columns: 26px 156px 48px 48px minmax(76px,auto) minmax(180px,1fr) 28px;
+  min-width: 624px;
 }
 .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions,
 .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions {
-  grid-template-columns: 26px 90px 48px 48px minmax(76px,auto) minmax(180px,1fr) 76px 84px 28px;
-  min-width: 748px;
+  grid-template-columns: 26px 156px 48px 48px minmax(76px,auto) minmax(180px,1fr) 76px 84px 28px;
+  min-width: 814px;
 }
 .sd-qty-breakdown > .sd-order-item-qty,
 .sd-qty-breakdown > .sd-order-item-diff {
@@ -683,14 +697,6 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
 .sd-order-item-diff.sd-marketplace-ok { color:#15803d; }
 .sd-order-item-diff.sd-marketplace-short { color:#b91c1c; }
 .sd-order-item-diff .sd-sku-mismatch { white-space: normal; }
-.sd-item-review { position: relative; white-space: normal; }
-.sd-item-review > summary { cursor: pointer; font-weight: 800; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
-.sd-item-review > summary:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; border-radius: 2px; }
-.sd-item-review-panel { position: absolute; z-index: 5; top: calc(100% + .25rem); right: 0; width: max-content; max-width: min(260px, 70vw); padding: .55rem .65rem; border: 1px solid rgba(180,83,9,.28); border-radius: 7px; background: #fff; box-shadow: 0 8px 22px rgba(15,23,42,.16); color: #334155; text-align: left; font-size: .68rem; line-height: 1.35; }
-.sd-item-review-panel strong,.sd-item-review-panel span { display: block; }
-.sd-item-review-panel strong { margin-bottom: .2rem; color: #92400e; }
-.sd-item-review-panel .sd-order-item-name { max-width: 230px; white-space: normal; }
-body[data-theme="dark"] .sd-item-review-panel { background: #1e293b; border-color: rgba(251,191,36,.35); color: #e2e8f0; }
 @media(max-width:600px){
   .sd-items-head,
   .sd-order-item,
@@ -704,22 +710,22 @@ body[data-theme="dark"] .sd-item-review-panel { background: #1e293b; border-colo
   .sd-items-head.sd-has-cogs.sd-has-actions,
   .sd-order-item.sd-has-cogs.sd-has-actions,
   .sd-item-row.sd-has-cogs.sd-has-actions { grid-template-columns: 26px minmax(0,1fr) 44px 76px 84px 28px; }
-  .sd-items-head.sd-has-marketplace-sku { grid-template-columns: 26px 90px 44px minmax(0,1fr); }
-  .sd-items-head.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px 90px 44px minmax(0,1fr) 28px; }
-  .sd-items-head.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px 90px 44px minmax(0,1fr) 76px 84px; }
-  .sd-items-head.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px 90px 44px minmax(0,1fr) 76px 84px 28px; }
-  .sd-order-item.sd-has-marketplace-sku { grid-template-columns: 26px 90px 44px minmax(0,1fr); }
-  .sd-order-item.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px 90px 44px minmax(0,1fr) 28px; }
-  .sd-order-item.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px 90px 44px minmax(0,1fr) 76px 84px; }
-  .sd-order-item.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px 90px 44px minmax(0,1fr) 76px 84px 28px; }
+  .sd-items-head.sd-has-marketplace-sku { grid-template-columns: 26px 124px 44px minmax(0,1fr); }
+  .sd-items-head.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px 124px 44px minmax(0,1fr) 28px; }
+  .sd-items-head.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px 124px 44px minmax(0,1fr) 76px 84px; }
+  .sd-items-head.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px 124px 44px minmax(0,1fr) 76px 84px 28px; }
+  .sd-order-item.sd-has-marketplace-sku { grid-template-columns: 26px 124px 44px minmax(0,1fr); }
+  .sd-order-item.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px 124px 44px minmax(0,1fr) 28px; }
+  .sd-order-item.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px 124px 44px minmax(0,1fr) 76px 84px; }
+  .sd-order-item.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px 124px 44px minmax(0,1fr) 76px 84px 28px; }
   .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku,
-  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku { grid-template-columns: 26px 90px 48px 48px minmax(76px,auto) minmax(180px,1fr); }
+  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku { grid-template-columns: 26px 124px 48px 48px minmax(76px,auto) minmax(180px,1fr); }
   .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs,
-  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px 90px 48px 48px minmax(76px,auto) minmax(180px,1fr) 76px 84px; }
+  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px 124px 48px 48px minmax(76px,auto) minmax(180px,1fr) 76px 84px; }
   .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-actions,
-  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px 90px 48px 48px minmax(76px,auto) minmax(180px,1fr) 28px; }
+  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px 124px 48px 48px minmax(76px,auto) minmax(180px,1fr) 28px; }
   .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions,
-  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px 90px 48px 48px minmax(76px,auto) minmax(180px,1fr) 76px 84px 28px; }
+  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px 124px 48px 48px minmax(76px,auto) minmax(180px,1fr) 76px 84px 28px; }
 }
 </style>
 @endpush
@@ -1143,7 +1149,7 @@ body[data-theme="dark"] .sd-item-review-panel { background: #1e293b; border-colo
                         </div>
                         <div class="sd-order-items">
                             @if($ungroupedLines->isNotEmpty())
-                                <div class="sd-items-head {{ $itemGridClass }}"><span>No</span><span>Kode Item</span><span>Qty</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
+                                <div class="sd-items-head {{ $itemGridClass }}"><span>No</span><span>Scan Item Gudang</span><span>Qty</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                             @endif
                             @forelse($ungroupedLines as $line)
                                 <div class="sd-order-item {{ $itemGridClass }}">
@@ -1333,7 +1339,7 @@ body[data-theme="dark"] .sd-item-review-panel { background: #1e293b; border-colo
                                 @if(!$scan->fulfillment?->marketplaceOrder)
                                     <div class="sd-order-items {{ $hasBookingOnly ? 'sd-order-items-breakdown' : '' }}">
                                         @if($orderLines->isNotEmpty())
-                                            <div class="sd-items-head {{ $orderItemGridClass }} {{ $hasBookingOnly ? 'sd-qty-breakdown' : '' }}"><span>No</span><span>SKU Marketplace</span>@if($hasBookingOnly)<span>Order</span><span>Ship</span><span>Diff</span>@else<span>Qty</span>@endif<span>Kode Item</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
+                                            <div class="sd-items-head {{ $orderItemGridClass }} {{ $hasBookingOnly ? 'sd-qty-breakdown' : '' }}"><span>No</span><span>SKU Marketplace</span>@if($hasBookingOnly)<span>Order</span><span>Ship</span><span>Diff</span>@else<span>Qty</span>@endif<span>Scan Item Gudang</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                                         @endif
                                         @forelse($orderLines as $line)
                                             @php
@@ -1428,10 +1434,23 @@ body[data-theme="dark"] .sd-item-review-panel { background: #1e293b; border-colo
                                                             'marketplace_line' => $marketplaceLine,
                                                         ];
                                                     });
+                                                } else {
+                                                    foreach ($unmatchedMarketplaceLines as $unmatchedLine) {
+                                                        $unmatchedItemId = (int) ($unmatchedLine->internal_item_id ?: $unmatchedLine->item_id);
+                                                        if ($unmatchedItemId > 0 && !$orderLines->contains(fn ($line) => (int) $line->item_id === $unmatchedItemId)) {
+                                                            $displayLines->push((object) [
+                                                                'id' => null,
+                                                                'item_id' => $unmatchedItemId,
+                                                                'item' => $unmatchedLine->internalItem,
+                                                                'qty_scanned' => 0,
+                                                                'marketplace_line' => $unmatchedLine,
+                                                            ]);
+                                                        }
+                                                    }
                                                 }
                                             @endphp
                                             <div class="sd-order-items sd-order-items-breakdown">
-                                                <div class="sd-items-head {{ $orderItemGridClass }} sd-qty-breakdown"><span>No</span><span>SKU Marketplace</span><span>Order</span><span>Ship</span><span>Diff</span><span>Kode Item</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
+                                                <div class="sd-items-head {{ $orderItemGridClass }} sd-qty-breakdown"><span>No</span><span>SKU Marketplace</span><span>Order</span><span>Ship</span><span>Diff</span><span>Scan Item Gudang</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                                                 @foreach($displayLines as $line)
                                                     @php
                                                         $matchedMarketplaceLine = $line->marketplace_line ?? $marketplaceLines->first(function ($candidate) use ($line, $sourceItemMatchesShipmentLine) {
@@ -1445,6 +1464,7 @@ body[data-theme="dark"] .sd-item-review-panel { background: #1e293b; border-colo
                                                         // Tampilkan SKU asli dari payload marketplace saja.
                                                         // Jangan gunakan marketplace_sku hasil mapping nama atau kode internal.
                                                         $marketplaceSku = $marketplaceLine?->model_sku ?: $marketplaceLine?->marketplace_sku ?: $marketplaceLine?->item_sku ?: '—';
+                                                        $marketplaceTitle = trim((string) ($marketplaceLine?->item_name ?: $marketplaceLine?->item_name_snapshot ?: ''));
                                                         $marketplaceVariant = trim((string) ($marketplaceLine?->variant_name ?: $marketplaceLine?->variant_snapshot ?: ''));
                                                         $unpairedMarketplaceLines = $itemMismatch && !$singleLineMismatch ? $unmatchedMarketplaceLines : collect();
                                                         $qtyOrder = $itemMismatch && !$singleLineMismatch
@@ -1462,14 +1482,17 @@ body[data-theme="dark"] .sd-item-review-panel { background: #1e293b; border-colo
                                                                     @foreach($unpairedMarketplaceLines as $unpairedLine)
                                                                         @php
                                                                             $unpairedSku = $unpairedLine->model_sku ?: $unpairedLine->marketplace_sku ?: $unpairedLine->item_sku ?: 'SKU belum tersedia';
+                                                                            $unpairedTitle = trim((string) ($unpairedLine->item_name ?: $unpairedLine->item_name_snapshot ?: ''));
                                                                             $unpairedVariant = trim((string) ($unpairedLine->variant_name ?: $unpairedLine->variant_snapshot ?: ''));
                                                                         @endphp
                                                                         <span class="sd-marketplace-sku-value" title="SKU marketplace: {{ $unpairedSku }}">{{ $unpairedSku }}</span>
+                                                                        @if($unpairedTitle !== '')<span class="sd-marketplace-product-name" title="{{ $unpairedTitle }}">{{ $unpairedTitle }}</span>@endif
                                                                         @if($unpairedVariant !== '')<span class="sd-marketplace-variant" title="{{ $unpairedVariant }}">{{ $unpairedVariant }}</span>@endif
                                                                     @endforeach
                                                                 </div>
                                                             @else
                                                                 <span class="sd-marketplace-sku-value" title="SKU marketplace: {{ $marketplaceSku }}">{{ $marketplaceSku }}</span>
+                                                                @if($marketplaceTitle !== '')<span class="sd-marketplace-product-name" title="{{ $marketplaceTitle }}">{{ $marketplaceTitle }}</span>@endif
                                                                 @if($marketplaceVariant !== '')<span class="sd-marketplace-variant" title="{{ $marketplaceVariant }}">{{ $marketplaceVariant }}</span>@endif
                                                             @endif
                                                             @if($itemMismatch && !$singleLineMismatch && $unpairedMarketplaceLines->isEmpty())<span class="sd-sku-mismatch">Lihat SKU order</span>@endif
@@ -1477,20 +1500,8 @@ body[data-theme="dark"] .sd-item-review-panel { background: #1e293b; border-colo
                                                         <div class="sd-order-item-qty">{{ $qtyOrder === null ? '—' : number_format($qtyOrder, 0, ',', '.') }}</div>
                                                         <div class="sd-order-item-qty">{{ number_format($qtyShipment, 0, ',', '.') }}</div>
                                                         <div class="sd-order-item-diff {{ !$itemMismatch && $difference === 0 ? 'sd-marketplace-ok' : 'sd-marketplace-short' }}">
-                                                            @if($itemMismatch)
-                                                                <details class="sd-item-review">
-                                                                    <summary>Periksa</summary>
-                                                                    @if($singleLineMismatch)<span class="sd-sku-mismatch">Item berbeda</span>@endif
-                                                                    <div class="sd-item-review-panel">
-                                                                        <strong>Item yang discan</strong>
-                                                                        <span>{{ $line->item?->code ?: 'Kode item tidak tersedia' }}</span>
-                                                                        <span class="sd-order-item-name">{{ $line->item?->name ?: 'Nama item tidak tersedia' }}</span>
-                                                                        <span>Qty scan: {{ number_format($qtyShipment, 0, ',', '.') }}</span>
-                                                                    </div>
-                                                                </details>
-                                                            @else
-                                                                {{ ($difference > 0 ? '+' : '') . number_format($difference, 0, ',', '.') }}
-                                                            @endif
+                                                            {{ $itemMismatch ? 'Periksa' : (($difference > 0 ? '+' : '') . number_format($difference, 0, ',', '.')) }}
+                                                            @if($singleLineMismatch)<span class="sd-sku-mismatch">Item berbeda</span>@endif
                                                         </div>
                                                         <div>
                                                             <div class="sd-order-item-code">{{ $line->item?->code ?: ($marketplaceLine?->item_code_snapshot ?: '-') }}</div>
@@ -1526,7 +1537,7 @@ body[data-theme="dark"] .sd-item-review-panel { background: #1e293b; border-colo
                             <div class="sd-order sd-order-group" data-order-card data-order-link-state="unlinked" data-order-search="belum dikelompokkan">
                                 <div class="sd-order-lead"><div><div class="sd-order-no">SISA BELUM TERKELOMPOK</div><div class="sd-muted">Item menunggu nomor order atau belum cocok</div></div></div>
                                 <div class="sd-order-items">
-                                    <div class="sd-items-head {{ $orderItemGridClass }}"><span>No</span><span>SKU Marketplace</span><span>Qty</span><span>Kode Item</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
+                                    <div class="sd-items-head {{ $orderItemGridClass }}"><span>No</span><span>SKU Marketplace</span><span>Qty</span><span>Scan Item Gudang</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                                     @foreach($ungroupedLines as $line)
                                         <div class="sd-order-item {{ $orderItemGridClass }}"><span class="sd-order-item-num">{{ $loop->iteration }}</span><div class="sd-order-item-marketplace-sku">—</div><div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div>@if($canSeeCogs)<div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div><div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>@endif @if($canDeleteShipmentRows)<span class="sd-line-action"><form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">@csrf @method('DELETE')<button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button></form></span>@endif</div>
                                     @endforeach
@@ -1563,7 +1574,7 @@ body[data-theme="dark"] .sd-item-review-panel { background: #1e293b; border-colo
                 <div class="sd-body">
                     <div class="sd-item-list">
                         @if($lines->isNotEmpty())
-                            <div class="sd-items-head sd-item-list-head {{ $itemGridClass }}"><span>No</span><span>Kode Item</span><span>Qty</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
+                            <div class="sd-items-head sd-item-list-head {{ $itemGridClass }}"><span>No</span><span>Scan Item Gudang</span><span>Qty</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                         @endif
                         @forelse($lines as $line)
                             @php
