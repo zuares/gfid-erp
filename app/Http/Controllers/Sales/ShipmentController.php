@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Sales;
 
 use App\Http\Controllers\Controller;
+use App\Models\InventoryMutation;
 use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\MpReconciliation;
@@ -336,10 +337,14 @@ class ShipmentController extends Controller
             return [];
         }
 
-        $stocks = InventoryStock::where('warehouse_id', $warehouse->id)
-            ->whereIn('item_id', $lines->pluck('item_id')->unique())
-            ->get(['item_id', 'qty', 'allocated_qty'])
-            ->keyBy('item_id');
+        $shipment = $wave->relationLoaded('shipment')
+            ? $wave->shipment
+            : $wave->shipment()->firstOrFail();
+        $stockPosition = $this->stockPositionForShipmentDate(
+            $shipment,
+            $warehouse,
+            $lines->pluck('item_id')->unique()->all(),
+        );
 
         $requirements = $lines
             ->groupBy('item_id')
@@ -358,9 +363,8 @@ class ShipmentController extends Controller
             }
 
             $itemId = $requirement['item_id'];
-            $stock = $stocks->get($itemId);
-            $physical = (float) ($stock->qty ?? 0);
-            $allocated = (float) ($stock->allocated_qty ?? 0);
+            $physical = (float) ($stockPosition['physical']->get($itemId, 0));
+            $allocated = (float) ($stockPosition['allocated']->get($itemId, 0));
             $ownAllocation = $requirement['own_allocation'];
             $available = $physical - $allocated + $ownAllocation;
 
@@ -2007,10 +2011,7 @@ class ShipmentController extends Controller
         }
 
         $itemIds = $lines->pluck('item_id')->unique()->toArray();
-        $stocks  = InventoryStock::where('warehouse_id', $warehouse->id)
-            ->whereIn('item_id', $itemIds)
-            ->get(['item_id', 'qty', 'allocated_qty'])
-            ->keyBy('item_id');
+        $stockPosition = $this->stockPositionForShipmentDate($shipment, $warehouse, $itemIds);
 
         $requirements = $lines
             ->groupBy('item_id')
@@ -2027,10 +2028,8 @@ class ShipmentController extends Controller
             if ($qty <= 0) continue;
 
             $itemId = $requirement['item_id'];
-            $stock = $stocks->get($itemId);
-            
-            $physQty    = (float) ($stock->qty ?? 0);
-            $totalAlloc = (float) ($stock->allocated_qty ?? 0);
+            $physQty    = (float) ($stockPosition['physical']->get($itemId, 0));
+            $totalAlloc = (float) ($stockPosition['allocated']->get($itemId, 0));
             $myAlloc    = $requirement['own_allocation'];
 
             // True available = Stok fisik - Total alokasi semua draft + Alokasi milik shipment ini sendiri
@@ -2048,6 +2047,82 @@ class ShipmentController extends Controller
         }
 
         return $errors;
+    }
+
+    /**
+     * Ambil posisi stok untuk tanggal shipment, bukan saldo berjalan hari ini.
+     *
+     * Saldo fisik memakai saldo berjalan dengan membalik mutasi setelah tanggal
+     * shipment; bila belum ada saldo berjalan, ledger sampai tanggal tersebut
+     * dipakai sebagai fallback. Reservasi hanya mengambil draft shipment dengan
+     * tanggal yang sama/lebih awal, sehingga shipment pada tanggal berikutnya
+     * tidak ikut membuat tanggal sebelumnya terlihat kekurangan stok.
+     *
+     * @return array{physical:\Illuminate\Support\Collection, allocated:\Illuminate\Support\Collection}
+     */
+    protected function stockPositionForShipmentDate(Shipment $shipment, Warehouse $warehouse, array $itemIds): array
+    {
+        $itemIds = collect($itemIds)
+            ->filter(fn ($itemId) => (int) $itemId > 0)
+            ->map(fn ($itemId) => (int) $itemId)
+            ->unique()
+            ->values();
+
+        if ($itemIds->isEmpty()) {
+            return [
+                'physical' => collect(),
+                'allocated' => collect(),
+            ];
+        }
+
+        $asOfDate = $shipment->date?->toDateString() ?: now()->toDateString();
+
+        $currentStocks = InventoryStock::query()
+            ->where('warehouse_id', $warehouse->id)
+            ->whereIn('item_id', $itemIds->all())
+            ->get(['item_id', 'qty'])
+            ->keyBy('item_id');
+        $historicalPhysical = InventoryMutation::query()
+            ->where('warehouse_id', $warehouse->id)
+            ->whereIn('item_id', $itemIds->all())
+            ->whereDate('date', '<=', $asOfDate)
+            ->selectRaw('item_id, COALESCE(SUM(qty_change), 0) as qty')
+            ->groupBy('item_id')
+            ->pluck('qty', 'item_id');
+        $futureMutations = InventoryMutation::query()
+            ->where('warehouse_id', $warehouse->id)
+            ->whereIn('item_id', $itemIds->all())
+            ->whereDate('date', '>', $asOfDate)
+            ->selectRaw('item_id, COALESCE(SUM(qty_change), 0) as qty')
+            ->groupBy('item_id')
+            ->pluck('qty', 'item_id');
+        $physical = $itemIds->mapWithKeys(function (int $itemId) use (
+            $currentStocks,
+            $historicalPhysical,
+            $futureMutations,
+        ) {
+            if ($currentStocks->has($itemId)) {
+                return [
+                    $itemId => (float) $currentStocks->get($itemId)->qty
+                        - (float) $futureMutations->get($itemId, 0),
+                ];
+            }
+
+            return [$itemId => (float) $historicalPhysical->get($itemId, 0)];
+        });
+
+        $allocated = ShipmentLine::query()
+            ->join('shipments as reserved_shipments', 'reserved_shipments.id', '=', 'shipment_lines.shipment_id')
+            ->whereNull('reserved_shipments.cancelled_at')
+            ->where('reserved_shipments.status', 'draft')
+            ->whereDate('reserved_shipments.date', '<=', $asOfDate)
+            ->whereIn('shipment_lines.item_id', $itemIds->all())
+            ->where('shipment_lines.allocated_qty', '>', 0)
+            ->selectRaw('shipment_lines.item_id, COALESCE(SUM(shipment_lines.allocated_qty), 0) as allocated_qty')
+            ->groupBy('shipment_lines.item_id')
+            ->pluck('allocated_qty', 'shipment_lines.item_id');
+
+        return compact('physical', 'allocated');
     }
 
     /**

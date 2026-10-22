@@ -3,6 +3,8 @@
 namespace Tests\Feature\Sales;
 
 use App\Models\Channel;
+use App\Models\InventoryMutation;
+use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\MarketplaceBooking;
 use App\Models\MarketplaceOrder;
@@ -16,6 +18,7 @@ use App\Models\ShipmentOrderScan;
 use App\Models\SkuMapping;
 use App\Models\Store;
 use App\Models\User;
+use App\Models\Warehouse;
 use App\Services\MarketplaceSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -87,6 +90,76 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'allocated_qty' => 3,
         ]);
         $this->assertSame(5, (int) ShipmentLine::where('shipment_id', $shipment->id)->sum('qty_scanned'));
+    }
+
+    public function test_confirmation_uses_stock_position_on_shipment_date(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $warehouse = Warehouse::create([
+            'code' => 'WH-RTS',
+            'name' => 'Gudang RTS',
+            'type' => 'finished_goods',
+            'active' => true,
+        ]);
+        $shipmentDate = now()->subDay()->toDateString();
+
+        $shipment = Shipment::create([
+            'code' => 'SHP-STOCK-DATE-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'store_id' => $store->id,
+            'date' => $shipmentDate,
+            'status' => 'draft',
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 2,
+            'allocated_qty' => 2,
+        ]);
+
+        InventoryMutation::create([
+            'date' => $shipmentDate,
+            'warehouse_id' => $warehouse->id,
+            'item_id' => $item->id,
+            'qty_change' => 10,
+            'direction' => 'in',
+            'source_type' => 'test',
+        ]);
+        InventoryMutation::create([
+            'date' => now()->toDateString(),
+            'warehouse_id' => $warehouse->id,
+            'item_id' => $item->id,
+            'qty_change' => -9,
+            'direction' => 'out',
+            'source_type' => 'test',
+        ]);
+        InventoryStock::create([
+            'warehouse_id' => $warehouse->id,
+            'item_id' => $item->id,
+            'qty' => 1,
+            'allocated_qty' => 102,
+        ]);
+
+        $futureShipment = Shipment::create([
+            'code' => 'SHP-STOCK-DATE-002',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'store_id' => $store->id,
+            'date' => now()->addDay()->toDateString(),
+            'status' => 'draft',
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $futureShipment->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 100,
+            'allocated_qty' => 100,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertDontSee('Stok WH-RTS belum cukup untuk shipment ini');
     }
 
     public function test_item_first_confirmation_shows_mapping_error_when_item_is_unassigned(): void
