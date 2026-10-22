@@ -3623,11 +3623,33 @@ class MarketplaceController extends Controller
             }
         } elseif (! $isUnsettledFilter) {
             if ($request->filled('settlement_date_from')) {
-                $query->whereDate('settlement_time', '>=', $request->settlement_date_from);
+                $from = $request->settlement_date_from;
+                $query->where(function ($q) use ($from, $isTikTokFinanceFinal) {
+                    $q->whereDate('settlement_time', '>=', $from)
+                        ->orWhere(function ($q2) use ($from, $isTikTokFinanceFinal) {
+                            // TikTok Finance final tidak selalu mengisi
+                            // settlement_time. Untuk filter Tgl Cair, pakai
+                            // tanggal order sebagai fallback khusus TikTok.
+                            $isTikTokFinanceFinal($q2);
+                            $q2->whereHas('order', function ($oq) use ($from) {
+                                $oq->whereDate('ordered_at', '>=', $from);
+                            });
+                        });
+                });
             }
 
             if ($request->filled('settlement_date_to')) {
-                $query->whereDate('settlement_time', '<=', $request->settlement_date_to);
+                $to = $request->settlement_date_to;
+                $query->where(function ($q) use ($to, $isTikTokFinanceFinal) {
+                    $q->whereDate('settlement_time', '<=', $to)
+                        ->orWhere(function ($q2) use ($to, $isTikTokFinanceFinal) {
+                            // Fallback pasangan untuk batas akhir tanggal.
+                            $isTikTokFinanceFinal($q2);
+                            $q2->whereHas('order', function ($oq) use ($to) {
+                                $oq->whereDate('ordered_at', '<=', $to);
+                            });
+                        });
+                });
             }
         }
 

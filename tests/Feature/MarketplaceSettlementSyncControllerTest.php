@@ -1818,6 +1818,69 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertNotNull($payload['meta']['estimate_last_synced_at']);
     }
 
+    public function test_filter_tanggal_cair_tiktok_memakai_tanggal_order_sebagai_fallback(): void
+    {
+        $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $tiktok->id,
+            'code' => 'TTK-DATE-FILTER',
+            'name' => 'TikTok Date Filter Test',
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => ['access_token' => 'dummy-token'],
+        ]);
+
+        $inside = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-TTK-DATE-IN',
+            'channel_order_id' => 'ORDER-TTK-DATE-IN',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => Carbon::parse('2026-09-23 10:00:00'),
+            'order_date' => Carbon::parse('2026-09-23 10:00:00'),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+        $outside = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-TTK-DATE-OUT',
+            'channel_order_id' => 'ORDER-TTK-DATE-OUT',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => Carbon::parse('2026-10-03 10:00:00'),
+            'order_date' => Carbon::parse('2026-10-03 10:00:00'),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+
+        foreach ([$inside, $outside] as $order) {
+            MarketplaceOrderSettlement::create([
+                'store_id' => $store->id,
+                'order_id' => $order->id,
+                'channel_order_id' => $order->channel_order_id,
+                'buyer_payment_amount' => 100000,
+                'final_income' => 80000,
+                'settlement_time' => null,
+                'data_status' => 'complete',
+                'raw_json' => ['source' => 'tiktok_finance_202501_order_statement_transactions'],
+            ]);
+        }
+
+        $request = Request::create('/api/marketplace/settlements', 'GET', [
+            'store_id' => $store->id,
+            'settlement_status' => 'cair',
+            'settlement_date_from' => '2026-09-01',
+            'settlement_date_to' => '2026-09-30',
+            'page' => 1,
+            'per_page' => 50,
+        ]);
+
+        $payload = app(MarketplaceController::class)->settlements($request)->getData(true);
+        $ids = collect($payload['paginator']['data'])->pluck('channel_order_id')->all();
+
+        $this->assertSame(['ORDER-TTK-DATE-IN'], $ids);
+        $this->assertTrue($payload['paginator']['data'][0]['is_finance_final']);
+        $this->assertNull($payload['paginator']['data'][0]['settlement_time']);
+    }
+
     public function test_kpi_cair_tidak_memakai_estimasi_lama_sebagai_settlement_final(): void
     {
         $store = $this->createStore();
