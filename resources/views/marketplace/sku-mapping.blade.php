@@ -3,8 +3,21 @@
 
 @include('marketplace._shared')
 
+@push('head')
+<style>
+    @media (min-width: 768px) {
+        .app-main .page-wrap:has(.sku-mapping-dashboard) { max-width: none; }
+    }
+
+    .sku-mapping-dashboard {
+        max-width: 1280px;
+        margin-inline: auto;
+    }
+</style>
+@endpush
+
 @section('content')
-<x-gf.page eyebrow="Marketplace" title="SKU Mapping" description="Petakan SKU marketplace ke item internal agar fulfillment bisa diproses.">
+<x-gf.page class="sku-mapping-dashboard" eyebrow="Marketplace" title="SKU Mapping" description="Petakan SKU marketplace ke item internal agar fulfillment bisa diproses.">
     <x-slot:actions>
         <button type="button" class="btn btn-dark btn-sm fw-bold"
             style="border-radius:999px;font-size:.78rem"

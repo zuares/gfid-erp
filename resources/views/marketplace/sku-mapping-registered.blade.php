@@ -3,8 +3,21 @@
 
 @include('marketplace._shared')
 
+@push('head')
+<style>
+    @media (min-width: 768px) {
+        .app-main .page-wrap:has(.sku-mapping-dashboard) { max-width: none; }
+    }
+
+    .sku-mapping-dashboard {
+        max-width: 1280px;
+        margin-inline: auto;
+    }
+</style>
+@endpush
+
 @section('content')
-<x-gf.page eyebrow="Marketplace" title="Mapping Terdaftar" description="Kelola mapping SKU marketplace yang sudah terhubung ke item internal.">
+<x-gf.page class="sku-mapping-dashboard" eyebrow="Marketplace" title="Mapping Terdaftar" description="Kelola mapping SKU marketplace yang sudah terhubung ke item internal.">
     <x-slot:actions>
         <a href="{{ route('marketplace.sku-mapping') }}" class="btn btn-light border btn-sm fw-bold"
             style="border-radius:999px;font-size:.78rem">← SKU Belum Dipetakan</a>
