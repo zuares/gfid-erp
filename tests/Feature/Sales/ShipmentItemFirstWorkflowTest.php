@@ -1030,6 +1030,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Booking ditemukan')
             ->assertSee('<span>No</span><span>SKU Marketplace</span><span>Order</span><span>Ship</span><span>Diff</span><span>Scan Item Gudang</span><span>COGS</span><span>Subtotal COGS</span>', false)
             ->assertSee('>Periksa</div>', false)
+            ->assertSee('sd-order-item-review', false)
             ->assertSee('class="sd-marketplace-sku-value">K5BLK-1</span>', false)
             ->assertDontSee('SKU booking belum tersedia.');
 
@@ -1056,6 +1057,9 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
             ->assertSee('sd-badge linked', false)
+            ->assertSee('data-order-platform-highlight="shopee"', false)
+            ->assertSee('sd-platform-highlight is-shopee', false)
+            ->assertSee('>Shopee</span>', false)
             ->assertDontSee('Booking ditemukan')
             ->assertSee('sd-marketplace-detail', false);
     }
@@ -1411,6 +1415,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('>ORDER-SPX-SKU-MISMATCH</span>', false)
             ->assertSee('Item berbeda')
             ->assertSee('sd-order-item-diff sd-marketplace-short', false)
+            ->assertSee('sd-order-item-review', false)
             ->assertSee('sd-badge linked', false);
 
         $this->assertMatchesRegularExpression(
@@ -1492,10 +1497,19 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('class="sd-marketplace-sku-value" title="SKU marketplace: MARKETPLACE-SKU-B">MARKETPLACE-SKU-B</span>', false)
             ->assertSee('class="sd-marketplace-product-name" title="Celana Jogger Training Navy">Celana Jogger Training Navy</span>', false)
             ->assertSee('Varian Navy L')
+            ->assertSee('<footer class="sd-marketplace-footer">', false)
+            ->assertSee('<dt>Status</dt>', false)
+            ->assertSee('Lihat Order')
+            ->assertSee('Edit Qty')
             ->assertSee('Periksa');
 
         $html = $response->getContent();
-        preg_match_all('/<div class="sd-order-item [^\"]*sd-qty-breakdown">/', $html, $rows);
+        $this->assertGreaterThan(
+            strpos($html, '>MARKETPLACE-SKU-B</span>'),
+            strpos($html, '<footer class="sd-marketplace-footer">'),
+            'Marketplace status and actions should appear after the item rows in the footer.',
+        );
+        preg_match_all('/<div class="sd-order-item [^\"]*sd-qty-breakdown[^\"]*">/', $html, $rows);
         $this->assertCount(4, $rows[0], 'Two unmatched marketplace item rows should be shown alongside the two scanned rows.');
         $this->assertStringNotContainsString('<details class="sd-item-review">', $html);
         $this->assertSame(2, preg_match_all('/class="sd-order-item-diff[^\"]*">\s*<span class="sd-diff-badge">Periksa<\/span>/', $html));

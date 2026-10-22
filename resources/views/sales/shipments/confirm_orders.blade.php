@@ -54,6 +54,14 @@
 .sd-order-group{display:block;padding:0;border:1px solid rgba(148,163,184,.2);border-radius:9px;overflow:hidden;background:#fff}
 .sd-order-group > .sd-order-lead{padding:.58rem .65rem;border:0;border-bottom:1px solid rgba(37,99,235,.16);border-radius:0;background:#eff6ff}
 .sd-order-group .sd-order-lead{justify-content:space-between}
+.sd-order-group[data-order-platform-highlight="shopee"]{border-left:3px solid #ee4d2d}
+.sd-order-group[data-order-platform-highlight="shopee"] > .sd-order-lead{background:#fff8f5;border-bottom-color:#fed7aa}
+.sd-order-group[data-order-platform-highlight="tiktok"]{border-left:3px solid #25f4ee}
+.sd-order-group[data-order-platform-highlight="tiktok"] > .sd-order-lead{background:#f8fafc;border-bottom:2px solid #fe2c55}
+.sd-platform-highlight{display:inline-flex;align-items:center;gap:.28rem;min-height:23px;padding:.1rem .42rem;border:1px solid transparent;border-radius:999px;font-size:.64rem;font-weight:850;white-space:nowrap}
+.sd-platform-highlight::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.sd-platform-highlight.is-shopee{border-color:#fed7aa;background:#fff1e9;color:#c2410c}
+.sd-platform-highlight.is-tiktok{border-color:#cbd5e1;background:#f1f5f9;color:#111827}
 .sd-order-qty{margin-left:auto;min-width:42px;text-align:center;border-radius:999px;padding:.2rem .45rem;background:rgba(148,163,184,.12);color:#334155;font-size:.76rem;font-weight:900}
 .sd-order-items{margin:0;padding:.2rem .6rem;background:#f8fafc}
 .sd-order-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.6rem;align-items:center;padding:.48rem 0;border-bottom:1px solid rgba(148,163,184,.1)}
@@ -63,11 +71,15 @@
 .sd-order-item-name{color:#64748b;font-size:.76rem;margin-top:.06rem}
 .sd-order-item-qty{color:#334155;font-size:.8rem;font-weight:900}
 .sd-marketplace-detail{margin:0;padding:.65rem .75rem .75rem;border:0;border-top:1px solid #e2e8f0;border-radius:0;background:transparent}
-.sd-marketplace-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.6rem;flex-wrap:wrap;margin-bottom:.55rem}
 .sd-marketplace-title{font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:#1e40af}
-.sd-marketplace-meta{display:flex;gap:.4rem .75rem;flex-wrap:wrap;margin-top:.15rem;color:#64748b;font-size:.72rem}
+.sd-marketplace-footer{display:flex;align-items:flex-end;justify-content:space-between;gap:.75rem 1rem;margin-top:.65rem;padding-top:.65rem;border-top:1px solid #e2e8f0}
+.sd-marketplace-meta{display:flex;align-items:flex-start;gap:.5rem 1.15rem;flex-wrap:wrap;margin:0}
+.sd-marketplace-meta-item{display:grid;gap:.12rem;min-width:0}
+.sd-marketplace-meta-item dt{color:#64748b;font-size:.61rem;font-weight:750;letter-spacing:.035em;text-transform:uppercase}
+.sd-marketplace-meta-item dd{margin:0;color:#334155;font-size:.72rem;font-weight:800;line-height:1.3;overflow-wrap:anywhere}
 .sd-marketplace-actions{display:flex;gap:.35rem;flex-wrap:wrap}
 .sd-marketplace-actions a{min-height:28px;padding:.18rem .5rem;font-size:.7rem}
+.sd-marketplace-actions .sd-btn{white-space:nowrap}
 .sd-marketplace-table{width:100%;border-collapse:collapse}
 .sd-marketplace-table th,.sd-marketplace-table td{padding:.38rem .4rem;border-bottom:1px solid rgba(37,99,235,.1);font-size:.73rem;vertical-align:middle}
 .sd-marketplace-table th{text-align:left;color:#64748b;font-size:.64rem;text-transform:uppercase;letter-spacing:.03em}
@@ -76,7 +88,14 @@
 .sd-marketplace-table .sd-marketplace-number{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .sd-marketplace-short{color:#b91c1c;font-weight:900}.sd-marketplace-ok{color:#15803d;font-weight:900}
 body[data-theme="dark"] .sd-marketplace-detail{background:transparent;border-top-color:rgba(148,163,184,.25)}
+body[data-theme="dark"] .sd-order-group[data-order-platform-highlight="shopee"] > .sd-order-lead{background:rgba(194,65,12,.14);border-bottom-color:rgba(251,146,60,.35)}
+body[data-theme="dark"] .sd-order-group[data-order-platform-highlight="tiktok"] > .sd-order-lead{background:rgba(15,23,42,.7);border-bottom-color:#fe2c55}
+body[data-theme="dark"] .sd-platform-highlight.is-tiktok{border-color:rgba(148,163,184,.5);background:#1e293b;color:#f8fafc}
+body[data-theme="dark"] .sd-marketplace-footer{border-top-color:rgba(148,163,184,.25)}
+body[data-theme="dark"] .sd-marketplace-meta-item dt{color:#94a3b8}
+body[data-theme="dark"] .sd-marketplace-meta-item dd{color:#e2e8f0}
 body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dark"] .sd-marketplace-table td{color:#cbd5e1}body[data-theme="dark"] .sd-marketplace-table .sd-marketplace-code{color:#f1f5f9}
+body[data-theme="dark"] .sd-order-item-review{background:rgba(245,158,11,.09);box-shadow:inset 3px 0 #fbbf24}
 .sd-badge{display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid rgba(148,163,184,.25);padding:.16rem .48rem;font-size:.69rem;font-weight:900;color:#64748b;white-space:nowrap}
 .sd-badge.pending{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:#92400e}
 .sd-badge.linked{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
@@ -510,6 +529,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-item-row.sd-has-cogs { grid-template-columns: 30px minmax(0,1fr) 52px 86px 110px; }
 .sd-item-row.sd-has-cogs.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 86px 110px 30px; }
 .sd-order-item:hover { background: #f8fafc; }
+.sd-order-item-review { background: #fffbeb; box-shadow: inset 3px 0 #f59e0b; }
+.sd-order-item-review:hover { background: #fffbeb; }
 .sd-order-item-num {
   min-width: 0;
   height: auto;
@@ -726,6 +747,11 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
 .sd-order-item-diff.sd-marketplace-ok .sd-diff-value { background: #ecfdf5; }
 .sd-order-item-diff.sd-marketplace-short .sd-diff-value { background: #fff1f2; }
 .sd-scan-item-missing { color: #94a3b8; font-size: .7rem; font-style: italic; white-space: nowrap; }
+@media(max-width:600px){
+  .sd-marketplace-footer{align-items:stretch;flex-direction:column;gap:.65rem}
+  .sd-marketplace-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem .75rem}
+  .sd-marketplace-actions{justify-content:flex-end}
+}
 @media(max-width:600px){
   .sd-items-head,
   .sd-order-item,
@@ -1226,6 +1252,12 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                 $isSpxShopee = str_starts_with($orderCodeUpper, 'SPX');
                                 $hasMarketplaceOrder = (bool) $scan->fulfillment?->marketplaceOrder;
                                 $linkedOrder = $scan->fulfillment?->marketplaceOrder;
+                                $linkedPlatformCode = strtolower(trim((string) ($linkedOrder?->store?->channel?->code ?? '')));
+                                $platformHighlight = match ($linkedPlatformCode) {
+                                    'shopee', 'shp' => 'shopee',
+                                    'tiktok', 'tiktok shop', 'ttk', 'tt' => 'tiktok',
+                                    default => '',
+                                };
                                 $linkedStore = $linkedOrder?->store ?: ($hasMarketplaceOrder ? null : $shipment->store);
                                 $hasBookingOnly = $isSpxShopee && !$hasMarketplaceOrder && !empty($kilatMatches[$scan->id]);
                                 $hasMarketplaceLink = $isSpxShopee
@@ -1318,7 +1350,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                 $showSingleBookingSku = count($bookingSkus) === 1
                                     && $hasSingleBookingItem;
                             @endphp
-                            <div class="sd-order sd-order-group" data-order-card data-order-link-state="{{ $hasMarketplaceLink ? 'linked' : 'unlinked' }}" data-order-problem="{{ $orderNeedsReview ? 'true' : 'false' }}" data-order-platform="{{ $linkedOrder?->store?->channel?->code ? strtolower((string) $linkedOrder->store->channel->code) : '' }}" data-order-store="{{ $linkedOrder?->store_id ?? '' }}" data-order-search="{{ $orderSearchText }}">
+                            <div class="sd-order sd-order-group" data-order-card data-order-link-state="{{ $hasMarketplaceLink ? 'linked' : 'unlinked' }}" data-order-problem="{{ $orderNeedsReview ? 'true' : 'false' }}" data-order-platform="{{ $linkedOrder?->store?->channel?->code ? strtolower((string) $linkedOrder->store->channel->code) : '' }}" data-order-platform-highlight="{{ $platformHighlight }}" data-order-store="{{ $linkedOrder?->store_id ?? '' }}" data-order-search="{{ $orderSearchText }}">
                                 <div class="sd-order-lead">
                                     <div>
                                         <div class="sd-order-no">
@@ -1352,6 +1384,9 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                             @if($hasMarketplaceLink && $linkedStore)
                                                 <span class="sd-store-name" title="Toko order">{{ $linkedStore->name ?: $linkedStore->code }}</span>
                                             @endif
+                                            @if($platformHighlight !== '')
+                                                <span class="sd-platform-highlight is-{{ $platformHighlight }}">{{ $platformHighlight === 'tiktok' ? 'TikTok Shop' : 'Shopee' }}</span>
+                                            @endif
                                             <span class="sd-badge {{ $scanBadgeClass }}">{{ $scanLabel }}</span>
                                             @if($bookingStatus !== '')<span class="sd-booking-status" title="Status booking Shopee">{{ str_replace('_', ' ', $bookingStatus) }}</span>@endif
                                         </div>
@@ -1384,7 +1419,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                 $lineBookingVariant = $bookingItems->first(fn ($item) => (int) ($item['item_id'] ?? 0) === (int) $line->item_id)['variant_name']
                                                     ?? ($hasSingleBookingItem ? ($bookingItems->first()['variant_name'] ?? '') : '');
                                             @endphp
-                                            <div class="sd-order-item {{ $orderItemGridClass }} {{ $hasBookingOnly ? 'sd-qty-breakdown' : '' }}">
+                                            <div class="sd-order-item {{ $orderItemGridClass }} {{ $hasBookingOnly ? 'sd-qty-breakdown' : '' }} {{ $lineDifference === null ? 'sd-order-item-review' : '' }}">
                                                 <span class="sd-order-item-num">{{ $loop->iteration }}</span>
                                                 <div class="sd-order-item-marketplace-sku" @if($showSingleBookingSku && !$bookingCanVerify) title="SKU Shopee dari booking atau produk toko; item scan belum diverifikasi" @endif>
                                                     <span class="sd-marketplace-sku-value">{{ $lineBookingSku }}</span>
@@ -1434,22 +1469,6 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                             : collect();
                                     @endphp
                                     <div class="sd-marketplace-detail">
-                                        <div class="sd-marketplace-head">
-                                            <div>
-                                                <div class="sd-marketplace-meta">
-                                                    <span>Status: <b>{{ $marketplaceStatus ?: '—' }}</b></span>
-                                                    @if($marketplaceOrder->buyer_username)<span>Pembeli: {{ $marketplaceOrder->buyer_username }}</span>@endif
-                                                    @if($marketplaceOrder->shipping_awb_no)<span>Resi: <b>{{ $marketplaceOrder->shipping_awb_no }}</b></span>@endif
-                                                    @if($marketplaceOrder->total_amount)<span>Total: <b>Rp{{ number_format((float) $marketplaceOrder->total_amount, 0, ',', '.') }}</b></span>@endif
-                                                </div>
-                                            </div>
-                                            <div class="sd-marketplace-actions">
-                                                @if(Route::has('marketplace.orders.show'))
-                                                    <a href="{{ route('marketplace.orders.show', $marketplaceOrder) }}" class="sd-btn" target="_blank" rel="noopener">Lihat Order</a>
-                                                @endif
-                                                <a href="{{ $editShipmentUrl }}" class="sd-btn">Edit Qty</a>
-                                            </div>
-                                        </div>
                                         @if($marketplaceLines->isNotEmpty())
                                             @php
                                                 $displayLines = $orderLines->values();
@@ -1502,7 +1521,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                         $qtyShipment = (int) ($pickedByItem[$line->item_id] ?? ($orderLines->isEmpty() ? 0 : $line->qty_scanned));
                                                         $difference = $qtyShipment - (int) $qtyOrder;
                                                     @endphp
-                                                    <div class="sd-order-item {{ $orderItemGridClass }} sd-qty-breakdown">
+                                                    <div class="sd-order-item {{ $orderItemGridClass }} sd-qty-breakdown {{ $itemMismatch ? 'sd-order-item-review' : '' }}">
                                                         <span class="sd-order-item-num">{{ $loop->iteration }}</span>
                                                         <div class="sd-order-item-marketplace-sku {{ $itemMismatch ? 'is-mismatch' : '' }}">
                                                             @if($unpairedMarketplaceLines->isNotEmpty())
@@ -1552,6 +1571,38 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                         @else
                                             <div class="sd-muted">Detail item marketplace belum tersedia.</div>
                                         @endif
+                                        <footer class="sd-marketplace-footer">
+                                            <dl class="sd-marketplace-meta">
+                                                <div class="sd-marketplace-meta-item">
+                                                    <dt>Status</dt>
+                                                    <dd>{{ $marketplaceStatus ?: '—' }}</dd>
+                                                </div>
+                                                @if($marketplaceOrder->buyer_username)
+                                                    <div class="sd-marketplace-meta-item">
+                                                        <dt>Pembeli</dt>
+                                                        <dd>{{ $marketplaceOrder->buyer_username }}</dd>
+                                                    </div>
+                                                @endif
+                                                @if($marketplaceOrder->shipping_awb_no)
+                                                    <div class="sd-marketplace-meta-item">
+                                                        <dt>Resi</dt>
+                                                        <dd>{{ $marketplaceOrder->shipping_awb_no }}</dd>
+                                                    </div>
+                                                @endif
+                                                @if($marketplaceOrder->total_amount)
+                                                    <div class="sd-marketplace-meta-item">
+                                                        <dt>Total pesanan</dt>
+                                                        <dd>Rp{{ number_format((float) $marketplaceOrder->total_amount, 0, ',', '.') }}</dd>
+                                                    </div>
+                                                @endif
+                                            </dl>
+                                            <div class="sd-marketplace-actions">
+                                                @if(Route::has('marketplace.orders.show'))
+                                                    <a href="{{ route('marketplace.orders.show', $marketplaceOrder) }}" class="sd-btn" target="_blank" rel="noopener">Lihat Order</a>
+                                                @endif
+                                                <a href="{{ $editShipmentUrl }}" class="sd-btn">Edit Qty</a>
+                                            </div>
+                                        </footer>
                                     </div>
                                 @endif
                             </div>
