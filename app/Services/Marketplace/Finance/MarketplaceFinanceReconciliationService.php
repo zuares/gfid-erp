@@ -16,6 +16,7 @@ use Illuminate\Support\Collection;
 class MarketplaceFinanceReconciliationService
 {
     private const TOLERANCE = 0.01;
+    private const PAGE_SIZES = [10, 25, 50];
 
     /**
      * Read-only reconciliation over the bounded finance submodule.
@@ -25,22 +26,21 @@ class MarketplaceFinanceReconciliationService
     public function reconcile(array $filters = []): array
     {
         $filters = $this->filters($filters);
-        $transactions = $this->transactionQuery($filters)->get();
-        $journalCounts = $this->activeJournalCounts($transactions);
         $items = [];
-        foreach ($transactions as $transaction) {
-            $item = $this->transactionResult($transaction, $journalCounts);
+        $this->eachTransactionResult($filters, function (array $item) use (&$items, $filters): void {
             if ($filters['status'] !== null && $item['status'] !== $filters['status']) {
-                continue;
+                return;
             }
             $items[] = $item;
-        }
+        });
 
-        $settlements = $this->settlementQuery($filters)->get()
-            ->map(fn (MarketplaceFinanceSettlement $settlement): array => $this->settlementResult($settlement))
-            ->filter(fn (array $settlement): bool => $filters['status'] === null || $settlement['status'] === $filters['status'])
-            ->values()
-            ->all();
+        $settlements = [];
+        $this->eachSettlementResult($filters, function (array $settlement) use (&$settlements, $filters): void {
+            if ($filters['status'] !== null && $settlement['status'] !== $filters['status']) {
+                return;
+            }
+            $settlements[] = $settlement;
+        });
 
         $counts = array_fill_keys(['matched', 'mismatch', 'unmatched', 'pending'], 0);
         foreach ($items as $item) {
@@ -78,7 +78,7 @@ class MarketplaceFinanceReconciliationService
     public function paginateTransactions(array $filters = [], int $perPage = 50, string $pageName = 'page'): LengthAwarePaginator
     {
         $filters = $this->filters($filters);
-        $perPage = in_array($perPage, [25, 50, 100], true) ? $perPage : 50;
+        $perPage = $this->normalisePerPage($perPage);
 
         return $this->paginateTransactionRows($filters, $perPage, $pageName);
     }
@@ -150,7 +150,7 @@ class MarketplaceFinanceReconciliationService
     public function paginateSettlements(array $filters = [], int $perPage = 50, string $pageName = 'page'): LengthAwarePaginator
     {
         $filters = $this->filters($filters);
-        $perPage = in_array($perPage, [25, 50, 100], true) ? $perPage : 50;
+        $perPage = $this->normalisePerPage($perPage);
 
         return $this->paginateSettlementRows($filters, $perPage, $pageName);
     }
@@ -162,7 +162,7 @@ class MarketplaceFinanceReconciliationService
     public function paginateReconciliation(array $filters = [], int $perPage = 50): array
     {
         $filters = $this->filters($filters);
-        $perPage = in_array($perPage, [25, 50, 100], true) ? $perPage : 50;
+        $perPage = $this->normalisePerPage($perPage);
 
         return [
             'filters' => $filters,
@@ -349,12 +349,35 @@ class MarketplaceFinanceReconciliationService
 
     private function transactionQuery(array $filters): Builder
     {
-        $query = MarketplaceFinancialTransaction::query()->with([
-            'salesInvoice',
-            'components',
-            'allocations.settlement.journal.lines',
-            'saleJournal.lines',
-            'escrowJournal.lines',
+        $query = MarketplaceFinancialTransaction::query()
+            ->select([
+                'id',
+                'store_id',
+                'marketplace_order_id',
+                'order_sn',
+                'sales_invoice_id',
+                'shipment_id',
+                'currency',
+                'gross_amount',
+                'net_amount',
+                'escrow_status',
+                'income_status',
+                'released_at',
+                'sale_journal_id',
+                'escrow_journal_id',
+                'created_at',
+            ])
+            ->with([
+                'salesInvoice:id,grand_total',
+                'components:id,financial_transaction_id,component_code,amount,source_hash',
+                'allocations:id,settlement_id,financial_transaction_id,allocated_amount',
+                'allocations.settlement:id,status,journal_id',
+                'allocations.settlement.journal:id,voided_at',
+                'allocations.settlement.journal.lines:id,journal_id,debit',
+                'saleJournal:id,voided_at',
+                'saleJournal.lines:id,journal_id,debit',
+                'escrowJournal:id,voided_at',
+                'escrowJournal.lines:id,journal_id,debit',
         ]);
 
         if ($filters['store_id'] !== null) {
@@ -375,7 +398,21 @@ class MarketplaceFinanceReconciliationService
 
     private function settlementQuery(array $filters): Builder
     {
-        $query = MarketplaceFinanceSettlement::query()->with(['allocations', 'journal.lines']);
+        $query = MarketplaceFinanceSettlement::query()
+            ->select([
+                'id',
+                'store_id',
+                'external_settlement_id',
+                'settlement_date',
+                'amount',
+                'status',
+                'journal_id',
+            ])
+            ->with([
+                'allocations:id,settlement_id,financial_transaction_id,allocated_amount',
+                'journal:id,voided_at',
+                'journal.lines:id,journal_id,debit',
+            ]);
         if ($filters['store_id'] !== null) {
             $query->where('store_id', $filters['store_id']);
         }
@@ -387,6 +424,15 @@ class MarketplaceFinanceReconciliationService
         }
 
         return $query->orderByDesc('id');
+    }
+
+    private function normalisePerPage(int $perPage): int
+    {
+        if (in_array($perPage, self::PAGE_SIZES, true)) {
+            return $perPage;
+        }
+
+        return $perPage > 50 ? 50 : 25;
     }
 
     private function transactionResult(MarketplaceFinancialTransaction $transaction, array $journalCounts = []): array

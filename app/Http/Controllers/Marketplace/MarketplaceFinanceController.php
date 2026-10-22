@@ -206,8 +206,8 @@ class MarketplaceFinanceController extends Controller
 
     private function transactionsPerPage(Request $request): int
     {
-        $perPage = (int) $request->input('per_page', 50);
+        $perPage = (int) $request->input('per_page', 25);
 
-        return in_array($perPage, [25, 50, 100], true) ? $perPage : 50;
+        return $perPage >= 50 ? 50 : 25;
     }
 }

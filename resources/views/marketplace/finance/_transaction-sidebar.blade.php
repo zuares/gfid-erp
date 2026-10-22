@@ -46,8 +46,8 @@
         <div class="mb-4">
             <label class="form-label" for="transaction-per-page">Baris per halaman</label>
             <select id="transaction-per-page" name="per_page" class="form-select">
-                @foreach ([25, 50, 100] as $option)
-                    <option value="{{ $option }}" @selected((int) request('per_page', 50) === $option)>{{ $option }} transaksi</option>
+                @foreach ([25, 50] as $option)
+                    <option value="{{ $option }}" @selected((int) request('per_page', 25) === $option)>{{ $option }} transaksi</option>
                 @endforeach
             </select>
         </div>
