@@ -1034,8 +1034,20 @@
                                             </a>
                                         @endif
                                         @if ($hasMarketplaceFinance)
-                                            <a href="{{ route('marketplace.finance.index') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.*') ? 'active' : '' }}">
-                                                <span class="icon"><i class="bi bi-wallet2"></i></span><span>Marketplace Finance</span>
+                                            <a href="{{ route('marketplace.finance.index') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.index') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-wallet2"></i></span><span>Finance Overview</span>
+                                            </a>
+                                            <a href="{{ route('marketplace.finance.transactions') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.transactions') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-list-columns-reverse"></i></span><span>Finance Transactions</span>
+                                            </a>
+                                            <a href="{{ route('marketplace.finance.settlements') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.settlements') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-bank"></i></span><span>Finance Settlements</span>
+                                            </a>
+                                            <a href="{{ route('marketplace.finance.reconciliation') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.reconciliation') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-check2-square"></i></span><span>Finance Reconciliation</span>
+                                            </a>
+                                            <a href="{{ route('marketplace.finance.fee-analysis') }}" class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.fee-analysis') ? 'active' : '' }}">
+                                                <span class="icon"><i class="bi bi-percent"></i></span><span>Finance Fee Analysis</span>
                                             </a>
                                         @endif
                                         @if ($hasMarketplaceReconcileQueue)
@@ -2084,8 +2096,24 @@
 
                             @if ($hasMarketplaceFinance)
                                 <a href="{{ route('marketplace.finance.index') }}"
-                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.*') ? 'active' : '' }}">
-                                    <span class="icon">💳</span><span>Marketplace Finance</span>
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.index') ? 'active' : '' }}">
+                                    <span class="icon">💳</span><span>Finance Overview</span>
+                                </a>
+                                <a href="{{ route('marketplace.finance.transactions') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.transactions') ? 'active' : '' }}">
+                                    <span class="icon">🧾</span><span>Finance Transactions</span>
+                                </a>
+                                <a href="{{ route('marketplace.finance.settlements') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.settlements') ? 'active' : '' }}">
+                                    <span class="icon">🏦</span><span>Finance Settlements</span>
+                                </a>
+                                <a href="{{ route('marketplace.finance.reconciliation') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.reconciliation') ? 'active' : '' }}">
+                                    <span class="icon">✅</span><span>Finance Reconciliation</span>
+                                </a>
+                                <a href="{{ route('marketplace.finance.fee-analysis') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.finance.fee-analysis') ? 'active' : '' }}">
+                                    <span class="icon">%</span><span>Finance Fee Analysis</span>
                                 </a>
                             @endif
 
