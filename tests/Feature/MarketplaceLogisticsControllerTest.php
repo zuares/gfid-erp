@@ -133,4 +133,29 @@ class MarketplaceLogisticsControllerTest extends TestCase
         $this->assertSame(422, $response->getStatusCode());
         $this->assertStringContainsString('tepat satu', $response->getData(true)['message']);
     }
+
+    public function test_arrange_shipment_accepts_auto_sync_fallback_without_shipping_method(): void
+    {
+        $store = new Store();
+        $store->id = 7;
+
+        $this->mock(MarketplaceLogisticsService::class, function (MockInterface $mock) {
+            $mock->shouldReceive('arrangeShipment')
+                ->once()
+                ->withArgs(function (Store $receivedStore, string $orderSn, array $params, bool $isAutoSync): bool {
+                    return $receivedStore->id === 7
+                        && $orderSn === 'ORDER-AUTO'
+                        && $params === []
+                        && $isAutoSync === true;
+                })
+                ->andReturn(['success' => true]);
+        });
+
+        $request = Request::create('/ship', 'POST', ['auto_sync_only' => 1]);
+        $response = app(MarketplaceLogisticsController::class)
+            ->arrangeShipment($request, $store, 'ORDER-AUTO');
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertTrue($response->getData(true)['success']);
+    }
 }

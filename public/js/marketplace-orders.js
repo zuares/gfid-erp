@@ -3838,7 +3838,8 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
             
             if (html === '') {
                 html = `<div class="alert alert-warning py-1" style="font-size:0.75rem">Informasi metode pengiriman tidak spesifik, lanjutkan untuk mencoba arrange shipment otomatis.</div>
-                <input type="hidden" name="asMethod" value="auto">`;
+                <input type="hidden" name="asMethod" value="auto">
+                <input type="hidden" name="auto_sync_only" value="1">`;
             }
             
             $('asOptions').innerHTML = html;
@@ -3948,6 +3949,11 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
                 params.pickup.address_id = Number(addressSelect.value) || addressSelect.value || 0;
                 params.pickup.pickup_time_id = timeSelect.value || "";
             }
+        } else if (method === 'auto') {
+            // Jika Shopee tidak mengembalikan info_needed pickup/dropoff,
+            // modal membuat fallback "auto". Tandai sebagai sinkronisasi
+            // status agar controller tidak menerima payload metode kosong.
+            params.auto_sync_only = 1;
         }
         
         if (document.querySelector('input[name="auto_sync_only"]')) {
