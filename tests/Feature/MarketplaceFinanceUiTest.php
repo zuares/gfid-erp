@@ -114,6 +114,10 @@ class MarketplaceFinanceUiTest extends TestCase
             ->assertSee('25 transaksi')
             ->assertSee('Menampilkan 1–25 dari 51 transaksi')
             ->assertDontSee('PAGINATION-ORDER-001');
+
+        $this->get('/marketplace/finance/transactions?per_page=100')
+            ->assertOk()
+            ->assertSee('Menampilkan 1–50 dari 51 transaksi');
     }
 
     public function test_fee_analysis_aggregates_in_sql_and_paginates_orders(): void
