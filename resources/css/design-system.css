@@ -233,6 +233,73 @@
 .ds-tab-hierarchy-row code { color: var(--gf-color-brand-strong); font-size: .58rem; white-space: nowrap; }
 .ds-tab-hierarchy-branch { height: 11px; margin-left: 13px; border-left: 1px solid #d0d5dd; }
 .ds-tab-hierarchy-branch span { display: block; width: 9px; height: 1px; margin-top: 5px; background: #d0d5dd; }
+.ds-flatpickr-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+.ds-flatpickr-field { min-width: 0; }
+.ds-flatpickr-field label { display: block; margin-bottom: .32rem; color: #475467; font-size: .66rem; font-weight: 750; }
+.ds-flatpickr-control { position: relative; display: flex; align-items: center; }
+.ds-flatpickr-control input { width: 100%; min-height: 38px; padding: 0 2.15rem 0 2.05rem; border: 1px solid #d0d5dd; border-radius: 10px; color: var(--gf-color-content); outline: none; background: #fff !important; font: inherit; font-size: .7rem; cursor: pointer; transition: border-color .18s ease, box-shadow .18s ease; }
+.ds-flatpickr-control input::placeholder { color: #98a2b3; }
+.ds-flatpickr-control input:focus { border-color: var(--gf-color-brand); box-shadow: 0 0 0 3px rgba(91,92,226,.12); }
+.ds-flatpickr-icon { position: absolute; left: .7rem; z-index: 1; color: var(--gf-color-brand); font-size: .76rem; pointer-events: none; }
+.ds-flatpickr-clear { position: absolute; right: .35rem; display: grid; width: 27px; height: 27px; place-items: center; border: 0; border-radius: 7px; color: #98a2b3; background: transparent; cursor: pointer; }
+.ds-flatpickr-clear:hover { color: var(--gf-color-brand-strong); background: #eeefff; }
+.ds-flatpickr-clear:focus-visible { outline: 3px solid rgba(91,92,226,.28); outline-offset: 1px; }
+.ds-flatpickr-feedback { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-top: .8rem; padding: .55rem .65rem; border: 1px solid #eef0f3; border-radius: 10px; background: #fcfcfd; }
+.ds-flatpickr-feedback span { color: #98a2b3; font-size: .61rem; font-weight: 750; }
+.ds-flatpickr-feedback span i { margin-right: .25rem; color: var(--gf-color-success); }
+.ds-flatpickr-feedback strong { color: var(--gf-color-content); font-size: .65rem; text-align: right; }
+.ds-flatpickr-contract { display: grid; gap: .45rem; }
+.ds-flatpickr-contract > div { display: grid; grid-template-columns: 27px minmax(0, 1fr) auto; gap: .55rem; align-items: center; padding: .52rem .55rem; border: 1px solid #eef0f3; border-radius: 10px; background: #fcfcfd; }
+.ds-flatpickr-contract-icon { display: grid; width: 27px; height: 27px; place-items: center; border-radius: 8px; color: var(--gf-color-brand); background: #eeefff; font-size: .72rem; }
+.ds-flatpickr-contract strong, .ds-flatpickr-contract small { display: block; }
+.ds-flatpickr-contract strong { color: var(--gf-color-content); font-size: .66rem; }
+.ds-flatpickr-contract small { margin-top: .12rem; color: #98a2b3; font-size: .59rem; line-height: 1.35; }
+.ds-flatpickr-contract code { color: var(--gf-color-brand-strong); font-size: .58rem; }
+.ds-period-picker { position: relative; z-index: 3; width: min(100%, 430px); }
+.ds-period-trigger { display: grid; grid-template-columns: auto minmax(0, auto) minmax(0, 1fr) auto; gap: .42rem; align-items: center; width: 100%; min-height: 52px; padding: .55rem .7rem; border: 1px solid #d0d5dd; border-radius: 12px; color: var(--gf-color-content); background: #fff; font: inherit; text-align: left; cursor: pointer; transition: border-color .18s ease, box-shadow .18s ease, background .18s ease; }
+.ds-period-trigger:hover, .ds-period-trigger[aria-expanded="true"] { border-color: #b9baf4; background: #fdfdff; }
+.ds-period-trigger:focus-visible { outline: 3px solid rgba(91,92,226,.2); outline-offset: 2px; }
+.ds-period-trigger-label, .ds-period-trigger-preset, .ds-period-trigger-summary { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-period-trigger-label { color: var(--gf-color-content); font-size: .68rem; font-weight: 850; }
+.ds-period-trigger-preset { color: var(--gf-color-muted); font-size: .63rem; }
+.ds-period-trigger-summary { color: var(--gf-color-brand-strong); font-size: .65rem; font-weight: 800; }
+.ds-period-trigger-icon { color: var(--gf-color-brand); font-size: .8rem; }
+.ds-period-popover { position: absolute; top: calc(100% + .55rem); left: 0; z-index: 30; width: min(590px, calc(100vw - 2rem)); overflow: hidden; border: 1px solid var(--gf-color-line); border-radius: 14px; background: #fff; box-shadow: 0 18px 48px rgba(16,24,40,.18); }
+.ds-period-popover[hidden] { display: none; }
+.ds-period-layout { display: grid; grid-template-columns: 168px minmax(0, 1fr); min-height: 320px; }
+.ds-period-menu { display: grid; align-content: start; gap: .12rem; padding: .75rem; border-right: 1px solid #eef0f3; background: #fafbfc; }
+.ds-period-option { display: flex; align-items: center; justify-content: space-between; gap: .5rem; min-height: 32px; padding: 0 .6rem; border: 0; border-radius: 8px; color: #475467; background: transparent; font: inherit; font-size: .65rem; font-weight: 700; text-align: left; cursor: pointer; }
+.ds-period-option:hover, .ds-period-option.is-active { color: var(--gf-color-brand-strong); background: #eeefff; }
+.ds-period-arrow { color: #98a2b3; font-size: .95rem; line-height: 1; }
+.ds-period-divider { height: 1px; margin: .45rem .25rem; background: #e4e7ec; }
+.ds-period-panel { min-width: 0; padding: 1rem; }
+.ds-period-eyebrow { color: var(--gf-color-brand); font-size: .6rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.ds-period-title { margin-top: .22rem; color: var(--gf-color-content); font-size: .88rem; font-weight: 850; }
+.ds-period-help { margin: .35rem 0 .85rem; color: var(--gf-color-muted); font-size: .65rem; line-height: 1.45; }
+.ds-period-range-action { display: inline-flex; align-items: center; gap: .4rem; min-height: 36px; padding: 0 .68rem; border: 1px solid #c7c8f5; border-radius: 9px; color: var(--gf-color-brand-strong); background: #f5f5ff; font: inherit; font-size: .65rem; font-weight: 800; cursor: pointer; }
+.ds-period-range-action:hover { border-color: var(--gf-color-brand); background: #eeefff; }
+.ds-period-calendar-wrap { margin-top: .65rem; overflow: auto; border: 1px solid #eef0f3; border-radius: 11px; background: #fff; }
+.ds-period-calendar-wrap > input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.ds-period-calendar-wrap .flatpickr-calendar.inline { width: 100%; max-width: none; border: 0; border-radius: 0; box-shadow: none; }
+.ds-period-calendar-wrap .flatpickr-calendar.inline .flatpickr-months { padding: .35rem .45rem 0; }
+.ds-period-calendar-wrap .flatpickr-calendar.inline .flatpickr-weekdays { padding-inline: .45rem; }
+.ds-period-calendar-wrap .flatpickr-calendar.inline .flatpickr-days { width: 100%; }
+.ds-period-calendar-wrap .flatpickr-calendar.inline .dayContainer { width: 100%; min-width: 100%; max-width: none; }
+.ds-period-calendar-wrap .flatpickr-day.ds-week-hover { border-color: #c7c8f5; color: var(--gf-color-brand-strong); background: #eeefff; }
+.ds-period-calendar-wrap .flatpickr-day.ds-week-hover:hover { border-color: var(--gf-color-brand); background: #e3e4ff; }
+.ds-period-calendar-wrap .flatpickr-day.ds-week-selected { border-color: #a5b4fc; color: #3730a3; background: #e0e7ff; }
+.ds-period-calendar-wrap .flatpickr-day.ds-week-selected:hover { border-color: #818cf8; background: #c7d2fe; }
+.ds-period-calendar-wrap .flatpickr-day.ds-week-hover, .ds-period-calendar-wrap .flatpickr-day.ds-week-selected { margin-inline: 0; border-radius: 0; }
+.ds-period-calendar-wrap .flatpickr-day.ds-week-hover-start, .ds-period-calendar-wrap .flatpickr-day.ds-week-selected-start { border-radius: 8px 0 0 8px; }
+.ds-period-calendar-wrap .flatpickr-day.ds-week-hover-end, .ds-period-calendar-wrap .flatpickr-day.ds-week-selected-end { border-radius: 0 8px 8px 0; }
+.ds-period-nav { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-top: .75rem; }
+.ds-period-nav strong { color: var(--gf-color-content); font-size: .75rem; }
+.ds-period-nav button { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid #d0d5dd; border-radius: 8px; color: var(--gf-color-muted); background: #fff; font-size: 1rem; line-height: 1; cursor: pointer; }
+.ds-period-nav button:hover { border-color: #b9baf4; color: var(--gf-color-brand-strong); background: #f5f5ff; }
+.ds-period-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .42rem; margin-top: .8rem; }
+.ds-period-grid button { min-height: 34px; border: 1px solid #eef0f3; border-radius: 9px; color: #475467; background: #fff; font: inherit; font-size: .65rem; font-weight: 750; cursor: pointer; }
+.ds-period-grid button:hover, .ds-period-grid button.is-selected { border-color: #c7c8f5; color: var(--gf-color-brand-strong); background: #eeefff; }
+.ds-period-grid button:disabled { color: #d0d5dd; background: #f9fafb; cursor: not-allowed; }
 .ds-error, .ds-form-error { color: var(--gf-color-danger); font-size: .63rem; font-weight: 650; }
 .ds-form-error { margin: .55rem 0 0; }
 .ds-form-actions { display: flex; flex-wrap: wrap; gap: .42rem; }
@@ -464,6 +531,19 @@
 .ds-shell.is-dark-preview .ds-tab-preview-panel, .ds-shell.is-dark-preview .ds-tab-hierarchy-row { border-color: #334155; background: #0f172a; }
 .ds-shell.is-dark-preview .ds-tab-preview-panel strong, .ds-shell.is-dark-preview .ds-tab-hierarchy-row strong { color: #f8fafc; }
 .ds-shell.is-dark-preview .ds-tab-hierarchy-branch, .ds-shell.is-dark-preview .ds-tab-hierarchy-branch span { background: #475569; border-color: #475569; }
+.ds-shell.is-dark-preview .ds-flatpickr-control input { border-color: #334155; color: #e5e7eb; background: #0f172a !important; }
+.ds-shell.is-dark-preview .ds-flatpickr-feedback, .ds-shell.is-dark-preview .ds-flatpickr-contract > div { border-color: #334155; background: #0f172a; }
+.ds-shell.is-dark-preview .ds-flatpickr-feedback strong, .ds-shell.is-dark-preview .ds-flatpickr-contract strong { color: #f8fafc; }
+.ds-shell.is-dark-preview .ds-flatpickr-contract-icon { background: #312e81; }
+.ds-shell.is-dark-preview .ds-period-trigger, .ds-shell.is-dark-preview .ds-period-popover, .ds-shell.is-dark-preview .ds-period-nav button, .ds-shell.is-dark-preview .ds-period-grid button, .ds-shell.is-dark-preview .ds-period-calendar-wrap { border-color: #334155; color: #e5e7eb; background: #0f172a; }
+.ds-shell.is-dark-preview .ds-period-trigger:hover, .ds-shell.is-dark-preview .ds-period-trigger[aria-expanded="true"] { background: #111827; }
+.ds-shell.is-dark-preview .ds-period-trigger-label, .ds-shell.is-dark-preview .ds-period-title, .ds-shell.is-dark-preview .ds-period-nav strong { color: #f8fafc; }
+.ds-shell.is-dark-preview .ds-period-menu { border-color: #263149; background: #111827; }
+.ds-shell.is-dark-preview .ds-period-option { color: #aab4c5; }
+.ds-shell.is-dark-preview .ds-period-option:hover, .ds-shell.is-dark-preview .ds-period-option.is-active, .ds-shell.is-dark-preview .ds-period-grid button:hover, .ds-shell.is-dark-preview .ds-period-grid button.is-selected { color: #e0e7ff; background: #312e81; }
+.ds-shell.is-dark-preview .ds-period-divider { background: #334155; }
+.ds-shell.is-dark-preview .ds-period-help { color: #aab4c5; }
+.ds-shell.is-dark-preview .ds-period-range-action { border-color: #4338ca; color: #e0e7ff; background: #1e1b4b; }
 
 @media (max-width: 1100px) {
     .ds-shell { grid-template-columns: 190px minmax(0, 1fr); }
@@ -493,6 +573,13 @@
     .ds-contract-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ds-tab-hierarchy-row { grid-template-columns: 27px minmax(0,1fr); }
     .ds-tab-hierarchy-row code { grid-column: 2; }
+    .ds-flatpickr-grid { grid-template-columns: 1fr; }
+    .ds-flatpickr-feedback { align-items: flex-start; flex-direction: column; gap: .2rem; }
+    .ds-flatpickr-feedback strong { text-align: left; }
+    .ds-period-popover { position: fixed; top: 1rem; right: 1rem; bottom: 1rem; left: 1rem; width: auto; overflow: auto; }
+    .ds-period-layout { grid-template-columns: 1fr; }
+    .ds-period-menu { grid-template-columns: repeat(2, minmax(0, 1fr)); display: grid; border-right: 0; border-bottom: 1px solid #eef0f3; }
+    .ds-period-divider { grid-column: 1 / -1; }
 }
 
 @media (max-width: 640px) {

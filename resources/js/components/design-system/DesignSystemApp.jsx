@@ -3,7 +3,7 @@ import DesignSystemSidebar from './DesignSystemSidebar';
 import CrudModal, { crudFieldCatalog, selectAllOnFocus, selectAllOnMouseDown } from './CrudModal';
 import DataTable from './DataTable';
 import { colorTokens, componentNavItems, kpis, layoutTemplates, navItems } from './designSystemConfig';
-import { Alert, Badge, Button, ComparisonKpi, LayoutPreview, Panel, SearchInput, SectionHeader, Tabs, TokenSwatch } from './DesignSystemPrimitives';
+import { Alert, Badge, Button, ComparisonKpi, FlatpickrField, LayoutPreview, Panel, PeriodPicker, SearchInput, SectionHeader, Tabs, TokenSwatch } from './DesignSystemPrimitives';
 
 const tabItems = [
     { id: 'summary', label: 'Summary', content: 'Summary menyajikan angka penting tanpa mengalihkan fokus pengguna.' },
@@ -106,6 +106,14 @@ const tabPanelCopy = {
     },
 };
 
+const flatpickrFieldTypes = [
+    { id: 'single', label: 'Single date', note: 'Satu tanggal untuk filter atau form dasar.' },
+    { id: 'range', label: 'Date range', note: 'Periode mulai dan selesai dalam satu input.' },
+    { id: 'datetime', label: 'Date & time', note: 'Tanggal dengan jam untuk jadwal atau SLA.' },
+    { id: 'multiple', label: 'Multiple dates', note: 'Pilih beberapa tanggal yang tidak berurutan.' },
+    { id: 'business', label: 'Business days', note: 'Weekend dinonaktifkan untuk hari kerja.' },
+];
+
 export default function DesignSystemApp() {
     const [activeSection, setActiveSection] = useState('overview');
     const [isDarkPreview, setIsDarkPreview] = useState(false);
@@ -119,6 +127,7 @@ export default function DesignSystemApp() {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeProductTab, setActiveProductTab] = useState('overview');
     const [activeProductSubtab, setActiveProductSubtab] = useState('summary');
+    const [flatpickrValues, setFlatpickrValues] = useState({});
 
     useEffect(() => {
         const sections = [...navItems, ...componentNavItems].map(({ id }) => document.getElementById(id)).filter(Boolean);
@@ -194,6 +203,10 @@ export default function DesignSystemApp() {
     };
 
     const activeTabCopy = tabPanelCopy[activeProductTab][activeProductSubtab];
+
+    const handleFlatpickrChange = (fieldId) => (_selectedDates, dateString) => {
+        setFlatpickrValues((current) => ({ ...current, [fieldId]: dateString }));
+    };
 
     return (
         <div className={`ds-shell ${isDarkPreview ? 'is-dark-preview' : ''}`} id="design-system">
@@ -387,6 +400,81 @@ export default function DesignSystemApp() {
                                 <div className="ds-tab-hierarchy-row is-sub"><i className="bi bi-layout-text-sidebar-reverse" aria-hidden="true" /><span><strong>Subtab</strong><small>Memecah detail tanpa berpindah halaman.</small></span><code>variant=subtabs</code></div>
                                 <div className="ds-tab-hierarchy-branch" aria-hidden="true"><span /></div>
                                 <div className="ds-tab-hierarchy-row is-panel"><i className="bi bi-window" aria-hidden="true" /><span><strong>Panel content</strong><small>Konten mengikuti kombinasi tab aktif.</small></span><code>aria-live</code></div>
+                            </div>
+                        </Panel>
+                    </div>
+                    <div className="ds-grid ds-grid-2 ds-space-top">
+                        <Panel id="component-flatpickr-period" title="Flatpickr period picker" meta="PeriodPicker">
+                            <p className="ds-pattern-intro">Pattern untuk filter laporan: trigger ringkas, preset periode, dan pilihan granular per hari, minggu, bulan, atau tahun.</p>
+                            <PeriodPicker defaultStart="2026-10-01" defaultEnd="2026-10-23" />
+                            <div className="ds-search-hint"><i className="bi bi-lightning-charge" aria-hidden="true" /> Klik trigger untuk membuka preset periode atau kalender detail.</div>
+                        </Panel>
+                        <Panel title="Period picker contract" meta="presets / views">
+                            <div className="ds-flatpickr-contract">
+                                <div><span className="ds-flatpickr-contract-icon"><i className="bi bi-lightning-charge" aria-hidden="true" /></span><span><strong>Presets</strong><small>Real-time, kemarin, 7 hari, dan 30 hari.</small></span><code>quick select</code></div>
+                                <div><span className="ds-flatpickr-contract-icon"><i className="bi bi-calendar-range" aria-hidden="true" /></span><span><strong>Per Hari / Minggu</strong><small>Inline Flatpickr untuk tanggal tunggal dan rentang.</small></span><code>flatpickr</code></div>
+                                <div><span className="ds-flatpickr-contract-icon"><i className="bi bi-calendar-month" aria-hidden="true" /></span><span><strong>Per Bulan / Tahun</strong><small>Grid cepat untuk laporan periodik.</small></span><code>custom grid</code></div>
+                                <div><span className="ds-flatpickr-contract-icon"><i className="bi bi-keyboard" aria-hidden="true" /></span><span><strong>Keyboard & dismiss</strong><small>Escape menutup popover dan focus kembali ke trigger.</small></span><code>a11y</code></div>
+                            </div>
+                        </Panel>
+                    </div>
+                    <div className="ds-grid ds-grid-2 ds-space-top">
+                        <Panel id="component-flatpickr" title="Flatpickr field variants" meta="FlatpickrField">
+                            <p className="ds-pattern-intro">Pilih pola tanggal sesuai kebutuhan: single, range, datetime, multiple, atau hari kerja.</p>
+                            <div className="ds-flatpickr-grid">
+                                <FlatpickrField
+                                    id="ds-flatpickr-single"
+                                    label="Single date"
+                                    placeholder="Pilih satu tanggal"
+                                    onChange={handleFlatpickrChange('single')}
+                                />
+                                <FlatpickrField
+                                    id="ds-flatpickr-range"
+                                    label="Date range"
+                                    placeholder="Pilih periode"
+                                    mode="range"
+                                    onChange={handleFlatpickrChange('range')}
+                                />
+                                <FlatpickrField
+                                    id="ds-flatpickr-datetime"
+                                    label="Date & time"
+                                    placeholder="Pilih tanggal dan jam"
+                                    enableTime
+                                    dateFormat="d M Y, H:i"
+                                    onChange={handleFlatpickrChange('datetime')}
+                                />
+                                <FlatpickrField
+                                    id="ds-flatpickr-multiple"
+                                    label="Multiple dates"
+                                    placeholder="Pilih beberapa tanggal"
+                                    mode="multiple"
+                                    rangeSeparator=", "
+                                    onChange={handleFlatpickrChange('multiple')}
+                                />
+                                <FlatpickrField
+                                    id="ds-flatpickr-business"
+                                    label="Business days"
+                                    placeholder="Pilih hari kerja"
+                                    minDate="today"
+                                    disableWeekends
+                                    onChange={handleFlatpickrChange('business')}
+                                />
+                            </div>
+                            <div className="ds-flatpickr-feedback" role="status" aria-live="polite">
+                                <span><i className="bi bi-check2-circle" aria-hidden="true" /> Active value</span>
+                                <strong>{flatpickrValues.single || flatpickrValues.range || flatpickrValues.datetime || flatpickrValues.multiple || flatpickrValues.business || 'Belum ada tanggal dipilih'}</strong>
+                            </div>
+                            <div className="ds-search-hint"><i className="bi bi-info-circle" aria-hidden="true" /> Kalender mengikuti locale Indonesia dan tetap bisa dinavigasi dengan keyboard.</div>
+                        </Panel>
+                        <Panel title="Flatpickr types" meta="interaction contract">
+                            <div className="ds-flatpickr-contract">
+                                {flatpickrFieldTypes.map((field) => (
+                                    <div key={field.id}>
+                                        <span className="ds-flatpickr-contract-icon"><i className={`bi ${{ single: 'bi-calendar-date', range: 'bi-calendar-range', datetime: 'bi-clock', multiple: 'bi-calendar2-plus', business: 'bi-briefcase' }[field.id]}`} aria-hidden="true" /></span>
+                                        <span><strong>{field.label}</strong><small>{field.note}</small></span>
+                                        <code>{field.id}</code>
+                                    </div>
+                                ))}
                             </div>
                         </Panel>
                     </div>
