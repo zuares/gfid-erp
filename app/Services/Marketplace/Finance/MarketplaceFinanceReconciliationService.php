@@ -397,11 +397,41 @@ class MarketplaceFinanceReconciliationService
         if ($filters['order_sn'] !== null) {
             $query->where('order_sn', $filters['order_sn']);
         }
-        if ($filters['date_from'] !== null) {
-            $query->where($filters['date_basis'], '>=', CarbonImmutable::parse($filters['date_from'])->startOfDay());
-        }
-        if ($filters['date_to'] !== null) {
-            $query->where($filters['date_basis'], '<=', CarbonImmutable::parse($filters['date_to'])->endOfDay());
+        if ($filters['date_from'] !== null || $filters['date_to'] !== null) {
+            if ($filters['date_basis'] === 'ordered_at') {
+                $query->whereExists(function ($orders) use ($filters): void {
+                    $orders->selectRaw('1')
+                        ->from('marketplace_orders as finance_order')
+                        ->where(function ($match) {
+                            $match->whereColumn('finance_order.id', 'marketplace_financial_transactions.marketplace_order_id')
+                                ->orWhere(function ($fallback) {
+                                    $fallback->whereColumn('finance_order.store_id', 'marketplace_financial_transactions.store_id')
+                                        ->where(function ($orderId) {
+                                            $orderId->whereColumn('finance_order.channel_order_id', 'marketplace_financial_transactions.order_sn')
+                                                ->orWhereColumn('finance_order.external_order_id', 'marketplace_financial_transactions.order_sn');
+                                        });
+                                });
+                        });
+
+                    if ($filters['date_from'] !== null) {
+                        $orders->whereRaw('COALESCE(finance_order.ordered_at, finance_order.order_date) >= ?', [
+                            CarbonImmutable::parse($filters['date_from'])->startOfDay(),
+                        ]);
+                    }
+                    if ($filters['date_to'] !== null) {
+                        $orders->whereRaw('COALESCE(finance_order.ordered_at, finance_order.order_date) <= ?', [
+                            CarbonImmutable::parse($filters['date_to'])->endOfDay(),
+                        ]);
+                    }
+                });
+            } else {
+                if ($filters['date_from'] !== null) {
+                    $query->where($filters['date_basis'], '>=', CarbonImmutable::parse($filters['date_from'])->startOfDay());
+                }
+                if ($filters['date_to'] !== null) {
+                    $query->where($filters['date_basis'], '<=', CarbonImmutable::parse($filters['date_to'])->endOfDay());
+                }
+            }
         }
 
         return $query->orderByDesc('id');
@@ -674,10 +704,10 @@ class MarketplaceFinanceReconciliationService
 
     private function filters(array $filters): array
     {
-        $requestedBasis = $filters['date_basis'] ?? 'created_at';
-        $basis = in_array($requestedBasis, ['created_at', 'released_at'], true)
+        $requestedBasis = $filters['date_basis'] ?? 'ordered_at';
+        $basis = in_array($requestedBasis, ['ordered_at', 'created_at', 'released_at'], true)
             ? $requestedBasis
-            : 'created_at';
+            : 'ordered_at';
 
         return [
             'store_id' => isset($filters['store_id']) && $filters['store_id'] !== '' ? (int) $filters['store_id'] : null,

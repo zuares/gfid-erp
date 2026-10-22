@@ -1,7 +1,7 @@
 @php
     $activeFilterCount = collect([
         $filters['store_id'] ?? null,
-        ($filters['date_basis'] ?? 'created_at') !== 'created_at' ? ($filters['date_basis'] ?? null) : null,
+        ($filters['date_basis'] ?? 'ordered_at') !== 'ordered_at' ? ($filters['date_basis'] ?? null) : null,
         filled($filters['date_from'] ?? null) || filled($filters['date_to'] ?? null) ? 'date_range' : null,
         $filters['order_sn'] ?? null,
     ])->filter(fn ($value) => filled($value))->count();
@@ -41,8 +41,9 @@
             <div class="finance-sidebar-field">
                 <label class="form-label" for="transaction-date-basis">Gunakan tanggal</label>
                 <select id="transaction-date-basis" name="date_basis" class="form-select">
-                    <option value="created_at" @selected(($filters['date_basis'] ?? 'created_at') === 'created_at')>Transaksi dibuat</option>
-                    <option value="released_at" @selected(($filters['date_basis'] ?? '') === 'released_at')>Income released</option>
+                    <option value="ordered_at" @selected(($filters['date_basis'] ?? 'ordered_at') === 'ordered_at')>Tanggal order</option>
+                    <option value="created_at" @selected(($filters['date_basis'] ?? '') === 'created_at')>Transaksi dicatat</option>
+                    <option value="released_at" @selected(($filters['date_basis'] ?? '') === 'released_at')>Dana cair</option>
                 </select>
             </div>
 

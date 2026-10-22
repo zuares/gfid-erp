@@ -172,28 +172,68 @@ class MarketplaceFinanceController extends Controller
         if ($filters['order_sn'] !== null) {
             $query->where('ft.order_sn', $filters['order_sn']);
         }
-        if ($filters['date_from'] !== null) {
-            $query->where('ft.'.$filters['date_basis'], '>=', CarbonImmutable::parse($filters['date_from'])->startOfDay());
-        }
-        if ($filters['date_to'] !== null) {
-            $query->where('ft.'.$filters['date_basis'], '<=', CarbonImmutable::parse($filters['date_to'])->endOfDay());
+        if ($filters['date_from'] !== null || $filters['date_to'] !== null) {
+            if ($filters['date_basis'] === 'ordered_at') {
+                $this->whereFeeTransactionOrderDate($query, $filters);
+            } else {
+                $this->whereDateRange($query, 'ft.'.$filters['date_basis'], $filters);
+            }
         }
 
         return $query;
+    }
+
+    private function whereFeeTransactionOrderDate($query, array $filters): void
+    {
+        $query->whereExists(function ($orders) use ($filters): void {
+            $orders->selectRaw('1')
+                ->from('marketplace_orders as finance_order')
+                ->where(function ($match) {
+                    $match->whereColumn('finance_order.id', 'ft.marketplace_order_id')
+                        ->orWhere(function ($fallback) {
+                            $fallback->whereColumn('finance_order.store_id', 'ft.store_id')
+                                ->where(function ($orderId) {
+                                    $orderId->whereColumn('finance_order.channel_order_id', 'ft.order_sn')
+                                        ->orWhereColumn('finance_order.external_order_id', 'ft.order_sn');
+                                });
+                        });
+                });
+
+            if ($filters['date_from'] !== null) {
+                $orders->whereRaw('COALESCE(finance_order.ordered_at, finance_order.order_date) >= ?', [
+                    CarbonImmutable::parse($filters['date_from'])->startOfDay(),
+                ]);
+            }
+            if ($filters['date_to'] !== null) {
+                $orders->whereRaw('COALESCE(finance_order.ordered_at, finance_order.order_date) <= ?', [
+                    CarbonImmutable::parse($filters['date_to'])->endOfDay(),
+                ]);
+            }
+        });
+    }
+
+    private function whereDateRange($query, string $column, array $filters): void
+    {
+        if ($filters['date_from'] !== null) {
+            $query->where($column, '>=', CarbonImmutable::parse($filters['date_from'])->startOfDay());
+        }
+        if ($filters['date_to'] !== null) {
+            $query->where($column, '<=', CarbonImmutable::parse($filters['date_to'])->endOfDay());
+        }
     }
 
     private function filters(Request $request): array
     {
         return $request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
-            'date_basis' => ['nullable', 'in:created_at,released_at'],
+            'date_basis' => ['nullable', 'in:ordered_at,created_at,released_at'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'status' => ['nullable', 'in:matched,mismatch,unmatched,pending'],
             'order_sn' => ['nullable', 'string', 'max:120'],
         ]) + [
             'store_id' => $request->input('store_id'),
-            'date_basis' => $request->input('date_basis', 'created_at'),
+            'date_basis' => $request->input('date_basis', 'ordered_at'),
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
             'status' => $request->input('status'),

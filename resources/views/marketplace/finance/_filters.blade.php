@@ -37,6 +37,15 @@
                         @endforeach
                     </select>
                 </div>
+                <div class="finance-filter-field">
+                    <label class="form-label" for="finance-date-basis">Gunakan tanggal</label>
+                    <select id="finance-date-basis" name="date_basis" class="form-select">
+                        <option value="ordered_at" @selected(($filters['date_basis'] ?? 'ordered_at') === 'ordered_at')>Tanggal order</option>
+                        <option value="created_at" @selected(($filters['date_basis'] ?? '') === 'created_at')>Transaksi dicatat</option>
+                        <option value="released_at" @selected(($filters['date_basis'] ?? '') === 'released_at')>Dana cair</option>
+                    </select>
+                    <small class="text-muted">Settlement tetap menggunakan tanggal settlement.</small>
+                </div>
                 <div class="finance-filter-field finance-filter-period-field">
                     <label class="form-label" id="finance-period-label" for="finance-period-display">Periode tanggal</label>
                     <input id="finance-from" type="hidden" name="date_from" value="{{ $filters['date_from'] ?? '' }}" data-gf-date="off">

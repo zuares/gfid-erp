@@ -7,6 +7,7 @@ use App\Domain\Marketplace\Finance\Enums\EscrowStatus;
 use App\Domain\Marketplace\Finance\Enums\IncomeStatus;
 use App\Models\MarketplaceFinancialComponent;
 use App\Models\MarketplaceFinancialTransaction;
+use App\Models\MarketplaceOrder;
 use App\Models\Store;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -93,10 +94,71 @@ class MarketplaceFinanceUiTest extends TestCase
             ->assertOk()
             ->assertSee('UI-ORDER-001')
             ->assertSee('Pending');
-        $this->get('/marketplace/finance/fee-analysis?store_id='.$store->id.'&order_sn=UI-ORDER-001')
+        $this->get('/marketplace/finance/fee-analysis?store_id='.$store->id.'&date_basis=created_at&order_sn=UI-ORDER-001')
             ->assertOk()
             ->assertSee('Admin Fee')
             ->assertSee('UI-ORDER-001');
+    }
+
+    public function test_finance_date_filter_defaults_to_marketplace_order_date(): void
+    {
+        $store = Store::create([
+            'code' => 'ORDER-DATE-STORE',
+            'name' => 'Order Date Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-DATE-001',
+            'channel_order_id' => 'ORDER-DATE-001',
+            'order_status' => 'COMPLETED',
+            'order_date' => '2026-10-09 12:00:00',
+            'ordered_at' => '2026-10-09 12:00:00',
+            'total_amount' => 120000,
+        ]);
+        $transaction = MarketplaceFinancialTransaction::create([
+            'store_id' => $store->id,
+            'marketplace_order_id' => $order->id,
+            'channel' => 'shopee',
+            'order_sn' => 'ORDER-DATE-001',
+            'currency' => 'IDR',
+            'gross_amount' => 120000,
+            'net_amount' => 100000,
+            'escrow_status' => EscrowStatus::FINALIZED,
+            'income_status' => IncomeStatus::RELEASED,
+            'released_at' => '2026-09-20 12:00:00',
+        ]);
+        $transaction->forceFill([
+            'created_at' => '2026-09-15 12:00:00',
+            'updated_at' => '2026-09-15 12:00:00',
+        ])->save();
+        MarketplaceFinancialComponent::create([
+            'financial_transaction_id' => $transaction->id,
+            'component_code' => 'admin_fee',
+            'component_name' => 'Admin Fee',
+            'amount' => 20000,
+            'direction' => ComponentDirection::DEBIT,
+            'dedupe_key' => str_repeat('o', 64),
+        ]);
+
+        $query = '?store_id='.$store->id.'&date_from=2026-10-01&date_to=2026-10-31';
+
+        $this->get('/marketplace/finance'.$query)
+            ->assertOk()
+            ->assertSee('Tanggal order')
+            ->assertSee('ORDER-DATE-001');
+        $this->get('/marketplace/finance/transactions'.$query)
+            ->assertOk()
+            ->assertSee('ORDER-DATE-001');
+        $this->get('/marketplace/finance/fee-analysis'.$query)
+            ->assertOk()
+            ->assertSee('Admin Fee')
+            ->assertSee('ORDER-DATE-001');
+
+        $this->get('/marketplace/finance/transactions'.$query.'&date_basis=created_at')
+            ->assertOk()
+            ->assertDontSee('ORDER-DATE-001');
     }
 
     public function test_get_pages_do_not_create_journals(): void
@@ -132,14 +194,14 @@ class MarketplaceFinanceUiTest extends TestCase
             ]);
         }
 
-        $this->get('/marketplace/finance/transactions?per_page=25')
+        $this->get('/marketplace/finance/transactions?per_page=25&date_basis=created_at')
             ->assertOk()
             ->assertSee('Filter transaksi')
             ->assertSee('25 transaksi')
             ->assertSee('Menampilkan 1–25 dari 51 transaksi')
             ->assertDontSee('PAGINATION-ORDER-001');
 
-        $this->get('/marketplace/finance/transactions?per_page=100')
+        $this->get('/marketplace/finance/transactions?per_page=100&date_basis=created_at')
             ->assertOk()
             ->assertSee('Menampilkan 1–50 dari 51 transaksi');
     }
@@ -180,7 +242,7 @@ class MarketplaceFinanceUiTest extends TestCase
             'dedupe_key' => str_repeat('m', 64),
         ]);
 
-        $this->get('/marketplace/finance/fee-analysis?store_id='.$store->id)
+        $this->get('/marketplace/finance/fee-analysis?store_id='.$store->id.'&date_basis=created_at')
             ->assertOk()
             ->assertSee('Selisih settlement belum terpetakan')
             ->assertSee('Sisa dari gross − net setelah komponen yang dikenali.')
@@ -217,7 +279,7 @@ class MarketplaceFinanceUiTest extends TestCase
             ]);
         }
 
-        $this->get('/marketplace/finance/fee-analysis')
+        $this->get('/marketplace/finance/fee-analysis?date_basis=created_at')
             ->assertOk()
             ->assertSee('Menampilkan 1–50 dari 51 order')
             ->assertSee('Admin Fee');
