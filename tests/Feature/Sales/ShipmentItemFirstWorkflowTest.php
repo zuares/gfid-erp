@@ -817,6 +817,83 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('ORDER-TO-REKON-001', false);
     }
 
+    public function test_confirmation_marks_per_order_item_and_quantity_differences_for_review(): void
+    {
+        [$user, $store, $scannedItem] = $this->shipmentContext();
+        $differentItem = Item::create([
+            'code' => 'ITEM-FIRST-DIFFERENT',
+            'name' => 'Different marketplace item',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+        $shipment = Shipment::create([
+            'code' => 'SHP-ORDER-DIFF-CHECK-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+
+        foreach ([
+            ['number' => 'ORDER-ITEM-DIFF-001', 'source_item' => $differentItem, 'source_qty' => 1],
+            ['number' => 'ORDER-QTY-DIFF-001', 'source_item' => $scannedItem, 'source_qty' => 3],
+        ] as $case) {
+            $order = MarketplaceOrder::create([
+                'store_id' => $store->id,
+                'external_order_id' => $case['number'],
+                'channel_order_id' => $case['number'],
+                'order_status' => 'SHIPPED',
+                'order_date' => now(),
+                'ordered_at' => now(),
+            ]);
+            MarketplaceOrderItem::create([
+                'order_id' => $order->id,
+                'marketplace_order_id' => $order->id,
+                'item_id' => $case['source_item']->id,
+                'internal_item_id' => $case['source_item']->id,
+                'item_name' => $case['source_item']->name,
+                'item_sku' => $case['source_item']->code,
+                'model_sku' => $case['source_item']->code,
+                'qty' => $case['source_qty'],
+            ]);
+            $fulfillment = OrderFulfillment::create([
+                'marketplace_order_id' => $order->id,
+                'status' => OrderFulfillment::STATUS_DRAFT,
+            ]);
+            $scan = ShipmentOrderScan::create([
+                'shipment_id' => $shipment->id,
+                'order_no' => $case['number'],
+                'fulfillment_id' => $fulfillment->id,
+                'status' => 'pending',
+                'source' => 'scanner',
+                'raw_payload' => ['mode' => 'auto_link'],
+            ]);
+            ShipmentLine::create([
+                'shipment_id' => $shipment->id,
+                'shipment_order_scan_id' => $scan->id,
+                'item_id' => $scannedItem->id,
+                'qty_scanned' => 1,
+                'allocated_qty' => 1,
+            ]);
+        }
+
+        $response = $this->actingAs($user)->get(route('sales.shipments.confirm_orders', $shipment));
+        $response->assertOk()
+            ->assertSee('Selisih item')
+            ->assertSee('Selisih qty')
+            ->assertSee('data-order-problem="true"', false)
+            ->assertSee('Shipment Test Store');
+
+        $html = $response->getContent();
+        $storePosition = strpos($html, '<span class="sd-store-name" title="Toko order">Shipment Test Store</span>');
+        $linkedStatusPosition = strpos($html, '<span class="sd-badge linked">Tertaut</span>');
+        $this->assertNotFalse($storePosition);
+        $this->assertNotFalse($linkedStatusPosition);
+        $this->assertLessThan($linkedStatusPosition, $storePosition);
+    }
+
     public function test_kilat_booking_is_shown_as_linked_on_the_shipment_check_page(): void
     {
         [$user, $store] = $this->shipmentContext();

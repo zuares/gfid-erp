@@ -83,6 +83,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-badge.unlinked{background:#f8fafc;border-color:#cbd5e1;color:#64748b}
 .sd-link-status{display:flex;align-items:center;justify-content:flex-end;gap:.35rem;flex-wrap:wrap}
 .sd-booking-status{color:#9a3412;font-size:.67rem;font-weight:700;white-space:nowrap}
+.sd-store-name{display:inline-flex;align-items:center;min-height:25px;padding:.12rem .42rem;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;color:#334155;font-size:.68rem;font-weight:800;white-space:nowrap}
+.sd-review-badge{display:inline-flex;align-items:center;min-height:21px;margin-left:.3rem;padding:.1rem .42rem;border:1px solid #fed7aa;border-radius:999px;background:#fff7ed;color:#9a3412;font-size:.62rem;font-weight:850;line-height:1.25;vertical-align:middle}
 .sd-sku-mismatch{display:block;margin-top:.12rem;color:#b45309;font-family:inherit;font-size:.65rem;font-weight:700;white-space:normal}
 .sd-order-item-marketplace-sku.is-mismatch{overflow:visible;white-space:normal}
 .sd-sku-unmatched{padding:.4rem .1rem .2rem;color:#92400e;font-size:.7rem}
@@ -156,6 +158,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-marketplace-tab { display:inline-flex; align-items:center; justify-content:center; gap:.32rem; min-height:32px; flex:1 0 0; padding:.24rem .58rem; border:1px solid transparent; border-radius:7px; color:#64748b; background:transparent; font-size:.68rem; font-weight:750; white-space:nowrap; cursor:pointer; transition:background .12s ease,color .12s ease,border-color .12s ease,box-shadow .12s ease; }
 .sd-marketplace-tab:hover { color:#334155; background:#f1f5f9; }
 .sd-marketplace-tab.active { color:#334155; border-color:#dbe3ee; background:#fff; box-shadow:0 1px 2px rgba(15,23,42,.06); }
+.sd-marketplace-tabs[hidden], .sd-marketplace-tab[hidden] { display:none!important; }
 .sd-marketplace-tab-count { color:#94a3b8; font-size:.64rem; font-weight:850; }
 .sd-marketplace-tab::before { content:''; width:5px; height:5px; border-radius:999px; background:#94a3b8; }
 .sd-marketplace-tab[data-order-marketplace-tab="problem"]::before { background:#dc2626; }
@@ -729,19 +732,67 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     $ungroupedQty = (int) $ungroupedLines->sum('qty_scanned');
     $ungroupedItemTypes = (int) $ungroupedLines->map($itemTypeKey)->filter()->unique()->count();
     $ungroupedCogs = (float) $ungroupedLines->sum(fn ($line) => $lineCogs($line));
+    $compareOrderShipment = static function ($shipmentLines, $sourceItems): array {
+        $shipmentLines = collect($shipmentLines);
+        $sourceItems = collect($sourceItems);
+        if ($sourceItems->isEmpty()) {
+            return ['needs_review' => false, 'item_mismatch' => false, 'qty_mismatch' => false, 'unverified' => false];
+        }
+
+        $sourceItemId = static fn ($item): int => (int) (is_array($item)
+            ? ($item['item_id'] ?? 0)
+            : (($item->internal_item_id ?? null) ?: ($item->item_id ?? 0)));
+        $sourceQty = static fn ($item): int => (int) (is_array($item)
+            ? ($item['qty'] ?? $item['quantity'] ?? $item['model_quantity_purchased'] ?? 0)
+            : ($item->qty ?? 0));
+        $shipmentByItem = $shipmentLines->groupBy(fn ($line) => (int) ($line->item_id ?? 0))
+            ->map(fn ($itemLines) => (int) $itemLines->sum('qty_scanned'));
+        $sourceByItem = $sourceItems->groupBy($sourceItemId)
+            ->map(fn ($items) => (int) $items->sum($sourceQty));
+        $unverified = $sourceByItem->keys()->contains(fn ($itemId) => (int) $itemId <= 0)
+            || $shipmentByItem->keys()->contains(fn ($itemId) => (int) $itemId <= 0);
+        $itemMismatch = false;
+        $qtyMismatch = $shipmentLines->sum('qty_scanned') !== $sourceItems->sum($sourceQty);
+
+        if (!$unverified) {
+            $shipmentIds = $shipmentByItem->keys()->map(fn ($id) => (int) $id)->sort()->values()->all();
+            $sourceIds = $sourceByItem->keys()->map(fn ($id) => (int) $id)->sort()->values()->all();
+            $itemMismatch = $shipmentIds !== $sourceIds;
+            if (!$itemMismatch) {
+                foreach ($sourceByItem as $itemId => $qty) {
+                    if ((int) ($shipmentByItem->get($itemId) ?? 0) !== (int) $qty) {
+                        $qtyMismatch = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return [
+            'needs_review' => $itemMismatch || $qtyMismatch || $unverified,
+            'item_mismatch' => $itemMismatch,
+            'qty_mismatch' => $qtyMismatch,
+            'unverified' => $unverified,
+        ];
+    };
     $marketplaceCounts = ['all' => (int) $orderScans->count(), 'problem' => 0];
     $sourceTabs = ['platform' => [], 'store' => []];
     $linkCounts = ['all' => (int) $orderScans->count(), 'linked' => 0, 'unlinked' => 0];
     foreach ($orderScans as $orderScan) {
         $orderScanLines = $orderScan->lines->merge($singleOrderFallbackLines);
-        if ((int) data_get($orderScan->raw_payload, 'duplicate_count', 0) > 0 || $orderScanLines->isEmpty()) {
+        $sourceItems = $orderScan->fulfillment?->marketplaceOrder?->items ?? collect();
+        if ($sourceItems->isEmpty() && !empty($kilatMatches[$orderScan->id])) {
+            $sourceItems = collect($bookingItemsByScan[$orderScan->id] ?? []);
+        }
+        $orderComparison = $compareOrderShipment($orderScanLines, $sourceItems);
+        if ((int) data_get($orderScan->raw_payload, 'duplicate_count', 0) > 0 || $orderScanLines->isEmpty() || $orderComparison['needs_review']) {
             $marketplaceCounts['problem']++;
         }
         $linkedStore = $orderScan->fulfillment?->marketplaceOrder?->store;
         $linkedChannel = $linkedStore?->channel;
-        if ($linkedChannel?->code && $linkedChannel?->name) {
+        if ($linkedChannel?->code) {
             $platformKey = strtolower((string) $linkedChannel->code);
-            $sourceTabs['platform'][$platformKey] ??= ['label' => $linkedChannel->name, 'count' => 0];
+            $sourceTabs['platform'][$platformKey] ??= ['label' => $linkedChannel->name ?: $linkedChannel->code, 'count' => 0];
             $sourceTabs['platform'][$platformKey]['count']++;
         }
         if ($linkedStore?->id && ($linkedStore->name || $linkedStore->code)) {
@@ -749,6 +800,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
             $sourceTabs['store'][$storeKey] ??= [
                 'label' => $linkedStore->name ?: $linkedStore->code,
                 'platform' => $linkedChannel?->name ?: 'Toko',
+                'platform_key' => $linkedChannel?->code ? strtolower((string) $linkedChannel->code) : '',
                 'count' => 0,
             ];
             $sourceTabs['store'][$storeKey]['count']++;
@@ -946,16 +998,26 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                     </button>
                 @endforeach
             </div>
-            @if(count($sourceTabs['platform']) || count($sourceTabs['store']))
-                <div class="sd-marketplace-tabs sd-source-tabs" role="tablist" aria-label="Filter berdasarkan platform atau toko">
+            @if(count($sourceTabs['platform']))
+                <div class="sd-marketplace-tabs sd-source-tabs" role="tablist" aria-label="Filter berdasarkan platform">
+                    <button type="button" class="sd-marketplace-tab active" data-order-platform-tab="" role="tab" aria-selected="true">
+                        <span>Semua platform</span>
+                    </button>
                     @foreach($sourceTabs['platform'] as $key => $tab)
-                        <button type="button" class="sd-marketplace-tab" data-order-marketplace-tab="platform:{{ $key }}" role="tab" aria-selected="false">
-                            <span>Platform · {{ $tab['label'] }}</span><span class="sd-marketplace-tab-count">{{ number_format($tab['count'], 0, ',', '.') }}</span>
+                        <button type="button" class="sd-marketplace-tab" data-order-platform-tab="{{ $key }}" role="tab" aria-selected="false">
+                            <span>{{ $tab['label'] }}</span><span class="sd-marketplace-tab-count">{{ number_format($tab['count'], 0, ',', '.') }}</span>
                         </button>
                     @endforeach
+                </div>
+            @endif
+            @if(count($sourceTabs['store']))
+                <div class="sd-marketplace-tabs sd-store-tabs" id="orderStoreTabs" role="tablist" aria-label="Filter berdasarkan toko" hidden>
+                    <button type="button" class="sd-marketplace-tab active" data-order-store-tab="all" role="tab" aria-selected="true">
+                        <span>Semua toko</span>
+                    </button>
                     @foreach($sourceTabs['store'] as $key => $tab)
-                        <button type="button" class="sd-marketplace-tab" data-order-marketplace-tab="store:{{ $key }}" role="tab" aria-selected="false">
-                            <span>{{ $tab['platform'] }} · {{ $tab['label'] }}</span><span class="sd-marketplace-tab-count">{{ number_format($tab['count'], 0, ',', '.') }}</span>
+                        <button type="button" class="sd-marketplace-tab" data-order-store-tab="{{ $key }}" data-store-platform="{{ $tab['platform_key'] }}" role="tab" aria-selected="false" hidden>
+                            <span>{{ $tab['label'] }}</span><span class="sd-marketplace-tab-count">{{ number_format($tab['count'], 0, ',', '.') }}</span>
                         </button>
                     @endforeach
                 </div>
@@ -1036,6 +1098,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 $orderCodeUpper = strtoupper(trim((string) $scan->order_no));
                                 $isSpxShopee = str_starts_with($orderCodeUpper, 'SPX');
                                 $hasMarketplaceOrder = (bool) $scan->fulfillment?->marketplaceOrder;
+                                $linkedOrder = $scan->fulfillment?->marketplaceOrder;
+                                $linkedStore = $linkedOrder?->store ?: ($hasMarketplaceOrder ? null : $shipment->store);
                                 $hasBookingOnly = $isSpxShopee && !$hasMarketplaceOrder && !empty($kilatMatches[$scan->id]);
                                 $hasMarketplaceLink = $isSpxShopee
                                     ? ($hasMarketplaceOrder || $hasBookingOnly)
@@ -1080,6 +1144,17 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 $orderQty = (int) $orderLines->sum('qty_scanned');
                                 $orderCogs = (float) $orderLines->sum(fn ($line) => $lineCogs($line));
                                 $hasNoItems = $orderLines->isEmpty();
+                                $sourceItems = $linkedOrder?->items ?? collect();
+                                if ($sourceItems->isEmpty() && $hasBookingOnly) {
+                                    $sourceItems = collect($bookingItemsByScan[$scan->id] ?? []);
+                                }
+                                $orderComparison = $compareOrderShipment($orderLines, $sourceItems);
+                                $orderNeedsReview = $duplicateCount > 0 || $hasNoItems || $orderComparison['needs_review'];
+                                $reviewReasons = array_values(array_filter([
+                                    $orderComparison['item_mismatch'] ? 'Selisih item' : null,
+                                    $orderComparison['qty_mismatch'] ? 'Selisih qty' : null,
+                                    $orderComparison['unverified'] ? 'Item belum terpetakan' : null,
+                                ]));
                                 $bookingSkus = $hasBookingOnly ? ($bookingSkusByScan[$scan->id] ?? []) : [];
                                 $bookingItems = collect($hasBookingOnly ? ($bookingItemsByScan[$scan->id] ?? []) : []);
                                 $scannedItemIds = $orderLines->pluck('item_id')->map(fn ($id) => (int) $id);
@@ -1103,7 +1178,6 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 $bookingOrderQty = $hasSingleBookingItem ? ($bookingOrderQtyByScan[$scan->id] ?? null) : null;
                                 $bookingStatus = $hasBookingOnly ? ($bookingStatusesByScan[$scan->id] ?? '') : '';
                                 $bookingIdentifiers = $bookingIdentifiersByScan[$scan->id] ?? [];
-                                $linkedOrder = $scan->fulfillment?->marketplaceOrder;
                                 $bookingNumber = trim((string) ($linkedOrder?->booking_sn ?: ($bookingIdentifiers['booking_sn'] ?? '')));
                                 $marketplaceOrderNumber = trim((string) ($linkedOrder?->channel_order_id
                                     ?: $linkedOrder?->external_order_id
@@ -1117,13 +1191,14 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 $showSingleBookingSku = count($bookingSkus) === 1
                                     && $hasSingleBookingItem;
                             @endphp
-                            <div class="sd-order sd-order-group" data-order-card data-order-link-state="{{ $hasMarketplaceLink ? 'linked' : 'unlinked' }}" data-order-problem="{{ $duplicateCount > 0 || $hasNoItems ? 'true' : 'false' }}" data-order-platform="{{ $linkedOrder?->store?->channel?->code ? strtolower((string) $linkedOrder->store->channel->code) : '' }}" data-order-store="{{ $linkedOrder?->store_id ?? '' }}" data-order-search="{{ $orderSearchText }}">
+                            <div class="sd-order sd-order-group" data-order-card data-order-link-state="{{ $hasMarketplaceLink ? 'linked' : 'unlinked' }}" data-order-problem="{{ $orderNeedsReview ? 'true' : 'false' }}" data-order-platform="{{ $linkedOrder?->store?->channel?->code ? strtolower((string) $linkedOrder->store->channel->code) : '' }}" data-order-store="{{ $linkedOrder?->store_id ?? '' }}" data-order-search="{{ $orderSearchText }}">
                                 <div class="sd-order-lead">
                                     <div>
                                         <div class="sd-order-no">
                                             <button type="button" class="sd-copy-value sd-copy-scan" data-copy-value="{{ $scan->order_no }}" data-copy-label="{{ $scanCopyLabel }}" title="Salin {{ strtolower($scanCopyLabel) }}" aria-label="Salin {{ strtolower($scanCopyLabel) }} {{ $scan->order_no }}"><span>{{ $scan->order_no }}</span><span class="sd-copy-action" data-copy-action><i class="bi bi-copy" aria-hidden="true"></i> Salin</span><span class="sd-copy-confirmation" data-copy-feedback hidden><i class="bi bi-check2" aria-hidden="true"></i> Disalin</span></button>
                                             @if($duplicateCount > 0)<span class="sd-duplicate-badge" title="Order ini discan lebih dari sekali">Duplikat</span>@endif
                                             @if($hasNoItems)<span class="sd-missing-item-badge" title="Order belum memiliki item">Belum ada item</span>@endif
+                                            @if($reviewReasons !== [])<span class="sd-review-badge" title="Order dan item shipment perlu diverifikasi">{{ implode(' · ', $reviewReasons) }}</span>@endif
                                         </div>
                                         @if($bookingNumber !== '' || $marketplaceOrderNumber !== '')
                                             <div class="sd-order-identifiers">
@@ -1147,6 +1222,9 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                     </div>
                                     <div class="sd-order-head-side">
                                         <div class="sd-link-status">
+                                            @if($hasMarketplaceLink && $linkedStore)
+                                                <span class="sd-store-name" title="Toko order">{{ $linkedStore->name ?: $linkedStore->code }}</span>
+                                            @endif
                                             <span class="sd-badge {{ $scanBadgeClass }}">{{ $scanLabel }}</span>
                                             @if($bookingStatus !== '')<span class="sd-booking-status" title="Status booking Shopee">{{ str_replace('_', ' ', $bookingStatus) }}</span>@endif
                                         </div>
@@ -1220,7 +1298,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                         $pickedByItem = $orderLines->groupBy('item_id')->map(fn ($itemLines) => (int) $itemLines->sum('qty_scanned'));
                                         $cogsByItem = $orderLines->groupBy('item_id')->map(fn ($itemLines) => (float) $itemLines->sum(fn ($line) => $lineCogs($line)));
                                         $marketplaceStatus = strtoupper(str_replace('_', ' ', (string) ($marketplaceOrder->order_status ?: $marketplaceOrder->status ?: '')));
-                                        $unmatchedMarketplaceLines = $isSpxShopee && $orderLines->isNotEmpty()
+                                        $unmatchedMarketplaceLines = $orderLines->isNotEmpty()
                                             ? $marketplaceLines->filter(fn ($candidate) => !$orderLines->contains(fn ($line) => (int) ($candidate->internal_item_id ?: $candidate->item_id) === (int) $line->item_id))
                                             : collect();
                                     @endphp
@@ -1243,17 +1321,30 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                         </div>
                                         @if($marketplaceLines->isNotEmpty())
                                             @php
-                                                $displayLines = $orderLines;
+                                                $displayLines = $orderLines->values();
                                                 if ($displayLines->isEmpty()) {
                                                     $displayLines = $marketplaceLines->map(function ($marketplaceLine) {
                                                         return (object) [
                                                             'id' => null,
                                                             'item_id' => $marketplaceLine->internal_item_id ?: $marketplaceLine->item_id,
                                                             'item' => $marketplaceLine->internalItem,
-                                                            'qty_scanned' => (int) $marketplaceLine->qty,
+                                                            'qty_scanned' => 0,
                                                             'marketplace_line' => $marketplaceLine,
                                                         ];
                                                     });
+                                                } else {
+                                                    foreach ($unmatchedMarketplaceLines as $unmatchedLine) {
+                                                        $unmatchedItemId = (int) ($unmatchedLine->internal_item_id ?: $unmatchedLine->item_id);
+                                                        if ($unmatchedItemId > 0 && !$orderLines->contains(fn ($line) => (int) $line->item_id === $unmatchedItemId)) {
+                                                            $displayLines->push((object) [
+                                                                'id' => null,
+                                                                'item_id' => $unmatchedItemId,
+                                                                'item' => $unmatchedLine->internalItem,
+                                                                'qty_scanned' => 0,
+                                                                'marketplace_line' => $unmatchedLine,
+                                                            ]);
+                                                        }
+                                                    }
                                                 }
                                             @endphp
                                             <div class="sd-order-items sd-order-items-breakdown">
@@ -1265,14 +1356,14 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                         });
                                                         // Satu item scan dan satu item order boleh ditampilkan berdampingan,
                                                         // tetapi perbedaan item tidak boleh dianggap Diff 0.
-                                                        $itemMismatch = $isSpxShopee && !$matchedMarketplaceLine && $orderLines->isNotEmpty();
+                                                        $itemMismatch = !$matchedMarketplaceLine && $orderLines->isNotEmpty();
                                                         $singleLineMismatch = $itemMismatch && $orderLines->count() === 1 && $marketplaceLines->count() === 1;
                                                         $marketplaceLine = $matchedMarketplaceLine ?: ($singleLineMismatch ? $marketplaceLines->first() : null);
                                                         // Tampilkan SKU asli dari payload marketplace saja.
                                                         // Jangan gunakan marketplace_sku hasil mapping nama atau kode internal.
                                                         $marketplaceSku = $marketplaceLine?->model_sku ?: $marketplaceLine?->item_sku ?: '—';
                                                         $qtyOrder = $itemMismatch && !$singleLineMismatch ? null : (int) ($marketplaceLine?->qty ?? $line->qty_scanned);
-                                                        $qtyShipment = (int) ($pickedByItem[$line->item_id] ?? $line->qty_scanned);
+                                                        $qtyShipment = (int) ($pickedByItem[$line->item_id] ?? ($orderLines->isEmpty() ? 0 : $line->qty_scanned));
                                                         $difference = $qtyShipment - (int) $qtyOrder;
                                                     @endphp
                                                     <div class="sd-order-item {{ $orderItemGridClass }} sd-qty-breakdown">
@@ -1301,7 +1392,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                     </div>
                                                 @endforeach
                                             </div>
-                                            @if($isSpxShopee && $unmatchedMarketplaceLines->isNotEmpty() && !($orderLines->count() === 1 && $marketplaceLines->count() === 1))
+                                            @if($unmatchedMarketplaceLines->isNotEmpty() && !($orderLines->count() === 1 && $marketplaceLines->count() === 1))
                                                 <div class="sd-sku-unmatched">Item order belum cocok: {{ $unmatchedMarketplaceLines->map(fn ($line) => $line->model_sku ?: $line->item_sku ?: 'SKU belum tersedia')->join(', ') }}</div>
                                             @endif
                                         @else
@@ -1478,16 +1569,38 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     var orderSearchEmpty = document.getElementById('orderSearchEmpty');
     var orderCards = document.querySelectorAll('[data-order-card]');
     var marketplaceTabButtons = document.querySelectorAll('[data-order-marketplace-tab]');
+    var platformTabButtons = document.querySelectorAll('[data-order-platform-tab]');
+    var storeTabButtons = document.querySelectorAll('[data-order-store-tab]');
+    var orderStoreTabs = document.getElementById('orderStoreTabs');
     var linkTabButtons = document.querySelectorAll('[data-order-link-tab]');
     var activeMarketplaceTab = 'all';
+    var activePlatform = '';
+    var activeStore = '';
     var activeLinkTab = 'all';
 
     function matchesMarketplace(card){
-        if (activeMarketplaceTab === 'all') return true;
-        if (activeMarketplaceTab === 'problem') return card.dataset.orderProblem === 'true';
-        if (activeMarketplaceTab.indexOf('platform:') === 0) return card.dataset.orderPlatform === activeMarketplaceTab.slice(9);
-        if (activeMarketplaceTab.indexOf('store:') === 0) return card.dataset.orderStore === activeMarketplaceTab.slice(6);
-        return false;
+        return (activeMarketplaceTab !== 'problem' || card.dataset.orderProblem === 'true')
+            && (!activePlatform || card.dataset.orderPlatform === activePlatform)
+            && (!activeStore || card.dataset.orderStore === activeStore);
+    }
+
+    function updateSourceTabs(){
+        platformTabButtons.forEach(function(button){
+            var active = button.dataset.orderPlatformTab === activePlatform;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+
+        var visibleStores = 0;
+        storeTabButtons.forEach(function(button){
+            var isAll = button.dataset.orderStoreTab === 'all';
+            var visible = Boolean(activePlatform) && (isAll || button.dataset.storePlatform === activePlatform);
+            button.hidden = !visible;
+            button.classList.toggle('active', isAll ? !activeStore : button.dataset.orderStoreTab === activeStore);
+            button.setAttribute('aria-selected', (isAll ? !activeStore : button.dataset.orderStoreTab === activeStore) ? 'true' : 'false');
+            if (visible && !isAll) visibleStores++;
+        });
+        if (orderStoreTabs) orderStoreTabs.hidden = !activePlatform || visibleStores === 0;
     }
 
     function updateLinkTabCounts(){
@@ -1512,6 +1625,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
         var query = (orderSearchInput?.value || '').trim().toLowerCase();
         var visibleCount = 0;
 
+        updateSourceTabs();
         updateLinkTabCounts();
 
         orderCards.forEach(function(card){
@@ -1532,11 +1646,30 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     marketplaceTabButtons.forEach(function(button){
         button.addEventListener('click', function(){
             activeMarketplaceTab = button.dataset.orderMarketplaceTab || 'all';
+            if (activeMarketplaceTab === 'all') {
+                activePlatform = '';
+                activeStore = '';
+            }
             marketplaceTabButtons.forEach(function(tab){
                 var active = tab === button;
                 tab.classList.toggle('active', active);
                 tab.setAttribute('aria-selected', active ? 'true' : 'false');
             });
+            applyOrderFilters();
+        });
+    });
+
+    platformTabButtons.forEach(function(button){
+        button.addEventListener('click', function(){
+            activePlatform = button.dataset.orderPlatformTab || '';
+            activeStore = '';
+            applyOrderFilters();
+        });
+    });
+
+    storeTabButtons.forEach(function(button){
+        button.addEventListener('click', function(){
+            activeStore = button.dataset.orderStoreTab === 'all' ? '' : (button.dataset.orderStoreTab || '');
             applyOrderFilters();
         });
     });

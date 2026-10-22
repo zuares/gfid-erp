@@ -396,6 +396,7 @@
 
     .sr-marketplace-tab:hover { background: #f1f5f9; color: #334155; }
     .sr-marketplace-tab.active { color: #334155; border-color: #dbe3ee; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .06); }
+    .sr-marketplace-tabs[hidden], .sr-marketplace-tab[hidden] { display: none !important; }
     .sr-marketplace-tab-count { color: #94a3b8; font-size: .64rem; font-weight: 850; }
     .sr-marketplace-tab::before { content: ''; width: 5px; height: 5px; border-radius: 999px; background: #94a3b8; }
     .sr-marketplace-tab[data-order-marketplace-tab="problem"]::before { background: #dc2626; }
@@ -1233,7 +1234,8 @@
                         <span>Perlu Diperiksa</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="problem">0</span>
                     </button>
                 </div>
-                <div class="sr-marketplace-tabs" id="orderSourceTabs" role="tablist" aria-label="Filter berdasarkan platform atau toko"></div>
+                <div class="sr-marketplace-tabs" id="orderSourceTabs" role="tablist" aria-label="Filter berdasarkan platform"></div>
+                <div class="sr-marketplace-tabs" id="orderStoreTabs" role="tablist" aria-label="Filter berdasarkan toko" hidden></div>
             </div>
             <div class="sr-panel-body sr-order-panel-body">
                 <div class="sr-orders" id="ordersWrap">
@@ -1274,7 +1276,7 @@
     const initialOrders = @json($initialOrders);
     const initialLines = @json($initialLines);
 
-    const state = { mode: 'order', current: null, expanded: null, search: '', marketplaceTab: 'all', highlightedItemKey: null, orders: [] };
+    const state = { mode: 'order', current: null, expanded: null, search: '', marketplaceTab: 'all', platformKey: '', storeId: '', highlightedItemKey: null, orders: [] };
     const lastScanStack = [];
     let highlightTimer = null;
 
@@ -1635,8 +1637,8 @@
         const query = normalize(state.search);
         return state.orders.filter(order => {
             if (state.marketplaceTab === 'problem' && Number(order.duplicateCount || 0) <= 0 && (order.items || []).length > 0) return false;
-            if (state.marketplaceTab.startsWith('platform:') && order.platformKey !== state.marketplaceTab.slice(9)) return false;
-            if (state.marketplaceTab.startsWith('store:') && String(order.storeId) !== state.marketplaceTab.slice(6)) return false;
+            if (state.platformKey && order.platformKey !== state.platformKey) return false;
+            if (state.storeId && String(order.storeId) !== state.storeId) return false;
             if (!query) return true;
             if (order.code.includes(query)) return true;
             return Object.values(order.items || {}).some(item => {
@@ -1661,18 +1663,23 @@
             }
             if (order.storeId && order.storeLabel) {
                 const key = `store:${order.storeId}`;
-                if (!storeTabs.has(key)) storeTabs.set(key, { label: order.storeLabel, platform: order.platformLabel || '', count: 0 });
+                if (!storeTabs.has(key)) storeTabs.set(key, { label: order.storeLabel, platform: order.platformLabel || '', platformKey: order.platformKey, count: 0 });
                 storeTabs.get(key).count++;
             }
         });
 
         if (orderSourceTabs) {
-            const groups = [
-                ...Array.from(platformTabs, ([key, value]) => ({ key, label: value.label, count: value.count, type: 'Platform' })),
-                ...Array.from(storeTabs, ([key, value]) => ({ key, label: value.label, count: value.count, type: value.platform || 'Toko' })),
-            ];
-            orderSourceTabs.innerHTML = groups.map(tab => `<button type="button" class="sr-marketplace-tab${state.marketplaceTab === tab.key ? ' active' : ''}" data-order-marketplace-tab="${esc(tab.key)}" role="tab" aria-selected="${state.marketplaceTab === tab.key ? 'true' : 'false'}"><span>${esc(tab.type)} · ${esc(tab.label)}</span><span class="sr-marketplace-tab-count">${tab.count}</span></button>`).join('');
-            orderSourceTabs.hidden = groups.length === 0;
+            const platforms = Array.from(platformTabs, ([key, value]) => ({ key: key.slice(9), label: value.label, count: value.count }));
+            orderSourceTabs.innerHTML = `<button type="button" class="sr-marketplace-tab${state.platformKey ? '' : ' active'}" data-order-platform-tab="" role="tab" aria-selected="${state.platformKey ? 'false' : 'true'}"><span>Semua platform</span></button>` + platforms.map(tab => `<button type="button" class="sr-marketplace-tab${state.platformKey === tab.key ? ' active' : ''}" data-order-platform-tab="${esc(tab.key)}" role="tab" aria-selected="${state.platformKey === tab.key ? 'true' : 'false'}"><span>${esc(tab.label)}</span><span class="sr-marketplace-tab-count">${tab.count}</span></button>`).join('');
+            orderSourceTabs.hidden = platforms.length === 0;
+        }
+
+        const storeSourceTabs = document.getElementById('orderStoreTabs');
+        if (storeSourceTabs) {
+            const stores = Array.from(storeTabs, ([key, value]) => ({ key: key.slice(6), ...value }))
+                .filter(store => store.platformKey === state.platformKey);
+            storeSourceTabs.innerHTML = `<button type="button" class="sr-marketplace-tab${state.storeId ? '' : ' active'}" data-order-store-tab="all" role="tab" aria-selected="${state.storeId ? 'false' : 'true'}"><span>Semua toko</span></button>` + stores.map(store => `<button type="button" class="sr-marketplace-tab${state.storeId === store.key ? ' active' : ''}" data-order-store-tab="${esc(store.key)}" role="tab" aria-selected="${state.storeId === store.key ? 'true' : 'false'}"><span>${esc(store.label)}</span><span class="sr-marketplace-tab-count">${store.count}</span></button>`).join('');
+            storeSourceTabs.hidden = !state.platformKey || stores.length === 0;
         }
 
         document.querySelectorAll('[data-order-marketplace-tab]').forEach(tab => {
@@ -1680,7 +1687,7 @@
             tab.classList.toggle('active', state.marketplaceTab === key);
             tab.setAttribute('aria-selected', state.marketplaceTab === key ? 'true' : 'false');
             const count = tab.querySelector('[data-order-marketplace-count]');
-            if (count) count.textContent = (key === 'all' ? counts.all : key === 'problem' ? counts.problem : platformTabs.get(key)?.count ?? storeTabs.get(key)?.count ?? 0);
+            if (count) count.textContent = key === 'all' ? counts.all : key === 'problem' ? counts.problem : 0;
         });
 
         if (orderToolsCount) orderToolsCount.textContent = `${visibleOrders.length} order`;
@@ -2537,9 +2544,24 @@
     });
 
     marketplaceTabsWrap?.parentElement?.addEventListener('click', function (event) {
-        const tab = event.target.closest('[data-order-marketplace-tab]');
-        if (tab) {
-            state.marketplaceTab = tab.dataset.orderMarketplaceTab || 'all';
+        const marketplaceTab = event.target.closest('[data-order-marketplace-tab]');
+        const platformTab = event.target.closest('[data-order-platform-tab]');
+        const storeTab = event.target.closest('[data-order-store-tab]');
+        if (marketplaceTab) {
+            state.marketplaceTab = marketplaceTab.dataset.orderMarketplaceTab || 'all';
+            if (state.marketplaceTab === 'all') {
+                state.platformKey = '';
+                state.storeId = '';
+            }
+            state.expanded = null;
+            render();
+        } else if (platformTab) {
+            state.platformKey = platformTab.dataset.orderPlatformTab || '';
+            state.storeId = '';
+            state.expanded = null;
+            render();
+        } else if (storeTab) {
+            state.storeId = storeTab.dataset.orderStoreTab === 'all' ? '' : (storeTab.dataset.orderStoreTab || '');
             state.expanded = null;
             render();
         }
