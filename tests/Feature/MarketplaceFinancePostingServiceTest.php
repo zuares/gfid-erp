@@ -111,6 +111,54 @@ class MarketplaceFinancePostingServiceTest extends TestCase
         $this->assertDatabaseCount('journals', 0);
     }
 
+    public function test_wallet_withdrawal_cannot_post_bank_even_if_legacy_status_says_received(): void
+    {
+        $store = $this->store();
+        $this->accounts();
+        $settlement = MarketplaceFinanceSettlement::create([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'external_settlement_id' => 'POST-WALLET-WITHDRAWAL',
+            'settlement_date' => '2026-10-10',
+            'amount' => 2000000,
+            'bank_account_id' => Account::where('code', '1101')->value('id'),
+            'status' => SettlementStatus::RECEIVED,
+            'received_at' => now(),
+            'raw_payload' => ['transaction_type' => 'WITHDRAWAL_CREATED', 'status' => 'COMPLETED'],
+        ]);
+
+        $this->expectException(ValidationException::class);
+        try {
+            app(MarketplaceFinancePostingService::class)->postSettlement($settlement);
+        } finally {
+            $this->assertDatabaseCount('journals', 0);
+        }
+    }
+
+    public function test_provider_payout_cannot_post_bank_even_if_legacy_status_says_received(): void
+    {
+        $store = $this->store();
+        $this->accounts();
+        $settlement = MarketplaceFinanceSettlement::create([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'external_settlement_id' => 'POST-PROVIDER-PAYOUT',
+            'settlement_date' => '2026-10-10',
+            'amount' => 95000,
+            'bank_account_id' => Account::where('code', '1101')->value('id'),
+            'status' => SettlementStatus::RECEIVED,
+            'received_at' => now(),
+            'raw_payload' => ['payout_info' => ['encrypted_payout_id' => 'POST-PROVIDER-PAYOUT', 'status' => 'COMPLETED']],
+        ]);
+
+        $this->expectException(ValidationException::class);
+        try {
+            app(MarketplaceFinancePostingService::class)->postSettlement($settlement);
+        } finally {
+            $this->assertDatabaseCount('journals', 0);
+        }
+    }
+
     public function test_reversal_uses_journal_service_and_allows_a_new_active_posting(): void
     {
         [$store, $transaction] = $this->transaction('POST-REVERSAL-001', 75000);

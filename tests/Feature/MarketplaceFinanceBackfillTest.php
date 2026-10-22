@@ -60,6 +60,36 @@ class MarketplaceFinanceBackfillTest extends TestCase
         $this->assertSame(1, DB::table('marketplace_finance_settlement_allocations')->count());
     }
 
+    public function test_dry_run_predicts_residual_components_and_zero_net_does_not_repeat_update(): void
+    {
+        $store = $this->store();
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'BF-RESIDUAL-001',
+            'buyer_payment_amount' => 100000,
+            'commission_fee' => 5000,
+            'final_income' => 90000,
+            'settlement_time' => '2026-08-28 12:00:00',
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'BF-ZERO-NET-001',
+            'buyer_payment_amount' => 100000,
+            'final_income' => 0,
+        ]);
+        $service = app(\App\Services\Marketplace\Finance\MarketplaceFinanceBackfillService::class);
+        $options = ['store_id' => $store->id, 'sources' => ['order_settlements']];
+
+        $preflight = $service->run($options + ['dry_run' => true]);
+        $applied = $service->run($options + ['dry_run' => false]);
+        $after = $service->run($options + ['dry_run' => true]);
+
+        $this->assertSame($preflight['summary']['components_created'], $applied['summary']['components_created']);
+        $this->assertSame(2, $applied['summary']['components_created']);
+        $this->assertSame(0, $after['summary']['updated']);
+        $this->assertSame(0, $after['summary']['created']);
+    }
+
     public function test_dry_run_reports_unmatched_payout_without_creating_anything(): void
     {
         $store = $this->store();
@@ -125,6 +155,54 @@ class MarketplaceFinanceBackfillTest extends TestCase
         $this->assertSame('pending', $settlement->status->value);
         $this->assertNull($settlement->journal_id);
         $this->assertSame(0, DB::table('marketplace_finance_settlement_allocations')->count());
+    }
+
+    public function test_completed_wallet_withdrawal_backfills_as_withdrawn_not_bank_received(): void
+    {
+        $store = $this->store();
+        $bank = Account::create(['code' => 'BF-WALLET-COMPLETED-1101', 'name' => 'Wallet Withdrawal Bank', 'type' => 'asset', 'is_cash' => true, 'is_active' => true]);
+        MarketplacePayout::create([
+            'date' => '2026-10-10',
+            'marketplace_name' => 'Shopee',
+            'store_id' => $store->id,
+            'source' => 'shopee_wallet',
+            'amount' => 2000000,
+            'bank_account_id' => $bank->id,
+            'external_transaction_id' => 'BF-WALLET-COMPLETED',
+            'status' => 'draft',
+            'source_payload' => [
+                'transaction_type' => 'WITHDRAWAL_CREATED',
+                'status' => 'COMPLETED',
+                'amount' => -2000000,
+            ],
+        ]);
+
+        app(\App\Services\Marketplace\Finance\MarketplaceFinanceBackfillService::class)->run([
+            'dry_run' => false,
+            'sources' => ['payouts'],
+            'store_id' => $store->id,
+        ]);
+
+        $settlement = MarketplaceFinanceSettlement::firstOrFail();
+        $this->assertSame('withdrawn', $settlement->status->value);
+        $this->assertNull($settlement->received_at);
+        $this->assertTrue($settlement->isWalletWithdrawal());
+        $this->assertNull($settlement->journal_id);
+
+        $settlement->forceFill([
+            'status' => \App\Domain\Marketplace\Finance\Enums\SettlementStatus::RECEIVED,
+            'received_at' => now(),
+            'raw_payload' => ['source' => 'marketplace_payouts'],
+        ])->save();
+        app(\App\Services\Marketplace\Finance\MarketplaceFinanceBackfillService::class)->run([
+            'dry_run' => false,
+            'sources' => ['payouts'],
+            'store_id' => $store->id,
+        ]);
+
+        $this->assertSame('withdrawn', $settlement->fresh()->status->value);
+        $this->assertNull($settlement->fresh()->received_at);
+        $this->assertTrue($settlement->fresh()->isWalletWithdrawal());
     }
 
     public function test_settlement_backfill_maps_existing_order_invoice_and_shipment_on_first_insert(): void

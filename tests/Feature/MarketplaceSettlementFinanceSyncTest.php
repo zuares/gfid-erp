@@ -102,8 +102,41 @@ class MarketplaceSettlementFinanceSyncTest extends TestCase
         $service->syncPayouts($store, $from, $to);
 
         $this->assertSame(1, MarketplaceFinanceSettlement::count());
-        $this->assertSame(SettlementStatus::RECEIVED, MarketplaceFinanceSettlement::firstOrFail()->status);
+        $settlement = MarketplaceFinanceSettlement::firstOrFail();
+        $this->assertSame(SettlementStatus::PAYOUT_COMPLETED, $settlement->status);
+        $this->assertNull($settlement->received_at);
+        $this->assertTrue($settlement->isProviderPayout());
         $this->assertSame(0, MarketplaceFinanceSettlementAllocation::count());
+        $this->assertDatabaseCount('journals', 0);
+    }
+
+    public function test_payout_sync_corrects_unposted_legacy_received_without_bank_journal(): void
+    {
+        $store = $this->createStore();
+        $from = Carbon::parse('2026-10-08', config('app.timezone'));
+        $to = Carbon::parse('2026-10-15', config('app.timezone'));
+        $header = ['payout_info' => [
+            'encrypted_payout_id' => 'PAYOUT-CORRECT-001',
+            'payout_amount' => 95000,
+            'status' => 'COMPLETED',
+        ]];
+        MarketplaceFinanceSettlement::create([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'external_settlement_id' => 'PAYOUT-CORRECT-001',
+            'amount' => 95000,
+            'status' => SettlementStatus::RECEIVED,
+            'received_at' => now(),
+            'raw_payload' => $header,
+        ]);
+        $this->mockPayoutApis($store, $from, $to, $header, $header);
+
+        app(MarketplaceSettlementSyncService::class)->syncPayouts($store, $from, $to);
+
+        $settlement = MarketplaceFinanceSettlement::firstOrFail();
+        $this->assertSame(SettlementStatus::PAYOUT_COMPLETED, $settlement->status);
+        $this->assertNull($settlement->received_at);
+        $this->assertNull($settlement->journal_id);
     }
 
     public function test_wallet_payout_requires_withdrawal_row_and_valid_status_and_is_idempotent(): void
@@ -132,10 +165,44 @@ class MarketplaceSettlementFinanceSyncTest extends TestCase
 
         $this->assertSame(1, $first['synced']);
         $this->assertSame(1, $first['invalid']);
-        $this->assertSame(SettlementStatus::RECEIVED, $settlement->status);
+        $this->assertSame(SettlementStatus::WITHDRAWN, $settlement->status);
         $this->assertSame('125000.00', $settlement->amount);
-        $this->assertNotNull($settlement->received_at);
+        $this->assertNull($settlement->received_at);
         $this->assertSame(1, MarketplaceFinanceSettlement::count());
+    }
+
+    public function test_wallet_sync_corrects_unposted_received_status_without_bank_journal(): void
+    {
+        $store = $this->createStore();
+        $from = Carbon::parse('2026-10-08', config('app.timezone'));
+        $to = Carbon::parse('2026-10-15', config('app.timezone'));
+        $row = [
+            'transaction_id' => 'WALLET-CORRECT-001',
+            'transaction_type' => 'WITHDRAWAL_CREATED',
+            'status' => 'COMPLETED',
+            'amount' => -2000000,
+        ];
+        MarketplaceFinanceSettlement::create([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'external_settlement_id' => 'WALLET-CORRECT-001',
+            'amount' => 2000000,
+            'status' => SettlementStatus::RECEIVED,
+            'received_at' => now(),
+            'raw_payload' => $row,
+        ]);
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($row): void {
+            $mock->shouldReceive('getWalletTransactionList')->once()->andReturn([
+                'response' => ['transaction_list' => [$row], 'more' => false],
+            ]);
+        });
+
+        app(MarketplaceSettlementSyncService::class)->syncWalletPayouts($store, $from, $to);
+
+        $settlement = MarketplaceFinanceSettlement::firstOrFail();
+        $this->assertSame(SettlementStatus::WITHDRAWN, $settlement->status);
+        $this->assertNull($settlement->received_at);
+        $this->assertNull($settlement->journal_id);
     }
 
     private function mockPayoutApis(Store $store, Carbon $from, Carbon $to, array $info, array $detail): void

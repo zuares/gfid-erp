@@ -67,6 +67,67 @@ class MarketplaceFinanceReconciliationServiceTest extends TestCase
         $this->assertNull($item['gross_sales_invoice']);
     }
 
+    public function test_one_posted_payout_allocated_to_two_orders_does_not_create_false_amount_mismatch(): void
+    {
+        $store = $this->store();
+        $bank = $this->account('1101', 'Bank Rekonsiliasi', 'asset', true);
+        $this->account('1302', 'Saldo Marketplace', 'asset');
+        $this->account('2301', 'Payout Belum Direkonsiliasi', 'liability');
+        $settlement = MarketplaceFinanceSettlement::create([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'external_settlement_id' => 'RECON-MULTI-ORDER',
+            'settlement_date' => '2026-08-28',
+            'amount' => 150000,
+            'currency' => 'IDR',
+            'bank_account_id' => $bank->id,
+            'status' => SettlementStatus::RECEIVED,
+            'received_at' => '2026-08-28 12:00:00',
+        ]);
+
+        foreach (['RECON-MULTI-001' => 60000, 'RECON-MULTI-002' => 90000] as $orderSn => $amount) {
+            $order = MarketplaceOrder::create([
+                'store_id' => $store->id,
+                'external_order_id' => $orderSn,
+                'channel_order_id' => $orderSn,
+                'order_date' => '2026-08-28',
+                'ordered_at' => '2026-08-28 09:00:00',
+                'order_status' => 'COMPLETED',
+                'total_amount' => $amount,
+                'currency' => 'IDR',
+            ]);
+            $transaction = MarketplaceFinancialTransaction::create([
+                'store_id' => $store->id,
+                'marketplace_order_id' => $order->id,
+                'channel' => 'shopee',
+                'order_sn' => $orderSn,
+                'currency' => 'IDR',
+                'gross_amount' => $amount,
+                'net_amount' => $amount,
+                'escrow_status' => EscrowStatus::SYNCED,
+                'income_status' => IncomeStatus::RELEASED,
+            ]);
+            MarketplaceFinanceSettlementAllocation::create([
+                'settlement_id' => $settlement->id,
+                'financial_transaction_id' => $transaction->id,
+                'order_sn' => $orderSn,
+                'allocated_amount' => $amount,
+            ]);
+        }
+
+        app(MarketplaceFinancePostingService::class)->postSettlement($settlement);
+
+        $result = app(MarketplaceFinanceReconciliationService::class)->reconcile(['store_id' => $store->id]);
+
+        $this->assertSame(2, $result['summary']['matched']);
+        $this->assertSame(0, $result['summary']['mismatch']);
+        foreach ($result['transactions'] as $item) {
+            $this->assertSame('matched', $item['status']);
+            $this->assertNotContains('amount_mismatch', $item['reasons']);
+            $this->assertSame($item['allocated_amount'], $item['journal_amount']['settlement']);
+        }
+    }
+
     public function test_invoice_or_fee_amount_difference_is_reported_as_mismatch(): void
     {
         [$store, $transaction] = $this->transaction('RECON-MISMATCH-001', 100000);
@@ -144,6 +205,69 @@ class MarketplaceFinanceReconciliationServiceTest extends TestCase
         $this->assertContains('settlement_without_allocation', $settlement['reasons']);
         $this->assertContains('missing_settlement', $settlement['reasons']);
         $this->assertSame(0, DB::table('journals')->count());
+    }
+
+    public function test_wallet_withdrawal_never_counts_as_bank_received_even_with_legacy_received_status(): void
+    {
+        $store = $this->store();
+        $transaction = MarketplaceFinancialTransaction::create([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'order_sn' => 'RECON-WALLET-001',
+            'currency' => 'IDR',
+            'gross_amount' => 95000,
+            'net_amount' => 95000,
+            'escrow_status' => EscrowStatus::SYNCED,
+            'income_status' => IncomeStatus::RELEASED,
+        ]);
+        $settlement = MarketplaceFinanceSettlement::create([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'external_settlement_id' => 'RECON-WALLET-WITHDRAWAL',
+            'settlement_date' => '2026-10-10',
+            'amount' => 95000,
+            'currency' => 'IDR',
+            'status' => SettlementStatus::RECEIVED,
+            'received_at' => '2026-10-10 23:11:28',
+            'raw_payload' => ['transaction_type' => 'WITHDRAWAL_CREATED'],
+        ]);
+        MarketplaceFinanceSettlementAllocation::create([
+            'settlement_id' => $settlement->id,
+            'financial_transaction_id' => $transaction->id,
+            'order_sn' => $transaction->order_sn,
+            'allocated_amount' => 95000,
+        ]);
+
+        $result = app(MarketplaceFinanceReconciliationService::class)->reconcile(['store_id' => $store->id]);
+
+        $this->assertSame('pending', $result['transactions'][0]['status'], implode(', ', $result['transactions'][0]['reasons']));
+        $this->assertContains('bank_unverified', $result['transactions'][0]['reasons']);
+        $this->assertSame(0.0, $result['transactions'][0]['settlement_received_amount']);
+        $this->assertSame('pending', $result['settlements'][0]['status']);
+        $this->assertContains('bank_unverified', $result['settlements'][0]['reasons']);
+        $this->assertSame(0.0, $result['settlements'][0]['settlement_received_amount']);
+        $this->assertSame(1, $result['summary']['reason_counts']['bank_unverified']);
+    }
+
+    public function test_completed_provider_payout_does_not_count_as_bank_received(): void
+    {
+        $store = $this->store();
+        MarketplaceFinanceSettlement::create([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'external_settlement_id' => 'RECON-PAYOUT-COMPLETED',
+            'settlement_date' => '2026-10-10',
+            'amount' => 95000,
+            'status' => SettlementStatus::PAYOUT_COMPLETED,
+            'raw_payload' => ['source_kind' => 'marketplace_payout', 'payout_info' => ['status' => 'COMPLETED']],
+        ]);
+
+        $result = app(MarketplaceFinanceReconciliationService::class)->reconcile(['store_id' => $store->id]);
+
+        $this->assertSame('pending', $result['settlements'][0]['status']);
+        $this->assertContains('bank_unverified', $result['settlements'][0]['reasons']);
+        $this->assertSame(0.0, $result['settlements'][0]['settlement_received_amount']);
+        $this->assertSame(0.0, app(MarketplaceFinanceReconciliationService::class)->overview(['store_id' => $store->id])['metrics']['settlement_received']);
     }
 
     private function completeChain(): array

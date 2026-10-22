@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Domain\Marketplace\Finance\Enums\ComponentDirection;
 use App\Domain\Marketplace\Finance\Enums\EscrowStatus;
 use App\Domain\Marketplace\Finance\Enums\IncomeStatus;
+use App\Domain\Marketplace\Finance\Enums\SettlementStatus;
+use App\Models\MarketplaceFinanceSettlement;
 use App\Models\MarketplaceFinancialComponent;
 use App\Models\MarketplaceFinancialTransaction;
 use App\Models\MarketplaceOrder;
@@ -158,6 +160,8 @@ class MarketplaceFinanceUiTest extends TestCase
 
         $this->get('/marketplace/finance/transactions'.$query.'&date_basis=created_at')
             ->assertOk()
+            ->assertSee('Tidak ada transaksi pada filter ini')
+            ->assertSee('Transaksi dicatat: 2026-10-01 – 2026-10-31')
             ->assertDontSee('ORDER-DATE-001');
     }
 
@@ -212,7 +216,73 @@ class MarketplaceFinanceUiTest extends TestCase
             ->assertOk()
             ->assertSee('Filter settlement')
             ->assertSee('Periode settlement')
+            ->assertSee('Belum ada payout finance yang tersinkron')
             ->assertSee('1 aktif');
+    }
+
+    public function test_wallet_withdrawal_is_labeled_as_unverified_bank_cash_on_finance_pages(): void
+    {
+        $store = Store::create([
+            'code' => 'UI-WALLET-STORE',
+            'name' => 'UI Wallet Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        MarketplaceFinanceSettlement::create([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'external_settlement_id' => 'UI-WALLET-WITHDRAWAL',
+            'settlement_date' => '2026-10-10',
+            'amount' => 2000000,
+            'currency' => 'IDR',
+            'status' => SettlementStatus::WITHDRAWN,
+            'raw_payload' => ['transaction_type' => 'WITHDRAWAL_CREATED'],
+        ]);
+        MarketplaceFinanceSettlement::create([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'external_settlement_id' => 'UI-LEGACY-WALLET',
+            'settlement_date' => '2026-10-10',
+            'amount' => 100000,
+            'currency' => 'IDR',
+            'status' => SettlementStatus::RECEIVED,
+            'raw_payload' => ['transaction_type' => 'WITHDRAWAL_CREATED'],
+        ]);
+        MarketplaceFinanceSettlement::create([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'external_settlement_id' => 'UI-PAYOUT-COMPLETED',
+            'settlement_date' => '2026-10-10',
+            'amount' => 95000,
+            'currency' => 'IDR',
+            'status' => SettlementStatus::PAYOUT_COMPLETED,
+            'raw_payload' => ['source_kind' => 'marketplace_payout', 'payout_info' => ['status' => 'COMPLETED']],
+        ]);
+
+        $query = '?store_id='.$store->id.'&date_from=2026-10-01&date_to=2026-10-22';
+        $settlementsPage = $this->get('/marketplace/finance/settlements'.$query)
+            ->assertOk()
+            ->assertSee('UI-WALLET-WITHDRAWAL')
+            ->assertSee('UI-LEGACY-WALLET')
+            ->assertSee('UI-PAYOUT-COMPLETED')
+            ->assertSee('Ditarik dari wallet')
+            ->assertSee('Payout selesai · bank belum dicek')
+            ->assertSee('Bank tujuan');
+        $this->assertSame(3, substr_count($settlementsPage->getContent(), 'Ditarik dari wallet'));
+
+        $this->get('/marketplace/finance/reconciliation'.$query)
+            ->assertOk()
+            ->assertSee('Dana masuk bank belum terverifikasi')
+            ->assertSee('UI-WALLET-WITHDRAWAL');
+    }
+
+    public function test_reconciliation_distinguishes_missing_payout_and_journal_from_bank_difference(): void
+    {
+        $this->get('/marketplace/finance/reconciliation')
+            ->assertOk()
+            ->assertSee('Alasan yang perlu ditindaklanjuti')
+            ->assertSee('Bukan selisih mutasi bank yang sudah terverifikasi')
+            ->assertSee('Belum ada payout Finance pada filter ini');
     }
 
     public function test_fee_analysis_explains_unmapped_settlement_adjustment(): void

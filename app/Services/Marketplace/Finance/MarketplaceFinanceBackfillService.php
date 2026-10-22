@@ -310,13 +310,27 @@ class MarketplaceFinanceBackfillService
         }
         $this->duplicateSource($stats, 'payouts', $store->id.'|'.$channel.'|'.$externalId);
         $items = $this->allocationRows($row->source_payload);
+        $rawSource = is_array($row->source_payload) ? $row->source_payload : [];
+        $walletWithdrawal = strtolower((string) $row->source) === 'shopee_wallet'
+            || MarketplaceFinanceSettlement::isWalletWithdrawalPayload($rawSource);
+        $sourceStatus = strtolower(trim((string) ($rawSource['status'] ?? $row->status)));
+        $status = $this->settlementStatus($row->status);
+        if ($walletWithdrawal
+            && strtolower((string) $row->status) !== 'posted'
+            && in_array($sourceStatus, ['completed', 'success', 'successful', 'paid', 'withdrawal_completed'], true)) {
+            $status = SettlementStatus::WITHDRAWN;
+        }
+        $payload = $this->legacyPayload('marketplace_payouts', $row->id, $row->source_payload);
+        if ($walletWithdrawal) {
+            $payload['source_kind'] = 'wallet_withdrawal';
+        }
         $settlement = $this->settlement($store, $channel, $externalId, [
             'amount' => $this->nullableAmount($row->amount) ?? '0.00',
             'currency' => 'IDR',
             'settlement_date' => $row->transaction_created_at?->toDateString() ?? $row->date?->toDateString(),
             'bank_account_id' => $row->bank_account_id,
-            'status' => $this->settlementStatus($row->status),
-            'raw_payload' => $this->legacyPayload('marketplace_payouts', $row->id, $row->source_payload),
+            'status' => $status,
+            'raw_payload' => $payload,
         ], $stats);
 
         // Wallet withdrawals have no order-level mapping. Keep their payout
@@ -424,7 +438,7 @@ class MarketplaceFinanceBackfillService
         if ($context['shipment'] && ! $transaction?->shipment_id) {
             $changes['shipment_id'] = $context['shipment']->id;
         }
-        if ($transaction && (float) $transaction->gross_amount === 0.0 && ($values['gross_amount'] ?? null) !== null) {
+        if ($transaction && (float) $transaction->gross_amount === 0.0 && ($values['gross_amount'] ?? null) !== null && abs((float) $values['gross_amount']) > 0.01) {
             $changes['gross_amount'] = $values['gross_amount'];
         }
         if ($transaction
@@ -439,7 +453,7 @@ class MarketplaceFinanceBackfillService
             // before a sale journal has been posted.
             $changes['gross_amount'] = $values['gross_amount'];
         }
-        if ($transaction && (float) $transaction->net_amount === 0.0 && ($values['net_amount'] ?? null) !== null) {
+        if ($transaction && (float) $transaction->net_amount === 0.0 && ($values['net_amount'] ?? null) !== null && abs((float) $values['net_amount']) > 0.01) {
             $changes['net_amount'] = $values['net_amount'];
         }
         if ($transaction) {
@@ -557,9 +571,24 @@ class MarketplaceFinanceBackfillService
                 $changes[$field] = $values[$field] ?? null;
             }
         }
+        $walletWithdrawal = MarketplaceFinanceSettlement::isWalletWithdrawalPayload($values['raw_payload'] ?? []);
+        if ($settlement && $walletWithdrawal && ! $settlement->isWalletWithdrawal()) {
+            $changes['raw_payload'] = array_merge($settlement->raw_payload ?? [], ['source_kind' => 'wallet_withdrawal']);
+        }
+        if ($settlement && $walletWithdrawal && ! $settlement->journal_id
+            && $settlement->status === SettlementStatus::RECEIVED
+            && ($values['status'] ?? null) === SettlementStatus::WITHDRAWN) {
+            $changes['status'] = SettlementStatus::WITHDRAWN;
+            $changes['received_at'] = null;
+        }
         if ($settlement && $settlement->status !== SettlementStatus::RECEIVED && ($values['status'] ?? null) === SettlementStatus::RECEIVED) {
             $changes['status'] = SettlementStatus::RECEIVED;
             $changes['received_at'] = now();
+        }
+        if ($settlement
+            && in_array($settlement->status, [SettlementStatus::PENDING, SettlementStatus::UNKNOWN], true)
+            && ($values['status'] ?? null) === SettlementStatus::WITHDRAWN) {
+            $changes['status'] = SettlementStatus::WITHDRAWN;
         }
         if (! $settlement && ($values['status'] ?? null) === SettlementStatus::RECEIVED) {
             $changes['received_at'] = now();
@@ -743,9 +772,7 @@ class MarketplaceFinanceBackfillService
 
     private function settlementResidual(array $transaction, MarketplaceOrderSettlement $row, ?string $gross, ?string $net, array &$stats): void
     {
-        if ($this->dryRun
-            || ! $transaction['id']
-            || $gross === null
+        if ($gross === null
             || $net === null
             || ! $row->settlement_time) {
             return;

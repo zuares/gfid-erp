@@ -2,13 +2,13 @@
 
 namespace App\Services\Marketplace\Finance;
 
-use Carbon\CarbonImmutable;
 use App\Domain\Marketplace\Finance\Enums\EscrowStatus;
 use App\Domain\Marketplace\Finance\Enums\IncomeStatus;
 use App\Domain\Marketplace\Finance\Enums\SettlementStatus;
 use App\Models\Journal;
 use App\Models\MarketplaceFinanceSettlement;
 use App\Models\MarketplaceFinancialTransaction;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -16,6 +16,7 @@ use Illuminate\Support\Collection;
 class MarketplaceFinanceReconciliationService
 {
     private const TOLERANCE = 0.01;
+
     private const PAGE_SIZES = [10, 25, 50];
 
     /**
@@ -49,8 +50,14 @@ class MarketplaceFinanceReconciliationService
         });
 
         $counts = array_fill_keys(['matched', 'mismatch', 'unmatched', 'pending'], 0);
+        $reasonCounts = array_fill_keys(['missing_settlement', 'bank_unverified', 'journal_missing', 'amount_mismatch', 'fee_mismatch'], 0);
         foreach ($items as $item) {
             $counts[$item['status']]++;
+            foreach (array_keys($reasonCounts) as $reason) {
+                if (in_array($reason, $item['reasons'], true)) {
+                    $reasonCounts[$reason]++;
+                }
+            }
         }
         foreach ($settlements as $settlement) {
             if ($settlement['status'] !== 'matched') {
@@ -67,6 +74,7 @@ class MarketplaceFinanceReconciliationService
                 'mismatch' => $counts['mismatch'],
                 'unmatched' => $counts['unmatched'],
                 'pending' => $counts['pending'],
+                'reason_counts' => $reasonCounts,
                 'unreconciled_amount' => round(array_sum(array_map(
                     fn (array $item): float => abs((float) ($item['actual_net_income'] ?? 0) - (float) ($item['allocated_amount'] ?? 0)),
                     array_filter($items, fn (array $item): bool => $item['status'] !== 'matched'),
@@ -191,17 +199,23 @@ class MarketplaceFinanceReconciliationService
     {
         $filters = $this->filters($filters);
         $counts = array_fill_keys(['matched', 'mismatch', 'unmatched', 'pending'], 0);
+        $reasonCounts = array_fill_keys(['missing_settlement', 'bank_unverified', 'journal_missing', 'amount_mismatch', 'fee_mismatch'], 0);
         $transactionCount = 0;
         $settlementCount = 0;
         $unreconciledAmount = 0.0;
 
-        $this->eachTransactionResult($filters, function (array $item) use (&$counts, &$transactionCount, &$unreconciledAmount, $filters): void {
+        $this->eachTransactionResult($filters, function (array $item) use (&$counts, &$reasonCounts, &$transactionCount, &$unreconciledAmount, $filters): void {
             if ($filters['status'] !== null && $item['status'] !== $filters['status']) {
                 return;
             }
 
             $transactionCount++;
             $counts[$item['status']]++;
+            foreach (array_keys($reasonCounts) as $reason) {
+                if (in_array($reason, $item['reasons'], true)) {
+                    $reasonCounts[$reason]++;
+                }
+            }
             if ($item['status'] !== 'matched') {
                 $unreconciledAmount += abs((float) ($item['actual_net_income'] ?? 0) - (float) ($item['allocated_amount'] ?? 0));
             }
@@ -225,6 +239,7 @@ class MarketplaceFinanceReconciliationService
             'mismatch' => $counts['mismatch'],
             'unmatched' => $counts['unmatched'],
             'pending' => $counts['pending'],
+            'reason_counts' => $reasonCounts,
             'unreconciled_amount' => round($unreconciledAmount, 2),
         ];
     }
@@ -382,14 +397,14 @@ class MarketplaceFinanceReconciliationService
                 'salesInvoice:id,grand_total',
                 'components:id,financial_transaction_id,component_code,amount,source_hash',
                 'allocations:id,settlement_id,financial_transaction_id,allocated_amount',
-                'allocations.settlement:id,status,journal_id',
+                'allocations.settlement:id,status,amount,journal_id,raw_payload',
                 'allocations.settlement.journal:id,voided_at',
                 'allocations.settlement.journal.lines:id,journal_id,debit',
                 'saleJournal:id,voided_at',
                 'saleJournal.lines:id,journal_id,debit',
                 'escrowJournal:id,voided_at',
                 'escrowJournal.lines:id,journal_id,debit',
-        ]);
+            ]);
 
         if ($filters['store_id'] !== null) {
             $query->where('store_id', $filters['store_id']);
@@ -448,6 +463,7 @@ class MarketplaceFinanceReconciliationService
                 'amount',
                 'status',
                 'journal_id',
+                'raw_payload',
             ])
             ->with([
                 'allocations:id,settlement_id,financial_transaction_id,allocated_amount',
@@ -519,10 +535,14 @@ class MarketplaceFinanceReconciliationService
 
         $allocated = round((float) $transaction->allocations->sum('allocated_amount'), 2);
         $receivedAllocated = round((float) $transaction->allocations
-            ->filter(fn ($allocation): bool => $allocation->settlement?->status === SettlementStatus::RECEIVED)
+            ->filter(fn ($allocation): bool => $allocation->settlement?->status === SettlementStatus::RECEIVED && ! $allocation->settlement->requiresBankVerification())
             ->sum('allocated_amount'), 2);
         if ($allocated <= self::TOLERANCE) {
             $reasons[] = 'missing_settlement';
+            $pending = true;
+        }
+        if ($transaction->allocations->contains(fn ($allocation): bool => $allocation->settlement?->requiresBankVerification())) {
+            $reasons[] = 'bank_unverified';
             $pending = true;
         }
 
@@ -569,12 +589,14 @@ class MarketplaceFinanceReconciliationService
         } elseif ($settlement->status === SettlementStatus::RECEIVED && $this->different($amount, $allocated)) {
             $reasons[] = 'amount_mismatch';
         }
-        if ($settlement->status !== SettlementStatus::RECEIVED) {
+        if ($settlement->requiresBankVerification()) {
+            $reasons[] = 'bank_unverified';
+        } elseif ($settlement->status !== SettlementStatus::RECEIVED) {
             $reasons[] = 'missing_settlement';
         } elseif (! $settlement->journal_id || ! $settlement->journal || $settlement->journal->voided_at !== null) {
             $reasons[] = 'journal_missing';
         }
-        $status = $this->status($reasons, $settlement->status !== SettlementStatus::RECEIVED);
+        $status = $this->status($reasons, $settlement->status !== SettlementStatus::RECEIVED || $settlement->requiresBankVerification());
 
         return [
             'settlement_id' => $settlement->id,
@@ -585,7 +607,7 @@ class MarketplaceFinanceReconciliationService
             'settlement_amount' => $amount,
             'allocated_amount' => $allocated,
             'unallocated_amount' => $unallocated,
-            'settlement_received_amount' => $settlement->status === SettlementStatus::RECEIVED ? $amount : 0.0,
+            'settlement_received_amount' => $settlement->status === SettlementStatus::RECEIVED && ! $settlement->requiresBankVerification() ? $amount : 0.0,
             'settlement_status' => $settlement->status?->value,
             'journal_amount' => $this->journalAmountFromModel($settlement->journal, $reasons),
         ];
@@ -593,29 +615,26 @@ class MarketplaceFinanceReconciliationService
 
     private function settlementJournalResult(MarketplaceFinancialTransaction $transaction, array &$reasons): ?float
     {
-        $received = $transaction->allocations->filter(fn ($allocation): bool => $allocation->settlement?->status === SettlementStatus::RECEIVED);
+        $received = $transaction->allocations->filter(fn ($allocation): bool => $allocation->settlement?->status === SettlementStatus::RECEIVED && ! $allocation->settlement->requiresBankVerification());
         if ($received->isEmpty()) {
             return null;
         }
-        $amount = round((float) $received->sum('allocated_amount'), 2);
         $journalAmount = 0.0;
-        $seenSettlements = [];
-        foreach ($received as $allocation) {
-            $settlementId = $allocation->settlement?->id;
-            if (! $settlementId || isset($seenSettlements[$settlementId])) {
-                continue;
-            }
-            $seenSettlements[$settlementId] = true;
-            $settlementJournal = $this->journalAmountFromModel($allocation->settlement?->journal, $reasons);
+        foreach ($received->groupBy('settlement_id') as $allocations) {
+            $settlement = $allocations->first()->settlement;
+            $settlementJournal = $this->journalAmountFromModel($settlement?->journal, $reasons);
             if ($settlementJournal === null) {
                 $reasons[] = 'journal_missing';
 
                 continue;
             }
-            $journalAmount += $settlementJournal;
-        }
-        if ($journalAmount > 0 && $this->different($journalAmount, $amount)) {
-            $reasons[] = 'amount_mismatch';
+
+            // One payout journal covers every order in the payout. Validate it
+            // against the payout header, then attribute only this order's share.
+            if ($this->different($settlementJournal, (float) $settlement->amount)) {
+                $reasons[] = 'amount_mismatch';
+            }
+            $journalAmount += (float) $allocations->sum('allocated_amount');
         }
 
         return round($journalAmount, 2);

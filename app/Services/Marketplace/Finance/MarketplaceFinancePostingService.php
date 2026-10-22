@@ -7,10 +7,10 @@ use App\Domain\Marketplace\Finance\Enums\EscrowStatus;
 use App\Domain\Marketplace\Finance\Enums\SettlementStatus;
 use App\Models\Account;
 use App\Models\Journal;
+use App\Models\JournalLine;
 use App\Models\MarketplaceFinanceSettlement;
 use App\Models\MarketplaceFinancialClosing;
 use App\Models\MarketplaceFinancialTransaction;
-use App\Models\JournalLine;
 use App\Services\Accounting\JournalService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -117,6 +117,9 @@ class MarketplaceFinancePostingService
             $existing = $this->activeLinkedJournal($locked->journal_id);
             if ($existing) {
                 return $locked;
+            }
+            if ($locked->requiresBankVerification()) {
+                throw ValidationException::withMessages(['settlement' => 'Status payout marketplace belum membuktikan kredit bank. Cocokkan mutasi bank lewat alur penerimaan terpisah.']);
             }
             $this->assertPeriodOpen($locked->settlement_date?->toDateString() ?? now()->toDateString(), $locked->store_id);
             if ($locked->status !== SettlementStatus::RECEIVED) {

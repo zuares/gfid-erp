@@ -17,13 +17,15 @@ class MarketplaceSettlementNormalizer
             'withdrawal_id', 'withdraw_id', 'transaction_id',
         ]);
 
+        $status = $this->status($info['status'] ?? $info['payout_status'] ?? $row['status'] ?? null);
+
         return [
             'external_settlement_id' => $identifier,
             'settlement_date' => $this->timestamp($info['payout_time'] ?? $info['settlement_time'] ?? $info['create_time'] ?? null),
             'amount' => $this->amount($info['payout_amount'] ?? $info['amount'] ?? $info['net_amount'] ?? null),
             'currency' => $this->currency($info['payout_currency'] ?? $info['currency'] ?? null),
-            'status' => $this->status($info['status'] ?? $info['payout_status'] ?? $row['status'] ?? null),
-            'raw_payload' => Arr::except($row, ['_meta']),
+            'status' => $status === SettlementStatus::RECEIVED ? SettlementStatus::PAYOUT_COMPLETED : $status,
+            'raw_payload' => array_merge(Arr::except($row, ['_meta']), ['source_kind' => 'marketplace_payout']),
         ];
     }
 
@@ -62,8 +64,11 @@ class MarketplaceSettlementNormalizer
         ]);
         $status = $this->status($row['status'] ?? $row['transaction_status'] ?? null);
         $type = strtolower(str_replace('-', '_', trim((string) ($row['transaction_type'] ?? $row['type'] ?? ''))));
-        if ($status === SettlementStatus::UNKNOWN && in_array($type, ['withdrawal_completed', '202'], true)) {
-            $status = SettlementStatus::RECEIVED;
+        // Shopee confirms the wallet debit, not the bank credit. Bank receipt
+        // requires an independent statement and must not be inferred here.
+        if ($status === SettlementStatus::RECEIVED
+            || ($status === SettlementStatus::UNKNOWN && in_array($type, ['withdrawal_completed', '202'], true))) {
+            $status = SettlementStatus::WITHDRAWN;
         }
 
         return [
@@ -72,7 +77,7 @@ class MarketplaceSettlementNormalizer
             'amount' => $this->amount($row['amount'] ?? $row['transaction_amount'] ?? $row['withdrawal_amount'] ?? $row['net_amount'] ?? null),
             'currency' => $this->currency($row['currency'] ?? $row['transaction_currency'] ?? null),
             'status' => $status,
-            'raw_payload' => Arr::except($row, ['_meta']),
+            'raw_payload' => array_merge(Arr::except($row, ['_meta']), ['source_kind' => 'wallet_withdrawal']),
         ];
     }
 

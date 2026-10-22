@@ -10,6 +10,11 @@ return [
     // settlement syncs for one store cannot overlap while a batch is finishing.
     'settlement_lock_ttl' => (int) env('MARKETPLACE_SETTLEMENT_LOCK_TTL', 3600),
 
+    // Pilot Shopee Finance tetap nonaktif sampai payout dan mutasi bank toko
+    // ini diperiksa. Nama toko dipakai karena ID berbeda antar lingkungan.
+    'finance_pilot_store_name' => env('MARKETPLACE_FINANCE_PILOT_STORE_NAME', 'Greatfit.id'),
+    'finance_pilot_sync_enabled' => (bool) env('MARKETPLACE_FINANCE_PILOT_SYNC_ENABLED', false),
+
     // Ads dashboard menyimpan spend sebelum pajak. Jadikan configurable agar
     // laporan profit tidak mengunci aturan pajak di source code.
     'ads_vat_percent' => (float) env('MARKETPLACE_ADS_VAT_PERCENT', 11),

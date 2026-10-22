@@ -7,9 +7,15 @@
 @section('finance-content')
     @php
         $money = fn ($value): string => number_format((float) $value, 2, ',', '.');
+        $selectedStoreName = $storeNames[$filters['store_id'] ?? 0] ?? null;
+        $dateBasisLabel = [
+            'ordered_at' => 'Tanggal order',
+            'created_at' => 'Transaksi dicatat',
+            'released_at' => 'Dana cair',
+        ][$filters['date_basis'] ?? 'ordered_at'] ?? 'Tanggal order';
         $activeFilters = collect([
-            filled($filters['store_id'] ?? null) ? 'Toko dipilih' : null,
-            filled($filters['date_from'] ?? null) || filled($filters['date_to'] ?? null) ? 'Periode tanggal' : null,
+            $selectedStoreName ? 'Toko: '.$selectedStoreName : null,
+            filled($filters['date_from'] ?? null) || filled($filters['date_to'] ?? null) ? $dateBasisLabel.': '.($filters['date_from'] ?: 'awal').' – '.($filters['date_to'] ?: 'sekarang') : null,
             filled($filters['order_sn'] ?? null) ? 'Order SN: '.$filters['order_sn'] : null,
         ])->filter()->values();
     @endphp
@@ -84,6 +90,13 @@
     </style>
 
     <section class="transactions-screen finance-tab-panel finance-transactions" aria-label="Daftar transaksi marketplace">
+        <div class="finance-callout" role="note">
+            <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
+            <div>
+                <strong>Status Released bukan bukti dana masuk bank</strong>
+                <span>Net income berasal dari data marketplace. Alokasi payout dan penerimaan bank perlu dicocokkan secara terpisah.</span>
+            </div>
+        </div>
         <div class="transactions-filter-status" aria-label="Filter aktif">
             @if ($activeFilters->isNotEmpty())
                 <span class="transactions-filter-label">Filter aktif:</span>
@@ -122,15 +135,15 @@
                             <tr>
                                 <td><span class="transaction-order">{{ $row['order_sn'] }}</span></td>
                                 <td><span class="transaction-store">{{ $storeNames[$row['store_id']] ?? 'Toko tidak diketahui' }}</span></td>
-                                <td><span class="transaction-context">{{ $row['gross_sales_invoice'] !== null ? 'Invoice linked' : 'Invoice belum ada' }}<br>{{ $row['settlement_received_amount'] > 0 ? 'Settlement diterima' : 'Shipment/settlement pending' }}</span></td>
+                                <td><span class="transaction-context">{{ $row['gross_sales_invoice'] !== null ? 'Invoice terhubung' : 'Invoice belum terhubung' }}<br>{{ $row['settlement_received_amount'] > 0 ? 'Payout berstatus diterima' : ($row['allocated_amount'] > 0 ? 'Payout teralokasi; penerimaan belum terkonfirmasi' : 'Payout belum teralokasi') }}</span></td>
                                 <td><span class="transaction-money">Rp {{ $money($row['gross_sales_invoice'] ?? $row['escrow_gross'] ?? 0) }}</span></td>
                                 <td><span class="transaction-money">Rp {{ $money(abs($row['total_components'])) }}</span></td>
                                 <td><span class="transaction-money is-net">Rp {{ $money($row['actual_net_income']) }}</span></td>
                                 <td><span class="transaction-status {{ $incomeTone }}"><span class="finance-status-dot" aria-hidden="true"></span>{{ str_replace('_', ' ', ucfirst($incomeStatus)) }}</span></td>
-                                <td><span class="transaction-journal {{ $journalCount === 3 ? 'is-complete' : '' }}"><i class="bi bi-journal-text" aria-hidden="true"></i>{{ $journalCount }}/3 posted</span></td>
+                                <td><span class="transaction-journal"><i class="bi bi-journal-text" aria-hidden="true"></i>{{ $journalCount }} jurnal terkait</span></td>
                             </tr>
                         @empty
-                            <tr><td colspan="8"><div class="transactions-empty"><i class="bi bi-search" aria-hidden="true"></i><strong>Belum ada transaksi finance</strong><span>Coba ubah filter toko, periode, atau nomor order untuk melihat data lain.</span></div></td></tr>
+                            <tr><td colspan="8"><div class="transactions-empty"><i class="bi bi-search" aria-hidden="true"></i><strong>Tidak ada transaksi pada filter ini</strong><span>Periksa pilihan tanggal: tanggal order, saat transaksi dicatat, dan tanggal dana cair dapat menghasilkan rentang yang berbeda. Coba ubah periode atau reset filter.</span></div></td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -154,14 +167,14 @@
                         </div>
                         <div class="transaction-card-main">
                             <div class="transaction-card-field"><span>Net income</span><strong class="is-net">Rp {{ $money($row['actual_net_income']) }}</strong></div>
-                            <div class="transaction-card-field"><span>Journal</span><strong><span class="transaction-journal {{ $journalCount === 3 ? 'is-complete' : '' }}"><i class="bi bi-journal-text" aria-hidden="true"></i>{{ $journalCount }}/3 posted</span></strong></div>
+                            <div class="transaction-card-field"><span>Jurnal</span><strong><span class="transaction-journal"><i class="bi bi-journal-text" aria-hidden="true"></i>{{ $journalCount }} terkait</span></strong></div>
                             <div class="transaction-card-field"><span>Gross</span><strong>Rp {{ $money($row['gross_sales_invoice'] ?? $row['escrow_gross'] ?? 0) }}</strong></div>
                             <div class="transaction-card-field"><span>Fees</span><strong>Rp {{ $money(abs($row['total_components'])) }}</strong></div>
-                            <div class="transaction-card-context">{{ $row['gross_sales_invoice'] !== null ? 'Invoice linked' : 'Invoice belum ada' }} · {{ $row['settlement_received_amount'] > 0 ? 'Settlement diterima' : 'Shipment/settlement pending' }}</div>
+                            <div class="transaction-card-context">{{ $row['gross_sales_invoice'] !== null ? 'Invoice terhubung' : 'Invoice belum terhubung' }} · {{ $row['settlement_received_amount'] > 0 ? 'Payout berstatus diterima' : ($row['allocated_amount'] > 0 ? 'Payout teralokasi; penerimaan belum terkonfirmasi' : 'Payout belum teralokasi') }}</div>
                         </div>
                     </article>
                 @empty
-                    <div class="transactions-empty transactions-mobile-empty"><i class="bi bi-search" aria-hidden="true"></i><strong>Belum ada transaksi finance</strong><span>Coba ubah filter toko, periode, atau nomor order untuk melihat data lain.</span></div>
+                    <div class="transactions-empty transactions-mobile-empty"><i class="bi bi-search" aria-hidden="true"></i><strong>Tidak ada transaksi pada filter ini</strong><span>Periksa pilihan tanggal atau reset filter untuk melihat data lain.</span></div>
                 @endforelse
             </div>
 

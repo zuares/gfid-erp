@@ -170,18 +170,30 @@ class MarketplaceSettlementSyncService
 
             $current = $settlement->status instanceof SettlementStatus ? $settlement->status : SettlementStatus::UNKNOWN;
             $status = $this->forwardStatus($current, $normalized['status']);
+            $providerOnly = MarketplaceFinanceSettlement::isWalletWithdrawalPayload($normalized['raw_payload'])
+                || MarketplaceFinanceSettlement::isProviderPayoutPayload($normalized['raw_payload']);
+            $correctUnpostedProvider = $providerOnly
+                && $current === SettlementStatus::RECEIVED
+                && in_array($normalized['status'], [SettlementStatus::WITHDRAWN, SettlementStatus::PAYOUT_COMPLETED], true)
+                && ! $settlement->journal_id;
+            if ($correctUnpostedProvider) {
+                $status = $normalized['status'];
+            }
             $values = [
                 'status' => $status,
                 'currency' => $normalized['currency'],
                 'raw_payload' => $normalized['raw_payload'],
             ];
+            if ($providerOnly && ! $settlement->journal_id && $status !== SettlementStatus::RECEIVED) {
+                $values['received_at'] = null;
+            }
             if ($normalized['amount'] !== null) {
                 $values['amount'] = $normalized['amount'];
             }
             if ($normalized['settlement_date']) {
                 $values['settlement_date'] = $normalized['settlement_date']->toDateString();
             }
-            if ($status === SettlementStatus::RECEIVED && ! $settlement->received_at) {
+            if ($status === SettlementStatus::RECEIVED && ! $providerOnly && ! $settlement->received_at) {
                 $values['received_at'] = now();
             }
             $settlement->fill($values)->save();
@@ -251,6 +263,12 @@ class MarketplaceSettlementSyncService
         }
         if ($current === SettlementStatus::UNKNOWN) {
             return $incoming;
+        }
+        if ($current === SettlementStatus::WITHDRAWN && $incoming === SettlementStatus::PENDING) {
+            return $current;
+        }
+        if ($current === SettlementStatus::PAYOUT_COMPLETED && $incoming === SettlementStatus::PENDING) {
+            return $current;
         }
         if ($current === SettlementStatus::RECEIVED && $incoming !== SettlementStatus::VOID) {
             return $current;
