@@ -398,13 +398,7 @@
     .sr-marketplace-tab.active { color: #334155; border-color: #dbe3ee; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .06); }
     .sr-marketplace-tab-count { color: #94a3b8; font-size: .64rem; font-weight: 850; }
     .sr-marketplace-tab::before { content: ''; width: 5px; height: 5px; border-radius: 999px; background: #94a3b8; }
-    .sr-marketplace-tab[data-order-marketplace-tab="shopee"]::before { background: #f97316; }
-    .sr-marketplace-tab[data-order-marketplace-tab="tiktok"]::before { background: #0f8f8c; }
-    .sr-marketplace-tab[data-order-marketplace-tab="anomaly"]::before { background: #d97706; }
     .sr-marketplace-tab[data-order-marketplace-tab="problem"]::before { background: #dc2626; }
-    .sr-marketplace-tab[data-order-marketplace-tab="shopee"].active { color: #c2410c; border-color: #fed7aa; background: #fff7ed; }
-    .sr-marketplace-tab[data-order-marketplace-tab="tiktok"].active { color: #0f716e; border-color: #bfe9e4; background: #f0fdfa; }
-    .sr-marketplace-tab[data-order-marketplace-tab="anomaly"].active { color: #a16207; border-color: #fde68a; background: #fffbeb; }
     .sr-marketplace-tab[data-order-marketplace-tab="problem"].active { color: #b91c1c; border-color: #fecaca; background: #fff1f2; }
 
     .sr-order-search {
@@ -451,20 +445,6 @@
         border-color: rgba(37, 99, 235, .48);
         box-shadow: 0 0 0 2px rgba(37, 99, 235, .08);
     }
-
-    .sr-order.sr-theme-shopee .sr-order-head {
-        border-bottom-color: #fed7aa;
-        background: #fff7ed;
-    }
-
-    .sr-order.sr-theme-shopee .sr-order-code { color: #c2410c; }
-
-    .sr-order.sr-theme-green .sr-order-head {
-        border-bottom-color: #bbf7d0;
-        background: #f0fdf4;
-    }
-
-    .sr-order.sr-theme-green .sr-order-code { color: #15803d; }
 
     .sr-order-head {
         display: grid;
@@ -1159,8 +1139,15 @@
                         <div class="sr-meta-value">{{ $shipmentTypeLabel }}</div>
                     </div>
                     <div class="sr-meta-item sr-meta-store">
-                        <div class="sr-meta-label">Channel</div>
-                        <div class="sr-meta-value">{{ $shipment->store ? (($shipment->store->code ?? '-') . ' - ' . ($shipment->store->name ?? '-')) : 'Belum dihubungkan' }}</div>
+                        <div class="sr-meta-label">Toko / channel</div>
+                        <div class="sr-meta-value">
+                            @if($shipment->store)
+                                {{ $shipment->store->code ?? '-' }} · {{ $shipment->store->name ?? '-' }}
+                                <small style="display:block;color:#64748b;font-size:.72rem;font-weight:650">{{ $shipment->store->channel?->name ?? $shipment->store->channel?->code ?? 'Channel belum disetel' }}</small>
+                            @else
+                                Belum dihubungkan
+                            @endif
+                        </div>
                     </div>
                     <div class="sr-meta-item">
                         <div class="sr-meta-label">Tanggal</div>
@@ -1173,6 +1160,15 @@
                 </div>
             </div>
         </div>
+
+        @if($shipment->shipment_type === 'marketplace')
+            <div class="sr-section-help" role="status" style="margin:.55rem 0;padding:.65rem .8rem;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;color:#1e40af">
+                <strong>Finance &amp; akuntansi:</strong> scan order hanya mencatat dan menautkan pesanan. Revenue, fee, refund, dan payout mengikuti sinkronisasi Finance marketplace; HPP dan pengurangan stok diproses saat shipment diposting.
+                @if(!$shipment->store)
+                    <span> Shipment ini belum memiliki toko terpilih—pastikan toko/channel order sudah benar sebelum melanjutkan.</span>
+                @endif
+            </div>
+        @endif
 
         <div class="sr-summary">
             <div class="sr-stat">
@@ -1225,18 +1221,9 @@
                     <span class="sr-order-tools-count" id="orderToolsCount">0 order</span>
                 </div>
                 <input type="search" id="orderSearch" class="form-control sr-order-search" placeholder="Cari order" autocomplete="off">
-                <div class="sr-marketplace-tabs" role="tablist" aria-label="Filter order berdasarkan marketplace">
+                <div class="sr-marketplace-tabs" role="tablist" aria-label="Filter daftar order">
                     <button type="button" class="sr-marketplace-tab active" data-order-marketplace-tab="all" role="tab" aria-selected="true">
                         <span>Semua</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="all">0</span>
-                    </button>
-                    <button type="button" class="sr-marketplace-tab" data-order-marketplace-tab="shopee" role="tab" aria-selected="false">
-                        <span>Shopee</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="shopee">0</span>
-                    </button>
-                    <button type="button" class="sr-marketplace-tab" data-order-marketplace-tab="tiktok" role="tab" aria-selected="false">
-                        <span>TikTok</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="tiktok">0</span>
-                    </button>
-                    <button type="button" class="sr-marketplace-tab" data-order-marketplace-tab="anomaly" role="tab" aria-selected="false">
-                        <span>Anomali</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="anomaly">0</span>
                     </button>
                     <button type="button" class="sr-marketplace-tab" data-order-marketplace-tab="problem" role="tab" aria-selected="false">
                         <span>Perlu Diperiksa</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="problem">0</span>
@@ -1313,20 +1300,6 @@
         return normalized.toUpperCase();
     }
 
-    function orderTheme(orderCode) {
-        const code = normalize(orderCode);
-        if (code.startsWith('SPX')) return 'sr-theme-shopee';
-        if (code.startsWith('JY')) return 'sr-theme-green';
-        return '';
-    }
-
-    function marketplaceGroup(orderCode) {
-        const code = normalize(orderCode);
-        if (code.startsWith('SPX') || code.startsWith('SHP') || code.includes('SHOPEE')) return 'shopee';
-        if (code.startsWith('JY') || code.startsWith('TTK') || code.includes('TIKTOK')) return 'tiktok';
-        return 'anomaly';
-    }
-
     function itemHighlightKey(orderCode, itemOrLineId, itemCode = '') {
         const lineId = typeof itemOrLineId === 'object'
             ? (itemOrLineId.line_id || itemOrLineId.id || itemOrLineId.code || itemOrLineId.item_code || '')
@@ -1345,7 +1318,7 @@
     }
 
     function selectMarketplaceForOrder(orderCode) {
-        state.marketplaceTab = marketplaceGroup(orderCode);
+        state.marketplaceTab = 'all';
     }
 
     function isNextOrderCommand(code) {
@@ -1649,7 +1622,6 @@
         const query = normalize(state.search);
         return state.orders.filter(order => {
             if (state.marketplaceTab === 'problem' && Number(order.duplicateCount || 0) <= 0 && (order.items || []).length > 0) return false;
-            if (state.marketplaceTab !== 'all' && state.marketplaceTab !== 'problem' && marketplaceGroup(order.code) !== state.marketplaceTab) return false;
             if (!query) return true;
             if (order.code.includes(query)) return true;
             return Object.values(order.items || {}).some(item => {
@@ -1659,9 +1631,8 @@
     }
 
     function updateMarketplaceTabs(visibleOrders) {
-        const counts = { all: state.orders.length, shopee: 0, tiktok: 0, anomaly: 0, problem: 0 };
+        const counts = { all: state.orders.length, problem: 0 };
         state.orders.forEach(order => {
-            counts[marketplaceGroup(order.code)] += 1;
             if (Number(order.duplicateCount || 0) > 0 || (order.items || []).length === 0) counts.problem += 1;
         });
 
@@ -1765,7 +1736,7 @@
                 : '';
 
             return `
-                <div class="sr-order ${isActive ? 'active' : ''} ${orderTheme(order.code)}" data-order-code="${esc(order.code)}">
+                <div class="sr-order ${isActive ? 'active' : ''}" data-order-code="${esc(order.code)}">
                     <div class="sr-order-head" data-toggle-order="${esc(order.code)}">
                         <div>
                             <div class="sr-order-code-line">
@@ -2507,7 +2478,7 @@
         .filter(order => order.code !== 'BELUM DIKELOMPOKKAN')
         .at(-1) || null;
     if (lastScannedOrder) {
-        state.marketplaceTab = marketplaceGroup(lastScannedOrder.code);
+        state.marketplaceTab = 'all';
     }
     state.expanded = lastScannedOrder?.code || null;
     state.search = '';

@@ -158,13 +158,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-marketplace-tab.active { color:#334155; border-color:#dbe3ee; background:#fff; box-shadow:0 1px 2px rgba(15,23,42,.06); }
 .sd-marketplace-tab-count { color:#94a3b8; font-size:.64rem; font-weight:850; }
 .sd-marketplace-tab::before { content:''; width:5px; height:5px; border-radius:999px; background:#94a3b8; }
-.sd-marketplace-tab[data-order-marketplace-tab="shopee"]::before { background:#f97316; }
-.sd-marketplace-tab[data-order-marketplace-tab="tiktok"]::before { background:#0f8f8c; }
-.sd-marketplace-tab[data-order-marketplace-tab="anomaly"]::before { background:#d97706; }
 .sd-marketplace-tab[data-order-marketplace-tab="problem"]::before { background:#dc2626; }
-.sd-marketplace-tab[data-order-marketplace-tab="shopee"].active { color:#c2410c; border-color:#fed7aa; background:#fff7ed; }
-.sd-marketplace-tab[data-order-marketplace-tab="tiktok"].active { color:#0f716e; border-color:#bfe9e4; background:#f0fdfa; }
-.sd-marketplace-tab[data-order-marketplace-tab="anomaly"].active { color:#a16207; border-color:#fde68a; background:#fffbeb; }
 .sd-marketplace-tab[data-order-marketplace-tab="problem"].active { color:#b91c1c; border-color:#fecaca; background:#fff1f2; }
 .sd-filter-stack { margin:.1rem .75rem .65rem; padding:.22rem; border:1px solid #e2e8f0; border-radius:9px; background:#f8fafc; }
 .sd-filter-stack .sd-marketplace-tabs { margin:0; padding:0; border:0; background:transparent; }
@@ -254,26 +248,6 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
   padding: .65rem .75rem;
   border-bottom-color: #dbe3ee;
   background: #f8fafc;
-}
-.sd-order-group.sd-theme-shopee > .sd-order-lead {
-  border-bottom-color: #fed7aa;
-  background: #fff7ed;
-}
-.sd-order-group.sd-theme-shopee .sd-order-no { color: #c2410c; }
-.sd-order-group.sd-theme-shopee .sd-order-qty {
-  border-color: #fed7aa;
-  color: #c2410c;
-  background: #fff;
-}
-.sd-order-group.sd-theme-green > .sd-order-lead {
-  border-bottom-color: #bbf7d0;
-  background: #f0fdf4;
-}
-.sd-order-group.sd-theme-green .sd-order-no { color: #15803d; }
-.sd-order-group.sd-theme-green .sd-order-qty {
-  border-color: #bbf7d0;
-  color: #15803d;
-  background: #fff;
 }
 .sd-order-qty {
   display: inline-flex;
@@ -755,20 +729,9 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     $ungroupedQty = (int) $ungroupedLines->sum('qty_scanned');
     $ungroupedItemTypes = (int) $ungroupedLines->map($itemTypeKey)->filter()->unique()->count();
     $ungroupedCogs = (float) $ungroupedLines->sum(fn ($line) => $lineCogs($line));
-    $marketplaceGroup = static function ($orderNo): string {
-        $code = strtoupper(trim((string) $orderNo));
-        if (str_starts_with($code, 'SPX') || str_starts_with($code, 'SHP') || str_contains($code, 'SHOPEE')) {
-            return 'shopee';
-        }
-        if (str_starts_with($code, 'JY') || str_starts_with($code, 'TTK') || str_contains($code, 'TIKTOK')) {
-            return 'tiktok';
-        }
-        return 'anomaly';
-    };
-    $marketplaceCounts = ['all' => (int) $orderScans->count(), 'shopee' => 0, 'tiktok' => 0, 'anomaly' => 0, 'problem' => 0];
+    $marketplaceCounts = ['all' => (int) $orderScans->count(), 'problem' => 0];
     $linkCounts = ['all' => (int) $orderScans->count(), 'linked' => 0, 'unlinked' => 0];
     foreach ($orderScans as $orderScan) {
-        $marketplaceCounts[$marketplaceGroup($orderScan->order_no)]++;
         $orderScanLines = $orderScan->lines->merge($singleOrderFallbackLines);
         if ((int) data_get($orderScan->raw_payload, 'duplicate_count', 0) > 0 || $orderScanLines->isEmpty()) {
             $marketplaceCounts['problem']++;
@@ -785,13 +748,11 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     }
     if ($orderScans->count() > 1 && $ungroupedLines->isNotEmpty()) {
         $marketplaceCounts['all']++;
-        $marketplaceCounts['anomaly']++;
         $linkCounts['all']++;
         $linkCounts['unlinked']++;
     }
     if ($orderScans->isEmpty() && $isItemFirst && $ungroupedLines->isNotEmpty()) {
         $marketplaceCounts['all'] = 1;
-        $marketplaceCounts['anomaly'] = 1;
         $linkCounts = ['all' => 1, 'linked' => 0, 'unlinked' => 1];
     }
 @endphp
@@ -851,6 +812,21 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
             @endif
         </div>
     </div>
+
+    @if($shipment->shipment_type === 'marketplace')
+        <div class="sd-info-banner" role="status">
+            <i class="bi bi-diagram-3" aria-hidden="true"></i>
+            <span>
+                <strong>Finance &amp; akuntansi:</strong>
+                submit memotong stok dan mencatat HPP dari mutasi inventory. Revenue, fee, refund, dan payout dicatat dari sinkronisasi Finance marketplace, bukan dari scan/submit shipment.
+                @if($shipment->store)
+                    Toko: {{ $shipment->store->name ?? $shipment->store->code }} · Channel: {{ $shipment->store->channel?->name ?? $shipment->store->channel?->code ?? 'belum disetel' }}.
+                @else
+                    <strong>Shipment belum memilih toko.</strong> Pastikan setiap order tertaut ke toko/channel yang benar sebelum submit.
+                @endif
+            </span>
+        </div>
+    @endif
 
     @if(!empty($stockInsufficient))
         <div class="sd-stock-warning" role="alert">
@@ -937,12 +913,9 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                 <input type="search" id="orderSearchInput" placeholder="Cari nomor order atau resi" autocomplete="off">
             </div>
             <div class="sd-filter-stack">
-            <div class="sd-marketplace-tabs" role="tablist" aria-label="Filter order berdasarkan marketplace">
+            <div class="sd-marketplace-tabs" role="tablist" aria-label="Filter daftar order">
                 @foreach([
                     'all' => ['label' => 'Semua', 'icon' => 'bi-grid'],
-                    'shopee' => ['label' => 'Shopee', 'icon' => 'bi-bag'],
-                    'tiktok' => ['label' => 'TikTok', 'icon' => 'bi-play-circle'],
-                    'anomaly' => ['label' => 'Anomali', 'icon' => 'bi-exclamation-triangle'],
                     'problem' => ['label' => 'Perlu Diperiksa', 'icon' => 'bi-exclamation-octagon'],
                 ] as $tab => $tabMeta)
                     <button type="button"
@@ -976,7 +949,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
             </div>
             <div class="sd-body">
                 @if($orderScans->isEmpty() && $isItemFirst)
-                    <div class="sd-order sd-order-group" data-order-card data-order-marketplace="anomaly" data-order-link-state="unlinked" data-order-search="item shipment">
+                    <div class="sd-order sd-order-group" data-order-card data-order-link-state="unlinked" data-order-search="item shipment">
                         <div class="sd-order-lead">
                             <div>
                                 <div class="sd-order-no">ITEM SHIPMENT</div>
@@ -1069,11 +1042,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 $scanBadgeClass = $scanStatus === 'skip'
                                     ? 'skip'
                                     : ($hasBookingOnly ? 'pending' : ($hasMarketplaceLink ? 'linked' : 'unlinked'));
-                                $marketplaceGroupKey = $marketplaceGroup($scan->order_no);
                                 $duplicateCount = (int) data_get($scan->raw_payload, 'duplicate_count', 0);
-                                $orderTheme = str_starts_with($orderCodeUpper, 'SPX')
-                                    ? 'sd-theme-shopee'
-                                    : (str_starts_with($orderCodeUpper, 'JY') ? 'sd-theme-green' : '');
                                 $orderLines = $scan->lines->merge($singleOrderFallbackLines)->values();
                                 $orderItemCount = (int) $orderLines->count();
                                 $orderItemTypes = (int) $orderLines->map($itemTypeKey)->filter()->unique()->count();
@@ -1117,7 +1086,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 $showSingleBookingSku = count($bookingSkus) === 1
                                     && $hasSingleBookingItem;
                             @endphp
-                            <div class="sd-order sd-order-group {{ $orderTheme }}" data-order-card data-order-marketplace="{{ $marketplaceGroupKey }}" data-order-link-state="{{ $hasMarketplaceLink ? 'linked' : 'unlinked' }}" data-order-problem="{{ $duplicateCount > 0 || $hasNoItems ? 'true' : 'false' }}" data-order-search="{{ $orderSearchText }}">
+                            <div class="sd-order sd-order-group" data-order-card data-order-link-state="{{ $hasMarketplaceLink ? 'linked' : 'unlinked' }}" data-order-problem="{{ $duplicateCount > 0 || $hasNoItems ? 'true' : 'false' }}" data-order-search="{{ $orderSearchText }}">
                                 <div class="sd-order-lead">
                                     <div>
                                         <div class="sd-order-no">
@@ -1313,7 +1282,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                         @endforeach
 
                         @if($orderScans->count() > 1 && $ungroupedLines->isNotEmpty())
-                            <div class="sd-order sd-order-group" data-order-card data-order-marketplace="anomaly" data-order-link-state="unlinked" data-order-search="belum dikelompokkan">
+                            <div class="sd-order sd-order-group" data-order-card data-order-link-state="unlinked" data-order-search="belum dikelompokkan">
                                 <div class="sd-order-lead"><div><div class="sd-order-no">SISA BELUM TERKELOMPOK</div><div class="sd-muted">Item menunggu nomor order atau belum cocok</div></div></div>
                                 <div class="sd-order-items">
                                     <div class="sd-items-head {{ $orderItemGridClass }}"><span>No</span><span>Kode Item</span><span>Qty</span><span>SKU Marketplace</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
@@ -1483,11 +1452,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     var activeLinkTab = 'all';
 
     function matchesMarketplace(card){
-        var marketplace = card.dataset.orderMarketplace || 'anomaly';
         return activeMarketplaceTab === 'all'
-            || (activeMarketplaceTab === 'problem'
-                ? card.dataset.orderProblem === 'true'
-                : marketplace === activeMarketplaceTab);
+            || (activeMarketplaceTab === 'problem' && card.dataset.orderProblem === 'true');
     }
 
     function updateLinkTabCounts(){

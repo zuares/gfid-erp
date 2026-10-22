@@ -1266,7 +1266,7 @@ class ShipmentController extends Controller
         }
 
         $shipment->load([
-            'store',
+            'store.channel',
             'lines.item',
             'orderScans.lines.item',
         ]);
@@ -4006,6 +4006,7 @@ class ShipmentController extends Controller
         $currentWave = $this->currentShipmentWave($shipment);
         $this->autoMapItemFirstLines($shipment);
         $shipment->load([
+            'store.channel',
             'lines.item',
             'orderScans.lines.item',
             'orderScans.fulfillment.marketplaceOrder.items.internalItem',
@@ -4067,6 +4068,7 @@ class ShipmentController extends Controller
         // ulang dari operator.
         $this->autoReconcileSavedOrderScans($shipment, $currentWave);
         $shipment->load([
+            'store.channel',
             'lines.item',
             'orderScans.lines.item',
             'orderScans.fulfillment.marketplaceOrder.items.internalItem',

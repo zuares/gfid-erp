@@ -206,6 +206,10 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('belum terhubung ke order')
             ->assertSee('Order & Item')
             ->assertSee('Item First Test')
+            ->assertSee('Finance &amp; akuntansi', false)
+            ->assertDontSee('data-order-marketplace-tab="anomaly"', false)
+            ->assertDontSee('data-order-marketplace-tab="shopee"', false)
+            ->assertDontSee('data-order-marketplace-tab="tiktok"', false)
             ->assertDontSee('data-sd-tab="rekon"', false)
             ->assertDontSee('sd-tab-rekon', false)
             ->assertDontSee('sd-tab-unlinked', false);
@@ -589,7 +593,10 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $this->actingAs($admin)
             ->get(route('sales.shipments.scan_order', $shipment))
             ->assertOk()
-            ->assertSee('Klik qty item untuk mengubah jumlah.');
+            ->assertSee('Klik qty item untuk mengubah jumlah.')
+            ->assertSee('Toko / channel')
+            ->assertSee('Finance &amp; akuntansi', false)
+            ->assertDontSee('data-order-marketplace-tab="anomaly"', false);
 
         $this->actingAs($admin)
             ->patchJson(route('sales.shipments.update_line_qty', $line), ['qty' => 3])
@@ -882,7 +889,6 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('data-copy-value="ORDER-SPX-001" data-copy-label="No. pesanan"', false)
             ->assertSee('data-copy-feedback hidden', false)
             ->assertSee('SKU booking belum tersedia.')
-            ->assertSee('data-order-marketplace="shopee" data-order-link-state="linked"', false)
             ->assertSee('data-order-link-state="linked"', false)
             ->assertSee('sd-badge pending', false)
             ->assertSee('<span class="sd-booking-status" title="Status booking Shopee">SHIPPED</span>', false)
