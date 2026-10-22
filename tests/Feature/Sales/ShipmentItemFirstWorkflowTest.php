@@ -1028,7 +1028,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
             ->assertSee('Booking ditemukan')
-            ->assertSee('<span>No</span><span>Kode Item</span><span>Order</span><span>Ship</span><span>Diff</span><span>SKU Marketplace</span><span>COGS</span><span>Subtotal COGS</span>', false)
+            ->assertSee('<span>No</span><span>SKU Marketplace</span><span>Order</span><span>Ship</span><span>Diff</span><span>Kode Item</span><span>COGS</span><span>Subtotal COGS</span>', false)
             ->assertSee('>Periksa</div>', false)
             ->assertSee('class="sd-marketplace-sku-value">K5BLK-1</span>', false)
             ->assertDontSee('SKU booking belum tersedia.');
@@ -1401,16 +1401,22 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'allocated_qty' => 1,
         ]);
 
-        $this->actingAs($user)
+        $response = $this->actingAs($user)
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
+            ->assertSee('<span>No</span><span>SKU Marketplace</span><span>Order</span><span>Ship</span><span>Diff</span><span>Kode Item</span>', false)
             ->assertSee('TTD-BLK-M')
             ->assertSee('Hitam / Ukuran M')
             ->assertSee('>BOOKING-SPX-SKU-MISMATCH</span>', false)
             ->assertSee('>ORDER-SPX-SKU-MISMATCH</span>', false)
             ->assertSee('Item berbeda')
-            ->assertSee('>Periksa</div>', false)
+            ->assertSee('sd-order-item-diff sd-marketplace-short', false)
             ->assertSee('sd-badge linked', false);
+
+        $this->assertMatchesRegularExpression(
+            '/<div class="sd-order-item-diff[^\"]*">\s*Periksa\s*<span class="sd-sku-mismatch">Item berbeda<\/span>\s*<\/div>/',
+            $response->getContent(),
+        );
     }
 
     public function test_spx_confirmation_lists_unmatched_order_skus_without_pairing_multiple_items(): void
@@ -1484,7 +1490,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Varian Hitam M')
             ->assertSee('class="sd-marketplace-sku-value" title="SKU marketplace: MARKETPLACE-SKU-B">MARKETPLACE-SKU-B</span>', false)
             ->assertSee('Varian Navy L')
-            ->assertSee('>Periksa</div>', false);
+            ->assertSee('Periksa');
     }
 
     public function test_ready_to_ship_and_processed_kilat_orders_are_linked_when_scanned(): void
