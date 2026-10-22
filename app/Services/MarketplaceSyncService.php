@@ -1771,6 +1771,7 @@ class MarketplaceSyncService
         int $incomeStatus = 2,
         int $pageSize = 100,
         ?callable $progress = null,
+        ?int $days = 30,
     ): array {
         $channelCode = strtolower((string) ($store->channel?->code ?? ''));
         if (! in_array($channelCode, ['shopee', 'shp'], true)) {
@@ -1782,7 +1783,8 @@ class MarketplaceSyncService
         }
 
         $pageSize = min(100, max(1, $pageSize));
-        $dateFrom = now()->subDay()->toDateString();
+        $days = min(183, max(1, (int) ($days ?? 30)));
+        $dateFrom = now()->subDays($days - 1)->toDateString();
         $dateTo = now()->toDateString();
         $cursor = '';
         $pages = 0;
@@ -1818,6 +1820,7 @@ class MarketplaceSyncService
                     return [
                         'found' => $found, 'updated' => $updated, 'created' => $created,
                         'unmatched' => $unmatched, 'pages' => $pages, 'errors' => 1,
+                        'date_from' => $dateFrom, 'date_to' => $dateTo,
                         'message' => "Income detail gagal: {$message}",
                     ];
                 }
@@ -1915,6 +1918,7 @@ class MarketplaceSyncService
             return [
                 'found' => $found, 'updated' => $updated, 'created' => $created,
                 'unmatched' => $unmatched, 'pages' => $pages, 'errors' => 1,
+                'date_from' => $dateFrom, 'date_to' => $dateTo,
                 'message' => 'Income detail gagal sementara: ' . $e->getMessage(),
             ];
         }
@@ -1926,6 +1930,8 @@ class MarketplaceSyncService
             'unmatched' => $unmatched,
             'pages' => $pages,
             'errors' => 0,
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
             'message' => "Income detail: {$updated} diperbarui, {$created} dibuat, {$unmatched} tidak cocok.",
         ];
     }

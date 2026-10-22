@@ -1779,7 +1779,7 @@
         try {
             const result = await api('/api/marketplace/stores/' + storeId + '/sync-income-details', {
                 method: 'POST',
-                body: JSON.stringify({ page_size: 100 }),
+                body: JSON.stringify({ page_size: 100, days: 30 }),
             });
             showSyncFeedback('success', 'Estimasi dana cair diperbarui', result.message || 'Income detail Shopee berhasil diperbarui.', [
                 result.found !== undefined ? `Ditemukan: ${result.found}` : null,
@@ -1787,6 +1787,7 @@
                 result.created !== undefined ? `Baru: ${result.created}` : null,
                 result.unmatched !== undefined ? `Order tidak cocok: ${result.unmatched}` : null,
                 result.pages !== undefined ? `Halaman: ${result.pages}` : null,
+                result.date_from && result.date_to ? `Periode: ${result.date_from} s/d ${result.date_to}` : null,
             ].filter(Boolean));
             setSyncState('success', 'Siap');
             updateSyncDot(false);

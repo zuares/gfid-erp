@@ -3450,6 +3450,7 @@ class MarketplaceController extends Controller
 
         $data = $request->validate([
             'page_size' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'days' => ['nullable', 'integer', 'min:1', 'max:183'],
         ]);
 
         $store->loadMissing('channel');
@@ -3488,6 +3489,8 @@ class MarketplaceController extends Controller
                 $store,
                 2,
                 (int) ($data['page_size'] ?? 100),
+                null,
+                (int) ($data['days'] ?? 30),
             );
 
             $hasErrors = (int) ($result['errors'] ?? 0) > 0;

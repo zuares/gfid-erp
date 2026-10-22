@@ -16,7 +16,8 @@ class SyncIncomeDetailsCommand extends Command
     protected $signature = 'marketplace:sync-income-details
         {--store= : ID toko Shopee spesifik}
         {--status=2 : Income status Shopee (2 = Pending)}
-        {--page-size=100 : Jumlah record per halaman (1-100)}';
+        {--page-size=100 : Jumlah record per halaman (1-100)}
+        {--days=30 : Rentang tanggal income detail (1-183 hari)}';
 
     protected $description = 'Sinkronisasi estimated_escrow_amount dari Shopee get_income_detail untuk order pending.';
 
@@ -25,6 +26,12 @@ class SyncIncomeDetailsCommand extends Command
         $pageSize = (int) $this->option('page-size');
         if ($pageSize < 1 || $pageSize > 100) {
             $this->error('Opsi --page-size harus di antara 1 dan 100.');
+            return self::FAILURE;
+        }
+
+        $days = (int) $this->option('days');
+        if ($days < 1 || $days > 183) {
+            $this->error('Opsi --days harus di antara 1 dan 183.');
             return self::FAILURE;
         }
 
@@ -55,7 +62,7 @@ class SyncIncomeDetailsCommand extends Command
             }
 
             try {
-                $result = $syncService->syncIncomeDetails($store, $incomeStatus, $pageSize);
+                $result = $syncService->syncIncomeDetails($store, $incomeStatus, $pageSize, null, $days);
                 $this->line(sprintf(
                     '%s: found=%d updated=%d created=%d unmatched=%d pages=%d',
                     $store->name,
