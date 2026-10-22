@@ -35,8 +35,6 @@
 .sd-order{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.65rem;border:1px solid rgba(148,163,184,.18);border-radius:8px;padding:.58rem .65rem}
 .sd-order{background:transparent;border-color:transparent}
 .sd-order-no{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#111827;word-break:break-word}
-.sd-order-primary-label{display:block;margin-bottom:.12rem;color:#64748b;font-size:.62rem;font-weight:850;letter-spacing:.045em;text-transform:uppercase}
-.sd-order-no .sd-copy-scan{font-size:1.02rem;font-weight:950;letter-spacing:.01em;color:#0f172a}
 .sd-order-identifiers{display:flex;flex-wrap:wrap;gap:.1rem .65rem;margin-top:.18rem;color:#64748b;font-size:.68rem;line-height:1.4}
 .sd-order-identifier{display:inline-flex;align-items:baseline;gap:.25rem;min-width:0}
 .sd-order-identifier-value{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#475569;overflow-wrap:anywhere}
@@ -57,15 +55,13 @@
 .sd-order-group > .sd-order-lead{padding:.58rem .65rem;border:0;border-bottom:1px solid rgba(37,99,235,.16);border-radius:0;background:#eff6ff}
 .sd-order-group .sd-order-lead{justify-content:space-between}
 .sd-order-group[data-order-platform-highlight="shopee"]{border-left:3px solid #ee4d2d}
-.sd-order-group[data-order-platform-highlight="shopee"] > .sd-order-lead{border-top:3px solid #ee4d2d;background:linear-gradient(100deg,#fff5ef 0%,#fffaf7 62%,#fff 100%);border-bottom-color:#fed7aa}
+.sd-order-group[data-order-platform-highlight="shopee"] > .sd-order-lead{background:#fff8f5;border-bottom-color:#fed7aa}
 .sd-order-group[data-order-platform-highlight="tiktok"]{border-left:3px solid #25f4ee}
-.sd-order-group[data-order-platform-highlight="tiktok"] > .sd-order-lead{border-top:3px solid #fe2c55;box-shadow:inset 3px 0 #25f4ee;background:linear-gradient(100deg,rgba(37,244,238,.11) 0%,#f8fafc 48%,rgba(254,44,85,.07) 100%);border-bottom:2px solid #fe2c55}
+.sd-order-group[data-order-platform-highlight="tiktok"] > .sd-order-lead{background:#f8fafc;border-bottom:2px solid #fe2c55}
 .sd-platform-highlight{display:inline-flex;align-items:center;gap:.28rem;min-height:23px;padding:.1rem .42rem;border:1px solid transparent;border-radius:999px;font-size:.64rem;font-weight:850;white-space:nowrap}
 .sd-platform-highlight::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .sd-platform-highlight.is-shopee{border-color:#fed7aa;background:#fff1e9;color:#c2410c}
 .sd-platform-highlight.is-tiktok{border-color:#cbd5e1;background:#f1f5f9;color:#111827}
-.sd-scan-kind{display:inline-flex;align-items:center;min-height:23px;padding:.1rem .45rem;border:1px solid #bfdbfe;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:.64rem;font-weight:900;letter-spacing:.035em;white-space:nowrap}
-.sd-order-scan-meta{color:#64748b;font-size:.64rem;font-weight:700;text-align:right}
 .sd-order-qty{margin-left:auto;min-width:42px;text-align:center;border-radius:999px;padding:.2rem .45rem;background:rgba(148,163,184,.12);color:#334155;font-size:.76rem;font-weight:900}
 .sd-order-items{margin:0;padding:.2rem .6rem;background:#f8fafc}
 .sd-order-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.6rem;align-items:center;padding:.48rem 0;border-bottom:1px solid rgba(148,163,184,.1)}
@@ -81,16 +77,6 @@
 .sd-marketplace-meta-item{display:grid;gap:.12rem;min-width:0}
 .sd-marketplace-meta-item dt{color:#64748b;font-size:.61rem;font-weight:750;letter-spacing:.035em;text-transform:uppercase}
 .sd-marketplace-meta-item dd{margin:0;color:#334155;font-size:.72rem;font-weight:800;line-height:1.3;overflow-wrap:anywhere}
-.sd-marketplace-footer-content{display:grid;gap:.65rem;min-width:0;flex:1}
-.sd-marketplace-footer-summary{display:flex;flex-wrap:wrap;gap:.35rem}
-.sd-marketplace-footer-summary .sd-order-summary-item{flex-direction:row;align-items:baseline;gap:.22rem;padding:.2rem .48rem;border:1px solid #e2e8f0;border-radius:999px;background:#f8fafc;color:#64748b;font-size:.59rem}
-.sd-marketplace-footer-summary .sd-order-summary-item strong{color:#334155;font-size:.68rem;font-weight:850}
-.sd-marketplace-footer-summary .sd-order-summary-item.is-negative strong{color:#b91c1c}
-.sd-marketplace-footer-summary .sd-order-summary-item.is-positive strong{color:#15803d}
-.sd-order-group[data-order-platform-highlight="shopee"] .sd-marketplace-footer{padding-left:.65rem;border-top-color:#fed7aa;border-left:3px solid #ee4d2d;border-radius:0 0 7px 7px;background:linear-gradient(100deg,#fff7f2 0%,#fff 78%)}
-.sd-order-group[data-order-platform-highlight="tiktok"] .sd-marketplace-footer{padding-left:.65rem;border-top-color:#fe2c55;border-left:3px solid #25f4ee;border-radius:0 0 7px 7px;background:linear-gradient(100deg,rgba(37,244,238,.1) 0%,#fff 47%,rgba(254,44,85,.055) 100%)}
-.sd-order-group[data-order-platform-highlight="shopee"] .sd-marketplace-footer-summary .sd-order-summary-item{border-color:#fed7aa;background:#fffaf7}
-.sd-order-group[data-order-platform-highlight="tiktok"] .sd-marketplace-footer-summary .sd-order-summary-item{border-color:rgba(37,99,235,.18);background:rgba(255,255,255,.82)}
 .sd-marketplace-actions{display:flex;gap:.35rem;flex-wrap:wrap}
 .sd-marketplace-actions a{min-height:28px;padding:.18rem .5rem;font-size:.7rem}
 .sd-marketplace-actions .sd-btn{white-space:nowrap}
@@ -102,21 +88,12 @@
 .sd-marketplace-table .sd-marketplace-number{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .sd-marketplace-short{color:#b91c1c;font-weight:900}.sd-marketplace-ok{color:#15803d;font-weight:900}
 body[data-theme="dark"] .sd-marketplace-detail{background:transparent;border-top-color:rgba(148,163,184,.25)}
-body[data-theme="dark"] .sd-order-group[data-order-platform-highlight="shopee"] > .sd-order-lead{background:linear-gradient(100deg,rgba(194,65,12,.2),rgba(30,41,59,.88));border-top-color:#fb923c;border-bottom-color:rgba(251,146,60,.45)}
-body[data-theme="dark"] .sd-order-group[data-order-platform-highlight="tiktok"] > .sd-order-lead{background:linear-gradient(100deg,rgba(37,244,238,.11),rgba(15,23,42,.85) 48%,rgba(254,44,85,.13));border-top-color:#fe2c55;border-bottom-color:#fe2c55}
+body[data-theme="dark"] .sd-order-group[data-order-platform-highlight="shopee"] > .sd-order-lead{background:rgba(194,65,12,.14);border-bottom-color:rgba(251,146,60,.35)}
+body[data-theme="dark"] .sd-order-group[data-order-platform-highlight="tiktok"] > .sd-order-lead{background:rgba(15,23,42,.7);border-bottom-color:#fe2c55}
 body[data-theme="dark"] .sd-platform-highlight.is-tiktok{border-color:rgba(148,163,184,.5);background:#1e293b;color:#f8fafc}
 body[data-theme="dark"] .sd-marketplace-footer{border-top-color:rgba(148,163,184,.25)}
 body[data-theme="dark"] .sd-marketplace-meta-item dt{color:#94a3b8}
 body[data-theme="dark"] .sd-marketplace-meta-item dd{color:#e2e8f0}
-body[data-theme="dark"] .sd-order-primary-label{color:#94a3b8}body[data-theme="dark"] .sd-order-no .sd-copy-scan{color:#f8fafc}
-body[data-theme="dark"] .sd-scan-kind{border-color:rgba(96,165,250,.35);background:rgba(30,64,175,.2);color:#bfdbfe}
-body[data-theme="dark"] .sd-order-scan-meta{color:#94a3b8}
-body[data-theme="dark"] .sd-marketplace-footer-summary .sd-order-summary-item{border-color:rgba(148,163,184,.25);background:rgba(15,23,42,.55);color:#94a3b8}
-body[data-theme="dark"] .sd-marketplace-footer-summary .sd-order-summary-item strong{color:#e2e8f0}
-body[data-theme="dark"] .sd-order-group[data-order-platform-highlight="shopee"] .sd-marketplace-footer{border-top-color:rgba(251,146,60,.45);border-left-color:#fb923c;background:linear-gradient(100deg,rgba(194,65,12,.14),rgba(15,23,42,.4))}
-body[data-theme="dark"] .sd-order-group[data-order-platform-highlight="tiktok"] .sd-marketplace-footer{border-top-color:#fe2c55;border-left-color:#25f4ee;background:linear-gradient(100deg,rgba(37,244,238,.1),rgba(15,23,42,.5) 48%,rgba(254,44,85,.1))}
-body[data-theme="dark"] .sd-order-group[data-order-platform-highlight="shopee"] .sd-marketplace-footer-summary .sd-order-summary-item{border-color:rgba(251,146,60,.35);background:rgba(124,45,18,.16)}
-body[data-theme="dark"] .sd-order-group[data-order-platform-highlight="tiktok"] .sd-marketplace-footer-summary .sd-order-summary-item{border-color:rgba(148,163,184,.32);background:rgba(15,23,42,.72)}
 body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dark"] .sd-marketplace-table td{color:#cbd5e1}body[data-theme="dark"] .sd-marketplace-table .sd-marketplace-code{color:#f1f5f9}
 body[data-theme="dark"] .sd-order-item-review{background:rgba(245,158,11,.09);box-shadow:inset 3px 0 #fbbf24}
 .sd-badge{display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid rgba(148,163,184,.25);padding:.16rem .48rem;font-size:.69rem;font-weight:900;color:#64748b;white-space:nowrap}
@@ -772,11 +749,8 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
 .sd-scan-item-missing { color: #94a3b8; font-size: .7rem; font-style: italic; white-space: nowrap; }
 @media(max-width:600px){
   .sd-marketplace-footer{align-items:stretch;flex-direction:column;gap:.65rem}
-  .sd-marketplace-footer-content{width:100%}
   .sd-marketplace-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem .75rem}
   .sd-marketplace-actions{justify-content:flex-end}
-  .sd-order-head-side .sd-link-status{justify-content:flex-start}
-  .sd-order-scan-meta{text-align:left}
 }
 @media(max-width:600px){
   .sd-items-head,
@@ -1299,8 +1273,14 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                 $scanCopyLabel = $isSpxShopee || str_starts_with($orderCodeUpper, 'JY') || in_array($matchMethod, ['awb', 'awb_booking'], true)
                                     ? 'No. resi'
                                     : 'No. pesanan';
-                                $scanKindLabel = $scanCopyLabel === 'No. resi' ? 'AWB' : 'Order';
                                 $matchReason = $scan->match_reason ?: data_get($scan->raw_payload, 'match_reason') ?: data_get($scan->raw_payload, 'lookup_status');
+                                $matchMethodLabel = match ($matchMethod) {
+                                    'awb' => 'AWB order',
+                                    'awb_booking' => 'AWB booking',
+                                    'booking_sn' => 'Booking SN',
+                                    'order_no' => 'No. pesanan',
+                                    default => null,
+                                };
                                 $matchReasonLabel = match ($matchReason) {
                                     'order_not_found' => 'Order tidak ditemukan',
                                     'empty_scan_code' => 'Kode scan kosong',
@@ -1361,7 +1341,6 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                 $marketplaceOrderNumber = trim((string) ($linkedOrder?->channel_order_id
                                     ?: $linkedOrder?->external_order_id
                                     ?: ($bookingIdentifiers['order_sn'] ?? '')));
-                                $marketplaceResi = trim((string) ($linkedOrder?->shipping_awb_no ?: ($scanCopyLabel === 'No. resi' ? $scan->order_no : '')));
                                 $orderSearchText = strtolower(trim(implode(' ', array_filter([
                                     $scan->order_no,
                                     $scan->source,
@@ -1374,26 +1353,27 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                             <div class="sd-order sd-order-group" data-order-card data-order-link-state="{{ $hasMarketplaceLink ? 'linked' : 'unlinked' }}" data-order-problem="{{ $orderNeedsReview ? 'true' : 'false' }}" data-order-platform="{{ $linkedOrder?->store?->channel?->code ? strtolower((string) $linkedOrder->store->channel->code) : '' }}" data-order-platform-highlight="{{ $platformHighlight }}" data-order-store="{{ $linkedOrder?->store_id ?? '' }}" data-order-search="{{ $orderSearchText }}">
                                 <div class="sd-order-lead">
                                     <div>
-                                        <span class="sd-order-primary-label">{{ $scanCopyLabel }}</span>
                                         <div class="sd-order-no">
                                             <button type="button" class="sd-copy-value sd-copy-scan" data-copy-value="{{ $scan->order_no }}" data-copy-label="{{ $scanCopyLabel }}" title="Salin {{ strtolower($scanCopyLabel) }}" aria-label="Salin {{ strtolower($scanCopyLabel) }} {{ $scan->order_no }}"><span>{{ $scan->order_no }}</span><span class="sd-copy-action" data-copy-action><i class="bi bi-copy" aria-hidden="true"></i> Salin</span><span class="sd-copy-confirmation" data-copy-feedback hidden><i class="bi bi-check2" aria-hidden="true"></i> Disalin</span></button>
                                             @if($duplicateCount > 0)<span class="sd-duplicate-badge" title="Order ini discan lebih dari sekali">Duplikat</span>@endif
                                             @if($hasNoItems)<span class="sd-missing-item-badge" title="Order belum memiliki item">Belum ada item</span>@endif
                                             @if($reviewReasons !== [])<span class="sd-review-badge" title="Order dan item shipment perlu diverifikasi">{{ implode(' · ', $reviewReasons) }}</span>@endif
                                         </div>
-                                        @if($bookingNumber !== '' || $marketplaceOrderNumber !== '' || ($marketplaceResi !== '' && !($scanCopyLabel === 'No. resi' && $marketplaceResi === $scan->order_no)))
+                                        @if($bookingNumber !== '' || $marketplaceOrderNumber !== '')
                                             <div class="sd-order-identifiers">
                                                 @if($bookingNumber !== '')<span class="sd-order-identifier"><span>Booking</span><button type="button" class="sd-copy-value sd-copy-identifier" data-copy-value="{{ $bookingNumber }}" data-copy-label="No. booking" title="Salin nomor booking" aria-label="Salin nomor booking {{ $bookingNumber }}"><span class="sd-order-identifier-value">{{ $bookingNumber }}</span><span class="sd-copy-action" data-copy-action><i class="bi bi-copy" aria-hidden="true"></i> Salin</span><span class="sd-copy-confirmation" data-copy-feedback hidden><i class="bi bi-check2" aria-hidden="true"></i> Disalin</span></button></span>@endif
-                                                @if($marketplaceResi !== '' && !($scanCopyLabel === 'No. resi' && $marketplaceResi === $scan->order_no))<span class="sd-order-identifier"><span>No. resi</span><button type="button" class="sd-copy-value sd-copy-identifier" data-copy-value="{{ $marketplaceResi }}" data-copy-label="No. resi" title="Salin nomor resi" aria-label="Salin nomor resi {{ $marketplaceResi }}"><span class="sd-order-identifier-value">{{ $marketplaceResi }}</span><span class="sd-copy-action" data-copy-action><i class="bi bi-copy" aria-hidden="true"></i> Salin</span><span class="sd-copy-confirmation" data-copy-feedback hidden><i class="bi bi-check2" aria-hidden="true"></i> Disalin</span></button></span>@endif
-                                                @if($marketplaceOrderNumber !== '' && !($scanCopyLabel === 'No. pesanan' && $marketplaceOrderNumber === $scan->order_no))<span class="sd-order-identifier"><span>No. pesanan</span><button type="button" class="sd-copy-value sd-copy-identifier" data-copy-value="{{ $marketplaceOrderNumber }}" data-copy-label="No. pesanan" title="Salin nomor pesanan" aria-label="Salin nomor pesanan {{ $marketplaceOrderNumber }}"><span class="sd-order-identifier-value">{{ $marketplaceOrderNumber }}</span><span class="sd-copy-action" data-copy-action><i class="bi bi-copy" aria-hidden="true"></i> Salin</span><span class="sd-copy-confirmation" data-copy-feedback hidden><i class="bi bi-check2" aria-hidden="true"></i> Disalin</span></button></span>@endif
-                                            </div>
-                                        @endif
-                                        @if($canSeeScanDiagnostics && $scan->confirmed_at)
-                                            <div class="sd-muted">
-                                                Confirmed: {{ $scan->confirmed_at->format('d M Y H:i') }}
+                                                @if($marketplaceOrderNumber !== '')<span class="sd-order-identifier"><span>No. pesanan</span><button type="button" class="sd-copy-value sd-copy-identifier" data-copy-value="{{ $marketplaceOrderNumber }}" data-copy-label="No. pesanan" title="Salin nomor pesanan" aria-label="Salin nomor pesanan {{ $marketplaceOrderNumber }}"><span class="sd-order-identifier-value">{{ $marketplaceOrderNumber }}</span><span class="sd-copy-action" data-copy-action><i class="bi bi-copy" aria-hidden="true"></i> Salin</span><span class="sd-copy-confirmation" data-copy-feedback hidden><i class="bi bi-check2" aria-hidden="true"></i> Disalin</span></button></span>@endif
                                             </div>
                                         @endif
                                         @if($canSeeScanDiagnostics)
+                                            <div class="sd-muted">
+                                                @if(!$scanIsUnlinked)
+                                                    {{ $matchMethodLabel ?: ($scan->source ?: 'Tertaut') }}
+                                                    @if($scan->created_at) · @endif
+                                                @endif
+                                                @if($scan->created_at)Scan: {{ $scan->created_at->format('d M Y H:i') }}@endif
+                                                @if($scan->confirmed_at) · Confirmed: {{ $scan->confirmed_at->format('d M Y H:i') }}@endif
+                                            </div>
                                             @if($scanIsUnlinked && !$hasBookingOnly && $matchReasonLabel)
                                                 <div class="sd-muted" title="{{ $matchReason }}">{{ $matchReasonLabel }}</div>
                                             @endif
@@ -1401,7 +1381,6 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                     </div>
                                     <div class="sd-order-head-side">
                                         <div class="sd-link-status">
-                                            <span class="sd-scan-kind" title="Jenis nomor yang dipindai">{{ $scanKindLabel }}</span>
                                             @if($hasMarketplaceLink && $linkedStore)
                                                 <span class="sd-store-name" title="Toko order">{{ $linkedStore->name ?: $linkedStore->code }}</span>
                                             @endif
@@ -1411,9 +1390,6 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                             <span class="sd-badge {{ $scanBadgeClass }}">{{ $scanLabel }}</span>
                                             @if($bookingStatus !== '')<span class="sd-booking-status" title="Status booking Shopee">{{ str_replace('_', ' ', $bookingStatus) }}</span>@endif
                                         </div>
-                                        @if($canSeeScanDiagnostics && $scan->created_at)
-                                            <div class="sd-order-scan-meta">Scan · {{ $scan->created_at->format('d M Y H:i') }}</div>
-                                        @endif
                                         <div class="sd-order-summary sd-order-summary-inline {{ $canSeeCogs ? 'sd-summary-has-cogs' : '' }}">
                                             <span class="sd-order-summary-item"><span>Item</span><strong>{{ number_format($orderItemCount, 0, ',', '.') }}</strong></span>
                                             <span class="sd-order-summary-item"><span>Jenis</span><strong>{{ number_format($orderItemTypes, 0, ',', '.') }}</strong></span>
@@ -1488,9 +1464,6 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                         $pickedByItem = $orderLines->groupBy('item_id')->map(fn ($itemLines) => (int) $itemLines->sum('qty_scanned'));
                                         $cogsByItem = $orderLines->groupBy('item_id')->map(fn ($itemLines) => (float) $itemLines->sum(fn ($line) => $lineCogs($line)));
                                         $marketplaceStatus = strtoupper(str_replace('_', ' ', (string) ($marketplaceOrder->order_status ?: $marketplaceOrder->status ?: '')));
-                                        $footerOrderQty = (int) $marketplaceLines->sum(fn ($item) => $sourceQty($item, $orderLines));
-                                        $footerShipmentQty = (int) $orderLines->sum('qty_scanned');
-                                        $footerQtyDifference = $footerShipmentQty - $footerOrderQty;
                                         $unmatchedMarketplaceLines = $orderLines->isNotEmpty()
                                             ? $marketplaceLines->filter(fn ($candidate) => !$orderLines->contains(fn ($line) => $sourceItemMatchesShipmentLine($candidate, $line)))
                                             : collect();
@@ -1599,48 +1572,30 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                             <div class="sd-muted">Detail item marketplace belum tersedia.</div>
                                         @endif
                                         <footer class="sd-marketplace-footer">
-                                            <div class="sd-marketplace-footer-content">
-                                                <dl class="sd-marketplace-meta">
-                                                    @if($marketplaceOrderNumber !== '')
-                                                        <div class="sd-marketplace-meta-item">
-                                                            <dt>No. pesanan</dt>
-                                                            <dd>{{ $marketplaceOrderNumber }}</dd>
-                                                        </div>
-                                                    @endif
-                                                    <div class="sd-marketplace-meta-item">
-                                                        <dt>Status</dt>
-                                                        <dd>{{ $marketplaceStatus ?: '—' }}</dd>
-                                                    </div>
-                                                    @if($marketplaceOrder->buyer_username)
+                                            <dl class="sd-marketplace-meta">
+                                                <div class="sd-marketplace-meta-item">
+                                                    <dt>Status</dt>
+                                                    <dd>{{ $marketplaceStatus ?: '—' }}</dd>
+                                                </div>
+                                                @if($marketplaceOrder->buyer_username)
                                                     <div class="sd-marketplace-meta-item">
                                                         <dt>Pembeli</dt>
                                                         <dd>{{ $marketplaceOrder->buyer_username }}</dd>
                                                     </div>
-                                                    @endif
-                                                    @if($marketplaceResi !== '')
+                                                @endif
+                                                @if($marketplaceOrder->shipping_awb_no)
                                                     <div class="sd-marketplace-meta-item">
                                                         <dt>Resi</dt>
-                                                        <dd>{{ $marketplaceResi }}</dd>
+                                                        <dd>{{ $marketplaceOrder->shipping_awb_no }}</dd>
                                                     </div>
-                                                    @endif
-                                                    @if($marketplaceOrder->total_amount)
+                                                @endif
+                                                @if($marketplaceOrder->total_amount)
                                                     <div class="sd-marketplace-meta-item">
                                                         <dt>Total pesanan</dt>
                                                         <dd>Rp{{ number_format((float) $marketplaceOrder->total_amount, 0, ',', '.') }}</dd>
                                                     </div>
-                                                    @endif
-                                                </dl>
-                                                <div class="sd-marketplace-footer-summary" aria-label="Ringkasan item dan qty order">
-                                                    <span class="sd-order-summary-item"><span>Item order</span><strong>{{ number_format($marketplaceLines->count(), 0, ',', '.') }}</strong></span>
-                                                    <span class="sd-order-summary-item"><span>Item scan</span><strong>{{ number_format($orderLines->count(), 0, ',', '.') }}</strong></span>
-                                                    <span class="sd-order-summary-item"><span>Qty order</span><strong>{{ number_format($footerOrderQty, 0, ',', '.') }}</strong></span>
-                                                    <span class="sd-order-summary-item"><span>Qty dikirim</span><strong>{{ number_format($footerShipmentQty, 0, ',', '.') }}</strong></span>
-                                                    <span class="sd-order-summary-item {{ $footerQtyDifference < 0 ? 'is-negative' : ($footerQtyDifference > 0 ? 'is-positive' : '') }}"><span>Selisih qty</span><strong>{{ $footerQtyDifference > 0 ? '+' : '' }}{{ number_format($footerQtyDifference, 0, ',', '.') }}</strong></span>
-                                                    @if($orderComparison['item_mismatch'] || $orderComparison['unverified'])
-                                                        <span class="sd-order-summary-item is-negative"><span>Item</span><strong>Periksa</strong></span>
-                                                    @endif
-                                                </div>
-                                            </div>
+                                                @endif
+                                            </dl>
                                             <div class="sd-marketplace-actions">
                                                 @if(Route::has('marketplace.orders.show'))
                                                     <a href="{{ route('marketplace.orders.show', $marketplaceOrder) }}" class="sd-btn" target="_blank" rel="noopener">Lihat Order</a>
