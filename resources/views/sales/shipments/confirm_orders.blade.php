@@ -498,14 +498,14 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-order-item.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 30px; }
 .sd-order-item.sd-has-cogs { grid-template-columns: 30px minmax(0,1fr) 52px 86px 110px; }
 .sd-order-item.sd-has-cogs.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 86px 110px 30px; }
-.sd-items-head.sd-has-marketplace-sku { grid-template-columns: 30px 156px 52px minmax(0,1fr); }
-.sd-items-head.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 30px 156px 52px minmax(0,1fr) 30px; }
-.sd-items-head.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 30px 156px 52px minmax(0,1fr) 86px 110px; }
-.sd-items-head.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 30px 156px 52px minmax(0,1fr) 86px 110px 30px; }
-.sd-order-item.sd-has-marketplace-sku { grid-template-columns: 30px 156px 52px minmax(0,1fr); }
-.sd-order-item.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 30px 156px 52px minmax(0,1fr) 30px; }
-.sd-order-item.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 30px 156px 52px minmax(0,1fr) 86px 110px; }
-.sd-order-item.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 30px 156px 52px minmax(0,1fr) 86px 110px 30px; }
+.sd-items-head.sd-has-marketplace-sku { grid-template-columns: 30px minmax(0,1fr) 52px 156px; }
+.sd-items-head.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 156px 30px; }
+.sd-items-head.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 30px minmax(0,1fr) 52px 156px 86px 110px; }
+.sd-items-head.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 156px 86px 110px 30px; }
+.sd-order-item.sd-has-marketplace-sku { grid-template-columns: 30px minmax(0,1fr) 52px 156px; }
+.sd-order-item.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 156px 30px; }
+.sd-order-item.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 30px minmax(0,1fr) 52px 156px 86px 110px; }
+.sd-order-item.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 156px 86px 110px 30px; }
 .sd-item-row.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 30px; }
 .sd-item-row.sd-has-cogs { grid-template-columns: 30px minmax(0,1fr) 52px 86px 110px; }
 .sd-item-row.sd-has-cogs.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 86px 110px 30px; }
@@ -678,22 +678,22 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
 .sd-order-items-breakdown { overflow-x: auto; }
 .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku,
 .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku {
-  grid-template-columns: 26px 156px 48px 48px minmax(76px,auto) minmax(180px,1fr);
+  grid-template-columns: 26px minmax(180px,1fr) 48px 48px minmax(76px,auto) 156px;
   min-width: 594px;
 }
 .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs,
 .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs {
-  grid-template-columns: 26px 156px 48px 48px minmax(76px,auto) minmax(180px,1fr) 76px 84px;
+  grid-template-columns: 26px minmax(180px,1fr) 48px 48px minmax(76px,auto) 156px 76px 84px;
   min-width: 774px;
 }
 .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-actions,
 .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-actions {
-  grid-template-columns: 26px 156px 48px 48px minmax(76px,auto) minmax(180px,1fr) 28px;
+  grid-template-columns: 26px minmax(180px,1fr) 48px 48px minmax(76px,auto) 156px 28px;
   min-width: 624px;
 }
 .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions,
 .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions {
-  grid-template-columns: 26px 156px 48px 48px minmax(76px,auto) minmax(180px,1fr) 76px 84px 28px;
+  grid-template-columns: 26px minmax(180px,1fr) 48px 48px minmax(76px,auto) 156px 76px 84px 28px;
   min-width: 814px;
 }
 .sd-qty-breakdown > .sd-order-item-qty,
@@ -739,22 +739,22 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
   .sd-items-head.sd-has-cogs.sd-has-actions,
   .sd-order-item.sd-has-cogs.sd-has-actions,
   .sd-item-row.sd-has-cogs.sd-has-actions { grid-template-columns: 26px minmax(0,1fr) 44px 76px 84px 28px; }
-  .sd-items-head.sd-has-marketplace-sku { grid-template-columns: 26px 124px 44px minmax(0,1fr); }
-  .sd-items-head.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px 124px 44px minmax(0,1fr) 28px; }
-  .sd-items-head.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px 124px 44px minmax(0,1fr) 76px 84px; }
-  .sd-items-head.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px 124px 44px minmax(0,1fr) 76px 84px 28px; }
-  .sd-order-item.sd-has-marketplace-sku { grid-template-columns: 26px 124px 44px minmax(0,1fr); }
-  .sd-order-item.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px 124px 44px minmax(0,1fr) 28px; }
-  .sd-order-item.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px 124px 44px minmax(0,1fr) 76px 84px; }
-  .sd-order-item.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px 124px 44px minmax(0,1fr) 76px 84px 28px; }
+  .sd-items-head.sd-has-marketplace-sku { grid-template-columns: 26px minmax(0,1fr) 44px 124px; }
+  .sd-items-head.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px minmax(0,1fr) 44px 124px 28px; }
+  .sd-items-head.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px minmax(0,1fr) 44px 124px 76px 84px; }
+  .sd-items-head.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px minmax(0,1fr) 44px 124px 76px 84px 28px; }
+  .sd-order-item.sd-has-marketplace-sku { grid-template-columns: 26px minmax(0,1fr) 44px 124px; }
+  .sd-order-item.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px minmax(0,1fr) 44px 124px 28px; }
+  .sd-order-item.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px minmax(0,1fr) 44px 124px 76px 84px; }
+  .sd-order-item.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px minmax(0,1fr) 44px 124px 76px 84px 28px; }
   .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku,
-  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku { grid-template-columns: 26px 124px 48px 48px minmax(76px,auto) minmax(180px,1fr); }
+  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku { grid-template-columns: 26px minmax(180px,1fr) 48px 48px minmax(76px,auto) 124px; }
   .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs,
-  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px 124px 48px 48px minmax(76px,auto) minmax(180px,1fr) 76px 84px; }
+  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs { grid-template-columns: 26px minmax(180px,1fr) 48px 48px minmax(76px,auto) 124px 76px 84px; }
   .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-actions,
-  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px 124px 48px 48px minmax(76px,auto) minmax(180px,1fr) 28px; }
+  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-actions { grid-template-columns: 26px minmax(180px,1fr) 48px 48px minmax(76px,auto) 124px 28px; }
   .sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions,
-  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px 124px 48px 48px minmax(76px,auto) minmax(180px,1fr) 76px 84px 28px; }
+  .sd-order-item.sd-qty-breakdown.sd-has-marketplace-sku.sd-has-cogs.sd-has-actions { grid-template-columns: 26px minmax(180px,1fr) 48px 48px minmax(76px,auto) 124px 76px 84px 28px; }
 }
 </style>
 @endpush
