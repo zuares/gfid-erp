@@ -856,6 +856,24 @@
     body[data-theme="dark"] .item-page .item-table thead th:last-child { background-color: #0f172a !important; }
     body[data-theme="dark"] .item-page .item-table tbody tr:hover td:last-child,
     body[data-theme="dark"] .item-page .item-table tbody tr:focus-within td:last-child { background-color: #172033 !important; }
+    /* Width contract: the desktop filter has two search tracks, four selects, and one action track. */
+    @media (min-width: 1101px) {
+        .item-page > .item-card { width: 100%; min-width: 0; }
+        .item-page .item-filter {
+            grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.35fr) repeat(4, minmax(100px, 1fr)) auto;
+        }
+        .item-page .item-filter > * { min-width: 0; }
+        .item-page .item-filter-search { grid-column: span 2; min-width: 0; }
+    }
+    /* Match the shared GFID canvas: only the page owns the 1280px max-width. */
+    .item-page {
+        width: 100%;
+        max-width: var(--gf-content-max, 1280px);
+        margin-inline: auto;
+    }
+    @media (min-width: 768px) {
+        .app-main .page-wrap:has(.item-page) { max-width: none; }
+    }
     @media (prefers-reduced-motion: reduce) { .item-results, .item-primary, .item-soft, .item-add-button { transition: none !important; } }
 </style>
 @endpush
