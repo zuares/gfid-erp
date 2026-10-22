@@ -158,6 +158,53 @@ class TikTokShopChannelTest extends TestCase
         });
     }
 
+    public function test_statement_finance_methods_use_the_statement_and_v202501_detail_endpoints(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::firstOrCreate(['code' => 'tiktok'], ['name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-STATEMENT-FINANCE',
+            'name' => 'TikTok Statement Finance Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202309/statements*' => Http::response([
+                'code' => 0,
+                'data' => ['statements' => [], 'next_page_token' => ''],
+            ]),
+            'https://open-api.tiktokglobalshop.com/finance/202501/statements/STATEMENT-1/statement_transactions*' => Http::response([
+                'code' => 0,
+                'data' => ['transactions' => [], 'next_page_token' => ''],
+            ]),
+        ]);
+
+        $driver = app(TikTokShopChannel::class);
+        $statements = $driver->getStatements($store, 1754006400, 1754438400, '', 100);
+        $transactions = $driver->getTransactionsByStatement($store, 'STATEMENT-1', '', 100);
+
+        $this->assertSame([], data_get($statements, 'data.statements'));
+        $this->assertSame([], data_get($transactions, 'data.transactions'));
+        Http::assertSent(function ($request): bool {
+            $url = $request->url();
+
+            return $request->method() === 'GET'
+                && str_contains($url, 'app_key=app-key-test')
+                && str_contains($url, 'shop_cipher=shop-cipher-test')
+                && str_contains($url, 'sign=');
+        });
+        Http::assertSentCount(2);
+    }
+
     public function test_order_responses_are_normalized_to_the_shared_marketplace_schema(): void
     {
         config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');

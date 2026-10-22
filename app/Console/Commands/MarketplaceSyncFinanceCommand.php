@@ -251,11 +251,17 @@ class MarketplaceSyncFinanceCommand extends Command
                 $tiktokPending = (int) ($tiktokResult['pending'] ?? 0);
                 $tiktokErrors = (int) ($tiktokResult['errors'] ?? 0) + (int) ($tiktokResult['estimate_errors'] ?? 0);
                 $estimateUpdated = (int) ($tiktokResult['estimates_updated'] ?? 0);
+                $statementAdCostsUpdated = (int) ($tiktokResult['statement_ad_costs_updated'] ?? 0);
+                $statementAdCostsTotal = (float) ($tiktokResult['statement_ad_costs_total'] ?? 0);
+                $statementAdCostErrors = (int) ($tiktokResult['statement_ad_cost_errors'] ?? 0);
                 $totalSyncedToFinance += $tiktokSynced;
-                $failureCount += $tiktokErrors;
+                $failureCount += $tiktokErrors + $statementAdCostErrors;
 
                 $this->info("   TikTok Finance: {$tiktokSynced} settled, {$tiktokPending} belum settled, "
                     . "{$estimateUpdated} estimasi diperbarui, {$tiktokErrors} error. "
+                    . "GMV Max settlement: {$statementAdCostsUpdated} order / "
+                    . number_format($statementAdCostsTotal, 2, ',', '.') . ", "
+                    . "{$statementAdCostErrors} error. "
                     . "Total order diproses: " . (int) ($tiktokResult['processed'] ?? 0)
                     . " dari " . (int) ($tiktokResult['found'] ?? 0)
                     . " kandidat dalam " . (int) ($tiktokResult['batches'] ?? 1) . " batch.");
@@ -270,6 +276,9 @@ class MarketplaceSyncFinanceCommand extends Command
                     'errors' => $tiktokErrors,
                     'batches' => $tiktokResult['batches'] ?? 1,
                     'estimates_updated' => $estimateUpdated,
+                    'statement_ad_costs_updated' => $statementAdCostsUpdated,
+                    'statement_ad_costs_total' => $statementAdCostsTotal,
+                    'statement_ad_cost_errors' => $statementAdCostErrors,
                     'label' => "Finance TikTok selesai: {$tiktokSynced} settled, {$tiktokPending} belum settled, "
                         . "{$estimateUpdated} estimasi diperbarui, {$tiktokErrors} error.",
                     'store_id' => $store->id,

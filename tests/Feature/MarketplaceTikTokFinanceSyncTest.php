@@ -173,6 +173,113 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertSame(766.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.taxes.vat'));
     }
 
+    public function test_statement_transactions_supply_gmv_max_cost_from_settlement(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-GMV-MAX-STATEMENT',
+            'name' => 'TikTok GMV Max Statement Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'TT-ORDER-GMV-MAX-1',
+            'external_order_id' => 'TT-ORDER-GMV-MAX-1',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202507/orders/unsettled*' => Http::response([
+                'code' => 0,
+                'data' => ['transactions' => [], 'next_page_token' => ''],
+            ]),
+            'https://open-api.tiktokglobalshop.com/finance/202501/orders/*/statement_transactions*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'order_id' => 'TT-ORDER-GMV-MAX-1',
+                    'currency' => 'IDR',
+                    'revenue_amount' => '100000',
+                    'fee_and_tax_amount' => '-5000',
+                    'shipping_cost_amount' => '0',
+                    'settlement_amount' => '95000',
+                    'sku_transactions' => [[
+                        'sku_id' => 'SKU-1',
+                        'fee_tax_breakdown' => [
+                            'fee' => ['platform_commission_amount' => '-5000'],
+                            'tax' => [],
+                        ],
+                    ]],
+                ],
+            ]),
+            'https://open-api.tiktokglobalshop.com/finance/202309/statements*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'statements' => [[
+                        'id' => 'STATEMENT-GMV-MAX-1',
+                    ]],
+                    'next_page_token' => '',
+                ],
+            ]),
+            'https://open-api.tiktokglobalshop.com/finance/202501/statements/STATEMENT-GMV-MAX-1/statement_transactions*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'transactions' => [[
+                        'id' => 'TRANSACTION-GMV-MAX-1',
+                        'type' => 'ORDER',
+                        'associated_order_id' => 'TT-ORDER-GMV-MAX-1',
+                        'currency' => 'IDR',
+                        'fee_tax_breakdown' => [
+                            'fee' => [
+                                'gmv_max_ad_fee_amount' => '-3000',
+                                'gmv_max_coupon_fee' => '-500',
+                                'platform_commission_amount' => '-5000',
+                            ],
+                            'tax' => [
+                                'cps_shop_ads_commission_tax_amount' => '-55',
+                            ],
+                        ],
+                    ]],
+                    'next_page_token' => '',
+                ],
+            ]),
+        ]);
+
+        $result = app(MarketplaceSyncService::class)->syncTikTokFinance(
+            $store,
+            now()->subDays(2)->timestamp,
+            now()->timestamp,
+            false,
+            null,
+            200,
+        );
+
+        $this->assertSame(1, $result['statement_ad_costs_updated']);
+        $this->assertSame(3555.0, (float) $result['statement_ad_costs_total']);
+
+        $settlement = MarketplaceOrderSettlement::where('order_id', $order->id)->firstOrFail();
+        $this->assertSame(3555.0, (float) $settlement->ad_cost);
+        $this->assertSame('STATEMENT-GMV-MAX-1', data_get($settlement->raw_json, 'tiktok_statement.statement_id'));
+        $this->assertSame(3000.0, (float) data_get($settlement->raw_json, 'tiktok_statement_gmv_max.ad_fee'));
+        $this->assertSame(500.0, (float) data_get($settlement->raw_json, 'tiktok_statement_gmv_max.coupon_fee'));
+        $this->assertSame(55.0, (float) data_get($settlement->raw_json, 'tiktok_statement_gmv_max.ad_tax'));
+    }
+
     public function test_legacy_tiktok_payload_does_not_double_count_aggregate_fee(): void
     {
         $settlement = new MarketplaceOrderSettlement([

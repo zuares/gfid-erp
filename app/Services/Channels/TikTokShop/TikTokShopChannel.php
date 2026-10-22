@@ -555,6 +555,62 @@ class TikTokShopChannel implements MarketplaceChannel
     }
 
     /**
+     * Ambil daftar statement seller dalam rentang waktu tertentu.
+     * Statement endpoint dipakai sebagai sumber biaya GMV Max yang benar-benar
+     * dipotong dari settlement, bukan sebagai pengganti report performa iklan.
+     */
+    public function getStatements(
+        Store $store,
+        int $statementTimeFrom,
+        int $statementTimeTo,
+        string $pageToken = '',
+        int $pageSize = 100,
+    ): array {
+        $pageSize = max(1, min($pageSize, 100));
+
+        return $this->get($store, '/finance/202309/statements', [
+            'statement_time_ge' => $statementTimeFrom,
+            'statement_time_lt' => $statementTimeTo,
+            'page_size' => $pageSize,
+            'page_token' => $pageToken,
+            'sort_field' => 'statement_time',
+            'sort_order' => 'ASC',
+        ]);
+    }
+
+    /**
+     * Ambil transaksi detail dari satu statement.
+     * v202501 menyediakan fee_tax_breakdown, termasuk biaya GMV Max.
+     */
+    public function getTransactionsByStatement(
+        Store $store,
+        string $statementId,
+        string $pageToken = '',
+        int $pageSize = 100,
+    ): array {
+        $statementId = trim($statementId);
+        if ($statementId === '') {
+            return [
+                'error' => 'statement_id_missing',
+                'message' => 'Statement ID TikTok wajib diisi.',
+            ];
+        }
+
+        $pageSize = max(1, min($pageSize, 100));
+
+        return $this->get(
+            $store,
+            '/finance/202501/statements/' . rawurlencode($statementId) . '/statement_transactions',
+            [
+                'page_size' => $pageSize,
+                'page_token' => $pageToken,
+                'sort_field' => 'order_create_time',
+                'sort_order' => 'ASC',
+            ],
+        );
+    }
+
+    /**
      * Ambil transaksi TikTok yang belum settle.
      *
      * Nilai dari endpoint ini adalah estimasi dan dapat berubah sampai
