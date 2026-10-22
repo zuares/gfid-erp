@@ -818,6 +818,29 @@
         }
     }
 
+    function populateFilterStoreSelect(preferredStoreId = '') {
+        const platformSel = $('filterPlatform');
+        const storeSel = $('filterStore');
+        if (!storeSel) return;
+
+        const selectedPlatform = String(platformSel?.value || '').trim().toLowerCase();
+        const currentStoreId = String(preferredStoreId || storeSel.value || '');
+        const candidates = stores.filter(store => !selectedPlatform
+            || storePlatformCode(store) === selectedPlatform);
+
+        storeSel.innerHTML = '<option value="">Semua Toko</option>';
+        candidates.forEach(store => {
+            const option = document.createElement('option');
+            option.value = store.id;
+            option.textContent = `${store.name} (${store.channel?.name || '?'})`;
+            storeSel.appendChild(option);
+        });
+
+        if (candidates.some(store => String(store.id) === currentStoreId)) {
+            storeSel.value = currentStoreId;
+        }
+    }
+
     function getStoreSyncState(store) {
         if (!isActiveStore(store)) {
             return { key: 'inactive', label: 'Nonaktif', icon: 'bi-pause-circle', note: 'Aktifkan toko untuk sync.' };
@@ -1075,16 +1098,7 @@
             });
         }
 
-        stores.forEach(s => {
-            const label = s.name + ' (' + (s.channel?.name || '?') + ')';
-
-            const filterOpt = document.createElement('option');
-            filterOpt.value = s.id;
-            filterOpt.textContent = label;
-            filterSel.appendChild(filterOpt);
-
-        });
-
+        populateFilterStoreSelect();
         populateSyncStoreSelect();
         renderStoreHealth();
     }
@@ -1297,6 +1311,9 @@
         document.querySelectorAll('.filter-select').forEach(el => {
             if (el.tagName === 'SELECT' || el.id === 'filterSearch') {
                 el.addEventListener('change', () => {
+                    if (el.id === 'filterPlatform') {
+                        populateFilterStoreSelect();
+                    }
                     if (el.id !== 'filterOrderDate' && el.id !== 'filterSettlementDate') {
                         currentPage = 1;
                         loadSettlements();
@@ -1336,17 +1353,8 @@
             });
         }
 
-        if (syncStore) {
-            const activeSyncStores = stores.filter(s => ['shopee', 'shp'].includes(String(s.channel?.code || '').toLowerCase())
-                && s.status === 'active'
-                && s.is_active === true);
-            if (activeSyncStores.length === 1) {
-                syncStore.value = String(activeSyncStores[0].id);
-                if (syncPlatform) syncPlatform.value = storePlatformCode(activeSyncStores[0]);
-            }
-        }
-
         restoreSettlementFilterState();
+        populateFilterStoreSelect($('filterStore')?.value || '');
         const restoredStore = stores.find(store => String(store.id) === String(syncStore?.value || ''));
         if (syncPlatform && restoredStore) {
             syncPlatform.value = storePlatformCode(restoredStore);
@@ -1365,6 +1373,9 @@
 
     window.resetFilters = function() {
         document.querySelectorAll('.filter-select').forEach(el => el.value = '');
+        if ($('syncPlatform')) $('syncPlatform').value = '';
+        populateFilterStoreSelect();
+        populateSyncStoreSelect();
         if ($('filterSettlementStatus')) $('filterSettlementStatus').value = 'cair';
         if (fpOrderDate) fpOrderDate.clear();
         if (fpSettlementDate) fpSettlementDate.clear();
