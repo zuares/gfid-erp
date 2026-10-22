@@ -147,13 +147,17 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-returns'))
     ->name('sync-returns')
     ->withoutOverlapping();
 
-// Jalur pengaman order BARU: tidak memakai cursor backlog, sehingga order hari
-// ini tidak menunggu sync settlement histori yang dapat berhenti di batas runtime.
+// Jalur settlement terbaru mengikuti autosync order: cek ulang order 3 hari
+// terakhir setiap 5 menit. Mode resync diperlukan karena nilai final dari Shopee
+// dapat berubah setelah order sebelumnya sudah tersimpan sebagai CAIR • FINAL.
+// Rentang pendek ini sengaja dipisahkan dari --all agar histori lama tidak terus
+// dipanggil ulang dan API tidak dibebani seluruh database setiap 5 menit.
 Schedule::call(fn () => Artisan::call('marketplace:sync-settlements', [
-        '--from' => now()->subDay()->toDateString(),
+        '--from' => now()->subDays(3)->toDateString(),
         '--to' => now()->toDateString(),
         '--limit' => 100,
         '--newest-first' => true,
+        '--resync' => true,
     ]))
     ->everyFiveMinutes()
     ->name('sync-recent-settlements')
