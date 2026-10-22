@@ -157,7 +157,7 @@ class DashboardController extends Controller
 
     private function ownerData(): array
     {
-        $cacheKey = 'dashboard.owner.v12.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.owner.v13.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->ownerDataUncached());
     }
@@ -630,7 +630,7 @@ class DashboardController extends Controller
                     ->whereIn('s.item_id', $itemIds->all())
                     ->select('s.item_id')
                     ->selectRaw(
-                        'COALESCE(SUM(CASE WHEN w.code IN (?, ?) THEN s.qty ELSE 0 END), 0) as stock_qty',
+                        'COALESCE(SUM(CASE WHEN w.code = ? THEN s.qty ELSE 0 END), 0) as stock_qty',
                         $sellableWarehouseCodes,
                     )
                     ->selectRaw(
