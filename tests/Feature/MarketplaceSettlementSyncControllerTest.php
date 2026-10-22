@@ -629,7 +629,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ->assertOk()
             ->assertSee('Dana Cair (Final)')
             ->assertSee('Perbarui Estimasi')
-            ->assertSee('EST. SHOPEE')
+            ->assertSee('ESTIMASI BELUM TERSEDIA')
             ->assertSee('Rincian tersedia setelah settlement.');
     }
 
@@ -1955,6 +1955,50 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame(['ORDER-TTK-DATE-IN'], $ids);
         $this->assertTrue($payload['paginator']['data'][0]['is_finance_final']);
         $this->assertNull($payload['paginator']['data'][0]['settlement_time']);
+    }
+
+    public function test_filter_biaya_iklan_hanya_mengembalikan_settlement_yang_memiliki_ad_cost(): void
+    {
+        $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $tiktok->id,
+            'code' => 'TTK-AD-FILTER',
+            'name' => 'TikTok Ad Filter Test',
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => ['access_token' => 'dummy-token'],
+        ]);
+
+        foreach ([['id' => 'WITH-AD', 'ad_cost' => 12500], ['id' => 'WITHOUT-AD', 'ad_cost' => 0]] as $fixture) {
+            $order = MarketplaceOrder::create([
+                'store_id' => $store->id,
+                'external_order_id' => 'EXT-'.$fixture['id'],
+                'channel_order_id' => 'ORDER-'.$fixture['id'],
+                'order_status' => 'COMPLETED',
+                'ordered_at' => now(),
+                'order_date' => now(),
+                'subtotal_items' => 100000,
+                'total_paid_customer' => 100000,
+            ]);
+            MarketplaceOrderSettlement::create([
+                'store_id' => $store->id,
+                'order_id' => $order->id,
+                'channel_order_id' => $order->channel_order_id,
+                'buyer_payment_amount' => 100000,
+                'final_income' => 80000,
+                'ad_cost' => $fixture['ad_cost'],
+                'settlement_time' => now(),
+            ]);
+        }
+
+        $payload = app(MarketplaceController::class)->settlements(Request::create(
+            '/api/marketplace/settlements',
+            'GET',
+            ['store_id' => $store->id, 'ad_cost_filter' => 'with', 'page' => 1, 'per_page' => 50],
+        ))->getData(true);
+
+        $this->assertSame(['ORDER-WITH-AD'], collect($payload['paginator']['data'])->pluck('channel_order_id')->all());
+        $this->assertSame(12500.0, (float) $payload['meta']['kpi_ad_cost']);
     }
 
     public function test_kpi_cair_tidak_memakai_estimasi_lama_sebagai_settlement_final(): void

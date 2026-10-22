@@ -405,6 +405,15 @@
                         <i class="bi bi-wallet2" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
                     </div>
 
+                    <div style="position:relative; min-width:145px; width:145px;">
+                        <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterAdCost">
+                            <option value="">Semua Biaya Iklan</option>
+                            <option value="with">Ada Biaya Iklan</option>
+                            <option value="without">Tanpa Biaya Iklan</option>
+                        </select>
+                        <i class="bi bi-megaphone" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
+                    </div>
+
                     <div style="position:relative; min-width:135px; width:135px;">
                         <input type="text" class="form-control form-control-sm filter-select w-100" style="background:#fff;cursor:pointer;padding-left:26px" id="filterOrderDate" placeholder="Tgl Order...">
                         <i class="bi bi-calendar3" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
@@ -436,6 +445,10 @@
                 <div class="oc-kpi-label" id="kpiFeeLabel" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Total Fee Marketplace">Fee Marketplace</div>
                 <div class="oc-kpi-value" id="kpiFeeTotal" style="font-size: 1.05rem; color:#b91c1c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
                 <div id="kpiFeePercent" style="font-size:.72rem; color:var(--shp-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
+            </div>
+            <div class="oc-kpi-card" style="flex: 1 1 0; min-width: 0; margin: 0; padding: .65rem .75rem; overflow:hidden;">
+                <div class="oc-kpi-label" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Total Biaya Iklan">Biaya Iklan</div>
+                <div class="oc-kpi-value" id="kpiAdCost" style="font-size: 1.05rem; color:#dc2626; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
             </div>
             <div class="oc-kpi-card" style="flex: 1 1 0; min-width: 0; margin: 0; padding: .65rem .75rem; overflow:hidden;">
                 <div class="oc-kpi-label" id="kpiNetPayoutLabel" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Dana Cair Final">Dana Cair (Final)</div>
@@ -637,6 +650,7 @@
             platform: $('filterPlatform')?.value || '',
             status: $('filterStatus')?.value || '',
             settlement_status: $('filterSettlementStatus')?.value || '',
+            ad_cost_filter: $('filterAdCost')?.value || '',
             search: $('filterSearch')?.value || '',
             order_date_from: orderDates[0] ? fpOrderDate.formatDate(orderDates[0], 'Y-m-d') : '',
             order_date_to: orderDates[1] ? fpOrderDate.formatDate(orderDates[1], 'Y-m-d') : '',
@@ -669,6 +683,7 @@
                 ? state.settlement_status
                 : 'cair';
         }
+        if ($('filterAdCost')) $('filterAdCost').value = state.ad_cost_filter || '';
         if ($('filterSearch')) $('filterSearch').value = state.search || '';
 
         if (fpOrderDate) {
@@ -1456,6 +1471,7 @@
         if ($('filterPlatform').value) params.append('platform', $('filterPlatform').value);
         if ($('filterStatus').value) params.append('status', $('filterStatus').value);
         if ($('filterSettlementStatus').value) params.append('settlement_status', $('filterSettlementStatus').value);
+        if ($('filterAdCost').value) params.append('ad_cost_filter', $('filterAdCost').value);
         if ($('filterSearch').value) params.append('search', $('filterSearch').value);
         params.append('page', currentPage);
         params.append('per_page', 50);
@@ -1483,6 +1499,7 @@
                 $('kpiCount').textContent = res.meta.kpi_count;
                 $('kpiBuyerTotal').textContent = fmtRp(res.meta.kpi_gross);
                 $('kpiFeeTotal').textContent = fmtRp(res.meta.kpi_fees);
+                $('kpiAdCost').textContent = fmtRp(res.meta.kpi_ad_cost || 0);
                 $('kpiFeePercent').textContent = Number.isFinite(Number(res.meta.kpi_fee_pct))
                     ? `${Number(res.meta.kpi_fee_pct).toFixed(1)}% dari gross setelah voucher`
                     : '—';

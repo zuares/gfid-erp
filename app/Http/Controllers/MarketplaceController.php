@@ -3529,6 +3529,10 @@ class MarketplaceController extends Controller
         $sortBy = $request->input('sort_by', 'settlement_time');
         $sortDir = strtolower($request->input('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
         $settlementStatus = strtolower((string) $request->input('settlement_status', ''));
+        $adCostFilter = strtolower(trim((string) $request->input('ad_cost_filter', '')));
+        if (! in_array($adCostFilter, ['with', 'without'], true)) {
+            $adCostFilter = '';
+        }
         $includeMissingPending = $settlementStatus === 'belum_cair'
             || $request->input('tab') === 'belum_cair';
         $isTikTokFinanceChannel = static function ($channelQuery): void {
@@ -3561,6 +3565,14 @@ class MarketplaceController extends Controller
             $query->whereHas('store.channel', function ($channelQuery) use ($platform) {
                 $channelQuery->whereRaw('LOWER(code) = ?', [$platform])
                     ->orWhereRaw('LOWER(name) = ?', [$platform]);
+            });
+        }
+
+        if ($adCostFilter === 'with') {
+            $query->where('ad_cost', '>', 0);
+        } elseif ($adCostFilter === 'without') {
+            $query->where(function ($adCostQuery) {
+                $adCostQuery->whereNull('ad_cost')->orWhere('ad_cost', '<=', 0);
             });
         }
 
@@ -3804,6 +3816,10 @@ class MarketplaceController extends Controller
                     $channelQuery->whereRaw('LOWER(code) = ?', [$platform])
                         ->orWhereRaw('LOWER(name) = ?', [$platform]);
                 });
+            }
+            if ($adCostFilter === 'with') {
+                // Order pending belum memiliki settlement/ad cost aktual.
+                $pendingOrdersQuery->whereRaw('1 = 0');
             }
             if ($request->filled('status')) {
                 $pendingOrdersQuery->where('order_status', $request->status);
@@ -4177,6 +4193,7 @@ class MarketplaceController extends Controller
             $buyerPaidTotal = (float) $metaRows->sum(fn (MarketplaceOrderSettlement $settlement) => $this->settlementBuyerPaidAmount($settlement));
             $grossAfterVoucher = max($grossTotal - ($voucherTokoTotal + $voucherPlatformTotal), 0);
             $grossAfterVoucherToko = max($grossTotal - $voucherTokoTotal, 0);
+            $adCostTotal = (float) $metaRows->sum(fn (MarketplaceOrderSettlement $settlement) => (float) $settlement->ad_cost);
             $countSelesai = 0;
             $countBatal = 0;
             $countPenyesuaian = 0;
@@ -4359,6 +4376,7 @@ class MarketplaceController extends Controller
                 'kpi_platform_burden' => $platformFeeTotal,
                 'kpi_adjustment_total' => $adjustmentFeeTotal,
                 'kpi_total_burden' => $allFeeTotal,
+                'kpi_ad_cost' => $adCostTotal,
                 'kpi_fee_pct' => $feePercent,
                 'kpi_fee_pct_toko' => $feePercentToko,
                 'estimate_shopee_count' => $estimatedShopeeCount,
