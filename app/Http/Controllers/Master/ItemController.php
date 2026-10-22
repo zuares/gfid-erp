@@ -395,6 +395,12 @@ class ItemController extends Controller
             }
         });
 
+        if ($request->boolean('return_to_index')) {
+            return redirect()
+                ->route('master.items.index')
+                ->with('success', "Item {$item->code} berhasil ditambahkan.");
+        }
+
         return redirect()
             ->route('master.items.show', $item)
             ->with('success', 'Item baru berhasil dibuat beserta barcode-nya.');
