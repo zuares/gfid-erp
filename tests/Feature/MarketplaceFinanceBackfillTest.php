@@ -6,6 +6,7 @@ use App\Domain\Marketplace\Finance\Enums\EscrowStatus;
 use App\Domain\Marketplace\Finance\Enums\IncomeStatus;
 use App\Models\Account;
 use App\Models\Channel;
+use App\Models\Journal;
 use App\Models\MarketplaceFinanceSettlement;
 use App\Models\MarketplaceFinancialComponent;
 use App\Models\MarketplaceFinancialTransaction;
@@ -203,6 +204,43 @@ class MarketplaceFinanceBackfillTest extends TestCase
         $this->assertSame('withdrawn', $settlement->fresh()->status->value);
         $this->assertNull($settlement->fresh()->received_at);
         $this->assertTrue($settlement->fresh()->isWalletWithdrawal());
+    }
+
+    public function test_posted_legacy_wallet_keeps_its_journal_reference_but_not_bank_received_status(): void
+    {
+        $store = $this->store();
+        $bank = Account::create(['code' => 'BF-POSTED-WALLET-1101', 'name' => 'Posted Wallet Bank', 'type' => 'asset', 'is_cash' => true, 'is_active' => true]);
+        $payout = MarketplacePayout::create([
+            'date' => '2026-10-10',
+            'marketplace_name' => 'Shopee',
+            'store_id' => $store->id,
+            'source' => 'shopee_wallet',
+            'amount' => 2000000,
+            'bank_account_id' => $bank->id,
+            'external_transaction_id' => 'BF-POSTED-WALLET',
+            'status' => 'posted',
+            'source_payload' => ['transaction_type' => 'WITHDRAWAL_CREATED', 'status' => 'COMPLETED'],
+        ]);
+        $journal = Journal::create([
+            'date' => '2026-10-10',
+            'source_type' => 'marketplace_payout',
+            'source_id' => $payout->id,
+            'posted_at' => now(),
+        ]);
+        $payout->forceFill(['journal_id' => $journal->id])->save();
+
+        app(\App\Services\Marketplace\Finance\MarketplaceFinanceBackfillService::class)->run([
+            'dry_run' => false,
+            'sources' => ['payouts'],
+            'store_id' => $store->id,
+        ]);
+
+        $settlement = MarketplaceFinanceSettlement::firstOrFail();
+        $this->assertSame('withdrawn', $settlement->status->value);
+        $this->assertNull($settlement->received_at);
+        $this->assertSame($journal->id, $settlement->raw_payload['legacy_journal_id']);
+        $this->assertNull($settlement->journal_id);
+        $this->assertSame(1, Journal::count());
     }
 
     public function test_settlement_backfill_maps_existing_order_invoice_and_shipment_on_first_insert(): void

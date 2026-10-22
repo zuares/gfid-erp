@@ -316,13 +316,13 @@ class MarketplaceFinanceBackfillService
         $sourceStatus = strtolower(trim((string) ($rawSource['status'] ?? $row->status)));
         $status = $this->settlementStatus($row->status);
         if ($walletWithdrawal
-            && strtolower((string) $row->status) !== 'posted'
             && in_array($sourceStatus, ['completed', 'success', 'successful', 'paid', 'withdrawal_completed'], true)) {
             $status = SettlementStatus::WITHDRAWN;
         }
         $payload = $this->legacyPayload('marketplace_payouts', $row->id, $row->source_payload);
         if ($walletWithdrawal) {
             $payload['source_kind'] = 'wallet_withdrawal';
+            $payload['legacy_journal_id'] = $row->journal_id;
         }
         $settlement = $this->settlement($store, $channel, $externalId, [
             'amount' => $this->nullableAmount($row->amount) ?? '0.00',
