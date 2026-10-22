@@ -634,6 +634,19 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sd-marketplace-unpaired-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .22rem;
+  max-width: 100%;
+}
+.sd-marketplace-unpaired-label {
+  color: #92400e;
+  font-size: .6rem;
+  font-weight: 750;
+  line-height: 1.2;
+}
 body[data-theme="dark"] .sd-marketplace-sku-value {
   background: rgba(30,64,175,.24);
   border-color: rgba(96,165,250,.38);
@@ -1438,6 +1451,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                         // Jangan gunakan marketplace_sku hasil mapping nama atau kode internal.
                                                         $marketplaceSku = $marketplaceLine?->model_sku ?: $marketplaceLine?->item_sku ?: $marketplaceLine?->marketplace_sku ?: '—';
                                                         $marketplaceVariant = trim((string) ($marketplaceLine?->variant_name ?: $marketplaceLine?->variant_snapshot ?: ''));
+                                                        $unpairedMarketplaceLines = $itemMismatch && !$singleLineMismatch ? $unmatchedMarketplaceLines : collect();
                                                         $qtyOrder = $itemMismatch && !$singleLineMismatch
                                                             ? null
                                                             : ($marketplaceLine ? $sourceQty($marketplaceLine, $orderLines) : (int) $line->qty_scanned);
@@ -1454,9 +1468,23 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                         <div class="sd-order-item-qty">{{ number_format($qtyShipment, 0, ',', '.') }}</div>
                                                         <div class="sd-order-item-diff {{ !$itemMismatch && $difference === 0 ? 'sd-marketplace-ok' : 'sd-marketplace-short' }}">{{ $itemMismatch ? 'Periksa' : (($difference > 0 ? '+' : '') . number_format($difference, 0, ',', '.')) }}</div>
                                                         <div class="sd-order-item-marketplace-sku {{ $itemMismatch ? 'is-mismatch' : '' }}">
-                                                            <span class="sd-marketplace-sku-value" title="SKU marketplace: {{ $marketplaceSku }}">{{ $marketplaceSku }}</span>
-                                                            @if($marketplaceVariant !== '')<span class="sd-marketplace-variant" title="{{ $marketplaceVariant }}">{{ $marketplaceVariant }}</span>@endif
-                                                            @if($itemMismatch)<span class="sd-sku-mismatch">{{ $singleLineMismatch ? 'Item berbeda' : 'Lihat SKU order' }}</span>@endif
+                                                            @if($unpairedMarketplaceLines->isNotEmpty())
+                                                                <div class="sd-marketplace-unpaired-list">
+                                                                    <span class="sd-marketplace-unpaired-label">SKU order belum dipasangkan</span>
+                                                                    @foreach($unpairedMarketplaceLines as $unpairedLine)
+                                                                        @php
+                                                                            $unpairedSku = $unpairedLine->model_sku ?: $unpairedLine->item_sku ?: $unpairedLine->marketplace_sku ?: 'SKU belum tersedia';
+                                                                            $unpairedVariant = trim((string) ($unpairedLine->variant_name ?: $unpairedLine->variant_snapshot ?: ''));
+                                                                        @endphp
+                                                                        <span class="sd-marketplace-sku-value" title="SKU marketplace: {{ $unpairedSku }}">{{ $unpairedSku }}</span>
+                                                                        @if($unpairedVariant !== '')<span class="sd-marketplace-variant" title="{{ $unpairedVariant }}">{{ $unpairedVariant }}</span>@endif
+                                                                    @endforeach
+                                                                </div>
+                                                            @else
+                                                                <span class="sd-marketplace-sku-value" title="SKU marketplace: {{ $marketplaceSku }}">{{ $marketplaceSku }}</span>
+                                                                @if($marketplaceVariant !== '')<span class="sd-marketplace-variant" title="{{ $marketplaceVariant }}">{{ $marketplaceVariant }}</span>@endif
+                                                            @endif
+                                                            @if($itemMismatch && $unpairedMarketplaceLines->isEmpty())<span class="sd-sku-mismatch">{{ $singleLineMismatch ? 'Item berbeda' : 'Lihat SKU order' }}</span>@endif
                                                         </div>
                                                         @if($canSeeCogs)
                                                             <div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div>

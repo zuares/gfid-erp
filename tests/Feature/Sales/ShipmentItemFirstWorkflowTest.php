@@ -1438,7 +1438,11 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'order_date' => now(),
             'ordered_at' => now(),
         ]);
-        foreach (['MARKETPLACE-SKU-A', 'MARKETPLACE-SKU-B'] as $sku) {
+        foreach ([
+            ['sku' => 'MARKETPLACE-SKU-A', 'variant' => 'Varian Hitam M'],
+            ['sku' => 'MARKETPLACE-SKU-B', 'variant' => 'Varian Navy L'],
+        ] as $marketplaceLine) {
+            $sku = $marketplaceLine['sku'];
             $marketplaceItem = Item::create([
                 'code' => $sku, 'name' => $sku, 'unit' => 'pcs',
                 'type' => 'finished_good', 'active' => true,
@@ -1450,6 +1454,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
                 'internal_item_id' => $marketplaceItem->id,
                 'item_name' => $marketplaceItem->name,
                 'model_sku' => $sku,
+                'variant_name' => $marketplaceLine['variant'],
                 'qty' => 1,
             ]);
         }
@@ -1474,7 +1479,11 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
             ->assertSee('Item order belum cocok: MARKETPLACE-SKU-A, MARKETPLACE-SKU-B')
-            ->assertSee('Lihat SKU order')
+            ->assertSee('SKU order belum dipasangkan')
+            ->assertSee('class="sd-marketplace-sku-value" title="SKU marketplace: MARKETPLACE-SKU-A">MARKETPLACE-SKU-A</span>', false)
+            ->assertSee('Varian Hitam M')
+            ->assertSee('class="sd-marketplace-sku-value" title="SKU marketplace: MARKETPLACE-SKU-B">MARKETPLACE-SKU-B</span>', false)
+            ->assertSee('Varian Navy L')
             ->assertSee('>Periksa</div>', false);
     }
 
