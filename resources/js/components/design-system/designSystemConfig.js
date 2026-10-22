@@ -1,9 +1,30 @@
 export const navItems = [
-    { id: 'overview', label: 'Overview', icon: 'bi-grid-1x2-fill' },
-    { id: 'foundations', label: 'Foundations', icon: 'bi-palette-fill' },
-    { id: 'components', label: 'Components', icon: 'bi-boxes' },
-    { id: 'patterns', label: 'Patterns', icon: 'bi-layout-text-window-reverse' },
-    { id: 'layouts', label: 'Layouts', icon: 'bi-columns-gap' },
+    { id: 'overview', label: 'Overview', icon: 'bi-grid-1x2-fill', keywords: ['intro', 'overview'] },
+    { id: 'foundations', label: 'Foundations', icon: 'bi-palette-fill', keywords: ['token', 'color', 'typography'] },
+    { id: 'components', label: 'Components', icon: 'bi-boxes', keywords: ['button', 'badge', 'alert', 'toast', 'input', 'select', 'tabs', 'navigation', 'form'] },
+    { id: 'crud-modal', label: 'CRUD modal', icon: 'bi-window-stack', keywords: ['modal', 'dialog', 'create', 'edit', 'delete', 'combobox'] },
+    { id: 'patterns', label: 'Patterns', icon: 'bi-layout-text-window-reverse', keywords: ['table', 'datatable', 'empty state', 'loading', 'responsive'] },
+    { id: 'layouts', label: 'Layouts', icon: 'bi-columns-gap', keywords: ['workspace', 'dashboard', 'detail', 'responsive'] },
+];
+
+export const componentNavItems = [
+    { id: 'foundation-color-roles', parent: 'foundations', label: 'Color roles', icon: 'bi-droplet', keywords: ['color', 'brand', 'surface'] },
+    { id: 'foundation-typography', parent: 'foundations', label: 'Typography scale', icon: 'bi-type', keywords: ['type', 'font', 'text'] },
+    { id: 'component-actions-status', parent: 'components', label: 'Actions & status', icon: 'bi-lightning-charge', keywords: ['button', 'badge', 'action', 'status'] },
+    { id: 'component-kpi-comparison', parent: 'components', label: 'KPI comparison', icon: 'bi-graph-up-arrow', keywords: ['kpi', 'metric', 'net orders', 'comparison', 'dod', 'mom'] },
+    { id: 'component-feedback', parent: 'components', label: 'Feedback', icon: 'bi-chat-square-text', keywords: ['alert', 'toast', 'feedback', 'notification'] },
+    { id: 'component-form-controls', parent: 'components', label: 'Form controls', icon: 'bi-input-cursor-text', keywords: ['input', 'select', 'form', 'validation', 'error'] },
+    { id: 'component-navigation', parent: 'components', label: 'Navigation', icon: 'bi-signpost-split', keywords: ['tabs', 'segmented', 'navigation'] },
+    { id: 'crud-product-form', parent: 'crud-modal', label: 'Product form', icon: 'bi-box-seam', keywords: ['create', 'edit', 'delete', 'product'] },
+    { id: 'crud-field-choices', parent: 'crud-modal', label: 'Field choices', icon: 'bi-ui-checks-grid', keywords: ['field', 'input types', 'combobox'] },
+    { id: 'crud-contract', parent: 'crud-modal', label: 'Reusable contract', icon: 'bi-braces', keywords: ['props', 'contract', 'api'] },
+    { id: 'patterns-data-table', parent: 'patterns', label: 'Responsive data table', icon: 'bi-table', keywords: ['table', 'datatable', 'responsive', 'rows'] },
+    { id: 'patterns-system-states', parent: 'patterns', label: 'Empty & loading', icon: 'bi-hourglass-split', keywords: ['empty', 'loading', 'skeleton', 'state'] },
+    { id: 'patterns-data-table-contract', parent: 'patterns', label: 'DataTable contract', icon: 'bi-braces', keywords: ['columns', 'actions', 'empty state'] },
+    { id: 'layout-workspace-shell', parent: 'layouts', label: 'Workspace shell', icon: 'bi-window-sidebar', keywords: ['sidebar', 'workspace'] },
+    { id: 'layout-dashboard-overview', parent: 'layouts', label: 'Dashboard overview', icon: 'bi-speedometer2', keywords: ['dashboard', 'kpi', 'overview'] },
+    { id: 'layout-list-detail', parent: 'layouts', label: 'List + detail', icon: 'bi-layout-split', keywords: ['list', 'detail', 'master'] },
+    { id: 'layout-implementation-tokens', parent: 'layouts', label: 'Implementation tokens', icon: 'bi-braces-asterisk', keywords: ['token', 'css', 'implementation'] },
 ];
 
 export const colorTokens = [
@@ -27,7 +48,7 @@ export const orders = [
 ];
 
 export const layoutTemplates = [
-    { title: 'Workspace shell', note: 'Sidebar + top navigation + content canvas untuk modul utama.', variant: 'workspace' },
-    { title: 'Dashboard overview', note: 'KPI, insight, lalu detail data untuk keputusan cepat.', variant: 'dashboard' },
-    { title: 'List + detail', note: 'Master list di kiri, konteks dan action di panel detail.', variant: 'detail' },
+    { id: 'layout-workspace-shell', title: 'Workspace shell', note: 'Sidebar + top navigation + content canvas untuk modul utama.', variant: 'workspace' },
+    { id: 'layout-dashboard-overview', title: 'Dashboard overview', note: 'KPI, insight, lalu detail data untuk keputusan cepat.', variant: 'dashboard' },
+    { id: 'layout-list-detail', title: 'List + detail', note: 'Master list di kiri, konteks dan action di panel detail.', variant: 'detail' },
 ];

@@ -47,14 +47,15 @@
     /* ========= GLOBAL SHELL DIMENSIONS ========= */
     --sidebar-width-tablet:210px;
     --sidebar-width-desktop:240px;
-    --app-content-max-width:1100px;
+    --app-content-max-width:1280px;
+    --app-content-gutter:clamp(1rem, 1.6vw, 2rem);
 
     /* Android baseline viewport helper (dipakai layout kamu) */
     --app-vh: 100vh;
     --vv-kbd: 0px;
 
     /* Navbar fixed tetap membutuhkan ruang di flow dokumen. */
-    --app-navbar-offset: 58px;
+    --app-navbar-offset: calc(58px + env(safe-area-inset-top, 0px));
 
     /* Clearance konten dari mobile bottom navigation yang fixed. */
     --mobile-bottom-nav-clearance: calc(70px + env(safe-area-inset-bottom, 0px) + 1rem);
@@ -64,6 +65,25 @@
     --gf-ui-small-size: .7rem;
     --gf-ui-icon-size: .9rem;
     --gf-ui-control-height: 36px;
+
+    /* Fondasi visual bersama untuk halaman baru dan marketplace. */
+    --gf-color-brand:#5b5ce2;
+    --gf-color-brand-strong:#4142bb;
+    --gf-color-accent:#13b8c4;
+    --gf-color-content:#101828;
+    --gf-color-muted:#667085;
+    --gf-color-surface:#ffffff;
+    --gf-color-surface-muted:#f2f4f7;
+    --gf-color-line:#e4e7ec;
+    --gf-color-success:#14945a;
+    --gf-color-warning:#b7791f;
+    --gf-color-danger:#d6455d;
+    --gf-radius-card:16px;
+    --gf-radius-control:10px;
+    --gf-content-max:var(--app-content-max-width);
+    --gf-content-gutter:var(--app-content-gutter);
+    --gf-shadow-sm:0 1px 2px rgba(16,24,40,.04), 0 4px 12px rgba(16,24,40,.04);
+    --gf-shadow-lg:0 24px 56px rgba(48,49,125,.14);
   }
 
   /* ========= THEME RESOLVER ========= */
@@ -86,6 +106,14 @@
 
     --success:var(--success-light);
     --success-soft:var(--success-soft-light);
+
+    --gf-color-content:var(--text-light);
+    --gf-color-muted:var(--muted-light);
+    --gf-color-surface:var(--card-light);
+    --gf-color-surface-muted:var(--card-soft-light);
+    --gf-color-line:var(--line-light);
+    --gf-color-success:var(--success-light);
+    --gf-color-danger:var(--danger-light);
 
     --primary:var(--accent);
     --primary-soft:var(--accent-soft);
@@ -118,6 +146,14 @@
 
     --success:#4ade80;
     --success-soft:#064e3b;
+
+    --gf-color-content:var(--text-dark);
+    --gf-color-muted:var(--muted-dark);
+    --gf-color-surface:var(--card-dark);
+    --gf-color-surface-muted:var(--card-soft-dark);
+    --gf-color-line:var(--line-dark);
+    --gf-color-success:var(--success-dark);
+    --gf-color-danger:var(--danger-dark);
 
     --primary:var(--accent);
     --primary-soft:var(--accent-soft);
@@ -206,11 +242,11 @@
     max-width:var(--app-content-max-width);
     min-width:0;
     margin-inline:auto;
-    padding-inline:1rem;
+    padding-inline:var(--app-content-gutter);
   }
 
   @media (min-width:768px) and (max-width:991.98px){
-    :root{ --app-navbar-offset:62px; }
+    :root{ --app-navbar-offset:calc(62px + env(safe-area-inset-top, 0px)); }
 
     .app-main{
       width:calc(100% - var(--sidebar-width-tablet));
@@ -219,7 +255,7 @@
   }
 
   @media (min-width:992px){
-    :root{ --app-navbar-offset:62px; }
+    :root{ --app-navbar-offset:calc(62px + env(safe-area-inset-top, 0px)); }
 
     .app-main{
       width:calc(100% - var(--sidebar-width-desktop));
@@ -238,13 +274,13 @@
   .card{
     background:var(--card);
     border:1px solid var(--line);
-    border-radius:14px;
-    box-shadow:0 18px 45px rgba(15,23,42,.12),0 1px 0 rgba(15,23,42,.04);
+    border-radius:var(--gf-radius-card);
+    box-shadow:var(--gf-shadow-sm);
     color:var(--text);
   }
 
   .card-header{
-    background:color-mix(in srgb, var(--card) 85%, var(--bg) 15%);
+    background:color-mix(in srgb, var(--gf-color-surface) 86%, var(--gf-color-surface-muted) 14%);
     border-bottom:1px solid var(--line);
     color:var(--text)!important;
   }

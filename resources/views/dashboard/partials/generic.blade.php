@@ -19,7 +19,7 @@
     @endif
 </div>
 
-<div class="dash-empty" style="margin-top:1rem;">
+<div class="dash-empty dash-empty-spaced">
     <i class="bi bi-info-circle"></i>
     Gunakan menu di samping untuk membuka modul yang tersedia untukmu.
 </div>

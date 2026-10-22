@@ -85,15 +85,16 @@
                     </div>
                 </div>
                 <table class="ditem-table">
+                    <caption class="visually-hidden">{{ $title }}</caption>
                     <thead>
                         <tr>
-                            <th class="numeric">No</th>
-                            <th>Kode item internal</th>
-                            <th class="numeric">Permintaan</th>
-                            <th class="numeric ditem-mobile-secondary">Stok FG/RTS</th>
-                            <th class="numeric ditem-mobile-secondary">Stok produksi</th>
-                            <th class="numeric ditem-mobile-secondary">Stok WIP</th>
-                            <th class="numeric">Selisih kurang</th>
+                            <th scope="col" class="numeric">No</th>
+                            <th scope="col">Kode item internal</th>
+                            <th scope="col" class="numeric">Permintaan</th>
+                            <th scope="col" class="numeric ditem-mobile-secondary">Stok FG/RTS</th>
+                            <th scope="col" class="numeric ditem-mobile-secondary">Stok produksi</th>
+                            <th scope="col" class="numeric ditem-mobile-secondary">Stok WIP</th>
+                            <th scope="col" class="numeric">Selisih kurang</th>
                         </tr>
                     </thead>
                     <tbody>

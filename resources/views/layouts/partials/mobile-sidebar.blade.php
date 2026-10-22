@@ -17,6 +17,8 @@
         position: fixed;
         inset: 0;
         background: rgba(15, 23, 42, 0.45);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
         z-index: 1040;
         opacity: 0;
         visibility: hidden;
@@ -35,8 +37,8 @@
         top: 0;
         left: 0;
         bottom: 0;
-        width: 250px;
-        max-width: 84%;
+        width: min(320px, 88vw);
+        max-width: 88vw;
         background: var(--card);
         border-right: 1px solid var(--line);
         box-shadow:
@@ -47,8 +49,9 @@
         transition: transform .22s ease-out;
         display: flex;
         flex-direction: column;
-        padding: .75rem .9rem 1.1rem;
+        padding: max(.75rem, env(safe-area-inset-top, 0px)) 1rem 1.1rem;
         padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+        overscroll-behavior: contain;
         background:
             radial-gradient(circle at 100% 0%, rgba(91, 92, 226, .12), transparent 30%),
             var(--card);
@@ -63,6 +66,7 @@
         align-items: center;
         justify-content: space-between;
         gap: .5rem;
+        min-height: 44px;
         margin-bottom: .6rem;
         padding-bottom: .65rem;
         border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, var(--accent) 20%);
@@ -97,8 +101,8 @@
     .mobile-sidebar-close-btn {
         border-radius: 999px;
         border: 1px solid var(--line);
-        width: 30px;
-        height: 30px;
+        width: 44px;
+        height: 44px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -112,37 +116,11 @@
     .mobile-sidebar-close-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
     .mobile-sidebar-close-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    .mobile-sidebar-workspace {
-        display: flex;
-        align-items: center;
-        gap: .55rem;
-        margin-bottom: .6rem;
-        padding: .58rem .62rem;
-        border: 1px solid color-mix(in srgb, var(--line) 80%, var(--accent) 20%);
-        border-radius: 13px;
-        background: color-mix(in srgb, var(--card) 80%, var(--accent-soft) 20%);
-    }
-
-    .mobile-sidebar-workspace-icon {
-        display: grid;
-        width: 27px;
-        height: 27px;
-        flex: 0 0 27px;
-        place-items: center;
-        border-radius: 9px;
-        color: var(--accent);
-        background: color-mix(in srgb, var(--accent-soft) 75%, var(--card) 25%);
-    }
-
-    .mobile-sidebar-workspace-copy { display: grid; min-width: 0; line-height: 1.1; }
-    .mobile-sidebar-workspace-copy small { color: var(--muted); font-size: .57rem; font-weight: 750; text-transform: uppercase; }
-    .mobile-sidebar-workspace-copy strong { overflow: hidden; margin-top: .17rem; color: var(--text); font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
-
     .mobile-sidebar-search {
         display: flex;
         align-items: center;
         gap: .45rem;
-        min-height: 36px;
+        min-height: 44px;
         margin-bottom: .6rem;
         padding: 0 .62rem;
         border: 1px solid var(--line);
@@ -152,7 +130,7 @@
     }
 
     .mobile-sidebar-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent 85%); }
-    .mobile-sidebar-search input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--text); background: transparent; font-size: .76rem; }
+    .mobile-sidebar-search input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--text); background: transparent; font-size: 16px; }
     .mobile-sidebar-search input::placeholder { color: var(--muted); }
     .mobile-sidebar-panel.is-searching .collapse { display: block !important; }
     .mobile-sidebar-panel .mobile-sidebar-link[hidden] { display: none !important; }
@@ -162,6 +140,8 @@
         flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
         padding-right: .15rem;
     }
 
@@ -184,11 +164,12 @@
         display: flex;
         align-items: center;
         gap: .42rem;
-        padding: .52rem .36rem;
+        min-height: 44px;
+        padding: .62rem .48rem;
         border-radius: 12px;
         text-decoration: none;
         color: var(--text);
-        font-size: .8rem;
+        font-size: .84rem;
         margin-bottom: .15rem;
         transition: background .16s ease, color .16s ease, transform .08s ease;
         position: relative;
@@ -206,6 +187,14 @@
 
     .mobile-sidebar-link:active {
         transform: translateY(1px);
+    }
+
+    .mobile-sidebar-link:focus-visible,
+    .mobile-sidebar-toggle:focus-visible,
+    .mobile-sidebar-nested-toggle:focus-visible,
+    .mobile-sidebar-search input:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
     }
 
     .mobile-sidebar-link.active {
@@ -239,6 +228,15 @@
         color: var(--muted);
         padding-top: .6rem;
         border-top: 1px solid var(--line);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .mobile-sidebar-overlay,
+        .mobile-sidebar-panel,
+        .mobile-sidebar-link,
+        .mobile-sidebar-close-btn {
+            transition: none;
+        }
     }
 
     .mono {
@@ -304,7 +302,8 @@
     .mobile-sidebar-link-sub {
         position: relative;
         font-size: .75rem;
-        padding: .4rem .38rem .4rem 2.05rem;
+        min-height: 40px;
+        padding: .5rem .38rem .5rem 2.05rem;
         margin-bottom: .1rem;
     }
 
@@ -822,15 +821,10 @@
 <div id="mobileSidebarOverlay" class="mobile-sidebar-overlay"></div>
 
 {{-- PANEL --}}
-<aside id="mobileSidebarPanel" class="mobile-sidebar-panel" aria-labelledby="mobileSidebarTitle">
+<aside id="mobileSidebarPanel" class="mobile-sidebar-panel" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="mobileSidebarTitle">
     <div class="mobile-sidebar-header">
         <div class="mobile-sidebar-title" id="mobileSidebarTitle">{{ config('app.name', 'GFID') }}</div>
         <button type="button" class="mobile-sidebar-close-btn" id="mobileSidebarCloseBtn" aria-label="Tutup menu">✕</button>
-    </div>
-
-    <div class="mobile-sidebar-workspace" aria-label="Workspace aktif">
-        <span class="mobile-sidebar-workspace-icon" aria-hidden="true"><i class="bi bi-buildings"></i></span>
-        <span class="mobile-sidebar-workspace-copy"><small>Workspace</small><strong>Greatfit HQ</strong></span>
     </div>
 
     <label class="mobile-sidebar-search" for="mobile-sidebar-menu-search">
@@ -848,7 +842,6 @@
                 @if ($isOperatorRole)
 
                     @if ($hasDashboardRoute)
-                        <div class="mobile-sidebar-section-label">Dashboard</div>
                         <li>
                             <a href="{{ route('dashboard') }}"
                                class="mobile-sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
@@ -902,7 +895,6 @@
                 @elseif ($isAdmin || $isOperating)
 
                     @if ($hasDashboardRoute)
-                        <div class="mobile-sidebar-section-label">Dashboard</div>
                         <li>
                             <a href="{{ route('dashboard') }}"
                                class="mobile-sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
@@ -1623,7 +1615,6 @@
 
                     {{-- DASHBOARD --}}
                     @if ($hasDashboardRoute)
-                        <div class="mobile-sidebar-section-label">Dashboard</div>
                         <li>
                             <a href="{{ route('dashboard') }}"
                                class="mobile-sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
@@ -2900,20 +2891,31 @@ document.addEventListener('DOMContentLoaded', function() {
     const overlay = document.getElementById('mobileSidebarOverlay');
     const links = sidebar ? sidebar.querySelectorAll('.mobile-sidebar-link[href]') : [];
     const search = document.getElementById('mobile-sidebar-menu-search');
+    const focusableSelector = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    let lastFocusedElement = null;
 
     if (!toggleBtn || !sidebar || !overlay) return;
 
     function openSidebar() {
+        lastFocusedElement = document.activeElement;
         sidebar.classList.add('is-open');
         overlay.classList.add('is-open');
+        sidebar.setAttribute('aria-hidden', 'false');
+        toggleBtn.setAttribute('aria-expanded', 'true');
         document.body.dataset.prevOverflow = document.body.style.overflow || '';
         document.body.style.overflow = 'hidden';
+        window.requestAnimationFrame(() => search?.focus());
     }
 
     function closeSidebar() {
         sidebar.classList.remove('is-open');
         overlay.classList.remove('is-open');
+        sidebar.setAttribute('aria-hidden', 'true');
+        toggleBtn.setAttribute('aria-expanded', 'false');
         document.body.style.overflow = document.body.dataset.prevOverflow || '';
+        if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+            lastFocusedElement.focus();
+        }
     }
 
     toggleBtn.addEventListener('click', function() {
@@ -2942,6 +2944,24 @@ document.addEventListener('DOMContentLoaded', function() {
             search.value = '';
             search.dispatchEvent(new Event('input'));
             search.blur();
+        }
+    });
+
+    sidebar.addEventListener('keydown', function (event) {
+        if (event.key !== 'Tab' || !sidebar.classList.contains('is-open')) return;
+
+        const focusable = Array.from(sidebar.querySelectorAll(focusableSelector))
+            .filter((element) => element.offsetParent !== null);
+        if (!focusable.length) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
         }
     });
 

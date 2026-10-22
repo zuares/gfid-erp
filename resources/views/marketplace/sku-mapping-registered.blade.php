@@ -32,9 +32,11 @@
     <x-gf.panel title="Mapping Terdaftar" subtitle="Seluruh mapping SKU marketplace → item internal.">
         <x-slot:actions>
             <div class="d-flex flex-wrap gap-2 justify-content-end">
+                <label class="visually-hidden" for="mappingSearch">Cari SKU atau item</label>
                 <input type="text" id="mappingSearch" placeholder="Cari SKU atau item…"
                     style="border-radius:999px;font-size:.75rem;padding:.3rem .85rem;border:1px solid rgba(15,23,42,.1);background:#fff;min-width:200px"
                     oninput="filterMappings(this.value)">
+                <label class="visually-hidden" for="mappingChannelFilter">Filter channel</label>
                 <select id="mappingChannelFilter" class="form-select form-select-sm"
                     style="border-radius:999px;font-size:.75rem;width:auto;min-width:130px"
                     onchange="applyMappingFilters()">
@@ -45,6 +47,7 @@
                     <option value="tokopedia">Tokopedia</option>
                     <option value="lazada">Lazada</option>
                 </select>
+                <label class="visually-hidden" for="mappingStockFilter">Filter stok</label>
                 <select id="mappingStockFilter" class="form-select form-select-sm"
                     style="border-radius:999px;font-size:.75rem;width:auto;min-width:125px"
                     onchange="applyMappingFilters()">

@@ -69,10 +69,6 @@
 /* ─────────────────────────────────────────────────────────────────────────────
    MODERN DASHBOARD UI UPGRADE (Rich Aesthetics, Glassmorphism, Micro-animations)
 ───────────────────────────────────────────────────────────────────────────── */
-body {
-    font-family: 'Inter', sans-serif !important;
-}
-
 .compare-mode-tabs {
     display: inline-flex;
     gap: .2rem;
@@ -1001,7 +997,7 @@ body[data-theme="dark"] .dpanel-table thead th { color: #9ca3af; }
     border-radius: 10px !important;
     border: 1px solid var(--dsh-border) !important;
     box-shadow: 0 10px 30px rgba(15,23,42,.14) !important;
-    font-family: 'Inter', sans-serif !important;
+    font-family: inherit;
     overflow: hidden;
 }
 .ads-fp .flatpickr-months { padding: .25rem 0; }
@@ -1057,7 +1053,7 @@ body[data-theme="dark"] .ads-fp-chip { color: #9ca3af; }
 
 /* Final UI pass: flat header + cleaner tabs, aligned with shipments/income */
 .ads-shell{
-    max-width:1040px; /* Selaras dengan shipments */
+    max-width:var(--gf-content-max,1280px);
     width:100%;
     min-width:0;
     box-sizing:border-box;

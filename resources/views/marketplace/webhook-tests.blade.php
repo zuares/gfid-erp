@@ -13,7 +13,7 @@
         --shp-muted:#64748b;
     }
     
-    .page-wrap{ max-width:1040px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
+    .page-wrap{ max-width:var(--gf-content-max,1280px); margin-inline:auto; padding:.75rem var(--gf-content-gutter,.75rem) 4rem; background:transparent!important; }
     
     .card-main{
         background: var(--card);

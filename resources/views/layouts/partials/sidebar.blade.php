@@ -546,7 +546,7 @@
             left: 0;
             width: 210px;
             height: 100vh;
-            padding: .8rem .65rem 1.4rem;
+            padding: 0 .65rem 1.4rem;
             display: flex;
             flex-direction: column;
             gap: .75rem;
@@ -554,7 +554,7 @@
             backdrop-filter: blur(14px);
             border-right: 1px solid rgba(148, 163, 184, .35);
             box-shadow: 8px 0 24px rgba(15,23,42,.05), 2px 0 8px rgba(15,23,42,.03);
-            border-radius: 0 18px 18px 0;
+            border-radius: 0 0 18px 0;
             z-index: 1030;
             overflow-y: auto;
             overflow-x: hidden;
@@ -567,8 +567,9 @@
         /* Kecilkan font dan padding sedikit agar tetap proporsional */
         .sidebar-modern .sidebar-brand {
             font-size: 1rem;
-            padding: .55rem .2rem .75rem;
+            padding: .7rem .2rem .75rem;
             gap: .5rem;
+            min-height: 62px;
         }
         .sidebar-modern .sidebar-brand .role-pill {
             font-size: .62rem;
@@ -581,7 +582,8 @@
         .sidebar-modern .sidebar-link,
         .sidebar-modern .sidebar-toggle {
             font-size: .74rem;
-            padding: .42rem .58rem;
+            min-height: 40px;
+            padding: .5rem .58rem;
             gap: .32rem;
         }
         .sidebar-modern .sidebar-link .icon,
@@ -591,7 +593,8 @@
         }
         .sidebar-modern .sidebar-link-sub {
             font-size: .7rem;
-            padding: .31rem .56rem .31rem 1.4rem;
+            min-height: 36px;
+            padding: .4rem .56rem .4rem 1.4rem;
         }
         .sidebar-modern .sidebar-link-sub .icon {
             width: 14px;
@@ -603,9 +606,9 @@
     @media (min-width: 992px) {
         .sidebar-modern {
             width: 240px;
-            padding: 1rem 1rem 1.6rem;
+            padding: 0 1rem 1.6rem;
             gap: 1rem;
-            border-radius: 0 22px 22px 0;
+            border-radius: 0 0 22px 0;
         }
 
         .app-main { margin-left: 240px; }
@@ -613,8 +616,9 @@
         /* Kembalikan ukuran font/padding ke default */
         .sidebar-modern .sidebar-brand {
             font-size: 1.15rem;
-            padding: .7rem .35rem .9rem;
+            padding: .7rem .35rem .75rem;
             gap: .75rem;
+            min-height: 62px;
         }
         .sidebar-modern .sidebar-brand .role-pill {
             font-size: .7rem;
@@ -627,7 +631,8 @@
         .sidebar-modern .sidebar-link,
         .sidebar-modern .sidebar-toggle {
             font-size: .82rem;
-            padding: .47rem .72rem;
+            min-height: 42px;
+            padding: .52rem .72rem;
             gap: .44rem;
         }
         .sidebar-modern .sidebar-link .icon,
@@ -637,7 +642,8 @@
         }
         .sidebar-modern .sidebar-link-sub {
             font-size: .76rem;
-            padding: .34rem .72rem .34rem 2rem;
+            min-height: 36px;
+            padding: .4rem .72rem .4rem 2rem;
         }
         .sidebar-modern .sidebar-link-sub .icon {
             width: 18px;
@@ -839,8 +845,8 @@
     }
 
     .sidebar-brand {
-        min-height: 53px;
-        padding: .55rem .25rem .65rem;
+        min-height: 62px;
+        padding: .7rem .25rem .75rem;
         margin: .1rem .1rem 0;
         border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent 28%);
     }
@@ -903,66 +909,13 @@
         box-shadow: inset 0 0 0 1px rgba(96, 165, 250, .22);
     }
 
-    .sidebar-workspace-card {
-        display: flex;
-        align-items: center;
-        gap: .55rem;
-        margin: .1rem .1rem .35rem;
-        padding: .58rem .6rem;
-        border: 1px solid color-mix(in srgb, var(--line) 80%, var(--sidebar-brand) 20%);
-        border-radius: 13px;
-        background: color-mix(in srgb, var(--card) 78%, var(--accent-soft) 22%);
-    }
-
-    .sidebar-workspace-icon {
-        display: grid;
-        width: 27px;
-        height: 27px;
-        flex: 0 0 27px;
-        place-items: center;
-        border-radius: 9px;
-        color: var(--sidebar-brand-strong);
-        background: color-mix(in srgb, var(--accent-soft) 78%, var(--card) 22%);
-        font-size: .72rem;
-    }
-
-    .sidebar-workspace-copy {
-        display: grid;
-        min-width: 0;
-        line-height: 1.1;
-    }
-
-    .sidebar-workspace-copy small {
-        color: var(--muted);
-        font-size: .57rem;
-        font-weight: 750;
-        letter-spacing: .04em;
-        text-transform: uppercase;
-    }
-
-    .sidebar-workspace-copy strong {
-        overflow: hidden;
-        margin-top: .18rem;
-        color: var(--text);
-        font-size: .7rem;
-        font-weight: 800;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .sidebar-workspace-card > .bi-chevron-down {
-        margin-left: auto;
-        color: var(--muted);
-        font-size: .65rem;
-    }
-
     .sidebar-menu-search {
         position: relative;
         display: flex;
         align-items: center;
         gap: .45rem;
         margin: .05rem .1rem .15rem;
-        min-height: 34px;
+        min-height: 40px;
         padding: 0 .58rem;
         border: 1px solid color-mix(in srgb, var(--line) 82%, var(--sidebar-brand) 18%);
         border-radius: 10px;
@@ -1026,7 +979,7 @@
     }
 
     .sidebar-link {
-        min-height: 36px;
+        min-height: 40px;
         border: 1px solid transparent;
         font-size: .78rem;
         font-weight: 650;
@@ -1051,7 +1004,7 @@
     .sidebar-toggle.is-open .icon { color: var(--sidebar-brand); }
 
     .sidebar-link-sub {
-        min-height: 30px;
+        min-height: 36px;
         font-size: .71rem;
         color: color-mix(in srgb, var(--text) 84%, var(--muted) 16%);
     }
@@ -1067,8 +1020,7 @@
     }
 
     @media (min-width: 768px) and (max-width: 991.98px) {
-        .sidebar-workspace-card { padding-inline: .45rem; }
-        .sidebar-workspace-copy strong { font-size: .65rem; }
+        .sidebar-menu-search { margin-top: .35rem; }
     }
 </style>
 
@@ -1086,15 +1038,6 @@
         @endif
     </div>
 
-    <div class="sidebar-workspace-card" aria-label="Workspace aktif">
-        <span class="sidebar-workspace-icon" aria-hidden="true"><i class="bi bi-buildings"></i></span>
-        <span class="sidebar-workspace-copy">
-            <small>Workspace</small>
-            <strong>Greatfit HQ</strong>
-        </span>
-        <i class="bi bi-chevron-down" aria-hidden="true"></i>
-    </div>
-
     <label class="sidebar-menu-search" for="sidebar-menu-search">
         <i class="bi bi-search" aria-hidden="true"></i>
         <input id="sidebar-menu-search" type="search" placeholder="Cari menu..." autocomplete="off" spellcheck="false" aria-label="Cari menu sidebar">
@@ -1105,14 +1048,12 @@
 
         {{-- DASHBOARD --}}
         @if ($hasDashboardRoute)
-            <x-sidebar.label text="Dashboard" />
             <li>
                 <x-sidebar.simple-link href="{{ route('dashboard') }}" icon="bi bi-house" :active="request()->routeIs('dashboard')">
                     Beranda
                 </x-sidebar.simple-link>
             </li>
             @if ($isAdmin && $hasMasterItemsIndex)
-                <x-sidebar.label text="Master" />
                 <li>
                     <x-sidebar.simple-link href="{{ route('master.items.index') }}" icon="bi bi-box-seam"
                         :active="request()->routeIs('master.items.*')">

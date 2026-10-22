@@ -17,18 +17,19 @@
         @if(!empty($rows))
             <div class="drepeat-table-wrap">
                 <table class="drepeat-table">
+                    <caption class="visually-hidden">{{ $title }}</caption>
                     <thead>
                         <tr>
-                            <th class="numeric">No</th>
-                            <th>Username</th>
-                            <th>Order hari ini</th>
-                            <th>SKU hari ini</th>
-                            <th class="numeric">Qty hari ini</th>
-                            <th>Pesanan terakhir</th>
-                            <th class="drepeat-mobile-secondary">SKU terakhir</th>
-                            <th class="numeric drepeat-mobile-secondary">Qty terakhir</th>
-                            <th class="drepeat-mobile-secondary">Terakhir beli</th>
-                            <th>Status</th>
+                            <th scope="col" class="numeric">No</th>
+                            <th scope="col">Username</th>
+                            <th scope="col">Order hari ini</th>
+                            <th scope="col">SKU hari ini</th>
+                            <th scope="col" class="numeric">Qty hari ini</th>
+                            <th scope="col">Pesanan terakhir</th>
+                            <th scope="col" class="drepeat-mobile-secondary">SKU terakhir</th>
+                            <th scope="col" class="numeric drepeat-mobile-secondary">Qty terakhir</th>
+                            <th scope="col" class="drepeat-mobile-secondary">Terakhir beli</th>
+                            <th scope="col">Status</th>
                         </tr>
                     </thead>
                     <tbody>

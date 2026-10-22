@@ -359,16 +359,16 @@
     </div>
 
     <div class="settlement-tabs" role="tablist" aria-label="Tabs settlement">
-        <button type="button" id="settlementTabDataBtn" class="settlement-tab-btn active" onclick="switchSettlementTab('data')">
+        <button type="button" id="settlementTabDataBtn" class="settlement-tab-btn active" role="tab" aria-selected="true" aria-controls="settlementTabData" onclick="switchSettlementTab('data')">
             <i class="bi bi-receipt"></i> Settlement
         </button>
-        <button type="button" id="settlementTabSyncBtn" class="settlement-tab-btn" onclick="switchSettlementTab('sync')">
+        <button type="button" id="settlementTabSyncBtn" class="settlement-tab-btn" role="tab" aria-selected="false" aria-controls="settlementTabSync" tabindex="-1" onclick="switchSettlementTab('sync')">
             <i class="bi bi-arrow-repeat"></i> Sync
             <span id="settlementSyncDot" style="display:none; width:8px; height:8px; border-radius:50%; background:#3b82f6; margin-left:2px;"></span>
         </button>
     </div>
 
-    <div id="settlementTabData">
+    <div id="settlementTabData" role="tabpanel" aria-labelledby="settlementTabDataBtn" tabindex="0">
         <div class="card-main mb-3">
             <div style="padding:.75rem; background:rgba(148,163,184,.03);">
                 <div class="controls" style="flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; gap: .4rem;">
@@ -466,7 +466,7 @@
         </div>
     </div>
 
-    <div id="settlementTabSync" style="display:none;">
+    <div id="settlementTabSync" role="tabpanel" aria-labelledby="settlementTabSyncBtn" tabindex="0" aria-hidden="true" style="display:none;">
         <div class="card-main settlement-sync-shell mb-3">
             <div class="settlement-sync-header">
                 <div>
@@ -1292,6 +1292,12 @@
         const isSync = activeTab === 'sync';
         $('settlementTabData').style.display = isSync ? 'none' : '';
         $('settlementTabSync').style.display = isSync ? '' : 'none';
+        $('settlementTabData').setAttribute('aria-hidden', String(isSync));
+        $('settlementTabSync').setAttribute('aria-hidden', String(!isSync));
+        $('settlementTabDataBtn').setAttribute('aria-selected', String(!isSync));
+        $('settlementTabSyncBtn').setAttribute('aria-selected', String(isSync));
+        $('settlementTabDataBtn').tabIndex = isSync ? -1 : 0;
+        $('settlementTabSyncBtn').tabIndex = isSync ? 0 : -1;
         $('settlementTabDataBtn').classList.toggle('active', !isSync);
         $('settlementTabSyncBtn').classList.toggle('active', isSync);
 

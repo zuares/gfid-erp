@@ -12,9 +12,12 @@
     $variant = $variant ?? '';
     $featured = $featured ?? false;
 @endphp
-<{{ $tag }} class="kpi {{ $color }} {{ $variant }} {{ $featured ? 'kpi-featured' : '' }}" @if(!empty($url)) href="{{ $url }}" @endif>
-    <span class="kpi-label"><span class="ico"><i class="bi {{ $icon ?? 'bi-dot' }}"></i></span> {{ $label }}</span>
-    <div class="kpi-value {{ $small ? 'sm' : '' }}">{{ $value }}</div>
+<{{ $tag }} class="kpi {{ $color }} {{ $variant }} {{ $featured ? 'kpi-featured' : '' }}" @if(!empty($url)) href="{{ $url }}" @endif @if(!empty($url)) aria-label="{{ $label }}: {{ strip_tags((string) $value) }}" @endif>
+    <span class="kpi-label">
+        <span class="ico" aria-hidden="true"><i class="bi {{ $icon ?? 'bi-dot' }}"></i></span>
+        <span class="kpi-label-text">{{ $label }}</span>
+    </span>
+    <strong class="kpi-value {{ $small ? 'sm' : '' }}">{{ $value }}</strong>
     @if(!empty($sub))
         <div class="kpi-sub">{{ $sub }}</div>
     @endif
@@ -22,9 +25,9 @@
         <div class="kpi-comparisons">
             @foreach($comparisons as $comparison)
                 <span class="kpi-compare {{ $comparison['tone'] ?? 'muted' }}">
-                    <span>{{ $comparison['label'] }}</span>
+                    <span>{{ $comparison['label'] ?? 'Pembanding' }}</span>
                     <strong>
-                        {{ $comparison['value'] }}
+                        {{ $comparison['value'] ?? '—' }}
                         @if(!empty($comparison['delta']))
                             <small class="kpi-compare-delta {{ $comparison['delta_tone'] ?? 'muted' }}">{{ $comparison['delta'] }}</small>
                         @endif

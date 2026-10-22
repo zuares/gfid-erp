@@ -21,7 +21,7 @@
 
 @push('head')
 <style>
-    .mp-finance-page { max-width:1040px; margin-inline:auto; padding:.75rem .75rem 4rem; }
+    .mp-finance-page { max-width:var(--gf-content-max,1280px); margin-inline:auto; padding:.75rem var(--gf-content-gutter,.75rem) 4rem; }
     .mp-finance-page .card { border-radius:8px; border-color:rgba(148,163,184,.18); box-shadow:none!important; }
     .mp-finance-page .mp-finance-hero { background:var(--card,#fff); border:1px solid rgba(148,163,184,.18); padding:.45rem .75rem; border-radius:8px; }
     .mp-finance-page .mp-eyebrow { text-transform:none; letter-spacing:0; font-size:.72rem; font-weight:650; color:#64748b; }

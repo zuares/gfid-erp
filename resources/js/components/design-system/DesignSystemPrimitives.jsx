@@ -10,9 +10,9 @@ export function SectionHeader({ id, title, description, count }) {
     );
 }
 
-export function Panel({ title, meta, children, className = '' }) {
+export function Panel({ id, title, meta, children, className = '' }) {
     return (
-        <article className={`ds-panel ${className}`.trim()}>
+        <article id={id} className={`ds-panel ${className}`.trim()}>
             {(title || meta) && (
                 <div className="ds-panel-title">
                     <h3>{title}</h3>
@@ -20,6 +20,42 @@ export function Panel({ title, meta, children, className = '' }) {
                 </div>
             )}
             {children}
+        </article>
+    );
+}
+
+export function ComparisonKpi({ title, value, description, comparisons = [] }) {
+    return (
+        <article className="ds-comparison-kpi" aria-label={title}>
+            <div className="ds-comparison-kpi-main">
+                <div>
+                    <span className="ds-comparison-kpi-label">{title}</span>
+                    <strong>{value}</strong>
+                    <span className="ds-comparison-kpi-description">{description}</span>
+                </div>
+                <span className="ds-comparison-kpi-icon" aria-hidden="true"><i className="bi bi-graph-up-arrow" /></span>
+            </div>
+            <div className="ds-comparison-kpi-comparisons" aria-label="Perbandingan periode">
+                {comparisons.map((comparison) => {
+                    const direction = comparison.direction || 'up';
+                    const icon = direction === 'down' ? 'bi-arrow-down-right' : direction === 'neutral' ? 'bi-dash' : 'bi-arrow-up-right';
+
+                    return (
+                        <div className="ds-comparison-kpi-row" key={`${comparison.label}-${comparison.period}`}>
+                            <div>
+                                <span>{comparison.label}</span>
+                                <small>{comparison.period}</small>
+                            </div>
+                            <div className="ds-comparison-kpi-result">
+                                <strong>{comparison.value}</strong>
+                                <span className={`ds-comparison-kpi-change is-${direction}`}>
+                                    <i className={`bi ${icon}`} aria-hidden="true" /> {comparison.change}
+                                </span>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
         </article>
     );
 }

@@ -45,14 +45,17 @@
                     style="border-radius:999px;font-size:.75rem"
                     title="Cocokkan SKU marketplace dengan kode item internal yang sama"
                     onclick="runUnmappedAutoMap()">⚡ Mapping Otomatis</button>
+                <label class="visually-hidden" for="unmappedSearch">Cari SKU atau nama item</label>
                 <input type="text" id="unmappedSearch" placeholder="Cari SKU atau nama item…"
                     style="border-radius:999px;font-size:.75rem;padding:.3rem .85rem;border:1px solid rgba(15,23,42,.1);background:#fff;min-width:210px"
                     oninput="filterUnmapped(this.value)">
+                <label class="visually-hidden" for="unmappedStoreFilter">Filter toko</label>
                 <select id="unmappedStoreFilter" class="form-select form-select-sm"
                     style="border-radius:999px;font-size:.75rem;width:auto;min-width:170px"
                     onchange="applyUnmappedFilters()">
                     <option value="">Semua Toko</option>
                 </select>
+                <label class="visually-hidden" for="unmappedChannelFilter">Filter channel</label>
                 <select id="unmappedChannelFilter" class="form-select form-select-sm"
                     style="border-radius:999px;font-size:.75rem;width:auto;min-width:135px"
                     onchange="applyUnmappedFilters()">
@@ -62,6 +65,7 @@
                     <option value="tokopedia">Tokopedia</option>
                     <option value="lazada">Lazada</option>
                 </select>
+                <label class="visually-hidden" for="unmappedDateRange">Rentang tanggal order</label>
                 <input type="text" id="unmappedDateRange" class="form-control form-control-sm"
                     placeholder="Rentang tanggal" autocomplete="off"
                     aria-label="Rentang tanggal order" title="Rentang tanggal order"

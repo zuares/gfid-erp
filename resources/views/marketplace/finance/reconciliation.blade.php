@@ -23,11 +23,11 @@
         ];
     @endphp
 
-    <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+    <div class="finance-view-header d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
         <div>
             <div class="finance-eyebrow mb-1">Audit finance</div>
-            <h2 class="h4 mb-1">Rekonsiliasi transaksi</h2>
-            <div class="finance-caption">Periksa status order, escrow, fee, settlement, dan jurnal dalam satu tampilan.</div>
+            <h2 class="finance-page-title h4 mb-1">Rekonsiliasi transaksi</h2>
+            <div class="finance-page-subtitle finance-caption">Periksa status order, escrow, fee, settlement, dan jurnal dalam satu tampilan.</div>
         </div>
         <div class="text-md-end">
             <div class="finance-section-meta">Transaksi terfilter</div>

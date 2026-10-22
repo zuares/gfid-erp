@@ -57,7 +57,7 @@
 <div class="dash-sec"><i class="bi bi-lightning-charge"></i> Aksi Cepat</div>
 <div class="dash-actions">
     @if($u = $r('inventory.warehouse_intelligence'))
-        <a class="act" href="{{ $u }}"><span class="ico indigo" style="color: #4f46e5; background: #e0e7ff;"><i class="bi bi-cpu"></i></span><span class="t">Stok Gudang<small>Prioritas packing & jahit</small></span></a>
+        <a class="act" href="{{ $u }}"><span class="ico indigo"><i class="bi bi-cpu" aria-hidden="true"></i></span><span class="t">Stok Gudang<small>Prioritas packing & jahit</small></span></a>
     @endif
 
     @if($u = $r('production.dashboard'))

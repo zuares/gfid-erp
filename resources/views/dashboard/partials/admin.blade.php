@@ -4,12 +4,15 @@
     $qty = fn ($n) => number_format((float) $n, 0, ',', '.');
 @endphp
 
-<div class="dash-panels">
-    @include('dashboard.partials._list_repeat_orders', ['title' => 'Repeat order pesanan hari ini', 'rows' => $d['repeat_orders'] ?? [], 'link' => $r('marketplace.orders')])
-</div>
-<div class="dash-panels">
-    @include('dashboard.partials._list_order_items', ['title' => 'Permintaan belum dikirim per item internal', 'rows' => $d['list_todo_items'] ?? [], 'link' => $r('marketplace.orders')])
-</div>
+<section class="dash-priority-stack" aria-labelledby="dash-priority-title">
+    <h2 id="dash-priority-title" class="visually-hidden">Prioritas kerja hari ini</h2>
+    <div class="dash-panels">
+        @include('dashboard.partials._list_repeat_orders', ['title' => 'Repeat order pesanan hari ini', 'rows' => $d['repeat_orders'] ?? [], 'link' => $r('marketplace.orders')])
+    </div>
+    <div class="dash-panels">
+        @include('dashboard.partials._list_order_items', ['title' => 'Permintaan belum dikirim per item internal', 'rows' => $d['list_todo_items'] ?? [], 'link' => $r('marketplace.orders')])
+    </div>
+</section>
 
 {{-- ================= PESANAN HARI INI ================= --}}
 <div class="dash-sec"><i class="bi bi-bag-check"></i> Pesanan & Penjualan</div>
@@ -72,7 +75,7 @@
 <div class="dash-sec"><i class="bi bi-lightning-charge"></i> Aksi Cepat</div>
 <div class="dash-actions">
     @if($u = $r('inventory.warehouse_intelligence'))
-        <a class="act" href="{{ $u }}"><span class="ico indigo" style="color: #4f46e5; background: #e0e7ff;"><i class="bi bi-cpu"></i></span><span class="t">Stok Gudang<small>Rekomendasi stok RTS</small></span></a>
+        <a class="act" href="{{ $u }}"><span class="ico indigo"><i class="bi bi-cpu" aria-hidden="true"></i></span><span class="t">Stok Gudang<small>Rekomendasi stok RTS</small></span></a>
     @endif
 
     @if($u = $r('marketplace.orders'))

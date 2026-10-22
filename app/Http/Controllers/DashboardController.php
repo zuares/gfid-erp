@@ -147,6 +147,8 @@ class DashboardController extends Controller
             'greeting'  => $this->greeting(),
             'userName'  => $user?->name ?? 'User',
             'today'     => Carbon::now()->translatedFormat('l, d F Y'),
+            'activeAnomaliesCount' => $this->activeInventoryAuditFindingCount(),
+            'canRunInventoryAudit' => $user && method_exists($user, 'isOwner') && $user->isOwner(),
             'd'         => $data,
         ]);
     }
@@ -327,7 +329,7 @@ class DashboardController extends Controller
 
     private function adminData(): array
     {
-        $cacheKey = 'dashboard.admin.v12.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.admin.v13.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->adminDataUncached());
     }
@@ -375,6 +377,21 @@ class DashboardController extends Controller
     // =====================================================================
     //  HELPER QUERY (defensif)
     // =====================================================================
+
+    /** Jumlah temuan audit aktif untuk indikator dashboard, tanpa query dari Blade. */
+    private function activeInventoryAuditFindingCount(): int
+    {
+        return (int) $this->safe(
+            fn () => Cache::store('file')->remember(
+                'dashboard.inventory_audit.active.v1',
+                now()->addSeconds(30),
+                fn () => Schema::hasTable('inventory_audit_findings')
+                    ? DB::table('inventory_audit_findings')->whereNull('resolved_at')->count()
+                    : 0,
+            ),
+            0,
+        );
+    }
 
     /** Jalankan closure query, kembalikan fallback bila gagal / tabel tak ada. */
     private function safe(callable $fn, $fallback = 0)

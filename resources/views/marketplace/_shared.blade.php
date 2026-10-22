@@ -3,23 +3,23 @@
     @include('production.dashboard.partials._gf-styles')
     <style>
         :root{
-            --shp-accent:#334155;
-            --shp-accent-2:#1f2937;
-            --shp-border:rgba(148,163,184,.18);
-            --shp-border-strong:rgba(148,163,184,.30);
-            --shp-muted:#64748b;
-            --shp-text:#0f172a;
+            --shp-accent:var(--gf-color-brand,#5b5ce2);
+            --shp-accent-2:var(--gf-color-brand-strong,#4142bb);
+            --shp-border:var(--gf-color-line,#e4e7ec);
+            --shp-border-strong:color-mix(in srgb, var(--gf-color-brand,#5b5ce2) 30%, transparent);
+            --shp-muted:var(--gf-color-muted,#667085);
+            --shp-text:var(--gf-color-content,#101828);
         }
         body[data-theme="dark"] {
             --shp-text:#f8fafc;
         }
-        .page-wrap{ max-width:1040px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
+        .page-wrap{ max-width:var(--gf-content-max,1280px); margin-inline:auto; padding:.75rem var(--gf-content-gutter,.75rem) 4rem; background:transparent!important; }
 
         .card-main{
             background: var(--card);
-            border-radius: 8px;
+            border-radius: var(--gf-radius-card,16px);
             border: 1px solid var(--shp-border);
-            box-shadow: none;
+            box-shadow: var(--gf-shadow-sm,0 1px 2px rgba(16,24,40,.04));
             overflow:hidden;
         }
         body[data-theme="dark"] .card-main{
@@ -227,7 +227,11 @@ window.mpHelpers = (function () {
         return new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
     }
     function fmtRp(v) {
-        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(v || 0);
+        if (v === null || v === undefined || v === '') return '—';
+        const amount = Number(v);
+        return Number.isFinite(amount)
+            ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount)
+            : '—';
     }
     function esc(s) { const d = document.createElement('div'); d.innerText = s ?? ''; return d.innerHTML; }
 

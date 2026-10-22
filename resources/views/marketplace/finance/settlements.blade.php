@@ -2,11 +2,11 @@
 
 @section('finance-content')
     @php $money = fn ($value): string => number_format((float) $value, 2, ',', '.'); @endphp
-    <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+    <div class="finance-view-header d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
         <div>
             <div class="finance-eyebrow mb-1">Payout marketplace</div>
-            <h2 class="h4 mb-1">Settlements</h2>
-            <div class="finance-caption">Daftar payout yang masuk dari marketplace dan status posting jurnalnya.</div>
+            <h2 class="finance-page-title h4 mb-1">Settlements</h2>
+            <div class="finance-page-subtitle finance-caption">Daftar payout yang masuk dari marketplace dan status posting jurnalnya.</div>
         </div>
         <span class="badge rounded-pill text-bg-light border px-3 py-2">{{ number_format($rows->total()) }} settlement</span>
     </div>
@@ -40,7 +40,7 @@
             </table>
         </div>
         @if ($rows->hasPages())
-            <div class="card-footer bg-white d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="finance-pagination card-footer bg-white">
                 <span class="text-muted small">Menampilkan {{ number_format($rows->firstItem() ?? 0) }}–{{ number_format($rows->lastItem() ?? 0) }} dari {{ number_format($rows->total()) }} settlement</span>
                 {{ $rows->onEachSide(1)->links() }}
             </div>

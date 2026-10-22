@@ -209,8 +209,7 @@
     @media (max-width: 420px) { .an-kpis { grid-template-columns:1fr 1fr; gap:.45rem; } .an-kpi { padding:.72rem; min-height:100px; } .an-toolbar, .an-toolbar-controls { align-items:stretch; } .an-field, .an-field input, .an-btn { width:100%; } }
 
     /* Selaras dengan Ads Dashboard: header flat, panel rapat, dan KPI beraksen. */
-    body { font-family:'Inter', sans-serif !important; }
-    .an-page { max-width:1040px; width:100%; min-width:0; margin-inline:auto; padding-inline:.75rem; }
+    .an-page { max-width:var(--gf-content-max,1280px); width:100%; min-width:0; margin-inline:auto; padding-inline:var(--gf-content-gutter,.75rem); }
     .an-shell { gap:.85rem; }
     .an-hero { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-inline:-.75rem; padding:.4rem .7rem; border-bottom:1px solid var(--dsh-border); background:var(--card,#fff); }
     .an-hero-copy { min-width:0; }

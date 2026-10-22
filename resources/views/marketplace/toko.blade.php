@@ -12,11 +12,11 @@
         --shp-border-strong:rgba(148,163,184,.30);
         --shp-muted:#64748b;
     }
-    .page-wrap{ max-width:1040px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
+    .page-wrap{ max-width:var(--gf-content-max,1280px); margin-inline:auto; padding:.75rem var(--gf-content-gutter,.75rem) 4rem; background:transparent!important; }
 
     .card-main{
         background: var(--card, #fff);
-        border-radius: 8px;
+        border-radius: var(--gf-radius-card,16px);
         border: 1px solid var(--shp-border);
         box-shadow: none;
         margin-bottom: 1.5rem;

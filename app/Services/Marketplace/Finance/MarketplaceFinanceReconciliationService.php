@@ -19,6 +19,12 @@ class MarketplaceFinanceReconciliationService
     private const PAGE_SIZES = [10, 25, 50];
 
     /**
+     * Keep reconciliation bounded while reducing the number of eager-load
+     * round trips for overview and summary requests.
+     */
+    private const RECONCILIATION_CHUNK_SIZE = 250;
+
+    /**
      * Read-only reconciliation over the bounded finance submodule.
      *
      * @return array{filters:array,summary:array,transactions:array<int,array>,settlements:array<int,array>}
@@ -335,7 +341,7 @@ class MarketplaceFinanceReconciliationService
 
     private function eachTransactionResult(array $filters, callable $callback): void
     {
-        $this->transactionQuery($filters)->reorder('id')->chunkById(100, function (Collection $transactions) use ($callback): void {
+        $this->transactionQuery($filters)->reorder('id')->chunkById(self::RECONCILIATION_CHUNK_SIZE, function (Collection $transactions) use ($callback): void {
             $journalCounts = $this->activeJournalCounts($transactions);
             foreach ($transactions as $transaction) {
                 $callback($this->transactionResult($transaction, $journalCounts));
@@ -345,7 +351,7 @@ class MarketplaceFinanceReconciliationService
 
     private function eachSettlementResult(array $filters, callable $callback): void
     {
-        $this->settlementQuery($filters)->reorder('id')->chunkById(100, function (Collection $settlements) use ($callback): void {
+        $this->settlementQuery($filters)->reorder('id')->chunkById(self::RECONCILIATION_CHUNK_SIZE, function (Collection $settlements) use ($callback): void {
             foreach ($settlements as $settlement) {
                 $callback($this->settlementResult($settlement));
             }

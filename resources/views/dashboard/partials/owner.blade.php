@@ -58,9 +58,16 @@
     $marketplaceExceptions = (int) ($marketplaceMonthKpi['exception_total'] ?? 0);
     $marketplaceRoas = $marketplaceMonthKpi['roas_net'] ?? null;
 @endphp
-<div class="dash-panels">
-    @include('dashboard.partials._list_repeat_orders', ['title' => 'Repeat order pesanan hari ini', 'rows' => $d['repeat_orders'] ?? [], 'link' => $r('marketplace.orders')])
-</div>
+<section class="dash-priority-stack" aria-labelledby="dash-priority-title">
+    <h2 id="dash-priority-title" class="visually-hidden">Prioritas kerja hari ini</h2>
+    <div class="dash-panels">
+        @include('dashboard.partials._list_repeat_orders', ['title' => 'Repeat order pesanan hari ini', 'rows' => $d['repeat_orders'] ?? [], 'link' => $r('marketplace.orders')])
+    </div>
+
+    <div class="dash-panels">
+        @include('dashboard.partials._list_order_items', ['title' => 'Permintaan belum dikirim per item internal', 'rows' => $d['list_todo_items'] ?? [], 'link' => $r('marketplace.orders')])
+    </div>
+</section>
 
 <div class="dash-sec"><i class="bi bi-graph-up-arrow"></i> Penjualan (bulan berjalan)</div>
 <div class="dash-grid">
@@ -116,10 +123,6 @@
         'sub' => 'Net Sales ÷ order bulan ini',
         'comparisons' => [$monthComparison('net_aov', $money)],
     ])
-</div>
-
-<div class="dash-panels">
-    @include('dashboard.partials._list_order_items', ['title' => 'Permintaan belum dikirim per item internal', 'rows' => $d['list_todo_items'] ?? [], 'link' => $r('marketplace.orders')])
 </div>
 
 <div class="dash-sec"><i class="bi bi-speedometer2"></i> KPI Marketplace (bulan berjalan)</div>
@@ -275,36 +278,36 @@
 </div>
 
 {{-- ================= ANALITIK IKLAN ================= --}}
-<div class="dash-sec mt-4"><i class="bi bi-megaphone"></i> Analitik Iklan Marketplace (7 Hari Terakhir)</div>
-<div class="dash-panels mb-4" style="grid-template-columns: 1fr 2fr; gap: 1rem;">
+<div class="dash-sec"><i class="bi bi-megaphone"></i> Analitik Iklan Marketplace (7 Hari Terakhir)</div>
+<div class="dash-panels dash-ads-grid mb-4">
     
     {{-- PIE CHART KAMPANYE --}}
-    <div class="dpanel p-3">
-        <div style="font-size: 0.85rem; font-weight: 650; color: var(--text); margin-bottom: 0.5rem;">
+    <div class="dpanel dash-chart-card">
+        <div class="dash-chart-card-title">
             Proporsi Biaya per Kampanye
         </div>
-        <div style="font-size: 0.72rem; color: var(--dsh-muted); margin-bottom: 1rem;">
+        <div class="dash-chart-card-subtitle">
             Top 5 kampanye dengan pengeluaran terbesar.
         </div>
-        <div style="position: relative; height: 250px; display: flex; justify-content: center; align-items: center;">
+        <div class="dash-chart-wrap dash-chart-wrap-pie">
             @if(empty($d['ads_campaigns']) || count($d['ads_campaigns']) === 0)
-                <div style="color: var(--dsh-muted); font-size: 0.8rem; text-align: center;">Belum ada data kampanye aktif.</div>
+                <div class="dash-chart-empty">Belum ada data kampanye aktif.</div>
             @else
-                <canvas id="execPieChart"></canvas>
+                <canvas id="execPieChart" role="img" aria-label="Proporsi biaya per kampanye"></canvas>
             @endif
         </div>
     </div>
 
     {{-- HEATMAP JAM TAYANG --}}
-    <div class="dpanel p-3">
-        <div style="font-size: 0.85rem; font-weight: 650; color: var(--text); margin-bottom: 0.5rem;">
+    <div class="dpanel dash-chart-card">
+        <div class="dash-chart-card-title">
             Heatmap Jam Tayang Efektif (Golden Hours)
         </div>
-        <div style="font-size: 0.72rem; color: var(--dsh-muted); margin-bottom: 1rem;">
+        <div class="dash-chart-card-subtitle">
             Menampilkan performa metrik (GMV / Biaya) per jam tayang dari data mesin. Semakin pekat warnanya, semakin tinggi performanya.
         </div>
-        <div style="position: relative; height: 250px;">
-            <canvas id="execHeatmapChart"></canvas>
+        <div class="dash-chart-wrap dash-chart-wrap-heatmap">
+            <canvas id="execHeatmapChart" role="img" aria-label="Heatmap jam tayang efektif"></canvas>
         </div>
     </div>
 

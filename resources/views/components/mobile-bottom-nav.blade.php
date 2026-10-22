@@ -62,6 +62,7 @@
         position: relative;
         flex: 0 0 auto;
         min-width: 54px;
+        min-height: 44px;
 
         text-align: center;
         padding-top: .2rem;
@@ -80,6 +81,7 @@
         transition:
             color .18s ease,
             transform .14s ease;
+        touch-action: manipulation;
     }
 
     .mobile-bottom-nav .nav-item::before {
@@ -121,6 +123,13 @@
 
     .mobile-bottom-nav .nav-item:active {
         transform: translateY(1px) scale(.98);
+    }
+
+    .mobile-bottom-nav .nav-item:focus-visible,
+    .mobile-bottom-nav .center-btn:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+        border-radius: 14px;
     }
 
     .mobile-bottom-nav .icon svg {
@@ -222,6 +231,14 @@
     @media (min-width: 768px) {
         .mobile-bottom-nav {
             display: none;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .mobile-bottom-nav .nav-item,
+        .mobile-bottom-nav .nav-item::before,
+        .mobile-bottom-nav .center-icon {
+            transition: none;
         }
     }
 </style>

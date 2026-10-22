@@ -11,16 +11,17 @@
     }
 
     .sales-dashboard {
-        --sales-bg: var(--bg, #f4f5fb);
-        --sales-line: var(--line, #d4d7e3);
-        --sales-muted: var(--muted, #6b7280);
-        --sales-card: var(--card, #fff);
-        --sales-soft: var(--card-soft, #f9fafb);
-        --sales-ink: var(--text, #111827);
-        --sales-accent: var(--accent, #2563eb);
-        --sales-accent-soft: var(--accent-soft, #dbeafe);
-        max-width: 1280px;
+        --sales-bg: var(--gf-color-surface-muted, #f2f4f7);
+        --sales-line: var(--gf-color-line, #e4e7ec);
+        --sales-muted: var(--gf-color-muted, #667085);
+        --sales-card: var(--gf-color-surface, #fff);
+        --sales-soft: var(--gf-color-surface-muted, #f2f4f7);
+        --sales-ink: var(--gf-color-content, #101828);
+        --sales-accent: var(--gf-color-brand, #5b5ce2);
+        --sales-accent-soft: #eeefff;
+        max-width: var(--gf-content-max, 1280px);
         margin-inline: auto;
+        padding-inline: var(--gf-content-gutter, .75rem);
         color: var(--sales-ink);
     }
 
@@ -846,8 +847,13 @@
     .sales-dashboard .sales-event-summary-value { overflow: hidden; color: var(--sales-ink); font-size: .78rem; font-weight: 850; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
     .sales-dashboard .sales-event-summary-content small { color: var(--sales-muted); font-size: .5rem; font-weight: 600; }
     .sales-dashboard .sales-event-summary + .table-responsive { border-top: 1px solid color-mix(in srgb, var(--sales-line) 70%, transparent); }
-    .sales-dashboard .sales-period-label { display: block; color: var(--sales-ink); font-size: .65rem; font-weight: 800; letter-spacing: .035em; line-height: 1.1; text-transform: uppercase; }
-    .sales-dashboard .sales-period-range { display: block; margin-top: .25rem; color: var(--sales-muted); font-size: .56rem; font-weight: 600; line-height: 1.15; }
+    .sales-dashboard .sales-period-heading { display: flex; min-width: 8.5rem; flex-direction: column; align-items: flex-end; gap: .28rem; }
+    .sales-dashboard .sales-period-title { display: inline-flex; align-items: flex-end; flex-direction: column; justify-content: flex-end; gap: .2rem; max-width: 100%; }
+    .sales-dashboard .sales-period-label { display: block; max-width: 100%; overflow: hidden; color: var(--sales-ink); font-size: .68rem; font-weight: 800; letter-spacing: .01em; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+    .sales-dashboard .sales-period-role { display: inline-flex; flex: 0 0 auto; align-items: center; min-height: 1.15rem; padding: .12rem .36rem; border: 1px solid var(--sales-line); border-radius: 999px; color: var(--sales-muted); background: color-mix(in srgb, var(--sales-muted) 7%, var(--sales-card) 93%); font-size: .48rem; font-weight: 800; letter-spacing: .045em; line-height: 1; text-transform: uppercase; }
+    .sales-dashboard .sales-period-role.is-current { border-color: color-mix(in srgb, var(--sales-accent) 22%, var(--sales-line) 78%); color: var(--sales-accent); background: color-mix(in srgb, var(--sales-accent-soft) 72%, var(--sales-card) 28%); }
+    .sales-dashboard .sales-period-range { display: inline-flex; align-items: center; gap: .24rem; margin-top: 0; color: var(--sales-muted); font-size: .57rem; font-weight: 600; line-height: 1.15; white-space: nowrap; }
+    .sales-dashboard .sales-period-range i { color: var(--sales-accent); font-size: .58rem; }
     .sales-dashboard .sales-twin-period-range { color: #6d28d9; font-weight: 750; }
     .sales-dashboard .sales-comparison-metric { color: var(--sales-ink); font-weight: 750; }
     .sales-dashboard .sales-comparison-cell { display: inline-flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: .15rem; }
@@ -1085,6 +1091,12 @@
     @media (max-width: 767.98px) {
         .sales-dashboard { padding-inline: .75rem !important; }
         .sales-dashboard .sales-table { min-width: 720px; }
+        .sales-dashboard .sales-comparison-section .table-responsive { border: 1px solid var(--sales-line); border-radius: .72rem; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sales-card) 40%, transparent); }
+        .sales-dashboard .sales-comparison-section .sales-table thead th:first-child,
+        .sales-dashboard .sales-comparison-section .sales-table tbody tr:not(.sales-table-section-row) > td:first-child { position: sticky; left: 0; background: var(--sales-card); box-shadow: 8px 0 12px -12px rgba(15, 23, 42, .5); }
+        .sales-dashboard .sales-comparison-section .sales-table thead th:first-child { z-index: 4; }
+        .sales-dashboard .sales-comparison-section .sales-table tbody tr:not(.sales-table-section-row) > td:first-child { z-index: 2; }
+        .sales-dashboard .sales-comparison-section .sales-table .sales-table-section-row > td { position: static; }
         .sales-dashboard .sales-trend-body { padding-inline: .65rem; }
         .sales-dashboard .sales-trend-layout { grid-template-columns: 1fr; }
         .sales-dashboard .sales-trend-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1195,8 +1207,8 @@
     /* Enterprise visual pass: flatter surfaces, stronger hierarchy, and
        denser information scanning without changing dashboard behavior. */
     .sales-dashboard {
-        max-width: 1480px;
-        padding-inline: clamp(.75rem, 1.6vw, 1.5rem);
+        max-width: var(--gf-content-max, 1280px);
+        padding-inline: var(--gf-content-gutter, .75rem);
     }
     .sales-dashboard .sales-title {
         color: #0f172a;
@@ -1206,8 +1218,8 @@
     }
     body[data-theme="dark"] .sales-dashboard .sales-title { color: #f8fafc; }
     .sales-dashboard .sales-card {
-        border-radius: 10px;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 8px 24px rgba(15, 23, 42, .045);
+        border-radius: var(--gf-radius-card, 16px);
+        box-shadow: var(--gf-shadow-sm, 0 1px 2px rgba(16, 24, 40, .04));
     }
     .sales-dashboard .sales-filter-card {
         border-top: 3px solid color-mix(in srgb, var(--sales-accent) 76%, var(--sales-line) 24%);
@@ -2698,7 +2710,7 @@
                 />
                 <div class="col-12 col-md-auto sales-filter-comparison">
                     <div class="sales-nav-comparison" role="group" aria-label="Perbandingan periode">
-                        <span class="sales-nav-comparison-label"><i class="bi bi-arrow-left-right" aria-hidden="true"></i>Bandingkan</span>
+                        <span class="sales-nav-comparison-label"><i class="bi bi-arrow-left-right" aria-hidden="true"></i>Bandingkan dengan</span>
                         <button type="button" class="sales-comparison-tab {{ $comparisonMode === 'period' ? 'active' : '' }}" data-comparison-mode="period" aria-pressed="{{ $comparisonMode === 'period' ? 'true' : 'false' }}"><i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>Periode lalu</button>
                         <button type="button" class="sales-comparison-tab {{ $comparisonMode === 'month' ? 'active' : '' }}" data-comparison-mode="month" aria-pressed="{{ $comparisonMode === 'month' ? 'true' : 'false' }}"><i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>Bulan lalu</button>
                     </div>
@@ -2839,8 +2851,13 @@
                             <th class="ps-3" scope="col">Metrik</th>
                             @foreach ($salesComparisonPeriods as $periodIndex => $period)
                                 <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}" scope="col">
-                                    <span class="sales-period-label">{{ $period['label'] }}</span>
-                                    <span class="sales-period-range">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
+                                    <span class="sales-period-heading">
+                                        <span class="sales-period-title">
+                                            <span class="sales-period-label">{{ $period['label'] }}</span>
+                                            <span class="sales-period-role {{ $periodIndex === 0 ? 'is-current' : '' }}">{{ $periodIndex === 0 ? 'Aktif' : 'Pembanding '.$periodIndex }}</span>
+                                        </span>
+                                        <span class="sales-period-range"><i class="bi bi-calendar3" aria-hidden="true"></i>{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
+                                    </span>
                                 </th>
                             @endforeach
                         </tr>
@@ -3444,8 +3461,13 @@
                                 <th class="ps-3">Metrik</th>
                                 @foreach ($profitLossComparisonSources as $periodIndex => $period)
                                     <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
-                                        <span class="sales-period-label">{{ $period['label'] }}</span>
-                                        <span class="sales-period-range">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
+                                        <span class="sales-period-heading">
+                                            <span class="sales-period-title">
+                                                <span class="sales-period-label">{{ $period['label'] }}</span>
+                                                <span class="sales-period-role {{ $periodIndex === 0 ? 'is-current' : '' }}">{{ $periodIndex === 0 ? 'Aktif' : 'Pembanding '.$periodIndex }}</span>
+                                            </span>
+                                            <span class="sales-period-range"><i class="bi bi-calendar3" aria-hidden="true"></i>{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
+                                        </span>
                                     </th>
                                 @endforeach
                             </tr>
@@ -3757,8 +3779,13 @@
                                 <th class="ps-3">Metrik</th>
                                 @foreach ($productComparisonPeriods as $periodIndex => $period)
                                     <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
-                                        <span class="sales-period-label">{{ $period['label'] }}</span>
-                                        <span class="sales-period-range">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
+                                        <span class="sales-period-heading">
+                                            <span class="sales-period-title">
+                                                <span class="sales-period-label">{{ $period['label'] }}</span>
+                                                <span class="sales-period-role {{ $periodIndex === 0 ? 'is-current' : '' }}">{{ $periodIndex === 0 ? 'Aktif' : 'Pembanding '.$periodIndex }}</span>
+                                            </span>
+                                            <span class="sales-period-range"><i class="bi bi-calendar3" aria-hidden="true"></i>{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
+                                        </span>
                                     </th>
                                 @endforeach
                             </tr>
@@ -3961,8 +3988,13 @@
                                                             <th class="ps-3">Metrik</th>
                                                             @foreach ($categoryComparisonPeriods as $periodIndex => $period)
                                                                 <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
-                                                                    <span class="sales-period-label">{{ $period['label'] }}</span>
-                                                                    <span class="sales-period-range">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
+                                                                    <span class="sales-period-heading">
+                                                                        <span class="sales-period-title">
+                                                                            <span class="sales-period-label">{{ $period['label'] }}</span>
+                                                                            <span class="sales-period-role {{ $periodIndex === 0 ? 'is-current' : '' }}">{{ $periodIndex === 0 ? 'Aktif' : 'Pembanding '.$periodIndex }}</span>
+                                                                        </span>
+                                                                        <span class="sales-period-range"><i class="bi bi-calendar3" aria-hidden="true"></i>{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
+                                                                    </span>
                                                                 </th>
                                                             @endforeach
                                                         </tr>
@@ -4811,8 +4843,13 @@
                                 <th class="ps-3">Metrik</th>
                                 @foreach ($paymentComparisonPeriods as $periodIndex => $period)
                                     <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
-                                        <span class="sales-period-label">{{ $period['label'] }}</span>
-                                        <span class="sales-period-range">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
+                                        <span class="sales-period-heading">
+                                            <span class="sales-period-title">
+                                                <span class="sales-period-label">{{ $period['label'] }}</span>
+                                                <span class="sales-period-role {{ $periodIndex === 0 ? 'is-current' : '' }}">{{ $periodIndex === 0 ? 'Aktif' : 'Pembanding '.$periodIndex }}</span>
+                                            </span>
+                                            <span class="sales-period-range"><i class="bi bi-calendar3" aria-hidden="true"></i>{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
+                                        </span>
                                         @foreach ($period['phases'] as $phase)
                                             <span class="sales-period-phase-badge sales-period-phase-badge--{{ $phase['key'] }}" title="{{ $phase['label'] }}: tanggal {{ $phase['range'] }}">
                                                 <i class="sales-phase-dot sales-phase-dot--{{ $phase['key'] }}"></i>
@@ -5022,8 +5059,13 @@
                                 <th class="ps-3">Metrik</th>
                                 @foreach ($platformPromotionPeriods as $periodIndex => $period)
                                     <th class="text-end {{ $periodIndex === 0 ? 'sales-period-current' : '' }}">
-                                        <span class="sales-period-label">{{ $period['label'] }}</span>
-                                        <span class="sales-period-range">{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
+                                        <span class="sales-period-heading">
+                                            <span class="sales-period-title">
+                                                <span class="sales-period-label">{{ $period['label'] }}</span>
+                                                <span class="sales-period-role {{ $periodIndex === 0 ? 'is-current' : '' }}">{{ $periodIndex === 0 ? 'Aktif' : 'Pembanding '.$periodIndex }}</span>
+                                            </span>
+                                            <span class="sales-period-range"><i class="bi bi-calendar3" aria-hidden="true"></i>{{ $period['from'] && $period['to'] ? $dateRangeLabel($period['from'], $period['to']) : '—' }}</span>
+                                        </span>
                                     </th>
                                 @endforeach
                             </tr>

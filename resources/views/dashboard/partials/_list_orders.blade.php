@@ -57,7 +57,7 @@
                         <div class="meta order-items-empty">Detail produk belum tersedia</div>
                     @endif
                 </div>
-                <div style="text-align:right;">
+                <div class="drow-actions">
                     @if($showAmount)
                         <div class="val">{{ rupiah($row['amount'] ?? 0) }}</div>
                     @endif

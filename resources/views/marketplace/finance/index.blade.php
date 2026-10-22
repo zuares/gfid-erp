@@ -14,11 +14,11 @@
         ];
     @endphp
 
-    <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+    <div class="finance-view-header d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
         <div>
             <div class="finance-eyebrow mb-1">Financial overview</div>
-            <h2 class="h4 mb-1">Ringkasan performa finance</h2>
-            <div class="finance-caption">KPI dihitung dari transaksi dan settlement yang sesuai filter analitik.</div>
+            <h2 class="finance-page-title h4 mb-1">Ringkasan performa finance</h2>
+            <div class="finance-page-subtitle finance-caption">KPI dihitung dari transaksi dan settlement yang sesuai filter analitik.</div>
         </div>
         <span class="badge rounded-pill text-bg-light border px-3 py-2">{{ number_format($report['summary']['transaction_count']) }} transaksi terfilter</span>
     </div>
@@ -26,11 +26,11 @@
     <div class="row g-3 mb-4">
         @foreach ($cards as $card)
             <div class="col-12 col-sm-6 col-xl-3">
-                <div class="finance-card card h-100 shadow-sm">
+                <div class="finance-card finance-kpi card h-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <span class="text-muted small">{{ $card['label'] }}</span>
-                            <i class="bi {{ $card['icon'] }} text-primary"></i>
+                            <span class="finance-kpi-icon"><i class="bi {{ $card['icon'] }}"></i></span>
                         </div>
                         <div class="finance-number">Rp {{ $money($card['value']) }}</div>
                     </div>
@@ -41,13 +41,13 @@
 
     <div class="row g-3">
         <div class="col-12 col-xl-5">
-            <div class="finance-card card shadow-sm h-100">
+            <div class="finance-card card h-100">
                 <div class="card-body">
                     <h2 class="h6">Status rekonsiliasi</h2>
                     <div class="row g-2 text-center mt-2">
                         @foreach (['matched' => 'Matched', 'mismatch' => 'Mismatch', 'unmatched' => 'Unmatched', 'pending' => 'Pending'] as $key => $label)
                             <div class="col-6">
-                                <div class="border rounded p-3">
+                                <div class="border rounded-3 p-3 bg-light-subtle">
                                     <div class="h4 mb-1">{{ $report['summary'][$key] }}</div>
                                     <div class="text-muted small">{{ $label }}</div>
                                 </div>
@@ -58,7 +58,7 @@
             </div>
         </div>
         <div class="col-12 col-xl-7">
-            <div class="finance-card card shadow-sm h-100">
+            <div class="finance-card card h-100">
                 <div class="card-body">
                     <h2 class="h6">Akses cepat</h2>
                     <div class="d-flex flex-wrap gap-2 mt-3">
@@ -97,7 +97,7 @@
                     </table>
                 </div>
                 @if ($transactions->hasPages())
-                    <div class="card-footer bg-white d-flex flex-wrap align-items-center justify-content-between gap-2"><span class="text-muted small">{{ number_format($transactions->firstItem() ?? 0) }}–{{ number_format($transactions->lastItem() ?? 0) }} dari {{ number_format($transactions->total()) }}</span>{{ $transactions->onEachSide(1)->links() }}</div>
+                    <div class="finance-pagination card-footer bg-white"><span class="text-muted small">{{ number_format($transactions->firstItem() ?? 0) }}–{{ number_format($transactions->lastItem() ?? 0) }} dari {{ number_format($transactions->total()) }}</span>{{ $transactions->onEachSide(1)->links() }}</div>
                 @endif
             </div>
         </div>
@@ -125,7 +125,7 @@
                     </table>
                 </div>
                 @if ($settlements->hasPages())
-                    <div class="card-footer bg-white d-flex flex-wrap align-items-center justify-content-between gap-2"><span class="text-muted small">{{ number_format($settlements->firstItem() ?? 0) }}–{{ number_format($settlements->lastItem() ?? 0) }} dari {{ number_format($settlements->total()) }}</span>{{ $settlements->onEachSide(1)->links() }}</div>
+                    <div class="finance-pagination card-footer bg-white"><span class="text-muted small">{{ number_format($settlements->firstItem() ?? 0) }}–{{ number_format($settlements->lastItem() ?? 0) }} dari {{ number_format($settlements->total()) }}</span>{{ $settlements->onEachSide(1)->links() }}</div>
                 @endif
             </div>
         </div>

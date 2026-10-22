@@ -14,6 +14,9 @@ $navPendingItems = [];
 if ($navShowBell) {
     $navCacheKey = 'navbar_notif_owner_v2_' . (int) $navUser->id;
     $navPending  = Cache::remember($navCacheKey, now()->addSeconds(20), function () {
+        $todayStart = today()->startOfDay();
+        $todayEnd   = today()->endOfDay();
+
         $poDrafts = \App\Models\PurchaseOrder::where('status', 'draft')
             ->where('grand_total', '>', 0)
             ->orderByDesc('id')
@@ -37,18 +40,22 @@ if ($navShowBell) {
                 ->count();
 
             // Order masuk hari ini (baru)
-            $crmNewOrders = \App\Models\StorefrontOrder::whereDate('created_at', today())
+            $crmNewOrders = \App\Models\StorefrontOrder::whereBetween('created_at', [$todayStart, $todayEnd])
                 ->where('status', 'pending')
                 ->count();
         }
 
-        if (class_exists(\App\Models\StorefrontEvent::class)) {
+        if (class_exists(\App\Models\StorefrontEvent::class) && class_exists(\App\Models\StorefrontOrder::class)) {
             // Prospects baru hari ini (add_to_cart tanpa order)
-            $orderedToday = \App\Models\StorefrontOrder::whereDate('created_at', today())
-                ->pluck('visitor_token')->filter()->unique();
             $crmProspects = \App\Models\StorefrontEvent::where('event_type', 'add_to_cart')
-                ->whereDate('created_at', today())
-                ->whereNotIn('visitor_token', $orderedToday)
+                ->whereBetween('created_at', [$todayStart, $todayEnd])
+                ->whereNotNull('visitor_token')
+                ->whereNotExists(function ($query) use ($todayStart, $todayEnd) {
+                    $query->selectRaw('1')
+                        ->from('storefront_orders as orders')
+                        ->whereColumn('orders.visitor_token', 'storefront_events.visitor_token')
+                        ->whereBetween('orders.created_at', [$todayStart, $todayEnd]);
+                })
                 ->distinct('visitor_token')
                 ->count('visitor_token');
         }
@@ -122,16 +129,23 @@ if ($navShowBell) {
        GLOBAL NAVBAR LAYOUT
     ============================ */
     .app-navbar {
+        --navbar-brand: #5b5ce2;
+        --navbar-cyan: #13b8c4;
+
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
 
-        height: 56px;
+        height: calc(58px + env(safe-area-inset-top, 0px));
+        padding-top: env(safe-area-inset-top, 0px);
         z-index: 1050;
 
-        background: var(--card);
-        border-bottom: 1px solid var(--line);
+        background:
+            radial-gradient(circle at 0% 0%, rgba(91, 92, 226, .11), transparent 28%),
+            color-mix(in srgb, var(--sidebar) 94%, var(--card) 6%);
+        border-bottom: 1px solid color-mix(in srgb, var(--line) 78%, var(--navbar-brand) 22%);
+        box-shadow: 0 8px 22px rgba(16, 24, 40, .05), inset 0 -1px rgba(255,255,255,.35);
 
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
@@ -140,45 +154,87 @@ if ($navShowBell) {
         align-items: center;
     }
 
+    .app-navbar::before {
+        content: '';
+        position: absolute;
+        inset: 0 0 auto;
+        height: 3px;
+        background: linear-gradient(90deg, var(--navbar-brand), var(--navbar-cyan));
+        opacity: .95;
+        pointer-events: none;
+    }
+
     body {
         /* kasih ruang buat navbar fixed */
-        padding-top: 58px;
+        padding-top: calc(58px + env(safe-area-inset-top, 0px));
     }
 
     .app-navbar .navbar-inner {
         max-width: 100%;
         margin-inline: auto;
         width: 100%;
+        min-height: 100%;
 
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: .5rem;
-        padding-inline: .75rem;
+        gap: .6rem;
+        padding-inline: .85rem;
     }
 
     /* BRAND */
     .app-navbar .navbar-brand {
         display: flex;
         align-items: center;
-        gap: 8px;
-        font-size: 11px;
-        font-weight: 900;
-        letter-spacing: .15em;
-        text-transform: uppercase;
+        gap: .58rem;
+        min-width: 0;
         color: var(--text) !important;
+        font-size: .92rem;
+        font-weight: 850;
+        letter-spacing: -.035em;
+        text-transform: none;
         padding: 0;
         margin: 0;
         text-decoration: none;
     }
+    .app-navbar .navbar-brand-mark {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        flex: 0 0 32px;
+        place-items: center;
+        border-radius: 11px;
+        background: linear-gradient(145deg, var(--navbar-brand), var(--navbar-cyan));
+        box-shadow: 0 8px 16px rgba(91, 92, 226, .22);
+    }
     .app-navbar .navbar-brand img {
-        width: 26px;
-        height: 26px;
+        width: 24px;
+        height: 24px;
         object-fit: contain;
+    }
+    .app-navbar .navbar-brand-copy {
+        display: grid;
+        min-width: 0;
+        line-height: 1.1;
+    }
+    .app-navbar .navbar-brand-copy strong {
+        color: var(--text);
+        font-size: .86rem;
+        font-weight: 850;
+    }
+    .app-navbar .navbar-brand-copy small {
+        margin-top: .18rem;
+        color: var(--muted);
+        font-size: .56rem;
+        font-weight: 750;
+        letter-spacing: .08em;
+        text-transform: uppercase;
     }
 
     /* THEME BUTTON */
     .theme-toggle-btn {
+        min-width: 44px;
+        min-height: 44px;
         border-radius: 999px;
         border: 1px solid var(--line);
         padding: .26rem .7rem;
@@ -192,6 +248,7 @@ if ($navShowBell) {
         gap: .35rem;
 
         cursor: pointer;
+        touch-action: manipulation;
     }
 
     .theme-toggle-btn .icon {
@@ -212,6 +269,8 @@ if ($navShowBell) {
 
     /* HAMBURGER */
     .mobile-menu-btn {
+        width: 44px;
+        height: 44px;
         border: 0;
         background: transparent;
         padding: .2rem;
@@ -220,6 +279,7 @@ if ($navShowBell) {
         justify-content: center;
         color: var(--muted);
         cursor: pointer;
+        touch-action: manipulation;
     }
 
     .mobile-menu-btn svg {
@@ -234,6 +294,8 @@ if ($navShowBell) {
 
     /* MOBILE LOGOUT BUTTON */
     .mobile-logout-btn {
+        width: 44px;
+        height: 44px;
         border: 0;
         background: transparent;
         padding: .2rem;
@@ -243,6 +305,7 @@ if ($navShowBell) {
         color: #ef4444;
         /* merah nyaman */
         cursor: pointer;
+        touch-action: manipulation;
     }
 
     .mobile-logout-btn svg {
@@ -268,6 +331,8 @@ if ($navShowBell) {
        NOTIFICATION BELL
     ============================ */
     .notif-bell-btn {
+        width: 44px;
+        height: 44px;
         position: relative;
         border: 0;
         background: transparent;
@@ -277,6 +342,7 @@ if ($navShowBell) {
         justify-content: center;
         color: var(--muted);
         cursor: pointer;
+        touch-action: manipulation;
         border-radius: 8px;
         transition: background .15s;
     }
@@ -390,6 +456,9 @@ if ($navShowBell) {
 
     .app-navbar .dropdown-item {
         color: var(--text);
+        min-height: 44px;
+        display: flex;
+        align-items: center;
     }
 
     .app-navbar .dropdown-item:hover {
@@ -397,23 +466,65 @@ if ($navShowBell) {
         color: var(--accent);
     }
 
+    .app-navbar button:focus-visible,
+    .app-navbar a:focus-visible {
+        outline: 2px solid var(--navbar-cyan);
+        outline-offset: 2px;
+    }
+
+    @media (max-width: 767.98px) {
+        .app-navbar .navbar-brand-copy small {
+            display: none;
+        }
+    }
+
     @media (min-width: 768px) {
         .app-navbar {
-            height: 60px;
+            left: var(--sidebar-width-tablet);
+            height: calc(62px + env(safe-area-inset-top, 0px));
+        }
+
+        /* Identitas utama tinggal di sidebar agar shell terasa satu bidang. */
+        .app-navbar .navbar-brand {
+            display: none;
         }
 
         body {
-            padding-top: 62px;
+            padding-top: calc(62px + env(safe-area-inset-top, 0px));
         }
 
         .app-navbar .navbar-inner {
-            padding-inline: 1rem;
+            padding-inline: 1.1rem 1.25rem;
+            justify-content: flex-end;
         }
 
         .app-navbar .desktop-nav {
             display: flex;
             align-items: center;
             gap: 1rem;
+        }
+
+        .app-navbar .nav-link {
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
+        }
+    }
+
+    @media (min-width: 992px) {
+        .app-navbar {
+            left: var(--sidebar-width-desktop);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .app-navbar,
+        .theme-toggle-btn,
+        .notif-dropdown,
+        .notif-item,
+        .mobile-menu-btn,
+        .mobile-logout-btn {
+            transition: none;
         }
     }
 </style>
@@ -423,7 +534,13 @@ if ($navShowBell) {
 
         {{-- LEFT: Brand --}}
         <a class="navbar-brand" href="{{ url('/') }}">
-            <img src="{{ asset('images/logo-mark.svg') }}" alt="{{ config('app.name', 'Greatfit') }}">
+            <span class="navbar-brand-mark" aria-hidden="true">
+                <img src="{{ asset('images/logo-mark.svg') }}" alt="">
+            </span>
+            <span class="navbar-brand-copy">
+                <strong>GFID</strong>
+                <small>Operations OS</small>
+            </span>
         </a>
 
         {{-- RIGHT: mobile cluster (theme + logout + hamburger) + desktop nav --}}
@@ -468,7 +585,7 @@ if ($navShowBell) {
             @endif
 
             {{-- THEME TOGGLE --}}
-            <button type="button" class="theme-toggle-btn" id="themeToggleBtn">
+            <button type="button" class="theme-toggle-btn" id="themeToggleBtn" aria-label="Ganti tema tampilan">
                 <span class="icon" id="themeToggleIcon">🌙</span>
                 <span class="label muted" id="themeToggleLabel">Mode Gelap</span>
             </button>
@@ -491,7 +608,7 @@ if ($navShowBell) {
 
             {{-- HAMBURGER: buka mobile sidebar --}}
             <button type="button" class="mobile-menu-btn d-md-none" id="mobileSidebarToggle"
-                aria-label="Toggle sidebar">
+                aria-label="Buka menu navigasi" aria-controls="mobileSidebarPanel" aria-expanded="false">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
                     stroke-linejoin="round">
                     <path d="M4 6h16" />

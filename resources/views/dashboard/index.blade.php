@@ -22,57 +22,57 @@
             </div>
         </div>
 
-        @php
-            $activeAnomaliesCount = \App\Models\InventoryAuditFinding::whereNull('resolved_at')->count();
-        @endphp
-        
         @if($activeAnomaliesCount > 0)
-            <div class="alert alert-danger" style="margin-bottom: 20px; border-radius: 8px; padding: 15px; background: #fff5f5; border: 1px solid #ffcaca; color: #d32f2f; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <i class="bi bi-exclamation-triangle-fill" style="font-size: 1.2rem;"></i>
+            <div class="dash-alert dash-alert-danger" role="alert">
+                <div class="dash-alert-content">
+                    <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
                     <div>
-                        <strong>Peringatan Sistem:</strong> Ditemukan <b><span id="anomalyCount">{{ $activeAnomaliesCount }}</span></b> anomali stok/fulfillment. Hubungi administrator untuk mengecek log <code>inventory_audit_findings</code>.
+                        <strong>Peringatan Sistem</strong>
+                        <span>Ditemukan <b id="anomalyCount">{{ $activeAnomaliesCount }}</b> anomali stok/fulfillment.</span>
+                        <small>Periksa log <code>inventory_audit_findings</code> untuk detail.</small>
                     </div>
                 </div>
-                <div>
-                    <button id="btnRunAudit" onclick="runInventoryAudit()" class="btn btn-sm" style="background:#d32f2f; color:white; border-radius:6px; font-weight:bold; border:none; padding: 6px 12px; cursor:pointer;">
-                        <i class="bi bi-arrow-repeat"></i> Jalankan Audit
+                @if($canRunInventoryAudit)
+                    <button id="btnRunAudit" type="button" class="dash-alert-action" data-audit-url="{{ url('/api/dev/run-audit') }}">
+                        <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Jalankan Audit
                     </button>
-                </div>
+                    <span id="auditFeedback" class="dash-alert-feedback" role="status" aria-live="polite"></span>
+                @endif
             </div>
 
+            @if($canRunInventoryAudit)
             <script>
-            async function runInventoryAudit() {
-                const btn = document.getElementById('btnRunAudit');
-                const origText = btn.innerHTML;
-                btn.innerHTML = '⏳ Menjalankan...';
-                btn.disabled = true;
+            (() => {
+                const button = document.querySelector('[data-audit-url]');
+                const feedback = document.getElementById('auditFeedback');
+                if (!button || !feedback) return;
 
-                try {
-                    const res = await fetch('/api/dev/run-audit', { 
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                            'Accept': 'application/json'
-                        }
-                    });
-                    const data = await res.json();
-                    
-                    if(res.ok) {
-                        alert(data.message);
-                        location.reload();
-                    } else {
-                        alert('Gagal: ' + (data.message || 'Error'));
-                        btn.innerHTML = origText;
-                        btn.disabled = false;
+                button.addEventListener('click', async () => {
+                    const original = button.innerHTML;
+                    button.disabled = true;
+                    button.innerHTML = '<i class="bi bi-arrow-repeat spin-icon" aria-hidden="true"></i> Menjalankan...';
+                    feedback.textContent = '';
+
+                    try {
+                        const response = await fetch(button.dataset.auditUrl, {
+                            method: 'POST',
+                            headers: { 'Accept': 'application/json' },
+                            credentials: 'same-origin',
+                        });
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.message || 'Audit gagal dijalankan.');
+
+                        feedback.textContent = data.message || 'Audit selesai.';
+                        window.setTimeout(() => window.location.reload(), 500);
+                    } catch (error) {
+                        feedback.textContent = error.message || 'Gagal menghubungi server.';
+                        button.disabled = false;
+                        button.innerHTML = original;
                     }
-                } catch(e) {
-                    alert('Gagal menghubungi server.');
-                    btn.innerHTML = origText;
-                    btn.disabled = false;
-                }
-            }
+                });
+            })();
             </script>
+            @endif
         @endif
 
         @includeFirst(
