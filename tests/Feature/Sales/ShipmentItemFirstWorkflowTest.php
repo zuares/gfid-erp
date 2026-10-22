@@ -820,10 +820,17 @@ class ShipmentItemFirstWorkflowTest extends TestCase
     public function test_confirmation_marks_per_order_item_and_quantity_differences_for_review(): void
     {
         [$user, $store, $scannedItem] = $this->shipmentContext();
-        $scannedItem->update(['code' => 'S2RDM']);
+        $scannedItem->update(['code' => 'S3RDM']);
         $differentItem = Item::create([
             'code' => 'ITEM-FIRST-DIFFERENT',
             'name' => 'Different marketplace item',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+        $packSkuItem = Item::create([
+            'code' => 'S3RDM-6',
+            'name' => 'Shot Boxer Brief S3RDM-6',
             'unit' => 'pcs',
             'type' => 'finished_good',
             'active' => true,
@@ -840,7 +847,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         foreach ([
             ['number' => 'ORDER-ITEM-DIFF-001', 'source_item' => $differentItem, 'source_qty' => 1, 'shipment_qty' => 1],
             ['number' => 'ORDER-QTY-DIFF-001', 'source_item' => $scannedItem, 'source_qty' => 3, 'shipment_qty' => 1],
-            ['number' => 'ORDER-PACK-SKU-6', 'source_item' => $scannedItem, 'source_qty' => 1, 'source_sku' => 'S2RDM-6', 'shipment_qty' => 6],
+            ['number' => 'ORDER-PACK-SKU-6', 'source_item' => $packSkuItem, 'source_qty' => 1, 'source_sku' => 'S3RDM-6', 'shipment_qty' => 6],
         ] as $case) {
             $order = MarketplaceOrder::create([
                 'store_id' => $store->id,
@@ -887,7 +894,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Selisih qty')
             ->assertSee('data-order-problem="true"', false)
             ->assertSee('data-order-problem="false"', false)
-            ->assertSee('S2RDM-6')
+            ->assertSee('S3RDM-6')
             ->assertSee('Shipment Test Store');
 
         $html = $response->getContent();

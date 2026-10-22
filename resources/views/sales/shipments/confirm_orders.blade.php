@@ -732,57 +732,67 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     $ungroupedQty = (int) $ungroupedLines->sum('qty_scanned');
     $ungroupedItemTypes = (int) $ungroupedLines->map($itemTypeKey)->filter()->unique()->count();
     $ungroupedCogs = (float) $ungroupedLines->sum(fn ($line) => $lineCogs($line));
-    $compareOrderShipment = static function ($shipmentLines, $sourceItems): array {
+    $sourceSku = static fn ($item): string => strtoupper(trim((string) (is_array($item)
+        ? ($item['sku'] ?? $item['model_sku'] ?? $item['item_sku'] ?? '')
+        : ($item->model_sku ?: $item->item_sku ?: $item->item_code_snapshot ?: ''))));
+    $sourceItemId = static function ($item, $shipmentLines) use ($sourceSku): int {
+        $shipmentLines = collect($shipmentLines);
+        $sku = $sourceSku($item);
+        if (preg_match('/^(.+)-([1-9][0-9]*)$/', $sku, $matches)) {
+            $baseLine = $shipmentLines->first(fn ($line) => strtoupper(trim((string) ($line->item?->code ?? ''))) === $matches[1]);
+            if ($baseLine) {
+                return (int) $baseLine->item_id;
+            }
+        }
+
+        return (int) (is_array($item)
+            ? ($item['item_id'] ?? 0)
+            : (($item->internal_item_id ?? null) ?: ($item->item_id ?? 0)));
+    };
+    $sourceQty = static function ($item, $shipmentLines) use ($sourceSku): int {
+        $qty = (int) (is_array($item)
+            ? ($item['qty'] ?? $item['quantity'] ?? $item['model_quantity_purchased'] ?? 0)
+            : ($item->qty ?? 0));
+        $sku = $sourceSku($item);
+        if (!preg_match('/^(.+)-([1-9][0-9]*)$/', $sku, $matches)) {
+            return $qty;
+        }
+
+        $baseMatchesShipment = collect($shipmentLines)->contains(
+            fn ($line) => strtoupper(trim((string) ($line->item?->code ?? ''))) === $matches[1]
+        );
+        $internalItemCode = is_array($item) ? '' : strtoupper(trim((string) ($item->internalItem?->code ?? '')));
+        return $baseMatchesShipment || $internalItemCode === $matches[1]
+            ? $qty * (int) $matches[2]
+            : $qty;
+    };
+    $sourceItemMatchesShipmentLine = static function ($sourceItem, $shipmentLine) use ($sourceSku): bool {
+        $sourceItemId = (int) (is_array($sourceItem)
+            ? ($sourceItem['item_id'] ?? 0)
+            : (($sourceItem->internal_item_id ?? null) ?: ($sourceItem->item_id ?? 0)));
+        if ($sourceItemId === (int) $shipmentLine->item_id) {
+            return true;
+        }
+
+        $sku = $sourceSku($sourceItem);
+        return preg_match('/^(.+)-([1-9][0-9]*)$/', $sku, $matches) === 1
+            && strtoupper(trim((string) ($shipmentLine->item?->code ?? ''))) === $matches[1];
+    };
+    $compareOrderShipment = static function ($shipmentLines, $sourceItems) use ($sourceItemId, $sourceQty): array {
         $shipmentLines = collect($shipmentLines);
         $sourceItems = collect($sourceItems);
         if ($sourceItems->isEmpty()) {
             return ['needs_review' => false, 'item_mismatch' => false, 'qty_mismatch' => false, 'unverified' => false];
         }
 
-        $shipmentItemCodeById = $shipmentLines->mapWithKeys(fn ($line) => [
-            (int) $line->item_id => strtoupper(trim((string) ($line->item?->code ?? ''))),
-        ]);
-        $shipmentItemIdByCode = $shipmentItemCodeById->filter()->flip();
-        $sourceSku = static fn ($item): string => strtoupper(trim((string) (is_array($item)
-            ? ($item['sku'] ?? $item['model_sku'] ?? $item['item_sku'] ?? '')
-            : ($item->model_sku ?: $item->item_sku ?: $item->item_code_snapshot ?: ''))));
-        $sourceItemId = static function ($item) use ($shipmentItemIdByCode, $shipmentItemCodeById, $sourceSku): int {
-            $itemId = (int) (is_array($item)
-                ? ($item['item_id'] ?? 0)
-                : (($item->internal_item_id ?? null) ?: ($item->item_id ?? 0)));
-            if ($itemId > 0) {
-                return $itemId;
-            }
-
-            $sku = $sourceSku($item);
-            if (preg_match('/^(.+)-([1-9][0-9]*)$/', $sku, $matches)) {
-                return (int) ($shipmentItemIdByCode->get($matches[1]) ?? 0);
-            }
-
-            return 0;
-        };
-        $sourceQty = static function ($item) use ($sourceSku, $sourceItemId, $shipmentItemCodeById): int {
-            $qty = (int) (is_array($item)
-                ? ($item['qty'] ?? $item['quantity'] ?? $item['model_quantity_purchased'] ?? 0)
-                : ($item->qty ?? 0));
-            $sku = $sourceSku($item);
-            if (!preg_match('/^(.+)-([1-9][0-9]*)$/', $sku, $matches)) {
-                return $qty;
-            }
-
-            $itemId = $sourceItemId($item);
-            $internalCode = is_array($item) ? '' : strtoupper(trim((string) ($item->internalItem?->code ?? '')));
-            $internalCode = $internalCode ?: ($shipmentItemCodeById->get($itemId) ?? '');
-            return $internalCode === $matches[1] ? $qty * (int) $matches[2] : $qty;
-        };
         $shipmentByItem = $shipmentLines->groupBy(fn ($line) => (int) ($line->item_id ?? 0))
             ->map(fn ($itemLines) => (int) $itemLines->sum('qty_scanned'));
-        $sourceByItem = $sourceItems->groupBy($sourceItemId)
-            ->map(fn ($items) => (int) $items->sum($sourceQty));
+        $sourceByItem = $sourceItems->groupBy(fn ($item) => $sourceItemId($item, $shipmentLines))
+            ->map(fn ($items) => (int) $items->sum(fn ($item) => $sourceQty($item, $shipmentLines)));
         $unverified = $sourceByItem->keys()->contains(fn ($itemId) => (int) $itemId <= 0)
             || $shipmentByItem->keys()->contains(fn ($itemId) => (int) $itemId <= 0);
         $itemMismatch = false;
-        $qtyMismatch = $shipmentLines->sum('qty_scanned') !== $sourceItems->sum($sourceQty);
+        $qtyMismatch = $shipmentLines->sum('qty_scanned') !== $sourceItems->sum(fn ($item) => $sourceQty($item, $shipmentLines));
 
         if (!$unverified) {
             $shipmentIds = $shipmentByItem->keys()->map(fn ($id) => (int) $id)->sort()->values()->all();
@@ -1329,7 +1339,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                         $cogsByItem = $orderLines->groupBy('item_id')->map(fn ($itemLines) => (float) $itemLines->sum(fn ($line) => $lineCogs($line)));
                                         $marketplaceStatus = strtoupper(str_replace('_', ' ', (string) ($marketplaceOrder->order_status ?: $marketplaceOrder->status ?: '')));
                                         $unmatchedMarketplaceLines = $orderLines->isNotEmpty()
-                                            ? $marketplaceLines->filter(fn ($candidate) => !$orderLines->contains(fn ($line) => (int) ($candidate->internal_item_id ?: $candidate->item_id) === (int) $line->item_id))
+                                            ? $marketplaceLines->filter(fn ($candidate) => !$orderLines->contains(fn ($line) => $sourceItemMatchesShipmentLine($candidate, $line)))
                                             : collect();
                                     @endphp
                                     <div class="sd-marketplace-detail">
@@ -1381,8 +1391,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                 <div class="sd-items-head {{ $orderItemGridClass }} sd-qty-breakdown"><span>No</span><span>Kode Item</span><span>Order</span><span>Ship</span><span>Diff</span><span>SKU Marketplace</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                                                 @foreach($displayLines as $line)
                                                     @php
-                                                        $matchedMarketplaceLine = $line->marketplace_line ?? $marketplaceLines->first(function ($candidate) use ($line) {
-                                                            return (int) ($candidate->internal_item_id ?: $candidate->item_id) === (int) $line->item_id;
+                                                        $matchedMarketplaceLine = $line->marketplace_line ?? $marketplaceLines->first(function ($candidate) use ($line, $sourceItemMatchesShipmentLine) {
+                                                            return $sourceItemMatchesShipmentLine($candidate, $line);
                                                         });
                                                         // Satu item scan dan satu item order boleh ditampilkan berdampingan,
                                                         // tetapi perbedaan item tidak boleh dianggap Diff 0.
@@ -1392,7 +1402,9 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                                         // Tampilkan SKU asli dari payload marketplace saja.
                                                         // Jangan gunakan marketplace_sku hasil mapping nama atau kode internal.
                                                         $marketplaceSku = $marketplaceLine?->model_sku ?: $marketplaceLine?->item_sku ?: '—';
-                                                        $qtyOrder = $itemMismatch && !$singleLineMismatch ? null : (int) ($marketplaceLine?->qty ?? $line->qty_scanned);
+                                                        $qtyOrder = $itemMismatch && !$singleLineMismatch
+                                                            ? null
+                                                            : ($marketplaceLine ? $sourceQty($marketplaceLine, $orderLines) : (int) $line->qty_scanned);
                                                         $qtyShipment = (int) ($pickedByItem[$line->item_id] ?? ($orderLines->isEmpty() ? 0 : $line->qty_scanned));
                                                         $difference = $qtyShipment - (int) $qtyOrder;
                                                     @endphp
