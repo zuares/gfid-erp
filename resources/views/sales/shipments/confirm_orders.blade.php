@@ -683,6 +683,14 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
 .sd-order-item-diff.sd-marketplace-ok { color:#15803d; }
 .sd-order-item-diff.sd-marketplace-short { color:#b91c1c; }
 .sd-order-item-diff .sd-sku-mismatch { white-space: normal; }
+.sd-item-review { position: relative; white-space: normal; }
+.sd-item-review > summary { cursor: pointer; font-weight: 800; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
+.sd-item-review > summary:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; border-radius: 2px; }
+.sd-item-review-panel { position: absolute; z-index: 5; top: calc(100% + .25rem); right: 0; width: max-content; max-width: min(260px, 70vw); padding: .55rem .65rem; border: 1px solid rgba(180,83,9,.28); border-radius: 7px; background: #fff; box-shadow: 0 8px 22px rgba(15,23,42,.16); color: #334155; text-align: left; font-size: .68rem; line-height: 1.35; }
+.sd-item-review-panel strong,.sd-item-review-panel span { display: block; }
+.sd-item-review-panel strong { margin-bottom: .2rem; color: #92400e; }
+.sd-item-review-panel .sd-order-item-name { max-width: 230px; white-space: normal; }
+body[data-theme="dark"] .sd-item-review-panel { background: #1e293b; border-color: rgba(251,191,36,.35); color: #e2e8f0; }
 @media(max-width:600px){
   .sd-items-head,
   .sd-order-item,
@@ -1356,7 +1364,6 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                 @endif
                                                 <div>
                                                     <div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div>
-                                                    <div class="sd-order-item-name">{{ $line->item?->name ?? 'Nama item belum tersedia' }}</div>
                                                 </div>
                                                 @if($canSeeCogs)
                                                     <div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div>
@@ -1421,19 +1428,6 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                             'marketplace_line' => $marketplaceLine,
                                                         ];
                                                     });
-                                                } else {
-                                                    foreach ($unmatchedMarketplaceLines as $unmatchedLine) {
-                                                        $unmatchedItemId = (int) ($unmatchedLine->internal_item_id ?: $unmatchedLine->item_id);
-                                                        if ($unmatchedItemId > 0 && !$orderLines->contains(fn ($line) => (int) $line->item_id === $unmatchedItemId)) {
-                                                            $displayLines->push((object) [
-                                                                'id' => null,
-                                                                'item_id' => $unmatchedItemId,
-                                                                'item' => $unmatchedLine->internalItem,
-                                                                'qty_scanned' => 0,
-                                                                'marketplace_line' => $unmatchedLine,
-                                                            ]);
-                                                        }
-                                                    }
                                                 }
                                             @endphp
                                             <div class="sd-order-items sd-order-items-breakdown">
@@ -1450,7 +1444,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                         $marketplaceLine = $matchedMarketplaceLine ?: ($singleLineMismatch ? $marketplaceLines->first() : null);
                                                         // Tampilkan SKU asli dari payload marketplace saja.
                                                         // Jangan gunakan marketplace_sku hasil mapping nama atau kode internal.
-                                                        $marketplaceSku = $marketplaceLine?->model_sku ?: $marketplaceLine?->item_sku ?: $marketplaceLine?->marketplace_sku ?: '—';
+                                                        $marketplaceSku = $marketplaceLine?->model_sku ?: $marketplaceLine?->marketplace_sku ?: $marketplaceLine?->item_sku ?: '—';
                                                         $marketplaceVariant = trim((string) ($marketplaceLine?->variant_name ?: $marketplaceLine?->variant_snapshot ?: ''));
                                                         $unpairedMarketplaceLines = $itemMismatch && !$singleLineMismatch ? $unmatchedMarketplaceLines : collect();
                                                         $qtyOrder = $itemMismatch && !$singleLineMismatch
@@ -1467,7 +1461,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                                     <span class="sd-marketplace-unpaired-label">SKU order belum dipasangkan</span>
                                                                     @foreach($unpairedMarketplaceLines as $unpairedLine)
                                                                         @php
-                                                                            $unpairedSku = $unpairedLine->model_sku ?: $unpairedLine->item_sku ?: $unpairedLine->marketplace_sku ?: 'SKU belum tersedia';
+                                                                            $unpairedSku = $unpairedLine->model_sku ?: $unpairedLine->marketplace_sku ?: $unpairedLine->item_sku ?: 'SKU belum tersedia';
                                                                             $unpairedVariant = trim((string) ($unpairedLine->variant_name ?: $unpairedLine->variant_snapshot ?: ''));
                                                                         @endphp
                                                                         <span class="sd-marketplace-sku-value" title="SKU marketplace: {{ $unpairedSku }}">{{ $unpairedSku }}</span>
@@ -1483,12 +1477,23 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                         <div class="sd-order-item-qty">{{ $qtyOrder === null ? '—' : number_format($qtyOrder, 0, ',', '.') }}</div>
                                                         <div class="sd-order-item-qty">{{ number_format($qtyShipment, 0, ',', '.') }}</div>
                                                         <div class="sd-order-item-diff {{ !$itemMismatch && $difference === 0 ? 'sd-marketplace-ok' : 'sd-marketplace-short' }}">
-                                                            {{ $itemMismatch ? 'Periksa' : (($difference > 0 ? '+' : '') . number_format($difference, 0, ',', '.')) }}
-                                                            @if($singleLineMismatch)<span class="sd-sku-mismatch">Item berbeda</span>@endif
+                                                            @if($itemMismatch)
+                                                                <details class="sd-item-review">
+                                                                    <summary>Periksa</summary>
+                                                                    @if($singleLineMismatch)<span class="sd-sku-mismatch">Item berbeda</span>@endif
+                                                                    <div class="sd-item-review-panel">
+                                                                        <strong>Item yang discan</strong>
+                                                                        <span>{{ $line->item?->code ?: 'Kode item tidak tersedia' }}</span>
+                                                                        <span class="sd-order-item-name">{{ $line->item?->name ?: 'Nama item tidak tersedia' }}</span>
+                                                                        <span>Qty scan: {{ number_format($qtyShipment, 0, ',', '.') }}</span>
+                                                                    </div>
+                                                                </details>
+                                                            @else
+                                                                {{ ($difference > 0 ? '+' : '') . number_format($difference, 0, ',', '.') }}
+                                                            @endif
                                                         </div>
                                                         <div>
                                                             <div class="sd-order-item-code">{{ $line->item?->code ?: ($marketplaceLine?->item_code_snapshot ?: '-') }}</div>
-                                                            <div class="sd-order-item-name">{{ $line->item?->name ?: 'Nama item belum tersedia' }}</div>
                                                         </div>
                                                         @if($canSeeCogs)
                                                             <div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div>
@@ -1507,7 +1512,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                 @endforeach
                                             </div>
                                             @if($unmatchedMarketplaceLines->isNotEmpty() && !($orderLines->count() === 1 && $marketplaceLines->count() === 1))
-                                                <div class="sd-sku-unmatched">Item order belum cocok: {{ $unmatchedMarketplaceLines->map(fn ($line) => $line->model_sku ?: $line->item_sku ?: 'SKU belum tersedia')->join(', ') }}</div>
+                                                <div class="sd-sku-unmatched">Item order belum cocok: {{ $unmatchedMarketplaceLines->map(fn ($line) => $line->model_sku ?: $line->marketplace_sku ?: $line->item_sku ?: 'SKU belum tersedia')->join(', ') }}</div>
                                             @endif
                                         @else
                                             <div class="sd-muted">Detail item marketplace belum tersedia.</div>
@@ -1523,7 +1528,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                 <div class="sd-order-items">
                                     <div class="sd-items-head {{ $orderItemGridClass }}"><span>No</span><span>SKU Marketplace</span><span>Qty</span><span>Kode Item</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                                     @foreach($ungroupedLines as $line)
-                                        <div class="sd-order-item {{ $orderItemGridClass }}"><span class="sd-order-item-num">{{ $loop->iteration }}</span><div class="sd-order-item-marketplace-sku">—</div><div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div><div class="sd-order-item-name">{{ $line->item?->name ?? 'Nama item belum tersedia' }}</div></div>@if($canSeeCogs)<div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div><div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>@endif @if($canDeleteShipmentRows)<span class="sd-line-action"><form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">@csrf @method('DELETE')<button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button></form></span>@endif</div>
+                                        <div class="sd-order-item {{ $orderItemGridClass }}"><span class="sd-order-item-num">{{ $loop->iteration }}</span><div class="sd-order-item-marketplace-sku">—</div><div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div>@if($canSeeCogs)<div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div><div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>@endif @if($canDeleteShipmentRows)<span class="sd-line-action"><form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">@csrf @method('DELETE')<button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button></form></span>@endif</div>
                                     @endforeach
                                 </div>
                                 <div class="sd-order-summary {{ $canSeeCogs ? 'sd-summary-has-cogs' : '' }}">

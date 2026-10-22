@@ -1414,7 +1414,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('sd-badge linked', false);
 
         $this->assertMatchesRegularExpression(
-            '/<div class="sd-order-item-diff[^\"]*">\s*Periksa\s*<span class="sd-sku-mismatch">Item berbeda<\/span>\s*<\/div>/',
+            '/<div class="sd-order-item-diff[^\"]*">\s*<details class="sd-item-review">\s*<summary>Periksa<\/summary>\s*<span class="sd-sku-mismatch">Item berbeda<\/span>\s*<div class="sd-item-review-panel">\s*<strong>Item yang discan<\/strong>/',
             $response->getContent(),
         );
     }
@@ -1481,7 +1481,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ]);
         }
 
-        $this->actingAs($user)
+        $response = $this->actingAs($user)
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
             ->assertSee('Item order belum cocok: MARKETPLACE-SKU-A, MARKETPLACE-SKU-B')
@@ -1491,6 +1491,14 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('class="sd-marketplace-sku-value" title="SKU marketplace: MARKETPLACE-SKU-B">MARKETPLACE-SKU-B</span>', false)
             ->assertSee('Varian Navy L')
             ->assertSee('Periksa');
+
+        $html = $response->getContent();
+        preg_match_all('/<div class="sd-order-item [^\"]*sd-qty-breakdown">/', $html, $rows);
+        $this->assertCount(2, $rows[0], 'Only the two scanned item rows should remain; unmatched order items must not create extra rows.');
+        $this->assertSame(2, substr_count($html, '<summary>Periksa</summary>'));
+        $this->assertSame(2, substr_count($html, '<strong>Item yang discan</strong>'));
+        $this->assertDoesNotMatchRegularExpression('/<div class="sd-order-item-code">[^<]*<\/div>\s*<div class="sd-order-item-name">/', $html);
+        $this->assertStringContainsString('<span class="sd-order-item-name">Second scanned item</span>', $html);
     }
 
     public function test_ready_to_ship_and_processed_kilat_orders_are_linked_when_scanned(): void
