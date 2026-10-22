@@ -1495,7 +1495,7 @@
                     </td>
 
                     <td class="text-end">
-                        <div class="fw-bold" style="font-size:.82rem; color:var(--shp-text);">${fmtRp(s.raw_json ? (s.raw_json.cost_of_goods_sold || s.raw_json.order_selling_price || s.buyer_payment_amount) : s.buyer_payment_amount)}</div>
+                        <div class="fw-bold" style="font-size:.82rem; color:var(--shp-text);">${fmtRp(s.gross_amount || 0)}</div>
                         <div class="fw-black" style="font-size:.9rem; color:${isPending ? '#d97706' : '#16a34a'}; margin-top:2px;">${fmtRp(s.final_income)}</div>
                         <div style="font-size:.62rem; color:${isPending ? estimateSourceColor : '#15803d'}; margin-top:2px; font-weight:800;">${isPending ? estimateSourceLabel : 'CAIR • FINAL'}</div>
                     </td>

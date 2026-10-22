@@ -233,7 +233,7 @@ class MarketplaceSyncFinanceCommand extends Command
 
             if ($tiktokFinanceSupported && ! $dryRun) {
                 $tiktokProgressKey = "marketplace:settlement_sync_progress:{$store->id}";
-                $tiktokResult = $syncService->syncTikTokFinance(
+                $tiktokResult = $syncService->syncTikTokFinanceBatched(
                     $store,
                     $targetDate,
                     $syncEndTimestamp,

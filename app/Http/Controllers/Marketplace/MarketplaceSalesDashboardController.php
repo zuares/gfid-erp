@@ -493,7 +493,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->map(fn ($rows) => (float) $rows->sum('cogs'));
         $settledCogsByDay = (clone $base)
             ->join('marketplace_order_settlements as settled_cogs_ms', 'settled_cogs_ms.order_id', '=', 'o.id')
-            ->whereNotNull('settled_cogs_ms.settlement_time')
+            ->whereRaw($this->salesFinalIncomeCondition('settled_cogs_ms'))
             ->leftJoin('marketplace_order_items as cogs_oi', function ($join) {
                 $join->on('cogs_oi.marketplace_order_id', '=', 'o.id')
                     ->orOn(function ($fallback) {
@@ -518,7 +518,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->leftJoin('marketplace_order_income_estimates as payout_ie', 'payout_ie.marketplace_order_id', '=', 'o.id')
             ->selectRaw("DATE({$dateExpression}) as day")
             ->addSelect('o.store_id', 'st.name as store_name')
-            ->selectRaw('COALESCE(SUM(COALESCE(NULLIF(o.net_payout_estimated, 0), NULLIF(payout_ms.final_income, 0), payout_ie.estimated_escrow_amount, 0)), 0) as estimated_payout')
+            ->selectRaw('COALESCE(SUM('.$this->salesOrderPayoutExpression('payout_ms', 'payout_ie').'), 0) as estimated_payout')
             ->groupByRaw("DATE({$dateExpression}), o.store_id, st.name")
             ->get()
             ->map(function ($row) {
@@ -541,6 +541,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->tap(fn ($query) => $scopeItemAggregate($query, 'oi_total'))
             ->groupByRaw('COALESCE(oi_total.marketplace_order_id, oi_total.order_id)');
         $productBuyerPaymentExpression = 'COALESCE(NULLIF(s.buyer_payment_amount, 0), NULLIF(o.total_paid_customer, 0), NULLIF(o.total_amount, 0), NULLIF(o.subtotal_items, 0), 0)';
+        $productOrderPayoutExpression = $this->salesOrderPayoutExpression('s', 'payout_ie');
         $productLineValueForRow = 'CASE WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount WHEN COALESCE(oi.price, 0) > 0 THEN oi.price * COALESCE(oi.qty, 0) WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount ELSE 0 END';
         $productLineNetValueExpression = 'CASE WHEN COALESCE(oi.line_net_amount, 0) > 0 THEN oi.line_net_amount WHEN COALESCE(oi.price_after_discount, 0) > 0 THEN oi.price_after_discount * COALESCE(oi.qty, 0) WHEN COALESCE(oi.line_gross_amount, 0) > 0 THEN oi.line_gross_amount ELSE 0 END';
         $marketplaceProductNameExpression = "COALESCE(NULLIF(oi.item_name, ''), NULLIF(oi.item_name_snapshot, ''), NULLIF(oi.variant_name, ''), NULLIF(oi.variant_snapshot, ''), 'Produk tanpa nama')";
@@ -626,7 +627,7 @@ class MarketplaceSalesDashboardController extends Controller
             ->selectRaw("COALESCE(SUM({$productLineNetValueExpression}), 0) as sales")
             ->selectRaw("COALESCE(SUM({$productLineNetValueExpression}), 0) as net_sales")
             ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(product_order_totals.order_item_value, 0) > 0 THEN ({$productBuyerPaymentExpression} * {$productLineValueForRow} / product_order_totals.order_item_value) ELSE 0 END), 0) as buyer_payment")
-            ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(product_order_totals.order_item_value, 0) > 0 THEN (COALESCE(NULLIF(o.net_payout_estimated, 0), NULLIF(s.final_income, 0), payout_ie.estimated_escrow_amount, 0) * {$productLineValueForRow} / product_order_totals.order_item_value) ELSE 0 END), 0) as estimated_payout")
+            ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(product_order_totals.order_item_value, 0) > 0 THEN (({$productOrderPayoutExpression}) * {$productLineValueForRow} / product_order_totals.order_item_value) ELSE 0 END), 0) as estimated_payout")
             ->groupByRaw($resolvedProductInternalItemExpression)
             ->groupByRaw("CASE WHEN {$resolvedProductInternalItemExpression} IS NOT NULL THEN NULLIF(oi.external_item_id, '') END")
             ->groupByRaw("CASE WHEN {$resolvedProductInternalItemExpression} IS NULL THEN {$marketplaceProductNameExpression} END")
@@ -1123,19 +1124,20 @@ class MarketplaceSalesDashboardController extends Controller
             : 0;
 
         $incomePaymentExpression = 'COALESCE(NULLIF(income_ms.buyer_payment_amount, 0), NULLIF(o.total_paid_customer, 0), NULLIF(o.total_amount, 0), NULLIF(o.subtotal_items, 0), 0)';
+        $incomeFinalCondition = $this->salesFinalIncomeCondition('income_ms');
         $incomeBase = (clone $base)
             ->leftJoin('marketplace_order_settlements as income_ms', 'income_ms.order_id', '=', 'o.id');
         $incomeDaily = (clone $incomeBase)
             ->selectRaw("DATE({$dateExpression}) as day")
             ->selectRaw('COUNT(DISTINCT o.id) as orders')
-            ->selectRaw('COUNT(DISTINCT CASE WHEN income_ms.settlement_time IS NOT NULL THEN o.id END) as settled_orders')
-            ->selectRaw('COUNT(DISTINCT CASE WHEN income_ms.settlement_time IS NULL THEN o.id END) as pending_orders')
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$incomeFinalCondition} THEN o.id END) as settled_orders")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN NOT ({$incomeFinalCondition}) THEN o.id END) as pending_orders")
             ->selectRaw("COALESCE(SUM({$incomePaymentExpression}), 0) as buyer_paid")
-            ->selectRaw("COALESCE(SUM(CASE WHEN income_ms.settlement_time IS NOT NULL THEN ({$incomePaymentExpression}) ELSE 0 END), 0) as settled_buyer_paid")
-            ->selectRaw("COALESCE(SUM(CASE WHEN income_ms.settlement_time IS NULL THEN ({$incomePaymentExpression}) ELSE 0 END), 0) as pending_buyer_paid")
-            ->selectRaw('COALESCE(SUM(CASE WHEN income_ms.settlement_time IS NOT NULL THEN COALESCE(income_ms.final_income, 0) ELSE 0 END), 0) as final_income')
-            ->selectRaw('COUNT(DISTINCT CASE WHEN income_ms.settlement_time IS NOT NULL AND ABS(COALESCE(income_ms.drc_adjustable_refund, 0)) > 0 THEN o.id END) as refund_orders')
-            ->selectRaw('COALESCE(SUM(CASE WHEN income_ms.settlement_time IS NOT NULL THEN ABS(COALESCE(income_ms.drc_adjustable_refund, 0)) ELSE 0 END), 0) as refund_amount')
+            ->selectRaw("COALESCE(SUM(CASE WHEN {$incomeFinalCondition} THEN ({$incomePaymentExpression}) ELSE 0 END), 0) as settled_buyer_paid")
+            ->selectRaw("COALESCE(SUM(CASE WHEN NOT ({$incomeFinalCondition}) THEN ({$incomePaymentExpression}) ELSE 0 END), 0) as pending_buyer_paid")
+            ->selectRaw("COALESCE(SUM(CASE WHEN {$incomeFinalCondition} THEN COALESCE(income_ms.final_income, 0) ELSE 0 END), 0) as final_income")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$incomeFinalCondition} AND ABS(COALESCE(income_ms.drc_adjustable_refund, 0)) > 0 THEN o.id END) as refund_orders")
+            ->selectRaw("COALESCE(SUM(CASE WHEN {$incomeFinalCondition} THEN ABS(COALESCE(income_ms.drc_adjustable_refund, 0)) ELSE 0 END), 0) as refund_amount")
             ->groupByRaw("DATE({$dateExpression})")
             ->orderByDesc('day')
             ->get()
@@ -2440,7 +2442,7 @@ README;
             ->selectRaw('COALESCE(order_totals.marketplace_order_id, order_totals.order_id) as order_key')
             ->selectRaw("COALESCE(SUM({$orderLineValueExpression}), 0) as order_item_value")
             ->groupByRaw('COALESCE(order_totals.marketplace_order_id, order_totals.order_id)');
-        $orderPayoutExpression = 'COALESCE(NULLIF(o.net_payout_estimated, 0), NULLIF(s.final_income, 0), payout_ie.estimated_escrow_amount, 0)';
+        $orderPayoutExpression = $this->salesOrderPayoutExpression('s', 'payout_ie');
 
         $rows = DB::table('marketplace_order_items as oi')
             ->join('marketplace_orders as o', function ($join) {
@@ -3619,6 +3621,37 @@ SQL;
             'bundle_discount' => $bundleDiscount,
             'combo_hemat' => $comboHemat,
         ];
+    }
+
+    /**
+     * Select the most authoritative per-order payout value for dashboard
+     * projections. TikTok pending orders must use Get Unsettled Transactions;
+     * its value is more current than an incomplete order statement. A final
+     * TikTok statement wins once the settlement is marked complete.
+     */
+    private function salesOrderPayoutExpression(string $settlementAlias, string $estimateAlias): string
+    {
+        return "CASE
+            WHEN UPPER(COALESCE(ch.code, '')) IN ('TIKTOK', 'TTK', 'TKT')
+                AND COALESCE({$settlementAlias}.data_status, '') = 'complete'
+                THEN COALESCE({$settlementAlias}.final_income, NULLIF(o.net_payout_estimated, 0), {$estimateAlias}.estimated_escrow_amount, 0)
+            WHEN UPPER(COALESCE(ch.code, '')) IN ('TIKTOK', 'TTK', 'TKT')
+                THEN COALESCE({$estimateAlias}.estimated_escrow_amount, NULLIF(o.net_payout_estimated, 0), NULLIF({$settlementAlias}.final_income, 0), 0)
+            ELSE COALESCE(NULLIF(o.net_payout_estimated, 0), NULLIF({$settlementAlias}.final_income, 0), {$estimateAlias}.estimated_escrow_amount, 0)
+        END";
+    }
+
+    /**
+     * TikTok's final order statement is authoritative even though the
+     * v202501 endpoint does not provide the legacy settlement_time column.
+     * Keep the old settlement-time rule for Shopee and other channels.
+     */
+    private function salesFinalIncomeCondition(string $settlementAlias): string
+    {
+        return "({$settlementAlias}.settlement_time IS NOT NULL OR (
+            UPPER(COALESCE(ch.code, '')) IN ('TIKTOK', 'TTK', 'TKT')
+            AND COALESCE({$settlementAlias}.data_status, '') = 'complete'
+        ))";
     }
 
     private function firstPayloadAmount(array $payloads, array $keys): float

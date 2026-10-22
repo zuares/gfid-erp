@@ -1159,6 +1159,7 @@ class MarketplaceSyncService
         bool $missingOnly = false,
         ?callable $progress = null,
         int $limit = 200,
+        ?int $beforeId = null,
     ): array {
         $store->loadMissing('channel');
         $channel = strtolower(trim((string) ($store->channel?->code ?? '')));
@@ -1178,8 +1179,8 @@ class MarketplaceSyncService
         $limit = max(1, min($limit, 1000));
         $ordersQuery = MarketplaceOrder::query()
             ->where('store_id', $store->id)
-            ->when($timeFrom !== null, fn ($query) => $query->where('ordered_at', '>=', Carbon::createFromTimestamp($timeFrom)))
-            ->when($timeTo !== null, fn ($query) => $query->where('ordered_at', '<=', Carbon::createFromTimestamp($timeTo)))
+            ->when($timeFrom !== null, fn ($query) => $query->where('ordered_at', '>=', Carbon::createFromTimestamp($timeFrom, config('app.timezone'))))
+            ->when($timeTo !== null, fn ($query) => $query->where('ordered_at', '<=', Carbon::createFromTimestamp($timeTo, config('app.timezone'))))
             ->when($missingOnly, function ($query): void {
                 $query->where(function ($nested): void {
                     $nested->whereDoesntHave('settlement')
@@ -1189,7 +1190,10 @@ class MarketplaceSyncService
                         });
                 });
             })
-            ->orderByDesc('ordered_at')
+            ->when($beforeId !== null, fn ($query) => $query->where('id', '<', $beforeId))
+            // Cursor pagination uses the internal monotonic order id. Sorting
+            // by the same column prevents a date/id mismatch from skipping
+            // orders between TikTok finance batches.
             ->orderByDesc('id')
             ->limit($limit);
 
@@ -1273,6 +1277,81 @@ class MarketplaceSyncService
             . "{$summary['estimates_updated']} estimasi diperbarui, {$summary['errors']} error.";
 
         return $summary;
+    }
+
+    /**
+     * Process every TikTok order in the requested window. The per-order
+     * statement endpoint is intentionally paged locally so a busy store does
+     * not stop at the first 200 orders; the scheduler and manual sync use the
+     * same cursor semantics.
+     *
+     * @return array<string,mixed>
+     */
+    public function syncTikTokFinanceBatched(
+        Store $store,
+        ?int $timeFrom = null,
+        ?int $timeTo = null,
+        bool $missingOnly = false,
+        ?callable $progress = null,
+        int $limit = 200,
+    ): array {
+        $limit = max(1, min($limit, 1000));
+        $totals = [
+            'found' => 0,
+            'processed' => 0,
+            'synced' => 0,
+            'pending' => 0,
+            'skipped' => 0,
+            'errors' => 0,
+            'unsettled_found' => 0,
+            'estimates_updated' => 0,
+            'estimates_unmatched' => 0,
+            'estimate_errors' => 0,
+            'last_processed_id' => null,
+        ];
+        $beforeId = null;
+
+        while (true) {
+            $batch = $this->syncTikTokFinance(
+                $store,
+                $timeFrom,
+                $timeTo,
+                $missingOnly,
+                $progress,
+                $limit,
+                $beforeId,
+            );
+
+            foreach ([
+                'found', 'processed', 'synced', 'pending', 'skipped', 'errors',
+                'unsettled_found', 'estimates_updated', 'estimates_unmatched',
+                'estimate_errors',
+            ] as $key) {
+                $totals[$key] += (int) ($batch[$key] ?? 0);
+            }
+            $totals['last_processed_id'] = $batch['last_processed_id'] ?? $totals['last_processed_id'];
+
+            $nextBeforeId = (int) ($batch['last_processed_id'] ?? 0);
+            if (($batch['processed'] ?? 0) < $limit || $nextBeforeId <= 0) {
+                break;
+            }
+            if ($beforeId !== null && $nextBeforeId >= $beforeId) {
+                Log::warning('TikTok Finance batch berhenti karena cursor tidak maju', [
+                    'store_id' => $store->id,
+                    'before_id' => $beforeId,
+                    'last_processed_id' => $nextBeforeId,
+                ]);
+                $totals['errors']++;
+                break;
+            }
+
+            $beforeId = $nextBeforeId;
+        }
+
+        $totals['message'] = "Finance TikTok selesai: {$totals['synced']} settled, {$totals['pending']} belum settled, "
+            . "{$totals['estimates_updated']} estimasi diperbarui, {$totals['errors']} error.";
+
+        return $totals;
     }
 
     /**

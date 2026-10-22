@@ -3232,7 +3232,7 @@ class MarketplaceController extends Controller
         try {
             if ($isBackfill) {
                 $result = in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt'], true)
-                    ? $this->sync->syncTikTokFinance($store, $timeFrom, $timeTo, false, function (array $progress) use ($progressKey, $store): void {
+                    ? $this->sync->syncTikTokFinanceBatched($store, $timeFrom, $timeTo, false, function (array $progress) use ($progressKey, $store): void {
                         Cache::put($progressKey, array_merge($progress, [
                             'store_id' => $store->id,
                             'store_name' => $store->name,
@@ -3241,7 +3241,7 @@ class MarketplaceController extends Controller
                     : $this->sync->syncSettlementsBackfill($store, $timeFrom, $timeTo);
             } else {
                 $result = in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt'], true)
-                    ? $this->sync->syncTikTokFinance($store, $timeFrom, $timeTo, false, function (array $progress) use ($progressKey, $store): void {
+                    ? $this->sync->syncTikTokFinanceBatched($store, $timeFrom, $timeTo, false, function (array $progress) use ($progressKey, $store): void {
                         Cache::put($progressKey, array_merge($progress, [
                             'store_id' => $store->id,
                             'store_name' => $store->name,
@@ -3909,8 +3909,12 @@ class MarketplaceController extends Controller
             $voucherTokoAmount = $this->settlementVoucherTokoAmount($s);
             $adjustmentTotal = (float) ($feeTotals['adjustment'] ?? 0);
             $allBurdenTotal = (float) ($feeTotals['total'] ?? 0);
+            $status = strtoupper($s->order?->order_status ?? '');
+            $isCancelledOrReturned = in_array($status, ['CANCELLED', 'CANCELED', 'BATAL', 'RETURNED', 'REFUND']);
             $sellerDiscount = (float) data_get($s->raw_json, 'seller_discount', 0);
-            $grossAmount = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
+            $grossAmount = $isCancelledOrReturned
+                ? 0.0
+                : (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
             $buyerPaidAmount = $this->settlementBuyerPaidAmount($s);
             $voucherPlatformAmount = $this->settlementVoucherPlatformAmount($s);
             $voucherExternalAmount = $this->settlementVoucherExternalAmount($s);
@@ -3942,8 +3946,6 @@ class MarketplaceController extends Controller
             $estimatedEscrowAmount = $isBookingOnly ? null : $this->settlementEstimatedEscrowAmount($s);
             $isEstimatedIncome = false;
             $incomeEstimationSource = null;
-            $status = strtoupper($s->order?->order_status ?? '');
-            $isCancelledOrReturned = in_array($status, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
             $isReturning = in_array($status, ['TO_RETURN', 'RETURNING']);
 
             if ($isBookingOnly) {
@@ -4158,6 +4160,11 @@ class MarketplaceController extends Controller
             $adjustmentFeeTotal = (float) ($feeTotals['adjustment'] ?? 0);
             $allFeeTotal = (float) ($feeTotals['total'] ?? 0);
             $grossTotal = (float) $metaRows->sum(function (MarketplaceOrderSettlement $settlement) {
+                $status = strtoupper($settlement->order?->order_status ?? '');
+                if (in_array($status, ['CANCELLED', 'CANCELED', 'BATAL', 'RETURNED', 'REFUND'])) {
+                    return 0.0;
+                }
+
                 $sellerDiscount = (float) data_get($settlement->raw_json, 'seller_discount', 0);
 
                 return (float) ($settlement->order?->subtotal_items ?? $settlement->buyer_payment_amount) - $sellerDiscount;
@@ -4604,7 +4611,9 @@ class MarketplaceController extends Controller
             return $this->settlementFeeAmount($value);
         }
 
-        return 0.0;
+        // Imported/normalized settlement rows may keep the seller voucher in
+        // the canonical column instead of raw_json.
+        return $this->settlementFeeAmount($s->seller_voucher ?? 0);
     }
 
     private function settlementVoucherExternalAmount(MarketplaceOrderSettlement $s): float

@@ -1089,6 +1089,44 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertEquals(18.3, (float) $payload['meta']['kpi_fee_pct']);
     }
 
+    public function test_order_cancelled_has_zero_gross_and_net_settlement(): void
+    {
+        $store = $this->createStore();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-CANCELLED-GROSS',
+            'channel_order_id' => 'ORDER-CANCELLED-GROSS',
+            'order_status' => 'CANCELLED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'buyer_payment_amount' => 100000,
+            'final_income' => 90000,
+            'settlement_time' => now(),
+            'raw_json' => ['cost_of_goods_sold' => 100000, 'order_selling_price' => 100000],
+        ]);
+
+        $payload = app(MarketplaceController::class)->settlements(Request::create(
+            '/api/marketplace/settlements',
+            'GET',
+            ['store_id' => $store->id, 'page' => 1, 'per_page' => 50],
+        ))->getData(true);
+        $row = $payload['paginator']['data'][0];
+
+        $this->assertSame(0.0, (float) $row['gross_amount']);
+        $this->assertSame(0.0, (float) $row['gross_after_voucher']);
+        $this->assertSame(0.0, (float) $row['final_income']);
+        $this->assertSame(0.0, (float) $payload['meta']['kpi_gross']);
+        $this->assertSame(0.0, (float) $payload['meta']['kpi_net']);
+    }
+
     public function test_settlements_endpoint_mengembalikan_rincian_potongan_dinamis()
     {
         $admin = User::factory()->create(['role' => 'admin', 'employee_code' => 'ADM-BREAKDOWN']);
