@@ -913,7 +913,7 @@
                         </li>
                     @endif
 
-                    @if ($isAdmin && ($router->has('whatsapp.index') || $hasWhatsAppBroadcast))
+                    @if (! $isAdmin && ($router->has('whatsapp.index') || $hasWhatsAppBroadcast))
                         <div class="mobile-sidebar-section-label">Komunikasi</div>
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $whatsappOpen ? 'is-open' : '' }}"
@@ -1052,7 +1052,7 @@
                                     <button class="mobile-sidebar-link mobile-sidebar-toggle mobile-sidebar-nested-toggle {{ $marketplaceOrderGroupOpen ? 'is-open' : '' }}"
                                             type="button" data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminOrdersMobile"
                                             aria-expanded="{{ $marketplaceOrderGroupOpen ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminOrdersMobile">
-                                        <span class="icon"><i class="bi bi-box-seam"></i></span><span>Pesanan & Komunikasi</span><span class="chevron">▸</span>
+                                        <span class="icon"><i class="bi bi-box-seam"></i></span><span>Pesanan</span><span class="chevron">▸</span>
                                     </button>
                                     <div class="collapse mobile-sidebar-nested-collapse {{ $marketplaceOrderGroupOpen ? 'show' : '' }}" id="navMarketplaceAdminOrdersMobile">
                                         @if ($hasMarketplaceIndex)
@@ -1535,7 +1535,7 @@
 
                     {{-- Keuangan (admin / operating) --}}
                     @if ($hasAccountingIndex || $hasCashExpensesIndex || $hasCashTransfersIndex || $hasCashReceiptsIndex || $hasSupplierLoansIndex || $hasEmployeeSavingsIndex || $hasCashBasisReportIndex || $hasJournalsIndex || $hasAccountsIndex || $hasOpeningBalancesIndex || $hasOpeningBalancesBatchIndex || $hasSupplierApOpeningsIndex)
-                        <div class="mobile-sidebar-section-label">Keuangan</div>
+                        <div class="mobile-sidebar-section-label">{{ $isAdmin ? 'Akuntansi' : 'Keuangan' }}</div>
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $accountingOpen ? 'is-open' : '' }}"
                                     type="button" data-bs-toggle="collapse" data-bs-target="#navAccountingAdminMobile"

@@ -1061,7 +1061,7 @@
                     </x-sidebar.simple-link>
                 </li>
             @endif
-            @if ($isAdmin && ($router->has('whatsapp.index') || $hasWhatsAppBroadcast))
+            @if (! $isAdmin && ($router->has('whatsapp.index') || $hasWhatsAppBroadcast))
                 <x-sidebar.label text="Komunikasi" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openCommunication ? 'is-open' : '' }}" type="button"
@@ -1414,7 +1414,7 @@
                                 data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminOrders"
                                 aria-expanded="{{ $openMarketplaceOrderGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminOrders">
                                 <span class="icon"><i class="bi bi-box-seam"></i></span>
-                                <span>Pesanan & Komunikasi</span>
+                                <span>Pesanan</span>
                                 <span class="chevron">▸</span>
                             </button>
                             <div class="collapse sidebar-nested-collapse {{ $openMarketplaceOrderGroup ? 'show' : '' }}" id="navMarketplaceAdminOrders">
@@ -1966,7 +1966,7 @@
                 $hasSupplierApOpeningsIndex,
                 $hasAccountingIndex
             ))
-                <x-sidebar.label text="Keuangan" />
+                <x-sidebar.label :text="$isAdmin ? 'Akuntansi' : 'Keuangan'" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openAccounting ? 'is-open' : '' }}" type="button"
                         data-bs-toggle="collapse" data-bs-target="#navAccountingAdmin"

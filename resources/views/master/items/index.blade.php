@@ -351,11 +351,21 @@
     .item-card { overflow: hidden; border: 1px solid var(--gf-line); border-radius: 16px; background: #fff; box-shadow: var(--gf-shadow-sm); }
     .item-filter { display: grid; grid-template-columns: minmax(230px,1.5fr) repeat(4,minmax(120px,1fr)) auto; gap: .65rem; align-items: end; padding: 1rem; border-bottom: 1px solid #eef0f3; background: #fff; }
     .item-filter-search { position: relative; grid-column: span 2; }
-    .item-filter-search::before { content: '\F52A'; position: absolute; z-index: 1; left: .75rem; bottom: .72rem; color: #98a2b3; font-family: 'bootstrap-icons'; font-size: .78rem; pointer-events: none; }
+    .item-filter-search::before { display: none; }
     .item-label { display: block; height: auto; margin-bottom: .32rem; color: #475467; font-size: .65rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
-    .item-filter .form-control, .item-filter .form-select { min-height: 38px; height: 38px; padding-inline: .7rem; border: 1px solid #d0d5dd; border-radius: 9px; color: #344054; background: #fff; font-size: .74rem; font-weight: 600; box-shadow: none; }
-    .item-filter-search .form-control { padding-left: 2.1rem; border-color: #b9baf4; font-size: .78rem; }
-    .item-filter .form-control:focus, .item-filter .form-select:focus { border-color: var(--gf-brand); box-shadow: 0 0 0 3px rgba(91,92,226,.12); }
+    .item-filter-search-control, .item-filter-select { position: relative; display: flex; align-items: center; min-width: 0; min-height: 38px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease; }
+    .item-filter-search-control:focus-within, .item-filter-select:focus-within { border-color: var(--gf-brand); box-shadow: 0 0 0 3px rgba(91,92,226,.12); }
+    .item-filter-search-icon { position: absolute; top: 50%; left: .75rem; z-index: 1; color: #667085; font-size: .85rem; pointer-events: none; transform: translateY(-50%); }
+    .item-filter .form-control, .item-filter .form-select { min-height: 38px; height: 38px; padding-inline: .7rem; border: 0 !important; border-radius: 9px; color: #344054; background: transparent; font-size: .74rem; font-weight: 600; box-shadow: none !important; }
+    .item-filter-search .form-control { width: 100%; min-width: 0; padding: .45rem 2.2rem .45rem 2.15rem; font-size: .75rem; font-weight: 500; outline: none; }
+    .item-filter-select .form-select { flex: 1; min-width: 0; padding-right: 2.25rem; appearance: none; cursor: pointer; }
+    .item-filter-select-icon { position: absolute; right: .75rem; color: #98a2b3; font-size: .68rem; pointer-events: none; }
+    .item-filter .form-control::placeholder { color: #667085; opacity: .9; }
+    .item-filter .form-select option { color: #344054; background: #fff; font: inherit; }
+    .item-filter-search-clear { position: absolute; top: 50%; right: .4rem; display: inline-grid; width: 28px; height: 28px; padding: 0; place-items: center; border: 0; border-radius: 7px; color: #667085; background: transparent; cursor: pointer; transform: translateY(-50%); }
+    .item-filter-search-clear[hidden] { display: none; }
+    .item-filter-search-clear:hover { color: var(--gf-ink); background: #e2e8f0; }
+    .item-filter-search-clear:focus-visible { outline: 3px solid rgba(91,92,226,.32); outline-offset: 1px; }
     .item-filter-actions { display: flex; align-items: center; gap: .4rem; }
     .item-filter-actions .btn { min-height: 38px; }
     .item-results { transition: opacity .18s ease; }
@@ -427,27 +437,78 @@
     #addItemModal .add-item-section-icon { width: 28px; height: 28px; flex-basis: 28px; border-radius: 9px; color: var(--gf-brand-strong); background: #eeefff; font-size: .76rem; }
     #addItemModal .add-item-section-head h3 { color: var(--gf-ink); font-size: .75rem; font-weight: 800; }
     #addItemModal .add-item-section-head p { margin-top: .12rem; color: #98a2b3; font-size: .64rem; }
+    #addItemModal .add-item-section-summary { align-items: center; margin: 0; margin-bottom: 0; cursor: pointer; list-style: none; }
+    #addItemModal .add-item-section-summary::-webkit-details-marker { display: none; }
+    #addItemModal .add-item-section-summary:focus-visible { outline: 3px solid rgba(91,92,226,.22); outline-offset: 4px; border-radius: 8px; }
+    #addItemModal .add-item-section-copy { flex: 1 1 auto; min-width: 0; }
+    #addItemModal .add-item-section-badge { display: inline-flex; align-items: center; margin-left: .35rem; padding: .15rem .38rem; border: 1px solid #dfe1ff; border-radius: 999px; color: var(--gf-brand-strong); background: #f6f6ff; font-size: .54rem; font-weight: 800; letter-spacing: .02em; vertical-align: 2px; }
+    #addItemModal .add-item-section-toggle { display: grid; flex: 0 0 28px; width: 28px; height: 28px; place-items: center; border-radius: 8px; color: #98a2b3; background: #f8f9fb; font-size: .66rem; transition: transform .18s ease, color .18s ease, background .18s ease; }
+    #addItemModal .add-item-section-summary:hover .add-item-section-toggle { color: var(--gf-brand-strong); background: #f4f4ff; }
+    #addItemModal .add-item-optional-section[open] .add-item-section-toggle { color: var(--gf-brand-strong); background: #eeefff; transform: rotate(180deg); }
+    #addItemModal .add-item-section-content { margin-top: .75rem; }
     #addItemModal .form-label { margin-bottom: .3rem; color: #475467; font-size: .64rem; font-weight: 750; }
     #addItemModal .form-control, #addItemModal .form-select { min-height: 38px; border-color: #d0d5dd; border-radius: 9px; color: #344054; background: #fff; font-size: .72rem; box-shadow: none; }
     #addItemModal .form-control:focus, #addItemModal .form-select:focus { border-color: var(--gf-brand); box-shadow: 0 0 0 3px rgba(91,92,226,.12); }
     #addItemModal .form-text { margin-top: .25rem; color: #98a2b3; font-size: .6rem; }
     #addItemModal .invalid-feedback { font-size: .6rem; }
     #addItemModal .add-item-footer-note { margin-top: .75rem; padding: .62rem .7rem; border: 1px solid #b2ddff; border-radius: 9px; color: #175cd3; background: #eff8ff; font-size: .63rem; }
-    #addItemModal .add-item-modal-footer { display: flex; align-items: center; gap: .7rem; padding: .78rem 1.2rem; border-top: 1px solid #f0f1f3; background: #fcfcfd; }
-    #addItemModal .add-item-modal-footer .btn { min-height: 34px; font-size: .68rem; }
+    #addItemModal .add-item-modal-footer { display: flex; align-items: center; gap: .7rem; padding: .78rem 1.2rem; border-top: 1px solid #f0f1f3; background: rgba(252,252,253,.96); box-shadow: 0 -8px 18px rgba(16,24,40,.04); backdrop-filter: blur(8px); }
+    #addItemModal .add-item-modal-footer .btn { min-height: 40px; font-size: .68rem; }
     #addItemModal .add-item-full-link { color: #667085; font-size: .63rem; font-weight: 700; }
     #addItemModal .add-item-full-link:hover { color: var(--gf-brand-strong); }
+    #addItemModal, #editItemModal {
+        --gf-brand: var(--gf-color-brand);
+        --gf-brand-strong: var(--gf-color-brand-strong);
+        --gf-ink: var(--gf-color-content);
+        --gf-muted: var(--gf-color-muted);
+        --gf-line: var(--gf-color-line);
+    }
+    #editItemModal { z-index: 10050; }
+    #editItemModal .modal-dialog { max-width: 720px; }
+    #editItemModal .modal-content { overflow: hidden; border: 1px solid #e0e2fb; border-radius: 18px; box-shadow: var(--gf-shadow-lg); }
+    #editItemModal .item-edit-modal-header { display: grid; grid-template-columns: 38px minmax(0,1fr) 30px; align-items: start; gap: .7rem; padding: 1rem 1.2rem; border-bottom: 1px solid #f0f1f3; background: #fff; }
+    #editItemModal .item-edit-modal-icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 12px; color: var(--gf-brand-strong); background: #eeefff; font-size: .9rem; }
+    #editItemModal .item-edit-modal-kicker { margin-top: .05rem; color: var(--gf-brand-strong); font-size: .6rem; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+    #editItemModal .modal-title { margin: .18rem 0 0; color: var(--gf-ink); font-size: 1.05rem; font-weight: 820; letter-spacing: -.04em; }
+    #editItemModal .item-edit-modal-subtitle { max-width: 540px; margin: .25rem 0 0; color: var(--gf-muted); font-size: .7rem; line-height: 1.45; }
+    #editItemModal .btn-close { grid-column: 3; width: 30px; height: 30px; padding: .5rem; border-radius: 8px; }
+    #editItemModal .item-edit-modal-body { padding: 1rem 1.2rem 1.1rem; background: #fff; }
+    #editItemModal .item-edit-note { margin-bottom: 1rem; padding: .62rem .72rem; border: 1px solid #b2ddff; border-radius: 9px; color: #175cd3; background: #eff8ff; font-size: .64rem; }
+    #editItemModal .item-edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .85rem; }
+    #editItemModal .item-edit-field { display: grid; gap: .3rem; min-width: 0; }
+    #editItemModal .item-edit-field-full { grid-column: 1 / -1; }
+    #editItemModal .item-edit-help { color: #98a2b3; font-size: .6rem; line-height: 1.4; }
+    #editItemModal .form-check { display: flex; align-items: center; gap: .4rem; padding-top: .25rem; }
+    #editItemModal .form-check-label { color: #475467; font-size: .68rem; font-weight: 700; }
+    #editItemModal .form-control, #editItemModal .form-select { min-height: 38px; border-color: #d0d5dd; border-radius: 9px; color: #344054; background: #fff; font-size: .72rem; box-shadow: none; }
+    #editItemModal .form-control:focus, #editItemModal .form-select:focus { border-color: var(--gf-brand); box-shadow: 0 0 0 3px rgba(91,92,226,.12); }
+    #editItemModal .item-edit-modal-footer { display: flex; align-items: center; gap: .7rem; padding: .78rem 1.2rem; border-top: 1px solid #f0f1f3; background: rgba(252,252,253,.96); box-shadow: 0 -8px 18px rgba(16,24,40,.04); backdrop-filter: blur(8px); }
+    #editItemModal .item-edit-modal-footer .btn { min-height: 40px; font-size: .68rem; }
+    #editItemModal .item-edit-full-link { color: #667085; font-size: .63rem; font-weight: 700; }
+    #editItemModal .item-edit-full-link:hover { color: var(--gf-brand-strong); }
 
     body[data-theme="dark"] .item-page { --gf-ink: #f8fafc; --gf-muted: #aab4c5; }
     body[data-theme="dark"] .item-hero { border-color: #263149; background: linear-gradient(120deg,#171638 0%,#111827 52%,#0f2931 100%); }
     body[data-theme="dark"] .item-title, body[data-theme="dark"] .item-name, body[data-theme="dark"] .item-kpi-value, body[data-theme="dark"] .item-overview-stat strong { color: #f8fafc; }
     body[data-theme="dark"] .item-kpi, body[data-theme="dark"] .item-card, body[data-theme="dark"] .item-mobile-card, body[data-theme="dark"] .item-filter, body[data-theme="dark"] .item-table th:last-child, body[data-theme="dark"] .item-table td:last-child { border-color: #334155; background: #111827; }
     body[data-theme="dark"] .item-filter, body[data-theme="dark"] .item-table thead th, body[data-theme="dark"] .item-mobile-list, body[data-theme="dark"] .item-overview, body[data-theme="dark"] .item-bulk, body[data-theme="dark"] .item-footer { border-color: #263149; background: #0f172a; }
+    body[data-theme="dark"] .item-filter-search-control, body[data-theme="dark"] .item-filter-select { border-color: #475569; background: #111827; }
+    body[data-theme="dark"] .item-filter-search-icon, body[data-theme="dark"] .item-filter-select-icon, body[data-theme="dark"] .item-filter-search-clear { color: #aab4c5; }
+    body[data-theme="dark"] .item-filter-search-clear:hover { color: #f8fafc; background: #334155; }
     body[data-theme="dark"] .item-filter .form-control, body[data-theme="dark"] .item-filter .form-select, body[data-theme="dark"] #addItemModal .form-control, body[data-theme="dark"] #addItemModal .form-select { border-color: #475569; color: #f8fafc; background: #0f172a; }
+    body[data-theme="dark"] .item-filter .form-select option { color: #f8fafc; background: #0f172a; }
     body[data-theme="dark"] .item-table tbody td, body[data-theme="dark"] .item-mobile-card-value { color: #cbd5e1; border-color: #263149; }
     body[data-theme="dark"] .item-table tbody tr:hover, body[data-theme="dark"] .item-table tbody tr:hover td:last-child { background: #172033; }
     body[data-theme="dark"] #addItemModal .modal-content, body[data-theme="dark"] #addItemModal .add-item-modal-header, body[data-theme="dark"] #addItemModal .add-item-modal-body, body[data-theme="dark"] #addItemModal .add-item-section, body[data-theme="dark"] #addItemModal .add-item-modal-footer { border-color: #334155; background: #111827; }
     body[data-theme="dark"] #addItemModal .add-item-modal-header .modal-title, body[data-theme="dark"] #addItemModal .add-item-section-head h3 { color: #f8fafc; }
+    body[data-theme="dark"] #addItemModal .add-item-section-badge { border-color: #4338ca; color: #c7d2fe; background: #1e1b4b; }
+    body[data-theme="dark"] #addItemModal .add-item-section-toggle { color: #aab4c5; background: #1f2937; }
+    body[data-theme="dark"] #addItemModal .add-item-optional-section[open] .add-item-section-toggle { color: #c7d2fe; background: #312e81; }
+    body[data-theme="dark"] #editItemModal .modal-content, body[data-theme="dark"] #editItemModal .item-edit-modal-header, body[data-theme="dark"] #editItemModal .item-edit-modal-body, body[data-theme="dark"] #editItemModal .item-edit-modal-footer { border-color: #334155; background: #111827; }
+    body[data-theme="dark"] #editItemModal .modal-title, body[data-theme="dark"] #editItemModal .form-check-label { color: #f8fafc; }
+    body[data-theme="dark"] #editItemModal .form-control, body[data-theme="dark"] #editItemModal .form-select { border-color: #475569; color: #f8fafc; background: #0f172a; }
+    body[data-theme="dark"] #editItemModal .item-edit-note { border-color: #1e40af; color: #bfdbfe; background: #172554; }
+    body[data-theme="dark"] #editItemModal .item-edit-help { color: #94a3b8; }
 
     @media (max-width: 1100px) { .item-hero { grid-template-columns: 1fr; } .item-kpis { grid-template-columns: repeat(4,minmax(0,1fr)); } .item-actions { grid-column: auto; justify-content: flex-start; } .item-filter { grid-template-columns: repeat(3,minmax(0,1fr)); } .item-filter-search { grid-column: 1 / -1; } }
     @media (min-width: 761px) and (max-width: 1400px) {
@@ -478,6 +539,8 @@
         .item-actions .btn { justify-content: center; width: 100%; }
         .item-filter { grid-template-columns: 1fr; padding: .8rem; }
         .item-filter-search { grid-column: auto; }
+        .item-filter-search-control, .item-filter-select { min-height: 44px; }
+        .item-filter .form-control, .item-filter .form-select { min-height: 42px; height: 42px; font-size: .78rem; }
         .item-filter-actions { display: grid; grid-template-columns: 1fr auto; }
         .item-filter-actions .btn { justify-content: center; width: 100%; }
         .item-overview { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
@@ -491,13 +554,309 @@
         .item-bulk .item-muted { display: none; }
         .item-bulk .btn { flex: 1 1 auto; }
         .item-bulk #bulkClear { flex: 0 0 auto; }
-        #addItemModal .modal-dialog { margin: .5rem; }
+        #addItemModal .modal-dialog { width: auto; max-width: none; margin: .5rem; }
+        #addItemModal .modal-content { max-height: calc(100dvh - 1rem); border-radius: 16px; }
+        #addItemModal .add-item-modal-body { overflow-y: auto; overscroll-behavior: contain; }
         #addItemModal .add-item-modal-header, #addItemModal .add-item-modal-body, #addItemModal .add-item-modal-footer { padding-inline: .9rem; }
-        #addItemModal .add-item-modal-footer { align-items: stretch; flex-direction: column; }
+        #addItemModal .add-item-modal-header { grid-template-columns: 36px minmax(0,1fr) 40px; padding-block: .9rem; }
+        #addItemModal .add-item-modal-header-icon { width: 36px; height: 36px; }
+        #addItemModal .btn-close { width: 40px; height: 40px; margin-top: -.15rem; }
+        #addItemModal .add-item-section { padding: .8rem; }
+        #addItemModal .add-item-section-summary { min-height: 44px; }
+        #addItemModal .add-item-section-content { margin-top: .8rem; }
+        #addItemModal .form-control, #addItemModal .form-select { min-height: 44px; font-size: .78rem; }
+        #addItemModal .add-item-modal-footer { align-items: stretch; flex-direction: column; gap: .55rem; padding-block: .7rem; }
+        #addItemModal .add-item-modal-footer > .d-flex { order: 1; }
+        #addItemModal .add-item-full-link { order: 2; min-height: 36px; justify-content: center; }
         #addItemModal .add-item-modal-footer > .d-flex { width: 100%; margin-left: 0 !important; }
         #addItemModal .add-item-modal-footer > .d-flex .btn { flex: 1 1 0; }
+        #editItemModal .item-edit-modal-header, #editItemModal .item-edit-modal-body, #editItemModal .item-edit-modal-footer { padding-inline: .9rem; }
+        #editItemModal .item-edit-modal-header { grid-template-columns: 36px minmax(0,1fr) 40px; padding-block: .9rem; }
+        #editItemModal .item-edit-modal-icon { width: 36px; height: 36px; }
+        #editItemModal .item-edit-modal-body { overflow-y: auto; overscroll-behavior: contain; }
+        #editItemModal .item-edit-grid { grid-template-columns: 1fr; gap: .75rem; }
+        #editItemModal .item-edit-field-full { grid-column: auto; }
+        #editItemModal .form-control, #editItemModal .form-select { min-height: 44px; font-size: .78rem; }
+        #editItemModal .item-edit-modal-footer { align-items: stretch; flex-direction: column; gap: .55rem; padding-block: .7rem; }
+        #editItemModal .item-edit-modal-footer > .d-flex { width: 100%; margin-left: 0 !important; }
+        #editItemModal .item-edit-modal-footer > .d-flex .btn { flex: 1 1 0; }
+        #editItemModal .item-edit-full-link { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; }
     }
-    @media (prefers-reduced-motion: reduce) { .item-results, .item-primary, .item-soft { transition: none !important; } }
+    /* Keep the Add Item CTA explicitly primary despite legacy button overrides. */
+    .item-actions .item-add-button {
+        min-height: 40px;
+        padding-inline: .9rem;
+        --bs-btn-color: #fff;
+        --bs-btn-hover-color: #fff;
+        --bs-btn-active-color: #fff;
+        color: #fff !important;
+        -webkit-text-fill-color: #fff !important;
+        border: 1px solid var(--gf-brand) !important;
+        background: var(--gf-brand) !important;
+        box-shadow: 0 7px 14px rgba(91,92,226,.2) !important;
+    }
+    .item-actions .item-add-button span,
+    .item-actions .item-add-button i {
+        color: #fff !important;
+        -webkit-text-fill-color: #fff !important;
+    }
+    .item-actions .item-add-button:hover,
+    .item-actions .item-add-button:focus-visible {
+        color: #fff !important;
+        border-color: var(--gf-brand-strong) !important;
+        background: var(--gf-brand-strong) !important;
+        box-shadow: 0 9px 18px rgba(65,66,187,.24) !important;
+        transform: translateY(-1px);
+    }
+    .item-actions .item-add-button:active { transform: translateY(0); }
+    .item-actions .item-add-button:focus-visible { outline: 3px solid rgba(91,92,226,.22); outline-offset: 2px; }
+    .item-modal-primary,
+    .item-modal-primary:hover,
+    .item-modal-primary:focus-visible,
+    .item-modal-primary:active { color: #fff !important; }
+    .item-modal-primary i, .item-modal-primary span { color: inherit !important; }
+    .item-row-actions { min-width: max-content; gap: .42rem; }
+    .item-row-actions .btn { min-width: auto; min-height: 36px; padding-inline: .65rem; white-space: nowrap; }
+    .item-row-actions .action-label { display: inline !important; }
+    .item-row-actions .dropdown > .btn { width: 36px; padding-inline: 0; justify-content: center; }
+    .item-row-actions .dropdown-menu { z-index: 2000; }
+    .item-table th:last-child, .item-table td:last-child { min-width: 190px; }
+    .item-page .item-row-actions [data-item-edit],
+    .item-page .item-mobile-card-actions [data-item-edit] {
+        --bs-btn-color: #fff;
+        --bs-btn-hover-color: #fff;
+        --bs-btn-active-color: #fff;
+        color: #fff !important;
+        border: 1px solid var(--gf-brand) !important;
+        background: var(--gf-brand) !important;
+        box-shadow: 0 7px 14px rgba(91,92,226,.2) !important;
+    }
+    .item-page .item-row-actions [data-item-edit] i,
+    .item-page .item-row-actions [data-item-edit] .action-label,
+    .item-page .item-mobile-card-actions [data-item-edit] i {
+        color: #fff !important;
+        -webkit-text-fill-color: #fff !important;
+    }
+    .item-page .item-row-actions [data-item-edit]:hover,
+    .item-page .item-row-actions [data-item-edit]:focus-visible,
+    .item-page .item-mobile-card-actions [data-item-edit]:hover,
+    .item-page .item-mobile-card-actions [data-item-edit]:focus-visible {
+        color: #fff !important;
+        border-color: var(--gf-brand-strong) !important;
+        background: var(--gf-brand-strong) !important;
+        box-shadow: 0 9px 18px rgba(65,66,187,.24) !important;
+    }
+    .item-page .item-row-actions [data-item-edit]:focus-visible,
+    .item-page .item-mobile-card-actions [data-item-edit]:focus-visible { outline: 3px solid rgba(91,92,226,.24); outline-offset: 2px; }
+    .item-action-menu-portal.dropdown-menu {
+        position: fixed !important;
+        z-index: 12000 !important;
+        display: block !important;
+        min-width: 180px;
+        margin: 0 !important;
+        padding: .35rem;
+        border: 1px solid #e4e7ec;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: 0 18px 40px rgba(16,24,40,.16);
+    }
+    .item-action-menu-portal .dropdown-item {
+        display: flex;
+        align-items: center;
+        min-height: 38px;
+        gap: .45rem;
+        border-radius: 8px;
+        color: #344054;
+        font-size: .72rem;
+        font-weight: 650;
+    }
+    .item-action-menu-portal .dropdown-item:hover,
+    .item-action-menu-portal .dropdown-item:focus-visible { color: var(--gf-brand-strong); background: #f4f4ff; }
+    .item-action-menu-portal .dropdown-divider { margin: .3rem 0; border-color: #eef0f3; }
+    body[data-theme="dark"] .item-action-menu-portal.dropdown-menu { border-color: #334155; background: #111827; box-shadow: 0 18px 40px rgba(0,0,0,.32); }
+    body[data-theme="dark"] .item-action-menu-portal .dropdown-item { color: #e2e8f0; }
+    body[data-theme="dark"] .item-action-menu-portal .dropdown-item:hover,
+    body[data-theme="dark"] .item-action-menu-portal .dropdown-item:focus-visible { color: #c7d2fe; background: #1e1b4b; }
+    body[data-theme="dark"] .item-action-menu-portal .dropdown-divider { border-color: #334155; }
+    .item-modal-footer {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: .55rem;
+        padding: .78rem 1.2rem;
+        border-top: 1px solid var(--gf-color-line);
+        background: rgba(252,252,253,.96);
+        box-shadow: 0 -8px 18px rgba(16,24,40,.04);
+        backdrop-filter: blur(8px);
+    }
+    .item-modal-footer .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: .4rem;
+        min-height: 40px;
+        padding-inline: .78rem;
+        border-radius: var(--gf-radius-control);
+        font-size: .72rem;
+        font-weight: 750;
+        transition: color .18s ease, background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+    }
+    .item-modal-footer .btn:hover { transform: translateY(-1px); }
+    .item-modal-footer .item-primary {
+        color: #fff !important;
+        border: 1px solid var(--gf-color-brand) !important;
+        background: var(--gf-color-brand) !important;
+        box-shadow: 0 7px 14px rgba(91,92,226,.2) !important;
+    }
+    .item-modal-footer .item-primary:hover,
+    .item-modal-footer .item-primary:focus-visible {
+        color: #fff !important;
+        border-color: var(--gf-color-brand-strong) !important;
+        background: var(--gf-color-brand-strong) !important;
+        box-shadow: 0 9px 18px rgba(65,66,187,.24) !important;
+    }
+    .item-modal-footer .item-primary i,
+    .item-modal-footer .item-primary span { color: #fff !important; }
+    .item-modal-footer .item-soft {
+        color: #475467 !important;
+        border: 1px solid #d0d5dd !important;
+        background: #fff !important;
+        box-shadow: none !important;
+    }
+    .item-modal-footer .item-soft:hover,
+    .item-modal-footer .item-soft:focus-visible { color: var(--gf-color-brand-strong) !important; border-color: #b9baf4 !important; background: #fff !important; }
+    .item-modal-footer .btn:focus-visible { outline: 3px solid rgba(91,92,226,.24); outline-offset: 2px; }
+    .item-modal-footer .btn:disabled { opacity: .68; cursor: wait; transform: none; }
+    body[data-theme="dark"] .item-modal-footer { border-color: #334155; background: rgba(17,24,39,.96); }
+    body[data-theme="dark"] .item-modal-footer .item-soft { color: #e2e8f0 !important; border-color: #475569 !important; background: #0f172a !important; }
+    body[data-theme="dark"] .item-modal-footer .item-soft:hover,
+    body[data-theme="dark"] .item-modal-footer .item-soft:focus-visible { color: #c7d2fe !important; border-color: #6366f1 !important; background: #111827 !important; }
+    @media (max-width: 760px) {
+        .item-modal-footer { gap: .55rem; padding: .7rem .9rem; }
+        .item-modal-footer > .btn { min-height: 44px; flex: 1 1 0; }
+    }
+    /* Final component contract: one button hierarchy and one modal language. */
+    .item-page .btn { appearance: none; cursor: pointer; }
+    .item-page .item-actions .btn, .item-page .item-row-actions .btn, .item-page .item-mobile-card-actions .btn, .item-page .item-modal-footer .btn { min-height: 40px; border-radius: 10px; font-size: .72rem; font-weight: 780; letter-spacing: -.01em; transition: color .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+    .item-page .item-primary { color: #fff !important; border: 1px solid var(--gf-brand) !important; background: var(--gf-brand) !important; box-shadow: 0 7px 14px rgba(91,92,226,.2) !important; }
+    .item-page .item-primary:hover, .item-page .item-primary:focus-visible { color: #fff !important; border-color: var(--gf-brand-strong) !important; background: var(--gf-brand-strong) !important; box-shadow: 0 9px 18px rgba(65,66,187,.24) !important; transform: translateY(-1px); }
+    .item-page .item-primary:active { transform: translateY(0); }
+    .item-page .item-soft { color: #475467 !important; border: 1px solid #d0d5dd !important; background: #fff !important; box-shadow: none !important; }
+    .item-page .item-soft:hover, .item-page .item-soft:focus-visible { color: var(--gf-brand-strong) !important; border-color: #b9baf4 !important; background: #fff !important; box-shadow: 0 4px 10px rgba(16,24,40,.06) !important; transform: translateY(-1px); }
+    .item-page .item-primary:disabled, .item-page .item-soft:disabled, .item-page .btn:disabled { cursor: not-allowed; opacity: .55; pointer-events: none; transform: none; box-shadow: none !important; }
+    .item-page .item-row-actions [data-item-edit], .item-page .item-mobile-card-actions [data-item-edit] { color: var(--gf-brand-strong) !important; border-color: #dfe1ff !important; background: #f8f8ff !important; box-shadow: none !important; }
+    .item-page .item-row-actions [data-item-edit]:hover, .item-page .item-row-actions [data-item-edit]:focus-visible, .item-page .item-mobile-card-actions [data-item-edit]:hover, .item-page .item-mobile-card-actions [data-item-edit]:focus-visible { color: #fff !important; border-color: var(--gf-brand) !important; background: var(--gf-brand) !important; box-shadow: 0 4px 10px rgba(91,92,226,.16) !important; }
+    .item-page .item-filter-search-control, .item-page .item-filter-select { min-height: 42px; border-radius: 11px; background: #f8fafc; }
+    .item-page .item-filter .form-control, .item-page .item-filter .form-select { min-height: 40px; height: 40px; }
+    .item-page .item-filter-search-control:focus-within, .item-page .item-filter-select:focus-within { border-color: var(--gf-brand); box-shadow: 0 0 0 3px rgba(91,92,226,.12); }
+    .item-page .item-filter-search .form-control { border: 0 !important; box-shadow: none !important; }
+
+    body[data-theme="dark"] .item-page .item-soft { color: #e2e8f0 !important; border-color: #475569 !important; background: #0f172a !important; }
+    body[data-theme="dark"] .item-page .item-soft:hover, body[data-theme="dark"] .item-page .item-soft:focus-visible { color: #c7d2fe !important; border-color: #6366f1 !important; background: #111827 !important; }
+    body[data-theme="dark"] .item-page .item-row-actions [data-item-edit], body[data-theme="dark"] .item-page .item-mobile-card-actions [data-item-edit] { color: #c7d2fe !important; border-color: #4338ca !important; background: #1e1b4b !important; }
+    body[data-theme="dark"] .item-page .item-row-actions [data-item-edit]:hover, body[data-theme="dark"] .item-page .item-row-actions [data-item-edit]:focus-visible, body[data-theme="dark"] .item-page .item-mobile-card-actions [data-item-edit]:hover, body[data-theme="dark"] .item-page .item-mobile-card-actions [data-item-edit]:focus-visible { color: #fff !important; border-color: #6366f1 !important; background: #4f46e5 !important; }
+    @media (max-width: 700px) {
+        .item-page .item-actions { grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: .55rem; }
+        .item-page .item-actions .btn { min-height: 44px; }
+    }
+    /* Modals live outside .item-page so keep the same contract at document level. */
+    #addItemModal .modal-dialog, #editItemModal .modal-dialog { max-width: 720px; margin-block: .75rem; }
+    #addItemModal .modal-content, #editItemModal .modal-content { overflow: hidden; border: 1px solid #e0e2fb; border-radius: 18px; box-shadow: 0 24px 56px rgba(48,49,125,.16); }
+    #addItemModal .add-item-modal-header, #editItemModal .item-edit-modal-header { grid-template-columns: 38px minmax(0,1fr) 40px; padding: 1rem 1.2rem; border-bottom-color: #e4e7ec; background: linear-gradient(120deg,#f8f8ff 0%,#fff 64%,#f1fdff 100%); }
+    #addItemModal .btn-close, #editItemModal .btn-close { width: 40px; height: 40px; margin-top: -.15rem; padding: .75rem; border-radius: 9px; }
+    #addItemModal .add-item-modal-body, #editItemModal .item-edit-modal-body { background: #f8f9fc; }
+    #addItemModal .form-control, #addItemModal .form-select, #editItemModal .form-control, #editItemModal .form-select { min-height: 42px; border-color: #d0d5dd; border-radius: 10px; background: #fff; color: #344054; }
+    #addItemModal .form-control:focus, #addItemModal .form-select:focus, #editItemModal .form-control:focus, #editItemModal .form-select:focus { border-color: #5b5ce2; box-shadow: 0 0 0 3px rgba(91,92,226,.12); }
+    #addItemModal .add-item-modal-footer, #editItemModal .item-edit-modal-footer { gap: .55rem; padding: .8rem 1.2rem; border-top-color: #e4e7ec; background: rgba(252,252,253,.96); }
+    body[data-theme="dark"] #addItemModal .add-item-modal-header, body[data-theme="dark"] #editItemModal .item-edit-modal-header, body[data-theme="dark"] #addItemModal .add-item-modal-body, body[data-theme="dark"] #editItemModal .item-edit-modal-body, body[data-theme="dark"] #addItemModal .add-item-modal-footer, body[data-theme="dark"] #editItemModal .item-edit-modal-footer { border-color: #334155; background: #111827; }
+    body[data-theme="dark"] #addItemModal .form-control, body[data-theme="dark"] #addItemModal .form-select, body[data-theme="dark"] #editItemModal .form-control, body[data-theme="dark"] #editItemModal .form-select { border-color: #475569; background: #0f172a; color: #f8fafc; }
+    @media (max-width: 700px) {
+        #addItemModal .modal-dialog, #editItemModal .modal-dialog { margin: .5rem; }
+        #addItemModal .add-item-modal-header, #editItemModal .item-edit-modal-header { grid-template-columns: 36px minmax(0,1fr) 40px; padding-block: .9rem; }
+        #addItemModal .add-item-modal-body, #addItemModal .add-item-modal-footer, #editItemModal .item-edit-modal-body, #editItemModal .item-edit-modal-footer { padding-inline: .9rem; }
+        #addItemModal .form-control, #addItemModal .form-select, #editItemModal .form-control, #editItemModal .form-select { min-height: 44px; }
+        #addItemModal .add-item-modal-footer, #editItemModal .item-edit-modal-footer { align-items: stretch; flex-direction: column; }
+        #addItemModal .add-item-modal-footer > .d-flex, #editItemModal .item-edit-modal-footer > .d-flex { width: 100%; margin-left: 0 !important; }
+        #addItemModal .add-item-modal-footer > .d-flex .btn, #editItemModal .item-edit-modal-footer > .d-flex .btn { flex: 1 1 0; min-height: 44px; }
+    }
+    /* Keep table actions compact while preserving labeled, touch-friendly mobile cards. */
+    .item-page .item-table th:last-child,
+    .item-page .item-table td:last-child { min-width: 132px; }
+    .item-page .item-row-actions .btn {
+        width: 36px;
+        min-width: 36px;
+        min-height: 36px;
+        padding-inline: 0;
+        justify-content: center;
+    }
+    .item-page .item-row-actions .action-label { display: none !important; }
+    .item-page .item-row-actions [data-item-edit],
+    .item-page .item-mobile-card-actions [data-item-edit] {
+        --bs-btn-color: #fff;
+        --bs-btn-hover-color: #fff;
+        --bs-btn-active-color: #fff;
+        color: #fff !important;
+        border-color: var(--gf-color-brand) !important;
+        background: var(--gf-color-brand) !important;
+        box-shadow: 0 7px 14px rgba(91,92,226,.2) !important;
+    }
+    .item-page .item-row-actions [data-item-edit] i,
+    .item-page .item-row-actions [data-item-edit] .action-label,
+    .item-page .item-mobile-card-actions [data-item-edit] i {
+        color: #fff !important;
+        -webkit-text-fill-color: #fff !important;
+    }
+    .item-page .item-row-actions [data-item-edit]:hover,
+    .item-page .item-row-actions [data-item-edit]:focus-visible,
+    .item-page .item-mobile-card-actions [data-item-edit]:hover,
+    .item-page .item-mobile-card-actions [data-item-edit]:focus-visible {
+        color: #fff !important;
+        border-color: var(--gf-color-brand-strong) !important;
+        background: var(--gf-color-brand-strong) !important;
+        box-shadow: 0 9px 18px rgba(65,66,187,.24) !important;
+    }
+    @media (max-width: 760px) {
+        .item-page .item-mobile-card-actions .btn {
+            width: auto;
+            min-width: 0;
+            min-height: 44px;
+            padding-inline: .65rem;
+        }
+    }
+    /* Keep the sticky action rail fully opaque while the table scrolls underneath. */
+    .item-page .item-table-wrap {
+        position: relative;
+        isolation: isolate;
+    }
+    .item-page .item-table {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .item-page .item-table th:last-child,
+    .item-page .item-table td:last-child {
+        z-index: 12;
+        background-color: #fff !important;
+        background-image: none !important;
+        background-clip: padding-box;
+        box-shadow: -12px 0 20px rgba(16,24,40,.08);
+    }
+    .item-page .item-table thead th:last-child {
+        z-index: 20;
+        background-color: #fcfcfd !important;
+    }
+    .item-page .item-table tbody tr:hover td:last-child,
+    .item-page .item-table tbody tr:focus-within td:last-child {
+        background-color: #fafaff !important;
+    }
+    body[data-theme="dark"] .item-page .item-table th:last-child,
+    body[data-theme="dark"] .item-page .item-table td:last-child {
+        background-color: #111827 !important;
+        box-shadow: -12px 0 20px rgba(0,0,0,.25);
+    }
+    body[data-theme="dark"] .item-page .item-table thead th:last-child { background-color: #0f172a !important; }
+    body[data-theme="dark"] .item-page .item-table tbody tr:hover td:last-child,
+    body[data-theme="dark"] .item-page .item-table tbody tr:focus-within td:last-child { background-color: #172033 !important; }
+    @media (prefers-reduced-motion: reduce) { .item-results, .item-primary, .item-soft, .item-add-button { transition: none !important; } }
 </style>
 @endpush
 
@@ -523,7 +882,7 @@
                 @if($canManageMasterData)
                     <a href="{{ route('master.item_categories.index') }}" class="btn item-soft btn-sm"><i class="bi bi-tags"></i>Kategori</a>
                 @endif
-                <button type="button" class="btn item-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                <button type="button" class="btn item-primary item-add-button item-modal-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addItemModal" aria-haspopup="dialog" aria-controls="addItemModal">
                     <i class="bi bi-plus-lg"></i><span>Tambah Item</span>
                 </button>
             </div>
@@ -544,43 +903,61 @@
         <form method="GET" action="{{ route('master.items.index') }}" class="item-filter">
             <div class="item-filter-search">
                 <label class="item-label" for="item-search">Cari item</label>
-                <input id="item-search" type="search" name="q" value="{{ request('q') }}" class="form-control" autocomplete="off" placeholder="Kode, nama, atau SKU">
+                <div class="item-filter-search-control">
+                    <i class="bi bi-search item-filter-search-icon" aria-hidden="true"></i>
+                    <input id="item-search" type="search" name="q" value="{{ request('q') }}" class="form-control" autocomplete="off" inputmode="search" enterkeyhint="search" aria-label="Cari kode, nama, atau SKU" placeholder="Kode, nama, atau SKU">
+                    <button type="button" class="item-filter-search-clear" data-item-search-clear aria-label="Hapus pencarian" hidden>
+                        <i class="bi bi-x-lg" aria-hidden="true"></i>
+                    </button>
+                </div>
             </div>
             <div>
                 <label class="item-label" for="item-type">Tipe</label>
-                <select id="item-type" name="type" class="form-select">
-                    <option value="">Semua tipe</option>
-                    @foreach($typeLabels as $key => $label)
-                        <option value="{{ $key }}" @selected(request('type') === $key)>{{ $label }}</option>
-                    @endforeach
-                </select>
+                <div class="item-filter-select">
+                    <select id="item-type" name="type" class="form-select">
+                        <option value="">Semua tipe</option>
+                        @foreach($typeLabels as $key => $label)
+                            <option value="{{ $key }}" @selected(request('type') === $key)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <i class="bi bi-chevron-down item-filter-select-icon" aria-hidden="true"></i>
+                </div>
             </div>
             <div>
                 <label class="item-label" for="item-category-kind">Kelompok</label>
-                <select id="item-category-kind" name="category_kind" class="form-select">
-                    <option value="">Semua kelompok</option>
-                    @foreach($categoryKinds as $key => $label)
-                        <option value="{{ $key }}" @selected(request('category_kind') === $key)>{{ $label }}</option>
-                    @endforeach
-                </select>
+                <div class="item-filter-select">
+                    <select id="item-category-kind" name="category_kind" class="form-select">
+                        <option value="">Semua kelompok</option>
+                        @foreach($categoryKinds as $key => $label)
+                            <option value="{{ $key }}" @selected(request('category_kind') === $key)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <i class="bi bi-chevron-down item-filter-select-icon" aria-hidden="true"></i>
+                </div>
             </div>
             <div>
                 <label class="item-label" for="item-category">Kategori</label>
-                <select id="item-category" name="item_category_id" class="form-select">
-                    <option value="">Semua kategori</option>
-                    @foreach($categories as $category)
-                        <option value="{{ $category->id }}" @selected((string) request('item_category_id') === (string) $category->id)>{{ $category->code }} — {{ $category->name }}</option>
-                    @endforeach
-                </select>
+                <div class="item-filter-select">
+                    <select id="item-category" name="item_category_id" class="form-select">
+                        <option value="">Semua kategori</option>
+                        @foreach($categories as $category)
+                            <option value="{{ $category->id }}" @selected((string) request('item_category_id') === (string) $category->id)>{{ $category->code }} — {{ $category->name }}</option>
+                        @endforeach
+                    </select>
+                    <i class="bi bi-chevron-down item-filter-select-icon" aria-hidden="true"></i>
+                </div>
             </div>
             <div>
                 <label class="item-label" for="item-supply-mode">Metode pasok</label>
-                <select id="item-supply-mode" name="supply_mode" class="form-select">
-                    <option value="">Semua metode</option>
-                    @foreach($supplyModes as $key => $label)
-                        <option value="{{ $key }}" @selected(request('supply_mode') === $key)>{{ $label }}</option>
-                    @endforeach
-                </select>
+                <div class="item-filter-select">
+                    <select id="item-supply-mode" name="supply_mode" class="form-select">
+                        <option value="">Semua metode</option>
+                        @foreach($supplyModes as $key => $label)
+                            <option value="{{ $key }}" @selected(request('supply_mode') === $key)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <i class="bi bi-chevron-down item-filter-select-icon" aria-hidden="true"></i>
+                </div>
             </div>
             <div class="item-filter-actions">
                 <a href="{{ route('master.items.index') }}" class="btn item-soft btn-sm item-reset-filter {{ $hasFilters ? '' : 'd-none' }}" title="Hapus semua filter" aria-label="Reset filter"><i class="bi bi-x-lg"></i><span class="d-none d-xl-inline">Reset</span></a>
@@ -629,7 +1006,7 @@
                             @unless($isAdminRole)
                                 <th style="width:88px;">Status</th>
                             @endunless
-                            <th class="text-end" style="width:132px;">Aksi</th>
+                            <th class="text-end" style="width:132px;min-width:132px;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -683,13 +1060,13 @@
                                 <td class="text-end">
                                     <div class="item-row-actions">
                                         @if($isAdminRole)
-                                            <a href="{{ route('master.items.edit', $item) }}" class="btn item-primary btn-sm" title="Edit nama" aria-label="Edit nama {{ $item->code }}"><i class="bi bi-pencil"></i><span class="action-label">Edit Nama</span></a>
+                                            <button type="button" class="btn item-primary btn-sm" title="Edit nama" aria-label="Edit nama {{ $item->code }}" data-item-edit data-bs-toggle="modal" data-bs-target="#editItemModal" data-item-edit-url="{{ route('master.items.update', $item) }}" data-item-edit-full-url="{{ route('master.items.edit', $item) }}" data-item-edit-code="{{ $item->code }}" data-item-edit-name="{{ $item->name }}" data-item-edit-sku="{{ $item->sku }}" data-item-edit-type="{{ $item->type }}" data-item-edit-category="{{ $item->item_category_id }}" data-item-edit-stock-unit="{{ $item->stock_unit ?: $item->unit }}" data-item-edit-purchase-unit="{{ $item->purchase_unit ?: $item->unit }}" data-item-edit-conversion="{{ $item->purchase_conversion_factor ?: 1 }}" data-item-edit-production-source="{{ $item->production_source }}" data-item-edit-can-buy="{{ $item->can_buy ? 1 : 0 }}" data-item-edit-can-make="{{ $item->can_make ? 1 : 0 }}" data-item-edit-default-source="{{ $item->default_supply_source }}" data-item-edit-active="{{ $item->active ? 1 : 0 }}" data-item-edit-type-option="{{ $item->item_type_option_id }}" data-item-edit-allocation="{{ $item->default_allocation ?: 'hpp' }}" data-item-edit-treatment="{{ $item->purchase_treatment_id }}" data-item-edit-expense-account="{{ $item->default_expense_account_id }}"><i class="bi bi-pencil"></i><span class="action-label">Edit Nama</span></button>
                                         @else
                                             <a href="{{ route('master.items.show', $item) }}" class="btn item-soft btn-sm" title="Lihat detail" aria-label="Lihat detail {{ $item->code }}"><i class="bi bi-eye"></i><span class="action-label d-none d-xl-inline">Lihat</span></a>
-                                            <a href="{{ route('master.items.edit', $item) }}" class="btn item-primary btn-sm" title="Edit item" aria-label="Edit item {{ $item->code }}"><i class="bi bi-pencil"></i><span class="action-label d-none d-xl-inline">Edit</span></a>
+                                            <button type="button" class="btn item-primary btn-sm" title="Edit item" aria-label="Edit item {{ $item->code }}" data-item-edit data-bs-toggle="modal" data-bs-target="#editItemModal" data-item-edit-url="{{ route('master.items.update', $item) }}" data-item-edit-full-url="{{ route('master.items.edit', $item) }}" data-item-edit-code="{{ $item->code }}" data-item-edit-name="{{ $item->name }}" data-item-edit-sku="{{ $item->sku }}" data-item-edit-type="{{ $item->type }}" data-item-edit-category="{{ $item->item_category_id }}" data-item-edit-stock-unit="{{ $item->stock_unit ?: $item->unit }}" data-item-edit-purchase-unit="{{ $item->purchase_unit ?: $item->unit }}" data-item-edit-conversion="{{ $item->purchase_conversion_factor ?: 1 }}" data-item-edit-production-source="{{ $item->production_source }}" data-item-edit-can-buy="{{ $item->can_buy ? 1 : 0 }}" data-item-edit-can-make="{{ $item->can_make ? 1 : 0 }}" data-item-edit-default-source="{{ $item->default_supply_source }}" data-item-edit-active="{{ $item->active ? 1 : 0 }}" data-item-edit-type-option="{{ $item->item_type_option_id }}" data-item-edit-allocation="{{ $item->default_allocation ?: 'hpp' }}" data-item-edit-treatment="{{ $item->purchase_treatment_id }}" data-item-edit-expense-account="{{ $item->default_expense_account_id }}"><i class="bi bi-pencil"></i><span class="action-label d-none d-xl-inline">Edit</span></button>
                                             <div class="dropdown">
-                                                <button type="button" class="btn item-soft btn-sm px-2" data-bs-toggle="dropdown" aria-expanded="false" title="Aksi lainnya"><i class="bi bi-three-dots"></i></button>
-                                                <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                                <button type="button" class="btn item-soft btn-sm px-2" data-item-action-toggle aria-haspopup="menu" aria-expanded="false" aria-label="Aksi lainnya untuk {{ $item->code }}" title="Aksi lainnya"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
+                                                <ul class="dropdown-menu dropdown-menu-end shadow-sm" data-item-action-menu>
                                                     <li><a class="dropdown-item small" href="{{ route('master.items.hpp_temp.edit', $item) }}"><i class="bi bi-cash-coin me-2"></i>Set HPP</a></li>
                                                     <li><hr class="dropdown-divider"></li>
                                                     <li>
@@ -745,16 +1122,16 @@
                         <div class="item-mobile-card-footer">
                             <div class="item-mobile-card-actions">
                                 @if($isAdminRole)
-                                    <a href="{{ route('master.items.edit', $item) }}" class="btn item-primary btn-sm"><i class="bi bi-pencil"></i>Edit Nama</a>
+                                    <button type="button" class="btn item-primary btn-sm" data-item-edit data-bs-toggle="modal" data-bs-target="#editItemModal" data-item-edit-url="{{ route('master.items.update', $item) }}" data-item-edit-full-url="{{ route('master.items.edit', $item) }}" data-item-edit-code="{{ $item->code }}" data-item-edit-name="{{ $item->name }}" data-item-edit-sku="{{ $item->sku }}" data-item-edit-type="{{ $item->type }}" data-item-edit-category="{{ $item->item_category_id }}" data-item-edit-stock-unit="{{ $item->stock_unit ?: $item->unit }}" data-item-edit-purchase-unit="{{ $item->purchase_unit ?: $item->unit }}" data-item-edit-conversion="{{ $item->purchase_conversion_factor ?: 1 }}" data-item-edit-production-source="{{ $item->production_source }}" data-item-edit-can-buy="{{ $item->can_buy ? 1 : 0 }}" data-item-edit-can-make="{{ $item->can_make ? 1 : 0 }}" data-item-edit-default-source="{{ $item->default_supply_source }}" data-item-edit-active="{{ $item->active ? 1 : 0 }}" data-item-edit-type-option="{{ $item->item_type_option_id }}" data-item-edit-allocation="{{ $item->default_allocation ?: 'hpp' }}" data-item-edit-treatment="{{ $item->purchase_treatment_id }}" data-item-edit-expense-account="{{ $item->default_expense_account_id }}"><i class="bi bi-pencil"></i>Edit Nama</button>
                                 @else
                                     <a href="{{ route('master.items.show', $item) }}" class="btn item-soft btn-sm"><i class="bi bi-eye"></i>Lihat</a>
-                                    <a href="{{ route('master.items.edit', $item) }}" class="btn item-primary btn-sm"><i class="bi bi-pencil"></i>Edit</a>
+                                    <button type="button" class="btn item-primary btn-sm" data-item-edit data-bs-toggle="modal" data-bs-target="#editItemModal" data-item-edit-url="{{ route('master.items.update', $item) }}" data-item-edit-full-url="{{ route('master.items.edit', $item) }}" data-item-edit-code="{{ $item->code }}" data-item-edit-name="{{ $item->name }}" data-item-edit-sku="{{ $item->sku }}" data-item-edit-type="{{ $item->type }}" data-item-edit-category="{{ $item->item_category_id }}" data-item-edit-stock-unit="{{ $item->stock_unit ?: $item->unit }}" data-item-edit-purchase-unit="{{ $item->purchase_unit ?: $item->unit }}" data-item-edit-conversion="{{ $item->purchase_conversion_factor ?: 1 }}" data-item-edit-production-source="{{ $item->production_source }}" data-item-edit-can-buy="{{ $item->can_buy ? 1 : 0 }}" data-item-edit-can-make="{{ $item->can_make ? 1 : 0 }}" data-item-edit-default-source="{{ $item->default_supply_source }}" data-item-edit-active="{{ $item->active ? 1 : 0 }}" data-item-edit-type-option="{{ $item->item_type_option_id }}" data-item-edit-allocation="{{ $item->default_allocation ?: 'hpp' }}" data-item-edit-treatment="{{ $item->purchase_treatment_id }}" data-item-edit-expense-account="{{ $item->default_expense_account_id }}"><i class="bi bi-pencil"></i>Edit</button>
                                 @endif
                             </div>
                             @unless($isAdminRole)
                                 <div class="dropdown">
-                                    <button type="button" class="btn item-soft btn-sm px-2" data-bs-toggle="dropdown" aria-expanded="false" title="Aksi lainnya"><i class="bi bi-three-dots"></i></button>
-                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                    <button type="button" class="btn item-soft btn-sm px-2" data-item-action-toggle aria-haspopup="menu" aria-expanded="false" aria-label="Aksi lainnya untuk {{ $item->code }}" title="Aksi lainnya"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm" data-item-action-menu>
                                         <li><a class="dropdown-item small" href="{{ route('master.items.hpp_temp.edit', $item) }}"><i class="bi bi-cash-coin me-2"></i>Set HPP</a></li>
                                         <li><hr class="dropdown-divider"></li>
                                         <li>
@@ -796,7 +1173,7 @@
             <div class="modal-header add-item-modal-header">
                 <div class="add-item-modal-header-icon" aria-hidden="true"><i class="bi bi-plus-lg"></i></div>
                 <div>
-                    <div class="add-item-modal-kicker">New record</div>
+                    <div class="add-item-modal-kicker">Master data</div>
                     <h2 class="modal-title" id="addItemModalTitle">Tambah barang</h2>
                     <p class="add-item-modal-subtitle" id="addItemModalDescription">Isi informasi inti dulu. Detail supplier, barcode, dan HPP lanjutan bisa dilengkapi setelahnya.</p>
                 </div>
@@ -805,7 +1182,7 @@
 
             <div class="modal-body add-item-modal-body">
                 @if($errors->any() && old('return_to_index'))
-                    <div class="alert alert-danger add-item-alert" role="alert">
+                    <div class="alert alert-danger add-item-alert" role="alert" aria-live="assertive">
                         <div class="fw-bold"><i class="bi bi-exclamation-circle me-1"></i>Periksa kembali data barang</div>
                         <ul class="mb-0 mt-1 ps-3">
                             @foreach($errors->all() as $error)
@@ -815,10 +1192,10 @@
                     </div>
                 @endif
 
-                <div class="add-item-section">
+                <section class="add-item-section" aria-labelledby="add-item-identity-title">
                     <div class="add-item-section-head">
                         <span class="add-item-section-icon"><i class="bi bi-tag"></i></span>
-                        <div><h3>Identitas barang</h3><p>Kode dan nama menjadi identitas utama di transaksi.</p></div>
+                        <div><h3 id="add-item-identity-title">Identitas barang</h3><p>Kode dan nama menjadi identitas utama di transaksi.</p></div>
                     </div>
                     <div class="row g-3">
                         <div class="col-12 col-md-5">
@@ -858,12 +1235,12 @@
                             @error('item_category_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="add-item-section">
+                <section class="add-item-section" aria-labelledby="add-item-supply-title">
                     <div class="add-item-section-head">
                         <span class="add-item-section-icon"><i class="bi bi-rulers"></i></span>
-                        <div><h3>Satuan & pasokan</h3><p>Gunakan satuan stok untuk inventory dan satuan beli untuk purchasing.</p></div>
+                        <div><h3 id="add-item-supply-title">Satuan & pasokan</h3><p>Gunakan satuan stok untuk inventory dan satuan beli untuk purchasing.</p></div>
                     </div>
                     <div class="row g-3">
                         <div class="col-12 col-md-4">
@@ -892,14 +1269,15 @@
                             <div class="form-text" data-add-item-supply-help>Opsi ini berlaku untuk barang jadi dan WIP.</div>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="add-item-section">
-                    <div class="add-item-section-head">
+                <details class="add-item-section add-item-optional-section" data-add-item-advanced @if($errors->hasAny(['last_purchase_price', 'unit_cost'])) open @endif>
+                    <summary class="add-item-section-head add-item-section-summary">
                         <span class="add-item-section-icon"><i class="bi bi-cash-stack"></i></span>
-                        <div><h3>Harga awal</h3><p>Boleh dikosongkan jika harga akan diisi dari penerimaan pembelian.</p></div>
-                    </div>
-                    <div class="row g-3">
+                        <div class="add-item-section-copy"><h3 id="add-item-price-title">Harga awal <span class="add-item-section-badge">Opsional</span></h3><p>Boleh dikosongkan jika harga akan diisi dari penerimaan pembelian.</p></div>
+                        <span class="add-item-section-toggle" aria-hidden="true"><i class="bi bi-chevron-down"></i></span>
+                    </summary>
+                    <div class="row g-3 add-item-section-content" aria-labelledby="add-item-price-title">
                         <div class="col-12 col-md-6">
                             <label class="form-label" for="add-item-last-price">Harga beli terakhir (Rp)</label>
                             <input id="add-item-last-price" type="number" name="last_purchase_price" value="{{ old('last_purchase_price') }}" class="form-control @error('last_purchase_price') is-invalid @enderror" min="0" step="0.01" placeholder="0">
@@ -911,16 +1289,16 @@
                             @error('unit_cost')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                     </div>
-                </div>
+                </details>
 
                 <div class="add-item-footer-note"><i class="bi bi-shield-check"></i><span>Data akan divalidasi di server dan disimpan dalam satu transaksi.</span></div>
             </div>
 
-            <div class="modal-footer add-item-modal-footer">
+            <div class="modal-footer add-item-modal-footer item-modal-footer" aria-label="Aksi tambah barang">
                 <a href="{{ route('master.items.create') }}" class="add-item-full-link"><i class="bi bi-sliders2"></i><span>Buka form lengkap</span></a>
                 <div class="d-flex gap-2 ms-auto">
                     <button type="button" class="btn item-soft btn-sm" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn item-primary btn-sm" data-add-item-submit><i class="bi bi-check2-circle"></i><span>Simpan barang</span></button>
+                    <button type="submit" class="btn item-primary item-modal-primary btn-sm" data-add-item-submit><i class="bi bi-check2-circle"></i><span>Simpan barang</span></button>
                 </div>
             </div>
         </form>
@@ -934,7 +1312,7 @@
             <input type="hidden" name="action" value="set_category">
             <div class="modal-header"><h5 class="modal-title">Ubah kategori <span class="text-muted">(<span class="sel-count">0</span> item)</span></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
             <div class="modal-body"><label class="item-label" for="bulk-category">Kategori baru</label><select id="bulk-category" name="item_category_id" class="form-select" required><option value="">Pilih kategori</option>@foreach($categories as $category)<option value="{{ $category->id }}">{{ $category->code }} — {{ $category->name }}</option>@endforeach</select><div class="ids-container"></div></div>
-            <div class="modal-footer"><button type="button" class="btn item-soft btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn item-primary btn-sm">Terapkan</button></div>
+            <div class="modal-footer item-modal-footer"><button type="button" class="btn item-soft btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn item-primary btn-sm"><i class="bi bi-check2"></i>Terapkan</button></div>
         </form>
     </div>
 </div>
@@ -946,7 +1324,7 @@
             <input type="hidden" name="action" value="set_type">
             <div class="modal-header"><h5 class="modal-title">Ubah tipe <span class="text-muted">(<span class="sel-count">0</span> item)</span></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
             <div class="modal-body"><label class="item-label" for="bulk-type">Tipe baru</label><select id="bulk-type" name="type" class="form-select" required>@foreach($typeLabels as $key => $label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select><div class="alert alert-info py-2 px-3 mt-3 mb-0 small"><i class="bi bi-info-circle me-1"></i>Item yang menjadi Finished Good otomatis disiapkan sebagai bisa dibeli.</div><div class="ids-container"></div></div>
-            <div class="modal-footer"><button type="button" class="btn item-soft btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn item-primary btn-sm">Terapkan</button></div>
+            <div class="modal-footer item-modal-footer"><button type="button" class="btn item-soft btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn item-primary btn-sm"><i class="bi bi-check2"></i>Terapkan</button></div>
         </form>
     </div>
 </div>
@@ -958,11 +1336,113 @@
             <input type="hidden" name="action" value="set_hpp">
             <div class="modal-header"><h5 class="modal-title">Set HPP sementara <span class="text-muted">(<span class="sel-count">0</span> item)</span></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
             <div class="modal-body"><label class="item-label" for="bulk-hpp">HPP per unit (Rp)</label><input id="bulk-hpp" type="number" min="0" step="0.01" name="unit_cost" class="form-control" required><label class="item-label mt-3" for="bulk-hpp-notes">Catatan (opsional)</label><input id="bulk-hpp-notes" type="text" name="notes" maxlength="255" class="form-control"><div class="ids-container"></div></div>
-            <div class="modal-footer"><button type="button" class="btn item-soft btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn btn-success btn-sm rounded-pill fw-bold">Terapkan HPP</button></div>
+            <div class="modal-footer item-modal-footer"><button type="button" class="btn item-soft btn-sm" data-bs-dismiss="modal">Batal</button><button class="btn item-primary btn-sm"><i class="bi bi-check2"></i>Terapkan HPP</button></div>
         </form>
     </div>
 </div>
 @endunless
+
+<div class="modal fade item-edit-modal" id="editItemModal" tabindex="-1" aria-labelledby="editItemModalTitle" aria-describedby="editItemModalDescription" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <form method="POST" action="{{ old('edit_item_url', '#') }}" id="editItemForm" class="modal-content">
+            @csrf
+            @method('PUT')
+            <input type="hidden" name="compact_edit" value="1">
+            <input type="hidden" name="return_to_index" value="1">
+            <input type="hidden" name="edit_item_url" value="{{ old('edit_item_url') }}" data-edit-item-url-input>
+            <input type="hidden" name="unit" value="" data-edit-item-unit>
+            <input type="hidden" name="item_type_option_id" value="" data-edit-item-type-option>
+            <input type="hidden" name="production_source" value="" data-edit-item-production-source>
+            <input type="hidden" name="can_buy" value="0" data-edit-item-can-buy>
+            <input type="hidden" name="can_make" value="0" data-edit-item-can-make>
+            <input type="hidden" name="default_supply_source" value="" data-edit-item-default-source>
+            <input type="hidden" name="default_allocation" value="hpp" data-edit-item-allocation>
+            <input type="hidden" name="purchase_treatment_id" value="" data-edit-item-treatment>
+            <input type="hidden" name="default_expense_account_id" value="" data-edit-item-expense-account>
+
+            <div class="item-edit-modal-header">
+                <div class="item-edit-modal-icon" aria-hidden="true"><i class="bi bi-pencil-square"></i></div>
+                <div>
+                    <div class="item-edit-modal-kicker">Edit ringkas</div>
+                    <h2 class="modal-title" id="editItemModalTitle">Edit nama item</h2>
+                    <p class="item-edit-modal-subtitle" id="editItemModalDescription">Perbarui identitas inti tanpa mengubah supplier, barcode, atau HPP yang sudah tersimpan.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+
+            <div class="modal-body item-edit-modal-body">
+                <div class="alert alert-info item-edit-note" role="note"><i class="bi bi-shield-check me-1"></i>Relasi supplier dan barcode dipertahankan. Gunakan form lengkap untuk mengelola detail lanjutan.</div>
+                <div class="item-edit-grid">
+                    <div class="item-edit-field">
+                        <label class="item-label" for="edit-item-code">Kode item <span class="text-danger">*</span></label>
+                        <input id="edit-item-code" type="text" name="code" value="{{ old('code') }}" class="form-control" maxlength="50" required data-edit-item-code>
+                    </div>
+                    <div class="item-edit-field">
+                        <label class="item-label" for="edit-item-name">Nama item <span class="text-danger">*</span></label>
+                        <input id="edit-item-name" type="text" name="name" value="{{ old('name') }}" class="form-control" maxlength="190" required data-edit-item-name>
+                    </div>
+                    <div class="item-edit-field">
+                        <label class="item-label" for="edit-item-sku">SKU <span class="text-muted fw-normal">(opsional)</span></label>
+                        <input id="edit-item-sku" type="text" name="sku" value="{{ old('sku') }}" class="form-control" maxlength="100" data-edit-item-sku>
+                    </div>
+                    <div class="item-edit-field">
+                        <label class="item-label" for="edit-item-type">Tipe item <span class="text-danger">*</span></label>
+                        <select id="edit-item-type" name="type" class="form-select" required data-edit-item-type>
+                            @foreach($typeLabels as $key => $label)
+                                <option value="{{ $key }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="item-edit-field item-edit-field-full">
+                        <label class="item-label" for="edit-item-category">Kategori</label>
+                        <select id="edit-item-category" name="item_category_id" class="form-select" data-edit-item-category>
+                            <option value="">Tanpa kategori</option>
+                            @foreach($categories as $category)
+                                <option value="{{ $category->id }}" data-category-kind="{{ $category->kind }}">{{ $category->code }} — {{ $category->name }}</option>
+                            @endforeach
+                        </select>
+                        <div class="item-edit-help">Server akan memastikan kategori tetap sesuai dengan tipe item.</div>
+                    </div>
+                    <div class="item-edit-field">
+                        <label class="item-label" for="edit-item-stock-unit">Satuan stok <span class="text-danger">*</span></label>
+                        <input id="edit-item-stock-unit" type="text" name="stock_unit" value="{{ old('stock_unit') }}" class="form-control" maxlength="20" required data-edit-item-stock-unit>
+                    </div>
+                    <div class="item-edit-field">
+                        <label class="item-label" for="edit-item-purchase-unit">Satuan beli <span class="text-danger">*</span></label>
+                        <input id="edit-item-purchase-unit" type="text" name="purchase_unit" value="{{ old('purchase_unit') }}" class="form-control" maxlength="20" required data-edit-item-purchase-unit>
+                    </div>
+                    <div class="item-edit-field">
+                        <label class="item-label" for="edit-item-conversion">Konversi ke stok <span class="text-danger">*</span></label>
+                        <input id="edit-item-conversion" type="number" name="purchase_conversion_factor" value="{{ old('purchase_conversion_factor', '1') }}" class="form-control" min="0.000001" step="0.000001" required data-edit-item-conversion>
+                    </div>
+                    <div class="item-edit-field item-edit-field-full" data-edit-item-supply-wrap>
+                        <label class="item-label" for="edit-item-supply-mode">Metode pasok default</label>
+                        <select id="edit-item-supply-mode" class="form-select" data-edit-item-supply-mode>
+                            <option value="buy">Beli jadi</option>
+                            <option value="make">Produksi sendiri</option>
+                            <option value="hybrid">Hybrid: beli / produksi</option>
+                            <option value="outsource">Makloon / outsource</option>
+                        </select>
+                        <div class="item-edit-help">Opsi ini berlaku untuk barang jadi dan WIP.</div>
+                    </div>
+                    <div class="form-check item-edit-field item-edit-field-full">
+                        <input type="hidden" name="active" value="0">
+                        <input class="form-check-input" type="checkbox" name="active" value="1" id="edit-item-active" data-edit-item-active>
+                        <label class="form-check-label" for="edit-item-active">Item aktif dan dapat dipakai di transaksi</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer item-edit-modal-footer item-modal-footer">
+                <a class="item-edit-full-link" href="#" data-edit-item-full-link><i class="bi bi-sliders2"></i><span>Buka form lengkap</span></a>
+                <div class="d-flex gap-2 ms-auto">
+                    <button type="button" class="btn item-soft btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn item-primary item-modal-primary btn-sm" data-edit-item-submit><i class="bi bi-check2-circle"></i><span>Simpan perubahan</span></button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
@@ -970,8 +1450,83 @@
 document.addEventListener('DOMContentLoaded', function () {
     const filterForm = document.querySelector('.item-filter');
     const results = () => document.getElementById('itemResults');
+    const itemSearch = document.getElementById('item-search');
+    const itemSearchClear = document.querySelector('[data-item-search-clear]');
     let filterTimer = null;
     let activeRequest = null;
+    let openActionMenu = null;
+    let openActionToggle = null;
+    let actionMenuPlaceholder = null;
+
+    function positionActionMenu() {
+        if (!openActionMenu || !openActionToggle) return;
+        const toggleRect = openActionToggle.getBoundingClientRect();
+        const menuRect = openActionMenu.getBoundingClientRect();
+        const edge = 8;
+        const gap = 6;
+        let left = toggleRect.right - menuRect.width;
+        let top = toggleRect.bottom + gap;
+        if (top + menuRect.height > window.innerHeight - edge && toggleRect.top - menuRect.height - gap >= edge) {
+            top = toggleRect.top - menuRect.height - gap;
+        }
+        left = Math.max(edge, Math.min(left, window.innerWidth - menuRect.width - edge));
+        top = Math.max(edge, Math.min(top, window.innerHeight - menuRect.height - edge));
+        openActionMenu.style.left = `${left}px`;
+        openActionMenu.style.top = `${top}px`;
+    }
+
+    function closeActionMenu({ restoreFocus = false } = {}) {
+        if (!openActionMenu) return;
+        const menu = openActionMenu;
+        const toggle = openActionToggle;
+        menu.classList.remove('item-action-menu-portal', 'show');
+        menu.style.removeProperty('left');
+        menu.style.removeProperty('top');
+        menu.style.removeProperty('visibility');
+        if (actionMenuPlaceholder?.parentNode) actionMenuPlaceholder.replaceWith(menu);
+        else menu.remove();
+        toggle?.setAttribute('aria-expanded', 'false');
+        openActionMenu = null;
+        openActionToggle = null;
+        actionMenuPlaceholder = null;
+        if (restoreFocus) toggle?.focus();
+    }
+
+    function openActionMenuFor(toggle) {
+        const menu = toggle.closest('.dropdown')?.querySelector('[data-item-action-menu]');
+        if (!menu) return;
+        if (openActionMenu === menu) {
+            closeActionMenu({ restoreFocus: true });
+            return;
+        }
+        closeActionMenu();
+        actionMenuPlaceholder = document.createComment('item-action-menu-placeholder');
+        menu.replaceWith(actionMenuPlaceholder);
+        document.body.appendChild(menu);
+        menu.classList.add('item-action-menu-portal');
+        menu.style.visibility = 'hidden';
+        openActionMenu = menu;
+        openActionToggle = toggle;
+        toggle.setAttribute('aria-expanded', 'true');
+        positionActionMenu();
+        menu.style.visibility = 'visible';
+    }
+
+    document.addEventListener('click', event => {
+        const toggle = event.target.closest('[data-item-action-toggle]');
+        if (toggle) {
+            event.preventDefault();
+            event.stopPropagation();
+            openActionMenuFor(toggle);
+            return;
+        }
+        if (openActionMenu && !openActionMenu.contains(event.target)) closeActionMenu();
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && openActionMenu) closeActionMenu({ restoreFocus: true });
+    });
+    window.addEventListener('resize', positionActionMenu);
+    window.addEventListener('scroll', () => closeActionMenu(), true);
 
     const addItemModal = document.getElementById('addItemModal');
     const addItemForm = addItemModal?.querySelector('form');
@@ -979,9 +1534,121 @@ document.addEventListener('DOMContentLoaded', function () {
     const addItemCategory = addItemModal?.querySelector('[data-add-item-category]');
     const addItemSupplyWrap = addItemModal?.querySelector('[data-add-item-supply-wrap]');
     const addItemSupplyMode = addItemModal?.querySelector('[data-add-item-supply-mode]');
+    const addItemAdvanced = addItemModal?.querySelector('[data-add-item-advanced]');
     const addItemCanBuy = addItemModal?.querySelector('[data-add-item-can-buy]');
     const addItemCanMake = addItemModal?.querySelector('[data-add-item-can-make]');
     const addItemDefaultSource = addItemModal?.querySelector('[data-add-item-default-source]');
+
+    const editItemModal = document.getElementById('editItemModal');
+    const editItemForm = editItemModal?.querySelector('#editItemForm');
+    const editItemName = editItemModal?.querySelector('[data-edit-item-name]');
+    const editItemType = editItemModal?.querySelector('[data-edit-item-type]');
+    const editItemCategory = editItemModal?.querySelector('[data-edit-item-category]');
+    const editItemSupplyWrap = editItemModal?.querySelector('[data-edit-item-supply-wrap]');
+    const editItemSupplyMode = editItemModal?.querySelector('[data-edit-item-supply-mode]');
+    const editItemStockUnit = editItemModal?.querySelector('[data-edit-item-stock-unit]');
+    const editItemUnit = editItemModal?.querySelector('[data-edit-item-unit]');
+    const editItemCanBuy = editItemModal?.querySelector('[data-edit-item-can-buy]');
+    const editItemCanMake = editItemModal?.querySelector('[data-edit-item-can-make]');
+    const editItemDefaultSource = editItemModal?.querySelector('[data-edit-item-default-source]');
+    const editItemAdminReadonly = @json($isAdminRole);
+    const editItemLockedFields = editItemModal ? Array.from(editItemModal.querySelectorAll('[data-edit-item-code], [data-edit-item-sku], [data-edit-item-type], [data-edit-item-category], [data-edit-item-stock-unit], [data-edit-item-purchase-unit], [data-edit-item-conversion], [data-edit-item-active]')) : [];
+
+    function syncEditItemCategoryOptions() {
+        if (!editItemType || !editItemCategory) return;
+        const allowedKinds = ['finished_good', 'wip'].includes(editItemType.value)
+            ? ['product']
+            : ['material', 'support', 'accessory', 'packaging', 'operational', 'other'];
+        Array.from(editItemCategory.options).forEach(option => {
+            if (!option.dataset.categoryKind) return;
+            const allowed = allowedKinds.includes(option.dataset.categoryKind);
+            option.hidden = !allowed;
+            option.disabled = !allowed;
+        });
+        if (editItemCategory.options[editItemCategory.selectedIndex]?.disabled) editItemCategory.value = '';
+    }
+
+    function syncEditItemSupply() {
+        if (!editItemType || !editItemSupplyMode || !editItemCanBuy || !editItemCanMake || !editItemDefaultSource) return;
+        const isSupplyItem = ['finished_good', 'wip'].includes(editItemType.value);
+        editItemSupplyWrap?.toggleAttribute('hidden', !isSupplyItem);
+        if (!isSupplyItem) {
+            editItemCanBuy.value = '0';
+            editItemCanMake.value = '0';
+            editItemDefaultSource.value = '';
+            return;
+        }
+        const mode = editItemSupplyMode.value;
+        editItemCanBuy.value = ['buy', 'hybrid'].includes(mode) ? '1' : '0';
+        editItemCanMake.value = ['make', 'hybrid'].includes(mode) ? '1' : '0';
+        editItemDefaultSource.value = mode === 'hybrid' ? 'buy' : mode;
+    }
+
+    function supplyModeFromItem(data) {
+        if (data.itemEditCanBuy === '1' && data.itemEditCanMake === '1') return 'hybrid';
+        if (data.itemEditCanMake === '1') return 'make';
+        if (data.itemEditDefaultSource === 'outsource') return 'outsource';
+        return 'buy';
+    }
+
+    function prepareEditItem(button) {
+        if (!editItemForm) return;
+        const data = button.dataset;
+        editItemForm.action = data.itemEditUrl || '#';
+        editItemForm.querySelector('[data-edit-item-url-input]').value = data.itemEditUrl || '';
+        editItemForm.querySelector('[data-edit-item-code]').value = data.itemEditCode || '';
+        editItemName.value = data.itemEditName || '';
+        editItemForm.querySelector('[data-edit-item-sku]').value = data.itemEditSku || '';
+        editItemForm.querySelector('[data-edit-item-type]').value = data.itemEditType || 'material';
+        editItemForm.querySelector('[data-edit-item-category]').value = data.itemEditCategory || '';
+        editItemForm.querySelector('[data-edit-item-stock-unit]').value = data.itemEditStockUnit || 'pcs';
+        editItemForm.querySelector('[data-edit-item-purchase-unit]').value = data.itemEditPurchaseUnit || data.itemEditStockUnit || 'pcs';
+        editItemForm.querySelector('[data-edit-item-conversion]').value = data.itemEditConversion || '1';
+        if (editItemSupplyMode) editItemSupplyMode.value = supplyModeFromItem(data);
+        editItemForm.querySelector('[data-edit-item-unit]').value = data.itemEditStockUnit || 'pcs';
+        editItemForm.querySelector('[data-edit-item-type-option]').value = data.itemEditTypeOption || '';
+        editItemForm.querySelector('[data-edit-item-production-source]').value = data.itemEditProductionSource || '';
+        editItemForm.querySelector('[data-edit-item-can-buy]').value = data.itemEditCanBuy || '0';
+        editItemForm.querySelector('[data-edit-item-can-make]').value = data.itemEditCanMake || '0';
+        editItemForm.querySelector('[data-edit-item-default-source]').value = data.itemEditDefaultSource || '';
+        editItemForm.querySelector('[data-edit-item-allocation]').value = data.itemEditAllocation || 'hpp';
+        editItemForm.querySelector('[data-edit-item-treatment]').value = data.itemEditTreatment || '';
+        editItemForm.querySelector('[data-edit-item-expense-account]').value = data.itemEditExpenseAccount || '';
+        editItemForm.querySelector('[data-edit-item-active]').checked = data.itemEditActive === '1';
+        editItemForm.querySelector('[data-edit-item-full-link]').href = data.itemEditFullUrl || '#';
+
+        syncEditItemCategoryOptions();
+        syncEditItemSupply();
+
+        editItemLockedFields.forEach(field => field.disabled = editItemAdminReadonly);
+        const title = editItemModal.querySelector('#editItemModalTitle');
+        const subtitle = editItemModal.querySelector('#editItemModalDescription');
+        if (title) title.textContent = editItemAdminReadonly ? 'Edit nama item' : ['Edit', 'item'].join(' ');
+        if (subtitle) subtitle.textContent = editItemAdminReadonly
+            ? 'Admin dapat memperbarui nama item tanpa mengubah konfigurasi master.'
+            : 'Perbarui identitas inti tanpa mengubah supplier, barcode, atau HPP yang sudah tersimpan.';
+    }
+
+    document.addEventListener('click', function (event) {
+        const button = event.target.closest('[data-item-edit]');
+        if (button) prepareEditItem(button);
+    });
+    editItemType?.addEventListener('change', () => {
+        syncEditItemCategoryOptions();
+        syncEditItemSupply();
+    });
+    editItemSupplyMode?.addEventListener('change', syncEditItemSupply);
+    editItemModal?.addEventListener('shown.bs.modal', () => editItemName?.focus());
+    editItemForm?.addEventListener('submit', () => {
+        syncEditItemSupply();
+        if (editItemUnit && editItemStockUnit) editItemUnit.value = editItemStockUnit.value;
+        const submit = editItemForm.querySelector('[data-edit-item-submit]');
+        if (submit) {
+            submit.disabled = true;
+            submit.querySelector('span').textContent = 'Menyimpan…';
+            submit.querySelector('i').className = 'spinner-border spinner-border-sm';
+        }
+    });
 
     function syncAddItemCategoryOptions() {
         if (!addItemType || !addItemCategory) return;
@@ -1024,6 +1691,11 @@ document.addEventListener('DOMContentLoaded', function () {
         addItemDefaultSource.value = mode === 'hybrid' ? 'buy' : mode;
     }
 
+    function syncAddItemAdvanced() {
+        if (!addItemAdvanced || addItemAdvanced.open) return;
+        addItemAdvanced.open = !window.matchMedia('(max-width: 760px)').matches;
+    }
+
     addItemType?.addEventListener('change', () => {
         syncAddItemCategoryOptions();
         syncAddItemSupply();
@@ -1040,9 +1712,13 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     syncAddItemCategoryOptions();
     syncAddItemSupply();
+    syncAddItemAdvanced();
 
     @if($errors->any() && old('return_to_index'))
         if (addItemModal && window.bootstrap) bootstrap.Modal.getOrCreateInstance(addItemModal).show();
+    @endif
+    @if($errors->any() && old('return_to_index') && old('compact_edit'))
+        if (editItemModal && window.bootstrap) bootstrap.Modal.getOrCreateInstance(editItemModal).show();
     @endif
 
     function selectedIds() {
@@ -1114,7 +1790,12 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.item-reset-filter').forEach(link => link.classList.toggle('d-none', !['q', 'type', 'category_kind', 'item_category_id', 'supply_mode'].some(key => url.searchParams.get(key))));
     }
 
+    function syncItemSearchClear() {
+        if (itemSearchClear) itemSearchClear.hidden = !itemSearch?.value.trim();
+    }
+
     async function refreshItems(url) {
+        closeActionMenu();
         activeRequest?.abort();
         const requestController = new AbortController();
         activeRequest = requestController;
@@ -1153,9 +1834,17 @@ document.addEventListener('DOMContentLoaded', function () {
         clearTimeout(filterTimer);
         refreshItems(buildFilterUrl());
     });
-    document.getElementById('item-search')?.addEventListener('input', () => {
+    itemSearch?.addEventListener('input', () => {
+        syncItemSearchClear();
         clearTimeout(filterTimer);
         filterTimer = setTimeout(() => refreshItems(buildFilterUrl()), 280);
+    });
+    itemSearchClear?.addEventListener('click', () => {
+        if (!itemSearch) return;
+        itemSearch.value = '';
+        syncItemSearchClear();
+        itemSearch.focus();
+        refreshItems(buildFilterUrl());
     });
     filterForm?.querySelectorAll('select').forEach(select => select.addEventListener('change', () => refreshItems(buildFilterUrl())));
     document.addEventListener('click', event => {
@@ -1163,6 +1852,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!link) return;
         event.preventDefault();
         filterForm.reset();
+        if (itemSearch) itemSearch.value = '';
+        syncItemSearchClear();
         refreshItems(new URL(link.href, window.location.href));
     });
     document.addEventListener('click', event => {
@@ -1173,6 +1864,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     bindBulkControls();
+    syncItemSearchClear();
     syncFilterChrome(new URL(window.location.href));
 });
 </script>

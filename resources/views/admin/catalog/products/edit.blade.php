@@ -32,6 +32,111 @@
 .mapping-stock { font-size:.7rem;color:#64748b;font-weight:800;margin-top:.25rem; }
 .add-var-card { border:2px dashed #e2e8f0;border-radius:12px;height:100%;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:#fafafa;transition:all .15s; }
 .add-var-card:hover { border-color:#0f172a;background:#f1f5f9; }
+
+/* Variant workspace */
+.variant-workspace { display:grid; gap:1rem; }
+.variant-overview { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; padding:1.15rem 1.25rem; border:1px solid #e5e7eb; border-radius:16px; background:linear-gradient(135deg,#fff 0%,#f8fafc 100%); }
+.variant-overview-copy { min-width:0; }
+.variant-eyebrow { color:#64748b; font-size:.62rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+.variant-heading { margin:.25rem 0 0; color:#0f172a; font-size:1rem; font-weight:900; letter-spacing:-.02em; }
+.variant-description { max-width:680px; margin:.3rem 0 0; color:#64748b; font-size:.76rem; line-height:1.5; }
+.variant-overview-meta { display:flex; align-items:center; gap:.65rem; flex:0 0 auto; }
+.variant-count { display:inline-flex; align-items:center; gap:.35rem; padding:.45rem .65rem; border:1px solid #e2e8f0; border-radius:10px; color:#64748b; background:#fff; font-size:.7rem; font-weight:700; white-space:nowrap; }
+.variant-count strong { color:#0f172a; font-size:.9rem; }
+.variant-add-button { display:inline-flex; align-items:center; gap:.4rem; min-height:36px; padding:.45rem .75rem; border:0; border-radius:10px; color:#fff; background:#111827; font-size:.74rem; font-weight:800; cursor:pointer; box-shadow:0 6px 14px rgba(15,23,42,.12); }
+.variant-add-button:hover { color:#fff; background:#000; transform:translateY(-1px); }
+.variant-add-button:focus-visible, .variant-action:focus-visible, .variant-add-card:focus-visible, .variant-modal-close:focus-visible { outline:3px solid rgba(37,99,235,.3); outline-offset:2px; }
+.variant-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; }
+.variant-card { min-width:0; overflow:hidden; border:1px solid #e5e7eb; border-radius:16px; background:#fff; box-shadow:0 8px 22px rgba(15,23,42,.04); transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
+.variant-card:hover { border-color:#cbd5e1; box-shadow:0 12px 28px rgba(15,23,42,.09); transform:translateY(-2px); }
+.variant-card.is-inactive { opacity:.76; }
+.variant-media { position:relative; aspect-ratio:4/3; overflow:hidden; background:#f1f5f9; }
+.variant-media img, .variant-media-placeholder { width:100%; height:100%; object-fit:cover; }
+.variant-media-placeholder { display:grid; place-items:center; color:#cbd5e1; background:linear-gradient(135deg,#f8fafc,#e2e8f0); font-size:1.9rem; }
+.variant-media::after { content:''; position:absolute; inset:auto 0 0; height:35%; background:linear-gradient(transparent,rgba(15,23,42,.25)); pointer-events:none; }
+.variant-media-badges { position:absolute; z-index:1; inset:.6rem .6rem auto; display:flex; align-items:flex-start; justify-content:space-between; gap:.35rem; }
+.variant-badge { display:inline-flex; align-items:center; gap:.3rem; padding:.25rem .45rem; border:1px solid rgba(255,255,255,.7); border-radius:7px; color:#0f172a; background:rgba(255,255,255,.88); font-size:.6rem; font-weight:900; letter-spacing:.04em; text-transform:uppercase; backdrop-filter:blur(8px); }
+.variant-badge-default { color:#1d4ed8; }
+.variant-badge-off { color:#92400e; background:rgba(255,251,235,.92); }
+.variant-body { padding:.85rem .9rem .9rem; }
+.variant-name-row { display:flex; align-items:center; gap:.45rem; min-width:0; }
+.variant-swatch { width:18px; height:18px; flex:0 0 18px; border:2px solid rgba(15,23,42,.12); border-radius:50%; box-shadow:0 0 0 2px #fff; }
+.variant-name { min-width:0; overflow:hidden; color:#0f172a; font-size:.85rem; font-weight:850; text-overflow:ellipsis; white-space:nowrap; }
+.variant-meta { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-top:.6rem; padding-top:.6rem; border-top:1px solid #eef2f7; }
+.variant-meta-label { color:#94a3b8; font-size:.64rem; font-weight:700; }
+.variant-meta-value { color:#334155; font-size:.72rem; font-weight:800; text-align:right; }
+.variant-meta-value.is-price { color:#15803d; }
+.variant-actions { display:flex; gap:.45rem; margin-top:.75rem; }
+.variant-action { display:inline-flex; align-items:center; justify-content:center; gap:.3rem; min-height:32px; border-radius:8px; font-size:.7rem; font-weight:800; cursor:pointer; }
+.variant-action-edit { flex:1 1 auto; border:1px solid #dbe3ee; color:#334155; background:#fff; }
+.variant-action-edit:hover { color:#0f172a; background:#f8fafc; }
+.variant-action-delete { width:32px; border:1px solid #fecdd3; color:#be123c; background:#fff; }
+.variant-action-delete:hover { background:#fff1f2; }
+.variant-add-card { display:flex; min-height:100%; flex-direction:column; align-items:center; justify-content:center; gap:.6rem; min-height:260px; padding:1rem; border:1.5px dashed #cbd5e1; border-radius:16px; color:#64748b; background:#fbfdff; cursor:pointer; transition:all .16s ease; }
+.variant-add-card:hover { border-color:#64748b; color:#0f172a; background:#f8fafc; transform:translateY(-2px); }
+.variant-add-card i { display:grid; width:42px; height:42px; place-items:center; border:1px solid #e2e8f0; border-radius:12px; color:#475569; background:#fff; font-size:1.15rem; }
+.variant-add-card strong { font-size:.78rem; }
+.variant-add-card span { color:#94a3b8; font-size:.68rem; text-align:center; }
+.variant-empty { display:grid; place-items:center; padding:2.5rem 1rem; border:1px dashed #cbd5e1; border-radius:16px; color:#64748b; background:#fbfdff; text-align:center; }
+.variant-empty-icon { display:grid; width:50px; height:50px; place-items:center; border-radius:15px; color:#64748b; background:#f1f5f9; font-size:1.35rem; }
+.variant-empty-title { margin-top:.75rem; color:#334155; font-size:.85rem; font-weight:850; }
+.variant-empty-copy { max-width:420px; margin:.25rem 0 1rem; color:#94a3b8; font-size:.72rem; line-height:1.5; }
+.variant-guidance { display:flex; align-items:flex-start; gap:.5rem; padding:.75rem .85rem; border:1px solid #dbeafe; border-radius:12px; color:#1d4ed8; background:#eff6ff; font-size:.7rem; line-height:1.5; }
+.variant-guidance i { flex:0 0 auto; margin-top:.05rem; }
+
+/* Variant modals */
+.variant-modal { display:none; position:fixed; inset:0; z-index:1055; align-items:center; justify-content:center; padding:1rem; background:rgba(15,23,42,.55); backdrop-filter:blur(4px); }
+.variant-modal-panel { width:100%; max-width:500px; max-height:min(760px,calc(100vh - 2rem)); overflow-y:auto; border:1px solid rgba(255,255,255,.7); border-radius:18px; background:#fff; box-shadow:0 24px 70px rgba(15,23,42,.28); }
+.variant-modal-header { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; padding:1.15rem 1.25rem 1rem; border-bottom:1px solid #eef2f7; background:linear-gradient(135deg,#fff,#f8fafc); }
+.variant-modal-kicker { color:#64748b; font-size:.62rem; font-weight:900; letter-spacing:.09em; text-transform:uppercase; }
+.variant-modal-title { margin:.25rem 0 0; color:#0f172a; font-size:1rem; font-weight:900; letter-spacing:-.02em; }
+.variant-modal-subtitle { margin:.25rem 0 0; color:#64748b; font-size:.71rem; line-height:1.45; }
+.variant-modal-close { display:grid; width:30px; height:30px; flex:0 0 30px; place-items:center; border:1px solid #e2e8f0; border-radius:9px; color:#64748b; background:#fff; cursor:pointer; }
+.variant-modal-close:hover { color:#0f172a; background:#f8fafc; }
+.variant-modal-body { padding:1.1rem 1.25rem 1.25rem; }
+.variant-modal .form-label-sm { margin-bottom:.35rem; color:#334155; font-size:.68rem; }
+.variant-modal .form-control { min-height:40px; border-color:#dbe3ee; border-radius:10px; font-size:.82rem; box-shadow:none; }
+.variant-modal .form-control:focus { border-color:#111827; box-shadow:0 0 0 3px rgba(15,23,42,.08); }
+.variant-field { margin-bottom:.9rem; }
+.variant-field-hint { margin-top:.28rem; color:#94a3b8; font-size:.67rem; line-height:1.4; }
+.variant-color-input { width:44px; height:40px; padding:3px; border:1px solid #dbe3ee; border-radius:10px; background:#fff; cursor:pointer; }
+.variant-image-preview { margin-bottom:.55rem; overflow:hidden; border-radius:11px; border:1px solid #e2e8f0; background:#f8fafc; }
+.variant-image-preview img { display:block; width:100%; height:150px; object-fit:cover; }
+.variant-check-row { display:flex; flex-wrap:wrap; gap:1rem; margin:.15rem 0 1rem; }
+.variant-check-row .form-check { margin:0; }
+.variant-check-row .form-check-label { color:#475569; font-size:.76rem; font-weight:700; }
+.variant-modal-footer { display:flex; flex-direction:row-reverse; gap:.5rem; padding-top:.9rem; border-top:1px solid #eef2f7; }
+.variant-modal-footer .btn { min-height:38px; border-radius:10px; font-size:.75rem; font-weight:800; }
+body[data-theme="dark"] .variant-overview, body[data-theme="dark"] .variant-card, body[data-theme="dark"] .variant-add-card, body[data-theme="dark"] .variant-empty, body[data-theme="dark"] .variant-count, body[data-theme="dark"] .variant-modal-panel { border-color:#334155; background:#0f172a; }
+body[data-theme="dark"] .variant-overview { background:linear-gradient(135deg,#0f172a,#111827); }
+body[data-theme="dark"] .variant-heading, body[data-theme="dark"] .variant-name, body[data-theme="dark"] .variant-count strong, body[data-theme="dark"] .variant-modal-title { color:#f8fafc; }
+body[data-theme="dark"] .variant-description, body[data-theme="dark"] .variant-meta-label, body[data-theme="dark"] .variant-empty-copy, body[data-theme="dark"] .variant-modal-subtitle { color:#94a3b8; }
+body[data-theme="dark"] .variant-meta, body[data-theme="dark"] .variant-modal-header, body[data-theme="dark"] .variant-modal-footer { border-color:#334155; }
+body[data-theme="dark"] .variant-meta-value, body[data-theme="dark"] .variant-modal .form-label-sm, body[data-theme="dark"] .variant-check-row .form-check-label { color:#cbd5e1; }
+body[data-theme="dark"] .variant-action-edit, body[data-theme="dark"] .variant-modal-close { color:#cbd5e1; border-color:#475569; background:#111827; }
+body[data-theme="dark"] .variant-action-edit:hover, body[data-theme="dark"] .variant-modal-close:hover { background:#1e293b; }
+body[data-theme="dark"] .variant-modal-header { background:linear-gradient(135deg,#0f172a,#111827); }
+body[data-theme="dark"] .variant-modal .form-control { color:#f8fafc; background:#111827; border-color:#475569; }
+body[data-theme="dark"] .variant-color-input { border-color:#475569; background:#111827; }
+@media (max-width:1100px) { .variant-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (max-width:760px) {
+    .variant-overview { flex-direction:column; }
+    .variant-overview-meta { width:100%; justify-content:space-between; }
+    .variant-add-button { flex:1 1 auto; justify-content:center; }
+    .variant-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; }
+    .variant-body { padding:.75rem; }
+    .variant-add-card { min-height:220px; }
+}
+@media (max-width:480px) {
+    .variant-grid { grid-template-columns:1fr; }
+    .variant-add-card { min-height:150px; }
+    .variant-modal { padding:.5rem; }
+    .variant-modal-panel { max-height:calc(100vh - 1rem); }
+    .variant-modal-header, .variant-modal-body { padding-inline:.9rem; }
+    .variant-modal-footer { flex-direction:column-reverse; }
+    .variant-modal-footer .btn { width:100%; }
+}
+@media (prefers-reduced-motion:reduce) { .variant-card, .variant-add-card, .variant-add-button { transition:none; } .variant-card:hover, .variant-add-card:hover, .variant-add-button:hover { transform:none; } }
 /* Size table */
 .size-table th { font-size:.67rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;padding:.5rem .75rem;background:#f8fafc;white-space:nowrap;border-bottom:1.5px solid #e8ecf0; }
 .size-table td { font-size:.82rem;padding:.5rem .75rem;border-bottom:1px solid #f1f5f9;vertical-align:middle; }
@@ -269,91 +374,110 @@
 
     {{-- ══ TAB 2: VARIANT WARNA ════════════════════════════════════════════════ --}}
     <div class="tab-pane" id="tab-variants">
-        <div class="row g-3">
+        @php
+            $displayVariants = $product->variants
+                ->groupBy(fn($variant) => strtolower(trim((string) $variant->color_name)))
+                ->map(fn($group) => $group->firstWhere('size_label', null) ?? $group->first())
+                ->values();
+            $activeVariantCount = $displayVariants->where('is_active', true)->count();
+        @endphp
 
-            {{-- Existing variants --}}
-            @php
-                $displayVariants = $product->variants
-                    ->groupBy(fn($variant) => strtolower(trim((string) $variant->color_name)))
-                    ->map(fn($group) => $group->firstWhere('size_label', null) ?? $group->first())
-                    ->values();
-            @endphp
-            @foreach($displayVariants as $v)
-            <div class="col-6 col-md-4 col-lg-3">
-                <div class="var-card h-100">
-                    {{-- Image --}}
-                    @if($v->getImageSrc())
-                    <img src="{{ $v->getImageSrc() }}" alt="{{ $v->color_name }}" class="var-img">
-                    @else
-                    <div class="var-img-placeholder">
-                        <i class="bi bi-image" style="font-size:1.8rem;color:#cbd5e1;"></i>
-                    </div>
-                    @endif
-
-                    <div class="p-2">
-                        <div class="d-flex align-items-center gap-1 mb-1">
-                            @if($v->hex_color)
-                            <span class="var-swatch" style="background:{{ $v->hex_color }};"></span>
-                            @endif
-                            <span style="font-size:.82rem;font-weight:700;color:#0f172a;">{{ $v->color_name }}</span>
-                            @if($v->is_default)
-                            <span style="font-size:.6rem;font-weight:800;background:#dbeafe;color:#1d4ed8;padding:.1rem .3rem;border-radius:4px;margin-left:auto;">DEFAULT</span>
-                            @endif
-                        </div>
-
-                        @if($v->price_override)
-                        <div style="font-size:.72rem;color:#16a34a;font-weight:700;">
-                            Rp{{ number_format($v->price_override) }}
-                        </div>
-                        @else
-                        <div style="font-size:.72rem;color:#94a3b8;">Harga: base</div>
-                        @endif
-
-                        @if(!$v->is_active)
-                        <span style="font-size:.62rem;background:#f1f5f9;color:#94a3b8;padding:.1rem .35rem;border-radius:4px;font-weight:700;">NONAKTIF</span>
-                        @endif
-
-                        <div class="d-flex gap-1 mt-2">
-                            <button class="btn btn-sm btn-outline-secondary flex-grow-1"
-                                    style="font-size:.68rem;border-radius:7px;padding:.2rem 0;"
-                                    onclick="openEditVariant({{ json_encode([
-                                        'id'             => $v->id,
-                                        'color_name'     => $v->color_name,
-                                        'hex_color'      => $v->hex_color ?? '#000000',
-                                        'image_src'      => $v->getImageSrc(),
-                                        'price_override' => $v->price_override,
-                                        'is_default'     => $v->is_default,
-                                        'is_active'      => $v->is_active,
-                                    ]) }})">
-                                <i class="bi bi-pencil"></i> Edit
-                            </button>
-                            <form method="POST" action="{{ route('admin.catalog.products.variants.destroy', [$product, $v]) }}"
-                                  onsubmit="return confirm('Hapus variant {{ addslashes($v->color_name) }}?')">
-                                @csrf @method('DELETE')
-                                <button type="submit" class="btn btn-sm"
-                                        style="font-size:.68rem;border-radius:7px;padding:.2rem .45rem;background:#fff;border:1.5px solid #fecdd3;color:#be123c;">
-                                    <i class="bi bi-trash3"></i>
-                                </button>
-                            </form>
-                        </div>
-                    </div>
+        <div class="variant-workspace">
+            <div class="variant-overview">
+                <div class="variant-overview-copy">
+                    <div class="variant-eyebrow"><i class="bi bi-palette me-1"></i>Visual katalog</div>
+                    <h2 class="variant-heading">Warna & tampilan produk</h2>
+                    <p class="variant-description">Atur warna yang muncul di storefront, foto utama tiap warna, dan harga khusus bila berbeda dari harga dasar produk.</p>
                 </div>
-            </div>
-            @endforeach
-
-            {{-- Add new variant card --}}
-            <div class="col-6 col-md-4 col-lg-3">
-                <div class="add-var-card" onclick="document.getElementById('addVariantModal').style.display='flex'">
-                    <i class="bi bi-plus-circle" style="font-size:2rem;color:#94a3b8;"></i>
-                    <div style="font-size:.78rem;color:#94a3b8;margin-top:.5rem;font-weight:700;">Tambah Warna</div>
+                <div class="variant-overview-meta">
+                    <span class="variant-count"><strong>{{ $activeVariantCount }}</strong> aktif <span>· {{ $displayVariants->count() }} total</span></span>
+                    <button type="button" class="variant-add-button" onclick="openAddVariant()">
+                        <i class="bi bi-plus-lg"></i> Tambah warna
+                    </button>
                 </div>
             </div>
 
-        </div>
+            @if($displayVariants->isEmpty())
+                <div class="variant-empty">
+                    <div class="variant-empty-icon"><i class="bi bi-palette"></i></div>
+                    <div class="variant-empty-title">Belum ada variant warna</div>
+                    <p class="variant-empty-copy">Tambahkan warna pertama agar produk punya pilihan visual saat tampil di katalog dan storefront.</p>
+                    <button type="button" class="variant-add-button" onclick="openAddVariant()"><i class="bi bi-plus-lg"></i> Tambah warna pertama</button>
+                </div>
+            @else
+                <div class="variant-grid">
+                    @foreach($displayVariants as $v)
+                        <article class="variant-card {{ !$v->is_active ? 'is-inactive' : '' }}">
+                            <div class="variant-media">
+                                @if($v->getImageSrc())
+                                    <img src="{{ $v->getImageSrc() }}" alt="Foto variant {{ $v->color_name }}" loading="lazy">
+                                @else
+                                    <div class="variant-media-placeholder"><i class="bi bi-image"></i></div>
+                                @endif
+                                <div class="variant-media-badges">
+                                    @if($v->is_default)
+                                        <span class="variant-badge variant-badge-default"><i class="bi bi-star-fill"></i> Utama</span>
+                                    @else
+                                        <span></span>
+                                    @endif
+                                    @if(!$v->is_active)
+                                        <span class="variant-badge variant-badge-off">Nonaktif</span>
+                                    @endif
+                                </div>
+                            </div>
 
-        <div style="margin-top:1rem;font-size:.75rem;color:#94a3b8;">
-            <i class="bi bi-info-circle me-1"></i>
-            Variant pertama otomatis jadi default. Klik "Edit" untuk ganti foto, warna, atau harga khusus per variant.
+                            <div class="variant-body">
+                                <div class="variant-name-row">
+                                    @if($v->hex_color)
+                                        <span class="variant-swatch" style="background:{{ $v->hex_color }};" aria-hidden="true"></span>
+                                    @endif
+                                    <span class="variant-name" title="{{ $v->color_name }}">{{ $v->color_name }}</span>
+                                </div>
+                                <div class="variant-meta">
+                                    <span class="variant-meta-label">Harga</span>
+                                    @if($v->price_override)
+                                        <span class="variant-meta-value is-price">Rp{{ number_format($v->price_override) }}</span>
+                                    @else
+                                        <span class="variant-meta-value">Harga dasar</span>
+                                    @endif
+                                </div>
+                                <div class="variant-actions">
+                                    <button type="button" class="variant-action variant-action-edit"
+                                            onclick="openEditVariant({{ json_encode([
+                                                'id'             => $v->id,
+                                                'color_name'     => $v->color_name,
+                                                'hex_color'      => $v->hex_color ?? '#000000',
+                                                'image_src'      => $v->getImageSrc(),
+                                                'price_override' => $v->price_override,
+                                                'is_default'     => $v->is_default,
+                                                'is_active'      => $v->is_active,
+                                            ]) }})">
+                                        <i class="bi bi-pencil-square"></i> Edit variant
+                                    </button>
+                                    <form method="POST" action="{{ route('admin.catalog.products.variants.destroy', [$product, $v]) }}"
+                                          onsubmit="return confirm('Hapus variant {{ addslashes($v->color_name) }}?')">
+                                        @csrf @method('DELETE')
+                                        <button type="submit" class="variant-action variant-action-delete" aria-label="Hapus variant {{ $v->color_name }}" title="Hapus variant">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </article>
+                    @endforeach
+
+                    <button type="button" class="variant-add-card" onclick="openAddVariant()">
+                        <i class="bi bi-plus-lg"></i>
+                        <strong>Tambah warna lain</strong>
+                        <span>Tambahkan foto dan detail variant baru</span>
+                    </button>
+                </div>
+            @endif
+
+            <div class="variant-guidance">
+                <i class="bi bi-info-circle-fill"></i>
+                <span>Variant pertama otomatis menjadi warna utama. Warna utama dipakai sebagai foto fallback saat produk tampil di listing.</span>
+            </div>
         </div>
     </div>
 
@@ -580,124 +704,123 @@
 </div>
 
 {{-- ══ MODAL: ADD VARIANT ══════════════════════════════════════════════════════ --}}
-<div id="addVariantModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1055;align-items:center;justify-content:center;">
-    <div style="background:#fff;border-radius:16px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding:1.5rem;margin:1rem;">
-        <div class="d-flex align-items-center justify-content-between mb-3">
-            <h6 class="fw-black mb-0">Tambah Variant Warna</h6>
-            <button type="button" onclick="document.getElementById('addVariantModal').style.display='none'"
-                    style="background:none;border:none;font-size:1.25rem;color:#94a3b8;cursor:pointer;">×</button>
-        </div>
-        <form method="POST" action="{{ route('admin.catalog.products.variants.store', $product) }}" enctype="multipart/form-data">
-            @csrf
-            <div class="mb-3">
-                <label class="form-label-sm">Nama Warna <span class="text-danger">*</span></label>
-                <input type="text" name="color_name" required class="form-control"
-                       style="border-radius:10px;" placeholder="mis. Navy, Black, Olive">
+<div id="addVariantModal" class="variant-modal" role="dialog" aria-modal="true" aria-labelledby="addVariantTitle">
+    <div class="variant-modal-panel">
+        <div class="variant-modal-header">
+            <div>
+                <div class="variant-modal-kicker"><i class="bi bi-palette me-1"></i>Variant warna</div>
+                <h2 id="addVariantTitle" class="variant-modal-title">Tambah warna baru</h2>
+                <p class="variant-modal-subtitle">Lengkapi identitas warna dan aset visual yang akan digunakan di storefront.</p>
             </div>
-            <div class="mb-3">
-                <label class="form-label-sm">Kode Warna (Hex)</label>
+            <button type="button" class="variant-modal-close" onclick="closeVariantModal('addVariantModal')" aria-label="Tutup dialog">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <form method="POST" action="{{ route('admin.catalog.products.variants.store', $product) }}" enctype="multipart/form-data" class="variant-modal-body">
+            @csrf
+            <div class="variant-field">
+                <label class="form-label-sm" for="addColorName">Nama warna <span class="text-danger">*</span></label>
+                <input id="addColorName" type="text" name="color_name" required class="form-control" placeholder="Mis. Navy, Black, Olive">
+            </div>
+            <div class="variant-field">
+                <label class="form-label-sm" for="addHexText">Kode warna</label>
                 <div class="d-flex gap-2 align-items-center">
                     <input type="color" name="hex_color" value="#000000" id="addHexPicker"
-                           style="width:44px;height:36px;border:1.5px solid #e2e8f0;border-radius:8px;padding:2px;cursor:pointer;">
+                           class="variant-color-input" aria-label="Pilih warna">
                     <input type="text" id="addHexText" value="#000000"
-                           class="form-control" style="border-radius:10px;font-family:monospace;font-size:.85rem;"
+                           class="form-control font-monospace"
                            placeholder="#000000" maxlength="20">
                 </div>
+                <div class="variant-field-hint">Dipakai sebagai swatch kecil di pilihan warna.</div>
             </div>
-            <div class="mb-3">
-                <label class="form-label-sm">Foto Variant</label>
+            <div class="variant-field">
+                <label class="form-label-sm" for="addImageFile">Foto variant</label>
                 <input type="file" name="image" accept="image/*" id="addImageFile"
-                       class="form-control mb-2" style="border-radius:10px;font-size:.82rem;"
+                       class="form-control"
                        onchange="previewImg(this, 'addImgPreview')">
-                <div id="addImgPreview" style="display:none;margin-bottom:.5rem;">
-                    <img src="" alt="" style="width:100%;height:140px;object-fit:cover;border-radius:10px;border:1.5px solid #e8ecf0;">
+                <div id="addImgPreview" class="variant-image-preview" style="display:none;margin-top:.55rem;">
+                    <img src="" alt="Preview foto variant">
                 </div>
-                <div style="font-size:.7rem;color:#94a3b8;">atau URL gambar:</div>
+                <div class="variant-field-hint">Upload file atau gunakan URL gambar publik.</div>
                 <input type="text" name="image_url" class="form-control mt-1"
-                       style="border-radius:10px;font-size:.8rem;font-family:monospace;" placeholder="https://...">
+                       placeholder="https://...">
             </div>
-            <div class="mb-3">
-                <label class="form-label-sm">Harga Khusus Warna Ini (opsional)</label>
+            <div class="variant-field">
+                <label class="form-label-sm" for="addPriceOverride">Harga khusus warna <span class="text-muted fw-normal">(opsional)</span></label>
                 <input type="number" name="price_override" min="0" class="form-control"
-                       style="border-radius:10px;" placeholder="Kosong = pakai harga dasar">
+                       id="addPriceOverride" placeholder="Kosong = pakai harga dasar">
             </div>
-            <div class="form-check mb-3">
+            <div class="variant-check-row">
                 <input class="form-check-input" type="checkbox" name="is_default" value="1" id="addIsDefault">
-                <label class="form-check-label" for="addIsDefault" style="font-size:.8rem;">
-                    Jadikan variant default (foto utama di listing)
-                </label>
+                <label class="form-check-label" for="addIsDefault">Jadikan warna utama di listing</label>
             </div>
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-dark fw-bold flex-grow-1" style="border-radius:10px;">
-                    <i class="bi bi-plus-lg me-1"></i> Tambah Variant
-                </button>
-                <button type="button" onclick="document.getElementById('addVariantModal').style.display='none'"
-                        class="btn btn-outline-secondary" style="border-radius:10px;">Batal</button>
+            <div class="variant-modal-footer">
+                <button type="button" onclick="closeVariantModal('addVariantModal')" class="btn btn-outline-secondary">Batal</button>
+                <button type="submit" class="btn btn-dark"><i class="bi bi-plus-lg me-1"></i> Tambah variant</button>
             </div>
         </form>
     </div>
 </div>
 
 {{-- ══ MODAL: EDIT VARIANT ═════════════════════════════════════════════════════ --}}
-<div id="editVariantModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1055;align-items:center;justify-content:center;">
-    <div style="background:#fff;border-radius:16px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding:1.5rem;margin:1rem;">
-        <div class="d-flex align-items-center justify-content-between mb-3">
-            <h6 class="fw-black mb-0">Edit Variant Warna</h6>
-            <button type="button" onclick="document.getElementById('editVariantModal').style.display='none'"
-                    style="background:none;border:none;font-size:1.25rem;color:#94a3b8;cursor:pointer;">×</button>
-        </div>
-        <form id="editVariantForm" method="POST" enctype="multipart/form-data">
-            @csrf @method('PATCH')
-            <div class="mb-3">
-                <label class="form-label-sm">Nama Warna</label>
-                <input type="text" name="color_name" id="editColorName" required class="form-control" style="border-radius:10px;">
+<div id="editVariantModal" class="variant-modal" role="dialog" aria-modal="true" aria-labelledby="editVariantTitle">
+    <div class="variant-modal-panel">
+        <div class="variant-modal-header">
+            <div>
+                <div class="variant-modal-kicker"><i class="bi bi-pencil-square me-1"></i>Kelola variant</div>
+                <h2 id="editVariantTitle" class="variant-modal-title">Edit warna variant</h2>
+                <p class="variant-modal-subtitle">Perbarui identitas, foto, harga, atau status variant ini.</p>
             </div>
-            <div class="mb-3">
-                <label class="form-label-sm">Kode Warna (Hex)</label>
+            <button type="button" class="variant-modal-close" onclick="closeVariantModal('editVariantModal')" aria-label="Tutup dialog">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <form id="editVariantForm" method="POST" enctype="multipart/form-data" class="variant-modal-body">
+            @csrf @method('PATCH')
+            <div class="variant-field">
+                <label class="form-label-sm" for="editColorName">Nama warna <span class="text-danger">*</span></label>
+                <input type="text" name="color_name" id="editColorName" required class="form-control">
+            </div>
+            <div class="variant-field">
+                <label class="form-label-sm" for="editHexText">Kode warna</label>
                 <div class="d-flex gap-2 align-items-center">
                     <input type="color" name="hex_color" id="editHexPicker"
-                           style="width:44px;height:36px;border:1.5px solid #e2e8f0;border-radius:8px;padding:2px;cursor:pointer;">
-                    <input type="text" id="editHexText" class="form-control"
-                           style="border-radius:10px;font-family:monospace;font-size:.85rem;" maxlength="20">
+                           class="variant-color-input" aria-label="Pilih warna">
+                    <input type="text" id="editHexText" class="form-control font-monospace" maxlength="20">
                 </div>
             </div>
-            <div class="mb-3">
-                <label class="form-label-sm">Foto Variant (upload untuk ganti)</label>
-                <div id="editCurrentImg" style="margin-bottom:.5rem;display:none;">
-                    <img id="editCurrentImgEl" src="" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:10px;border:1.5px solid #e8ecf0;">
-                    <div style="font-size:.7rem;color:#94a3b8;margin-top:3px;">Foto saat ini</div>
+            <div class="variant-field">
+                <label class="form-label-sm" for="editImageFile">Foto variant</label>
+                <div id="editCurrentImg" class="variant-image-preview" style="display:none;">
+                    <img id="editCurrentImgEl" src="" alt="Foto variant saat ini">
                 </div>
-                <input type="file" name="image" accept="image/*" class="form-control mb-2"
-                       style="border-radius:10px;font-size:.82rem;"
+                <input type="file" name="image" accept="image/*" id="editImageFile" class="form-control"
                        onchange="previewImg(this, 'editImgPreview')">
-                <div id="editImgPreview" style="display:none;margin-bottom:.5rem;">
-                    <img src="" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:10px;border:1.5px solid #e8ecf0;">
+                <div id="editImgPreview" class="variant-image-preview" style="display:none;margin-top:.55rem;">
+                    <img src="" alt="Preview foto variant baru">
                 </div>
-                <div style="font-size:.7rem;color:#94a3b8;">atau URL baru (kosongkan untuk tetap pakai foto lama):</div>
+                <div class="variant-field-hint">Upload untuk mengganti foto, atau isi URL baru. Kosongkan jika tetap memakai foto lama.</div>
                 <input type="text" name="image_url" id="editImageUrl" class="form-control mt-1"
-                       style="border-radius:10px;font-size:.8rem;font-family:monospace;" placeholder="https://...">
+                       placeholder="https://...">
             </div>
-            <div class="mb-3">
-                <label class="form-label-sm">Harga Khusus Warna Ini (opsional)</label>
+            <div class="variant-field">
+                <label class="form-label-sm" for="editPriceOverride">Harga khusus warna <span class="text-muted fw-normal">(opsional)</span></label>
                 <input type="number" name="price_override" id="editPriceOverride" min="0" class="form-control"
-                       style="border-radius:10px;" placeholder="Kosong = pakai harga dasar">
+                       placeholder="Kosong = pakai harga dasar">
             </div>
-            <div class="d-flex gap-3 mb-3">
+            <div class="variant-check-row">
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="is_default" value="1" id="editIsDefault">
-                    <label class="form-check-label" for="editIsDefault" style="font-size:.8rem;">Default</label>
+                    <label class="form-check-label" for="editIsDefault">Warna utama</label>
                 </div>
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="is_active" value="1" id="editIsActive" checked>
-                    <label class="form-check-label" for="editIsActive" style="font-size:.8rem;">Aktif</label>
+                    <label class="form-check-label" for="editIsActive">Variant aktif</label>
                 </div>
             </div>
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-dark fw-bold flex-grow-1" style="border-radius:10px;">
-                    <i class="bi bi-check-lg me-1"></i> Simpan Perubahan
-                </button>
-                <button type="button" onclick="document.getElementById('editVariantModal').style.display='none'"
-                        class="btn btn-outline-secondary" style="border-radius:10px;">Batal</button>
+            <div class="variant-modal-footer">
+                <button type="button" onclick="closeVariantModal('editVariantModal')" class="btn btn-outline-secondary">Batal</button>
+                <button type="submit" class="btn btn-dark"><i class="bi bi-check-lg me-1"></i> Simpan perubahan</button>
             </div>
         </form>
     </div>
@@ -1050,6 +1173,20 @@ function escapeHtml(value) {
     });
 }
 
+// ── Variant modal helpers ─────────────────────────────────────────────────────
+function openAddVariant() {
+    const modal = document.getElementById('addVariantModal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    document.getElementById('addColorName')?.focus();
+}
+
+function closeVariantModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.style.display = 'none';
+}
+
 // ── Edit Variant modal ────────────────────────────────────────────────────────
 function openEditVariant(data) {
     const baseUrl = '{{ route('admin.catalog.products.variants.update', [$product, '__ID__']) }}';
@@ -1071,6 +1208,7 @@ function openEditVariant(data) {
     }
     document.getElementById('editImgPreview').style.display = 'none';
     document.getElementById('editVariantModal').style.display = 'flex';
+    document.getElementById('editColorName')?.focus();
 }
 
 // ── Edit Size modal ───────────────────────────────────────────────────────────
@@ -1085,8 +1223,16 @@ function openEditSize(data) {
 
 // Close modals on backdrop click
 ['addVariantModal', 'editVariantModal', 'editSizeModal'].forEach(id => {
-    document.getElementById(id).addEventListener('click', function(e) {
-        if (e.target === this) this.style.display = 'none';
+    document.getElementById(id)?.addEventListener('click', function(e) {
+        if (e.target === this) closeVariantModal(id);
+    });
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    ['addVariantModal', 'editVariantModal', 'editSizeModal'].forEach(id => {
+        const modal = document.getElementById(id);
+        if (modal?.style.display === 'flex') closeVariantModal(id);
     });
 });
 </script>

@@ -3,7 +3,7 @@ import DesignSystemSidebar from './DesignSystemSidebar';
 import CrudModal, { crudFieldCatalog, selectAllOnFocus, selectAllOnMouseDown } from './CrudModal';
 import DataTable from './DataTable';
 import { colorTokens, componentNavItems, kpis, layoutTemplates, navItems } from './designSystemConfig';
-import { Alert, Badge, Button, ComparisonKpi, LayoutPreview, Panel, SectionHeader, TokenSwatch } from './DesignSystemPrimitives';
+import { Alert, Badge, Button, ComparisonKpi, LayoutPreview, Panel, SearchInput, SectionHeader, Tabs, TokenSwatch } from './DesignSystemPrimitives';
 
 const tabItems = [
     { id: 'summary', label: 'Summary', content: 'Summary menyajikan angka penting tanpa mengalihkan fokus pengguna.' },
@@ -35,6 +35,77 @@ const salesTableRows = [
     { id: 'active-pants', product: 'Active pants', sku: 'GF-AP-008', orders: '61', sales: 'Rp 18.910.000', status: 'Perlu review', tone: 'warning' },
 ];
 
+const searchExamples = [
+    { name: 'Opening stock bahan baku', meta: 'Inventory · Stock Opname', keywords: 'opening stock bahan baku rm hpp' },
+    { name: 'Opening balance accounting', meta: 'Accounting · Opening Balance Batch', keywords: 'opening balance accounting kas piutang hutang ekuitas' },
+    { name: 'Verifikasi trial balance', meta: 'Accounting · Trial Balance', keywords: 'verifikasi trial balance debit kredit jurnal' },
+    { name: 'Mulai transaksi baru', meta: 'Operations · Cutting / Sewing / Shipment', keywords: 'transaksi baru cutting sewing finishing shipment' },
+];
+
+const productTabs = [
+    { id: 'overview', label: 'Overview', icon: 'bi-grid-1x2' },
+    { id: 'activity', label: 'Activity', icon: 'bi-activity', badge: '12' },
+    { id: 'settings', label: 'Settings', icon: 'bi-sliders2' },
+    { id: 'inventory', label: 'Inventory', icon: 'bi-boxes', badge: '24' },
+    { id: 'reports', label: 'Reports', icon: 'bi-bar-chart-line' },
+];
+
+const productSubtabs = {
+    overview: [
+        { id: 'summary', label: 'Summary' },
+        { id: 'performance', label: 'Performance' },
+        { id: 'channels', label: 'Channels' },
+    ],
+    activity: [
+        { id: 'recent', label: 'Recent' },
+        { id: 'audit', label: 'Audit log' },
+        { id: 'alerts', label: 'Alerts', badge: '3' },
+    ],
+    settings: [
+        { id: 'general', label: 'General' },
+        { id: 'access', label: 'Access' },
+        { id: 'notifications', label: 'Notifications' },
+    ],
+    inventory: [
+        { id: 'stock', label: 'Stock' },
+        { id: 'warehouses', label: 'Warehouses' },
+        { id: 'movements', label: 'Movements' },
+    ],
+    reports: [
+        { id: 'sales', label: 'Sales' },
+        { id: 'exports', label: 'Exports' },
+        { id: 'scheduled', label: 'Scheduled' },
+    ],
+};
+
+const tabPanelCopy = {
+    overview: {
+        summary: ['Summary', 'Ringkasan metrik utama untuk membantu pengguna memahami kondisi produk dalam sekali lihat.'],
+        performance: ['Performance', 'Tampilkan tren, perbandingan periode, dan insight performa pada konteks tab yang sama.'],
+        channels: ['Channels', 'Bandingkan kontribusi marketplace, website, dan channel penjualan lainnya.'],
+    },
+    activity: {
+        recent: ['Recent activity', 'Urutkan perubahan terbaru secara kronologis dengan status dan actor yang jelas.'],
+        audit: ['Audit log', 'Sediakan jejak perubahan yang dapat ditelusuri tanpa memenuhi halaman dengan detail sekunder.'],
+        alerts: ['Alerts', 'Pisahkan notifikasi yang membutuhkan tindakan agar tidak tercampur dengan histori biasa.'],
+    },
+    settings: {
+        general: ['General settings', 'Tempatkan preferensi dasar yang paling sering digunakan oleh pemilik workspace.'],
+        access: ['Access control', 'Kelola role dan izin dalam konteks settings yang lebih spesifik.'],
+        notifications: ['Notifications', 'Berikan kontrol notifikasi tanpa memindahkan pengguna ke halaman baru.'],
+    },
+    inventory: {
+        stock: ['Stock overview', 'Pantau ketersediaan stok dan tandai item yang membutuhkan perhatian lebih awal.'],
+        warehouses: ['Warehouses', 'Bandingkan distribusi stok antar gudang tanpa meninggalkan konteks inventory.'],
+        movements: ['Stock movements', 'Telusuri perpindahan stok berdasarkan waktu, lokasi, dan sumber transaksi.'],
+    },
+    reports: {
+        sales: ['Sales reports', 'Ringkas performa penjualan dalam periode yang dipilih dengan metrik yang mudah dipindai.'],
+        exports: ['Export reports', 'Sediakan hasil laporan yang siap diunduh atau dibagikan ke tim terkait.'],
+        scheduled: ['Scheduled reports', 'Atur laporan berkala agar insight penting datang tanpa pekerjaan manual berulang.'],
+    },
+};
+
 export default function DesignSystemApp() {
     const [activeSection, setActiveSection] = useState('overview');
     const [isDarkPreview, setIsDarkPreview] = useState(false);
@@ -45,6 +116,9 @@ export default function DesignSystemApp() {
     const [modalMode, setModalMode] = useState('create');
     const [modalOpen, setModalOpen] = useState(false);
     const [modalLoading, setModalLoading] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeProductTab, setActiveProductTab] = useState('overview');
+    const [activeProductSubtab, setActiveProductSubtab] = useState('summary');
 
     useEffect(() => {
         const sections = [...navItems, ...componentNavItems].map(({ id }) => document.getElementById(id)).filter(Boolean);
@@ -108,6 +182,18 @@ export default function DesignSystemApp() {
             setToast('Produk berhasil dihapus.');
         }, 650);
     };
+
+    const filteredSearchExamples = searchExamples.filter((item) => {
+        const query = searchQuery.trim().toLowerCase();
+        return !query || [item.name, item.meta, item.keywords].join(' ').toLowerCase().includes(query);
+    });
+
+    const handleProductTabChange = (tabId) => {
+        setActiveProductTab(tabId);
+        setActiveProductSubtab(productSubtabs[tabId][0].id);
+    };
+
+    const activeTabCopy = tabPanelCopy[activeProductTab][activeProductSubtab];
 
     return (
         <div className={`ds-shell ${isDarkPreview ? 'is-dark-preview' : ''}`} id="design-system">
@@ -229,6 +315,79 @@ export default function DesignSystemApp() {
                                 ))}
                             </div>
                             {tabItems.map((tab) => activeTab === tab.id && <div className="ds-tab-panel is-active" role="tabpanel" id={`panel-${tab.id}`} aria-labelledby={`tab-${tab.id}`} key={tab.id}>{tab.content}</div>)}
+                        </Panel>
+                    </div>
+                    <div className="ds-grid ds-grid-2 ds-space-top">
+                        <Panel id="component-search-input" title="Search input" meta="SearchInput">
+                            <p className="ds-pattern-intro">Input pencarian reusable dengan select-all saat focus/click, clear action, result count, dan empty state.</p>
+                            <SearchInput
+                                id="ds-search-component-input"
+                                label="Cari komponen"
+                                placeholder="Cari komponen, menu, atau kata kunci…"
+                                value={searchQuery}
+                                onChange={setSearchQuery}
+                                onClear={() => setSearchQuery('')}
+                                resultCount={filteredSearchExamples.length}
+                                totalCount={searchQuery.trim() ? searchExamples.length : undefined}
+                                itemLabel="komponen"
+                            />
+                            <div className="ds-search-results" role="list" aria-label="Hasil pencarian komponen">
+                                {filteredSearchExamples.map((item) => (
+                                    <div className="ds-search-result" role="listitem" key={item.name}>
+                                        <span className="ds-search-result-icon"><i className="bi bi-command" aria-hidden="true" /></span>
+                                        <span><strong>{item.name}</strong><small>{item.meta}</small></span>
+                                    </div>
+                                ))}
+                                {!filteredSearchExamples.length && (
+                                    <div className="ds-search-empty" role="status"><i className="bi bi-search" aria-hidden="true" /><strong>Komponen tidak ditemukan</strong><span>Coba kata kunci lain atau hapus pencarian.</span></div>
+                                )}
+                            </div>
+                            <div className="ds-search-hint"><i className="bi bi-lightning-charge-fill" aria-hidden="true" /> Klik input untuk memilih semua teks sebelum mengganti query.</div>
+                        </Panel>
+                        <Panel title="Search input contract" meta="props / states">
+                            <div className="ds-search-contract">
+                                <div><code>value</code><span>Query terkontrol dari parent.</span></div>
+                                <div><code>onChange</code><span>Filter berjalan realtime saat mengetik.</span></div>
+                                <div><code>onClear</code><span>Reset query dan fokus kembali ke input.</span></div>
+                                <div><code>resultCount</code><span>Jumlah hasil visible untuk feedback.</span></div>
+                                <div><code>empty state</code><span>Pesan saat tidak ada hasil.</span></div>
+                            </div>
+                        </Panel>
+                    </div>
+                    <div className="ds-grid ds-grid-2 ds-space-top">
+                        <Panel id="component-tabs-subtabs" title="Tabs & subtabs" meta="Tabs / Subtabs">
+                            <p className="ds-pattern-intro">Gunakan tab utama untuk mengganti konteks halaman, lalu subtab untuk detail di dalam konteks tersebut.</p>
+                            <Tabs
+                                idPrefix="ds-product-tabs"
+                                items={productTabs}
+                                activeId={activeProductTab}
+                                onChange={handleProductTabChange}
+                                ariaLabel="Product sections"
+                            />
+                            <div className="ds-tabs-connector" aria-hidden="true" />
+                            <Tabs
+                                idPrefix="ds-product-subtabs"
+                                items={productSubtabs[activeProductTab]}
+                                activeId={activeProductSubtab}
+                                onChange={setActiveProductSubtab}
+                                ariaLabel={`${activeProductTab} subsections`}
+                                variant="subtabs"
+                            />
+                            <div className="ds-tab-preview-panel" role="tabpanel" aria-live="polite" aria-label={`${activeProductTab} ${activeProductSubtab}`}>
+                                <span className="ds-preview-label">Active panel</span>
+                                <strong>{activeTabCopy[0]}</strong>
+                                <p>{activeTabCopy[1]}</p>
+                            </div>
+                            <div className="ds-search-hint"><i className="bi bi-keyboard" aria-hidden="true" /> Gunakan ← →, Home, atau End untuk berpindah tab melalui keyboard.</div>
+                        </Panel>
+                        <Panel title="Tabs hierarchy" meta="interaction contract">
+                            <div className="ds-tab-hierarchy">
+                                <div className="ds-tab-hierarchy-row is-primary"><i className="bi bi-layout-three-columns" aria-hidden="true" /><span><strong>Primary tab</strong><small>Mengganti konteks utama halaman.</small></span><code>role=tablist</code></div>
+                                <div className="ds-tab-hierarchy-branch" aria-hidden="true"><span /></div>
+                                <div className="ds-tab-hierarchy-row is-sub"><i className="bi bi-layout-text-sidebar-reverse" aria-hidden="true" /><span><strong>Subtab</strong><small>Memecah detail tanpa berpindah halaman.</small></span><code>variant=subtabs</code></div>
+                                <div className="ds-tab-hierarchy-branch" aria-hidden="true"><span /></div>
+                                <div className="ds-tab-hierarchy-row is-panel"><i className="bi bi-window" aria-hidden="true" /><span><strong>Panel content</strong><small>Konten mengikuti kombinasi tab aktif.</small></span><code>aria-live</code></div>
+                            </div>
                         </Panel>
                     </div>
                 </section>

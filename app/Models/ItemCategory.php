@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ItemCategory extends Model
 {
@@ -28,9 +30,29 @@ class ItemCategory extends Model
     /**
      * Satu kategori memiliki banyak item.
      */
-    public function items()
+    public function items(): HasMany
     {
         return $this->hasMany(Item::class);
+    }
+
+    public function pieceRates(): HasMany
+    {
+        return $this->hasMany(PieceRate::class, 'item_category_id');
+    }
+
+    public function pieceworkPayrollLines(): HasMany
+    {
+        return $this->hasMany(PieceworkPayrollLine::class, 'item_category_id');
+    }
+
+    public function cuttingJobBundles(): HasMany
+    {
+        return $this->hasMany(CuttingJobBundle::class, 'item_category_id');
+    }
+
+    public function supplierCategoryMapping(): HasOne
+    {
+        return $this->hasOne(SupplierCategoryMapping::class, 'item_category_id');
     }
 
     /* ==========================

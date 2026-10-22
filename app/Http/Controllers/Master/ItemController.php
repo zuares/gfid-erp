@@ -3,19 +3,19 @@
 namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
+use App\Models\Account;
 use App\Models\Item;
 use App\Models\ItemBom;
 use App\Models\ItemCategory;
 use App\Models\ItemCostSnapshot;
+use App\Models\ItemPurchaseTreatment;
 use App\Models\ItemRole;
 use App\Models\ItemTypeOption;
-use App\Models\ItemPurchaseTreatment;
-use App\Models\Account;
 use App\Models\Supplier;
 use App\Models\SupplierItem;
 use App\Services\Production\ItemBomCostService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -85,6 +85,7 @@ class ItemController extends Controller
         $itemTypeOptions = $this->itemTypeOptions();
         $purchaseTreatmentOptions = $this->purchaseTreatmentOptions();
         $activeCost = null;
+
         return view('master.items.create', compact('item', 'categories', 'suppliers', 'expenseAccounts', 'activeSnapshot', 'activeCost', 'typeLabels', 'itemTypeOptions', 'purchaseTreatmentOptions'));
     }
 
@@ -101,10 +102,10 @@ class ItemController extends Controller
             ->select(['id', 'code', 'name', 'type', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor'])
             ->when($excludeId > 0, fn ($q) => $q->where('id', '<>', $excludeId))
             ->where(function ($q) use ($query) {
-                $q->whereRaw('UPPER(code) LIKE ?', [$query . '%'])
-                    ->orWhereRaw('UPPER(name) LIKE ?', ['%' . $query . '%']);
+                $q->whereRaw('UPPER(code) LIKE ?', [$query.'%'])
+                    ->orWhereRaw('UPPER(name) LIKE ?', ['%'.$query.'%']);
             })
-            ->orderByRaw('CASE WHEN UPPER(code) = ? THEN 0 WHEN UPPER(code) LIKE ? THEN 1 ELSE 2 END', [$query, $query . '%'])
+            ->orderByRaw('CASE WHEN UPPER(code) = ? THEN 0 WHEN UPPER(code) LIKE ? THEN 1 ELSE 2 END', [$query, $query.'%'])
             ->orderBy('code')
             ->limit(8)
             ->get();
@@ -395,6 +396,16 @@ class ItemController extends Controller
             }
         });
 
+        if ($request->boolean('return_to_category')) {
+            return redirect()
+                ->route('master.item_categories.index', array_filter([
+                    'kind' => $request->input('return_kind'),
+                    'q' => $request->input('return_q'),
+                    'status' => $request->input('return_status'),
+                ]))
+                ->with('success', "Item {$item->code} berhasil ditambahkan.");
+        }
+
         if ($request->boolean('return_to_index')) {
             return redirect()
                 ->route('master.items.index')
@@ -424,12 +435,16 @@ class ItemController extends Controller
         $typeLabels = $this->typeLabels();
         $itemTypeOptions = $this->itemTypeOptions();
         $purchaseTreatmentOptions = $this->purchaseTreatmentOptions();
-        
+
         return view('master.items.edit', compact('item', 'categories', 'suppliers', 'expenseAccounts', 'activeSnapshot', 'activeCost', 'itemBom', 'bomEstimate', 'typeLabels', 'itemTypeOptions', 'purchaseTreatmentOptions'));
     }
 
     public function update(Request $request, Item $item)
     {
+        $returnToIndex = $request->boolean('return_to_index');
+        $returnToCategory = $request->boolean('return_to_category');
+        $compactEdit = $request->boolean('compact_edit');
+
         if ($this->isAdminReadOnly()) {
             $data = $request->validate([
                 'name' => ['required', 'string', 'max:190'],
@@ -437,8 +452,13 @@ class ItemController extends Controller
 
             $item->update(['name' => trim($data['name'])]);
 
-            return redirect()
-                ->route('master.items.show', $item)
+            return ($returnToCategory
+                ? redirect()->route('master.item_categories.index', array_filter([
+                    'kind' => $request->input('return_kind'),
+                    'q' => $request->input('return_q'),
+                    'status' => $request->input('return_status'),
+                ]))
+                : ($returnToIndex ? redirect()->route('master.items.index') : redirect()->route('master.items.show', $item)))
                 ->with('success', 'Nama item berhasil diperbarui.');
         }
 
@@ -448,7 +468,7 @@ class ItemController extends Controller
             $data['last_purchase_price'] = (float) $latestGrn->stock_unit_price;
         }
 
-        DB::transaction(function () use ($data, $item) {
+        DB::transaction(function () use ($data, $item, $compactEdit) {
             $classification = $this->classificationFor(
                 $data['type'],
                 $data['item_category_id'] ?? null,
@@ -485,26 +505,31 @@ class ItemController extends Controller
                 'last_purchase_price' => array_key_exists('last_purchase_price', $data) ? $data['last_purchase_price'] : $item->last_purchase_price,
             ]);
 
-            $this->syncSuppliers($item, $data['supplier_ids'] ?? [], $data['primary_supplier_id'] ?? null);
-            $this->syncBarcodes($item, $data['barcodes'] ?? []);
+            // Quick edit hanya mengubah field inti. Jangan menyentuh relasi
+            // supplier/barcode ketika form ringkas tidak menampilkan field-nya.
+            if (! $compactEdit) {
+                $this->syncSuppliers($item, $data['supplier_ids'] ?? [], $data['primary_supplier_id'] ?? null);
+                $this->syncBarcodes($item, $data['barcodes'] ?? []);
+            }
 
             if ($accountingPolicy['default_allocation'] === 'hpp' && isset($data['unit_cost'])) {
                 if ($item->latestPostedGrnPurchase()) {
                     app(\App\Services\Costing\ActiveHppService::class)->sync($item);
+
                     return;
                 }
 
                 $unitCost = $data['unit_cost'];
                 $hppNotes = $data['hpp_notes'] ?? 'HPP diperbarui dari form Master Item';
                 $currentSnapshot = ItemCostSnapshot::getActiveForItem($item->id, null);
-                
-                if (!$currentSnapshot || (float)$currentSnapshot->unit_cost !== (float)$unitCost || $currentSnapshot->notes !== $hppNotes) {
+
+                if (! $currentSnapshot || (float) $currentSnapshot->unit_cost !== (float) $unitCost || $currentSnapshot->notes !== $hppNotes) {
                     ItemCostSnapshot::where('item_id', $item->id)->active()->update(['is_active' => 0]);
                     $item->update([
                         'hpp' => $unitCost,
                         'base_unit_cost' => $unitCost,
                     ]);
-                    
+
                     ItemCostSnapshot::create([
                         'item_id' => $item->id,
                         'warehouse_id' => null,
@@ -527,8 +552,13 @@ class ItemController extends Controller
             }
         });
 
-        return redirect()
-            ->route('master.items.show', $item)
+        return ($returnToCategory
+            ? redirect()->route('master.item_categories.index', array_filter([
+                'kind' => $request->input('return_kind'),
+                'q' => $request->input('return_q'),
+                'status' => $request->input('return_status'),
+            ]))
+            : ($returnToIndex ? redirect()->route('master.items.index') : redirect()->route('master.items.show', $item)))
             ->with('success', 'Item & barcode berhasil diperbarui.');
     }
 
@@ -589,6 +619,7 @@ class ItemController extends Controller
                     ]);
                     $count++;
                 }
+
                 return;
             }
 
@@ -636,11 +667,12 @@ class ItemController extends Controller
                     ]);
                     $count++;
                 }
+
                 return;
             }
 
             if ($action === 'set_hpp') {
-                if (!isset($data['unit_cost'])) {
+                if (! isset($data['unit_cost'])) {
                     abort(422, 'Nilai HPP wajib diisi untuk aksi set HPP.');
                 }
 
@@ -653,6 +685,7 @@ class ItemController extends Controller
                     if ($item->latestPostedGrnPurchase()) {
                         app(\App\Services\Costing\ActiveHppService::class)->sync($item);
                         $count++;
+
                         continue;
                     }
 
@@ -689,6 +722,7 @@ class ItemController extends Controller
                     ]);
                     $count++;
                 }
+
                 return;
             }
 
@@ -698,7 +732,7 @@ class ItemController extends Controller
                 $defaultSource = $data['default_supply_source'] ?? null;
 
                 foreach (Item::whereIn('id', $ids)->get(['id', 'type', 'production_source']) as $item) {
-                    if (!in_array($item->type, ['finished_good', 'wip'], true)) {
+                    if (! in_array($item->type, ['finished_good', 'wip'], true)) {
                         continue;
                     }
 
@@ -847,7 +881,7 @@ class ItemController extends Controller
             ],
 
             'active' => ['nullable'],
-            
+
             'default_allocation' => ['nullable', 'string', Rule::in(['hpp', 'expense'])],
             'purchase_treatment_id' => [
                 'nullable',
@@ -893,8 +927,8 @@ class ItemController extends Controller
             ->filter()
             ->unique()
             ->values();
-        if (!empty($data['primary_supplier_id'])
-            && !$supplierIds->contains((int) $data['primary_supplier_id'])) {
+        if (! empty($data['primary_supplier_id'])
+            && ! $supplierIds->contains((int) $data['primary_supplier_id'])) {
             throw ValidationException::withMessages([
                 'primary_supplier_id' => 'Supplier utama harus dipilih dari daftar supplier item.',
             ]);
@@ -910,7 +944,7 @@ class ItemController extends Controller
 
     protected function applyCategoryAccountingDefaults(array $data): array
     {
-        $category = !empty($data['item_category_id'])
+        $category = ! empty($data['item_category_id'])
             ? ItemCategory::find($data['item_category_id'])
             : null;
 
@@ -920,10 +954,10 @@ class ItemController extends Controller
 
         $data['default_allocation'] = 'expense';
 
-        $selectedTreatment = !empty($data['purchase_treatment_id'])
+        $selectedTreatment = ! empty($data['purchase_treatment_id'])
             ? ItemPurchaseTreatment::find($data['purchase_treatment_id'])
             : null;
-        if (!$selectedTreatment || $selectedTreatment->allocation !== 'expense') {
+        if (! $selectedTreatment || $selectedTreatment->allocation !== 'expense') {
             $data['purchase_treatment_id'] = ItemPurchaseTreatment::query()
                 ->where('allocation', 'expense')
                 ->where('is_system', true)
@@ -945,7 +979,7 @@ class ItemController extends Controller
 
     protected function normalizeMasterOptions(array $data): array
     {
-        $typeOption = !empty($data['item_type_option_id'])
+        $typeOption = ! empty($data['item_type_option_id'])
             ? ItemTypeOption::query()->where('active', true)->find($data['item_type_option_id'])
             : ItemTypeOption::query()->where('code', $data['type'] ?? 'material')->where('active', true)->first();
 
@@ -954,7 +988,7 @@ class ItemController extends Controller
             $data['type'] = $typeOption->base_type;
         }
 
-        $treatment = !empty($data['purchase_treatment_id'])
+        $treatment = ! empty($data['purchase_treatment_id'])
             ? ItemPurchaseTreatment::query()->with('expenseAccount')->where('active', true)->find($data['purchase_treatment_id'])
             : ItemPurchaseTreatment::query()->where('allocation', $data['default_allocation'] ?? 'hpp')->where('active', true)->orderByDesc('is_system')->first();
 
@@ -973,14 +1007,14 @@ class ItemController extends Controller
 
     protected function validateCategoryForType(string $type, ?int $categoryId): void
     {
-        if (!$categoryId) {
+        if (! $categoryId) {
             return;
         }
 
         $kind = ItemCategory::whereKey($categoryId)->value('kind');
         $allowed = $this->allowedCategoryKindsForType($type);
 
-        if (!in_array($kind, $allowed, true)) {
+        if (! in_array($kind, $allowed, true)) {
             throw ValidationException::withMessages([
                 'item_category_id' => 'Kategori tidak sesuai dengan tipe item. Finished Good wajib kategori produk; Material wajib kategori bahan/pendukung/accessories/ATK/operasional/packaging.',
             ]);
@@ -1062,7 +1096,7 @@ class ItemController extends Controller
 
     protected function productionSourceFor(string $type, ?string $productionSource): ?string
     {
-        if (!in_array($type, ['finished_good', 'wip'], true)) {
+        if (! in_array($type, ['finished_good', 'wip'], true)) {
             return null;
         }
 
@@ -1079,7 +1113,7 @@ class ItemController extends Controller
      */
     protected function supplyPolicyFor(string $type, array $data, ?Item $item = null): array
     {
-        if (!in_array($type, ['finished_good', 'wip'], true)) {
+        if (! in_array($type, ['finished_good', 'wip'], true)) {
             return [
                 'can_buy' => false,
                 'can_make' => false,
@@ -1098,7 +1132,7 @@ class ItemController extends Controller
             : $legacySource === Item::PRODUCTION_IN_HOUSE;
 
         $defaultSource = $data['default_supply_source'] ?? null;
-        if (!array_key_exists($defaultSource, Item::supplySourceLabels())) {
+        if (! array_key_exists($defaultSource, Item::supplySourceLabels())) {
             $defaultSource = match ($legacySource) {
                 Item::PRODUCTION_IN_HOUSE => Item::SUPPLY_MAKE,
                 Item::PRODUCTION_OUTSOURCE => Item::SUPPLY_OUTSOURCE,
@@ -1106,11 +1140,11 @@ class ItemController extends Controller
             };
         }
 
-        if ($defaultSource === Item::SUPPLY_MAKE && !$canMake) {
+        if ($defaultSource === Item::SUPPLY_MAKE && ! $canMake) {
             $defaultSource = $canBuy ? Item::SUPPLY_BUY : null;
-        } elseif ($defaultSource === Item::SUPPLY_BUY && !$canBuy) {
+        } elseif ($defaultSource === Item::SUPPLY_BUY && ! $canBuy) {
             $defaultSource = $canMake ? Item::SUPPLY_MAKE : null;
-        } elseif (!$canBuy && !$canMake && $defaultSource !== Item::SUPPLY_OUTSOURCE) {
+        } elseif (! $canBuy && ! $canMake && $defaultSource !== Item::SUPPLY_OUTSOURCE) {
             $defaultSource = null;
         }
 
@@ -1123,7 +1157,7 @@ class ItemController extends Controller
 
     protected function legacyProductionSourceFor(string $type, ?string $defaultSource): ?string
     {
-        if (!in_array($type, ['finished_good', 'wip'], true)) {
+        if (! in_array($type, ['finished_good', 'wip'], true)) {
             return null;
         }
 
@@ -1168,9 +1202,9 @@ class ItemController extends Controller
 
         if ($search = trim((string) $request->input('q'))) {
             $query->where(function ($q) use ($search) {
-                $q->where('code', 'like', '%' . $search . '%')
-                    ->orWhere('sku', 'like', '%' . $search . '%')
-                    ->orWhere('name', 'like', '%' . $search . '%');
+                $q->where('code', 'like', '%'.$search.'%')
+                    ->orWhere('sku', 'like', '%'.$search.'%')
+                    ->orWhere('name', 'like', '%'.$search.'%');
             });
         }
 
@@ -1183,7 +1217,7 @@ class ItemController extends Controller
         }
 
         if ($categoryKind = $request->input('category_kind')) {
-            $query->whereHas('category', fn($q) => $q->where('kind', $categoryKind));
+            $query->whereHas('category', fn ($q) => $q->where('kind', $categoryKind));
         }
 
         $supplyMode = $request->input('supply_mode');
@@ -1243,7 +1277,7 @@ class ItemController extends Controller
         }
 
         $primaryId = (int) $primarySupplierId;
-        if (!$ids->contains($primaryId)) {
+        if (! $ids->contains($primaryId)) {
             $primaryId = (int) $ids->first();
         }
 
@@ -1311,7 +1345,7 @@ class ItemController extends Controller
         return response()->json([
             'ok' => true,
             'message' => 'Akun biaya berhasil diperbarui',
-            'expense_account_id' => $item->default_expense_account_id
+            'expense_account_id' => $item->default_expense_account_id,
         ]);
     }
 
@@ -1322,7 +1356,7 @@ class ItemController extends Controller
             ->where('id', $id)
             ->first();
 
-        if (!$item) {
+        if (! $item) {
             return response()->json(['ok' => false], 404);
         }
 

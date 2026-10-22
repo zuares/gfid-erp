@@ -5,15 +5,22 @@ namespace App\Http\Controllers\Master;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\ItemCategory;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ItemCategoryController extends Controller
 {
     public function index(Request $request)
     {
-        $query = ItemCategory::query()->withCount('items');
+        $search = trim((string) $request->input('q', ''));
+        $query = ItemCategory::query()->withCount([
+            'items',
+            'pieceRates',
+            'pieceworkPayrollLines',
+            'cuttingJobBundles',
+            'supplierCategoryMapping',
+        ]);
         $kindLabels = ItemCategory::kindLabels();
         $kindCounts = ItemCategory::query()
             ->selectRaw('kind, COUNT(*) as total')
@@ -29,11 +36,22 @@ class ItemCategoryController extends Controller
         $usedCount = ItemCategory::has('items')->count();
         $emptyCount = ItemCategory::doesntHave('items')->count();
         $kindItems = null;
+        $itemCategoryOptions = ItemCategory::query()
+            ->orderByRaw("CASE kind
+                WHEN 'product' THEN 1
+                WHEN 'material' THEN 2
+                WHEN 'support' THEN 3
+                WHEN 'accessory' THEN 4
+                WHEN 'packaging' THEN 5
+                ELSE 9
+            END")
+            ->orderBy('name')
+            ->get(['id', 'code', 'name', 'kind', 'active']);
 
-        if ($search = $request->input('q')) {
+        if ($search !== '') {
             $query->where(function ($q) use ($search) {
-                $q->where('code', 'like', '%' . $search . '%')
-                    ->orWhere('name', 'like', '%' . $search . '%');
+                $q->where('code', 'like', '%'.$search.'%')
+                    ->orWhere('name', 'like', '%'.$search.'%');
             });
         }
 
@@ -47,12 +65,12 @@ class ItemCategoryController extends Controller
             $itemQuery = Item::query()
                 ->with('category')
                 ->withCount('barcodes')
-                ->whereHas('category', fn($q) => $q->where('kind', $kind));
+                ->whereHas('category', fn ($q) => $q->where('kind', $kind));
 
             if ($search) {
                 $itemQuery->where(function ($q) use ($search) {
-                    $q->where('code', 'like', '%' . $search . '%')
-                        ->orWhere('name', 'like', '%' . $search . '%');
+                    $q->where('code', 'like', '%'.$search.'%')
+                        ->orWhere('name', 'like', '%'.$search.'%');
                 });
             }
 
@@ -89,11 +107,13 @@ class ItemCategoryController extends Controller
             'activeCount',
             'usedCount',
             'emptyCount',
+            'itemCategoryOptions',
         ));
     }
 
     public function store(Request $request)
     {
+        $this->normalizeRequest($request);
         $data = $this->validateRequest($request);
 
         ItemCategory::create([
@@ -140,6 +160,7 @@ class ItemCategoryController extends Controller
 
     public function update(Request $request, ItemCategory $item_category)
     {
+        $this->normalizeRequest($request);
         $data = $this->validateRequest($request, $item_category);
 
         $item_category->update([
@@ -156,13 +177,23 @@ class ItemCategoryController extends Controller
 
     public function destroy(ItemCategory $item_category)
     {
-        // Lindungi: jangan hapus kategori yang masih dipakai item.
-        $usedCount = $item_category->items()->count();
+        $usage = [
+            'item' => $item_category->items()->count(),
+            'tarif piece rate' => $item_category->pieceRates()->count(),
+            'riwayat payroll' => $item_category->pieceworkPayrollLines()->count(),
+            'bundle cutting' => $item_category->cuttingJobBundles()->count(),
+            'mapping supplier' => $item_category->supplierCategoryMapping()->count(),
+        ];
+        $usage = array_filter($usage);
 
-        if ($usedCount > 0) {
+        if ($usage !== []) {
+            $usageSummary = collect($usage)
+                ->map(fn (int $count, string $label) => "{$count} {$label}")
+                ->implode(', ');
+
             return redirect()
                 ->route('master.item_categories.index')
-                ->with('error', "Kategori \"{$item_category->name}\" masih dipakai {$usedCount} item dan tidak bisa dihapus.");
+                ->with('error', "Kategori \"{$item_category->name}\" masih memiliki referensi ({$usageSummary}) dan tidak bisa dihapus.");
         }
 
         $item_category->delete();
@@ -185,7 +216,15 @@ class ItemCategoryController extends Controller
             ],
             'name' => ['required', 'string', 'max:190'],
             'kind' => ['required', 'string', Rule::in(array_keys(ItemCategory::kindLabels()))],
-            'active' => ['nullable'],
+            'active' => ['sometimes', 'boolean'],
+        ]);
+    }
+
+    protected function normalizeRequest(Request $request): void
+    {
+        $request->merge([
+            'code' => strtoupper(trim((string) $request->input('code'))),
+            'name' => trim((string) $request->input('name')),
         ]);
     }
 }
