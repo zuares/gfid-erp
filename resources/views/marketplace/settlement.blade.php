@@ -1519,6 +1519,73 @@
                                     .split('.')
                                     .map((part) => part.replace(/[_-]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()))
                                     .join(' › ');
+                                const tiktokFeeLabels = {
+                                    platform_commission_amount: 'Komisi Platform',
+                                    platform_commission_fee: 'Komisi Platform',
+                                    referral_fee_amount: 'Referral Fee',
+                                    refund_administration_fee_amount: 'Biaya Administrasi Refund',
+                                    transaction_fee_amount: 'Biaya Transaksi',
+                                    transaction_fee: 'Biaya Transaksi',
+                                    credit_card_handling_fee_amount: 'Biaya Handling Kartu',
+                                    affiliate_commission_amount: 'Komisi Affiliate',
+                                    affiliate_commission_fee: 'Komisi Affiliate',
+                                    affiliate_commission_amount_before_pit: 'Komisi Affiliate sebelum Pajak',
+                                    affiliate_partner_commission_amount: 'Komisi Partner Affiliate',
+                                    shipping_fee_guarantee_service_fee: 'Biaya Jaminan Ongkir',
+                                    bonus_cashback_service_fee_amount: 'Biaya Layanan Bonus Cashback',
+                                    campaign_period_fee_cfp_amount: 'Biaya Campaign Period',
+                                    campaign_period_fee_cfp_tax_amount: 'Pajak Campaign Period',
+                                    smart_promotion_fee_amount: 'Biaya Smart Promotion',
+                                    flash_sales_service_fee_amount: 'Biaya Layanan Flash Sale',
+                                    voucher_xtra_service_fee_amount: 'Biaya Layanan Voucher Xtra',
+                                    tsp_commission_amount: 'Komisi TikTok Shop Partner',
+                                    tap_shop_ads_commission: 'Komisi Shop Ads',
+                                    non_standard_dimension_fee: 'Biaya Dimensi Non-Standar',
+                                    new_customer_growth_package_fee: 'Biaya Growth Package — New Customer',
+                                    store_gmv_growth_package_fee: 'Biaya Growth Package — Store GMV',
+                                    target_product_gmv_growth_package_fee: 'Biaya Growth Package — Target Product GMV',
+                                    auto_post_shoppable_video_commission_fee: 'Komisi Auto-Post Shoppable Video',
+                                    new_customer_growth_package_fee_tax: 'Pajak Growth Package — New Customer',
+                                    store_gmv_growth_package_fee_sales_tax: 'Pajak Growth Package — Store GMV',
+                                    target_product_gmv_growth_package_tax: 'Pajak Growth Package — Target Product GMV',
+                                    auto_post_shoppable_video_sales_tax: 'Pajak Auto-Post Shoppable Video',
+                                };
+                                const tiktokFeeLabel = (key, type) => {
+                                    const mapped = tiktokFeeLabels[String(key || '')];
+                                    if (mapped) return mapped;
+                                    const label = formatFeeKey(key);
+                                    return `${type === 'tax' ? 'Pajak' : 'Fee'} — ${label}`;
+                                };
+                                const extractTikTokBreakdown = (raw) => {
+                                    const normalized = raw.tiktok_fee_breakdown || {};
+                                    const result = {
+                                        fees: normalized.fees && typeof normalized.fees === 'object' ? { ...normalized.fees } : {},
+                                        taxes: normalized.taxes && typeof normalized.taxes === 'object' ? { ...normalized.taxes } : {},
+                                    };
+                                    const addValues = (rows, target, prefix = '') => {
+                                        if (!rows || typeof rows !== 'object') return;
+                                        Object.entries(rows).forEach(([key, value]) => {
+                                            const label = prefix ? `${prefix}.${key}` : key;
+                                            if (value && typeof value === 'object' && !Array.isArray(value)) {
+                                                addValues(value, target, label);
+                                                return;
+                                            }
+                                            if (value !== null && value !== '' && Number.isFinite(Number(value))) {
+                                                target[label] = Number(target[label] || 0) + Math.abs(Number(value));
+                                            }
+                                        });
+                                    };
+                                    if (Object.keys(result.fees).length === 0 && Object.keys(result.taxes).length === 0) {
+                                        (Array.isArray(raw.sku_transactions) ? raw.sku_transactions : []).forEach((transaction) => {
+                                            const breakdown = transaction && typeof transaction.fee_tax_breakdown === 'object'
+                                                ? transaction.fee_tax_breakdown
+                                                : {};
+                                            addValues(breakdown.fee, result.fees);
+                                            addValues(breakdown.tax, result.taxes);
+                                        });
+                                    }
+                                    return result;
+                                };
                                 const feeTotal = Number(s.fee_total || 0);
                                 const feePercent = s.fee_percent !== undefined && s.fee_percent !== null ? Number(s.fee_percent) : null;
                                 const feeBase = Number(s.gross_after_voucher || 0);
@@ -1528,18 +1595,25 @@
                                     const shippingInsuranceFee = r.shipping_insurance_fee ?? r.shipping_insurance ?? r.insurance_fee ?? s.shipping_insurance_fee ?? 0;
                                     const biayaAffiliate = r.biaya_affiliate ?? r.affiliate_fee ?? r.affiliate_commission_fee ?? s.biaya_affiliate ?? s.affiliate_fee ?? 0;
                                     const affiliate = r.affiliate ?? r.affiliate_commission ?? r.affiliate_commission_amount ?? r.seller_affiliate_fee ?? s.affiliate ?? 0;
-                                    const tiktokBreakdown = r.tiktok_fee_breakdown || {};
-                                    const tiktokFees = tiktokBreakdown.fees && typeof tiktokBreakdown.fees === 'object' ? tiktokBreakdown.fees : {};
-                                    const tiktokTaxes = tiktokBreakdown.taxes && typeof tiktokBreakdown.taxes === 'object' ? tiktokBreakdown.taxes : {};
+                                    const tiktokBreakdown = extractTikTokBreakdown(r);
+                                    const tiktokFees = tiktokBreakdown.fees;
+                                    const tiktokTaxes = tiktokBreakdown.taxes;
+                                    const isTikTokFinance = String(r.source || '').toLowerCase().includes('tiktok')
+                                        || Object.keys(tiktokFees).length > 0
+                                        || Object.keys(tiktokTaxes).length > 0
+                                        || Array.isArray(r.sku_transactions);
                                     const hasTikTokBreakdown = Object.keys(tiktokFees).length > 0 || Object.keys(tiktokTaxes).length > 0;
                                     html += renderFeeLine('Total Fee Marketplace', feeTotal, true, feePercent);
-                                    if (hasTikTokBreakdown) {
-                                        html += sectionLabel('TikTok Fee & Tax');
+                                    if (isTikTokFinance) {
+                                        html += sectionLabel('Komponen Biaya TikTok');
+                                        if (!hasTikTokBreakdown) {
+                                            html += renderFeeLine('Fee & Pajak TikTok (agregat)', Math.abs(Number(r.fee_and_tax_amount || 0)), true);
+                                        }
                                         Object.entries(tiktokFees).forEach(([key, value]) => {
-                                            html += renderFeeLine(`Fee — ${formatFeeKey(key)}`, value);
+                                            html += renderFeeLine(tiktokFeeLabel(key, 'fee'), value);
                                         });
                                         Object.entries(tiktokTaxes).forEach(([key, value]) => {
-                                            html += renderFeeLine(`Pajak — ${formatFeeKey(key)}`, value);
+                                            html += renderFeeLine(tiktokFeeLabel(key, 'tax'), value);
                                         });
                                     } else {
                                         html += sectionLabel('Komisi & Admin');
