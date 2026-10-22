@@ -77,7 +77,7 @@
                             <th>Kode item internal</th>
                             <th class="numeric">Permintaan</th>
                             <th class="numeric ditem-mobile-secondary">Stok FG/RTS</th>
-                            <th class="numeric ditem-mobile-secondary">Stok produksi</th>
+                            <th class="numeric ditem-mobile-secondary">Stok produksi / WIP</th>
                             <th class="numeric">Selisih kurang</th>
                         </tr>
                     </thead>
@@ -92,6 +92,12 @@
                                 $demand = (float) ($row['demand_qty'] ?? 0);
                                 $stock = $row['stock_qty'] ?? null;
                                 $productionStock = $row['production_stock_qty'] ?? null;
+                                $wipStages = [
+                                    'CUT' => $row['wip_cut_qty'] ?? null,
+                                    'SEW' => $row['wip_sew_qty'] ?? null,
+                                    'FIN' => $row['wip_fin_qty'] ?? null,
+                                    'PACK' => $row['wip_pack_qty'] ?? null,
+                                ];
                                 $short = $stock !== null && $stock < $demand;
                                 $gap = $stock === null ? null : $stock - $demand;
                             @endphp
@@ -149,6 +155,13 @@
                                         </span>
                                     @else
                                         0 pcs
+                                    @endif
+                                    @if($productionStock !== null)
+                                        <div class="ditem-wip-breakdown" title="Rincian stok setengah jadi per tahap produksi">
+                                            @foreach($wipStages as $stage => $stageQty)
+                                                <span>{{ $stage }} {{ $stageQty === null ? '—' : $qty($stageQty) }}</span>@if(!$loop->last) · @endif
+                                            @endforeach
+                                        </div>
                                     @endif
                                 </td>
                                 <td class="numeric ditem-gap">

@@ -581,6 +581,22 @@ class DashboardController extends Controller
                         'COALESCE(SUM(CASE WHEN w.code IN (?, ?, ?, ?) THEN s.qty ELSE 0 END), 0) as production_stock_qty',
                         self::PRODUCTION_WAREHOUSE_CODES,
                     )
+                    ->selectRaw(
+                        'COALESCE(SUM(CASE WHEN w.code = ? THEN s.qty ELSE 0 END), 0) as wip_cut_qty',
+                        [self::WH['CUT']],
+                    )
+                    ->selectRaw(
+                        'COALESCE(SUM(CASE WHEN w.code = ? THEN s.qty ELSE 0 END), 0) as wip_sew_qty',
+                        [self::WH['SEW']],
+                    )
+                    ->selectRaw(
+                        'COALESCE(SUM(CASE WHEN w.code = ? THEN s.qty ELSE 0 END), 0) as wip_fin_qty',
+                        [self::WH['FIN']],
+                    )
+                    ->selectRaw(
+                        'COALESCE(SUM(CASE WHEN w.code = ? THEN s.qty ELSE 0 END), 0) as wip_pack_qty',
+                        [self::WH['PACK']],
+                    )
                     ->groupBy('s.item_id')
                     ->get()
                     ->keyBy('item_id');
@@ -649,6 +665,10 @@ class DashboardController extends Controller
                     'qty' => (float) ($itemData['qty'] ?? 0),
                     'stock_qty' => $internalItemId ? (float) ($stockData->stock_qty ?? 0) : null,
                     'production_stock_qty' => $internalItemId ? (float) ($stockData->production_stock_qty ?? 0) : null,
+                    'wip_cut_qty' => $internalItemId ? (float) ($stockData->wip_cut_qty ?? 0) : null,
+                    'wip_sew_qty' => $internalItemId ? (float) ($stockData->wip_sew_qty ?? 0) : null,
+                    'wip_fin_qty' => $internalItemId ? (float) ($stockData->wip_fin_qty ?? 0) : null,
+                    'wip_pack_qty' => $internalItemId ? (float) ($stockData->wip_pack_qty ?? 0) : null,
                     'mapped' => (bool) $internalItemId,
                     'internal_item_id' => $internalItemId,
                     'internal_code' => $internalItem?->code,
@@ -689,6 +709,10 @@ class DashboardController extends Controller
                             'demand_qty' => 0,
                             'stock_qty' => $item['stock_qty'] ?? null,
                             'production_stock_qty' => $item['production_stock_qty'] ?? null,
+                            'wip_cut_qty' => $item['wip_cut_qty'] ?? null,
+                            'wip_sew_qty' => $item['wip_sew_qty'] ?? null,
+                            'wip_fin_qty' => $item['wip_fin_qty'] ?? null,
+                            'wip_pack_qty' => $item['wip_pack_qty'] ?? null,
                             'mapped' => $internalItemId > 0,
                         ];
                     }

@@ -177,6 +177,7 @@
     .ditem-stock { color: #166534; font-size: .78rem; font-weight: 700; }
     .ditem-stock.short { color: #dc2626; }
     .ditem-production-stock { color: var(--dsh-muted); font-size: .78rem; font-weight: 700; }
+    .ditem-wip-breakdown { margin-top: .18rem; color: var(--dsh-muted); font-size: .56rem; font-weight: 600; line-height: 1.25; white-space: nowrap; }
     .ditem-production-indicator { display: inline-flex; align-items: center; gap: .32rem; padding: .22rem .45rem; border-radius: 999px; color: #9a3412; background: #ffedd5; font-size: .78rem; font-weight: 800; line-height: 1; }
     .ditem-production-icon { font-size: .82rem; }
     .ditem-gap { width: 112px; }
