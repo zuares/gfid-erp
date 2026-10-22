@@ -372,6 +372,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/sync-hpp',      [MarketplaceController::class, 'syncHpp'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/auto-map-by-code/preview', [MarketplaceController::class, 'previewAutoMapByCode']);
     Route::post('/auto-map-by-code', [MarketplaceController::class, 'autoMapByCode'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/stores-summary',  [MarketplaceController::class, 'storesSummary']);

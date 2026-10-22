@@ -202,7 +202,22 @@ class SkuMappingController extends Controller
                     OR sm.marketplace_sku = NULLIF(moi.model_sku, '')
                     OR sm.marketplace_sku = NULLIF(moi.item_sku, '')
                 )")
-                ->whereRaw('(sm.channel_code IS NULL OR LOWER(sm.channel_code) = LOWER(c.code))');
+                ->whereRaw("(
+                    sm.channel_code IS NULL
+                    OR LOWER(TRIM(sm.channel_code)) = LOWER(TRIM(c.code))
+                    OR (
+                        LOWER(TRIM(c.code)) IN ('tiktok', 'ttk', 'tiktok shop')
+                        AND LOWER(TRIM(sm.channel_code)) IN ('tiktok', 'ttk', 'tiktok shop')
+                    )
+                    OR (
+                        LOWER(TRIM(c.code)) IN ('shopee', 'shp')
+                        AND LOWER(TRIM(sm.channel_code)) IN ('shopee', 'shp')
+                    )
+                    OR (
+                        LOWER(TRIM(c.code)) IN ('tokopedia', 'tkp')
+                        AND LOWER(TRIM(sm.channel_code)) IN ('tokopedia', 'tkp')
+                    )
+                )");
             })
             ->selectRaw("{$skuExpression} as sku,
                 MAX({$itemNameExpression}) as item_name,

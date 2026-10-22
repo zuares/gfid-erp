@@ -441,28 +441,7 @@ class MarketplaceIssueService
         // Sebagian data lama berstatus marketplace_sku_empty walaupun kolom
         // marketplace_sku sudah terisi, jadi jangan hanya mengandalkan
         // mapping_not_found.
-        $query = MarketplaceOrderItem::query()
-            ->where(function ($q) {
-                $q->where('mapping_status', '!=', self::MAPPING_MAPPED)
-                    ->orWhereNull('mapping_status')
-                    ->orWhereNull('internal_item_id');
-            })
-            ->where(function ($q) {
-                $q->whereNotNull('marketplace_sku')->where('marketplace_sku', '!=', '')
-                    ->orWhere(function ($q2) {
-                        $q2->whereNotNull('model_sku')->where('model_sku', '!=', '');
-                    })
-                    ->orWhere(function ($q2) {
-                        $q2->whereNotNull('item_sku')->where('item_sku', '!=', '');
-                    })
-                    ->orWhere(function ($q2) {
-                        $q2->whereNotNull('external_sku')->where('external_sku', '!=', '');
-                    });
-            })
-            ->when($storeId, fn ($q) => $q->whereHas(
-                'order', fn ($q2) => $q2->where('store_id', $storeId)
-            ))
-            ->with(['order.store.channel']);
+        $query = $this->autoMapPendingQuery($storeId);
 
         // Collect distinct (sku, channelCode) pairs to avoid processing duplicates
         $pairs   = [];
@@ -472,11 +451,7 @@ class MarketplaceIssueService
 
         $query->chunkById(200, function ($items) use (&$pairs, &$mapped, &$skipped, &$errors) {
             foreach ($items as $item) {
-                $sku = trim((string) ($item->getRawOriginal('marketplace_sku')
-                    ?: $item->model_sku
-                    ?: $item->item_sku
-                    ?: $item->external_sku
-                    ?: ''));
+                $sku = $this->autoMapSourceSku($item);
 
                 if (! $sku) { $skipped++; continue; }
 
@@ -492,16 +467,8 @@ class MarketplaceIssueService
 
                 $pairs[$pairKey] = true;
 
-                // ── Strategy 1: exact code match ──────────────────────────────
-                $internalItem = Item::whereRaw('LOWER(code) = ?', [mb_strtolower($sku)])->first();
-
-                // ── Strategy 2: strip trailing -\d+ suffix ────────────────────
-                if (! $internalItem) {
-                    $prefix = preg_replace('/-\d+$/', '', $sku);
-                    if ($prefix !== $sku) {
-                        $internalItem = Item::whereRaw('LOWER(code) = ?', [mb_strtolower($prefix)])->first();
-                    }
-                }
+                $match = $this->findAutoMapItem($item);
+                $internalItem = $match['item'] ?? null;
 
                 if (! $internalItem) { $skipped++; continue; }
 
@@ -549,6 +516,122 @@ class MarketplaceIssueService
         });
 
         return ['mapped' => $mapped, 'skipped' => $skipped, 'errors' => $errors];
+    }
+
+    /**
+     * Preview kandidat auto-map sebelum user menekan tombol konfirmasi.
+     * Kandidat dikelompokkan berdasarkan SKU marketplace + channel.
+     */
+    public function previewAutoMapByCode(?int $storeId = null): array
+    {
+        $matches = [];
+        $pairs = [];
+
+        $this->autoMapPendingQuery($storeId)->chunkById(200, function ($items) use (&$matches, &$pairs) {
+            foreach ($items as $item) {
+                $sku = $this->autoMapSourceSku($item);
+                if ($sku === '') continue;
+
+                $channelCode = strtolower(trim((string) ($item->order?->store?->channel?->code ?? '')));
+                $pairKey = strtolower($sku).'|'.$channelCode;
+                $match = $this->findAutoMapItem($item);
+                if (! $match) continue;
+
+                if (! isset($pairs[$pairKey])) {
+                    $pairs[$pairKey] = count($matches);
+                    $matches[] = [
+                        'marketplace_sku' => $sku,
+                        'channel_code' => $channelCode,
+                        'item_code' => $match['item']->code,
+                        'item_name' => $match['item']->name,
+                        'matched_by' => $match['matched_by'],
+                        'matched_code' => $match['matched_code'],
+                        'order_count' => 0,
+                        'store_names' => [],
+                    ];
+                }
+
+                $index = $pairs[$pairKey];
+                $matches[$index]['order_count']++;
+                $storeName = $item->order?->store?->name;
+                if ($storeName && ! in_array($storeName, $matches[$index]['store_names'], true)) {
+                    $matches[$index]['store_names'][] = $storeName;
+                }
+            }
+        });
+
+        return [
+            'matches' => $matches,
+            'total_matches' => count($matches),
+            'total_order_items' => array_sum(array_column($matches, 'order_count')),
+        ];
+    }
+
+    private function autoMapPendingQuery(?int $storeId = null)
+    {
+        return MarketplaceOrderItem::query()
+            ->where(function ($q) {
+                $q->where('mapping_status', '!=', self::MAPPING_MAPPED)
+                    ->orWhereNull('mapping_status')
+                    ->orWhereNull('internal_item_id');
+            })
+            ->where(function ($q) {
+                $q->whereNotNull('marketplace_sku')->where('marketplace_sku', '!=', '')
+                    ->orWhere(function ($q2) {
+                        $q2->whereNotNull('model_sku')->where('model_sku', '!=', '');
+                    })
+                    ->orWhere(function ($q2) {
+                        $q2->whereNotNull('item_sku')->where('item_sku', '!=', '');
+                    })
+                    ->orWhere(function ($q2) {
+                        $q2->whereNotNull('external_sku')->where('external_sku', '!=', '');
+                    });
+            })
+            ->when($storeId, fn ($q) => $q->whereHas(
+                'order', fn ($q2) => $q2->where('store_id', $storeId)
+            ))
+            ->with(['order.store.channel']);
+    }
+
+    private function autoMapSourceSku(MarketplaceOrderItem $item): string
+    {
+        return trim((string) ($item->getRawOriginal('marketplace_sku')
+            ?: $item->model_sku
+            ?: $item->item_sku
+            ?: $item->external_sku
+            ?: ''));
+    }
+
+    /** @return array{item: Item, matched_by: string, matched_code: string}|null */
+    private function findAutoMapItem(MarketplaceOrderItem $item): ?array
+    {
+        $skuCandidates = collect([
+            $item->getRawOriginal('marketplace_sku'),
+            $item->model_sku,
+            $item->item_sku,
+            $item->external_sku,
+        ])
+            ->map(fn ($value) => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->values();
+
+        foreach ($skuCandidates as $candidateSku) {
+            $internalItem = Item::whereRaw('LOWER(TRIM(code)) = ?', [mb_strtolower($candidateSku)])->first();
+            if ($internalItem) {
+                return ['item' => $internalItem, 'matched_by' => 'exact', 'matched_code' => $candidateSku];
+            }
+
+            $prefix = preg_replace('/-\d+$/', '', $candidateSku);
+            if ($prefix !== $candidateSku) {
+                $internalItem = Item::whereRaw('LOWER(TRIM(code)) = ?', [mb_strtolower($prefix)])->first();
+                if ($internalItem) {
+                    return ['item' => $internalItem, 'matched_by' => 'prefix', 'matched_code' => $prefix];
+                }
+            }
+        }
+
+        return null;
     }
 
     // ─────────────────────────────────────────────────────────────────────────

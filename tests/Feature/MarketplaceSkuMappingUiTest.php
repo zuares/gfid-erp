@@ -38,6 +38,9 @@ class MarketplaceSkuMappingUiTest extends TestCase
             ->assertSee('Nama Variant', false)
             ->assertSee('unmappedAutoMapBtn', false)
             ->assertSee('runUnmappedAutoMap', false)
+            ->assertSee('autoMapConfirmModal', false)
+            ->assertSee('confirmUnmappedAutoMap', false)
+            ->assertSee('Tidak ada order item yang perlu dipetakan otomatis', false)
             ->assertSee('Edit SKU Mapping', false)
             ->assertSee('mapSaveButton', false);
     }
@@ -173,6 +176,61 @@ class MarketplaceSkuMappingUiTest extends TestCase
 
         $this->actingAs($owner)
             ->getJson('/api/sku-mappings/unmapped-skus?store_id='.$storeA->id.'&channel_code=shopee')
+            ->assertOk()
+            ->assertJsonCount(0);
+    }
+
+    public function test_unmapped_skus_treats_tiktok_and_ttk_as_the_same_channel(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-UNMAPPED-ALIAS-'.uniqid(),
+        ]);
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok']);
+        $store = Store::create([
+            'code' => 'STORE-UNMAPPED-ALIAS-'.uniqid(),
+            'name' => 'Toko TikTok Alias',
+            'channel_id' => $channel->id,
+            'is_active' => true,
+        ]);
+        $item = Item::create([
+            'code' => 'TTC-BLK-L',
+            'name' => 'Tracktop Hitam Strip 2 Tangan Ukuiran L',
+            'unit' => 'pcs',
+            'type' => 'finished',
+            'active' => true,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-UNMAPPED-ALIAS',
+            'order_date' => now(),
+            'ordered_at' => now(),
+            'status' => 'new',
+            'order_status' => 'READY_TO_SHIP',
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'line_no' => 1,
+            'external_item_id' => 'ITEM-TTC-BLK-L',
+            'item_name' => 'Celana Pendek Short Boxer',
+            'variant_name' => 'Hitam, 6L',
+            'marketplace_sku' => 'TTC-BLK-L',
+            'model_sku' => 'TTC-BLK-L',
+            'item_sku' => 'TTC-BLK-L',
+            'qty' => 1,
+            'price' => 100,
+            'mapping_status' => 'mapped',
+            'internal_item_id' => $item->id,
+        ]);
+        SkuMapping::create([
+            'marketplace_sku' => 'TTC-BLK-L',
+            'channel_code' => 'TTK',
+            'item_id' => $item->id,
+        ]);
+
+        $this->actingAs($owner)
+            ->getJson('/api/sku-mappings/unmapped-skus?store_id='.$store->id)
             ->assertOk()
             ->assertJsonCount(0);
     }
@@ -314,6 +372,13 @@ class MarketplaceSkuMappingUiTest extends TestCase
             'type' => 'finished',
             'active' => true,
         ]);
+        $exactItem = Item::create([
+            'code' => 'TTC-BLK-L',
+            'name' => 'Tracktop Hitam Ukuran L',
+            'unit' => 'pcs',
+            'type' => 'finished',
+            'active' => true,
+        ]);
 
         foreach (['MODEL-AUTO-1', 'MODEL-AUTO-2'] as $index => $modelSku) {
             $order = MarketplaceOrder::create([
@@ -331,28 +396,65 @@ class MarketplaceSkuMappingUiTest extends TestCase
                 'line_no' => 1,
                 'external_item_id' => 'ITEM-AUTO-MAP-'.$index,
                 'item_name' => 'Produk Auto Map',
-                'marketplace_sku' => 'auto-ttk',
-                'model_sku' => $modelSku,
+                'marketplace_sku' => 'listing-auto-ttk',
+                'model_sku' => 'AUTO-TTK',
                 'qty' => 1,
                 'price' => 100,
                 'mapping_status' => $index === 0 ? 'marketplace_sku_empty' : 'mapping_not_found',
             ]);
         }
 
+        $exactOrder = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-AUTO-EXACT-'.uniqid(),
+            'order_date' => now(),
+            'ordered_at' => now(),
+            'status' => 'new',
+            'order_status' => 'READY_TO_SHIP',
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $exactOrder->id,
+            'marketplace_order_id' => $exactOrder->id,
+            'line_no' => 1,
+            'external_item_id' => 'ITEM-AUTO-EXACT',
+            'item_name' => 'Tracktop Hitam Ukuran L',
+            'marketplace_sku' => 'ttc-blk-l',
+            'model_sku' => 'MODEL-EXACT',
+            'qty' => 1,
+            'price' => 100,
+            'mapping_status' => 'mapping_not_found',
+        ]);
+
+        $this->actingAs($owner)
+            ->getJson('/api/marketplace/auto-map-by-code/preview')
+            ->assertOk()
+            ->assertJsonPath('total_matches', 2)
+            ->assertJsonPath('total_order_items', 3)
+            ->assertJsonPath('matches.1.item_code', 'TTC-BLK-L');
+
         $this->actingAs($owner)
             ->postJson('/api/marketplace/auto-map-by-code')
             ->assertOk()
-            ->assertJsonPath('mapped', 2)
+            ->assertJsonPath('mapped', 3)
             ->assertJsonPath('errors', 0);
 
-        $this->assertDatabaseCount('sku_mappings', 1);
+        $this->assertDatabaseCount('sku_mappings', 2);
         $this->assertDatabaseHas('sku_mappings', [
-            'marketplace_sku' => 'auto-ttk',
+            'marketplace_sku' => 'listing-auto-ttk',
             'channel_code' => 'ttk',
             'item_id' => $internalItem->id,
         ]);
+        $this->assertDatabaseHas('sku_mappings', [
+            'marketplace_sku' => 'ttc-blk-l',
+            'channel_code' => 'ttk',
+            'item_id' => $exactItem->id,
+        ]);
         $this->assertDatabaseMissing('marketplace_order_items', [
-            'marketplace_sku' => 'auto-ttk',
+            'marketplace_sku' => 'listing-auto-ttk',
+            'mapping_status' => 'mapping_not_found',
+        ]);
+        $this->assertDatabaseMissing('marketplace_order_items', [
+            'marketplace_sku' => 'ttc-blk-l',
             'mapping_status' => 'mapping_not_found',
         ]);
     }

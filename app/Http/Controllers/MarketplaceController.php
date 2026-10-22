@@ -6938,6 +6938,16 @@ class MarketplaceController extends Controller
         ]);
     }
 
+    public function previewAutoMapByCode(Request $request): JsonResponse
+    {
+        set_time_limit(300);
+        $storeId = $request->input('store_id');
+
+        return response()->json(
+            $this->issueService->previewAutoMapByCode($storeId ? (int) $storeId : null)
+        );
+    }
+
     /** [DEV ONLY] Hapus semua marketplace orders + fulfillments + mutations untuk reset testing. */
 
     /** [DEV ONLY] Hapus fulfillments saja, orders tetap (reset ke state "Perlu Proses"). */

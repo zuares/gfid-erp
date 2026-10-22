@@ -99,6 +99,30 @@
 </x-gf.page>
 
 @include('marketplace._mapping-modal')
+
+<div class="modal fade" id="autoMapConfirmModal" tabindex="-1" aria-labelledby="autoMapConfirmModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content" style="border-radius:20px">
+            <div class="modal-header border-0">
+                <div>
+                    <h5 class="modal-title fw-bold" id="autoMapConfirmModalTitle">Konfirmasi Mapping Otomatis</h5>
+                    <div class="text-muted" style="font-size:.78rem">Periksa item master yang akan digunakan sebelum proses dijalankan.</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+                <div id="autoMapPreviewSummary" class="mb-3"></div>
+                <div id="autoMapPreviewBody" class="gf-table-scroll" style="max-height:360px;overflow:auto"></div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-light border" style="border-radius:999px" data-bs-dismiss="modal">Batal</button>
+                <button type="button" id="autoMapConfirmButton" class="btn btn-warning fw-bold" style="border-radius:999px" onclick="confirmUnmappedAutoMap()">
+                    Jalankan Mapping
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
@@ -115,6 +139,7 @@
     let visibleMappings = [];
     let unmappedSearchTimeout;
     let unmappedFilterOptionsLoaded = false;
+    let pendingAutoMapStoreId = '';
 
     const $ = id => document.getElementById(id);
 
@@ -447,22 +472,82 @@
         reloadUnmappedOnly();
     };
 
-    window.runUnmappedAutoMap = async function () {
-        const btn = $('unmappedAutoMapBtn');
-        const storeId = $('unmappedStoreFilter').value || '';
-        const scope = storeId
-            ? 'untuk toko yang dipilih'
-            : 'untuk semua toko';
+    function renderAutoMapPreview(preview) {
+        const matches = Array.isArray(preview?.matches) ? preview.matches : [];
+        const confirmBtn = $('autoMapConfirmButton');
+        const storeName = pendingAutoMapStoreId
+            ? $('unmappedStoreFilter').selectedOptions[0]?.textContent || 'Toko terpilih'
+            : 'Semua toko';
 
-        if (!confirm(`Jalankan mapping otomatis ${scope}? Sistem akan mencocokkan SKU marketplace dengan kode item internal yang sama persis atau SKU dengan suffix variasi seperti -1.`)) {
+        $('autoMapPreviewSummary').innerHTML = `
+            <div class="alert alert-warning mb-0" style="border-radius:12px;font-size:.8rem">
+                <strong>${FMT.format(preview?.total_matches || 0)} SKU</strong> akan dipetakan untuk <strong>${esc(storeName)}</strong>,
+                mencakup <strong>${FMT.format(preview?.total_order_items || 0)} order item</strong>.
+            </div>`;
+
+        if (!matches.length) {
+            $('autoMapPreviewBody').innerHTML = '<div class="oc-empty">Tidak ada order item yang perlu dipetakan otomatis. SKU mungkin sudah terpetakan atau kode itemnya belum ada di master.</div>';
+            confirmBtn.disabled = true;
             return;
         }
 
+        confirmBtn.disabled = false;
+        $('autoMapPreviewBody').innerHTML = `
+            <table class="gf-clean-table w-100">
+                <thead><tr>
+                    <th>SKU Marketplace</th><th>Channel</th><th>Item Master</th>
+                    <th>Cocok Berdasarkan</th><th class="text-end">Order Item</th>
+                </tr></thead>
+                <tbody>${matches.map(match => `
+                    <tr>
+                        <td>
+                            <code style="font-size:.78rem;font-weight:700">${esc(match.marketplace_sku)}</code>
+                            <br><span class="text-muted" style="font-size:.68rem">${esc((match.store_names || []).join(', ') || '—')}</span>
+                        </td>
+                        <td style="font-size:.78rem">${esc(match.channel_code || 'Global')}</td>
+                        <td>
+                            <strong style="font-size:.8rem">${esc(match.item_code)}</strong><br>
+                            <span class="text-muted" style="font-size:.72rem">${esc(match.item_name)}</span>
+                        </td>
+                        <td style="font-size:.75rem">${match.matched_by === 'exact' ? 'Kode sama persis' : 'Prefix SKU varian'}<br>
+                            <code style="font-size:.68rem">${esc(match.matched_code)}</code>
+                        </td>
+                        <td class="text-end" style="font-size:.8rem;font-weight:700">${FMT.format(match.order_count || 0)}</td>
+                    </tr>`).join('')}</tbody>
+            </table>`;
+    }
+
+    window.runUnmappedAutoMap = async function () {
+        const btn = $('unmappedAutoMapBtn');
+        pendingAutoMapStoreId = $('unmappedStoreFilter').value || '';
         btn.disabled = true;
-        btn.textContent = '⏳ Mapping…';
+        btn.textContent = '⏳ Menyiapkan…';
 
         try {
-            const query = storeId ? '?store_id=' + encodeURIComponent(storeId) : '';
+            const query = pendingAutoMapStoreId ? '?store_id=' + encodeURIComponent(pendingAutoMapStoreId) : '';
+            const preview = await api('/api/marketplace/auto-map-by-code/preview' + query);
+            renderAutoMapPreview(preview);
+            bootstrap.Modal.getOrCreateInstance($('autoMapConfirmModal')).show();
+        } catch (e) {
+            if (window.GFID?.errorAlert) {
+                window.GFID.errorAlert(e.message);
+            } else {
+                alert(e.message);
+            }
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '⚡ Mapping Otomatis';
+        }
+    };
+
+    window.confirmUnmappedAutoMap = async function () {
+        const confirmBtn = $('autoMapConfirmButton');
+        const btn = $('unmappedAutoMapBtn');
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = '⏳ Memproses…';
+
+        try {
+            const query = pendingAutoMapStoreId ? '?store_id=' + encodeURIComponent(pendingAutoMapStoreId) : '';
             const res = await api('/api/marketplace/auto-map-by-code' + query, { method: 'POST' });
             const mapped = Number(res.mapped || 0);
             const message = mapped > 0
@@ -475,6 +560,7 @@
                 alert(message);
             }
 
+            bootstrap.Modal.getInstance($('autoMapConfirmModal'))?.hide();
             await loadData();
         } catch (e) {
             if (window.GFID?.errorAlert) {
@@ -483,6 +569,8 @@
                 alert(e.message);
             }
         } finally {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Jalankan Mapping';
             btn.disabled = false;
             btn.textContent = '⚡ Mapping Otomatis';
         }
