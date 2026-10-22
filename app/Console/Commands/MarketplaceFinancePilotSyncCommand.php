@@ -57,6 +57,9 @@ class MarketplaceFinancePilotSyncCommand extends Command
         // Always preflight before making a write; this step never posts a journal.
         $preflight = $backfill->run(['dry_run' => true, 'store_id' => $store->id]);
         $this->line('Backfill dry-run: '.json_encode($preflight['summary'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        if (($preflight['summary']['unallocated_wallet_withdrawals'] ?? 0) > 0) {
+            $this->warn($preflight['summary']['unallocated_wallet_withdrawals'].' penarikan wallet tanpa alokasi order; ini bukan bukti uang sudah masuk bank.');
+        }
         if ($preflight['summary']['errors'] > 0 || $preflight['summary']['duplicates'] > 0 || $preflight['summary']['unmatched'] > 0) {
             $this->error('Backfill memiliki error, duplikat, atau sumber tanpa pasangan. Tidak ada perubahan yang dijalankan.');
 

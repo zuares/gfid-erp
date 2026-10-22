@@ -161,6 +161,7 @@ class MarketplaceFinanceBackfillService
             'updated' => 0,
             'unchanged' => 0,
             'unmatched' => 0,
+            'unallocated_wallet_withdrawals' => 0,
             'duplicates' => 0,
             'errors' => 0,
             'transactions_created' => 0,
@@ -179,6 +180,7 @@ class MarketplaceFinanceBackfillService
             'updated' => 0,
             'unchanged' => 0,
             'unmatched' => 0,
+            'unallocated_wallet_withdrawals' => 0,
             'duplicates' => 0,
             'errors' => 0,
             'transactions_created' => 0,
@@ -333,10 +335,15 @@ class MarketplaceFinanceBackfillService
             'raw_payload' => $payload,
         ], $stats);
 
-        // Wallet withdrawals have no order-level mapping. Keep their payout
-        // visible as an unallocated settlement instead of dropping the header
-        // or assigning its amount to an arbitrary order.
+        // A wallet withdrawal is a transfer out of the provider wallet, not
+        // an order-level payout. Do not treat its missing order list as a
+        // broken mapping or allocate its amount to an arbitrary order.
         if ($items === []) {
+            if ($walletWithdrawal) {
+                $stats['unallocated_wallet_withdrawals']++;
+
+                return;
+            }
             $this->unmatched($stats, $result, 'payouts', $row->id, 'settlement_without_order_mapping');
 
             return;

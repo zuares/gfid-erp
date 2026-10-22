@@ -34,13 +34,14 @@ class MarketplaceFinanceBackfillCommand extends Command
             ? 'MODE DRY-RUN: tidak ada data yang ditulis.'
             : 'MODE APPLY: hasil backfill ditulis ke tabel finance baru.');
         $this->table(
-            ['Sumber', 'Scan', 'Created', 'Updated', 'Unchanged', 'Unmatched', 'Duplicate', 'Error'],
+            ['Sumber', 'Scan', 'Created', 'Updated', 'Unchanged', 'Wallet tanpa alokasi', 'Unmatched', 'Duplicate', 'Error'],
             collect($result['sources'])->map(fn (array $stats, string $source): array => [
                 $source,
                 $stats['scanned'],
                 $stats['created'],
                 $stats['updated'],
                 $stats['unchanged'],
+                $stats['unallocated_wallet_withdrawals'],
                 $stats['unmatched'],
                 $stats['duplicates'],
                 $stats['errors'],

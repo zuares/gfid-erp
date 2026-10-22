@@ -142,7 +142,9 @@ class MarketplaceFinanceBackfillTest extends TestCase
 
         $this->assertSame(1, $dryRun['summary']['settlements_created']);
         $this->assertSame(0, $dryRun['summary']['allocations_created']);
-        $this->assertSame('settlement_without_order_mapping', $dryRun['unmatched_rows'][0]['reason']);
+        $this->assertSame(1, $dryRun['summary']['unallocated_wallet_withdrawals']);
+        $this->assertSame(0, $dryRun['summary']['unmatched']);
+        $this->assertSame([], $dryRun['unmatched_rows']);
         $this->assertSame(0, MarketplaceFinanceSettlement::count());
 
         $this->artisan('marketplace:finance-backfill', [

@@ -11,7 +11,7 @@
         <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
         <div>
             <strong>Payout tidak sama dengan escrow per order</strong>
-            <span>Halaman ini menampilkan payout marketplace yang tersinkron. “Ditarik dari wallet” berarti saldo Shopee berkurang; “Payout selesai” juga belum membuktikan uang masuk bank. Cocokkan keduanya dengan mutasi rekening sebelum mencatat jurnal bank.</span>
+            <span>Halaman ini menampilkan payout marketplace yang tersinkron. “Ditarik dari wallet” berarti saldo Shopee berkurang; “Payout selesai” juga belum membuktikan uang masuk bank. Bank tujuan adalah akun yang dikonfigurasi, bukan konfirmasi bank. Kolom Jurnal Finance tidak menampilkan jurnal legacy. Cocokkan payout dengan bukti bank sebelum mencatat jurnal bank baru.</span>
         </div>
     </div>
     <div class="finance-card finance-section-card card">
@@ -24,7 +24,7 @@
         </div>
         <div class="finance-table-wrap table-responsive">
             <table class="finance-table table table-hover mb-0">
-                <thead><tr><th>Settlement ID</th><th>Tanggal</th><th>Toko</th><th>Status payout</th><th>Jumlah</th><th>Allocated</th><th>Unallocated</th><th>Bank tujuan</th><th>Jurnal</th></tr></thead>
+                <thead><tr><th>Settlement ID</th><th>Tanggal</th><th>Toko</th><th>Status payout</th><th>Jumlah</th><th>Allocated</th><th>Unallocated</th><th>Bank tujuan</th><th>Jurnal Finance</th></tr></thead>
                 <tbody>
                     @forelse ($rows as $row)
                         @php
@@ -53,7 +53,7 @@
                             <td data-label="Allocated">Rp {{ $money($row['allocated_amount']) }}</td>
                             <td data-label="Unallocated">Rp {{ $money($row['unallocated_amount']) }}</td>
                             <td data-label="Bank tujuan">{{ $settlement?->bankAccount?->name ?? 'Belum ditentukan' }}</td>
-                            <td data-label="Jurnal"><span class="badge text-bg-{{ $row['journal_amount'] !== null ? 'success' : 'secondary' }}">{{ $row['journal_amount'] !== null ? 'Tercatat' : 'Belum tercatat' }}</span></td>
+                            <td data-label="Jurnal Finance"><span class="badge text-bg-{{ $row['journal_amount'] !== null ? 'success' : 'secondary' }}">{{ $row['journal_amount'] !== null ? 'Tercatat' : 'Belum tercatat' }}</span></td>
                         </tr>
                     @empty
                         <tr><td colspan="9"><div class="finance-empty"><i class="bi bi-bank"></i>Belum ada payout finance yang tersinkron untuk toko dan periode ini. Periksa sumber payout, koneksi toko, dan pilihan tanggal settlement.</div></td></tr>

@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Account;
 use App\Models\Channel;
 use App\Models\MarketplaceFinanceSettlement;
+use App\Models\MarketplacePayout;
 use App\Models\Store;
 use App\Services\Marketplace\Finance\MarketplaceSettlementSyncService;
 use App\Services\Marketplace\MarketplaceApiGateway;
@@ -29,6 +31,60 @@ class MarketplaceFinancePilotSyncCommandTest extends TestCase
         ])->assertExitCode(0);
 
         $this->assertSame(0, MarketplaceFinanceSettlement::count());
+    }
+
+    public function test_dry_run_reports_wallet_withdrawal_without_blocking_on_expected_missing_order_mapping(): void
+    {
+        $store = $this->store();
+        $bank = Account::create(['code' => 'PILOT-WALLET-BANK', 'name' => 'Pilot Wallet Bank', 'type' => 'asset', 'is_cash' => true, 'is_active' => true]);
+        MarketplacePayout::create([
+            'date' => '2026-10-10',
+            'marketplace_name' => 'Shopee',
+            'store_id' => $store->id,
+            'bank_account_id' => $bank->id,
+            'source' => 'shopee_wallet',
+            'amount' => 2000000,
+            'external_transaction_id' => 'WALLET-ONLY-1',
+            'status' => 'posted',
+            'source_payload' => ['transaction_type' => 'WITHDRAWAL_CREATED', 'status' => 'COMPLETED'],
+        ]);
+        $this->mock(MarketplaceSettlementSyncService::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('syncPayouts');
+        });
+
+        $this->artisan('marketplace:finance-pilot-sync', [
+            '--store' => 'Greatfit.id',
+            '--from' => '2026-10-08',
+            '--to' => '2026-10-15',
+        ])->expectsOutputToContain('1 penarikan wallet tanpa alokasi order')->assertExitCode(0);
+
+        $this->assertDatabaseCount('marketplace_finance_settlements', 0);
+        $this->assertDatabaseCount('journals', 0);
+    }
+
+    public function test_dry_run_still_blocks_non_wallet_payout_without_order_mapping(): void
+    {
+        $store = $this->store();
+        $bank = Account::create(['code' => 'PILOT-UNMAPPED-BANK', 'name' => 'Pilot Unmapped Bank', 'type' => 'asset', 'is_cash' => true, 'is_active' => true]);
+        MarketplacePayout::create([
+            'date' => '2026-10-10',
+            'marketplace_name' => 'Shopee',
+            'store_id' => $store->id,
+            'bank_account_id' => $bank->id,
+            'source' => 'shopee',
+            'amount' => 2000000,
+            'external_transaction_id' => 'UNMAPPED-PAYOUT-1',
+            'status' => 'draft',
+            'source_payload' => [],
+        ]);
+
+        $this->artisan('marketplace:finance-pilot-sync', [
+            '--store' => 'Greatfit.id',
+            '--from' => '2026-10-08',
+            '--to' => '2026-10-15',
+        ])->assertExitCode(1);
+
+        $this->assertDatabaseCount('marketplace_finance_settlements', 0);
     }
 
     public function test_apply_requires_a_connected_store_before_writing(): void
