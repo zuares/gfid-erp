@@ -1076,6 +1076,10 @@
                 'code' => strtoupper((string) ($scan['code'] ?? $scan['order_no'] ?? '')),
                 'label' => $scan['label'] ?? 'Pencatatan order',
                 'duplicateCount' => (int) ($scan['duplicate_count'] ?? 0),
+                'platformKey' => $scan['platform_key'] ?? null,
+                'platformLabel' => $scan['platform_label'] ?? null,
+                'storeId' => $scan['store_id'] ?? null,
+                'storeLabel' => $scan['store_label'] ?? null,
                 'items' => $scan['items'] ?? [],
             ];
         })
@@ -1229,6 +1233,7 @@
                         <span>Perlu Diperiksa</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="problem">0</span>
                     </button>
                 </div>
+                <div class="sr-marketplace-tabs" id="orderSourceTabs" role="tablist" aria-label="Filter berdasarkan platform atau toko"></div>
             </div>
             <div class="sr-panel-body sr-order-panel-body">
                 <div class="sr-orders" id="ordersWrap">
@@ -1281,7 +1286,8 @@
     const nextOrderBtn = document.getElementById('nextOrderBtn');
     const orderSearch = document.getElementById('orderSearch');
     const ordersWrap = document.getElementById('ordersWrap');
-    const marketplaceTabs = document.querySelectorAll('[data-order-marketplace-tab]');
+    const marketplaceTabsWrap = document.querySelector('.sr-marketplace-tabs[aria-label="Filter daftar order"]');
+    const orderSourceTabs = document.getElementById('orderSourceTabs');
     const sumOrders = document.getElementById('sumOrders');
     const sumItems = document.getElementById('sumItems');
     const sumQty = document.getElementById('sumQty');
@@ -1524,12 +1530,19 @@
                 code,
                 label: meta.label || 'Manual',
                 duplicateCount: Number(meta.duplicateCount || 0),
+                platformKey: meta.platformKey || '',
+                platformLabel: meta.platformLabel || '',
+                storeId: meta.storeId || '',
+                storeLabel: meta.storeLabel || '',
                 items: Array.isArray(meta.items) ? meta.items : []
             };
             state.orders.push(order);
         } else if (Number(meta.duplicateCount || 0) > Number(order.duplicateCount || 0)) {
             order.duplicateCount = Number(meta.duplicateCount);
         }
+        ['platformKey', 'platformLabel', 'storeId', 'storeLabel'].forEach(key => {
+            if (meta[key]) order[key] = meta[key];
+        });
 
         state.current = order.code;
         state.expanded = order.code;
@@ -1622,6 +1635,8 @@
         const query = normalize(state.search);
         return state.orders.filter(order => {
             if (state.marketplaceTab === 'problem' && Number(order.duplicateCount || 0) <= 0 && (order.items || []).length > 0) return false;
+            if (state.marketplaceTab.startsWith('platform:') && order.platformKey !== state.marketplaceTab.slice(9)) return false;
+            if (state.marketplaceTab.startsWith('store:') && String(order.storeId) !== state.marketplaceTab.slice(6)) return false;
             if (!query) return true;
             if (order.code.includes(query)) return true;
             return Object.values(order.items || {}).some(item => {
@@ -1636,12 +1651,36 @@
             if (Number(order.duplicateCount || 0) > 0 || (order.items || []).length === 0) counts.problem += 1;
         });
 
-        marketplaceTabs.forEach(tab => {
+        const platformTabs = new Map();
+        const storeTabs = new Map();
+        state.orders.forEach(order => {
+            if (order.platformKey && order.platformLabel) {
+                const key = `platform:${order.platformKey}`;
+                if (!platformTabs.has(key)) platformTabs.set(key, { label: order.platformLabel, count: 0 });
+                platformTabs.get(key).count++;
+            }
+            if (order.storeId && order.storeLabel) {
+                const key = `store:${order.storeId}`;
+                if (!storeTabs.has(key)) storeTabs.set(key, { label: order.storeLabel, platform: order.platformLabel || '', count: 0 });
+                storeTabs.get(key).count++;
+            }
+        });
+
+        if (orderSourceTabs) {
+            const groups = [
+                ...Array.from(platformTabs, ([key, value]) => ({ key, label: value.label, count: value.count, type: 'Platform' })),
+                ...Array.from(storeTabs, ([key, value]) => ({ key, label: value.label, count: value.count, type: value.platform || 'Toko' })),
+            ];
+            orderSourceTabs.innerHTML = groups.map(tab => `<button type="button" class="sr-marketplace-tab${state.marketplaceTab === tab.key ? ' active' : ''}" data-order-marketplace-tab="${esc(tab.key)}" role="tab" aria-selected="${state.marketplaceTab === tab.key ? 'true' : 'false'}"><span>${esc(tab.type)} · ${esc(tab.label)}</span><span class="sr-marketplace-tab-count">${tab.count}</span></button>`).join('');
+            orderSourceTabs.hidden = groups.length === 0;
+        }
+
+        document.querySelectorAll('[data-order-marketplace-tab]').forEach(tab => {
             const key = tab.dataset.orderMarketplaceTab || 'all';
             tab.classList.toggle('active', state.marketplaceTab === key);
             tab.setAttribute('aria-selected', state.marketplaceTab === key ? 'true' : 'false');
             const count = tab.querySelector('[data-order-marketplace-count]');
-            if (count) count.textContent = counts[key] ?? 0;
+            if (count) count.textContent = (key === 'all' ? counts.all : key === 'problem' ? counts.problem : platformTabs.get(key)?.count ?? storeTabs.get(key)?.count ?? 0);
         });
 
         if (orderToolsCount) orderToolsCount.textContent = `${visibleOrders.length} order`;
@@ -2204,6 +2243,10 @@
             ensureOrder(orderCode, {
                 label: payload.order?.label || 'Pencatatan order',
                 duplicateCount: payload.duplicate ? Math.max(1, Number(payload.duplicate_count || 0)) : Number(payload.duplicate_count || 0),
+                platformKey: payload.order?.platform_key || '',
+                platformLabel: payload.order?.platform_label || '',
+                storeId: payload.order?.store_id || '',
+                storeLabel: payload.order?.store_label || '',
             });
             selectMarketplaceForOrder(orderCode);
             playTone(payload.created ? 'order' : 'orderRepeat');
@@ -2453,6 +2496,10 @@
     initialOrders.forEach(order => {
         ensureOrder(order.code, {
             label: order.label || 'Pencatatan order',
+            platformKey: order.platformKey,
+            platformLabel: order.platformLabel,
+            storeId: order.storeId,
+            storeLabel: order.storeLabel,
             items: order.items || [],
         });
     });
@@ -2489,12 +2536,13 @@
         render();
     });
 
-    marketplaceTabs.forEach(tab => {
-        tab.addEventListener('click', function () {
-            state.marketplaceTab = this.dataset.orderMarketplaceTab || 'all';
+    marketplaceTabsWrap?.parentElement?.addEventListener('click', function (event) {
+        const tab = event.target.closest('[data-order-marketplace-tab]');
+        if (tab) {
+            state.marketplaceTab = tab.dataset.orderMarketplaceTab || 'all';
             state.expanded = null;
             render();
-        });
+        }
     });
 
     if (isDraft) {

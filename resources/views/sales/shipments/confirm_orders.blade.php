@@ -730,11 +730,28 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     $ungroupedItemTypes = (int) $ungroupedLines->map($itemTypeKey)->filter()->unique()->count();
     $ungroupedCogs = (float) $ungroupedLines->sum(fn ($line) => $lineCogs($line));
     $marketplaceCounts = ['all' => (int) $orderScans->count(), 'problem' => 0];
+    $sourceTabs = ['platform' => [], 'store' => []];
     $linkCounts = ['all' => (int) $orderScans->count(), 'linked' => 0, 'unlinked' => 0];
     foreach ($orderScans as $orderScan) {
         $orderScanLines = $orderScan->lines->merge($singleOrderFallbackLines);
         if ((int) data_get($orderScan->raw_payload, 'duplicate_count', 0) > 0 || $orderScanLines->isEmpty()) {
             $marketplaceCounts['problem']++;
+        }
+        $linkedStore = $orderScan->fulfillment?->marketplaceOrder?->store;
+        $linkedChannel = $linkedStore?->channel;
+        if ($linkedChannel?->code && $linkedChannel?->name) {
+            $platformKey = strtolower((string) $linkedChannel->code);
+            $sourceTabs['platform'][$platformKey] ??= ['label' => $linkedChannel->name, 'count' => 0];
+            $sourceTabs['platform'][$platformKey]['count']++;
+        }
+        if ($linkedStore?->id && ($linkedStore->name || $linkedStore->code)) {
+            $storeKey = (string) $linkedStore->id;
+            $sourceTabs['store'][$storeKey] ??= [
+                'label' => $linkedStore->name ?: $linkedStore->code,
+                'platform' => $linkedChannel?->name ?: 'Toko',
+                'count' => 0,
+            ];
+            $sourceTabs['store'][$storeKey]['count']++;
         }
         $hasMarketplaceLink = str_starts_with(strtoupper(trim((string) $orderScan->order_no)), 'SPX')
             ? (bool) ($orderScan->fulfillment?->marketplaceOrder || !empty($kilatMatches[$orderScan->id]))
@@ -929,6 +946,20 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                     </button>
                 @endforeach
             </div>
+            @if(count($sourceTabs['platform']) || count($sourceTabs['store']))
+                <div class="sd-marketplace-tabs sd-source-tabs" role="tablist" aria-label="Filter berdasarkan platform atau toko">
+                    @foreach($sourceTabs['platform'] as $key => $tab)
+                        <button type="button" class="sd-marketplace-tab" data-order-marketplace-tab="platform:{{ $key }}" role="tab" aria-selected="false">
+                            <span>Platform · {{ $tab['label'] }}</span><span class="sd-marketplace-tab-count">{{ number_format($tab['count'], 0, ',', '.') }}</span>
+                        </button>
+                    @endforeach
+                    @foreach($sourceTabs['store'] as $key => $tab)
+                        <button type="button" class="sd-marketplace-tab" data-order-marketplace-tab="store:{{ $key }}" role="tab" aria-selected="false">
+                            <span>{{ $tab['platform'] }} · {{ $tab['label'] }}</span><span class="sd-marketplace-tab-count">{{ number_format($tab['count'], 0, ',', '.') }}</span>
+                        </button>
+                    @endforeach
+                </div>
+            @endif
             <div class="sd-link-tabs" role="tablist" aria-label="Filter status tautan order">
                 @foreach([
                     'all' => ['label' => 'Semua', 'icon' => 'bi-list-ul'],
@@ -1086,7 +1117,7 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
                                 $showSingleBookingSku = count($bookingSkus) === 1
                                     && $hasSingleBookingItem;
                             @endphp
-                            <div class="sd-order sd-order-group" data-order-card data-order-link-state="{{ $hasMarketplaceLink ? 'linked' : 'unlinked' }}" data-order-problem="{{ $duplicateCount > 0 || $hasNoItems ? 'true' : 'false' }}" data-order-search="{{ $orderSearchText }}">
+                            <div class="sd-order sd-order-group" data-order-card data-order-link-state="{{ $hasMarketplaceLink ? 'linked' : 'unlinked' }}" data-order-problem="{{ $duplicateCount > 0 || $hasNoItems ? 'true' : 'false' }}" data-order-platform="{{ $linkedOrder?->store?->channel?->code ? strtolower((string) $linkedOrder->store->channel->code) : '' }}" data-order-store="{{ $linkedOrder?->store_id ?? '' }}" data-order-search="{{ $orderSearchText }}">
                                 <div class="sd-order-lead">
                                     <div>
                                         <div class="sd-order-no">
@@ -1452,8 +1483,11 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
     var activeLinkTab = 'all';
 
     function matchesMarketplace(card){
-        return activeMarketplaceTab === 'all'
-            || (activeMarketplaceTab === 'problem' && card.dataset.orderProblem === 'true');
+        if (activeMarketplaceTab === 'all') return true;
+        if (activeMarketplaceTab === 'problem') return card.dataset.orderProblem === 'true';
+        if (activeMarketplaceTab.indexOf('platform:') === 0) return card.dataset.orderPlatform === activeMarketplaceTab.slice(9);
+        if (activeMarketplaceTab.indexOf('store:') === 0) return card.dataset.orderStore === activeMarketplaceTab.slice(6);
+        return false;
     }
 
     function updateLinkTabCounts(){

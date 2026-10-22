@@ -1269,6 +1269,7 @@ class ShipmentController extends Controller
             'store.channel',
             'lines.item',
             'orderScans.lines.item',
+            'orderScans.fulfillment.marketplaceOrder.store.channel',
         ]);
 
         $savedOrderScans = $shipment->orderScans
@@ -1285,6 +1286,10 @@ class ShipmentController extends Controller
                         ->values();
                 }
 
+                $marketplaceOrder = $scan->fulfillment?->marketplaceOrder;
+                $store = $marketplaceOrder?->store;
+                $channel = $store?->channel;
+
                 return [
                     'id' => $scan->id,
                     'code' => $scan->order_no,
@@ -1292,6 +1297,10 @@ class ShipmentController extends Controller
                     'status' => $scan->status,
                     'label' => $payload['label'] ?? 'Pencatatan order',
                     'duplicate_count' => (int) ($payload['duplicate_count'] ?? 0),
+                    'platform_key' => $channel?->code ? strtolower((string) $channel->code) : null,
+                    'platform_label' => $channel?->name ?: $channel?->code,
+                    'store_id' => $store?->id,
+                    'store_label' => $store?->name ?: $store?->code,
                     'items' => $scanLines
                         ->map(fn ($line) => [
                             'line_id' => $line->id,
@@ -1501,6 +1510,12 @@ class ShipmentController extends Controller
             $this->updateMarketplaceStatusIfAllowed($marketplaceOrder, 'link');
         }
 
+        $linkedStore = $marketplaceOrder?->store ?? $salesInvoice?->store;
+        if ($linkedStore && !$linkedStore->relationLoaded('channel')) {
+            $linkedStore->load('channel');
+        }
+        $linkedChannel = $linkedStore?->channel;
+
         return response()->json([
             'status' => 'ok',
             'created' => $scan->wasRecentlyCreated,
@@ -1519,6 +1534,10 @@ class ShipmentController extends Controller
                     : ($lookupFallbackStatus !== null ? 'Belum tertaut' : 'Pencatatan order'),
                 'linked_source' => $fulfillment ? 'marketplace_order' : ($salesInvoice ? 'sales_invoice' : null),
                 'duplicate_count' => (int) data_get($scan->raw_payload, 'duplicate_count', 0),
+                'platform_key' => $linkedChannel?->code ? strtolower((string) $linkedChannel->code) : null,
+                'platform_label' => $linkedChannel?->name ?: $linkedChannel?->code,
+                'store_id' => $linkedStore?->id,
+                'store_label' => $linkedStore?->name ?: $linkedStore?->code,
             ],
         ]);
     }
@@ -4010,7 +4029,7 @@ class ShipmentController extends Controller
             'lines.item',
             'orderScans.lines.item',
             'orderScans.fulfillment.marketplaceOrder.items.internalItem',
-            'orderScans.fulfillment.marketplaceOrder.store',
+            'orderScans.fulfillment.marketplaceOrder.store.channel',
             'waves',
         ]);
 
@@ -4072,7 +4091,7 @@ class ShipmentController extends Controller
             'lines.item',
             'orderScans.lines.item',
             'orderScans.fulfillment.marketplaceOrder.items.internalItem',
-            'orderScans.fulfillment.marketplaceOrder.store',
+            'orderScans.fulfillment.marketplaceOrder.store.channel',
             'waves',
         ]);
 
