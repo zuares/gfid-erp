@@ -805,14 +805,234 @@
         padding-left: .15rem;
         border-left: 1px solid color-mix(in srgb, var(--line) 75%, transparent 25%);
     }
+
+    /* ============================
+       GFID 2027 SIDEBAR SKIN
+       Struktur menu tetap Blade-driven; skin ini hanya mengatur hierarchy.
+    ============================ */
+    .sidebar-modern {
+        --sidebar-brand: #5b5ce2;
+        --sidebar-brand-strong: #4142bb;
+        --sidebar-cyan: #13b8c4;
+        background:
+            radial-gradient(circle at 100% 0%, rgba(91, 92, 226, .11), transparent 28%),
+            color-mix(in srgb, var(--card) 94%, var(--bg) 6%);
+        border-right-color: color-mix(in srgb, var(--line) 78%, var(--sidebar-brand) 22%);
+        box-shadow: 14px 0 38px rgba(16, 24, 40, .06), inset -1px 0 rgba(255,255,255,.38);
+    }
+
+    body[data-theme="dark"] .sidebar-modern {
+        background:
+            radial-gradient(circle at 100% 0%, rgba(96, 165, 250, .14), transparent 28%),
+            color-mix(in srgb, var(--card) 96%, #020617 4%);
+        box-shadow: 14px 0 38px rgba(0, 0, 0, .22), inset -1px 0 rgba(255,255,255,.03);
+    }
+
+    .sidebar-modern::before {
+        content: '';
+        display: block;
+        position: absolute;
+        inset: 0 0 auto;
+        height: 3px;
+        background: linear-gradient(90deg, var(--sidebar-brand), var(--sidebar-cyan));
+        opacity: .95;
+    }
+
+    .sidebar-brand {
+        min-height: 53px;
+        padding: .55rem .25rem .65rem;
+        margin: .1rem .1rem 0;
+        border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent 28%);
+    }
+
+    .sidebar-brand-main {
+        display: inline-flex;
+        align-items: center;
+        gap: .62rem;
+        min-width: 0;
+    }
+
+    .sidebar-logo-mark {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        flex: 0 0 34px;
+        place-items: center;
+        border-radius: 12px;
+        color: #fff;
+        background: linear-gradient(145deg, var(--sidebar-brand), var(--sidebar-cyan));
+        box-shadow: 0 8px 16px rgba(91, 92, 226, .24);
+        font-size: .78rem;
+        font-weight: 900;
+        letter-spacing: -.08em;
+    }
+
+    .sidebar-brand-copy {
+        display: grid;
+        min-width: 0;
+        line-height: 1.1;
+    }
+
+    .sidebar-brand-copy strong {
+        color: var(--text);
+        font-size: .92rem;
+        font-weight: 850;
+        letter-spacing: -.035em;
+    }
+
+    .sidebar-brand-copy small {
+        margin-top: .22rem;
+        color: var(--muted);
+        font-size: .59rem;
+        font-weight: 700;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    .sidebar-brand .role-pill {
+        color: var(--sidebar-brand-strong);
+        background: color-mix(in srgb, var(--accent-soft) 64%, var(--card) 36%);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sidebar-brand) 28%, var(--line) 72%);
+        font-size: .57rem;
+        font-weight: 850;
+    }
+
+    body[data-theme="dark"] .sidebar-brand .role-pill {
+        color: #bfdbfe;
+        background: rgba(37, 99, 235, .2);
+        box-shadow: inset 0 0 0 1px rgba(96, 165, 250, .22);
+    }
+
+    .sidebar-workspace-card {
+        display: flex;
+        align-items: center;
+        gap: .55rem;
+        margin: .1rem .1rem .35rem;
+        padding: .58rem .6rem;
+        border: 1px solid color-mix(in srgb, var(--line) 80%, var(--sidebar-brand) 20%);
+        border-radius: 13px;
+        background: color-mix(in srgb, var(--card) 78%, var(--accent-soft) 22%);
+    }
+
+    .sidebar-workspace-icon {
+        display: grid;
+        width: 27px;
+        height: 27px;
+        flex: 0 0 27px;
+        place-items: center;
+        border-radius: 9px;
+        color: var(--sidebar-brand-strong);
+        background: color-mix(in srgb, var(--accent-soft) 78%, var(--card) 22%);
+        font-size: .72rem;
+    }
+
+    .sidebar-workspace-copy {
+        display: grid;
+        min-width: 0;
+        line-height: 1.1;
+    }
+
+    .sidebar-workspace-copy small {
+        color: var(--muted);
+        font-size: .57rem;
+        font-weight: 750;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    .sidebar-workspace-copy strong {
+        overflow: hidden;
+        margin-top: .18rem;
+        color: var(--text);
+        font-size: .7rem;
+        font-weight: 800;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .sidebar-workspace-card > .bi-chevron-down {
+        margin-left: auto;
+        color: var(--muted);
+        font-size: .65rem;
+    }
+
+    .sidebar-subhead {
+        margin-top: .72rem;
+        padding: .4rem .75rem .2rem;
+        color: color-mix(in srgb, var(--muted) 82%, var(--sidebar-brand) 18%);
+        font-size: .6rem;
+        font-weight: 850;
+        letter-spacing: .13em;
+    }
+
+    .sidebar-link {
+        min-height: 36px;
+        border: 1px solid transparent;
+        font-size: .78rem;
+        font-weight: 650;
+    }
+
+    .sidebar-link:hover,
+    .sidebar-toggle:hover {
+        border-color: color-mix(in srgb, var(--line) 68%, var(--sidebar-brand) 32%);
+        background: color-mix(in srgb, var(--accent-soft) 36%, var(--card) 64%);
+        box-shadow: 0 4px 12px rgba(16,24,40,.05);
+        transform: translateX(0);
+    }
+
+    .sidebar-link.active {
+        border-color: color-mix(in srgb, var(--sidebar-brand) 20%, var(--line) 80%);
+        background: linear-gradient(90deg, color-mix(in srgb, var(--accent-soft) 78%, var(--card) 22%), transparent);
+        box-shadow: inset 3px 0 0 var(--sidebar-brand), 0 4px 12px rgba(91, 92, 226, .05);
+        color: var(--sidebar-brand-strong);
+    }
+
+    .sidebar-link.active .icon,
+    .sidebar-toggle.is-open .icon { color: var(--sidebar-brand); }
+
+    .sidebar-link-sub {
+        min-height: 30px;
+        font-size: .71rem;
+        color: color-mix(in srgb, var(--text) 84%, var(--muted) 16%);
+    }
+
+    .sidebar-link-sub.active {
+        color: var(--sidebar-brand-strong);
+        background: color-mix(in srgb, var(--accent-soft) 30%, transparent 70%);
+        box-shadow: inset 2px 0 0 var(--sidebar-brand);
+    }
+
+    .sidebar-modern > .sidebar-nav {
+        padding-bottom: 1.1rem;
+    }
+
+    @media (min-width: 768px) and (max-width: 991.98px) {
+        .sidebar-workspace-card { padding-inline: .45rem; }
+        .sidebar-workspace-copy strong { font-size: .65rem; }
+    }
 </style>
 
 <aside class="sidebar-modern flex-column">
     <div class="sidebar-brand">
-        <div>GFID</div>
+        <div class="sidebar-brand-main">
+            <span class="sidebar-logo-mark" aria-hidden="true">GF</span>
+            <span class="sidebar-brand-copy">
+                <strong>GFID</strong>
+                <small>Operations OS</small>
+            </span>
+        </div>
         @if($user)
             <div class="role-pill">{{ $role ?: 'user' }}</div>
         @endif
+    </div>
+
+    <div class="sidebar-workspace-card" aria-label="Workspace aktif">
+        <span class="sidebar-workspace-icon" aria-hidden="true"><i class="bi bi-buildings"></i></span>
+        <span class="sidebar-workspace-copy">
+            <small>Workspace</small>
+            <strong>Greatfit HQ</strong>
+        </span>
+        <i class="bi bi-chevron-down" aria-hidden="true"></i>
     </div>
 
     <ul class="sidebar-nav">
@@ -905,6 +1125,13 @@
                 <li>
                     <x-sidebar.simple-link href="{{ route('settings.system.index') }}" icon="bi bi-gear" :active="request()->routeIs('settings.system.*')">
                         Pengaturan Sistem
+                    </x-sidebar.simple-link>
+                </li>
+            @endif
+            @if ($isOwner && $router->has('design-system.index'))
+                <li>
+                    <x-sidebar.simple-link href="{{ route('design-system.index') }}" icon="bi bi-bezier2" :active="request()->routeIs('design-system.*')">
+                        Design System
                     </x-sidebar.simple-link>
                 </li>
             @endif
