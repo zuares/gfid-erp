@@ -418,6 +418,7 @@ class MarketplaceLogisticsController extends Controller
             // Cetak dari marketplace/orders memakai PDF yang sudah tersimpan di
             // aplikasi. Jangan membuat atau menampilkan resi darurat dari AWB.
             $storedOnly = request()->boolean('stored_only', true);
+            $isTikTok = $this->isTikTokStore($store);
             $cardParam = request()->query('card');
             $cacheSuffix = $cardParam === '0' ? '_nocard' : '';
             $disk = \Illuminate\Support\Facades\Storage::disk('local');
@@ -441,6 +442,13 @@ class MarketplaceLogisticsController extends Controller
                     'Content-Type' => 'application/pdf',
                     'Content-Disposition' => 'inline; filename="Resi_' . $orderSn . '.pdf"'
                 ]);
+            }
+
+            // TikTok returns the label URL only after fulfillment creates the
+            // package. Its normal order flow has no separate background label
+            // job, so fetch the official document on the first print request.
+            if ($isTikTok) {
+                return $this->printTikTokDocument($store, $orderSn, $order);
             }
 
             if ($storedOnly) {
@@ -692,6 +700,77 @@ class MarketplaceLogisticsController extends Controller
             }
 
             return $this->errorResponse($e);
+        }
+    }
+
+    protected function isTikTokStore(Store $store): bool
+    {
+        return in_array(strtoupper(trim((string) ($store->channel?->code ?? ''))), [
+            'TTK', 'TKT', 'TIKTOK', 'TIKTOK SHOP',
+        ], true);
+    }
+
+    protected function printTikTokDocument(Store $store, string $orderSn, ?MarketplaceOrder $order)
+    {
+        try {
+            $driver = $this->manager->driver($store);
+            $raw = is_array($order?->raw_json) ? $order->raw_json : [];
+            $package = data_get($raw, 'package_list.0', data_get($raw, 'packages.0', []));
+            $packageId = (string) data_get($package, 'package_number', data_get($package, 'package_id', data_get($package, 'id', '')));
+
+            $result = $driver->getShippingDocument($store, [[
+                'order_sn' => $orderSn,
+                'package_id' => $packageId,
+            ]]);
+            $this->ensureSuccess($result);
+
+            $document = data_get($result, 'response.documents.0', []);
+            $docUrl = (string) ($document['doc_url'] ?? $document['document_url'] ?? '');
+            $trackingNumber = trim((string) ($document['tracking_number'] ?? ''));
+
+            if ($trackingNumber !== '' && $order && $order->shipping_awb_no !== $trackingNumber) {
+                $order->update(['shipping_awb_no' => $trackingNumber]);
+            }
+
+            if ($docUrl === '') {
+                throw new \RuntimeException('TikTok tidak mengembalikan URL dokumen resi.');
+            }
+
+            $download = \Illuminate\Support\Facades\Http::connectTimeout(10)
+                ->timeout(30)
+                ->get($docUrl);
+            if (! $download->successful()) {
+                throw new \RuntimeException('Dokumen resi TikTok gagal diunduh (HTTP ' . $download->status() . ').');
+            }
+
+            $content = $download->body();
+            $contentType = (string) ($download->header('Content-Type') ?: 'application/pdf');
+            $disk = \Illuminate\Support\Facades\Storage::disk('local');
+            if (str_starts_with($content, '%PDF')) {
+                $disk->put("shipping_labels/{$store->id}/{$orderSn}.pdf.gz", gzencode($content, 9));
+                $contentType = 'application/pdf';
+            }
+
+            if ($order) {
+                $order->increment('print_count');
+                if (! $order->printed_at) {
+                    $order->update(['printed_at' => now()]);
+                }
+            }
+
+            return response($content, 200, [
+                'Content-Type' => $contentType,
+                'Content-Disposition' => 'inline; filename="Resi_' . $orderSn . '.pdf"',
+            ]);
+        } catch (\Throwable $e) {
+            return response(
+                "<div style='font-family:sans-serif;text-align:center;padding:50px;'>"
+                . "<h2 style='color:#e11d48;'>Gagal Mencetak Resi TikTok</h2>"
+                . '<p>' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '</p>'
+                . "<button onclick='window.close()' style='padding:10px 20px;background:#e2e8f0;border:none;border-radius:5px;cursor:pointer;'>Tutup</button>"
+                . '</div>',
+                422
+            );
         }
     }
 

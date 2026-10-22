@@ -3,6 +3,7 @@
 namespace App\Services\Channels\TikTokShop;
 
 use App\Models\Store;
+use App\Models\MarketplaceOrder;
 use App\Services\Channels\Contracts\MarketplaceChannel;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -299,22 +300,334 @@ class TikTokShopChannel implements MarketplaceChannel
 
     public function getShippingParameter(Store $store, string $orderSn): array
     {
-        return ['error' => 'not_implemented', 'message' => 'Fitur Atur Pengiriman untuk TikTok Shop belum tersedia.'];
+        $context = $this->logisticsContext($store, $orderSn);
+        $orderId = $context['order_id'];
+
+        // An existing package already has its shipping service allocated. In
+        // that case the UI only needs to confirm handover; querying eligible
+        // services again can return a misleading "service not found" error.
+        if (filled($context['package_id'])) {
+            return [
+                'code' => 0,
+                'message' => 'Success',
+                'response' => [
+                    'platform' => 'tiktok',
+                    'order_id' => $orderId,
+                    'package_id' => $context['package_id'],
+                    'shipping_type' => $context['shipping_type'],
+                    'delivery_option' => $context['delivery_option'],
+                    'shipping_services' => [],
+                    'weight' => $context['weight'],
+                    'dimension' => $context['dimension'],
+                    'order_line_item_ids' => $context['order_line_item_ids'],
+                    'order_line_list' => $context['order_line_list'],
+                ],
+            ];
+        }
+
+        $body = [
+            'order_line_item_ids' => $context['order_line_item_ids'],
+            'weight' => $context['weight'],
+            'dimension' => $context['dimension'],
+        ];
+
+        $body = array_filter($body, static fn ($value): bool => $value !== null && $value !== []);
+        $response = $this->post(
+            $store,
+            '/fulfillment/202309/orders/' . rawurlencode($orderId) . '/shipping_services/query',
+            $body
+        );
+
+        if (($response['code'] ?? null) !== 0) {
+            return $response;
+        }
+
+        $data = is_array($response['data'] ?? null) ? $response['data'] : [];
+        $response['response'] = [
+            'platform' => 'tiktok',
+            'order_id' => $orderId,
+            'package_id' => $context['package_id'],
+            'shipping_type' => $context['shipping_type'],
+            'delivery_option' => $context['delivery_option'],
+            'shipping_services' => $data['shipping_services'] ?? [],
+            'weight' => $body['weight'] ?? null,
+            'dimension' => $body['dimension'] ?? null,
+            'order_line_item_ids' => $context['order_line_item_ids'],
+            'order_line_list' => $context['order_line_list'],
+        ];
+
+        return $response;
     }
 
     public function shipOrder(Store $store, string $orderSn, array $params = []): array
     {
-        return ['error' => 'not_implemented', 'message' => 'Fitur Atur Pengiriman untuk TikTok Shop belum tersedia.'];
+        $context = $this->logisticsContext($store, $orderSn);
+        $orderId = $context['order_id'];
+        $packageId = trim((string) ($params['package_id'] ?? $context['package_id'] ?? ''));
+
+        if ($packageId === '') {
+            $shipType = (string) ($params['ship_type'] ?? '1');
+            $createPayload = [
+                'ship_type' => $shipType,
+                'order_id' => $orderId,
+                'order_line_item' => $params['order_line_item'] ?? $context['order_line_list'],
+                'dimension' => $params['dimension'] ?? $context['dimension'],
+                'shipping_service_id' => $params['shipping_service_id'] ?? null,
+                'weight' => $params['weight'] ?? $context['weight'],
+            ];
+
+            // TikTok only consumes order_line_item for split shipments
+            // (ship_type=2). Omitting it for a normal single-package order
+            // keeps the request aligned with the documented contract.
+            if ($shipType !== '2' || $createPayload['order_line_item'] === []) {
+                unset($createPayload['order_line_item']);
+            }
+            $createPayload = array_filter($createPayload, static fn ($value): bool => $value !== null && $value !== []);
+
+            $created = $this->post($store, '/fulfillment/202309/packages', $createPayload);
+            if (($created['code'] ?? null) !== 0) {
+                return $created;
+            }
+
+            $packageId = trim((string) data_get($created, 'data.package_id'));
+            if ($packageId === '') {
+                return [
+                    'error' => 'package_id_missing',
+                    'message' => 'TikTok tidak mengembalikan package_id setelah membuat paket.',
+                    'response' => $created,
+                ];
+            }
+        }
+
+        $shipPayload = $this->buildShipPayload($params);
+        $shipped = $this->post(
+            $store,
+            '/fulfillment/202309/packages/' . rawurlencode($packageId) . '/ship',
+            $shipPayload
+        );
+
+        // Make the generic logistics service idempotent for TikTok's known
+        // "already shipped" responses.
+        if (($shipped['code'] ?? null) !== 0 && $this->isAlreadyShipped($shipped)) {
+            return [
+                'error' => 'logistics.ship_order_already_shipped',
+                'message' => $shipped['message'] ?? 'Paket TikTok sudah dikirim sebelumnya.',
+                'response' => $shipped,
+                'package_id' => $packageId,
+            ];
+        }
+
+        $shipped['package_id'] = $packageId;
+        return $shipped;
     }
 
     public function createShippingDocument(Store $store, array $orderSnList): array
     {
-        return ['error' => 'not_implemented', 'message' => 'Fitur Cetak Resi untuk TikTok Shop belum tersedia.'];
+        return $this->getShippingDocument($store, $orderSnList);
     }
 
     public function getShippingDocument(Store $store, array $orderSnList): array
     {
-        return ['error' => 'not_implemented', 'message' => 'Fitur Cetak Resi untuk TikTok Shop belum tersedia.'];
+        $documents = [];
+
+        foreach ($orderSnList as $entry) {
+            $orderId = is_array($entry)
+                ? (string) ($entry['order_id'] ?? $entry['order_sn'] ?? '')
+                : (string) $entry;
+            if ($orderId === '') {
+                continue;
+            }
+
+            $packageId = is_array($entry)
+                ? (string) ($entry['package_id'] ?? $entry['package_number'] ?? '')
+                : '';
+            if ($packageId === '') {
+                $packageId = (string) ($this->logisticsContext($store, $orderId)['package_id'] ?? '');
+            }
+            if ($packageId === '') {
+                return [
+                    'error' => 'package_id_missing',
+                    'message' => 'Package ID TikTok belum tersedia. Atur pengiriman terlebih dahulu.',
+                ];
+            }
+
+            $result = $this->get(
+                $store,
+                '/fulfillment/202309/packages/' . rawurlencode($packageId) . '/shipping_documents'
+            );
+            if (($result['code'] ?? null) !== 0) {
+                return $result;
+            }
+
+            $data = is_array($result['data'] ?? null) ? $result['data'] : [];
+            $documents[] = [
+                'order_id' => $orderId,
+                'package_id' => $packageId,
+                'doc_url' => $data['doc_url'] ?? $data['document_url'] ?? null,
+                'tracking_number' => $data['tracking_number'] ?? null,
+                'document_type' => $data['document_type'] ?? null,
+                'raw' => $data,
+            ];
+        }
+
+        return [
+            'code' => 0,
+            'message' => 'Success',
+            'response' => ['documents' => $documents],
+        ];
+    }
+
+    /**
+     * TikTok's tracking API is order-based, unlike Shopee's order detail
+     * package shape. Keep a small compatibility response for the shared
+     * logistics service/controller.
+     */
+    public function getTrackingNumber(Store $store, string $orderSn): array
+    {
+        $result = $this->get($store, '/fulfillment/202309/orders/' . rawurlencode($orderSn) . '/tracking');
+        if (($result['code'] ?? null) !== 0) {
+            return $result;
+        }
+
+        $data = is_array($result['data'] ?? null) ? $result['data'] : [];
+        $tracking = $data['tracking_number']
+            ?? data_get($data, 'packages.0.tracking_number')
+            ?? data_get($data, 'package_list.0.tracking_number')
+            ?? data_get($data, 'tracking_info.0.tracking_number');
+
+        $result['response'] = ['tracking_number' => $tracking, 'raw' => $data];
+        return $result;
+    }
+
+    public function getTrackingInfo(Store $store, string $orderSn): array
+    {
+        $result = $this->getTrackingNumber($store, $orderSn);
+        $tracking = data_get($result, 'response.raw.tracking_info', []);
+        $result['response']['tracking_info'] = is_array($tracking) ? $tracking : [];
+        return $result;
+    }
+
+    public function getPackageDetail(Store $store, string $packageId): array
+    {
+        return $this->get($store, '/fulfillment/202309/packages/' . rawurlencode($packageId));
+    }
+
+    protected function buildShipPayload(array $params): array
+    {
+        $payload = [];
+        if (isset($params['dropoff'])) {
+            $payload['handover_method'] = 'DROP_OFF';
+        } elseif (isset($params['pickup'])) {
+            $payload['handover_method'] = 'PICKUP';
+        }
+
+        foreach (['handover_method', 'pickup_slot', 'self_shipment'] as $key) {
+            if (array_key_exists($key, $params) && $params[$key] !== null && $params[$key] !== []) {
+                $payload[$key] = $params[$key];
+            }
+        }
+
+        return $payload;
+    }
+
+    protected function isAlreadyShipped(array $response): bool
+    {
+        $code = (string) ($response['code'] ?? '');
+        $message = strtolower((string) ($response['message'] ?? ''));
+
+        return in_array($code, ['11006021', '21008099', '21011020', '21011040'], true)
+            || str_contains($message, 'already shipped')
+            || str_contains($message, 'already been shipped');
+    }
+
+    /**
+     * Build fulfillment inputs from the latest local TikTok order snapshot.
+     * No write is performed here; this method is safe for the GET modal call.
+     */
+    protected function logisticsContext(Store $store, string $orderSn): array
+    {
+        $order = MarketplaceOrder::query()
+            ->where('store_id', $store->id)
+            ->where(function ($query) use ($orderSn) {
+                $query->where('channel_order_id', $orderSn)
+                    ->orWhere('external_order_id', $orderSn);
+            })
+            ->first();
+        $raw = is_array($order?->raw_json) ? $order->raw_json : [];
+
+        $orderId = (string) ($raw['order_id'] ?? $raw['id'] ?? $order?->channel_order_id ?? $orderSn);
+        $packages = is_array($raw['packages'] ?? null)
+            ? $raw['packages']
+            : (is_array($raw['package_list'] ?? null) ? $raw['package_list'] : []);
+        $package = is_array($packages[0] ?? null) ? $packages[0] : [];
+        $packageId = (string) ($package['package_id'] ?? $package['id'] ?? $package['package_number'] ?? '');
+
+        $lineItems = is_array($raw['line_items'] ?? null)
+            ? $raw['line_items']
+            : (is_array($raw['item_list'] ?? null) ? $raw['item_list'] : []);
+        $orderLineItemIds = [];
+        $orderLineList = [];
+        foreach ($lineItems as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $lineId = (string) ($item['order_line_item_id'] ?? $item['line_item_id'] ?? $item['order_line_id'] ?? $item['id'] ?? '');
+            $subItemId = (string) ($item['sub_item_id'] ?? '');
+            if ($lineId !== '') {
+                $orderLineItemIds[] = $lineId;
+                $orderLineList[] = array_filter([
+                    'order_line_id' => $lineId,
+                    'sub_item_id' => $subItemId !== '' ? $subItemId : null,
+                ], static fn ($value): bool => $value !== null && $value !== '');
+            }
+        }
+
+        $fallback = config('tiktok_shop.logistics', []);
+        $weight = $this->firstArray($package, $raw, ['weight', 'package_weight']);
+        $dimension = $this->firstArray($package, $raw, ['dimension', 'dimensions', 'package_dimension']);
+        $weight = $this->normalizeWeight($weight, $fallback);
+        $dimension = $this->normalizeDimension($dimension, $fallback);
+
+        return [
+            'order_id' => $orderId,
+            'package_id' => $packageId !== '' ? $packageId : null,
+            'shipping_type' => $package['shipping_type'] ?? $raw['shipping_type'] ?? null,
+            'delivery_option' => $package['delivery_option'] ?? $raw['delivery_option'] ?? $raw['delivery_option_id'] ?? null,
+            'order_line_item_ids' => array_values(array_unique($orderLineItemIds)),
+            'order_line_list' => $orderLineList,
+            'weight' => $weight,
+            'dimension' => $dimension,
+        ];
+    }
+
+    protected function firstArray(array $primary, array $secondary, array $keys): array
+    {
+        foreach ($keys as $key) {
+            $value = $primary[$key] ?? $secondary[$key] ?? null;
+            if (is_array($value) && $value !== []) {
+                return $value;
+            }
+        }
+
+        return [];
+    }
+
+    protected function normalizeWeight(array $weight, array $fallback): array
+    {
+        return [
+            'value' => (string) ($weight['value'] ?? $weight['amount'] ?? $fallback['weight_gram'] ?? 1000),
+            'unit' => strtoupper((string) ($weight['unit'] ?? 'GRAM')),
+        ];
+    }
+
+    protected function normalizeDimension(array $dimension, array $fallback): array
+    {
+        return [
+            'length' => (string) ($dimension['length'] ?? $fallback['length_cm'] ?? 20),
+            'width' => (string) ($dimension['width'] ?? $fallback['width_cm'] ?? 15),
+            'height' => (string) ($dimension['height'] ?? $fallback['height_cm'] ?? 5),
+            'unit' => strtoupper((string) ($dimension['unit'] ?? 'CM')),
+        ];
     }
 
     public function getOrders(Store $store, int $timeFrom, int $timeTo, int $pageSize = 20, string $cursor = '', string $orderStatus = '', string $timeRangeField = 'update_time'): array

@@ -161,6 +161,26 @@ class MarketplaceLogisticsService
 
             $result = $this->ensureSuccess($rawResult);
 
+            // TikTok creates a fulfillment package before/while shipping. Keep
+            // the returned package ID in the local snapshot so the print flow
+            // can request the official label without another order lookup.
+            $channelCode = strtoupper(trim((string) ($store->channel?->code ?? '')));
+            if (in_array($channelCode, ['TTK', 'TKT', 'TIKTOK', 'TIKTOK SHOP'], true)
+                && ! empty($result['package_id'])
+                && $existingOrder) {
+                $rawJson = is_array($existingOrder->raw_json) ? $existingOrder->raw_json : [];
+                $packageList = is_array($rawJson['package_list'] ?? null) ? $rawJson['package_list'] : [];
+                $packageList[0] = array_merge(
+                    is_array($packageList[0] ?? null) ? $packageList[0] : [],
+                    [
+                        'package_number' => (string) $result['package_id'],
+                        'package_id' => (string) $result['package_id'],
+                    ]
+                );
+                $rawJson['package_list'] = $packageList;
+                $existingOrder->update(['raw_json' => $rawJson]);
+            }
+
             try {
                 // Background async AWB update
                 sleep(3);

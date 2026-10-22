@@ -3688,6 +3688,7 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
         $('asStoreId').value = storeId;
         $('asOrderSn').value = orderSn;
         window._asBookingSn = bookingSn || null;
+        window._asPlatform = null;
         $('asOptions').innerHTML = '';
         $('asSubmitBtn').disabled = true;
 
@@ -3711,6 +3712,59 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
             // We will simplify and assume it returns options we can show, 
             // but if there's no complex info needed, we just provide a default proceed.
             const responseData = res.response || res;
+
+            // TikTok fulfillment is package-based. The API returns eligible
+            // shipping services, while package creation and shipping happen
+            // together on submit. Do not render TikTok as Shopee pickup/dropoff.
+            if (responseData.platform === 'tiktok') {
+                window._asPlatform = 'tiktok';
+                const services = Array.isArray(responseData.shipping_services)
+                    ? responseData.shipping_services
+                    : [];
+                const weight = responseData.weight || { value: 1000, unit: 'GRAM' };
+                const dimension = responseData.dimension || { length: 20, width: 15, height: 5, unit: 'CM' };
+                const serviceOptions = services.map((service, index) => {
+                    const id = service.id ?? '';
+                    const label = service.name || service.shipping_provider_name || `Layanan ${index + 1}`;
+                    const price = service.price != null ? ` · ${service.currency || ''} ${service.price}` : '';
+                    const selected = service.is_default || (!services.some(s => s.is_default) && index === 0) ? 'selected' : '';
+                    return `<option value="${esc(id)}" ${selected}>${esc(label + price)}</option>`;
+                }).join('');
+
+                $('asOptions').innerHTML = `
+                    <div class="alert alert-info py-2" style="font-size:.78rem">
+                        TikTok Shop membuat package dan label resmi berdasarkan berat, dimensi, dan layanan yang dipilih.
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" style="font-size:.8rem">Layanan Pengiriman TikTok</label>
+                        <select class="form-select form-select-sm" id="asTtShippingService">
+                            <option value="">Gunakan layanan default TikTok</option>${serviceOptions}
+                        </select>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label" style="font-size:.8rem">Berat (gram)</label>
+                            <input class="form-control form-control-sm" id="asTtWeight" type="number" min="0.01" step="0.01" value="${esc(weight.value ?? 1000)}">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label" style="font-size:.8rem">Metode serah-terima</label>
+                            <select class="form-select form-select-sm" id="asTtHandover">
+                                <option value="DROP_OFF" selected>Drop-off</option>
+                                <option value="PICKUP">Pickup</option>
+                            </select>
+                        </div>
+                        <div class="col-4"><label class="form-label" style="font-size:.8rem">Panjang (cm)</label><input class="form-control form-control-sm" id="asTtLength" type="number" min="0.01" step="0.01" value="${esc(dimension.length ?? 20)}"></div>
+                        <div class="col-4"><label class="form-label" style="font-size:.8rem">Lebar (cm)</label><input class="form-control form-control-sm" id="asTtWidth" type="number" min="0.01" step="0.01" value="${esc(dimension.width ?? 15)}"></div>
+                        <div class="col-4"><label class="form-label" style="font-size:.8rem">Tinggi (cm)</label><input class="form-control form-control-sm" id="asTtHeight" type="number" min="0.01" step="0.01" value="${esc(dimension.height ?? 5)}"></div>
+                    </div>
+                    <input type="hidden" id="asTtPackageId" value="${esc(responseData.package_id || '')}">
+                    ${responseData.package_id ? `<div class="small text-muted mt-2">Package ID: ${esc(responseData.package_id)}</div>` : ''}
+                `;
+                $('asSubmitBtn').disabled = false;
+                return;
+            }
+
+            window._asPlatform = 'shopee';
             const infoNeeded = responseData.info_needed || {};
             
             // Permintaan USER: Untuk pesanan Reguler dan Kilat (Bukan Instan), tampilkan HANYA Drop-off.
@@ -3863,7 +3917,24 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
         btn.innerHTML = '⏳ Memproses...';
         
         let params = {};
-        if (method === 'dropoff') {
+        if (window._asPlatform === 'tiktok') {
+            const numberValue = id => {
+                const value = Number(document.getElementById(id)?.value);
+                return Number.isFinite(value) && value > 0 ? value : null;
+            };
+            params = {
+                package_id: document.getElementById('asTtPackageId')?.value || null,
+                shipping_service_id: document.getElementById('asTtShippingService')?.value || null,
+                handover_method: document.getElementById('asTtHandover')?.value || 'DROP_OFF',
+                weight: { value: String(numberValue('asTtWeight') || 1000), unit: 'GRAM' },
+                dimension: {
+                    length: String(numberValue('asTtLength') || 20),
+                    width: String(numberValue('asTtWidth') || 15),
+                    height: String(numberValue('asTtHeight') || 5),
+                    unit: 'CM',
+                },
+            };
+        } else if (method === 'dropoff') {
             params = { dropoff: {} };
             const branchSelect = document.getElementById('asDropoffBranch');
             if (branchSelect && branchSelect.value) {
