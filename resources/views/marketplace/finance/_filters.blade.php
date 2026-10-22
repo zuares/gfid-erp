@@ -2,8 +2,9 @@
     <div class="card-body">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
             <div>
-                <div class="finance-section-title">Filter data</div>
-                <div class="finance-section-meta">Persempit transaksi yang ingin kamu audit.</div>
+                <div class="finance-eyebrow mb-1">Filter analitik</div>
+                <div class="finance-section-title">Atur cakupan data</div>
+                <div class="finance-section-meta">Gunakan filter untuk mempersempit transaksi yang ingin dianalisis.</div>
             </div>
             @if (request()->query())
                 <a class="btn btn-sm btn-light border" href="{{ url()->current() }}"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</a>

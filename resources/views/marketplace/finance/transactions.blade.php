@@ -6,10 +6,17 @@
 
 @section('finance-content')
     @php $money = fn ($value): string => number_format((float) $value, 2, ',', '.'); @endphp
-    <div class="finance-card card shadow-sm">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h2 class="h6 mb-0">Transactions</h2>
-            <span class="text-muted small">{{ number_format($rows->total()) }} transaksi</span>
+    <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+        <div>
+            <div class="finance-eyebrow mb-1">Marketplace ledger</div>
+            <h2 class="h4 mb-1">Transactions</h2>
+            <div class="finance-caption">Semua transaksi finance marketplace, termasuk biaya iklan dan adjustment.</div>
+        </div>
+        <span class="badge rounded-pill text-bg-light border px-3 py-2">{{ number_format($rows->total()) }} transaksi</span>
+    </div>
+    <div class="finance-card card">
+        <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+            <div><div class="finance-section-meta">Ledger terfilter</div><h3 class="h6 mb-0 mt-1">Detail transaksi</h3></div>
         </div>
         <div class="table-responsive">
             <table class="table table-hover mb-0">

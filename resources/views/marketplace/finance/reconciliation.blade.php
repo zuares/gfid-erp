@@ -25,7 +25,7 @@
 
     <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
         <div>
-            <div class="text-uppercase text-primary fw-semibold small mb-1" style="letter-spacing:.08em;">Audit finance</div>
+            <div class="finance-eyebrow mb-1">Audit finance</div>
             <h2 class="h4 mb-1">Rekonsiliasi transaksi</h2>
             <div class="finance-caption">Periksa status order, escrow, fee, settlement, dan jurnal dalam satu tampilan.</div>
         </div>
@@ -86,7 +86,7 @@
                     <h3 class="h6 mb-1">Detail transaksi</h3>
                     <div class="finance-section-meta">Status dan alasan ditampilkan per order.</div>
                 </div>
-                <span class="badge rounded-pill text-bg-light border">{{ number_format(count($report['transactions'])) }} order</span>
+                <span class="badge rounded-pill text-bg-light border">{{ number_format($report['transactions']->total()) }} order</span>
             </div>
         </div>
         <div class="table-responsive">
@@ -133,6 +133,12 @@
                 </tbody>
             </table>
         </div>
+        @if ($report['transactions']->hasPages())
+            <div class="card-footer bg-white d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <span class="text-muted small">Menampilkan {{ number_format($report['transactions']->firstItem() ?? 0) }}–{{ number_format($report['transactions']->lastItem() ?? 0) }} dari {{ number_format($report['transactions']->total()) }} order</span>
+                {{ $report['transactions']->onEachSide(1)->links() }}
+            </div>
+        @endif
     </div>
 
     <div class="finance-card card">
@@ -142,7 +148,7 @@
                     <h3 class="h6 mb-1">Detail settlement</h3>
                     <div class="finance-section-meta">Payout yang sudah memiliki allocation ke order.</div>
                 </div>
-                <span class="badge rounded-pill text-bg-light border">{{ number_format(count($report['settlements'])) }} settlement</span>
+                <span class="badge rounded-pill text-bg-light border">{{ number_format($report['settlements']->total()) }} settlement</span>
             </div>
         </div>
         @if (count($report['settlements']) > 0)
@@ -165,6 +171,12 @@
                     </tbody>
                 </table>
             </div>
+            @if ($report['settlements']->hasPages())
+                <div class="card-footer bg-white d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <span class="text-muted small">Menampilkan {{ number_format($report['settlements']->firstItem() ?? 0) }}–{{ number_format($report['settlements']->lastItem() ?? 0) }} dari {{ number_format($report['settlements']->total()) }} settlement</span>
+                    {{ $report['settlements']->onEachSide(1)->links() }}
+                </div>
+            @endif
         @else
             <div class="finance-empty">
                 <i class="bi bi-bank"></i>

@@ -4,7 +4,7 @@
 
 @section('content')
     <style>
-        .finance-page { --finance-ink: #172033; --finance-muted: #64748b; --finance-line: #e7ebf0; --finance-soft: #f8fafc; max-width: 1760px; margin: 0 auto; padding-top: 1.75rem !important; padding-bottom: 2.5rem !important; color: var(--finance-ink); }
+        .finance-page { --finance-ink: #172033; --finance-muted: #64748b; --finance-line: #e7ebf0; --finance-soft: #f8fafc; --finance-blue: #2563eb; max-width: 1760px; margin: 0 auto; padding-top: 1.75rem !important; padding-bottom: 2.5rem !important; color: var(--finance-ink); }
         .finance-page .finance-card { border: 1px solid var(--finance-line); border-radius: 14px; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .035); }
         .finance-page .card-body { padding: 1.15rem 1.25rem; }
         .finance-page .card-header { padding: .85rem 1.25rem; }
@@ -28,6 +28,12 @@
         .finance-page .finance-kpi--warning { --finance-accent: #b45309; color: #b45309; }
         .finance-page .finance-kpi--muted { --finance-accent: #64748b; color: #64748b; }
         .finance-page .finance-caption { color: var(--finance-muted); font-size: .82rem; }
+        .finance-page .finance-eyebrow { color: var(--finance-blue); font-size: .7rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+        .finance-page .finance-page-title { font-size: clamp(1.65rem, 2vw, 2.15rem); font-weight: 780; letter-spacing: -.04em; }
+        .finance-page .finance-page-subtitle { color: var(--finance-muted); font-size: .92rem; }
+        .finance-page .finance-tabs { padding: .35rem; border: 1px solid var(--finance-line); border-radius: 13px; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .03); }
+        .finance-page .finance-tabs .nav-link { display: inline-flex; align-items: center; gap: .45rem; }
+        .finance-page .finance-tabs .nav-link i { font-size: .95rem; }
         .finance-page .finance-callout { display: flex; gap: .75rem; align-items: flex-start; border: 1px solid #dbeafe; border-radius: 14px; padding: .9rem 1rem; background: #f8fbff; color: #334155; }
         .finance-page .finance-callout > i { color: #2563eb; font-size: 1.1rem; margin-top: .1rem; }
         .finance-page .finance-callout strong { display: block; font-size: .88rem; color: #1e3a8a; }
@@ -60,21 +66,21 @@
         }
     </style>
     <div class="container-fluid py-4 finance-page">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-1">
+        <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4 pb-1">
             <div>
-                <div class="text-muted small">Toko Online</div>
-                <h1 class="h3 mb-1">Marketplace Finance</h1>
-                <div class="text-muted">Ringkasan transaksi, escrow, settlement, dan rekonsiliasi.</div>
+                <div class="finance-eyebrow mb-2">Marketplace / Operasional &amp; Keuangan</div>
+                <h1 class="finance-page-title mb-1">Marketplace Finance</h1>
+                <div class="finance-page-subtitle">Pantau transaksi, settlement, biaya, dan status rekonsiliasi marketplace.</div>
             </div>
-            <span class="badge text-bg-light border">Read-only reconciliation</span>
+            <span class="badge rounded-pill text-bg-light border px-3 py-2"><i class="bi bi-shield-check me-1 text-success"></i>Read-only reconciliation</span>
         </div>
 
-        <nav class="finance-nav nav nav-pills gap-2 mb-4" aria-label="Marketplace Finance">
-            <a class="nav-link {{ request()->routeIs('marketplace.finance.index') ? 'active' : '' }}" href="{{ route('marketplace.finance.index', request()->except('status')) }}">Overview</a>
-            <a class="nav-link {{ request()->routeIs('marketplace.finance.transactions') ? 'active' : '' }}" href="{{ route('marketplace.finance.transactions', request()->except('status')) }}">Transactions</a>
-            <a class="nav-link {{ request()->routeIs('marketplace.finance.settlements') ? 'active' : '' }}" href="{{ route('marketplace.finance.settlements', request()->except('status')) }}">Settlements</a>
-            <a class="nav-link {{ request()->routeIs('marketplace.finance.reconciliation') ? 'active' : '' }}" href="{{ route('marketplace.finance.reconciliation', request()->except('status')) }}">Reconciliation</a>
-            <a class="nav-link {{ request()->routeIs('marketplace.finance.fee-analysis') ? 'active' : '' }}" href="{{ route('marketplace.finance.fee-analysis', request()->except('status')) }}">Fee Analysis</a>
+        <nav class="finance-nav finance-tabs nav nav-pills gap-2 mb-4" aria-label="Marketplace Finance">
+            <a class="nav-link {{ request()->routeIs('marketplace.finance.index') ? 'active' : '' }}" href="{{ route('marketplace.finance.index', request()->except('status')) }}"><i class="bi bi-grid-1x2"></i>Overview</a>
+            <a class="nav-link {{ request()->routeIs('marketplace.finance.transactions') ? 'active' : '' }}" href="{{ route('marketplace.finance.transactions', request()->except('status')) }}"><i class="bi bi-receipt"></i>Transactions</a>
+            <a class="nav-link {{ request()->routeIs('marketplace.finance.settlements') ? 'active' : '' }}" href="{{ route('marketplace.finance.settlements', request()->except('status')) }}"><i class="bi bi-bank"></i>Settlements</a>
+            <a class="nav-link {{ request()->routeIs('marketplace.finance.reconciliation') ? 'active' : '' }}" href="{{ route('marketplace.finance.reconciliation', request()->except('status')) }}"><i class="bi bi-check2-square"></i>Reconciliation</a>
+            <a class="nav-link {{ request()->routeIs('marketplace.finance.fee-analysis') ? 'active' : '' }}" href="{{ route('marketplace.finance.fee-analysis', request()->except('status')) }}"><i class="bi bi-bar-chart-line"></i>Fee Analysis</a>
         </nav>
 
         @hasSection('finance-sidebar')

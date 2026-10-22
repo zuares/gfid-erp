@@ -2,26 +2,36 @@
 
 @section('finance-content')
     @php $money = fn ($value): string => number_format((float) $value, 2, ',', '.'); @endphp
+    <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+        <div>
+            <div class="finance-eyebrow mb-1">Cost intelligence</div>
+            <h2 class="h4 mb-1">Fee Analysis</h2>
+            <div class="finance-caption">Bandingkan biaya marketplace berdasarkan tipe, toko, dan order.</div>
+        </div>
+        <span class="badge rounded-pill text-bg-light border px-3 py-2"><i class="bi bi-lightning-charge me-1 text-warning"></i>Biaya teragregasi</span>
+    </div>
     <div class="row g-3">
-        <div class="col-12 col-xl-4">
-            <div class="finance-card card shadow-sm h-100">
-                <div class="card-header bg-white"><h2 class="h6 mb-0">Fee by type</h2></div>
+        <div class="col-12 col-xl-6">
+            <div class="finance-card card h-100">
+                <div class="card-header bg-white border-0"><div class="finance-section-meta">Komposisi biaya</div><h3 class="h6 mb-0 mt-1">Fee by type</h3></div>
                 <div class="table-responsive"><table class="table mb-0"><thead><tr><th>Type</th><th>Count</th><th>Amount</th></tr></thead><tbody>
                     @forelse ($byType as $row)<tr><td>{{ $row['label'] }}</td><td>{{ $row['count'] }}</td><td>Rp {{ $money($row['amount']) }}</td></tr>@empty<tr><td colspan="3" class="text-center text-muted py-4">Belum ada fee.</td></tr>@endforelse
                 </tbody></table></div>
+                @if ($byType->hasPages())<div class="card-footer bg-white d-flex flex-wrap align-items-center justify-content-between gap-2"><span class="text-muted small">{{ number_format($byType->total()) }} tipe</span>{{ $byType->onEachSide(1)->links() }}</div>@endif
             </div>
         </div>
-        <div class="col-12 col-xl-4">
-            <div class="finance-card card shadow-sm h-100">
-                <div class="card-header bg-white"><h2 class="h6 mb-0">Fee by store</h2></div>
+        <div class="col-12 col-xl-6">
+            <div class="finance-card card h-100">
+                <div class="card-header bg-white border-0"><div class="finance-section-meta">Performa channel</div><h3 class="h6 mb-0 mt-1">Fee by store</h3></div>
                 <div class="table-responsive"><table class="table mb-0"><thead><tr><th>Toko</th><th>Count</th><th>Amount</th></tr></thead><tbody>
                     @forelse ($byStore as $row)<tr><td>{{ $row['store_name'] }}</td><td>{{ $row['count'] }}</td><td>Rp {{ $money($row['amount']) }}</td></tr>@empty<tr><td colspan="3" class="text-center text-muted py-4">Belum ada fee.</td></tr>@endforelse
                 </tbody></table></div>
+                @if ($byStore->hasPages())<div class="card-footer bg-white d-flex flex-wrap align-items-center justify-content-between gap-2"><span class="text-muted small">{{ number_format($byStore->total()) }} toko</span>{{ $byStore->onEachSide(1)->links() }}</div>@endif
             </div>
         </div>
-        <div class="col-12 col-xl-4">
-            <div class="finance-card card shadow-sm h-100">
-                <div class="card-header bg-white"><h2 class="h6 mb-0">Fee by order</h2></div>
+        <div class="col-12">
+            <div class="finance-card card">
+                <div class="card-header bg-white border-0"><div class="finance-section-meta">Drill-down</div><h3 class="h6 mb-0 mt-1">Fee by order</h3></div>
                 <div class="table-responsive"><table class="table mb-0"><thead><tr><th>Order</th><th>Fee %</th><th>Fee</th></tr></thead><tbody>
                     @forelse ($byOrder as $row)<tr><td><span class="fw-semibold">{{ $row['order_sn'] }}</span><br><small class="text-muted">{{ $row['store_name'] }}</small></td><td>{{ $row['fee_percentage'] === null ? '-' : number_format($row['fee_percentage'], 2, ',', '.') . '%' }}</td><td>Rp {{ $money($row['fee_amount']) }}</td></tr>@empty<tr><td colspan="3" class="text-center text-muted py-4">Belum ada fee.</td></tr>@endforelse
                 </tbody></table></div>

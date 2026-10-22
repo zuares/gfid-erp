@@ -75,12 +75,157 @@ class MarketplaceFinanceReconciliationService
      * Reconcile only the current transaction page. The listing must not load
      * every financial transaction into memory before rendering the table.
      */
-    public function paginateTransactions(array $filters = [], int $perPage = 50): LengthAwarePaginator
+    public function paginateTransactions(array $filters = [], int $perPage = 50, string $pageName = 'page'): LengthAwarePaginator
     {
         $filters = $this->filters($filters);
         $perPage = in_array($perPage, [25, 50, 100], true) ? $perPage : 50;
+
+        return $this->paginateTransactionRows($filters, $perPage, $pageName);
+    }
+
+    /**
+     * Lightweight overview metrics. Rows are processed in chunks and are not
+     * retained, so the dashboard remains safe for large marketplace imports.
+     */
+    public function overview(array $filters = []): array
+    {
+        $filters = $this->filters($filters);
+        $summary = array_fill_keys(['matched', 'mismatch', 'unmatched', 'pending'], 0);
+        $metrics = [
+            'gross_sales' => 0.0,
+            'total_escrow_fee' => 0.0,
+            'pending_income' => 0.0,
+            'to_release' => 0.0,
+            'released' => 0.0,
+            'settlement_received' => 0.0,
+            'unreconciled_amount' => 0.0,
+        ];
+        $transactionCount = 0;
+        $settlementCount = 0;
+
+        $this->eachTransactionResult($filters, function (array $item) use (&$summary, &$metrics, &$transactionCount, $filters): void {
+            if ($filters['status'] !== null && $item['status'] !== $filters['status']) {
+                return;
+            }
+
+            $transactionCount++;
+            $summary[$item['status']]++;
+            $metrics['gross_sales'] += (float) ($item['gross_sales_invoice'] ?? $item['escrow_gross'] ?? 0);
+            $metrics['total_escrow_fee'] += abs((float) ($item['total_components'] ?? 0));
+            $incomeStatus = $item['income_status'] ?? 'unknown';
+            if (array_key_exists($incomeStatus, ['pending' => true, 'to_release' => true, 'released' => true])) {
+                $metrics[$incomeStatus] += (float) ($item['actual_net_income'] ?? 0);
+            }
+            if ($item['status'] !== 'matched') {
+                $metrics['unreconciled_amount'] += abs((float) ($item['actual_net_income'] ?? 0) - (float) ($item['allocated_amount'] ?? 0));
+            }
+        });
+
+        $this->eachSettlementResult($filters, function (array $settlement) use (&$summary, &$metrics, &$settlementCount, $filters): void {
+            if ($filters['status'] !== null && $settlement['status'] !== $filters['status']) {
+                return;
+            }
+
+            $settlementCount++;
+            $metrics['settlement_received'] += (float) ($settlement['settlement_received_amount'] ?? 0);
+            if ($settlement['status'] !== 'matched') {
+                $summary[$settlement['status']]++;
+            }
+        });
+
+        return [
+            'metrics' => array_map(fn (float $value): float => round($value, 2), $metrics),
+            'summary' => [
+                'transaction_count' => $transactionCount,
+                'settlement_count' => $settlementCount,
+                ...$summary,
+                'unreconciled_amount' => round($metrics['unreconciled_amount'], 2),
+            ],
+        ];
+    }
+
+    /**
+     * Paginate settlement rows without loading every settlement in memory.
+     */
+    public function paginateSettlements(array $filters = [], int $perPage = 50, string $pageName = 'page'): LengthAwarePaginator
+    {
+        $filters = $this->filters($filters);
+        $perPage = in_array($perPage, [25, 50, 100], true) ? $perPage : 50;
+
+        return $this->paginateSettlementRows($filters, $perPage, $pageName);
+    }
+
+    /**
+     * Reconciliation uses two independent paginators so a large transaction
+     * table never forces the settlement table to render all of its rows too.
+     */
+    public function paginateReconciliation(array $filters = [], int $perPage = 50): array
+    {
+        $filters = $this->filters($filters);
+        $perPage = in_array($perPage, [25, 50, 100], true) ? $perPage : 50;
+
+        return [
+            'filters' => $filters,
+            'summary' => $this->summary($filters),
+            'transactions' => $this->paginateTransactionRows($filters, $perPage, 'reconciliation_transaction_page'),
+            'settlements' => $this->paginateSettlementRows($filters, $perPage, 'reconciliation_settlement_page'),
+        ];
+    }
+
+    /**
+     * Calculate reconciliation counters in bounded chunks. This keeps the
+     * summary accurate without retaining all derived rows in the request.
+     */
+    public function summary(array $filters = []): array
+    {
+        $filters = $this->filters($filters);
+        $counts = array_fill_keys(['matched', 'mismatch', 'unmatched', 'pending'], 0);
+        $transactionCount = 0;
+        $settlementCount = 0;
+        $unreconciledAmount = 0.0;
+
+        $this->eachTransactionResult($filters, function (array $item) use (&$counts, &$transactionCount, &$unreconciledAmount, $filters): void {
+            if ($filters['status'] !== null && $item['status'] !== $filters['status']) {
+                return;
+            }
+
+            $transactionCount++;
+            $counts[$item['status']]++;
+            if ($item['status'] !== 'matched') {
+                $unreconciledAmount += abs((float) ($item['actual_net_income'] ?? 0) - (float) ($item['allocated_amount'] ?? 0));
+            }
+        });
+
+        $this->eachSettlementResult($filters, function (array $settlement) use (&$counts, &$settlementCount, $filters): void {
+            if ($filters['status'] !== null && $settlement['status'] !== $filters['status']) {
+                return;
+            }
+
+            $settlementCount++;
+            if ($settlement['status'] !== 'matched') {
+                $counts[$settlement['status']]++;
+            }
+        });
+
+        return [
+            'transaction_count' => $transactionCount,
+            'settlement_count' => $settlementCount,
+            'matched' => $counts['matched'],
+            'mismatch' => $counts['mismatch'],
+            'unmatched' => $counts['unmatched'],
+            'pending' => $counts['pending'],
+            'unreconciled_amount' => round($unreconciledAmount, 2),
+        ];
+    }
+
+    private function paginateTransactionRows(array $filters, int $perPage, string $pageName): LengthAwarePaginator
+    {
+        if ($filters['status'] !== null) {
+            return $this->paginateFilteredTransactions($filters, $perPage, $pageName);
+        }
+
         $paginator = $this->transactionQuery($filters)
-            ->paginate($perPage)
+            ->paginate($perPage, ['*'], $pageName)
             ->withQueryString();
         $journalCounts = $this->activeJournalCounts($paginator->getCollection());
 
@@ -91,6 +236,115 @@ class MarketplaceFinanceReconciliationService
         );
 
         return $paginator;
+    }
+
+    private function paginateSettlementRows(array $filters, int $perPage, string $pageName): LengthAwarePaginator
+    {
+        if ($filters['status'] !== null) {
+            return $this->paginateFilteredSettlements($filters, $perPage, $pageName);
+        }
+
+        $paginator = $this->settlementQuery($filters)
+            ->paginate($perPage, ['*'], $pageName)
+            ->withQueryString();
+        $paginator->setCollection(
+            $paginator->getCollection()
+                ->map(fn (MarketplaceFinanceSettlement $settlement): array => $this->settlementResult($settlement))
+                ->values(),
+        );
+
+        return $paginator;
+    }
+
+    private function paginateFilteredTransactions(array $filters, int $perPage, string $pageName): LengthAwarePaginator
+    {
+        $total = 0;
+        $this->eachTransactionResult($filters, function (array $item) use (&$total, $filters): void {
+            if ($item['status'] === $filters['status']) {
+                $total++;
+            }
+        });
+
+        $page = LengthAwarePaginator::resolveCurrentPage($pageName);
+        $start = max($total - ($page * $perPage), 0);
+        $end = max($total - (($page - 1) * $perPage), 0);
+        $index = 0;
+        $items = [];
+
+        $this->eachTransactionResult($filters, function (array $item) use (&$index, &$items, $filters, $start, $end): void {
+            if ($item['status'] !== $filters['status']) {
+                return;
+            }
+
+            if ($index >= $start && $index < $end) {
+                $items[] = $item;
+            }
+            $index++;
+        });
+
+        usort($items, fn (array $left, array $right): int => $right['transaction_id'] <=> $left['transaction_id']);
+
+        $paginator = new LengthAwarePaginator($items, $total, $perPage, $page, [
+            'path' => LengthAwarePaginator::resolveCurrentPath(),
+            'pageName' => $pageName,
+        ]);
+
+        return $paginator->withQueryString();
+    }
+
+    private function paginateFilteredSettlements(array $filters, int $perPage, string $pageName): LengthAwarePaginator
+    {
+        $total = 0;
+        $this->eachSettlementResult($filters, function (array $item) use (&$total, $filters): void {
+            if ($item['status'] === $filters['status']) {
+                $total++;
+            }
+        });
+
+        $page = LengthAwarePaginator::resolveCurrentPage($pageName);
+        $start = max($total - ($page * $perPage), 0);
+        $end = max($total - (($page - 1) * $perPage), 0);
+        $index = 0;
+        $items = [];
+
+        $this->eachSettlementResult($filters, function (array $item) use (&$index, &$items, $filters, $start, $end): void {
+            if ($item['status'] !== $filters['status']) {
+                return;
+            }
+
+            if ($index >= $start && $index < $end) {
+                $items[] = $item;
+            }
+            $index++;
+        });
+
+        usort($items, fn (array $left, array $right): int => $right['settlement_id'] <=> $left['settlement_id']);
+
+        $paginator = new LengthAwarePaginator($items, $total, $perPage, $page, [
+            'path' => LengthAwarePaginator::resolveCurrentPath(),
+            'pageName' => $pageName,
+        ]);
+
+        return $paginator->withQueryString();
+    }
+
+    private function eachTransactionResult(array $filters, callable $callback): void
+    {
+        $this->transactionQuery($filters)->reorder('id')->chunkById(100, function (Collection $transactions) use ($callback): void {
+            $journalCounts = $this->activeJournalCounts($transactions);
+            foreach ($transactions as $transaction) {
+                $callback($this->transactionResult($transaction, $journalCounts));
+            }
+        }, 'id');
+    }
+
+    private function eachSettlementResult(array $filters, callable $callback): void
+    {
+        $this->settlementQuery($filters)->reorder('id')->chunkById(100, function (Collection $settlements) use ($callback): void {
+            foreach ($settlements as $settlement) {
+                $callback($this->settlementResult($settlement));
+            }
+        }, 'id');
     }
 
     private function transactionQuery(array $filters): Builder

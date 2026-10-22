@@ -19,28 +19,29 @@ class MarketplaceFinanceController extends Controller
 
     public function index(Request $request)
     {
-        [$report, $stores, $filters] = $this->reportData($request);
+        $filters = $this->filters($request);
+        $stores = $this->stores();
+        $overviewData = $this->reconciliation->overview($filters);
+        $report = ['summary' => $overviewData['summary']];
         $storeNames = $stores->pluck('name', 'id');
-        $transactions = collect($report['transactions']);
-        $settlements = collect($report['settlements']);
+        $transactions = $this->reconciliation->paginateTransactions($filters, 10, 'overview_transaction_page');
+        $settlements = $this->reconciliation->paginateSettlements($filters, 10, 'overview_settlement_page');
+        $settlementModels = MarketplaceFinanceSettlement::query()
+            ->with(['store', 'bankAccount'])
+            ->whereIn('id', $settlements->getCollection()->pluck('settlement_id'))
+            ->get()
+            ->keyBy('id');
 
-        $grossSales = $transactions->sum(fn (array $row): float => (float) ($row['gross_sales_invoice'] ?? $row['escrow_gross'] ?? 0));
-        $totalFees = $transactions->sum(fn (array $row): float => abs((float) ($row['total_components'] ?? 0)));
-        $incomeAmounts = $transactions->groupBy('income_status')->map(
-            fn (Collection $rows): float => $rows->sum(fn (array $row): float => (float) ($row['actual_net_income'] ?? 0)),
-        );
-
-        $overview = [
-            'gross_sales' => round($grossSales, 2),
-            'total_escrow_fee' => round($totalFees, 2),
-            'pending_income' => round((float) ($incomeAmounts['pending'] ?? 0), 2),
-            'to_release' => round((float) ($incomeAmounts['to_release'] ?? 0), 2),
-            'released' => round((float) ($incomeAmounts['released'] ?? 0), 2),
-            'settlement_received' => round($settlements->sum('settlement_received_amount'), 2),
-            'unreconciled_amount' => (float) $report['summary']['unreconciled_amount'],
-        ];
-
-        return view('marketplace.finance.index', compact('filters', 'overview', 'report', 'storeNames', 'stores'));
+        return view('marketplace.finance.index', [
+            'filters' => $filters,
+            'overview' => $overviewData['metrics'],
+            'report' => $report,
+            'settlementModels' => $settlementModels,
+            'settlements' => $settlements,
+            'storeNames' => $storeNames,
+            'stores' => $stores,
+            'transactions' => $transactions,
+        ]);
     }
 
     public function transactions(Request $request)
@@ -60,8 +61,10 @@ class MarketplaceFinanceController extends Controller
 
     public function settlements(Request $request)
     {
-        [$report, $stores, $filters] = $this->reportData($request);
-        $settlementIds = collect($report['settlements'])->pluck('settlement_id');
+        $filters = $this->filters($request);
+        $stores = $this->stores();
+        $rows = $this->reconciliation->paginateSettlements($filters, $this->transactionsPerPage($request));
+        $settlementIds = $rows->getCollection()->pluck('settlement_id');
         $settlementModels = MarketplaceFinanceSettlement::query()
             ->with(['store', 'bankAccount'])
             ->whereIn('id', $settlementIds)
@@ -70,8 +73,7 @@ class MarketplaceFinanceController extends Controller
 
         return view('marketplace.finance.settlements', [
             'filters' => $filters,
-            'rows' => $report['settlements'],
-            'report' => $report,
+            'rows' => $rows,
             'settlementModels' => $settlementModels,
             'stores' => $stores,
         ]);
@@ -79,7 +81,14 @@ class MarketplaceFinanceController extends Controller
 
     public function reconciliation(Request $request)
     {
-        [$report, $stores, $filters] = $this->reportData($request);
+        $filters = $this->filters($request);
+        $stores = $this->stores();
+        $page = $this->reconciliation->paginateReconciliation($filters, $this->transactionsPerPage($request));
+        $report = [
+            'summary' => $page['summary'],
+            'transactions' => $page['transactions'],
+            'settlements' => $page['settlements'],
+        ];
 
         return view('marketplace.finance.reconciliation', compact('filters', 'report', 'stores'));
     }
@@ -97,13 +106,14 @@ class MarketplaceFinanceController extends Controller
             ->selectRaw('SUM(ABS(fc.amount)) as amount')
             ->groupBy('fc.component_code')
             ->orderBy('fc.component_code')
-            ->get()
-            ->map(fn ($row): array => [
+            ->paginate(10, ['*'], 'fee_type_page')
+            ->withQueryString();
+        $byType->setCollection($byType->getCollection()->map(fn ($row): array => [
                 'label' => $row->label ?: $row->code,
                 'code' => $row->code,
                 'amount' => round((float) $row->amount, 2),
                 'count' => (int) $row->count,
-            ])->values();
+            ])->values());
 
         $byStore = (clone $componentQuery)
             ->leftJoin('stores as fee_store', 'fee_store.id', '=', 'ft.store_id')
@@ -113,13 +123,14 @@ class MarketplaceFinanceController extends Controller
             ->selectRaw('SUM(ABS(fc.amount)) as amount')
             ->groupBy('ft.store_id')
             ->orderBy('store_name')
-            ->get()
-            ->map(fn ($row): array => [
+            ->paginate(10, ['*'], 'fee_store_page')
+            ->withQueryString();
+        $byStore->setCollection($byStore->getCollection()->map(fn ($row): array => [
                 'store_id' => $row->store_id ?? 'unknown',
                 'store_name' => $row->store_name ?: 'Toko tidak diketahui',
                 'amount' => round((float) $row->amount, 2),
                 'count' => (int) $row->count,
-            ])->values();
+            ])->values());
 
         $byOrder = (clone $componentQuery)
             ->leftJoin('stores as fee_store', 'fee_store.id', '=', 'ft.store_id')
@@ -167,13 +178,6 @@ class MarketplaceFinanceController extends Controller
         }
 
         return $query;
-    }
-
-    private function reportData(Request $request): array
-    {
-        $filters = $this->filters($request);
-
-        return [$this->reconciliation->reconcile($filters), $this->stores(), $filters];
     }
 
     private function filters(Request $request): array

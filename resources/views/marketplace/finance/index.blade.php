@@ -14,6 +14,15 @@
         ];
     @endphp
 
+    <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+        <div>
+            <div class="finance-eyebrow mb-1">Financial overview</div>
+            <h2 class="h4 mb-1">Ringkasan performa finance</h2>
+            <div class="finance-caption">KPI dihitung dari transaksi dan settlement yang sesuai filter analitik.</div>
+        </div>
+        <span class="badge rounded-pill text-bg-light border px-3 py-2">{{ number_format($report['summary']['transaction_count']) }} transaksi terfilter</span>
+    </div>
+
     <div class="row g-3 mb-4">
         @foreach ($cards as $card)
             <div class="col-12 col-sm-6 col-xl-3">
@@ -59,6 +68,65 @@
                         <a class="btn btn-outline-primary" href="{{ route('marketplace.finance.fee-analysis', request()->query()) }}">Analisa fee</a>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-1">
+        <div class="col-12 col-xl-7">
+            <div class="finance-card card h-100">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                    <div><div class="finance-section-meta">Aktivitas terbaru</div><h2 class="h6 mb-0 mt-1">Transactions</h2></div>
+                    <a class="btn btn-sm btn-light border" href="{{ route('marketplace.finance.transactions', request()->query()) }}">Lihat semua</a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead><tr><th>Order</th><th>Gross</th><th>Net</th><th>Income</th></tr></thead>
+                        <tbody>
+                            @forelse ($transactions as $row)
+                                <tr>
+                                    <td><span class="fw-semibold font-monospace small">{{ $row['order_sn'] }}</span><br><small class="text-muted">{{ $storeNames[$row['store_id']] ?? 'Toko tidak diketahui' }}</small></td>
+                                    <td class="text-nowrap">Rp {{ $money($row['gross_sales_invoice'] ?? $row['escrow_gross'] ?? 0) }}</td>
+                                    <td class="text-nowrap">Rp {{ $money($row['actual_net_income']) }}</td>
+                                    <td><span class="badge text-bg-{{ $row['income_status'] === 'released' ? 'success' : ($row['income_status'] === 'to_release' ? 'warning' : 'secondary') }}">{{ str_replace('_', ' ', ucfirst($row['income_status'] ?? 'unknown')) }}</span></td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4"><div class="finance-empty"><i class="bi bi-receipt"></i>Belum ada transaksi finance.</div></td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                @if ($transactions->hasPages())
+                    <div class="card-footer bg-white d-flex flex-wrap align-items-center justify-content-between gap-2"><span class="text-muted small">{{ number_format($transactions->firstItem() ?? 0) }}–{{ number_format($transactions->lastItem() ?? 0) }} dari {{ number_format($transactions->total()) }}</span>{{ $transactions->onEachSide(1)->links() }}</div>
+                @endif
+            </div>
+        </div>
+        <div class="col-12 col-xl-5">
+            <div class="finance-card card h-100">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                    <div><div class="finance-section-meta">Payout terbaru</div><h2 class="h6 mb-0 mt-1">Settlements</h2></div>
+                    <a class="btn btn-sm btn-light border" href="{{ route('marketplace.finance.settlements', request()->query()) }}">Lihat semua</a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead><tr><th>Settlement</th><th>Amount</th><th>Status</th></tr></thead>
+                        <tbody>
+                            @forelse ($settlements as $row)
+                                @php $settlement = $settlementModels[$row['settlement_id']] ?? null; @endphp
+                                <tr>
+                                    <td><span class="fw-semibold font-monospace small">{{ $row['external_settlement_id'] }}</span><br><small class="text-muted">{{ $settlement?->settlement_date?->format('d M Y') ?? '-' }}</small></td>
+                                    <td class="text-nowrap">Rp {{ $money($row['settlement_amount']) }}</td>
+                                    <td><span class="badge text-bg-{{ $row['status'] === 'matched' ? 'success' : ($row['status'] === 'mismatch' ? 'danger' : 'warning') }}">{{ ucfirst($row['status']) }}</span></td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="3"><div class="finance-empty"><i class="bi bi-bank"></i>Belum ada settlement.</div></td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                @if ($settlements->hasPages())
+                    <div class="card-footer bg-white d-flex flex-wrap align-items-center justify-content-between gap-2"><span class="text-muted small">{{ number_format($settlements->firstItem() ?? 0) }}–{{ number_format($settlements->lastItem() ?? 0) }} dari {{ number_format($settlements->total()) }}</span>{{ $settlements->onEachSide(1)->links() }}</div>
+                @endif
             </div>
         </div>
     </div>
