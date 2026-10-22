@@ -1414,7 +1414,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('sd-badge linked', false);
 
         $this->assertMatchesRegularExpression(
-            '/<div class="sd-order-item-diff[^\"]*">\s*Periksa\s*<span class="sd-sku-mismatch">Item berbeda<\/span>\s*<\/div>/',
+            '/<div class="sd-order-item-diff[^\"]*">\s*<span class="sd-diff-badge">Periksa<\/span>\s*<span class="sd-diff-note">Item berbeda<\/span>\s*<\/div>/',
             $response->getContent(),
         );
     }
@@ -1485,8 +1485,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $response = $this->actingAs($user)
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
-            ->assertSee('Item order belum cocok: MARKETPLACE-SKU-A, MARKETPLACE-SKU-B')
-            ->assertSee('SKU order belum dipasangkan')
+            ->assertSee('SKU belum dipasangkan')
             ->assertSee('class="sd-marketplace-sku-value" title="SKU marketplace: MARKETPLACE-SKU-A">MARKETPLACE-SKU-A</span>', false)
             ->assertSee('class="sd-marketplace-product-name" title="Kaos Olahraga Premium Hitam">Kaos Olahraga Premium Hitam</span>', false)
             ->assertSee('Varian Hitam M')
@@ -1499,7 +1498,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         preg_match_all('/<div class="sd-order-item [^\"]*sd-qty-breakdown">/', $html, $rows);
         $this->assertCount(4, $rows[0], 'Two unmatched marketplace item rows should be shown alongside the two scanned rows.');
         $this->assertStringNotContainsString('<details class="sd-item-review">', $html);
-        $this->assertSame(2, preg_match_all('/class="sd-order-item-diff[^\"]*">\s*Periksa/', $html));
+        $this->assertSame(2, preg_match_all('/class="sd-order-item-diff[^\"]*">\s*<span class="sd-diff-badge">Periksa<\/span>/', $html));
+        $this->assertStringContainsString('<span class="sd-scan-item-missing">Belum discan</span>', $html);
         $this->assertDoesNotMatchRegularExpression('/<div class="sd-order-item-code">[^<]*<\/div>\s*<div class="sd-order-item-name">/', $html);
     }
 

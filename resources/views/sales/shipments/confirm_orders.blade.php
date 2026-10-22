@@ -485,6 +485,8 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
 .sd-items-head.sd-has-cogs.sd-has-actions { grid-template-columns: 30px minmax(0,1fr) 52px 86px 110px 30px; }
 .sd-items-head span:nth-child(n+3) { text-align: right; }
 .sd-items-head span:last-child { text-align: center; }
+.sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku > span:nth-child(6) { text-align: left; }
+.sd-items-head.sd-qty-breakdown.sd-has-marketplace-sku > span:nth-child(5) { text-align: center; }
 .sd-order-item {
   grid-template-columns: 30px minmax(0,1fr) 52px;
   gap: .75rem;
@@ -656,9 +658,16 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
   max-width: 100%;
 }
 .sd-marketplace-unpaired-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: .12rem .42rem;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  background: #fff7ed;
   color: #92400e;
-  font-size: .6rem;
-  font-weight: 750;
+  font-size: .62rem;
+  font-weight: 800;
   line-height: 1.2;
 }
 body[data-theme="dark"] .sd-marketplace-sku-value {
@@ -697,6 +706,26 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
 .sd-order-item-diff.sd-marketplace-ok { color:#15803d; }
 .sd-order-item-diff.sd-marketplace-short { color:#b91c1c; }
 .sd-order-item-diff .sd-sku-mismatch { white-space: normal; }
+.sd-diff-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 23px;
+  padding: .12rem .48rem;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: .68rem;
+  font-weight: 850;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.sd-diff-note { display: block; margin-top: .18rem; color: #b45309; font-size: .64rem; font-weight: 750; line-height: 1.2; }
+.sd-diff-value { display: inline-block; min-width: 2.2rem; padding: .12rem .35rem; border-radius: 999px; font-variant-numeric: tabular-nums; text-align: center; }
+.sd-order-item-diff.sd-marketplace-ok .sd-diff-value { background: #ecfdf5; }
+.sd-order-item-diff.sd-marketplace-short .sd-diff-value { background: #fff1f2; }
+.sd-scan-item-missing { color: #94a3b8; font-size: .7rem; font-style: italic; white-space: nowrap; }
 @media(max-width:600px){
   .sd-items-head,
   .sd-order-item,
@@ -1478,17 +1507,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                         <div class="sd-order-item-marketplace-sku {{ $itemMismatch ? 'is-mismatch' : '' }}">
                                                             @if($unpairedMarketplaceLines->isNotEmpty())
                                                                 <div class="sd-marketplace-unpaired-list">
-                                                                    <span class="sd-marketplace-unpaired-label">SKU order belum dipasangkan</span>
-                                                                    @foreach($unpairedMarketplaceLines as $unpairedLine)
-                                                                        @php
-                                                                            $unpairedSku = $unpairedLine->model_sku ?: $unpairedLine->marketplace_sku ?: $unpairedLine->item_sku ?: 'SKU belum tersedia';
-                                                                            $unpairedTitle = trim((string) ($unpairedLine->item_name ?: $unpairedLine->item_name_snapshot ?: ''));
-                                                                            $unpairedVariant = trim((string) ($unpairedLine->variant_name ?: $unpairedLine->variant_snapshot ?: ''));
-                                                                        @endphp
-                                                                        <span class="sd-marketplace-sku-value" title="SKU marketplace: {{ $unpairedSku }}">{{ $unpairedSku }}</span>
-                                                                        @if($unpairedTitle !== '')<span class="sd-marketplace-product-name" title="{{ $unpairedTitle }}">{{ $unpairedTitle }}</span>@endif
-                                                                        @if($unpairedVariant !== '')<span class="sd-marketplace-variant" title="{{ $unpairedVariant }}">{{ $unpairedVariant }}</span>@endif
-                                                                    @endforeach
+                                                                    <span class="sd-marketplace-unpaired-label">SKU belum dipasangkan</span>
                                                                 </div>
                                                             @else
                                                                 <span class="sd-marketplace-sku-value" title="SKU marketplace: {{ $marketplaceSku }}">{{ $marketplaceSku }}</span>
@@ -1500,11 +1519,19 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                         <div class="sd-order-item-qty">{{ $qtyOrder === null ? '—' : number_format($qtyOrder, 0, ',', '.') }}</div>
                                                         <div class="sd-order-item-qty">{{ number_format($qtyShipment, 0, ',', '.') }}</div>
                                                         <div class="sd-order-item-diff {{ !$itemMismatch && $difference === 0 ? 'sd-marketplace-ok' : 'sd-marketplace-short' }}">
-                                                            {{ $itemMismatch ? 'Periksa' : (($difference > 0 ? '+' : '') . number_format($difference, 0, ',', '.')) }}
-                                                            @if($singleLineMismatch)<span class="sd-sku-mismatch">Item berbeda</span>@endif
+                                                            @if($itemMismatch)
+                                                                <span class="sd-diff-badge">Periksa</span>
+                                                                @if($singleLineMismatch)<span class="sd-diff-note">Item berbeda</span>@endif
+                                                            @else
+                                                                <span class="sd-diff-value">{{ ($difference > 0 ? '+' : '') . number_format($difference, 0, ',', '.') }}</span>
+                                                            @endif
                                                         </div>
                                                         <div>
-                                                            <div class="sd-order-item-code">{{ $line->item?->code ?: ($marketplaceLine?->item_code_snapshot ?: '-') }}</div>
+                                                            @if(empty($line->id))
+                                                                <span class="sd-scan-item-missing">Belum discan</span>
+                                                            @else
+                                                                <div class="sd-order-item-code">{{ $line->item?->code ?: ($marketplaceLine?->item_code_snapshot ?: '-') }}</div>
+                                                            @endif
                                                         </div>
                                                         @if($canSeeCogs)
                                                             <div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div>
@@ -1522,9 +1549,6 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                     </div>
                                                 @endforeach
                                             </div>
-                                            @if($unmatchedMarketplaceLines->isNotEmpty() && !($orderLines->count() === 1 && $marketplaceLines->count() === 1))
-                                                <div class="sd-sku-unmatched">Item order belum cocok: {{ $unmatchedMarketplaceLines->map(fn ($line) => $line->model_sku ?: $line->marketplace_sku ?: $line->item_sku ?: 'SKU belum tersedia')->join(', ') }}</div>
-                                            @endif
                                         @else
                                             <div class="sd-muted">Detail item marketplace belum tersedia.</div>
                                         @endif
