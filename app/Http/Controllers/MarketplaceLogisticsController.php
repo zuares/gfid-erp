@@ -380,6 +380,19 @@ class MarketplaceLogisticsController extends Controller
                 ->filter(fn (string $method) => array_key_exists($method, $params))
                 ->values();
 
+            // Kompatibilitas untuk tab browser yang masih memakai JavaScript
+            // lama atau respons Shopee yang tidak mengembalikan info_needed:
+            // order reguler Shopee dapat diproses lewat drop-off default.
+            // Biarkan API Marketplace memberi error spesifik bila drop-off
+            // memang tidak tersedia, bukan error validasi payload lokal.
+            $channelCode = strtoupper(trim((string) ($store->channel?->code ?? '')));
+            if (! $isAutoSync
+                && $selectedMethods->isEmpty()
+                && in_array($channelCode, ['SHP', 'SHOPEE'], true)) {
+                $params['dropoff'] = new \stdClass();
+                $selectedMethods = collect(['dropoff']);
+            }
+
             // Shopee requires exactly one shipping mode. Do this validation
             // here so an empty/ambiguous payload cannot reach the API.
             if (! $isAutoSync && $selectedMethods->count() !== 1) {

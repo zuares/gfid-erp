@@ -158,4 +158,30 @@ class MarketplaceLogisticsControllerTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($response->getData(true)['success']);
     }
+
+    public function test_arrange_shipment_defaults_to_dropoff_for_shopee_when_method_is_missing(): void
+    {
+        $store = new Store();
+        $store->id = 7;
+        $store->setRelation('channel', (object) ['code' => 'shopee']);
+
+        $this->mock(MarketplaceLogisticsService::class, function (MockInterface $mock) {
+            $mock->shouldReceive('arrangeShipment')
+                ->once()
+                ->withArgs(function (Store $receivedStore, string $orderSn, array $params, bool $isAutoSync): bool {
+                    return $receivedStore->id === 7
+                        && $orderSn === 'ORDER-DROPOFF'
+                        && $params['dropoff'] instanceof \stdClass
+                        && $isAutoSync === false;
+                })
+                ->andReturn(['success' => true]);
+        });
+
+        $request = Request::create('/ship', 'POST', []);
+        $response = app(MarketplaceLogisticsController::class)
+            ->arrangeShipment($request, $store, 'ORDER-DROPOFF');
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertTrue($response->getData(true)['success']);
+    }
 }
