@@ -105,6 +105,15 @@ class MarketplaceOrderSettlement extends Model
         $seen = [];
         $usedKeys = [];
 
+        // TikTok v202501 already maps fee and tax into the canonical columns
+        // below. Do not count the aggregate API fields a second time in the
+        // generic fee-field fallback.
+        if (is_array($raw['tiktok_fee_breakdown'] ?? null)) {
+            $usedKeys['fee_and_tax_amount'] = true;
+            $usedKeys['fee_tax_amount'] = true;
+            $usedKeys['tiktok_fee_breakdown'] = true;
+        }
+
         $amountOf = function (mixed $value): float {
             if ($value === null || $value === '') {
                 return 0.0;

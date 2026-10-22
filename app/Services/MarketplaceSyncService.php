@@ -1011,29 +1011,44 @@ class MarketplaceSyncService
         $hasStatement = $skuTransactions !== [];
 
         $amount = static fn (mixed $value): float => is_numeric($value) ? (float) $value : 0.0;
-        $sumBreakdown = static function (array $rows) use ($amount): float {
-            $total = 0.0;
-            foreach ($rows as $value) {
-                if (is_numeric($value)) {
-                    $total += abs($amount($value));
+        $collectBreakdown = static function (array $rows, array &$target, string $prefix = '') use (&$collectBreakdown, $amount): void {
+            foreach ($rows as $key => $value) {
+                $label = $prefix !== '' ? $prefix . '.' . $key : (string) $key;
+                if (is_array($value)) {
+                    $collectBreakdown($value, $target, $label);
+                    continue;
                 }
-            }
 
-            return round($total, 2);
+                if (! is_numeric($value)) {
+                    continue;
+                }
+
+                $target[$label] = round(($target[$label] ?? 0) + abs($amount($value)), 2);
+            }
         };
 
         $commission = 0.0;
         $tax = 0.0;
+        $tiktokFeeBreakdown = [
+            'fees' => [],
+            'taxes' => [],
+        ];
         foreach ($skuTransactions as $transaction) {
             $breakdown = is_array($transaction['fee_tax_breakdown'] ?? null)
                 ? $transaction['fee_tax_breakdown']
                 : [];
-            $commission += $sumBreakdown(is_array($breakdown['fee'] ?? null) ? $breakdown['fee'] : []);
-            $tax += $sumBreakdown(is_array($breakdown['tax'] ?? null) ? $breakdown['tax'] : []);
+            $fees = is_array($breakdown['fee'] ?? null) ? $breakdown['fee'] : [];
+            $taxes = is_array($breakdown['tax'] ?? null) ? $breakdown['tax'] : [];
+            $collectBreakdown($fees, $tiktokFeeBreakdown['fees']);
+            $collectBreakdown($taxes, $tiktokFeeBreakdown['taxes']);
         }
+        $commission = round(array_sum($tiktokFeeBreakdown['fees']), 2);
+        $tax = round(array_sum($tiktokFeeBreakdown['taxes']), 2);
         if ($commission <= 0 && $tax <= 0) {
             $commission = abs($amount($data['fee_and_tax_amount'] ?? 0));
         }
+        $tiktokFeeBreakdown['fee_total'] = $commission;
+        $tiktokFeeBreakdown['tax_total'] = $tax;
 
         $settlementAmount = $amount($data['settlement_amount'] ?? 0);
         $raw = array_merge((array) $order->settlement?->raw_json, [
@@ -1048,6 +1063,7 @@ class MarketplaceSyncService
             // membaca nominal escrow/net settlement dengan aturan yang sama.
             'escrow_amount' => $hasStatement ? ($data['settlement_amount'] ?? null) : null,
             'fee_tax_amount' => $tax,
+            'tiktok_fee_breakdown' => $tiktokFeeBreakdown,
             'sku_transactions' => $skuTransactions,
         ]);
 
@@ -1062,6 +1078,7 @@ class MarketplaceSyncService
             'service_fee' => '0.00',
             'transaction_fee' => '0.00',
             'affiliate_fee' => '0.00',
+            'escrow_tax' => $this->nn($this->decimalValue($tax)),
             'actual_shipping_fee' => $this->nn($this->decimalValue(abs($amount($data['shipping_cost_amount'] ?? 0)))),
             'final_income' => $this->nn($this->decimalValue($settlementAmount)),
             'raw_json' => $raw,

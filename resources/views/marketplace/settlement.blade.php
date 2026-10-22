@@ -1515,6 +1515,10 @@
                                     return `<li><span>${label}:</span> <span class="fee-val">${sign}${fmtRp(Math.abs(numeric))}${pct}</span></li>`;
                                 };
                                 const sectionLabel = (label) => `<li style="margin-top:.45rem; padding-top:.35rem; border-top:1px dashed rgba(148,163,184,.22); font-size:.62rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:#64748b;">${label}</li>`;
+                                const formatFeeKey = (key) => String(key || '')
+                                    .split('.')
+                                    .map((part) => part.replace(/[_-]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()))
+                                    .join(' › ');
                                 const feeTotal = Number(s.fee_total || 0);
                                 const feePercent = s.fee_percent !== undefined && s.fee_percent !== null ? Number(s.fee_percent) : null;
                                 const feeBase = Number(s.gross_after_voucher || 0);
@@ -1524,22 +1528,36 @@
                                     const shippingInsuranceFee = r.shipping_insurance_fee ?? r.shipping_insurance ?? r.insurance_fee ?? s.shipping_insurance_fee ?? 0;
                                     const biayaAffiliate = r.biaya_affiliate ?? r.affiliate_fee ?? r.affiliate_commission_fee ?? s.biaya_affiliate ?? s.affiliate_fee ?? 0;
                                     const affiliate = r.affiliate ?? r.affiliate_commission ?? r.affiliate_commission_amount ?? r.seller_affiliate_fee ?? s.affiliate ?? 0;
+                                    const tiktokBreakdown = r.tiktok_fee_breakdown || {};
+                                    const tiktokFees = tiktokBreakdown.fees && typeof tiktokBreakdown.fees === 'object' ? tiktokBreakdown.fees : {};
+                                    const tiktokTaxes = tiktokBreakdown.taxes && typeof tiktokBreakdown.taxes === 'object' ? tiktokBreakdown.taxes : {};
+                                    const hasTikTokBreakdown = Object.keys(tiktokFees).length > 0 || Object.keys(tiktokTaxes).length > 0;
                                     html += renderFeeLine('Total Fee Marketplace', feeTotal, true, feePercent);
-                                    html += sectionLabel('Komisi & Admin');
-                                    html += renderFeeLine('Biaya Administrasi', r.commission_fee);
-                                    html += renderFeeLine('Biaya Layanan', r.service_fee);
-                                    html += renderFeeLine('Biaya Transaksi', r.seller_transaction_fee ?? r.transaction_fee);
-                                    html += renderFeeLine('Biaya Proses Pesanan', r.seller_order_processing_fee);
+                                    if (hasTikTokBreakdown) {
+                                        html += sectionLabel('TikTok Fee & Tax');
+                                        Object.entries(tiktokFees).forEach(([key, value]) => {
+                                            html += renderFeeLine(`Fee — ${formatFeeKey(key)}`, value);
+                                        });
+                                        Object.entries(tiktokTaxes).forEach(([key, value]) => {
+                                            html += renderFeeLine(`Pajak — ${formatFeeKey(key)}`, value);
+                                        });
+                                    } else {
+                                        html += sectionLabel('Komisi & Admin');
+                                        html += renderFeeLine('Biaya Administrasi', r.commission_fee);
+                                        html += renderFeeLine('Biaya Layanan', r.service_fee);
+                                        html += renderFeeLine('Biaya Transaksi', r.seller_transaction_fee ?? r.transaction_fee);
+                                        html += renderFeeLine('Biaya Proses Pesanan', r.seller_order_processing_fee);
 
-                                    html += sectionLabel('Promo & Affiliate');
-                                    html += renderFeeLine('Premi', premi, true);
-                                    html += renderFeeLine('Biaya Kampanye', r.campaign_fee);
-                                    html += renderFeeLine('Biaya Affiliate', biayaAffiliate, true);
-                                    html += renderFeeLine('Affiliate', affiliate, true);
+                                        html += sectionLabel('Promo & Affiliate');
+                                        html += renderFeeLine('Premi', premi, true);
+                                        html += renderFeeLine('Biaya Kampanye', r.campaign_fee);
+                                        html += renderFeeLine('Biaya Affiliate', biayaAffiliate, true);
+                                        html += renderFeeLine('Affiliate', affiliate, true);
 
-                                    html += sectionLabel('Asuransi & Pajak');
-                                    html += renderFeeLine('Biaya Asuransi Pengiriman', shippingInsuranceFee, true);
-                                    html += renderFeeLine('Pajak (Escrow)', r.escrow_tax);
+                                        html += sectionLabel('Asuransi & Pajak');
+                                        html += renderFeeLine('Biaya Asuransi Pengiriman', shippingInsuranceFee, true);
+                                        html += renderFeeLine('Pajak (Escrow)', r.escrow_tax);
+                                    }
                                 } else {
                                     html += renderFeeLine('Total Fee Marketplace', feeTotal, true, feePercent);
                                     html += sectionLabel('Komisi & Admin');
