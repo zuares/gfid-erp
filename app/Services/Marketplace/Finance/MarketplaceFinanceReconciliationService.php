@@ -2,6 +2,7 @@
 
 namespace App\Services\Marketplace\Finance;
 
+use Carbon\CarbonImmutable;
 use App\Domain\Marketplace\Finance\Enums\EscrowStatus;
 use App\Domain\Marketplace\Finance\Enums\IncomeStatus;
 use App\Domain\Marketplace\Finance\Enums\SettlementStatus;
@@ -9,6 +10,8 @@ use App\Models\Journal;
 use App\Models\MarketplaceFinanceSettlement;
 use App\Models\MarketplaceFinancialTransaction;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 
 class MarketplaceFinanceReconciliationService
 {
@@ -23,9 +26,10 @@ class MarketplaceFinanceReconciliationService
     {
         $filters = $this->filters($filters);
         $transactions = $this->transactionQuery($filters)->get();
+        $journalCounts = $this->activeJournalCounts($transactions);
         $items = [];
         foreach ($transactions as $transaction) {
-            $item = $this->transactionResult($transaction);
+            $item = $this->transactionResult($transaction, $journalCounts);
             if ($filters['status'] !== null && $item['status'] !== $filters['status']) {
                 continue;
             }
@@ -67,14 +71,34 @@ class MarketplaceFinanceReconciliationService
         ];
     }
 
+    /**
+     * Reconcile only the current transaction page. The listing must not load
+     * every financial transaction into memory before rendering the table.
+     */
+    public function paginateTransactions(array $filters = [], int $perPage = 50): LengthAwarePaginator
+    {
+        $filters = $this->filters($filters);
+        $perPage = in_array($perPage, [25, 50, 100], true) ? $perPage : 50;
+        $paginator = $this->transactionQuery($filters)
+            ->paginate($perPage)
+            ->withQueryString();
+        $journalCounts = $this->activeJournalCounts($paginator->getCollection());
+
+        $paginator->setCollection(
+            $paginator->getCollection()
+                ->map(fn (MarketplaceFinancialTransaction $transaction): array => $this->transactionResult($transaction, $journalCounts))
+                ->values(),
+        );
+
+        return $paginator;
+    }
+
     private function transactionQuery(array $filters): Builder
     {
         $query = MarketplaceFinancialTransaction::query()->with([
-            'marketplaceOrder',
             'salesInvoice',
-            'shipment',
             'components',
-            'allocations.settlement',
+            'allocations.settlement.journal.lines',
             'saleJournal.lines',
             'escrowJournal.lines',
         ]);
@@ -86,32 +110,32 @@ class MarketplaceFinanceReconciliationService
             $query->where('order_sn', $filters['order_sn']);
         }
         if ($filters['date_from'] !== null) {
-            $query->whereDate($filters['date_basis'], '>=', $filters['date_from']);
+            $query->where($filters['date_basis'], '>=', CarbonImmutable::parse($filters['date_from'])->startOfDay());
         }
         if ($filters['date_to'] !== null) {
-            $query->whereDate($filters['date_basis'], '<=', $filters['date_to']);
+            $query->where($filters['date_basis'], '<=', CarbonImmutable::parse($filters['date_to'])->endOfDay());
         }
 
-        return $query->orderBy('id');
+        return $query->orderByDesc('id');
     }
 
     private function settlementQuery(array $filters): Builder
     {
-        $query = MarketplaceFinanceSettlement::query()->with('allocations');
+        $query = MarketplaceFinanceSettlement::query()->with(['allocations', 'journal.lines']);
         if ($filters['store_id'] !== null) {
             $query->where('store_id', $filters['store_id']);
         }
         if ($filters['date_from'] !== null) {
-            $query->whereDate('settlement_date', '>=', $filters['date_from']);
+            $query->where('settlement_date', '>=', $filters['date_from']);
         }
         if ($filters['date_to'] !== null) {
-            $query->whereDate('settlement_date', '<=', $filters['date_to']);
+            $query->where('settlement_date', '<=', $filters['date_to']);
         }
 
-        return $query->orderBy('id');
+        return $query->orderByDesc('id');
     }
 
-    private function transactionResult(MarketplaceFinancialTransaction $transaction): array
+    private function transactionResult(MarketplaceFinancialTransaction $transaction, array $journalCounts = []): array
     {
         $reasons = [];
         $pending = false;
@@ -166,9 +190,9 @@ class MarketplaceFinanceReconciliationService
             'escrow' => $this->journalResult('marketplace_escrow', $transaction->id, $transaction->escrowJournal, abs($totalComponents), $reasons, $transaction->escrow_status === EscrowStatus::FINALIZED && $transaction->components->isNotEmpty()),
             'settlement' => $this->settlementJournalResult($transaction, $reasons),
         ];
-        if ($this->activeJournalCount('marketplace_sale', $transaction->id) > 1
-            || $this->activeJournalCount('marketplace_escrow', $transaction->id) > 1
-            || $this->activeJournalCount('marketplace_settlement', $transaction->id) > 1) {
+        if (($journalCounts['marketplace_sale'][$transaction->id] ?? 0) > 1
+            || ($journalCounts['marketplace_escrow'][$transaction->id] ?? 0) > 1
+            || ($journalCounts['marketplace_settlement'][$transaction->id] ?? 0) > 1) {
             $reasons[] = 'journal_duplicate';
         }
 
@@ -206,10 +230,7 @@ class MarketplaceFinanceReconciliationService
         }
         if ($settlement->status !== SettlementStatus::RECEIVED) {
             $reasons[] = 'missing_settlement';
-        } elseif (! $settlement->journal_id || ! Journal::query()
-            ->whereKey($settlement->journal_id)
-            ->whereNull('voided_at')
-            ->exists()) {
+        } elseif (! $settlement->journal_id || ! $settlement->journal || $settlement->journal->voided_at !== null) {
             $reasons[] = 'journal_missing';
         }
         $status = $this->status($reasons, $settlement->status !== SettlementStatus::RECEIVED);
@@ -225,7 +246,7 @@ class MarketplaceFinanceReconciliationService
             'unallocated_amount' => $unallocated,
             'settlement_received_amount' => $settlement->status === SettlementStatus::RECEIVED ? $amount : 0.0,
             'settlement_status' => $settlement->status?->value,
-            'journal_amount' => $this->journalAmount($settlement->journal_id, $reasons),
+            'journal_amount' => $this->journalAmountFromModel($settlement->journal, $reasons),
         ];
     }
 
@@ -244,7 +265,7 @@ class MarketplaceFinanceReconciliationService
                 continue;
             }
             $seenSettlements[$settlementId] = true;
-            $settlementJournal = $this->journalAmount($allocation->settlement?->journal_id, $reasons);
+            $settlementJournal = $this->journalAmountFromModel($allocation->settlement?->journal, $reasons);
             if ($settlementJournal === null) {
                 $reasons[] = 'journal_missing';
 
@@ -264,7 +285,7 @@ class MarketplaceFinanceReconciliationService
         if (! $required && ! $journal) {
             return null;
         }
-        $amount = $this->journalAmount($journal?->id, $reasons);
+        $amount = $this->journalAmountFromModel($journal, $reasons);
         if ($required && $amount === null) {
             $reasons[] = 'journal_missing';
         } elseif ($amount !== null && $this->different($amount, $expected)) {
@@ -274,24 +295,44 @@ class MarketplaceFinanceReconciliationService
         return $amount;
     }
 
-    private function journalAmount(?int $journalId, array &$reasons): ?float
+    private function journalAmountFromModel(?Journal $journal, array &$reasons): ?float
     {
-        if (! $journalId) {
-            return null;
-        }
-        $journal = Journal::query()->with('lines')->whereKey($journalId)->whereNull('voided_at')->first();
-        if (! $journal) {
-            $reasons[] = 'journal_missing';
-
+        if (! $journal || $journal->voided_at !== null) {
             return null;
         }
 
         return round((float) $journal->lines->sum('debit'), 2);
     }
 
-    private function activeJournalCount(string $sourceType, int $sourceId): int
+    private function activeJournalCounts(Collection $transactions): array
     {
-        return Journal::query()->where('source_type', $sourceType)->where('source_id', $sourceId)->whereNull('voided_at')->count();
+        $sourceTypes = ['marketplace_sale', 'marketplace_escrow', 'marketplace_settlement'];
+        $transactionIds = $transactions->pluck('id')->map(fn ($id): int => (int) $id)->values();
+        $counts = array_fill_keys($sourceTypes, []);
+
+        foreach ($sourceTypes as $sourceType) {
+            foreach ($transactionIds as $transactionId) {
+                $counts[$sourceType][$transactionId] = 0;
+            }
+        }
+
+        if ($transactionIds->isEmpty()) {
+            return $counts;
+        }
+
+        Journal::query()
+            ->select('source_type', 'source_id')
+            ->selectRaw('COUNT(*) as aggregate')
+            ->whereNull('voided_at')
+            ->whereIn('source_type', $sourceTypes)
+            ->whereIn('source_id', $transactionIds)
+            ->groupBy('source_type', 'source_id')
+            ->get()
+            ->each(function (Journal $journal) use (&$counts): void {
+                $counts[$journal->source_type][(int) $journal->source_id] = (int) $journal->aggregate;
+            });
+
+        return $counts;
     }
 
     private function escrowGross(MarketplaceFinancialTransaction $transaction): ?float

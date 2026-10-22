@@ -44,10 +44,19 @@
         .finance-page .finance-filter-card .form-label { color: #475569; font-size: .78rem; font-weight: 650; }
         .finance-page .finance-filter-card .form-control,
         .finance-page .finance-filter-card .form-select { border-color: #dce2e9; background: #fff; }
+        .finance-page .finance-sidebar-layout { display: grid; grid-template-columns: 255px minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+        .finance-page .finance-sidebar { position: sticky; top: 1rem; }
+        .finance-page .finance-sidebar .finance-card { box-shadow: 0 8px 24px rgba(15, 23, 42, .05); }
+        .finance-page .finance-sidebar .form-label { margin-bottom: .35rem; }
+        .finance-page .finance-sidebar .form-control,
+        .finance-page .finance-sidebar .form-select { min-height: 40px; }
+        .finance-page .finance-sidebar .btn { min-height: 40px; }
         @media (max-width: 767.98px) {
             .finance-page .table { min-width: 860px; }
             .finance-page .finance-card .card-body { padding: 1rem; }
             .finance-page { padding-inline: .75rem !important; }
+            .finance-page .finance-sidebar-layout { grid-template-columns: 1fr; }
+            .finance-page .finance-sidebar { position: static; }
         }
     </style>
     <div class="container-fluid py-4 finance-page">
@@ -68,8 +77,18 @@
             <a class="nav-link {{ request()->routeIs('marketplace.finance.fee-analysis') ? 'active' : '' }}" href="{{ route('marketplace.finance.fee-analysis', request()->except('status')) }}">Fee Analysis</a>
         </nav>
 
-        @include('marketplace.finance._filters')
-
-        @yield('finance-content')
+        @hasSection('finance-sidebar')
+            <div class="finance-sidebar-layout">
+                <aside class="finance-sidebar" aria-label="Filter transaksi">
+                    @yield('finance-sidebar')
+                </aside>
+                <main>
+                    @yield('finance-content')
+                </main>
+            </div>
+        @else
+            @include('marketplace.finance._filters')
+            @yield('finance-content')
+        @endif
     </div>
 @endsection

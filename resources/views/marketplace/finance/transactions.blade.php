@@ -1,11 +1,15 @@
 @extends('marketplace.finance.layout')
 
+@section('finance-sidebar')
+    @include('marketplace.finance._transaction-sidebar')
+@endsection
+
 @section('finance-content')
     @php $money = fn ($value): string => number_format((float) $value, 2, ',', '.'); @endphp
     <div class="finance-card card shadow-sm">
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h2 class="h6 mb-0">Transactions</h2>
-            <span class="text-muted small">{{ count($rows) }} transaksi</span>
+            <span class="text-muted small">{{ number_format($rows->total()) }} transaksi</span>
         </div>
         <div class="table-responsive">
             <table class="table table-hover mb-0">
@@ -32,5 +36,13 @@
                 </tbody>
             </table>
         </div>
+        @if ($rows->hasPages())
+            <div class="card-footer bg-white d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <span class="text-muted small">
+                    Menampilkan {{ number_format($rows->firstItem() ?? 0) }}–{{ number_format($rows->lastItem() ?? 0) }} dari {{ number_format($rows->total()) }} transaksi
+                </span>
+                {{ $rows->onEachSide(1)->links() }}
+            </div>
+        @endif
     </div>
 @endsection

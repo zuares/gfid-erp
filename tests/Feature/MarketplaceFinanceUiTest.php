@@ -85,4 +85,34 @@ class MarketplaceFinanceUiTest extends TestCase
 
         $this->assertSame(0, DB::table('journals')->count());
     }
+
+    public function test_transactions_are_paginated_and_render_a_transaction_sidebar(): void
+    {
+        $store = Store::create([
+            'code' => 'PAGINATION-STORE',
+            'name' => 'Pagination Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        for ($index = 1; $index <= 51; $index++) {
+            MarketplaceFinancialTransaction::create([
+                'store_id' => $store->id,
+                'channel' => 'shopee',
+                'order_sn' => 'PAGINATION-ORDER-'.str_pad((string) $index, 3, '0', STR_PAD_LEFT),
+                'currency' => 'IDR',
+                'gross_amount' => 100000,
+                'net_amount' => 95000,
+                'escrow_status' => EscrowStatus::PENDING,
+                'income_status' => IncomeStatus::PENDING,
+            ]);
+        }
+
+        $this->get('/marketplace/finance/transactions?per_page=25')
+            ->assertOk()
+            ->assertSee('Filter transaksi')
+            ->assertSee('25 transaksi')
+            ->assertSee('Menampilkan 1–25 dari 51 transaksi')
+            ->assertDontSee('PAGINATION-ORDER-001');
+    }
 }

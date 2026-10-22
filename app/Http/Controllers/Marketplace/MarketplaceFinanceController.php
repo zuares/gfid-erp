@@ -44,13 +44,14 @@ class MarketplaceFinanceController extends Controller
 
     public function transactions(Request $request)
     {
-        [$report, $stores, $filters] = $this->reportData($request);
+        $filters = $this->filters($request);
+        $stores = $this->stores();
+        $rows = $this->reconciliation->paginateTransactions($filters, $this->transactionsPerPage($request));
         $storeNames = $stores->pluck('name', 'id');
 
         return view('marketplace.finance.transactions', [
             'filters' => $filters,
-            'rows' => $report['transactions'],
-            'report' => $report,
+            'rows' => $rows,
             'storeNames' => $storeNames,
             'stores' => $stores,
         ]);
@@ -167,5 +168,12 @@ class MarketplaceFinanceController extends Controller
     private function stores(): Collection
     {
         return Store::query()->with('channel')->where('is_active', true)->orderBy('name')->get();
+    }
+
+    private function transactionsPerPage(Request $request): int
+    {
+        $perPage = (int) $request->input('per_page', 50);
+
+        return in_array($perPage, [25, 50, 100], true) ? $perPage : 50;
     }
 }
