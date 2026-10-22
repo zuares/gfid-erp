@@ -129,9 +129,19 @@ class TikTokShopChannel implements MarketplaceChannel
 
         $query['sign'] = $this->sign($store, $path, $query, $bodyJson);
 
-        $request = Http::connectTimeout(10)
-            ->timeout(30)
-            ->retry(2, function (int $attempt, \Throwable $exception) {
+        // Cetak dokumen berjalan synchronously dari request browser. Endpoint
+        // shipping_documents sebelumnya memakai 30s x 3 percobaan, lalu
+        // controller masih mengunduh PDF; totalnya dapat melewati timeout
+        // Nginx dan tampil sebagai 502 Bad Gateway. Batasi khusus endpoint
+        // dokumen agar aplikasi sempat mengembalikan error yang jelas atau PDF.
+        $isShippingDocumentRequest = str_ends_with($path, '/shipping_documents');
+        $connectTimeout = $isShippingDocumentRequest ? 5 : 10;
+        $requestTimeout = $isShippingDocumentRequest ? 12 : 30;
+        $retryTimes = $isShippingDocumentRequest ? 1 : 2;
+
+        $request = Http::connectTimeout($connectTimeout)
+            ->timeout($requestTimeout)
+            ->retry($retryTimes, function (int $attempt, \Throwable $exception) {
                 // Hanya retry pada error transien (5xx, connection timeout)
                 if ($exception instanceof \Illuminate\Http\Client\ConnectionException) {
                     return $attempt * 1000;

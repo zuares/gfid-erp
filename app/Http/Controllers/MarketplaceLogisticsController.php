@@ -736,8 +736,10 @@ class MarketplaceLogisticsController extends Controller
                 throw new \RuntimeException('TikTok tidak mengembalikan URL dokumen resi.');
             }
 
-            $download = \Illuminate\Support\Facades\Http::connectTimeout(10)
-                ->timeout(30)
+            // Batasi download PDF supaya request cetak selesai sebelum batas
+            // Nginx/PHP-FPM dan tidak berubah menjadi 502 Bad Gateway.
+            $download = \Illuminate\Support\Facades\Http::connectTimeout(5)
+                ->timeout(20)
                 ->get($docUrl);
             if (! $download->successful()) {
                 throw new \RuntimeException('Dokumen resi TikTok gagal diunduh (HTTP ' . $download->status() . ').');
